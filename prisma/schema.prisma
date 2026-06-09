@@ -1,0 +1,218 @@
+generator client {
+provider = "prisma-client"
+output   = "../src/generated/prisma"
+}
+
+datasource db {
+provider = "postgresql"
+}
+
+enum UserRole {
+SUPER_ADMIN
+ADMIN
+SALES
+CONTENT
+WAREHOUSE
+}
+
+enum ProductStatus {
+ACTIVE
+DRAFT
+ARCHIVED
+}
+
+enum StockStatus {
+IN_STOCK
+LOW_STOCK
+OUT_OF_STOCK
+}
+
+enum LeadStatus {
+NEW
+PROCESSING
+QUOTED
+WON
+LOST
+}
+
+enum DealerStatus {
+PENDING
+APPROVED
+REJECTED
+}
+
+model User {
+id        String   @id @default(cuid())
+name      String
+email     String   @unique
+password  String
+role      UserRole @default(CONTENT)
+
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+}
+
+model Category {
+id        String   @id @default(cuid())
+
+name      String
+slug      String   @unique
+
+parentId  String?
+
+parent    Category? @relation("CategoryTree", fields: [parentId], references: [id])
+children  Category[] @relation("CategoryTree")
+
+products  Product[]
+
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+}
+
+model Product {
+id              String @id @default(cuid())
+
+name            String
+slug            String @unique
+
+shortDescription String?
+description      String?
+
+seoTitle         String?
+seoDescription   String?
+
+gsm              Int?
+material         String?
+fit              String?
+
+categoryId       String
+category         Category @relation(fields: [categoryId], references: [id])
+
+variants         ProductVariant[]
+images           ProductImage[]
+
+status           ProductStatus @default(ACTIVE)
+
+createdAt        DateTime @default(now())
+updatedAt        DateTime @updatedAt
+}
+
+model Color {
+id        String @id @default(cuid())
+
+name      String
+slug      String @unique
+
+variants  ProductVariant[]
+
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+}
+
+model Size {
+id        String @id @default(cuid())
+
+name      String
+slug      String @unique
+
+variants  ProductVariant[]
+
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+}
+
+model ProductVariant {
+id          String @id @default(cuid())
+
+productId   String
+product     Product @relation(fields: [productId], references: [id])
+
+colorId     String?
+color       Color? @relation(fields: [colorId], references: [id])
+
+sizeId      String?
+size        Size? @relation(fields: [sizeId], references: [id])
+
+sku         String @unique
+
+dealerPrice Decimal? @db.Decimal(12,2)
+vipPrice    Decimal? @db.Decimal(12,2)
+
+stockStatus StockStatus @default(IN_STOCK)
+
+createdAt   DateTime @default(now())
+updatedAt   DateTime @updatedAt
+}
+
+model ProductImage {
+id          String @id @default(cuid())
+
+productId   String
+product     Product @relation(fields: [productId], references: [id])
+
+imageUrl    String
+
+sortOrder   Int @default(0)
+
+createdAt   DateTime @default(now())
+}
+
+model Lead {
+id                String @id @default(cuid())
+
+name              String
+phone             String
+
+email             String?
+company           String?
+
+productInterest   String?
+
+message           String?
+
+source            String?
+
+status            LeadStatus @default(NEW)
+
+createdAt         DateTime @default(now())
+updatedAt         DateTime @updatedAt
+}
+
+model Dealer {
+id            String @id @default(cuid())
+
+companyName   String
+
+taxCode       String?
+
+phone         String
+
+email         String
+
+city          String?
+
+website       String?
+
+facebook      String?
+
+status        DealerStatus @default(PENDING)
+
+createdAt     DateTime @default(now())
+updatedAt     DateTime @updatedAt
+}
+
+model Post {
+id              String @id @default(cuid())
+
+title           String
+slug            String @unique
+
+excerpt         String?
+content         Json
+
+seoTitle        String?
+seoDescription  String?
+
+createdAt       DateTime @default(now())
+updatedAt       DateTime @updatedAt
+}
