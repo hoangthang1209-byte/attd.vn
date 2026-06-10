@@ -17,12 +17,8 @@ async function main() {
       slug: "non",
     },
     {
-      name: "Tote Bag",
+      name: "Tote",
       slug: "tote",
-    },
-    {
-      name: "Bandana",
-      slug: "bandana",
     },
     {
       name: "Bình giữ nhiệt",
@@ -40,7 +36,52 @@ async function main() {
     });
   }
 
-  console.log("Seeded categories");
+  const sizes = [
+    "S",
+    "M",
+    "L",
+    "XL",
+    "XXL",
+  ];
+
+  for (const size of sizes) {
+    await prisma.size.upsert({
+      where: {
+        slug: size.toLowerCase(),
+      },
+      update: {},
+      create: {
+        name: size,
+        slug: size.toLowerCase(),
+      },
+    });
+  }
+
+  const colors = [
+    "Trắng",
+    "Đen",
+    "Đỏ",
+    "Xanh Navy",
+  ];
+
+  for (const color of colors) {
+    await prisma.color.upsert({
+      where: {
+        slug: color
+          .toLowerCase()
+          .replaceAll(" ", "-"),
+      },
+      update: {},
+      create: {
+        name: color,
+        slug: color
+          .toLowerCase()
+          .replaceAll(" ", "-"),
+      },
+    });
+  }
+
+  console.log("Seed completed");
 }
 
 main()
@@ -49,6 +90,8 @@ main()
   })
   .catch(async (error) => {
     console.error(error);
+
     await prisma.$disconnect();
+
     process.exit(1);
   });

@@ -15,7 +15,7 @@ export default function ProductForm({
   categories,
 }: ProductFormProps) {
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
+  const [productCode, setProductCode] = useState("");
   const [categoryId, setCategoryId] = useState("");
 
   async function handleSubmit(
@@ -31,7 +31,7 @@ export default function ProductForm({
         },
         body: JSON.stringify({
           name,
-          slug,
+          productCode,
           categoryId,
         }),
       });
@@ -49,7 +49,7 @@ export default function ProductForm({
       alert("Đã tạo sản phẩm");
 
       setName("");
-      setSlug("");
+      setProductCode("");
       setCategoryId("");
 
       location.reload();
@@ -76,14 +76,15 @@ export default function ProductForm({
       <br />
 
       <div>
-        <label htmlFor="slug">
-          Slug
+        <label htmlFor="productCode">
+          Mã sản phẩm
         </label>
         <br />
         <input
-          id="slug"
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
+          id="productCode"
+          value={productCode}
+          onChange={(e) => setProductCode(e.target.value.toUpperCase())}
+          placeholder="AT01"
         />
       </div>
 
