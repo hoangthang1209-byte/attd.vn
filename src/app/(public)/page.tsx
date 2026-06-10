@@ -1,5 +1,7 @@
 import { getCategories } from "@/features/categories/services/category.service";
 import { getProducts } from "@/features/products/services/product.service";
+import Section from "@/components/public/Section";
+import ProductCard from "@/components/public/ProductCard";
 
 export default async function HomePage() {
   const categories = await getCategories();
@@ -79,29 +81,25 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="section">
-        <div className="container">
-          <h2 className="section-title">Danh mục nổi bật</h2>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "16px",
-            }}
-          >
-            {categories.map((category) => (
-              <a
-                key={category.id}
-                className="card"
-                href={`/${category.slug}`}
-              >
-                {category.name}
-              </a>
-            ))}
-          </div>
+      <Section title="Danh mục nổi bật">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "16px",
+          }}
+        >
+          {categories.map((category) => (
+            <a
+              key={category.id}
+              className="card"
+              href={`/${category.slug}`}
+            >
+              {category.name}
+            </a>
+          ))}
         </div>
-      </section>
+      </Section>
 
       <section className="section">
         <div className="container">
@@ -118,45 +116,14 @@ export default async function HomePage() {
             }}
           >
             {products.slice(0, 8).map((product) => (
-              <div
+              <ProductCard
                 key={product.id}
-                className="card"
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: "#6b7280",
-                    marginBottom: "8px",
-                  }}
-                >
-                  {product.productCode ?? "ATTD"}
-                </div>
-
-                <h3
-                  style={{
-                    margin: 0,
-                    marginBottom: "8px",
-                  }}
-                >
-                  {product.name}
-                </h3>
-
-                <div
-                  style={{
-                    color: "#6b7280",
-                    marginBottom: "12px",
-                  }}
-                >
-                  {product.category?.name}
-                </div>
-
-                <div>
-                  <strong>
-                    {product.variants.length}
-                  </strong>{" "}
-                  SKU
-                </div>
-              </div>
+                id={product.id}
+                name={product.name}
+                productCode={product.productCode}
+                skuCount={product.variants.length}
+                category={product.category?.name}
+              />
             ))}
           </div>
         </div>
@@ -210,7 +177,7 @@ export default async function HomePage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
               gap: "16px",
             }}
           >
