@@ -1,4 +1,3 @@
-import CategoryForm from "@/components/admin/category-form";
 import { getCategories } from "@/features/categories/services/category.service";
 
 export default async function CategoriesPage() {
@@ -8,14 +7,10 @@ export default async function CategoriesPage() {
     <div>
       <h1>Danh mục</h1>
 
-      <CategoryForm />
-
-      <hr />
-
       <ul>
         {categories.map((category) => (
           <li key={category.id}>
-            {category.name}
+            {category.name} - {category.slug}
           </li>
         ))}
       </ul>
