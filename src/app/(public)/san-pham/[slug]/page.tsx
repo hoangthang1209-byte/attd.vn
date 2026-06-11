@@ -3,6 +3,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getProductBySlug } from "@/features/products/services/product.service";
 import ProductImageGallery from "@/components/public/ProductImageGallery";
+import {
+  SITE_URL,
+  SITE_NAME,
+  DEFAULT_DESCRIPTION,
+  canonicalUrl,
+  buildOgImages,
+} from "@/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -12,21 +19,24 @@ export async function generateMetadata({
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) return {};
+
+  const title = product.seoTitle ?? `${product.name} | ${SITE_NAME}`;
+  const description =
+    product.seoDescription ?? product.shortDescription ?? DEFAULT_DESCRIPTION;
+  const ogImages = buildOgImages(product.images[0]?.imageUrl);
+
   return {
-    title: product.seoTitle ?? `${product.name} | ATTD`,
-    description:
-      product.seoDescription ??
-      product.shortDescription ??
-      "Nguồn hàng B2B dành cho đại lý, xưởng in và doanh nghiệp.",
+    title,
+    description,
+    alternates: {
+      canonical: canonicalUrl(`/san-pham/${slug}`),
+    },
     openGraph: {
       title: product.seoTitle ?? product.name,
-      description:
-        product.seoDescription ??
-        product.shortDescription ??
-        "Nguồn hàng B2B dành cho đại lý, xưởng in và doanh nghiệp.",
-      images: product.images[0]?.imageUrl
-        ? [product.images[0].imageUrl]
-        : [],
+      description,
+      url: canonicalUrl(`/san-pham/${slug}`),
+      siteName: SITE_NAME,
+      images: ogImages,
     },
   };
 }
@@ -86,8 +96,30 @@ export default async function ProductDetailPage({
 
   const hasSpecs = product.gsm || product.material || product.fit;
 
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description:
+      product.seoDescription ?? product.shortDescription ?? DEFAULT_DESCRIPTION,
+    brand: {
+      "@type": "Brand",
+      name: SITE_NAME,
+    },
+    category: product.category.name,
+    ...(product.images.length > 0 && {
+      image: product.images.map((img) => img.imageUrl),
+    }),
+    url: canonicalUrl(`/san-pham/${slug}`),
+  };
+
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
+
       {/* Breadcrumb */}
       <div className="container" style={{ paddingTop: "24px" }}>
         <nav
@@ -336,6 +368,41 @@ export default async function ProductDetailPage({
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Product description ──────────────────────────────────────────────── */}
+      <section
+        className="section"
+        style={{ borderTop: "1px solid #f3f4f6", background: "#f9fafb" }}
+      >
+        <div className="container" style={{ maxWidth: "720px" }}>
+          <h2
+            style={{
+              fontSize: "22px",
+              fontWeight: 700,
+              margin: "0 0 24px",
+            }}
+          >
+            Mô tả sản phẩm
+          </h2>
+
+          {product.description ? (
+            <div
+              style={{
+                fontSize: "15px",
+                lineHeight: 1.8,
+                color: "#374151",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {product.description}
+            </div>
+          ) : (
+            <p style={{ fontSize: "15px", color: "#9ca3af", margin: 0 }}>
+              Thông tin sản phẩm đang được cập nhật.
+            </p>
+          )}
         </div>
       </section>
     </main>

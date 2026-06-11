@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 
 type GalleryImage = {
@@ -16,8 +16,41 @@ type Props = {
 
 export default function ProductImageGallery({ images, productName }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [mainOpacity, setMainOpacity] = useState(1);
+  const [hoveredThumb, setHoveredThumb] = useState<number | null>(null);
 
-  if (images.length === 0) {
+  const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const total = images.length;
+
+  // Clean up any pending fade timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  function changeImage(index: number) {
+    if (index === selectedIndex) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    // Fade out → swap → fade in
+    setMainOpacity(0);
+    timerRef.current = setTimeout(() => {
+      setSelectedIndex(index);
+      setMainOpacity(1);
+    }, 130);
+
+    // Bring the clicked thumbnail into view on horizontal scroll
+    thumbRefs.current[index]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }
+
+  if (total === 0) {
     return (
       <div
         style={{
@@ -40,7 +73,7 @@ export default function ProductImageGallery({ images, productName }: Props) {
 
   return (
     <div>
-      {/* Main image */}
+      {/* ── Main image ─────────────────────────────────────────────────────── */}
       <div
         style={{
           position: "relative",
@@ -48,6 +81,8 @@ export default function ProductImageGallery({ images, productName }: Props) {
           borderRadius: "12px",
           overflow: "hidden",
           background: "#f3f4f6",
+          opacity: mainOpacity,
+          transition: "opacity 0.13s ease",
         }}
       >
         <Image
@@ -58,10 +93,33 @@ export default function ProductImageGallery({ images, productName }: Props) {
           sizes="(max-width: 1024px) 100vw, 50vw"
           priority
         />
+
+        {/* Image counter badge */}
+        {total > 1 && (
+          <div
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              bottom: "12px",
+              right: "12px",
+              background: "rgba(0, 0, 0, 0.45)",
+              color: "#fff",
+              fontSize: "12px",
+              fontWeight: 600,
+              lineHeight: 1,
+              padding: "5px 10px",
+              borderRadius: "20px",
+              pointerEvents: "none",
+              userSelect: "none",
+            }}
+          >
+            {selectedIndex + 1} / {total}
+          </div>
+        )}
       </div>
 
-      {/* Thumbnail strip — only when more than one image */}
-      {images.length > 1 && (
+      {/* ── Thumbnail strip ─────────────────────────────────────────────────── */}
+      {total > 1 && (
         <div
           role="list"
           aria-label="Xem ảnh sản phẩm"
@@ -70,43 +128,61 @@ export default function ProductImageGallery({ images, productName }: Props) {
             gap: "8px",
             marginTop: "12px",
             overflowX: "auto",
-            paddingBottom: "4px",
+            // Extra bottom padding gives scrollbar clearance and breathing room
+            paddingBottom: "6px",
+            // Prevent thumbnail strip from collapsing on short content
+            minHeight: "88px",
           }}
         >
-          {images.map((image, index) => (
-            <button
-              key={image.id}
-              role="listitem"
-              onClick={() => setSelectedIndex(index)}
-              aria-label={`Ảnh ${index + 1}`}
-              aria-pressed={index === selectedIndex}
-              style={{
-                position: "relative",
-                width: "80px",
-                height: "80px",
-                flexShrink: 0,
-                borderRadius: "8px",
-                overflow: "hidden",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                background: "#f3f4f6",
-                outline:
-                  index === selectedIndex
-                    ? "2px solid var(--primary)"
-                    : "2px solid transparent",
-                outlineOffset: "2px",
-              }}
-            >
-              <Image
-                src={image.imageUrl}
-                alt={image.altText ?? `${productName} ${index + 1}`}
-                fill
-                sizes="80px"
-                style={{ objectFit: "cover" }}
-              />
-            </button>
-          ))}
+          {images.map((image, index) => {
+            const isSelected = index === selectedIndex;
+            const isHovered = hoveredThumb === index && !isSelected;
+
+            return (
+              <button
+                key={image.id}
+                ref={(el) => {
+                  thumbRefs.current[index] = el;
+                }}
+                role="listitem"
+                onClick={() => changeImage(index)}
+                onMouseEnter={() => setHoveredThumb(index)}
+                onMouseLeave={() => setHoveredThumb(null)}
+                aria-label={`Xem ảnh ${index + 1}`}
+                aria-pressed={isSelected}
+                style={{
+                  position: "relative",
+                  width: "72px",
+                  height: "72px",
+                  flexShrink: 0,
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  border: "none",
+                  padding: 0,
+                  cursor: isSelected ? "default" : "pointer",
+                  background: "#f3f4f6",
+                  // Use box-shadow instead of outline for smooth CSS transition
+                  boxShadow: isSelected
+                    ? "0 0 0 2px var(--primary)"
+                    : "0 0 0 2px transparent",
+                  // Dim unselected; slightly brighten on hover
+                  opacity: isSelected ? 1 : isHovered ? 0.82 : 0.55,
+                  // Subtle lift on hover
+                  transform: isHovered ? "scale(1.05)" : "scale(1)",
+                  transition:
+                    "opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease",
+                }}
+              >
+                <Image
+                  src={image.imageUrl}
+                  alt={image.altText ?? `${productName} — ảnh ${index + 1}`}
+                  fill
+                  sizes="72px"
+                  style={{ objectFit: "cover" }}
+                />
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

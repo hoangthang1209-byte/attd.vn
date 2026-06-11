@@ -22,9 +22,27 @@ export default async function ProductAdminDetailPage({
       </Link>
 
       <div style={{ marginTop: "20px", marginBottom: "32px" }}>
-        <h1 style={{ margin: "0 0 8px", fontSize: "24px", fontWeight: 700 }}>
-          {product.name}
-        </h1>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", marginBottom: "8px" }}>
+          <h1 style={{ margin: 0, fontSize: "24px", fontWeight: 700 }}>
+            {product.name}
+          </h1>
+          <Link
+            href={`/quan-tri/san-pham/${id}/chinh-sua`}
+            style={{
+              padding: "8px 16px",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#374151",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            Chỉnh sửa
+          </Link>
+        </div>
         <div
           style={{
             display: "flex",
@@ -58,6 +76,53 @@ export default async function ProductAdminDetailPage({
 
       <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "0 0 32px" }} />
 
+      {/* SEO Information ─────────────────────────────────────────────────── */}
+      <h2 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 600 }}>
+        Thông tin SEO
+      </h2>
+
+      {product.seoTitle || product.seoDescription ? (
+        <div
+          style={{
+            display: "grid",
+            gap: "12px",
+            marginBottom: "32px",
+            padding: "16px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "10px",
+            background: "#fafafa",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+              SEO Title
+            </div>
+            <div style={{ fontSize: "14px", color: "#111827" }}>
+              {product.seoTitle ?? <span style={{ color: "#9ca3af" }}>—</span>}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+              SEO Description
+            </div>
+            <div style={{ fontSize: "14px", color: "#111827" }}>
+              {product.seoDescription ?? <span style={{ color: "#9ca3af" }}>—</span>}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <p style={{ fontSize: "14px", color: "#9ca3af", marginBottom: "32px" }}>
+          Chưa cấu hình SEO.{" "}
+          <a href={`/quan-tri/san-pham/${id}/chinh-sua`} style={{ color: "#6b7280", textDecoration: "underline" }}>
+            Chỉnh sửa
+          </a>{" "}
+          để thêm.
+        </p>
+      )}
+
+      <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "0 0 32px" }} />
+
+      {/* Image Manager ────────────────────────────────────────────────────── */}
       <h2 style={{ margin: "0 0 24px", fontSize: "18px", fontWeight: 600 }}>
         Quản lý hình ảnh
       </h2>
