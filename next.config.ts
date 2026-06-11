@@ -1,15 +1,17 @@
 import type { NextConfig } from "next";
 
+const BLOB_HOSTNAME =
+  process.env.BLOB_STORE_HOSTNAME ??
+  "0iitstjrwqim8udr.public.blob.vercel-storage.com";
+
 const nextConfig: NextConfig = {
   images: {
-    remotePatterns: process.env.BLOB_STORE_HOSTNAME
-      ? [
-          {
-            protocol: "https",
-            hostname: process.env.BLOB_STORE_HOSTNAME,
-          },
-        ]
-      : [],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: BLOB_HOSTNAME,
+      },
+    ],
   },
 };
 
