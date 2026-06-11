@@ -128,15 +128,22 @@ model Dealer {
 }
 
 model Post {
-  id             String   @id @default(cuid())
+  id             String     @id @default(cuid())
   title          String
-  slug           String   @unique
+  slug           String     @unique
   excerpt        String?
-  content        Json
+  content        String?
+  imageUrl       String?
+  status         PostStatus @default(DRAFT)
   seoTitle       String?
   seoDescription String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+enum PostStatus {
+  PUBLISHED
+  DRAFT
 }
 
 enum UserRole {

@@ -190,6 +190,58 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* B2B Solutions */}
+      <section
+        className="section"
+        style={{ background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}
+      >
+        <div className="container">
+          <h2 className="section-title">Giải pháp B2B</h2>
+          <p className="section-description">
+            ATTD phục vụ nhiều nhóm khách hàng doanh nghiệp khác nhau.
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: "16px",
+              marginTop: "28px",
+            }}
+          >
+            {[
+              { href: "/nguon-hang", title: "Nguồn hàng sỉ", desc: "Kho sỉ trơn cho đại lý và xưởng in" },
+              { href: "/oem", title: "OEM & Private Label", desc: "Hàng trơn gắn nhãn thương hiệu riêng" },
+              { href: "/qua-tang-doanh-nghiep", title: "Quà tặng doanh nghiệp", desc: "Áo thun, tote, nón cho sự kiện DN" },
+              { href: "/chinh-sach-dai-ly", title: "Chính sách đại lý", desc: "Quyền lợi và chính sách giá đại lý" },
+            ].map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="card"
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "15px",
+                    color: "#111827",
+                    marginBottom: "6px",
+                  }}
+                >
+                  {item.title}
+                </div>
+                <div
+                  style={{ fontSize: "13px", color: "#6b7280", lineHeight: 1.5 }}
+                >
+                  {item.desc}
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="section">
         <div className="container">
           <div className="card">
@@ -200,7 +252,7 @@ export default async function HomePage() {
             </p>
 
             <div style={{ marginTop: "24px" }}>
-              <a className="btn-primary" href="/lien-he">
+              <a className="btn-primary" href="/dai-ly">
                 Đăng ký đại lý
               </a>
             </div>

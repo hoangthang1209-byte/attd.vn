@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import { getProductBySlug } from "@/features/products/services/product.service";
 import ProductImageGallery from "@/components/public/ProductImageGallery";
 import {
-  SITE_URL,
   SITE_NAME,
   DEFAULT_DESCRIPTION,
   canonicalUrl,
@@ -102,15 +101,48 @@ export default async function ProductDetailPage({
     name: product.name,
     description:
       product.seoDescription ?? product.shortDescription ?? DEFAULT_DESCRIPTION,
-    brand: {
-      "@type": "Brand",
-      name: SITE_NAME,
-    },
+    brand: { "@type": "Brand", name: SITE_NAME },
     category: product.category.name,
+    ...(product.productCode && { sku: product.productCode }),
     ...(product.images.length > 0 && {
       image: product.images.map((img) => img.imageUrl),
     }),
     url: canonicalUrl(`/san-pham/${slug}`),
+    offers: {
+      "@type": "Offer",
+      availability: "https://schema.org/InStock",
+    },
+  };
+
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "Sản phẩm có nhận in logo không?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Có. ATTD hỗ trợ in logo theo yêu cầu.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Số lượng tối thiểu là bao nhiêu?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Liên hệ để được tư vấn theo từng dòng sản phẩm.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Có hỗ trợ gửi mẫu không?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Có thể hỗ trợ gửi mẫu tùy sản phẩm.",
+        },
+      },
+    ],
   };
 
   return (
@@ -118,6 +150,10 @@ export default async function ProductDetailPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
 
       {/* Breadcrumb */}
@@ -358,13 +394,50 @@ export default async function ProductDetailPage({
                   Liên hệ báo giá
                 </Link>
                 <a
-                  href="https://zalo.me/0000000000"
+                  href="https://zalo.me/0934337667"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-secondary"
                 >
                   Chat Zalo
                 </a>
+              </div>
+
+              {/* Internal links */}
+              <div
+                style={{
+                  marginTop: "28px",
+                  paddingTop: "20px",
+                  borderTop: "1px solid #f3f4f6",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                }}
+              >
+                <span
+                  style={{ fontSize: "13px", color: "#9ca3af", alignSelf: "center" }}
+                >
+                  Tìm hiểu thêm:
+                </span>
+                {[
+                  { href: "/nguon-hang", label: "Nguồn hàng sỉ" },
+                  { href: "/chinh-sach-dai-ly", label: "Chính sách đại lý" },
+                  { href: "/oem", label: "OEM & Private Label" },
+                  { href: "/qua-tang-doanh-nghiep", label: "Quà tặng DN" },
+                ].map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    style={{
+                      fontSize: "13px",
+                      color: "#374151",
+                      textDecoration: "underline",
+                      textUnderlineOffset: "3px",
+                    }}
+                  >
+                    {l.label}
+                  </Link>
+                ))}
               </div>
             </div>
           </div>
@@ -387,22 +460,125 @@ export default async function ProductDetailPage({
             Mô tả sản phẩm
           </h2>
 
-          {product.description ? (
-            <div
-              style={{
-                fontSize: "15px",
-                lineHeight: 1.8,
-                color: "#374151",
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {product.description}
-            </div>
+          {product.description || product.shortDescription ? (
+            <>
+              {product.shortDescription && (
+                <p
+                  style={{
+                    fontSize: "16px",
+                    lineHeight: 1.75,
+                    color: "#374151",
+                    fontWeight: 500,
+                    margin: "0 0 20px",
+                  }}
+                >
+                  {product.shortDescription}
+                </p>
+              )}
+
+              {product.description && (
+                <div
+                  style={{
+                    fontSize: "15px",
+                    lineHeight: 1.8,
+                    color: "#4b5563",
+                    whiteSpace: "pre-wrap",
+                    borderTop: product.shortDescription
+                      ? "1px solid #e5e7eb"
+                      : undefined,
+                    paddingTop: product.shortDescription ? "20px" : undefined,
+                  }}
+                >
+                  {product.description}
+                </div>
+              )}
+            </>
           ) : (
             <p style={{ fontSize: "15px", color: "#9ca3af", margin: 0 }}>
               Thông tin sản phẩm đang được cập nhật.
             </p>
           )}
+        </div>
+      </section>
+
+      {/* FAQ ──────────────────────────────────────────────────────────────── */}
+      <section
+        className="section"
+        style={{ borderTop: "1px solid #e5e7eb" }}
+      >
+        <div className="container" style={{ maxWidth: "720px" }}>
+          <h2
+            style={{
+              fontSize: "20px",
+              fontWeight: 700,
+              margin: "0 0 24px",
+              color: "#111827",
+            }}
+          >
+            Hỏi đáp thường gặp
+          </h2>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {[
+              {
+                q: "Sản phẩm có nhận in logo không?",
+                a: "Có. ATTD hỗ trợ in logo theo yêu cầu.",
+              },
+              {
+                q: "Số lượng tối thiểu là bao nhiêu?",
+                a: "Liên hệ để được tư vấn theo từng dòng sản phẩm.",
+              },
+              {
+                q: "Có hỗ trợ gửi mẫu không?",
+                a: "Có thể hỗ trợ gửi mẫu tùy sản phẩm.",
+              },
+            ].map(({ q, a }) => (
+              <details
+                key={q}
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  background: "#fff",
+                  overflow: "hidden",
+                }}
+              >
+                <summary
+                  style={{
+                    padding: "16px 20px",
+                    fontWeight: 600,
+                    fontSize: "15px",
+                    color: "#111827",
+                    cursor: "pointer",
+                    listStyle: "none",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    userSelect: "none",
+                  }}
+                >
+                  {q}
+                  <span
+                    aria-hidden
+                    style={{ fontSize: "20px", lineHeight: 1, color: "#9ca3af", flexShrink: 0 }}
+                  >
+                    +
+                  </span>
+                </summary>
+
+                <div
+                  style={{
+                    padding: "0 20px 16px",
+                    fontSize: "15px",
+                    lineHeight: 1.7,
+                    color: "#4b5563",
+                    borderTop: "1px solid #f3f4f6",
+                  }}
+                >
+                  <p style={{ margin: "12px 0 0" }}>{a}</p>
+                </div>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
     </main>

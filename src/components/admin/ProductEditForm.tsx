@@ -254,13 +254,35 @@ export default function ProductEditForm({ product, categories }: Props) {
       </div>
 
       <div style={groupStyle}>
-        <label style={labelStyle}>Mô tả ngắn</label>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            marginBottom: "6px",
+          }}
+        >
+          <label style={{ ...labelStyle, marginBottom: 0 }}>Mô tả ngắn</label>
+          <span
+            style={{
+              fontSize: "12px",
+              color: shortDescription.length > 280 ? "#dc2626" : "#9ca3af",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {shortDescription.length} / 300
+          </span>
+        </div>
         <textarea
           value={shortDescription}
           onChange={(e) => setShortDescription(e.target.value)}
           rows={3}
+          placeholder="Mô tả ngắn hiển thị dưới tên sản phẩm và dùng làm meta description dự phòng"
           style={{ ...inputStyle, resize: "vertical" }}
         />
+        <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "4px" }}>
+          Dùng cho mô tả ngắn và meta description. Gợi ý: dưới 300 ký tự.
+        </div>
       </div>
 
       <div style={groupStyle}>
