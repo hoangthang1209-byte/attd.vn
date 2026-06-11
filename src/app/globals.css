@@ -72,6 +72,22 @@ button {
   background: var(--primary-hover);
 }
 
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border: 2px solid var(--border);
+  color: var(--foreground);
+  border-radius: 10px;
+  font-weight: 600;
+  transition: border-color 0.2s;
+}
+
+.btn-secondary:hover {
+  border-color: var(--foreground);
+}
+
 .section {
   padding: 80px 0;
 }

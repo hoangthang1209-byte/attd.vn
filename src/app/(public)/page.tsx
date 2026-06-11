@@ -119,6 +119,7 @@ export default async function HomePage() {
               <ProductCard
                 key={product.id}
                 id={product.id}
+                slug={product.slug}
                 name={product.name}
                 productCode={product.productCode}
                 skuCount={product.variants.length}

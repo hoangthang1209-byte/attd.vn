@@ -2,6 +2,7 @@ import Link from "next/link";
 
 type ProductCardProps = {
   id: string;
+  slug: string;
   name: string;
   productCode?: string | null;
   skuCount?: number;
@@ -10,6 +11,7 @@ type ProductCardProps = {
 
 export default function ProductCard({
   id,
+  slug,
   name,
   productCode,
   skuCount = 0,
@@ -17,7 +19,7 @@ export default function ProductCard({
 }: ProductCardProps) {
   return (
     <Link
-      href={`/san-pham/${id}`}
+      href={`/san-pham/${slug}`}
       style={{
         textDecoration: "none",
         color: "inherit",
