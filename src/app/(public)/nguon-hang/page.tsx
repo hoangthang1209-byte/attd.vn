@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCategories } from "@/features/categories/services/category.service";
 import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
+import DealerLeadForm from "@/components/forms/DealerLeadForm";
+import TrackedLink from "@/components/analytics/TrackedLink";
 
 export const metadata: Metadata = {
   title: `Nguồn hàng sỉ | ${SITE_NAME}`,
@@ -109,11 +111,19 @@ export default async function WholesalePage() {
           </p>
 
           <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-            <Link href="/dai-ly" className="btn-primary">
+            <TrackedLink
+              href="/dai-ly"
+              trackEvent="dealer_registration_click"
+              trackSource="WHOLESALE_PAGE"
+              className="btn-primary"
+            >
               Đăng ký đại lý
-            </Link>
-            <a
+            </TrackedLink>
+            <TrackedLink
               href={ZALO}
+              trackEvent="contact_zalo"
+              trackSource="WHOLESALE_PAGE"
+              external
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -127,7 +137,7 @@ export default async function WholesalePage() {
               }}
             >
               Chat Zalo
-            </a>
+            </TrackedLink>
           </div>
         </div>
       </section>
@@ -320,65 +330,49 @@ export default async function WholesalePage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="section">
+      {/* CTA + Form */}
+      <section className="section" style={{ borderTop: "1px solid #e5e7eb" }}>
         <div className="container">
           <div
-            className="card"
             style={{
-              textAlign: "center",
-              padding: "48px 32px",
-              background: "#111827",
-              color: "#fff",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+              gap: "48px",
+              alignItems: "start",
             }}
           >
-            <h2
-              style={{
-                fontSize: "26px",
-                fontWeight: 700,
-                marginBottom: "12px",
-              }}
-            >
-              Sẵn sàng lấy hàng sỉ?
-            </h2>
-            <p
-              style={{
-                fontSize: "16px",
-                color: "#d1d5db",
-                marginBottom: "28px",
-                maxWidth: "480px",
-                marginInline: "auto",
-                lineHeight: 1.6,
-              }}
-            >
-              Đăng ký đại lý hoặc liên hệ ATTD để nhận báo giá sỉ theo số lượng.
-            </p>
-            <div
-              style={{
-                display: "flex",
-                gap: "14px",
-                justifyContent: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <Link href="/dai-ly" className="btn-primary">
-                Đăng ký đại lý
-              </Link>
-              <Link
-                href="/lien-he"
+            {/* Left: info */}
+            <div>
+              <h2
                 style={{
-                  padding: "10px 24px",
-                  border: "1px solid #4b5563",
-                  borderRadius: "8px",
-                  color: "#fff",
-                  textDecoration: "none",
-                  fontSize: "14px",
-                  fontWeight: 600,
+                  fontSize: "28px",
+                  fontWeight: 800,
+                  color: "#111827",
+                  marginBottom: "16px",
+                  lineHeight: 1.2,
                 }}
               >
-                Liên hệ báo giá
-              </Link>
+                Sẵn sàng lấy hàng sỉ?
+              </h2>
+              <p
+                style={{
+                  fontSize: "16px",
+                  color: "#6b7280",
+                  lineHeight: 1.7,
+                  marginBottom: "28px",
+                }}
+              >
+                Điền form để nhận báo giá sỉ theo số lượng. Đội ngũ ATTD phản hồi trong 24 giờ làm việc.
+              </p>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                <Link href="/chinh-sach-dai-ly" className="btn-secondary">
+                  Xem chính sách đại lý
+                </Link>
+              </div>
             </div>
+
+            {/* Right: form */}
+            <DealerLeadForm source="WHOLESALE_PAGE" title="Nhận báo giá sỉ" />
           </div>
         </div>
       </section>

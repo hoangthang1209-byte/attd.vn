@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
+import DealerLeadForm from "@/components/forms/DealerLeadForm";
+import TrackedLink from "@/components/analytics/TrackedLink";
 
 export const metadata: Metadata = {
   title: `OEM & Private Label | ${SITE_NAME}`,
@@ -97,11 +99,19 @@ export default function OemPage() {
           </p>
 
           <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-            <Link href="/lien-he" className="btn-primary">
+            <TrackedLink
+              href="/lien-he"
+              trackEvent="contact_quote"
+              trackSource="OEM_PAGE"
+              className="btn-primary"
+            >
               Liên hệ báo giá
-            </Link>
-            <a
+            </TrackedLink>
+            <TrackedLink
               href={ZALO}
+              trackEvent="contact_zalo"
+              trackSource="OEM_PAGE"
+              external
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -115,7 +125,7 @@ export default function OemPage() {
               }}
             >
               Chat Zalo
-            </a>
+            </TrackedLink>
           </div>
         </div>
       </section>
@@ -348,55 +358,60 @@ export default function OemPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="section">
+      {/* CTA + Form */}
+      <section className="section" style={{ borderTop: "1px solid #e5e7eb" }}>
         <div className="container">
           <div
-            className="card"
-            style={{ textAlign: "center", padding: "48px 32px", background: "#f9fafb" }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+              gap: "48px",
+              alignItems: "start",
+            }}
           >
-            <h2
-              style={{
-                fontSize: "26px",
-                fontWeight: 700,
-                marginBottom: "12px",
-                color: "#111827",
-              }}
-            >
-              Bắt đầu đặt hàng OEM
-            </h2>
-            <p
-              style={{
-                fontSize: "16px",
-                color: "#6b7280",
-                marginBottom: "28px",
-                maxWidth: "480px",
-                marginInline: "auto",
-                lineHeight: 1.6,
-              }}
-            >
-              Liên hệ để nhận báo giá và tư vấn nguồn hàng phù hợp với thương hiệu của bạn.
-            </p>
-            <div
-              style={{
-                display: "flex",
-                gap: "14px",
-                justifyContent: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <Link href="/lien-he" className="btn-primary">
-                Liên hệ báo giá
-              </Link>
-              <a
-                href={ZALO}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-secondary"
+            {/* Left: info */}
+            <div>
+              <h2
+                style={{
+                  fontSize: "28px",
+                  fontWeight: 800,
+                  color: "#111827",
+                  marginBottom: "16px",
+                  lineHeight: 1.2,
+                }}
               >
-                Chat Zalo ngay
-              </a>
+                Bắt đầu đặt hàng OEM
+              </h2>
+              <p
+                style={{
+                  fontSize: "16px",
+                  color: "#6b7280",
+                  lineHeight: 1.7,
+                  marginBottom: "28px",
+                }}
+              >
+                Điền form để nhận báo giá và tư vấn nguồn hàng phù hợp với thương hiệu của bạn. ATTD phản hồi trong 24 giờ làm việc.
+              </p>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                <TrackedLink
+                  href={ZALO}
+                  trackEvent="contact_zalo"
+                  trackSource="OEM_PAGE"
+                  external
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary"
+                >
+                  Chat Zalo ngay
+                </TrackedLink>
+                <Link href="/nguon-hang" style={{ fontSize: "14px", color: "#6b7280", alignSelf: "center", textDecoration: "underline" }}>
+                  Xem nguồn hàng sỉ
+                </Link>
+              </div>
             </div>
+
+            {/* Right: form */}
+            <DealerLeadForm source="OEM_PAGE" title="Nhận báo giá OEM" />
           </div>
         </div>
       </section>

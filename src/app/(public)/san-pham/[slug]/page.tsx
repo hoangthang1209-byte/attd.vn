@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import TrackedLink from "@/components/analytics/TrackedLink";
 import type { Metadata } from "next";
 import { getProductBySlug } from "@/features/products/services/product.service";
 import ProductImageGallery from "@/components/public/ProductImageGallery";
@@ -387,20 +388,33 @@ export default async function ProductDetailPage({
               <div
                 style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
               >
-                <Link href="/dai-ly" className="btn-primary">
+                <TrackedLink
+                  href="/dai-ly"
+                  trackEvent="dealer_registration_click"
+                  trackSource="PRODUCT_PAGE"
+                  className="btn-primary"
+                >
                   Đăng ký đại lý
-                </Link>
-                <Link href="/lien-he" className="btn-secondary">
+                </TrackedLink>
+                <TrackedLink
+                  href="/lien-he"
+                  trackEvent="contact_quote"
+                  trackSource="PRODUCT_PAGE"
+                  className="btn-secondary"
+                >
                   Liên hệ báo giá
-                </Link>
-                <a
+                </TrackedLink>
+                <TrackedLink
                   href="https://zalo.me/0934337667"
+                  trackEvent="contact_zalo"
+                  trackSource="PRODUCT_PAGE"
+                  external
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-secondary"
                 >
                   Chat Zalo
-                </a>
+                </TrackedLink>
               </div>
 
               {/* Internal links */}

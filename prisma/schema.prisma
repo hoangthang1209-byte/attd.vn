@@ -127,6 +127,20 @@ model Dealer {
   updatedAt   DateTime     @updatedAt
 }
 
+model DealerLead {
+  id          String           @id @default(cuid())
+  companyName String?
+  contactName String
+  phone       String
+  email       String?
+  city        String?
+  source      String
+  message     String?
+  status      DealerLeadStatus @default(NEW)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
 model Post {
   id             String     @id @default(cuid())
   title          String
@@ -178,4 +192,11 @@ enum DealerStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum DealerLeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CLOSED
 }

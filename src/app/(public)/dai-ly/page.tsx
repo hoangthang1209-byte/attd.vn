@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import DealerForm from "@/components/public/DealerForm";
+import DealerLeadForm from "@/components/forms/DealerLeadForm";
 
 export const metadata: Metadata = {
   title: "Đăng ký đại lý | ATTD",
@@ -117,7 +117,7 @@ export default function DaiLyPage() {
 
             {/* Right: Form */}
             <div>
-              <DealerForm />
+              <DealerLeadForm source="DEALER_FORM" title="Đăng ký đại lý" />
             </div>
           </div>
         </div>

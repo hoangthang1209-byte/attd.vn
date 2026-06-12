@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
+import TrackedLink from "@/components/analytics/TrackedLink";
 
 export const metadata: Metadata = {
   title: `Chính sách đại lý | ${SITE_NAME}`,
@@ -127,11 +128,19 @@ export default function DealerPolicyPage() {
           </p>
 
           <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-            <Link href="/dai-ly" className="btn-primary">
+            <TrackedLink
+              href="/dai-ly"
+              trackEvent="dealer_registration_click"
+              trackSource="DEALER_POLICY_PAGE"
+              className="btn-primary"
+            >
               Đăng ký đại lý ngay
-            </Link>
-            <a
+            </TrackedLink>
+            <TrackedLink
               href={ZALO}
+              trackEvent="contact_zalo"
+              trackSource="DEALER_POLICY_PAGE"
+              external
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -145,7 +154,7 @@ export default function DealerPolicyPage() {
               }}
             >
               Chat Zalo
-            </a>
+            </TrackedLink>
           </div>
         </div>
       </section>
@@ -388,9 +397,14 @@ export default function DealerPolicyPage() {
                 flexWrap: "wrap",
               }}
             >
-              <Link href="/dai-ly" className="btn-primary">
+              <TrackedLink
+                href="/dai-ly"
+                trackEvent="dealer_registration_click"
+                trackSource="DEALER_POLICY_PAGE"
+                className="btn-primary"
+              >
                 Đăng ký đại lý
-              </Link>
+              </TrackedLink>
               <Link
                 href="/nguon-hang"
                 style={{

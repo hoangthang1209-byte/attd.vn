@@ -2,6 +2,7 @@ import { getCategories } from "@/features/categories/services/category.service";
 import { getProducts } from "@/features/products/services/product.service";
 import Section from "@/components/public/Section";
 import ProductCard from "@/components/public/ProductCard";
+import TrackedLink from "@/components/analytics/TrackedLink";
 
 export default async function HomePage() {
   const categories = await getCategories();
@@ -44,9 +45,14 @@ export default async function HomePage() {
               Xem sản phẩm
             </a>
 
-            <a className="card" href="/dai-ly">
+            <TrackedLink
+              href="/dai-ly"
+              trackEvent="dealer_registration_click"
+              trackSource="HOMEPAGE"
+              className="card"
+            >
               Đăng ký đại lý
-            </a>
+            </TrackedLink>
           </div>
 
           <div
@@ -252,9 +258,14 @@ export default async function HomePage() {
             </p>
 
             <div style={{ marginTop: "24px" }}>
-              <a className="btn-primary" href="/dai-ly">
+              <TrackedLink
+                href="/dai-ly"
+                trackEvent="dealer_registration_click"
+                trackSource="HOMEPAGE"
+                className="btn-primary"
+              >
                 Đăng ký đại lý
-              </a>
+              </TrackedLink>
             </div>
           </div>
         </div>
