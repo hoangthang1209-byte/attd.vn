@@ -71,7 +71,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await prisma.dealerLead.create({
+    const created = await prisma.dealerLead.create({
       data: {
         contactName,
         phone,
@@ -88,7 +88,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         referrer,
         landingPage,
       },
+      select: { id: true },
     });
+
+    const total = await prisma.dealerLead.count();
+    console.log(
+      `[POST /api/dealer-leads] created id=${created.id} | total=${total}`
+    );
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (err) {

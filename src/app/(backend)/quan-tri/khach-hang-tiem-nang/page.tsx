@@ -72,6 +72,9 @@ export default async function KhachHangTiemNangPage() {
   const rawLeads = await prisma.dealerLead.findMany({
     orderBy: { createdAt: "desc" },
   });
+  console.log(
+    `[/quan-tri/khach-hang-tiem-nang] loaded ${rawLeads.length} leads`
+  );
 
   // Serialize: convert non-JSON-safe types (Date, Decimal) to plain strings
   const leads: SerializedLead[] = rawLeads.map((lead) => ({
