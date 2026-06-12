@@ -12,6 +12,11 @@ import {
   canonicalUrl,
   buildOgImages,
 } from "@/lib/seo";
+import {
+  getCatalogProduct,
+  isCatalogProduct,
+  getCatalogInternalLinks,
+} from "@/lib/productCatalog";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -19,16 +24,22 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
+  const catalog = getCatalogProduct(slug);
   const product = await getProductBySlug(slug);
-  if (!product) return {};
+  if (!product && !catalog) return {};
 
-  const title = product.seoTitle ?? `${product.name} | ${SITE_NAME}`;
+  const title =
+    catalog?.seoTitle ??
+    product?.seoTitle ??
+    `${catalog?.name ?? product?.name} | ${SITE_NAME}`;
   const description =
-    product.seoDescription ??
-    product.shortDescription ??
-    product.description ??
+    catalog?.seoDescription ??
+    product?.seoDescription ??
+    catalog?.shortDescription ??
+    product?.shortDescription ??
+    product?.description ??
     DEFAULT_DESCRIPTION;
-  const ogImages = buildOgImages(product.images[0]?.imageUrl);
+  const ogImages = buildOgImages(product?.images[0]?.imageUrl);
 
   return {
     title,
@@ -37,7 +48,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       canonical: canonicalUrl(`/san-pham/${slug}`),
     },
     openGraph: {
-      title: product.seoTitle ?? product.name,
+      title: catalog?.seoTitle ?? product?.seoTitle ?? catalog?.name ?? product?.name,
       description,
       url: canonicalUrl(`/san-pham/${slug}`),
       siteName: SITE_NAME,
@@ -46,7 +57,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
     twitter: {
       card: "summary_large_image",
-      title: product.seoTitle ?? product.name,
+      title: catalog?.seoTitle ?? product?.seoTitle ?? catalog?.name ?? product?.name,
       description,
       images: ogImages,
     },
@@ -55,8 +66,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
+  const catalog = getCatalogProduct(slug);
   const product = await getProductBySlug(slug);
+  if (!product && !catalog) notFound();
   if (!product) notFound();
+
+  const displayName = catalog?.name ?? product.name;
+  const displayShortDescription =
+    catalog?.shortDescription ?? product.shortDescription;
+  const displayContent = catalog?.content ?? product.description;
+  const categoryName = catalog?.categoryName ?? product.category.name;
+  const categorySlug = catalog?.categorySlug ?? product.category.slug;
 
   // Fetch related products in parallel (non-blocking)
   const relatedProducts = await getRelatedProducts(
@@ -109,28 +129,34 @@ export default async function ProductDetailPage({ params }: PageProps) {
       ? "#d97706"
       : "#dc2626";
 
-  const hasSpecs = product.gsm || product.material || product.fit;
+  const hasSpecs =
+    !isCatalogProduct(slug) &&
+    (product.gsm || product.material || product.fit);
 
-  // Product Schema — no `offers` when there is no price data in the DB
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: product.name,
+    name: displayName,
     description:
+      catalog?.seoDescription ??
+      displayShortDescription ??
+      displayContent ??
       product.seoDescription ??
       product.shortDescription ??
       product.description ??
       DEFAULT_DESCRIPTION,
     brand: { "@type": "Brand", name: SITE_NAME },
-    category: product.category.name,
-    ...(product.productCode && { sku: product.productCode }),
+    category: categoryName,
+    ...((catalog?.sku ?? product.productCode) && {
+      sku: catalog?.sku ?? product.productCode,
+    }),
     ...(product.images.length > 0 && {
       image: product.images.map((img) => img.imageUrl),
     }),
     url: canonicalUrl(`/san-pham/${slug}`),
   };
 
-  const faqItems = [
+  const legacyFaqItems = [
     {
       question: "Sản phẩm có nhận in logo không?",
       answer: "Có. ATTD hỗ trợ in logo theo yêu cầu.",
@@ -145,6 +171,19 @@ export default async function ProductDetailPage({ params }: PageProps) {
     },
   ];
 
+  const faqItems = catalog?.faqs ?? legacyFaqItems;
+
+  const legacyInternalLinks = [
+    { href: "/nguon-hang", label: "Nguồn hàng sỉ" },
+    { href: "/chinh-sach-dai-ly", label: "Chính sách đại lý" },
+    { href: "/oem", label: "OEM & Private Label" },
+    { href: "/qua-tang-doanh-nghiep", label: "Quà tặng DN" },
+  ];
+
+  const internalLinks = catalog
+    ? getCatalogInternalLinks(catalog.categorySlug)
+    : legacyInternalLinks;
+
   return (
     <main>
       {/* ── Structured Data ──────────────────────────────────────────────── */}
@@ -157,8 +196,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
       {/* ── Breadcrumb (visual + BreadcrumbList JSON-LD) ─────────────────── */}
       <Breadcrumb
         items={[
-          { name: product.category.name, href: `/${product.category.slug}` },
-          { name: product.name, href: `/san-pham/${slug}` },
+          { name: categoryName, href: `/${categorySlug}` },
+          { name: displayName, href: `/san-pham/${slug}` },
         ]}
       />
 
@@ -172,7 +211,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
             {/* Image column */}
             <ProductImageGallery
               images={product.images}
-              productName={product.name}
+              productName={displayName}
             />
 
             {/* Info column */}
@@ -187,7 +226,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   flexWrap: "wrap",
                 }}
               >
-                {product.productCode && (
+                {(catalog?.sku ?? product.productCode) && (
                   <span
                     style={{
                       fontSize: "12px",
@@ -199,14 +238,14 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       letterSpacing: "0.05em",
                     }}
                   >
-                    {product.productCode}
+                    {catalog?.sku ?? product.productCode}
                   </span>
                 )}
                 <Link
-                  href={`/${product.category.slug}`}
+                  href={`/${categorySlug}`}
                   style={{ fontSize: "14px", color: "#6b7280" }}
                 >
-                  {product.category.name}
+                  {categoryName}
                 </Link>
               </div>
 
@@ -218,10 +257,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   margin: "0 0 16px",
                 }}
               >
-                {product.name}
+                {displayName}
               </h1>
 
-              {product.shortDescription && (
+              {displayShortDescription && (
                 <p
                   style={{
                     color: "#6b7280",
@@ -229,7 +268,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     margin: "0 0 24px",
                   }}
                 >
-                  {product.shortDescription}
+                  {displayShortDescription}
                 </p>
               )}
 
@@ -410,12 +449,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 >
                   Tìm hiểu thêm:
                 </span>
-                {[
-                  { href: "/nguon-hang", label: "Nguồn hàng sỉ" },
-                  { href: "/chinh-sach-dai-ly", label: "Chính sách đại lý" },
-                  { href: "/oem", label: "OEM & Private Label" },
-                  { href: "/qua-tang-doanh-nghiep", label: "Quà tặng DN" },
-                ].map((l) => (
+                {internalLinks.map((l) => (
                   <Link
                     key={l.href}
                     href={l.href}
@@ -451,9 +485,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
             Mô tả sản phẩm
           </h2>
 
-          {product.description || product.shortDescription ? (
+          {displayContent || displayShortDescription ? (
             <>
-              {product.shortDescription && (
+              {displayShortDescription && (
                 <p
                   style={{
                     fontSize: "16px",
@@ -463,24 +497,24 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     margin: "0 0 20px",
                   }}
                 >
-                  {product.shortDescription}
+                  {displayShortDescription}
                 </p>
               )}
 
-              {product.description && (
+              {displayContent && (
                 <div
                   style={{
                     fontSize: "15px",
                     lineHeight: 1.8,
                     color: "#4b5563",
                     whiteSpace: "pre-wrap",
-                    borderTop: product.shortDescription
+                    borderTop: displayShortDescription
                       ? "1px solid #e5e7eb"
                       : undefined,
-                    paddingTop: product.shortDescription ? "20px" : undefined,
+                    paddingTop: displayShortDescription ? "20px" : undefined,
                   }}
                 >
-                  {product.description}
+                  {displayContent}
                 </div>
               )}
             </>
