@@ -12,6 +12,7 @@ interface BreadcrumbProps {
 
 export default function Breadcrumb({ items }: BreadcrumbProps) {
   const allItems: BreadcrumbItem[] = [{ name: "Trang chủ", href: "/" }, ...items];
+  const lastIndex = allItems.length - 1;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -20,6 +21,7 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
       "@type": "ListItem",
       position: index + 1,
       name: item.name,
+      // Include item URL for all entries that have an href — including the current page
       ...(item.href ? { item: `${SITE_URL}${item.href}` } : {}),
     })),
   };
@@ -47,29 +49,33 @@ export default function Breadcrumb({ items }: BreadcrumbProps) {
             flexWrap: "wrap",
           }}
         >
-          {allItems.map((item, index) => (
-            <span
-              key={index}
-              style={{ display: "flex", alignItems: "center", gap: "6px" }}
-            >
-              {index > 0 && <span aria-hidden="true">/</span>}
-              {item.href ? (
-                <Link
-                  href={item.href}
-                  style={{ color: "#6b7280", textDecoration: "none" }}
-                >
-                  {item.name}
-                </Link>
-              ) : (
-                <span
-                  style={{ color: "#111827", fontWeight: 500 }}
-                  aria-current="page"
-                >
-                  {item.name}
-                </span>
-              )}
-            </span>
-          ))}
+          {allItems.map((item, index) => {
+            const isCurrent = index === lastIndex;
+            return (
+              <span
+                key={index}
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                {index > 0 && <span aria-hidden="true">/</span>}
+                {item.href && !isCurrent ? (
+                  <Link
+                    href={item.href}
+                    style={{ color: "#6b7280", textDecoration: "none" }}
+                  >
+                    {item.name}
+                  </Link>
+                ) : (
+                  // Last item is always rendered as plain text (current page)
+                  <span
+                    style={{ color: "#111827", fontWeight: 500 }}
+                    aria-current="page"
+                  >
+                    {item.name}
+                  </span>
+                )}
+              </span>
+            );
+          })}
         </div>
       </nav>
     </>

@@ -40,3 +40,29 @@ export async function getProductById(id: string) {
     },
   });
 }
+
+/** Returns up to `limit` active products in the same category, excluding the given product. */
+export async function getRelatedProducts(
+  categoryId: string,
+  excludeProductId: string,
+  limit = 4
+) {
+  return prisma.product.findMany({
+    where: {
+      categoryId,
+      id: { not: excludeProductId },
+      status: "ACTIVE",
+      slug: { not: "" },
+    },
+    include: {
+      variants: { select: { id: true } },
+      images: {
+        select: { imageUrl: true, altText: true },
+        orderBy: { sortOrder: "asc" },
+        take: 1,
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}

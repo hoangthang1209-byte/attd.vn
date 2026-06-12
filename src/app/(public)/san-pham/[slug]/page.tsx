@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import type { Metadata } from "next";
-import { getProductBySlug } from "@/features/products/services/product.service";
+import { getProductBySlug, getRelatedProducts } from "@/features/products/services/product.service";
 import ProductImageGallery from "@/components/public/ProductImageGallery";
+import Breadcrumb from "@/components/seo/Breadcrumb";
+import FaqSchema from "@/components/seo/FaqSchema";
 import {
   SITE_NAME,
   DEFAULT_DESCRIPTION,
@@ -11,18 +13,21 @@ import {
   buildOgImages,
 } from "@/lib/seo";
 
-export async function generateMetadata({
-  params,
-}: {
+type PageProps = {
   params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
+};
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) return {};
 
   const title = product.seoTitle ?? `${product.name} | ${SITE_NAME}`;
   const description =
-    product.seoDescription ?? product.shortDescription ?? DEFAULT_DESCRIPTION;
+    product.seoDescription ??
+    product.shortDescription ??
+    product.description ??
+    DEFAULT_DESCRIPTION;
   const ogImages = buildOgImages(product.images[0]?.imageUrl);
 
   return {
@@ -36,19 +41,29 @@ export async function generateMetadata({
       description,
       url: canonicalUrl(`/san-pham/${slug}`),
       siteName: SITE_NAME,
+      type: "website",
+      images: ogImages,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: product.seoTitle ?? product.name,
+      description,
       images: ogImages,
     },
   };
 }
 
-export default async function ProductDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) notFound();
+
+  // Fetch related products in parallel (non-blocking)
+  const relatedProducts = await getRelatedProducts(
+    product.category.id,
+    product.id,
+    4
+  );
 
   const uniqueColors = [
     ...new Set(
@@ -96,12 +111,16 @@ export default async function ProductDetailPage({
 
   const hasSpecs = product.gsm || product.material || product.fit;
 
+  // Product Schema — no `offers` when there is no price data in the DB
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
     description:
-      product.seoDescription ?? product.shortDescription ?? DEFAULT_DESCRIPTION,
+      product.seoDescription ??
+      product.shortDescription ??
+      product.description ??
+      DEFAULT_DESCRIPTION,
     brand: { "@type": "Brand", name: SITE_NAME },
     category: product.category.name,
     ...(product.productCode && { sku: product.productCode }),
@@ -109,83 +128,41 @@ export default async function ProductDetailPage({
       image: product.images.map((img) => img.imageUrl),
     }),
     url: canonicalUrl(`/san-pham/${slug}`),
-    offers: {
-      "@type": "Offer",
-      availability: "https://schema.org/InStock",
-    },
   };
 
-  const faqJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: [
-      {
-        "@type": "Question",
-        name: "Sản phẩm có nhận in logo không?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Có. ATTD hỗ trợ in logo theo yêu cầu.",
-        },
-      },
-      {
-        "@type": "Question",
-        name: "Số lượng tối thiểu là bao nhiêu?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Liên hệ để được tư vấn theo từng dòng sản phẩm.",
-        },
-      },
-      {
-        "@type": "Question",
-        name: "Có hỗ trợ gửi mẫu không?",
-        acceptedAnswer: {
-          "@type": "Answer",
-          text: "Có thể hỗ trợ gửi mẫu tùy sản phẩm.",
-        },
-      },
-    ],
-  };
+  const faqItems = [
+    {
+      question: "Sản phẩm có nhận in logo không?",
+      answer: "Có. ATTD hỗ trợ in logo theo yêu cầu.",
+    },
+    {
+      question: "Số lượng tối thiểu là bao nhiêu?",
+      answer: "Liên hệ để được tư vấn theo từng dòng sản phẩm.",
+    },
+    {
+      question: "Có hỗ trợ gửi mẫu không?",
+      answer: "Có thể hỗ trợ gửi mẫu tùy sản phẩm.",
+    },
+  ];
 
   return (
     <main>
+      {/* ── Structured Data ──────────────────────────────────────────────── */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      <FaqSchema items={faqItems} />
+
+      {/* ── Breadcrumb (visual + BreadcrumbList JSON-LD) ─────────────────── */}
+      <Breadcrumb
+        items={[
+          { name: product.category.name, href: `/${product.category.slug}` },
+          { name: product.name, href: `/san-pham/${slug}` },
+        ]}
       />
 
-      {/* Breadcrumb */}
-      <div className="container" style={{ paddingTop: "24px" }}>
-        <nav
-          aria-label="breadcrumb"
-          style={{
-            fontSize: "14px",
-            color: "#6b7280",
-            display: "flex",
-            gap: "6px",
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <Link href="/" style={{ color: "#6b7280" }}>
-            Trang chủ
-          </Link>
-          <span>/</span>
-          <Link
-            href={`/${product.category.slug}`}
-            style={{ color: "#6b7280" }}
-          >
-            {product.category.name}
-          </Link>
-          <span>/</span>
-          <span style={{ color: "#111827" }}>{product.name}</span>
-        </nav>
-      </div>
-
-      {/* Product hero */}
+      {/* ── Product Hero ─────────────────────────────────────────────────── */}
       <section className="section">
         <div className="container">
           <div
@@ -458,7 +435,7 @@ export default async function ProductDetailPage({
         </div>
       </section>
 
-      {/* Product description ──────────────────────────────────────────────── */}
+      {/* ── Product Description ───────────────────────────────────────────── */}
       <section
         className="section"
         style={{ borderTop: "1px solid #f3f4f6", background: "#f9fafb" }}
@@ -515,7 +492,7 @@ export default async function ProductDetailPage({
         </div>
       </section>
 
-      {/* FAQ ──────────────────────────────────────────────────────────────── */}
+      {/* ── FAQ ──────────────────────────────────────────────────────────── */}
       <section
         className="section"
         style={{ borderTop: "1px solid #e5e7eb" }}
@@ -533,22 +510,9 @@ export default async function ProductDetailPage({
           </h2>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {[
-              {
-                q: "Sản phẩm có nhận in logo không?",
-                a: "Có. ATTD hỗ trợ in logo theo yêu cầu.",
-              },
-              {
-                q: "Số lượng tối thiểu là bao nhiêu?",
-                a: "Liên hệ để được tư vấn theo từng dòng sản phẩm.",
-              },
-              {
-                q: "Có hỗ trợ gửi mẫu không?",
-                a: "Có thể hỗ trợ gửi mẫu tùy sản phẩm.",
-              },
-            ].map(({ q, a }) => (
+            {faqItems.map(({ question, answer }) => (
               <details
-                key={q}
+                key={question}
                 style={{
                   border: "1px solid #e5e7eb",
                   borderRadius: "10px",
@@ -570,7 +534,7 @@ export default async function ProductDetailPage({
                     userSelect: "none",
                   }}
                 >
-                  {q}
+                  {question}
                   <span
                     aria-hidden
                     style={{ fontSize: "20px", lineHeight: 1, color: "#9ca3af", flexShrink: 0 }}
@@ -588,13 +552,118 @@ export default async function ProductDetailPage({
                     borderTop: "1px solid #f3f4f6",
                   }}
                 >
-                  <p style={{ margin: "12px 0 0" }}>{a}</p>
+                  <p style={{ margin: "12px 0 0" }}>{answer}</p>
                 </div>
               </details>
             ))}
           </div>
         </div>
       </section>
+
+      {/* ── Related Products ─────────────────────────────────────────────── */}
+      {relatedProducts.length > 0 && (
+        <section
+          className="section"
+          style={{ borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}
+        >
+          <div className="container">
+            <h2
+              style={{
+                fontSize: "20px",
+                fontWeight: 700,
+                margin: "0 0 24px",
+                color: "#111827",
+              }}
+            >
+              Sản phẩm liên quan
+            </h2>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: "16px",
+              }}
+            >
+              {relatedProducts.map((related) => (
+                <Link
+                  key={related.id}
+                  href={`/san-pham/${related.slug}`}
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
+                  <article
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "10px",
+                      overflow: "hidden",
+                      background: "#fff",
+                    }}
+                  >
+                    {/* Product thumbnail */}
+                    <div
+                      style={{
+                        aspectRatio: "1 / 1",
+                        background: "#f3f4f6",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {related.images[0]?.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={related.images[0].imageUrl}
+                          alt={related.images[0].altText ?? related.name}
+                          loading="lazy"
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : null}
+                    </div>
+
+                    <div style={{ padding: "12px 14px" }}>
+                      <h3
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#111827",
+                          margin: "0 0 4px",
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {related.name}
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "#9ca3af",
+                          margin: 0,
+                        }}
+                      >
+                        {related.variants.length} SKU
+                      </p>
+                    </div>
+                  </article>
+                </Link>
+              ))}
+            </div>
+
+            <div style={{ marginTop: "20px" }}>
+              <Link
+                href={`/${product.category.slug}`}
+                style={{
+                  fontSize: "14px",
+                  color: "#1d4ed8",
+                  textDecoration: "none",
+                }}
+              >
+                Xem tất cả {product.category.name} →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

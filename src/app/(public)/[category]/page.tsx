@@ -5,6 +5,7 @@ import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
 import CollectionSchema from "@/components/seo/CollectionSchema";
 import CollectionSEOContent from "@/components/seo/CollectionSEOContent";
+import ItemListSchema from "@/components/seo/ItemListSchema";
 import { getCategoryBySlug } from "@/features/categories/services/category.service";
 import { getCollectionContent } from "@/lib/collectionContent";
 import {
@@ -84,6 +85,13 @@ export default async function CategoryPage({ params }: PageProps) {
       />
       {content?.faq && content.faq.length > 0 && (
         <FaqSchema items={content.faq} />
+      )}
+      {cat.products.length > 0 && (
+        <ItemListSchema
+          items={cat.products
+            .filter((p) => p.slug)
+            .map((p, i) => ({ position: i + 1, name: p.name, slug: p.slug }))}
+        />
       )}
 
       {/* ── Breadcrumb (visual + JSON-LD) ──────────────────────────────── */}
