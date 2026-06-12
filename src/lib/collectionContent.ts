@@ -10,6 +10,16 @@
 import type { FaqItem } from "@/components/seo/FaqSchema";
 import type { ContentBenefit } from "@/components/seo/CollectionSEOContent";
 
+export interface WholesaleClusterLink {
+  label: string;
+  href: string;
+}
+
+export interface WholesaleCluster {
+  title: string;
+  links: WholesaleClusterLink[];
+}
+
 export interface CollectionContent {
   /** Overrides the DB seoTitle — used in <title> and OpenGraph */
   seoTitle: string;
@@ -26,6 +36,10 @@ export interface CollectionContent {
   faq: FaqItem[];
   ctaTitle: string;
   ctaDescription: string;
+  /** Optional wholesale cluster links shown as a contextual section on category pages */
+  wholesaleCluster?: WholesaleCluster;
+  /** Optional knowledge cluster links (fabric, size, color guides) */
+  knowledgeCluster?: WholesaleCluster;
 }
 
 const content: Record<string, CollectionContent> = {
@@ -115,6 +129,24 @@ const content: Record<string, CollectionContent> = {
     ctaTitle: "Cần nguồn hàng áo thun trơn số lượng lớn?",
     ctaDescription:
       "Liên hệ ATTD để nhận báo giá sỉ theo số lượng, chính sách đại lý và tư vấn nguồn hàng phù hợp nhu cầu của bạn. Giao hàng toàn quốc, hàng có sẵn kho.",
+    wholesaleCluster: {
+      title: "Nguồn hàng áo thun trơn",
+      links: [
+        { label: "Kho áo thun trơn số lượng lớn", href: "/kho-ao-thun-tron" },
+        { label: "Áo thun trơn sỉ giá tốt", href: "/ao-thun-tron-si" },
+        { label: "Nguồn hàng cho xưởng in", href: "/nguon-hang-ao-thun-tron" },
+      ],
+    },
+    knowledgeCluster: {
+      title: "Kiến thức áo thun trơn",
+      links: [
+        { label: "Bảng màu áo thun trơn", href: "/bang-mau-ao-thun-tron" },
+        { label: "Bảng size áo thun trơn", href: "/size-ao-thun-tron" },
+        { label: "Vải cotton 2 chiều là gì?", href: "/vai-cotton-2-chieu" },
+        { label: "Vải CVC là gì?", href: "/vai-cvc-la-gi" },
+        { label: "Vải TC là gì?", href: "/vai-tc-la-gi" },
+      ],
+    },
   },
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -203,6 +235,13 @@ const content: Record<string, CollectionContent> = {
     ctaTitle: "Cần nguồn hàng áo polo số lượng lớn?",
     ctaDescription:
       "Liên hệ ATTD để nhận báo giá sỉ, tư vấn đồng phục và khám phá giải pháp OEM private label phù hợp với thương hiệu của bạn. Giao hàng toàn quốc.",
+    wholesaleCluster: {
+      title: "Nguồn hàng áo polo trơn",
+      links: [
+        { label: "Kho áo polo trơn số lượng lớn", href: "/kho-ao-polo-tron" },
+        { label: "Áo polo trơn sỉ giá tốt", href: "/ao-polo-tron-si" },
+      ],
+    },
   },
 
   // ─────────────────────────────────────────────────────────────────────────

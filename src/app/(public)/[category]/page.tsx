@@ -170,15 +170,112 @@ export default async function CategoryPage({ params }: PageProps) {
 
       {/* ── Long-form SEO Content (shown when static content exists) ──── */}
       {content ? (
-        <CollectionSEOContent
-          title={cat.name}
-          intro={content.intro}
-          benefits={content.benefits}
-          applications={content.applications}
-          faq={content.faq}
-          ctaTitle={content.ctaTitle}
-          ctaDescription={content.ctaDescription}
-        />
+        <>
+          <CollectionSEOContent
+            title={cat.name}
+            intro={content.intro}
+            benefits={content.benefits}
+            applications={content.applications}
+            faq={content.faq}
+            ctaTitle={content.ctaTitle}
+            ctaDescription={content.ctaDescription}
+          />
+          {/* ── Wholesale cluster links (cross-linking to SEO keyword pages) */}
+          {content.wholesaleCluster && (
+            <section
+              style={{
+                padding: "40px 0",
+                background: "#fff",
+                borderTop: "1px solid #e5e7eb",
+              }}
+            >
+              <div
+                className="container"
+                style={{ padding: "0 24px", maxWidth: "860px" }}
+              >
+                <h2
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: 700,
+                    color: "#111827",
+                    marginBottom: "16px",
+                  }}
+                >
+                  {content.wholesaleCluster.title}
+                </h2>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+                  {content.wholesaleCluster.links.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      style={{
+                        display: "inline-block",
+                        padding: "10px 18px",
+                        background: "#f1f5f9",
+                        color: "#1d4ed8",
+                        borderRadius: "8px",
+                        fontWeight: 600,
+                        fontSize: "14px",
+                        textDecoration: "none",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      {link.label} →
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* ── Knowledge cluster links (fabric / size / color guides) */}
+          {content.knowledgeCluster && (
+            <section
+              style={{
+                padding: "40px 0",
+                background: "#f9fafb",
+                borderTop: "1px solid #e5e7eb",
+              }}
+            >
+              <div
+                className="container"
+                style={{ padding: "0 24px", maxWidth: "860px" }}
+              >
+                <h2
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: 700,
+                    color: "#111827",
+                    marginBottom: "16px",
+                  }}
+                >
+                  {content.knowledgeCluster.title}
+                </h2>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+                  {content.knowledgeCluster.links.map((link) => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      style={{
+                        display: "inline-block",
+                        padding: "10px 18px",
+                        background: "#fff",
+                        color: "#0f766e",
+                        borderRadius: "8px",
+                        fontWeight: 600,
+                        fontSize: "14px",
+                        textDecoration: "none",
+                        border: "1px solid #ccfbf1",
+                      }}
+                    >
+                      {link.label} →
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+        </>
       ) : (
         /* Fallback for categories without static content */
         <section

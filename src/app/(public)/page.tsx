@@ -248,6 +248,164 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ── Kiến thức áo thun cluster ───────────────────────────────────── */}
+      <section
+        className="section"
+        style={{ background: "#f0fdf4", borderTop: "1px solid #bbf7d0" }}
+      >
+        <div className="container">
+          <h2 className="section-title">Kiến thức áo thun</h2>
+          <p
+            className="section-description"
+            style={{ marginBottom: "28px" }}
+          >
+            Hướng dẫn chọn màu sắc, size, chất liệu vải cho đại lý và xưởng
+            in.
+          </p>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: "16px",
+            }}
+          >
+            {[
+              {
+                href: "/bang-mau-ao-thun-tron",
+                title: "Bảng màu áo thun trơn",
+                desc: "Hướng dẫn chọn màu đồng phục và tips in ấn",
+              },
+              {
+                href: "/size-ao-thun-tron",
+                title: "Size áo thun trơn",
+                desc: "Bảng size chuẩn và hướng dẫn đặt hàng đúng size",
+              },
+              {
+                href: "/vai-cotton-2-chieu",
+                title: "Vải cotton 2 chiều",
+                desc: "Đặc điểm, ưu nhược điểm và ứng dụng",
+              },
+              {
+                href: "/vai-cvc-la-gi",
+                title: "Vải CVC là gì?",
+                desc: "So sánh CVC với cotton và TC chi tiết",
+              },
+              {
+                href: "/vai-tc-la-gi",
+                title: "Vải TC là gì?",
+                desc: "Thành phần, ưu nhược điểm và khi nào nên dùng",
+              },
+            ].map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="card"
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "15px",
+                    color: "#0f766e",
+                    marginBottom: "6px",
+                  }}
+                >
+                  {item.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: "#6b7280",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {item.desc}
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Kho hàng & nguồn hàng cluster ──────────────────────────────── */}
+      <section
+        className="section"
+        style={{ background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}
+      >
+        <div className="container">
+          <h2 className="section-title">Kho hàng &amp; nguồn hàng</h2>
+          <p
+            className="section-description"
+            style={{ marginBottom: "28px" }}
+          >
+            Tìm hiểu chi tiết về kho hàng, giá sỉ và nguồn cung cấp cho đại
+            lý, xưởng in và doanh nghiệp.
+          </p>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: "16px",
+            }}
+          >
+            {[
+              {
+                href: "/kho-ao-thun-tron",
+                title: "Kho áo thun trơn",
+                desc: "Tồn kho lớn, hàng chục màu, giao nhanh toàn quốc",
+              },
+              {
+                href: "/ao-thun-tron-si",
+                title: "Áo thun trơn sỉ",
+                desc: "Giá sỉ bậc thang, chiết khấu đại lý lên đến 20%",
+              },
+              {
+                href: "/nguon-hang-ao-thun-tron",
+                title: "Nguồn hàng áo thun trơn",
+                desc: "Nhà cung cấp trực tiếp cho xưởng in và đại lý",
+              },
+              {
+                href: "/kho-ao-polo-tron",
+                title: "Kho áo polo trơn",
+                desc: "Pique cotton cao cấp, kho sẵn sàng cho đồng phục",
+              },
+              {
+                href: "/ao-polo-tron-si",
+                title: "Áo polo trơn sỉ",
+                desc: "Giá sỉ cạnh tranh, chính sách đại lý hấp dẫn",
+              },
+            ].map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="card"
+                style={{ textDecoration: "none", color: "inherit" }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "15px",
+                    color: "#1d4ed8",
+                    marginBottom: "6px",
+                  }}
+                >
+                  {item.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: "#6b7280",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {item.desc}
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="section">
         <div className="container">
           <div className="card">
