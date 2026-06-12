@@ -1,17 +1,38 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import type { LeadPipelineStatus } from "@prisma/client";
+import {
+  PIPELINE_STATUS_LABELS as PIPELINE_LABELS,
+  PIPELINE_STATUS_COLORS as PIPELINE_COLORS,
+  ALL_PIPELINE_STATUSES,
+} from "@/lib/pipelineStatus";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "";
 
 export default async function DashboardPage() {
-  const [totalLeads, newLeads, totalProducts, totalPosts, totalDealers] =
-    await Promise.all([
-      prisma.dealerLead.count(),
-      prisma.dealerLead.count({ where: { status: "NEW" } }),
-      prisma.product.count({ where: { status: "ACTIVE" } }),
-      prisma.post.count({ where: { status: "PUBLISHED" } }),
-      prisma.dealer.count(),
-    ]);
+  const [
+    totalLeads,
+    newLeads,
+    totalProducts,
+    totalPosts,
+    totalDealers,
+    pipelineGroups,
+  ] = await Promise.all([
+    prisma.dealerLead.count(),
+    prisma.dealerLead.count({ where: { pipelineStatus: "NEW" } }),
+    prisma.product.count({ where: { status: "ACTIVE" } }),
+    prisma.post.count({ where: { status: "PUBLISHED" } }),
+    prisma.dealer.count(),
+    prisma.dealerLead.groupBy({
+      by: ["pipelineStatus"],
+      _count: { id: true },
+    }),
+  ]);
+
+  const pipelineCounts: Partial<Record<LeadPipelineStatus, number>> = {};
+  for (const row of pipelineGroups) {
+    pipelineCounts[row.pipelineStatus] = row._count.id;
+  }
 
   const cards = [
     {
@@ -141,6 +162,65 @@ export default async function DashboardPage() {
             </div>
           </Link>
         ))}
+      </div>
+
+      {/* CRM Pipeline summary */}
+      <div style={{ marginBottom: "40px" }}>
+        <h2
+          style={{
+            fontSize: "16px",
+            fontWeight: 600,
+            color: "#374151",
+            margin: "0 0 16px",
+          }}
+        >
+          Pipeline CRM
+        </h2>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "10px",
+          }}
+        >
+          {ALL_PIPELINE_STATUSES.map((status) => {
+            const count = pipelineCounts[status] ?? 0;
+            const { bg, color } = PIPELINE_COLORS[status];
+            return (
+              <Link
+                key={status}
+                href="/quan-tri/khach-hang-tiem-nang"
+                style={{
+                  textDecoration: "none",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  padding: "12px 20px",
+                  borderRadius: "10px",
+                  background: bg,
+                  minWidth: "90px",
+                }}
+              >
+                <span
+                  style={{ fontSize: "24px", fontWeight: 800, color, lineHeight: 1 }}
+                >
+                  {count}
+                </span>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    color,
+                    marginTop: "4px",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {PIPELINE_LABELS[status]}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       {/* Analytics card */}

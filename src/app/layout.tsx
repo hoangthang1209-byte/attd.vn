@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SITE_URL, SITE_NAME } from "@/lib/seo";
 import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
+import AttributionTracker from "@/components/analytics/AttributionTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,6 +53,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
         />
         <GoogleAnalytics />
+        <AttributionTracker />
         {children}
       </body>
     </html>

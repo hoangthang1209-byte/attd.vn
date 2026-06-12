@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { trackGenerateLead } from "@/lib/analytics";
+import { getAttribution } from "@/lib/attribution";
 
 const PROVINCES = [
   "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
@@ -86,6 +87,8 @@ export default function DealerLeadForm({
     setErrorMessage("");
 
     try {
+      const attribution = getAttribution();
+
       const res = await fetch("/api/dealer-leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,6 +100,13 @@ export default function DealerLeadForm({
           city: city || undefined,
           message: message.trim() || undefined,
           source,
+          utmSource: attribution.utmSource,
+          utmMedium: attribution.utmMedium,
+          utmCampaign: attribution.utmCampaign,
+          utmTerm: attribution.utmTerm,
+          utmContent: attribution.utmContent,
+          referrer: attribution.referrer,
+          landingPage: attribution.landingPage,
         }),
       });
 

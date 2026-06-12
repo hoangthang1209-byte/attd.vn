@@ -24,13 +24,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const raw = body as Record<string, unknown>;
 
-  const contactName = typeof raw.contactName === "string" ? raw.contactName.trim() : "";
-  const phone = typeof raw.phone === "string" ? raw.phone.trim() : "";
-  const companyName = typeof raw.companyName === "string" ? raw.companyName.trim() : undefined;
-  const email = typeof raw.email === "string" ? raw.email.trim() : undefined;
-  const city = typeof raw.city === "string" ? raw.city.trim() : undefined;
-  const message = typeof raw.message === "string" ? raw.message.trim() : undefined;
-  const source = typeof raw.source === "string" ? raw.source.trim() : "WEBSITE";
+  /** Trim, truncate to maxLen, return null when empty. */
+  function sanitize(v: unknown, maxLen = 255): string | null {
+    if (typeof v !== "string") return null;
+    const t = v.trim().slice(0, maxLen);
+    return t || null;
+  }
+
+  const contactName = sanitize(raw.contactName) ?? "";
+  const phone = sanitize(raw.phone) ?? "";
+  const companyName = sanitize(raw.companyName);
+  const email = sanitize(raw.email);
+  const city = sanitize(raw.city);
+  const message = sanitize(raw.message, 2000);
+  const source = sanitize(raw.source) ?? "WEBSITE";
+
+  // Attribution fields — all optional, client-supplied, sanitized server-side
+  const utmSource = sanitize(raw.utmSource);
+  const utmMedium = sanitize(raw.utmMedium);
+  const utmCampaign = sanitize(raw.utmCampaign);
+  const utmTerm = sanitize(raw.utmTerm);
+  const utmContent = sanitize(raw.utmContent);
+  const referrer = sanitize(raw.referrer);
+  const landingPage = sanitize(raw.landingPage);
 
   // Required field validation
   if (!contactName) {
@@ -46,22 +62,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Length validation
+  // Length validation (after sanitize, these are already trimmed+capped)
   if (phone.length > 30) {
     return NextResponse.json(
       { success: false, message: "Số điện thoại không hợp lệ." },
-      { status: 400 }
-    );
-  }
-  if (email && email.length > 255) {
-    return NextResponse.json(
-      { success: false, message: "Email không hợp lệ." },
-      { status: 400 }
-    );
-  }
-  if (message && message.length > 2000) {
-    return NextResponse.json(
-      { success: false, message: "Nội dung tin nhắn quá dài (tối đa 2000 ký tự)." },
       { status: 400 }
     );
   }
@@ -71,11 +75,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       data: {
         contactName,
         phone,
-        companyName: companyName || null,
-        email: email || null,
-        city: city || null,
-        message: message || null,
+        companyName,
+        email,
+        city,
+        message,
         source,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+        utmTerm,
+        utmContent,
+        referrer,
+        landingPage,
       },
     });
 
