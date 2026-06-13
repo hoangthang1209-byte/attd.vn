@@ -10,7 +10,6 @@ type ProductCardProps = {
 };
 
 export default function ProductCard({
-  id,
   slug,
   name,
   productCode,
@@ -18,69 +17,52 @@ export default function ProductCard({
   category,
 }: ProductCardProps) {
   return (
-    <Link
-      href={`/san-pham/${slug}`}
-      style={{
-        textDecoration: "none",
-        color: "inherit",
-      }}
-    >
+    <Link href={`/san-pham/${slug}`} className="premium-card" style={{ padding: 0, overflow: "hidden" }}>
       <div
         style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: "12px",
-          overflow: "hidden",
-          background: "#fff",
+          aspectRatio: "4/5",
+          background: "#f9fafb",
+          borderBottom: "1px solid #e5e7eb",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
-        <div
-          style={{
-            aspectRatio: "1/1",
-            background: "#f3f4f6",
-          }}
-        />
+        <span style={{ fontSize: 13, color: "#9ca3af", fontWeight: 500 }}>
+          {productCode ?? "ATTD"}
+        </span>
+      </div>
 
-        <div
+      <div style={{ padding: "20px 22px 24px" }}>
+        <p
           style={{
-            padding: "16px",
+            margin: "0 0 8px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#9ca3af",
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
           }}
         >
-          <div
-            style={{
-              fontSize: "12px",
-              color: "#6b7280",
-            }}
-          >
-            {productCode ?? "ATTD"}
-          </div>
+          {category}
+        </p>
 
-          <h3
-            style={{
-              marginTop: "8px",
-              marginBottom: "8px",
-            }}
-          >
-            {name}
-          </h3>
+        <h3
+          style={{
+            margin: "0 0 12px",
+            fontSize: 15,
+            fontWeight: 600,
+            lineHeight: 1.45,
+            color: "#111827",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {name}
+        </h3>
 
-          <div
-            style={{
-              color: "#6b7280",
-              fontSize: "14px",
-            }}
-          >
-            {category}
-          </div>
-
-          <div
-            style={{
-              marginTop: "12px",
-              fontWeight: 600,
-            }}
-          >
-            {skuCount} SKU
-          </div>
-        </div>
+        <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
+          {skuCount} SKU
+        </p>
       </div>
     </Link>
   );

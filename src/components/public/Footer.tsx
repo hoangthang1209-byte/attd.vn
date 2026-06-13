@@ -1,49 +1,59 @@
+import Link from "next/link";
+
 export default function Footer() {
-    return (
-      <footer
-        style={{
-          borderTop: "1px solid #e5e7eb",
-          marginTop: "80px",
-          padding: "48px 24px",
-          background: "#fafafa",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns:
-              "2fr 1fr 1fr",
-            gap: "32px",
-          }}
-        >
+  return (
+    <footer className="site-footer">
+      <div className="container">
+        <div className="site-footer-grid">
           <div>
-            <h3>ATTD.VN</h3>
-  
-            <p>
-              Kho sỉ đồng phục và quà tặng
-              doanh nghiệp.
+            <p className="site-footer-brand">ATTD.VN</p>
+            <p className="site-footer-text">
+              Kho sỉ đồng phục và quà tặng doanh nghiệp — nguồn hàng B2B cho
+              đại lý, xưởng in và doanh nghiệp trên toàn quốc.
             </p>
           </div>
-  
+
           <div>
-            <h4>Danh mục</h4>
-  
-            <p>Áo thun</p>
-            <p>Áo polo</p>
-            <p>Nón</p>
-            <p>Tote</p>
+            <p className="site-footer-heading">Danh mục</p>
+            <div className="site-footer-links">
+              <Link href="/ao-thun-tron" className="site-footer-link">
+                Áo thun trơn
+              </Link>
+              <Link href="/ao-polo-tron" className="site-footer-link">
+                Áo polo trơn
+              </Link>
+              <Link href="/non" className="site-footer-link">
+                Nón
+              </Link>
+              <Link href="/tote" className="site-footer-link">
+                Tote
+              </Link>
+            </div>
           </div>
-  
+
           <div>
-            <h4>Hỗ trợ</h4>
-  
-            <p>Đại lý</p>
-            <p>Liên hệ</p>
-            <p>OEM</p>
+            <p className="site-footer-heading">Hỗ trợ</p>
+            <div className="site-footer-links">
+              <Link href="/dai-ly" className="site-footer-link">
+                Đăng ký đại lý
+              </Link>
+              <Link href="/lien-he" className="site-footer-link">
+                Liên hệ
+              </Link>
+              <Link href="/oem" className="site-footer-link">
+                OEM
+              </Link>
+              <Link href="/nguon-hang" className="site-footer-link">
+                Nguồn hàng
+              </Link>
+            </div>
           </div>
         </div>
-      </footer>
-    );
-  }
+
+        <div className="site-footer-bottom">
+          © {new Date().getFullYear()} ATTD.VN — B2B Sourcing Platform
+        </div>
+      </div>
+    </footer>
+  );
+}

@@ -1,61 +1,64 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import { Menu, X } from "lucide-react";
+
+const NAV_LINKS = [
+  { href: "/ao-thun-tron", label: "Áo thun" },
+  { href: "/ao-polo-tron", label: "Áo polo" },
+  { href: "/non", label: "Nón" },
+  { href: "/tote", label: "Tote" },
+  { href: "/binh-giu-nhiet", label: "Bình giữ nhiệt" },
+  { href: "/nguon-hang", label: "Nguồn hàng" },
+  { href: "/dai-ly", label: "Đại lý" },
+  { href: "/lien-he", label: "Liên hệ" },
+];
 
 export default function Header() {
+  const [open, setOpen] = useState(false);
+
   return (
-    <header
-      style={{
-        borderBottom: "1px solid #e5e7eb",
-        background: "#ffffff",
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "16px 24px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Link
-          href="/"
-          style={{
-            textDecoration: "none",
-            color: "#111827",
-            fontWeight: 700,
-            fontSize: "20px",
-          }}
-        >
-          ATTD
-        </Link>
-
-        <nav
-          style={{
-            display: "flex",
-            gap: "24px",
-            alignItems: "center",
-          }}
-        >
-          <Link href="/ao-thun-tron">Áo thun</Link>
-
-          <Link href="/ao-polo-tron">Áo polo</Link>
-
-          <Link href="/non">Nón</Link>
-
-          <Link href="/tote">Tote</Link>
-
-          <Link href="/binh-giu-nhiet">
-            Bình giữ nhiệt
+    <header className="site-header">
+      <div className="container">
+        <div className="site-header-inner">
+          <Link href="/" className="site-logo">
+            ATTD
           </Link>
 
-          <Link href="/dai-ly">Đại lý</Link>
+          <nav className="site-nav-desktop" aria-label="Main navigation">
+            {NAV_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className="site-nav-link">
+                {link.label}
+              </Link>
+            ))}
+          </nav>
 
-          <Link href="/lien-he">Liên hệ</Link>
-        </nav>
+          <button
+            type="button"
+            aria-label={open ? "Đóng menu" : "Mở menu"}
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="site-nav-toggle"
+          >
+            {open ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+
+        {open && (
+          <nav className="site-nav-mobile" aria-label="Mobile navigation">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setOpen(false)}
+                className="site-nav-mobile-link"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        )}
       </div>
     </header>
   );

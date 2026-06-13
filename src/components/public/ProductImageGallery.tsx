@@ -55,12 +55,13 @@ export default function ProductImageGallery({ images, productName }: Props) {
       <div
         style={{
           aspectRatio: "1 / 1",
-          background: "#f3f4f6",
-          borderRadius: "12px",
+          background: "#f9fafb",
+          borderRadius: 12,
+          border: "1px solid #e5e7eb",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: "14px",
+          fontSize: 14,
           color: "#9ca3af",
         }}
       >
@@ -78,9 +79,10 @@ export default function ProductImageGallery({ images, productName }: Props) {
         style={{
           position: "relative",
           aspectRatio: "1 / 1",
-          borderRadius: "12px",
+          borderRadius: 12,
           overflow: "hidden",
-          background: "#f3f4f6",
+          background: "#f9fafb",
+          border: "1px solid #e5e7eb",
           opacity: mainOpacity,
           transition: "opacity 0.13s ease",
         }}
@@ -155,16 +157,15 @@ export default function ProductImageGallery({ images, productName }: Props) {
                   width: "72px",
                   height: "72px",
                   flexShrink: 0,
-                  borderRadius: "8px",
+                  borderRadius: 10,
                   overflow: "hidden",
                   border: "none",
                   padding: 0,
                   cursor: isSelected ? "default" : "pointer",
-                  background: "#f3f4f6",
-                  // Use box-shadow instead of outline for smooth CSS transition
+                  background: "#f9fafb",
                   boxShadow: isSelected
-                    ? "0 0 0 2px var(--primary)"
-                    : "0 0 0 2px transparent",
+                    ? "0 0 0 2px #dc2626"
+                    : "0 0 0 1px #e5e7eb",
                   // Dim unselected; slightly brighten on hover
                   opacity: isSelected ? 1 : isHovered ? 0.82 : 0.55,
                   // Subtle lift on hover

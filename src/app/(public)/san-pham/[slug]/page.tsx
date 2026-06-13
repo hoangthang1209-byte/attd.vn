@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import TrackedLink from "@/components/analytics/TrackedLink";
 import type { Metadata } from "next";
 import { getProductBySlug, getRelatedProducts } from "@/features/products/services/product.service";
+import ProductCard from "@/components/public/ProductCard";
 import ProductImageGallery from "@/components/public/ProductImageGallery";
+import StickyInquiryBox from "@/components/public/StickyInquiryBox";
+import ProductFaqList from "@/components/public/ProductFaqList";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
 import {
@@ -202,48 +204,35 @@ export default async function ProductDetailPage({ params }: PageProps) {
       />
 
       {/* ── Product Hero ─────────────────────────────────────────────────── */}
-      <section className="section">
+      <section className="section-compact">
         <div className="container">
           <div
             className="grid grid-cols-1 lg:grid-cols-2"
-            style={{ gap: "48px" }}
+            style={{ gap: 56, alignItems: "start" }}
           >
-            {/* Image column */}
             <ProductImageGallery
               images={product.images}
               productName={displayName}
             />
 
-            {/* Info column */}
             <div>
-              {/* Product code + category */}
               <div
                 style={{
                   display: "flex",
-                  gap: "12px",
+                  gap: 12,
                   alignItems: "center",
-                  marginBottom: "12px",
+                  marginBottom: 16,
                   flexWrap: "wrap",
                 }}
               >
                 {(catalog?.sku ?? product.productCode) && (
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      background: "#f3f4f6",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      letterSpacing: "0.05em",
-                    }}
-                  >
+                  <span className="product-meta-pill">
                     {catalog?.sku ?? product.productCode}
                   </span>
                 )}
                 <Link
                   href={`/${categorySlug}`}
-                  style={{ fontSize: "14px", color: "#6b7280" }}
+                  style={{ fontSize: 14, color: "#6b7280", fontWeight: 500 }}
                 >
                   {categoryName}
                 </Link>
@@ -251,10 +240,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
               <h1
                 style={{
-                  fontSize: "32px",
+                  fontSize: "clamp(28px, 3.5vw, 36px)",
                   fontWeight: 700,
-                  lineHeight: 1.2,
-                  margin: "0 0 16px",
+                  lineHeight: 1.15,
+                  letterSpacing: "-0.02em",
+                  margin: "0 0 20px",
                 }}
               >
                 {displayName}
@@ -264,20 +254,17 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 <p
                   style={{
                     color: "#6b7280",
-                    lineHeight: 1.7,
-                    margin: "0 0 24px",
+                    lineHeight: 1.75,
+                    fontSize: 16,
+                    margin: "0 0 28px",
                   }}
                 >
                   {displayShortDescription}
                 </p>
               )}
 
-              {/* Specs */}
               {hasSpecs && (
-                <div
-                  className="card"
-                  style={{ marginBottom: "24px", padding: "16px" }}
-                >
+                <div className="premium-card-static" style={{ marginBottom: 24, padding: 20 }}>
                   <dl
                     style={{
                       margin: 0,
@@ -326,11 +313,14 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 <div
                   style={{
                     display: "flex",
-                    gap: "16px",
+                    gap: 20,
                     flexWrap: "wrap",
-                    fontSize: "14px",
+                    fontSize: 14,
                     color: "#374151",
-                    marginBottom: "16px",
+                    marginBottom: 28,
+                    padding: "16px 0",
+                    borderTop: "1px solid #f3f4f6",
+                    borderBottom: "1px solid #f3f4f6",
                   }}
                 >
                   <span>
@@ -347,140 +337,22 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 </div>
               )}
 
-              {/* Stock status */}
-              {stockLabel && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "24px",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background: stockColor,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: "14px",
-                      color: stockColor,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {stockLabel}
-                  </span>
-                </div>
-              )}
-
-              {/* Pricing notice */}
-              <div
-                className="card"
-                style={{
-                  marginBottom: "32px",
-                  padding: "16px",
-                  background: "#f9fafb",
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "14px",
-                    color: "#6b7280",
-                    lineHeight: 1.6,
-                  }}
-                >
-                  Vui lòng liên hệ để nhận báo giá dành cho đại lý và doanh
-                  nghiệp.
-                </p>
-              </div>
-
-              {/* CTAs */}
-              <div
-                style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}
-              >
-                <TrackedLink
-                  href="/dai-ly"
-                  trackEvent="dealer_registration_click"
-                  trackSource="PRODUCT_PAGE"
-                  className="btn-primary"
-                >
-                  Đăng ký đại lý
-                </TrackedLink>
-                <TrackedLink
-                  href="/lien-he"
-                  trackEvent="contact_quote"
-                  trackSource="PRODUCT_PAGE"
-                  className="btn-secondary"
-                >
-                  Liên hệ báo giá
-                </TrackedLink>
-                <TrackedLink
-                  href="https://zalo.me/0934337667"
-                  trackEvent="contact_zalo"
-                  trackSource="PRODUCT_PAGE"
-                  external
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary"
-                >
-                  Chat Zalo
-                </TrackedLink>
-              </div>
-
-              {/* Internal links */}
-              <div
-                style={{
-                  marginTop: "28px",
-                  paddingTop: "20px",
-                  borderTop: "1px solid #f3f4f6",
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "10px",
-                }}
-              >
-                <span
-                  style={{ fontSize: "13px", color: "#9ca3af", alignSelf: "center" }}
-                >
-                  Tìm hiểu thêm:
-                </span>
-                {internalLinks.map((l) => (
-                  <Link
-                    key={l.href}
-                    href={l.href}
-                    style={{
-                      fontSize: "13px",
-                      color: "#374151",
-                      textDecoration: "underline",
-                      textUnderlineOffset: "3px",
-                    }}
-                  >
-                    {l.label}
-                  </Link>
-                ))}
-              </div>
+              <StickyInquiryBox
+                stockLabel={stockLabel}
+                stockColor={stockColor}
+                internalLinks={internalLinks}
+              />
             </div>
           </div>
         </div>
       </section>
 
       {/* ── Product Description ───────────────────────────────────────────── */}
-      <section
-        className="section"
-        style={{ borderTop: "1px solid #f3f4f6", background: "#f9fafb" }}
-      >
-        <div className="container" style={{ maxWidth: "720px" }}>
+      <section className="section-alt section-compact">
+        <div className="container" style={{ maxWidth: 760 }}>
           <h2
-            style={{
-              fontSize: "22px",
-              fontWeight: 700,
-              margin: "0 0 24px",
-            }}
+            className="section-title"
+            style={{ fontSize: 24, marginBottom: 32 }}
           >
             Mô tả sản phẩm
           </h2>
@@ -526,88 +398,24 @@ export default async function ProductDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* ── FAQ ──────────────────────────────────────────────────────────── */}
-      <section
-        className="section"
-        style={{ borderTop: "1px solid #e5e7eb" }}
-      >
-        <div className="container" style={{ maxWidth: "720px" }}>
+      <section className="section-compact">
+        <div className="container" style={{ maxWidth: 760 }}>
           <h2
-            style={{
-              fontSize: "20px",
-              fontWeight: 700,
-              margin: "0 0 24px",
-              color: "#111827",
-            }}
+            className="section-title"
+            style={{ fontSize: 24, marginBottom: 32 }}
           >
             Hỏi đáp thường gặp
           </h2>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {faqItems.map(({ question, answer }) => (
-              <details
-                key={question}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "10px",
-                  background: "#fff",
-                  overflow: "hidden",
-                }}
-              >
-                <summary
-                  style={{
-                    padding: "16px 20px",
-                    fontWeight: 600,
-                    fontSize: "15px",
-                    color: "#111827",
-                    cursor: "pointer",
-                    listStyle: "none",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    userSelect: "none",
-                  }}
-                >
-                  {question}
-                  <span
-                    aria-hidden
-                    style={{ fontSize: "20px", lineHeight: 1, color: "#9ca3af", flexShrink: 0 }}
-                  >
-                    +
-                  </span>
-                </summary>
-
-                <div
-                  style={{
-                    padding: "0 20px 16px",
-                    fontSize: "15px",
-                    lineHeight: 1.7,
-                    color: "#4b5563",
-                    borderTop: "1px solid #f3f4f6",
-                  }}
-                >
-                  <p style={{ margin: "12px 0 0" }}>{answer}</p>
-                </div>
-              </details>
-            ))}
-          </div>
+          <ProductFaqList items={faqItems} />
         </div>
       </section>
 
-      {/* ── Related Products ─────────────────────────────────────────────── */}
       {relatedProducts.length > 0 && (
-        <section
-          className="section"
-          style={{ borderTop: "1px solid #e5e7eb", background: "#f9fafb" }}
-        >
+        <section className="section-alt section-compact">
           <div className="container">
             <h2
-              style={{
-                fontSize: "20px",
-                fontWeight: 700,
-                margin: "0 0 24px",
-                color: "#111827",
-              }}
+              className="section-title"
+              style={{ fontSize: 24, marginBottom: 32 }}
             >
               Sản phẩm liên quan
             </h2>
@@ -615,84 +423,28 @@ export default async function ProductDetailPage({ params }: PageProps) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                gap: "16px",
+                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                gap: 24,
               }}
             >
               {relatedProducts.map((related) => (
-                <Link
+                <ProductCard
                   key={related.id}
-                  href={`/san-pham/${related.slug}`}
-                  style={{ textDecoration: "none", color: "inherit" }}
-                >
-                  <article
-                    style={{
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "10px",
-                      overflow: "hidden",
-                      background: "#fff",
-                    }}
-                  >
-                    {/* Product thumbnail */}
-                    <div
-                      style={{
-                        aspectRatio: "1 / 1",
-                        background: "#f3f4f6",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {related.images[0]?.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={related.images[0].imageUrl}
-                          alt={related.images[0].altText ?? related.name}
-                          loading="lazy"
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : null}
-                    </div>
-
-                    <div style={{ padding: "12px 14px" }}>
-                      <h3
-                        style={{
-                          fontSize: "14px",
-                          fontWeight: 600,
-                          color: "#111827",
-                          margin: "0 0 4px",
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {related.name}
-                      </h3>
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          color: "#9ca3af",
-                          margin: 0,
-                        }}
-                      >
-                        {related.variants.length} SKU
-                      </p>
-                    </div>
-                  </article>
-                </Link>
+                  id={related.id}
+                  slug={related.slug}
+                  name={related.name}
+                  skuCount={related.variants.length}
+                  category={categoryName}
+                />
               ))}
             </div>
 
-            <div style={{ marginTop: "20px" }}>
-              <Link
-                href={`/${product.category.slug}`}
-                style={{
-                  fontSize: "14px",
-                  color: "#1d4ed8",
-                  textDecoration: "none",
-                }}
-              >
-                Xem tất cả {product.category.name} →
+            <div style={{ marginTop: 28 }}>
+              <Link href={`/${categorySlug}`} className="link-chip">
+                Xem tất cả {categoryName}
+                <span aria-hidden style={{ color: "#9ca3af" }}>
+                  →
+                </span>
               </Link>
             </div>
           </div>

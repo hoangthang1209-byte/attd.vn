@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/public/ProductCard";
+import InternalLinkBlock from "@/components/public/InternalLinkBlock";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
 import CollectionSchema from "@/components/seo/CollectionSchema";
@@ -98,8 +99,8 @@ export default async function CategoryPage({ params }: PageProps) {
       <Breadcrumb items={[{ name: cat.name }]} />
 
       {/* ── Category Hero ──────────────────────────────────────────────── */}
-      <section className="section" style={{ paddingBottom: "24px" }}>
-        <div className="container" style={{ padding: "0 24px" }}>
+      <section className="section-compact" style={{ paddingBottom: 32 }}>
+        <div className="container">
           {cat.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -107,39 +108,38 @@ export default async function CategoryPage({ params }: PageProps) {
               alt={cat.name}
               style={{
                 width: "100%",
-                maxHeight: "320px",
+                maxHeight: 280,
                 objectFit: "cover",
-                borderRadius: "12px",
-                marginBottom: "32px",
+                borderRadius: 12,
+                marginBottom: 40,
+                border: "1px solid #e5e7eb",
               }}
             />
           )}
 
-          {/* Single H1 per page */}
-          <h1
-            className="section-title"
-            style={{ marginBottom: "12px" }}
-          >
+          <h1 className="section-title" style={{ marginBottom: 16 }}>
             {cat.name}
           </h1>
 
           <p
             className="section-description"
-            style={{ marginBottom: "32px", maxWidth: "720px" }}
+            style={{ marginBottom: 48, maxWidth: 720 }}
           >
             {content?.shortIntro ??
               cat.description ??
               `Nguồn hàng ${cat.name.toLowerCase()} dành cho đại lý, xưởng in và doanh nghiệp.`}
           </p>
 
-          {/* ── Product Grid ─────────────────────────────────────────── */}
           {cat.products.length === 0 ? (
             <div
               style={{
-                padding: "48px 0",
+                padding: "64px 0",
                 textAlign: "center",
                 color: "#9ca3af",
-                fontSize: "15px",
+                fontSize: 15,
+                border: "1px dashed #e5e7eb",
+                borderRadius: 12,
+                background: "#f9fafb",
               }}
             >
               Chưa có sản phẩm trong danh mục này.
@@ -149,7 +149,7 @@ export default async function CategoryPage({ params }: PageProps) {
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                gap: "20px",
+                gap: 24,
               }}
             >
               {cat.products.map((product) => (
@@ -182,119 +182,30 @@ export default async function CategoryPage({ params }: PageProps) {
           />
           {/* ── Wholesale cluster links (cross-linking to SEO keyword pages) */}
           {content.wholesaleCluster && (
-            <section
-              style={{
-                padding: "40px 0",
-                background: "#fff",
-                borderTop: "1px solid #e5e7eb",
-              }}
-            >
-              <div
-                className="container"
-                style={{ padding: "0 24px", maxWidth: "860px" }}
-              >
-                <h2
-                  style={{
-                    fontSize: "18px",
-                    fontWeight: 700,
-                    color: "#111827",
-                    marginBottom: "16px",
-                  }}
-                >
-                  {content.wholesaleCluster.title}
-                </h2>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-                  {content.wholesaleCluster.links.map((link) => (
-                    <a
-                      key={link.href}
-                      href={link.href}
-                      style={{
-                        display: "inline-block",
-                        padding: "10px 18px",
-                        background: "#f1f5f9",
-                        color: "#1d4ed8",
-                        borderRadius: "8px",
-                        fontWeight: 600,
-                        fontSize: "14px",
-                        textDecoration: "none",
-                        border: "1px solid #e2e8f0",
-                      }}
-                    >
-                      {link.label} →
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </section>
+            <InternalLinkBlock
+              title={content.wholesaleCluster.title}
+              links={content.wholesaleCluster.links}
+            />
           )}
 
-          {/* ── Knowledge cluster links (fabric / size / color guides) */}
           {content.knowledgeCluster && (
-            <section
-              style={{
-                padding: "40px 0",
-                background: "#f9fafb",
-                borderTop: "1px solid #e5e7eb",
-              }}
-            >
-              <div
-                className="container"
-                style={{ padding: "0 24px", maxWidth: "860px" }}
-              >
-                <h2
-                  style={{
-                    fontSize: "18px",
-                    fontWeight: 700,
-                    color: "#111827",
-                    marginBottom: "16px",
-                  }}
-                >
-                  {content.knowledgeCluster.title}
-                </h2>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-                  {content.knowledgeCluster.links.map((link) => (
-                    <a
-                      key={link.href}
-                      href={link.href}
-                      style={{
-                        display: "inline-block",
-                        padding: "10px 18px",
-                        background: "#fff",
-                        color: "#0f766e",
-                        borderRadius: "8px",
-                        fontWeight: 600,
-                        fontSize: "14px",
-                        textDecoration: "none",
-                        border: "1px solid #ccfbf1",
-                      }}
-                    >
-                      {link.label} →
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </section>
+            <InternalLinkBlock
+              title={content.knowledgeCluster.title}
+              links={content.knowledgeCluster.links}
+              alt
+            />
           )}
         </>
       ) : (
         /* Fallback for categories without static content */
-        <section
-          style={{
-            background: "#f9fafb",
-            borderTop: "1px solid #e5e7eb",
-            padding: "48px 0",
-          }}
-        >
-          <div
-            className="container"
-            style={{ padding: "0 24px", maxWidth: "800px" }}
-          >
+        <section className="section-alt section-compact">
+          <div className="container" style={{ maxWidth: 800 }}>
             <h2
               style={{
-                fontSize: "18px",
+                fontSize: 20,
                 fontWeight: 700,
-                marginBottom: "16px",
-                color: "#111827",
+                marginBottom: 20,
+                letterSpacing: "-0.02em",
               }}
             >
               Về danh mục {cat.name}

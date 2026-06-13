@@ -1,433 +1,199 @@
+import Link from "next/link";
 import { getCategories } from "@/features/categories/services/category.service";
-import { getProducts } from "@/features/products/services/product.service";
-import Section from "@/components/public/Section";
-import ProductCard from "@/components/public/ProductCard";
+import SectionHeader from "@/components/public/SectionHeader";
+import CategoryCard from "@/components/public/CategoryCard";
+import ClusterLinkGrid from "@/components/public/ClusterLinkGrid";
+import TrustStats from "@/components/public/TrustStats";
+import CTASection from "@/components/public/CTASection";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import {
+  Shirt,
+  CircleDot,
+  HardHat,
+  ShoppingBag,
+  Thermometer,
+  type LucideIcon,
+} from "lucide-react";
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  "ao-thun-tron": Shirt,
+  "ao-polo-tron": CircleDot,
+  non: HardHat,
+  tote: ShoppingBag,
+  "binh-giu-nhiet": Thermometer,
+};
+
+const WHOLESALE_LINKS = [
+  {
+    href: "/kho-ao-thun-tron",
+    title: "Kho áo thun trơn",
+    desc: "Tồn kho đa màu, giao hàng toàn quốc cho đại lý và xưởng in",
+  },
+  {
+    href: "/ao-thun-tron-si",
+    title: "Áo thun trơn sỉ",
+    desc: "Giá sỉ theo bậc, chính sách ưu đãi cho đại lý",
+  },
+  {
+    href: "/nguon-hang-ao-thun-tron",
+    title: "Nguồn hàng áo thun trơn",
+    desc: "Nhà cung cấp trực tiếp cho xưởng in và agency",
+  },
+  {
+    href: "/kho-ao-polo-tron",
+    title: "Kho áo polo trơn",
+    desc: "Polo trơn sẵn kho, phù hợp đồng phục doanh nghiệp",
+  },
+  {
+    href: "/ao-polo-tron-si",
+    title: "Áo polo trơn sỉ",
+    desc: "Giá sỉ cạnh tranh, hỗ trợ thêu logo theo yêu cầu",
+  },
+];
+
+const KNOWLEDGE_LINKS = [
+  {
+    href: "/bang-mau-ao-thun-tron",
+    title: "Bảng màu áo thun trơn",
+    desc: "Hướng dẫn chọn màu đồng phục và tips in ấn",
+  },
+  {
+    href: "/size-ao-thun-tron",
+    title: "Size áo thun trơn",
+    desc: "Bảng size chuẩn và hướng dẫn đặt hàng đúng size",
+  },
+  {
+    href: "/vai-cotton-2-chieu",
+    title: "Vải cotton 2 chiều",
+    desc: "Đặc điểm, ưu nhược điểm và ứng dụng",
+  },
+  {
+    href: "/vai-cvc-la-gi",
+    title: "Vải CVC là gì?",
+    desc: "So sánh CVC với cotton và TC chi tiết",
+  },
+  {
+    href: "/vai-tc-la-gi",
+    title: "Vải TC là gì?",
+    desc: "Thành phần, ưu nhược điểm và khi nào nên dùng",
+  },
+];
 
 export default async function HomePage() {
   const categories = await getCategories();
-  const products = await getProducts();
 
   return (
     <main>
-      <section className="section">
+      {/* Hero */}
+      <section className="section" style={{ paddingBottom: 80 }}>
         <div className="container">
-          <h1
-            style={{
-              fontSize: "56px",
-              fontWeight: 700,
-              marginBottom: "16px",
-              maxWidth: "800px",
-            }}
-          >
-            Kho sỉ đồng phục và quà tặng doanh nghiệp
-          </h1>
-
           <p
             style={{
-              fontSize: "20px",
-              color: "#6b7280",
-              maxWidth: "700px",
-              lineHeight: 1.7,
+              fontSize: 13,
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "#dc2626",
+              marginBottom: 20,
             }}
           >
-            Nguồn hàng cho đại lý, xưởng in và doanh nghiệp trên toàn quốc. Hàng có sẵn, nhiều màu, nhiều size, giá sỉ tận kho và giao hàng nhanh.
+            B2B Sourcing Platform
+          </p>
+
+          <h1 className="hero-headline">
+            KHO SỈ ĐỒNG PHỤC &amp; QUÀ TẶNG DOANH NGHIỆP
+          </h1>
+
+          <p className="hero-subheadline">
+            Nguồn hàng dành cho đại lý, xưởng in, agency và doanh nghiệp trên
+            toàn quốc.
           </p>
 
           <div
             style={{
               display: "flex",
-              gap: "16px",
-              marginTop: "32px",
+              gap: 16,
+              marginTop: 40,
+              flexWrap: "wrap",
             }}
           >
-            <a className="btn-primary" href="/ao-thun-tron">
-              Xem sản phẩm
-            </a>
-
+            <Link href="/nguon-hang" className="btn-primary">
+              Xem nguồn hàng
+            </Link>
             <TrackedLink
               href="/dai-ly"
               trackEvent="dealer_registration_click"
               trackSource="HOMEPAGE"
-              className="card"
+              className="btn-secondary"
             >
               Đăng ký đại lý
             </TrackedLink>
           </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "16px",
-              marginTop: "48px",
-            }}
-          >
-            <div className="card">
-              <strong>1000+</strong>
-              <div>SKU nguồn hàng</div>
-            </div>
-
-            <div className="card">
-              <strong>Toàn quốc</strong>
-              <div>Giao hàng nhanh</div>
-            </div>
-
-            <div className="card">
-              <strong>B2B</strong>
-              <div>Đại lý & doanh nghiệp</div>
-            </div>
-
-            <div className="card">
-              <strong>OEM</strong>
-              <div>Private Label theo yêu cầu</div>
-            </div>
-          </div>
         </div>
       </section>
 
-      <Section title="Danh mục nổi bật">
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "16px",
-          }}
-        >
-          {categories.map((category) => (
-            <a
-              key={category.id}
-              className="card"
-              href={`/${category.slug}`}
-            >
-              {category.name}
-            </a>
-          ))}
-        </div>
-      </Section>
-
-      <section className="section">
+      {/* Category Grid */}
+      <section className="section-alt section-compact">
         <div className="container">
-          <h2 className="section-title">
-            Sản phẩm nổi bật
-          </h2>
-
+          <SectionHeader
+            title="Danh mục nổi bật"
+            description="Blank apparel và quà tặng doanh nghiệp — nguồn hàng cho đại lý và xưởng gia công."
+          />
           <div
             style={{
               display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: "16px",
+              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+              gap: 20,
             }}
           >
-            {products.slice(0, 8).map((product) => (
-              <ProductCard
-                key={product.id}
-                id={product.id}
-                slug={product.slug}
-                name={product.name}
-                productCode={product.productCode}
-                skuCount={product.variants.length}
-                category={product.category?.name}
+            {categories.map((category) => (
+              <CategoryCard
+                key={category.id}
+                name={category.name}
+                slug={category.slug}
+                icon={CATEGORY_ICONS[category.slug]}
               />
             ))}
           </div>
         </div>
       </section>
 
-      <section className="section">
+      {/* Wholesale Cluster */}
+      <section className="section-compact">
         <div className="container">
-          <h2 className="section-title">
-            ATTD dành cho ai?
-          </h2>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: "16px",
-            }}
-          >
-            <div className="card">
-              <h3>Đại lý</h3>
-              <p>
-                Nguồn hàng ổn định, nhiều mẫu mã,
-                chính sách giá theo cấp độ.
-              </p>
-            </div>
-
-            <div className="card">
-              <h3>Xưởng in</h3>
-              <p>
-                Áo thun, polo, nón và tote trơn
-                sẵn kho, phù hợp in theo yêu cầu.
-              </p>
-            </div>
-
-            <div className="card">
-              <h3>Doanh nghiệp</h3>
-              <p>
-                Đồng phục và quà tặng doanh nghiệp
-                với số lượng từ nhỏ đến lớn.
-              </p>
-            </div>
-          </div>
+          <SectionHeader
+            title="Kho hàng & nguồn hàng"
+            description="Tìm hiểu chi tiết về kho hàng, giá sỉ và nguồn cung cấp cho đại lý, xưởng in và doanh nghiệp."
+          />
+          <ClusterLinkGrid links={WHOLESALE_LINKS} />
         </div>
       </section>
 
-      <section className="section">
+      {/* Knowledge Cluster */}
+      <section className="section-alt section-compact">
         <div className="container">
-          <h2 className="section-title">Tại sao chọn ATTD?</h2>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "16px",
-            }}
-          >
-            <div className="card">Kho hàng có sẵn</div>
-            <div className="card">Nhiều màu - nhiều size</div>
-            <div className="card">Giá sỉ tận kho</div>
-            <div className="card">Giao hàng toàn quốc</div>
-          </div>
+          <SectionHeader
+            title="Kiến thức áo thun"
+            description="Hướng dẫn chọn màu sắc, size và chất liệu vải cho đại lý và xưởng in."
+          />
+          <ClusterLinkGrid links={KNOWLEDGE_LINKS} />
         </div>
       </section>
 
-      {/* B2B Solutions */}
-      <section
-        className="section"
-        style={{ background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}
-      >
+      {/* Trust Section */}
+      <section className="section-compact">
         <div className="container">
-          <h2 className="section-title">Giải pháp B2B</h2>
-          <p className="section-description">
-            ATTD phục vụ nhiều nhóm khách hàng doanh nghiệp khác nhau.
-          </p>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-              gap: "16px",
-              marginTop: "28px",
-            }}
-          >
-            {[
-              { href: "/nguon-hang", title: "Nguồn hàng sỉ", desc: "Kho sỉ trơn cho đại lý và xưởng in" },
-              { href: "/oem", title: "OEM & Private Label", desc: "Hàng trơn gắn nhãn thương hiệu riêng" },
-              { href: "/qua-tang-doanh-nghiep", title: "Quà tặng doanh nghiệp", desc: "Áo thun, tote, nón cho sự kiện DN" },
-              { href: "/chinh-sach-dai-ly", title: "Chính sách đại lý", desc: "Quyền lợi và chính sách giá đại lý" },
-            ].map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="card"
-                style={{ textDecoration: "none", color: "inherit" }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: "15px",
-                    color: "#111827",
-                    marginBottom: "6px",
-                  }}
-                >
-                  {item.title}
-                </div>
-                <div
-                  style={{ fontSize: "13px", color: "#6b7280", lineHeight: 1.5 }}
-                >
-                  {item.desc}
-                </div>
-              </a>
-            ))}
-          </div>
+          <SectionHeader
+            title="Tại sao đối tác chọn ATTD"
+            description="Nền tảng sourcing B2B — phục vụ đại lý, xưởng in, agency và doanh nghiệp."
+            align="center"
+          />
+          <TrustStats />
         </div>
       </section>
 
-      {/* ── Kiến thức áo thun cluster ───────────────────────────────────── */}
-      <section
-        className="section"
-        style={{ background: "#f0fdf4", borderTop: "1px solid #bbf7d0" }}
-      >
-        <div className="container">
-          <h2 className="section-title">Kiến thức áo thun</h2>
-          <p
-            className="section-description"
-            style={{ marginBottom: "28px" }}
-          >
-            Hướng dẫn chọn màu sắc, size, chất liệu vải cho đại lý và xưởng
-            in.
-          </p>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-              gap: "16px",
-            }}
-          >
-            {[
-              {
-                href: "/bang-mau-ao-thun-tron",
-                title: "Bảng màu áo thun trơn",
-                desc: "Hướng dẫn chọn màu đồng phục và tips in ấn",
-              },
-              {
-                href: "/size-ao-thun-tron",
-                title: "Size áo thun trơn",
-                desc: "Bảng size chuẩn và hướng dẫn đặt hàng đúng size",
-              },
-              {
-                href: "/vai-cotton-2-chieu",
-                title: "Vải cotton 2 chiều",
-                desc: "Đặc điểm, ưu nhược điểm và ứng dụng",
-              },
-              {
-                href: "/vai-cvc-la-gi",
-                title: "Vải CVC là gì?",
-                desc: "So sánh CVC với cotton và TC chi tiết",
-              },
-              {
-                href: "/vai-tc-la-gi",
-                title: "Vải TC là gì?",
-                desc: "Thành phần, ưu nhược điểm và khi nào nên dùng",
-              },
-            ].map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="card"
-                style={{ textDecoration: "none", color: "inherit" }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: "15px",
-                    color: "#0f766e",
-                    marginBottom: "6px",
-                  }}
-                >
-                  {item.title}
-                </div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#6b7280",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {item.desc}
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Kho hàng & nguồn hàng cluster ──────────────────────────────── */}
-      <section
-        className="section"
-        style={{ background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}
-      >
-        <div className="container">
-          <h2 className="section-title">Kho hàng &amp; nguồn hàng</h2>
-          <p
-            className="section-description"
-            style={{ marginBottom: "28px" }}
-          >
-            Tìm hiểu chi tiết về kho hàng, giá sỉ và nguồn cung cấp cho đại
-            lý, xưởng in và doanh nghiệp.
-          </p>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-              gap: "16px",
-            }}
-          >
-            {[
-              {
-                href: "/kho-ao-thun-tron",
-                title: "Kho áo thun trơn",
-                desc: "Tồn kho lớn, hàng chục màu, giao nhanh toàn quốc",
-              },
-              {
-                href: "/ao-thun-tron-si",
-                title: "Áo thun trơn sỉ",
-                desc: "Giá sỉ bậc thang, chiết khấu đại lý lên đến 20%",
-              },
-              {
-                href: "/nguon-hang-ao-thun-tron",
-                title: "Nguồn hàng áo thun trơn",
-                desc: "Nhà cung cấp trực tiếp cho xưởng in và đại lý",
-              },
-              {
-                href: "/kho-ao-polo-tron",
-                title: "Kho áo polo trơn",
-                desc: "Pique cotton cao cấp, kho sẵn sàng cho đồng phục",
-              },
-              {
-                href: "/ao-polo-tron-si",
-                title: "Áo polo trơn sỉ",
-                desc: "Giá sỉ cạnh tranh, chính sách đại lý hấp dẫn",
-              },
-            ].map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="card"
-                style={{ textDecoration: "none", color: "inherit" }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: "15px",
-                    color: "#1d4ed8",
-                    marginBottom: "6px",
-                  }}
-                >
-                  {item.title}
-                </div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#6b7280",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {item.desc}
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="section">
-        <div className="container">
-          <div className="card">
-            <h2 className="section-title">Trở thành đại lý ATTD</h2>
-
-            <p className="section-description">
-              Đăng ký tài khoản đại lý để nhận chính sách giá tốt hơn và cập nhật nguồn hàng mới nhất.
-            </p>
-
-            <div style={{ marginTop: "24px" }}>
-              <TrackedLink
-                href="/dai-ly"
-                trackEvent="dealer_registration_click"
-                trackSource="HOMEPAGE"
-                className="btn-primary"
-              >
-                Đăng ký đại lý
-              </TrackedLink>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Dealer CTA */}
+      <CTASection />
     </main>
   );
 }
