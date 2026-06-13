@@ -1,5 +1,6 @@
 import Header from "@/components/public/Header";
 import Footer from "@/components/public/Footer";
+import MobileActionBar from "@/components/public/MobileActionBar";
 
 export default function PublicLayout({
   children,
@@ -10,9 +11,10 @@ export default function PublicLayout({
     <>
       <Header />
 
-      {children}
+      <div className="public-main">{children}</div>
 
       <Footer />
+      <MobileActionBar />
     </>
   );
 }

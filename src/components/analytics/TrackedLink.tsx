@@ -19,6 +19,7 @@ interface TrackedLinkProps {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
+  onClick?: () => void;
   /** Pass true for external URLs (e.g. Zalo). Renders <a> instead of <Link>. */
   external?: boolean;
   target?: string;
@@ -38,6 +39,7 @@ export default function TrackedLink({
   external = false,
   className,
   style,
+  onClick,
   target,
   rel,
 }: TrackedLinkProps) {
@@ -53,6 +55,7 @@ export default function TrackedLink({
         trackDealerRegistration(trackSource);
         break;
     }
+    onClick?.();
   }
 
   if (external) {

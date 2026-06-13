@@ -1,65 +1,76 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Menu, X } from "lucide-react";
-
-const NAV_LINKS = [
-  { href: "/ao-thun-tron", label: "Áo thun" },
-  { href: "/ao-polo-tron", label: "Áo polo" },
-  { href: "/non", label: "Nón" },
-  { href: "/tote", label: "Tote" },
-  { href: "/binh-giu-nhiet", label: "Bình giữ nhiệt" },
-  { href: "/nguon-hang", label: "Nguồn hàng" },
-  { href: "/dai-ly", label: "Đại lý" },
-  { href: "/lien-he", label: "Liên hệ" },
-];
+import { useEffect, useState } from "react";
+import { Menu } from "lucide-react";
+import TrackedLink from "@/components/analytics/TrackedLink";
+import NavDropdownMenu from "@/components/public/NavDropdownMenu";
+import MobileNavPanel from "@/components/public/MobileNavPanel";
+import {
+  NAV_DROPDOWNS,
+  NAV_DEALER_LINK,
+  NAV_CONTACT_LINK,
+} from "@/lib/navConfig";
 
 export default function Header() {
-  const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > 8);
+    }
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <header className="site-header">
-      <div className="container">
-        <div className="site-header-inner">
-          <Link href="/" className="site-logo">
-            ATTD
-          </Link>
+    <>
+      <header className={`site-header${scrolled ? " site-header--scrolled" : ""}`}>
+        <div className="container">
+          <div className="site-header-inner">
+            <Link href="/" className="site-logo">
+              ATTD
+            </Link>
 
-          <nav className="site-nav-desktop" aria-label="Main navigation">
-            {NAV_LINKS.map((link) => (
-              <Link key={link.href} href={link.href} className="site-nav-link">
-                {link.label}
+            <nav className="site-nav-center" aria-label="Main navigation">
+              {NAV_DROPDOWNS.map((item) => (
+                <NavDropdownMenu key={item.id} item={item} />
+              ))}
+              <Link href={NAV_DEALER_LINK.href} className="site-nav-link">
+                {NAV_DEALER_LINK.label}
               </Link>
-            ))}
-          </nav>
+            </nav>
 
-          <button
-            type="button"
-            aria-label={open ? "Đóng menu" : "Mở menu"}
-            aria-expanded={open}
-            onClick={() => setOpen(!open)}
-            className="site-nav-toggle"
-          >
-            {open ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
-
-        {open && (
-          <nav className="site-nav-mobile" aria-label="Mobile navigation">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="site-nav-mobile-link"
+            <div className="site-nav-actions">
+              <Link href={NAV_CONTACT_LINK.href} className="site-nav-link">
+                {NAV_CONTACT_LINK.label}
+              </Link>
+              <TrackedLink
+                href="/dai-ly"
+                trackEvent="dealer_registration_click"
+                trackSource="HEADER"
+                className="btn-primary site-nav-cta"
               >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-        )}
-      </div>
-    </header>
+                Đăng ký đại lý
+              </TrackedLink>
+            </div>
+
+            <button
+              type="button"
+              aria-label="Mở menu"
+              aria-expanded={mobileOpen}
+              onClick={() => setMobileOpen(true)}
+              className="site-nav-toggle"
+            >
+              <Menu size={20} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <MobileNavPanel open={mobileOpen} onClose={() => setMobileOpen(false)} />
+    </>
   );
 }
