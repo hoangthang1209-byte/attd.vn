@@ -14,32 +14,13 @@ export default function CategoryCard({
   icon: Icon = Package,
 }: CategoryCardProps) {
   return (
-    <Link href={`/${slug}`} className="premium-card" style={{ color: "inherit" }}>
-      <div
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 12,
-          background: "#f9fafb",
-          border: "1px solid #e5e7eb",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 20,
-          color: "#111827",
-        }}
-      >
-        <Icon size={22} strokeWidth={1.75} />
+    <Link href={`/${slug}`} className="category-card">
+      <div className="category-card-icon" aria-hidden>
+        <Icon size={26} strokeWidth={1.65} />
       </div>
-      <div
-        style={{
-          fontWeight: 600,
-          fontSize: "16px",
-          color: "#111827",
-          letterSpacing: "-0.01em",
-        }}
-      >
-        {name}
+      <div className="category-card-body">
+        <h3 className="category-card-title">{name}</h3>
+        <span className="category-card-cta">Xem danh mục →</span>
       </div>
     </Link>
   );

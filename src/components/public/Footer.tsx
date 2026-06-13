@@ -1,10 +1,12 @@
 import Link from "next/link";
+import AttdLogo from "@/components/public/AttdLogo";
 import {
   CONTACT_HOTLINE,
   CONTACT_HOTLINE_DISPLAY,
   CONTACT_ZALO_URL,
   CONTACT_EMAIL,
 } from "@/lib/navConfig";
+import { FOOTER_TRUST, SITE_TAGLINE } from "@/lib/siteContent";
 
 const FOOTER_PRODUCTS = [
   { href: "/ao-thun-tron", label: "Áo thun trơn" },
@@ -33,12 +35,21 @@ export default function Footer() {
   return (
     <footer className="site-footer">
       <div className="container">
+        <div className="site-footer-trust">
+          <p className="site-footer-trust-title">{FOOTER_TRUST.title}</p>
+          <ul className="site-footer-trust-list">
+            {FOOTER_TRUST.items.map((item) => (
+              <li key={item} className="site-footer-trust-item">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+
         <div className="site-footer-grid">
           <div className="site-footer-col site-footer-col--brand">
-            <p className="site-footer-brand">ATTD</p>
-            <p className="site-footer-tagline">
-              KHO SỈ ĐỒNG PHỤC &amp; QUÀ TẶNG DOANH NGHIỆP
-            </p>
+            <AttdLogo variant="desktop" className="site-footer-logo" />
+            <p className="site-footer-tagline">{SITE_TAGLINE}</p>
             <p className="site-footer-text">
               Nguồn hàng B2B cho đại lý, xưởng in, agency và doanh nghiệp trên
               toàn quốc.

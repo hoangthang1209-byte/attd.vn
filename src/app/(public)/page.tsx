@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { getCategories } from "@/features/categories/services/category.service";
 import SectionHeader from "@/components/public/SectionHeader";
 import CategoryCard from "@/components/public/CategoryCard";
 import ClusterLinkGrid from "@/components/public/ClusterLinkGrid";
-import TrustStats from "@/components/public/TrustStats";
 import CTASection from "@/components/public/CTASection";
-import TrackedLink from "@/components/analytics/TrackedLink";
+import HeroSection from "@/components/public/HeroSection";
+import SocialProofSection from "@/components/public/SocialProofSection";
+import SourcingProcessSection from "@/components/public/SourcingProcessSection";
 import {
   Shirt,
   CircleDot,
@@ -84,68 +84,17 @@ export default async function HomePage() {
 
   return (
     <main>
-      {/* Hero */}
-      <section className="section" style={{ paddingBottom: 80 }}>
-        <div className="container">
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "#dc2626",
-              marginBottom: 20,
-            }}
-          >
-            B2B Sourcing Platform
-          </p>
+      <HeroSection />
+      <SocialProofSection />
+      <SourcingProcessSection />
 
-          <h1 className="hero-headline">
-            KHO SỈ ĐỒNG PHỤC &amp; QUÀ TẶNG DOANH NGHIỆP
-          </h1>
-
-          <p className="hero-subheadline">
-            Nguồn hàng dành cho đại lý, xưởng in, agency và doanh nghiệp trên
-            toàn quốc.
-          </p>
-
-          <div
-            style={{
-              display: "flex",
-              gap: 16,
-              marginTop: 40,
-              flexWrap: "wrap",
-            }}
-          >
-            <Link href="/nguon-hang" className="btn-primary">
-              Xem nguồn hàng
-            </Link>
-            <TrackedLink
-              href="/dai-ly"
-              trackEvent="dealer_registration_click"
-              trackSource="HOMEPAGE"
-              className="btn-secondary"
-            >
-              Đăng ký đại lý
-            </TrackedLink>
-          </div>
-        </div>
-      </section>
-
-      {/* Category Grid */}
       <section className="section-alt section-compact">
         <div className="container">
           <SectionHeader
             title="Danh mục nổi bật"
             description="Blank apparel và quà tặng doanh nghiệp — nguồn hàng cho đại lý và xưởng gia công."
           />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-              gap: 20,
-            }}
-          >
+          <div className="category-grid">
             {categories.map((category) => (
               <CategoryCard
                 key={category.id}
@@ -158,7 +107,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Wholesale Cluster */}
       <section className="section-compact">
         <div className="container">
           <SectionHeader
@@ -169,7 +117,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Knowledge Cluster */}
       <section className="section-alt section-compact">
         <div className="container">
           <SectionHeader
@@ -180,19 +127,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Trust Section */}
-      <section className="section-compact">
-        <div className="container">
-          <SectionHeader
-            title="Tại sao đối tác chọn ATTD"
-            description="Nền tảng sourcing B2B — phục vụ đại lý, xưởng in, agency và doanh nghiệp."
-            align="center"
-          />
-          <TrustStats />
-        </div>
-      </section>
-
-      {/* Dealer CTA */}
       <CTASection />
     </main>
   );

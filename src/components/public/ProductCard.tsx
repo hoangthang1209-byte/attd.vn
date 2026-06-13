@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 type ProductCardProps = {
   id: string;
@@ -17,52 +18,23 @@ export default function ProductCard({
   category,
 }: ProductCardProps) {
   return (
-    <Link href={`/san-pham/${slug}`} className="premium-card" style={{ padding: 0, overflow: "hidden" }}>
-      <div
-        style={{
-          aspectRatio: "4/5",
-          background: "#f9fafb",
-          borderBottom: "1px solid #e5e7eb",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span style={{ fontSize: 13, color: "#9ca3af", fontWeight: 500 }}>
-          {productCode ?? "ATTD"}
-        </span>
+    <Link href={`/san-pham/${slug}`} className="product-card">
+      <div className="product-card-media">
+        <span className="product-card-code">{productCode ?? "ATTD"}</span>
       </div>
 
-      <div style={{ padding: "20px 22px 24px" }}>
-        <p
-          style={{
-            margin: "0 0 8px",
-            fontSize: 12,
-            fontWeight: 600,
-            color: "#9ca3af",
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-          }}
-        >
-          {category}
-        </p>
+      <div className="product-card-body">
+        {category && <p className="product-card-category">{category}</p>}
 
-        <h3
-          style={{
-            margin: "0 0 12px",
-            fontSize: 15,
-            fontWeight: 600,
-            lineHeight: 1.45,
-            color: "#111827",
-            letterSpacing: "-0.01em",
-          }}
-        >
-          {name}
-        </h3>
+        <h3 className="product-card-title">{name}</h3>
 
-        <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-          {skuCount} SKU
-        </p>
+        <div className="product-card-footer">
+          <span className="product-card-meta">{skuCount} SKU</span>
+          <span className="product-card-link">
+            Xem chi tiết
+            <ArrowRight size={14} strokeWidth={2} />
+          </span>
+        </div>
       </div>
     </Link>
   );

@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { X, ChevronDown, Phone, MessageCircle } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import AttdLogo from "@/components/public/AttdLogo";
 import {
-  NAV_DROPDOWNS,
+  NAV_MEGA_MENUS,
+  getMegaMenuLinks,
   CONTACT_HOTLINE,
   CONTACT_HOTLINE_DISPLAY,
   CONTACT_ZALO_URL,
 } from "@/lib/navConfig";
+import { SITE_TAGLINE } from "@/lib/siteContent";
 
 type MobileNavPanelProps = {
   open: boolean;
@@ -54,9 +57,10 @@ export default function MobileNavPanel({ open, onClose }: MobileNavPanelProps) {
         aria-hidden={!open}
       >
         <div className="mobile-nav-header">
-          <Link href="/" className="site-logo" onClick={onClose}>
-            ATTD
-          </Link>
+          <div className="mobile-nav-brand">
+            <AttdLogo variant="mobile" onClick={onClose} />
+            <p className="mobile-nav-tagline">{SITE_TAGLINE}</p>
+          </div>
           <button
             type="button"
             className="mobile-nav-close"
@@ -68,14 +72,14 @@ export default function MobileNavPanel({ open, onClose }: MobileNavPanelProps) {
         </div>
 
         <nav className="mobile-nav-body" aria-label="Mobile navigation">
-          {NAV_DROPDOWNS.map((section) => (
+          {NAV_MEGA_MENUS.map((section) => (
             <details key={section.id} className="mobile-nav-accordion">
               <summary className="mobile-nav-accordion-trigger">
                 {section.label}
                 <ChevronDown size={18} className="mobile-nav-accordion-icon" />
               </summary>
               <div className="mobile-nav-accordion-content">
-                {section.links.map((link) => (
+                {getMegaMenuLinks(section).map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
@@ -89,34 +93,47 @@ export default function MobileNavPanel({ open, onClose }: MobileNavPanelProps) {
             </details>
           ))}
 
-          <Link href="/dai-ly" className="mobile-nav-sublink mobile-nav-sublink--solo" onClick={onClose}>
+          <Link
+            href="/dai-ly"
+            className="mobile-nav-sublink mobile-nav-sublink--solo"
+            onClick={onClose}
+          >
             Đại lý
+          </Link>
+          <Link
+            href="/lien-he"
+            className="mobile-nav-sublink mobile-nav-sublink--solo"
+            onClick={onClose}
+          >
+            Liên hệ
           </Link>
         </nav>
 
         <div className="mobile-nav-footer">
-          <TrackedLink
-            href="/dai-ly"
-            trackEvent="dealer_registration_click"
-            trackSource="MOBILE_NAV"
-            className="btn-primary mobile-nav-cta"
-            onClick={onClose}
-          >
-            Đăng ký đại lý
-          </TrackedLink>
-          <TrackedLink
-            href="/lien-he"
-            trackEvent="contact_quote"
-            trackSource="MOBILE_NAV"
-            className="btn-secondary mobile-nav-cta"
-            onClick={onClose}
-          >
-            Liên hệ báo giá
-          </TrackedLink>
+          <div className="mobile-nav-cta-block">
+            <TrackedLink
+              href="/dai-ly"
+              trackEvent="dealer_registration_click"
+              trackSource="MOBILE_NAV"
+              className="btn-primary mobile-nav-cta"
+              onClick={onClose}
+            >
+              Đăng ký đại lý
+            </TrackedLink>
+            <TrackedLink
+              href="/lien-he"
+              trackEvent="contact_quote"
+              trackSource="MOBILE_NAV"
+              className="btn-secondary mobile-nav-cta"
+              onClick={onClose}
+            >
+              Liên hệ báo giá
+            </TrackedLink>
+          </div>
 
           <div className="mobile-nav-contact">
             <a href={`tel:${CONTACT_HOTLINE}`} className="mobile-nav-contact-link">
-              <Phone size={16} />
+              <Phone size={18} />
               Hotline {CONTACT_HOTLINE_DISPLAY}
             </a>
             <a
@@ -125,7 +142,7 @@ export default function MobileNavPanel({ open, onClose }: MobileNavPanelProps) {
               rel="noopener noreferrer"
               className="mobile-nav-contact-link"
             >
-              <MessageCircle size={16} />
+              <MessageCircle size={18} />
               Chat Zalo
             </a>
           </div>

@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
-import NavDropdownMenu from "@/components/public/NavDropdownMenu";
+import AttdLogo from "@/components/public/AttdLogo";
+import NavMegaMenuPanel from "@/components/public/NavMegaMenu";
 import MobileNavPanel from "@/components/public/MobileNavPanel";
 import {
-  NAV_DROPDOWNS,
+  NAV_MEGA_MENUS,
   NAV_DEALER_LINK,
   NAV_CONTACT_LINK,
 } from "@/lib/navConfig";
@@ -30,13 +31,12 @@ export default function Header() {
       <header className={`site-header${scrolled ? " site-header--scrolled" : ""}`}>
         <div className="container">
           <div className="site-header-inner">
-            <Link href="/" className="site-logo">
-              ATTD
-            </Link>
+            <AttdLogo variant="desktop" className="site-header-logo-desktop" />
+            <AttdLogo variant="mobile" className="site-header-logo-mobile" />
 
             <nav className="site-nav-center" aria-label="Main navigation">
-              {NAV_DROPDOWNS.map((item) => (
-                <NavDropdownMenu key={item.id} item={item} />
+              {NAV_MEGA_MENUS.map((item) => (
+                <NavMegaMenuPanel key={item.id} item={item} />
               ))}
               <Link href={NAV_DEALER_LINK.href} className="site-nav-link">
                 {NAV_DEALER_LINK.label}
