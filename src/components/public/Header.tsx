@@ -12,6 +12,7 @@ import {
   NAV_DEALER_LINK,
   NAV_CONTACT_LINK,
 } from "@/lib/navConfig";
+import { CTA } from "@/lib/ctaConfig";
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -48,12 +49,12 @@ export default function Header() {
                 {NAV_CONTACT_LINK.label}
               </Link>
               <TrackedLink
-                href="/dai-ly"
-                trackEvent="dealer_registration_click"
+                href={CTA.primary.href}
+                trackEvent={CTA.primary.event}
                 trackSource="HEADER"
                 className="btn-primary site-nav-cta"
               >
-                Đăng ký đại lý
+                {CTA.primary.label}
               </TrackedLink>
             </div>
 

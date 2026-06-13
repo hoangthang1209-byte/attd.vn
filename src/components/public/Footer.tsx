@@ -1,12 +1,7 @@
 import Link from "next/link";
 import AttdLogo from "@/components/public/AttdLogo";
-import {
-  CONTACT_HOTLINE,
-  CONTACT_HOTLINE_DISPLAY,
-  CONTACT_ZALO_URL,
-  CONTACT_EMAIL,
-} from "@/lib/navConfig";
-import { FOOTER_TRUST, SITE_TAGLINE } from "@/lib/siteContent";
+import { getCompanySettings } from "@/features/settings/services/settings.service";
+import { FOOTER_TRUST } from "@/lib/siteContent";
 
 const FOOTER_PRODUCTS = [
   { href: "/ao-thun-tron", label: "Áo thun trơn" },
@@ -31,7 +26,9 @@ const FOOTER_KNOWLEDGE = [
   { href: "/vai-tc-la-gi", label: "Vải TC" },
 ];
 
-export default function Footer() {
+export default async function Footer() {
+  const company = await getCompanySettings();
+
   return (
     <footer className="site-footer">
       <div className="container">
@@ -49,11 +46,16 @@ export default function Footer() {
         <div className="site-footer-grid">
           <div className="site-footer-col site-footer-col--brand">
             <AttdLogo variant="desktop" className="site-footer-logo" />
-            <p className="site-footer-tagline">{SITE_TAGLINE}</p>
+            <p className="site-footer-tagline">{company.tagline}</p>
             <p className="site-footer-text">
               Nguồn hàng B2B cho đại lý, xưởng in, agency và doanh nghiệp trên
               toàn quốc.
             </p>
+            {company.workingHours && (
+              <p className="site-footer-text" style={{ marginTop: 8 }}>
+                {company.workingHours}
+              </p>
+            )}
           </div>
 
           <div className="site-footer-col">
@@ -92,25 +94,31 @@ export default function Footer() {
           <div className="site-footer-col">
             <p className="site-footer-heading">Liên hệ</p>
             <div className="site-footer-links">
-              <a href={`tel:${CONTACT_HOTLINE}`} className="site-footer-link">
-                Hotline {CONTACT_HOTLINE_DISPLAY}
+              <a href={`tel:${company.hotline.raw}`} className="site-footer-link">
+                Hotline {company.hotline.display}
               </a>
               <a
-                href={CONTACT_ZALO_URL}
+                href={company.zalo.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="site-footer-link"
               >
                 Zalo
               </a>
-              <a href={`mailto:${CONTACT_EMAIL}`} className="site-footer-link">
-                {CONTACT_EMAIL}
+              <a href={`mailto:${company.email}`} className="site-footer-link">
+                {company.email}
               </a>
+              {company.address && (
+                <span className="site-footer-link">{company.address}</span>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="site-footer-bottom">© ATTD.vn</div>
+        <div className="site-footer-bottom">
+          © {company.name}.vn
+          {company.taxCode ? ` · MST: ${company.taxCode}` : ""}
+        </div>
       </div>
     </footer>
   );

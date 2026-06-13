@@ -17,6 +17,12 @@ import {
   canonicalUrl,
   buildOgImages,
 } from "@/lib/seo";
+import {
+  getCategoryHeroImage,
+  getCategoryGalleryImages,
+} from "@/lib/categoryImages";
+import { getPrimaryProductImage } from "@/lib/productImages";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
 type PageProps = {
   params: Promise<{ category: string }>;
@@ -78,6 +84,9 @@ export default async function CategoryPage({ params }: PageProps) {
     cat.description ??
     `${cat.name} — ${DEFAULT_DESCRIPTION}`;
 
+  const heroImage = getCategoryHeroImage(category, cat.imageUrl);
+  const galleryImages = getCategoryGalleryImages(category);
+
   return (
     <main>
       {/* ── Structured Data ────────────────────────────────────────────── */}
@@ -103,10 +112,10 @@ export default async function CategoryPage({ params }: PageProps) {
       {/* ── Category Hero ──────────────────────────────────────────────── */}
       <section className="section-compact" style={{ paddingBottom: 32 }}>
         <div className="container">
-          {cat.imageUrl && (
+          {heroImage && isValidImageSrc(heroImage) && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={cat.imageUrl}
+              src={heroImage}
               alt={cat.name}
               style={{
                 width: "100%",
@@ -117,6 +126,33 @@ export default async function CategoryPage({ params }: PageProps) {
                 border: "1px solid #e5e7eb",
               }}
             />
+          )}
+
+          {galleryImages.length > 0 && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                gap: 12,
+                marginBottom: 40,
+              }}
+            >
+              {galleryImages.map((src) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={src}
+                  src={src}
+                  alt={`${cat.name} — gallery`}
+                  style={{
+                    width: "100%",
+                    aspectRatio: "4/3",
+                    objectFit: "cover",
+                    borderRadius: 12,
+                    border: "1px solid #e5e7eb",
+                  }}
+                />
+              ))}
+            </div>
           )}
 
           <h1 className="section-title" style={{ marginBottom: 16 }}>
@@ -156,6 +192,7 @@ export default async function CategoryPage({ params }: PageProps) {
                   productCode={product.productCode}
                   skuCount={product.variants.length}
                   category={cat.name}
+                  imageUrl={getPrimaryProductImage(product.images)}
                 />
               ))}
             </div>

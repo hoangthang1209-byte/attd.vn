@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { FaqItem } from "@/components/seo/FaqSchema";
+import { CTA } from "@/lib/ctaConfig";
 
 export interface ContentBenefit {
   title: string;
@@ -224,7 +225,7 @@ export default function CollectionSEOContent({
             }}
           >
             <Link
-              href="/dai-ly"
+              href={CTA.primary.href}
               style={{
                 display: "inline-block",
                 padding: "13px 28px",
@@ -236,10 +237,10 @@ export default function CollectionSEOContent({
                 textDecoration: "none",
               }}
             >
-              Đăng ký đại lý
+              {CTA.primary.label}
             </Link>
             <Link
-              href="/lien-he"
+              href={CTA.secondary.href}
               style={{
                 display: "inline-block",
                 padding: "13px 28px",
@@ -252,7 +253,7 @@ export default function CollectionSEOContent({
                 textDecoration: "none",
               }}
             >
-              Liên hệ tư vấn
+              {CTA.secondary.label}
             </Link>
           </div>
 

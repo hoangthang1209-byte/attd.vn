@@ -1,5 +1,12 @@
 /** Navigation structure — UI config only, not SEO/catalog data. */
 
+import {
+  getHotlineTel,
+  getHotlineDisplay,
+  getZaloUrl,
+  getEmail,
+} from "@/lib/companyInfo";
+
 export type NavLink = {
   href: string;
   label: string;
@@ -204,10 +211,14 @@ export const NAV_CONTACT_LINK: NavLink = {
   label: "Liên hệ",
 };
 
-export const CONTACT_HOTLINE = "0934337667";
-export const CONTACT_HOTLINE_DISPLAY = "0934 337 667";
-export const CONTACT_ZALO_URL = "https://zalo.me/0934337667";
-export const CONTACT_EMAIL = "contact@attd.vn";
+/** @deprecated Use companyInfo via getHotlineTel() */
+export const CONTACT_HOTLINE = getHotlineTel();
+/** @deprecated Use companyInfo via getHotlineDisplay() */
+export const CONTACT_HOTLINE_DISPLAY = getHotlineDisplay();
+/** @deprecated Use companyInfo via getZaloUrl() */
+export const CONTACT_ZALO_URL = getZaloUrl();
+/** @deprecated Use companyInfo via getEmail() */
+export const CONTACT_EMAIL = getEmail();
 
 export function shouldShowMobileActionBar(pathname: string): boolean {
   if (pathname === "/") return false;

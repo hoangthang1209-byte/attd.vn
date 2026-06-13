@@ -4,6 +4,8 @@ import { getCategories } from "@/features/categories/services/category.service";
 import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import { CTA } from "@/lib/ctaConfig";
+import { getZaloUrl } from "@/lib/companyInfo";
 
 export const metadata: Metadata = {
   title: `Nguồn hàng sỉ | ${SITE_NAME}`,
@@ -17,8 +19,6 @@ export const metadata: Metadata = {
     images: buildOgImages(),
   },
 };
-
-const ZALO = "https://zalo.me/0934337667";
 
 const whyItems = [
   {
@@ -120,7 +120,7 @@ export default async function WholesalePage() {
               Đăng ký đại lý
             </TrackedLink>
             <TrackedLink
-              href={ZALO}
+              href={getZaloUrl()}
               trackEvent="contact_zalo"
               trackSource="WHOLESALE_PAGE"
               external

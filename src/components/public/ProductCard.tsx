@@ -1,6 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 import ImagePlaceholder from "@/components/public/ImagePlaceholder";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
 type ProductCardProps = {
   id: string;
@@ -20,12 +22,19 @@ export default function ProductCard({
   category,
   imageUrl,
 }: ProductCardProps) {
+  const hasImage = imageUrl && isValidImageSrc(imageUrl);
+
   return (
     <Link href={`/san-pham/${slug}`} className="product-card">
       <div className="product-card-media">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt={name} className="product-card-img" />
+        {hasImage ? (
+          <Image
+            src={imageUrl}
+            alt={name}
+            fill
+            className="product-card-img"
+            sizes="(max-width: 768px) 50vw, 240px"
+          />
         ) : (
           <ImagePlaceholder
             variant="product"

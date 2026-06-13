@@ -1,7 +1,11 @@
 import CaseStudyCard from "@/components/public/CaseStudyCard";
-import { CASE_STUDIES, CASE_STUDIES_SECTION } from "@/lib/caseStudies";
+import { getVisibleCaseStudiesFromDb } from "@/features/case-studies/services/case-study.service";
+import { CASE_STUDIES_SECTION } from "@/lib/caseStudies";
 
-export default function CaseStudySection() {
+export default async function CaseStudySection() {
+  const studies = await getVisibleCaseStudiesFromDb();
+  if (studies.length === 0) return null;
+
   return (
     <section className="section-compact">
       <div className="container">
@@ -13,7 +17,7 @@ export default function CaseStudySection() {
         </p>
 
         <div className="case-study-grid">
-          {CASE_STUDIES.map((study) => (
+          {studies.map((study) => (
             <CaseStudyCard key={study.id} study={study} />
           ))}
         </div>

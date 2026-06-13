@@ -4,11 +4,7 @@ import { usePathname } from "next/navigation";
 import { Phone, MessageCircle, UserPlus } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import { CTA } from "@/lib/ctaConfig";
-import {
-  CONTACT_HOTLINE,
-  CONTACT_HOTLINE_DISPLAY,
-  CONTACT_ZALO_URL,
-} from "@/lib/navConfig";
+import { getHotlineTel, getHotlineDisplay, getZaloUrl } from "@/lib/companyInfo";
 
 export default function FloatingContactWidget() {
   const pathname = usePathname();
@@ -34,16 +30,16 @@ export default function FloatingContactWidget() {
       </TrackedLink>
 
       <a
-        href={`tel:${CONTACT_HOTLINE}`}
+        href={`tel:${getHotlineTel()}`}
         className="floating-contact-btn floating-contact-btn--call"
-        title={`Hotline ${CONTACT_HOTLINE_DISPLAY}`}
+        title={`Hotline ${getHotlineDisplay()}`}
       >
         <Phone size={20} aria-hidden />
         <span className="floating-contact-label">Hotline</span>
       </a>
 
       <a
-        href={CONTACT_ZALO_URL}
+        href={getZaloUrl()}
         target="_blank"
         rel="noopener noreferrer"
         className="floating-contact-btn floating-contact-btn--zalo"

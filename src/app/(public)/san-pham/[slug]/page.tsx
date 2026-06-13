@@ -16,6 +16,7 @@ import {
   canonicalUrl,
   buildOgImages,
 } from "@/lib/seo";
+import { getPrimaryProductImage } from "@/lib/productImages";
 import {
   getCatalogProduct,
   isCatalogProduct,
@@ -444,6 +445,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   name={related.name}
                   skuCount={related.variants.length}
                   category={categoryName}
+                  imageUrl={getPrimaryProductImage(related.images)}
                 />
               ))}
             </div>

@@ -171,6 +171,80 @@ model Post {
   updatedAt      DateTime   @updatedAt
 }
 
+enum MediaFolder {
+  PRODUCTS
+  CATEGORIES
+  CLIENTS
+  CASE_STUDIES
+}
+
+model MediaAsset {
+  id         String      @id @default(cuid())
+  filename   String
+  url        String
+  storageKey String
+  mimeType   String
+  sizeBytes  Int
+  folder     MediaFolder
+  altText    String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([folder])
+  @@index([filename])
+}
+
+model ClientLogoRecord {
+  id          String   @id @default(cuid())
+  companyName String
+  website     String?
+  imageUrl    String
+  isVisible   Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CaseStudyRecord {
+  id        String   @id @default(cuid())
+  title     String
+  category  String
+  quantity  String
+  timeline  String
+  summary   String
+  imageUrl  String
+  isVisible Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CompanySettings {
+  id             String   @id @default("default")
+  brandName      String   @default("ATTD")
+  legalName      String   @default("")
+  tagline        String   @default("")
+  hotlineRaw     String   @default("")
+  hotlineDisplay String   @default("")
+  zaloPhone      String   @default("")
+  zaloUrl        String   @default("")
+  email          String   @default("")
+  address        String   @default("")
+  taxCode        String   @default("")
+  workingHours   String   @default("")
+  updatedAt      DateTime @updatedAt
+}
+
+model TrustMetricsSettings {
+  id              String   @id @default("default")
+  clientsCount    Int?
+  partnerCount    Int?
+  provinceCount   Int?
+  experienceYears Int?
+  sectionTitle    String   @default("Tại sao đại lý và doanh nghiệp chọn ATTD?")
+  updatedAt       DateTime @updatedAt
+}
+
 enum PostStatus {
   PUBLISHED
   DRAFT

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import { CTA } from "@/lib/ctaConfig";
-import { CONTACT_ZALO_URL } from "@/lib/navConfig";
+import { getZaloUrl } from "@/lib/companyInfo";
 
 type InternalLink = {
   href: string;
@@ -56,7 +56,7 @@ export default function StickyInquiryBox({
             {CTA.secondary.label}
           </TrackedLink>
           <TrackedLink
-            href={CONTACT_ZALO_URL}
+            href={getZaloUrl()}
             trackEvent="contact_zalo"
             trackSource="PRODUCT_PAGE"
             external

@@ -137,3 +137,21 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  try {
+    await prisma.product.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    if (isPrismaNotFoundError(err)) {
+      return NextResponse.json({ message: "Sản phẩm không tồn tại" }, { status: 404 });
+    }
+    console.error("[api/products/[id]] DELETE failed:", err);
+    return NextResponse.json({ message: "Xóa sản phẩm thất bại" }, { status: 500 });
+  }
+}

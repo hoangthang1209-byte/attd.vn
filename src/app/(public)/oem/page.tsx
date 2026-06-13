@@ -4,6 +4,7 @@ import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import { CTA } from "@/lib/ctaConfig";
+import { getZaloUrl } from "@/lib/companyInfo";
 
 export const metadata: Metadata = {
   title: `OEM & Private Label | ${SITE_NAME}`,
@@ -17,8 +18,6 @@ export const metadata: Metadata = {
     images: buildOgImages(),
   },
 };
-
-const ZALO = "https://zalo.me/0934337667";
 
 const steps = [
   { n: "01", title: "Liên hệ tư vấn", body: "Gửi yêu cầu qua form hoặc Zalo. Đội ngũ ATTD phản hồi trong vòng 24 giờ." },
@@ -118,7 +117,7 @@ export default function OemPage() {
               {CTA.secondary.label}
             </TrackedLink>
             <TrackedLink
-              href={ZALO}
+              href={getZaloUrl()}
               trackEvent="contact_zalo"
               trackSource="OEM_PAGE"
               external
@@ -404,7 +403,7 @@ export default function OemPage() {
               </p>
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                 <TrackedLink
-                  href={ZALO}
+                  href={getZaloUrl()}
                   trackEvent="contact_zalo"
                   trackSource="OEM_PAGE"
                   external

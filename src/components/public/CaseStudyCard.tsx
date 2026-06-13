@@ -1,35 +1,31 @@
-import type { CaseStudy } from "@/lib/caseStudies";
-import { resolveUploadImage } from "@/lib/imagePaths";
-import ImagePlaceholder from "@/components/public/ImagePlaceholder";
+import type { VisibleCaseStudy } from "@/lib/caseStudies";
 import Image from "next/image";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
 type CaseStudyCardProps = {
-  study: CaseStudy;
+  study: VisibleCaseStudy;
 };
 
 export default function CaseStudyCard({ study }: CaseStudyCardProps) {
-  const imageSrc = resolveUploadImage("caseStudies", study.image);
+  if (!isValidImageSrc(study.imageSrc)) return null;
 
   return (
     <article className="case-study-card">
       <div className="case-study-media">
-        {imageSrc ? (
-          <Image
-            src={imageSrc}
-            alt={study.title}
-            fill
-            className="case-study-img"
-            sizes="(max-width: 768px) 100vw, 33vw"
-          />
-        ) : (
-          <ImagePlaceholder variant="generic" label="Dự án" />
-        )}
+        <Image
+          src={study.imageSrc}
+          alt={study.title}
+          fill
+          className="case-study-img"
+          sizes="(max-width: 768px) 100vw, 33vw"
+        />
       </div>
 
       <div className="case-study-body">
         <div className="case-study-tags">
-          <span className="case-study-tag">{study.industry}</span>
-          <span className="case-study-tag">{study.productType}</span>
+          <span className="case-study-tag">{study.category}</span>
+          <span className="case-study-tag">{study.quantity}</span>
+          <span className="case-study-tag">{study.timeline}</span>
         </div>
         <h3 className="case-study-title">{study.title}</h3>
         <p className="case-study-summary">{study.summary}</p>

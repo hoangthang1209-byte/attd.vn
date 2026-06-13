@@ -1,17 +1,8 @@
 /** Editable site UI content — not SEO/catalog data. */
 
-export const SITE_TAGLINE =
-  "KHO SỈ ĐỒNG PHỤC & QUÀ TẶNG DOANH NGHIỆP";
+import { companyInfo } from "@/lib/companyInfo";
 
-export const SOCIAL_PROOF = {
-  title: "Tại sao đại lý và doanh nghiệp chọn ATTD?",
-  metrics: [
-    { value: "1000+", label: "Khách hàng" },
-    { value: "50+", label: "Đối tác" },
-    { value: "63", label: "Tỉnh thành" },
-    { value: "10+", label: "Năm kinh nghiệm" },
-  ],
-} as const;
+export const SITE_TAGLINE = companyInfo.tagline;
 
 export const SOURCING_PROCESS = {
   title: "Quy trình làm việc",

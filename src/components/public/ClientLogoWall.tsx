@@ -1,9 +1,12 @@
+import { getVisibleClientLogosFromDb } from "@/features/client-logos/services/client-logo.service";
+import { CLIENT_LOGOS_SECTION } from "@/lib/clientLogos";
 import Image from "next/image";
-import { CLIENT_LOGOS, CLIENT_LOGOS_SECTION } from "@/lib/clientLogos";
-import { resolveUploadImage } from "@/lib/imagePaths";
-import ImagePlaceholder from "@/components/public/ImagePlaceholder";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
-export default function ClientLogoWall() {
+export default async function ClientLogoWall() {
+  const logos = await getVisibleClientLogosFromDb();
+  if (logos.length === 0) return null;
+
   return (
     <section className="section-compact section-alt">
       <div className="container">
@@ -15,29 +18,28 @@ export default function ClientLogoWall() {
         </p>
 
         <div className="client-logo-grid">
-          {CLIENT_LOGOS.map((client) => {
-            const logoSrc = resolveUploadImage("clients", client.logo);
-            const inner = logoSrc ? (
+          {logos.map((client) => {
+            if (!isValidImageSrc(client.imageSrc)) return null;
+
+            const inner = (
               <Image
-                src={logoSrc}
-                alt={client.name}
+                src={client.imageSrc}
+                alt={client.companyName}
                 width={120}
                 height={48}
                 className="client-logo-img"
               />
-            ) : (
-              <ImagePlaceholder variant="client" label={client.name} compact />
             );
 
-            if (client.url) {
+            if (client.website) {
               return (
                 <a
                   key={client.id}
-                  href={client.url}
+                  href={client.website}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="client-logo-card"
-                  title={client.name}
+                  title={client.companyName}
                 >
                   {inner}
                 </a>
@@ -45,7 +47,11 @@ export default function ClientLogoWall() {
             }
 
             return (
-              <div key={client.id} className="client-logo-card" title={client.name}>
+              <div
+                key={client.id}
+                className="client-logo-card"
+                title={client.companyName}
+              >
                 {inner}
               </div>
             );

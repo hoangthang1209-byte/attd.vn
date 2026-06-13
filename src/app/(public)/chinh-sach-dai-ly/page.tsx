@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import { CTA } from "@/lib/ctaConfig";
+import { getZaloUrl } from "@/lib/companyInfo";
 
 export const metadata: Metadata = {
   title: `Chính sách đại lý | ${SITE_NAME}`,
@@ -15,8 +17,6 @@ export const metadata: Metadata = {
     images: buildOgImages(),
   },
 };
-
-const ZALO = "https://zalo.me/0934337667";
 
 const benefits = [
   {
@@ -137,7 +137,7 @@ export default function DealerPolicyPage() {
               Đăng ký đại lý ngay
             </TrackedLink>
             <TrackedLink
-              href={ZALO}
+              href={getZaloUrl()}
               trackEvent="contact_zalo"
               trackSource="DEALER_POLICY_PAGE"
               external

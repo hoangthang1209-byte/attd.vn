@@ -8,10 +8,13 @@ import AttdLogo from "@/components/public/AttdLogo";
 import {
   NAV_MEGA_MENUS,
   getMegaMenuLinks,
-  CONTACT_HOTLINE,
-  CONTACT_HOTLINE_DISPLAY,
-  CONTACT_ZALO_URL,
 } from "@/lib/navConfig";
+import {
+  getHotlineTel,
+  getHotlineDisplay,
+  getZaloUrl,
+} from "@/lib/companyInfo";
+import { CTA } from "@/lib/ctaConfig";
 import { SITE_TAGLINE } from "@/lib/siteContent";
 
 type MobileNavPanelProps = {
@@ -112,32 +115,32 @@ export default function MobileNavPanel({ open, onClose }: MobileNavPanelProps) {
         <div className="mobile-nav-footer">
           <div className="mobile-nav-cta-block">
             <TrackedLink
-              href="/dai-ly"
-              trackEvent="dealer_registration_click"
+              href={CTA.primary.href}
+              trackEvent={CTA.primary.event}
               trackSource="MOBILE_NAV"
               className="btn-primary mobile-nav-cta"
               onClick={onClose}
             >
-              Đăng ký đại lý
+              {CTA.primary.label}
             </TrackedLink>
             <TrackedLink
-              href="/lien-he"
-              trackEvent="contact_quote"
+              href={CTA.secondary.href}
+              trackEvent={CTA.secondary.event}
               trackSource="MOBILE_NAV"
               className="btn-secondary mobile-nav-cta"
               onClick={onClose}
             >
-              Liên hệ báo giá
+              {CTA.secondary.label}
             </TrackedLink>
           </div>
 
           <div className="mobile-nav-contact">
-            <a href={`tel:${CONTACT_HOTLINE}`} className="mobile-nav-contact-link">
+            <a href={`tel:${getHotlineTel()}`} className="mobile-nav-contact-link">
               <Phone size={18} />
-              Hotline {CONTACT_HOTLINE_DISPLAY}
+              Hotline {getHotlineDisplay()}
             </a>
             <a
-              href={CONTACT_ZALO_URL}
+              href={getZaloUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="mobile-nav-contact-link"

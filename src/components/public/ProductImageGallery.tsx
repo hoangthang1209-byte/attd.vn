@@ -3,15 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import ImagePlaceholder from "@/components/public/ImagePlaceholder";
-
-type GalleryImage = {
-  id: string;
-  imageUrl: string;
-  altText: string | null;
-};
+import {
+  getProductGalleryImages,
+  type ProductImageRecord,
+} from "@/lib/productImages";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
 type Props = {
-  images: GalleryImage[];
+  images: ProductImageRecord[];
   productName: string;
 };
 
@@ -23,13 +22,20 @@ export default function ProductImageGallery({ images, productName }: Props) {
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const total = images.length;
+  const gallery = getProductGalleryImages(images);
+  const total = gallery.length;
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (selectedIndex >= total && total > 0) {
+      setSelectedIndex(0);
+    }
+  }, [selectedIndex, total]);
 
   function changeImage(index: number) {
     if (index === selectedIndex) return;
@@ -56,7 +62,16 @@ export default function ProductImageGallery({ images, productName }: Props) {
     );
   }
 
-  const selected = images[selectedIndex] ?? images[0];
+  const selected = gallery[selectedIndex] ?? gallery[0];
+  const selectedSrc = selected?.imageUrl;
+
+  if (!selectedSrc || !isValidImageSrc(selectedSrc)) {
+    return (
+      <div className="product-gallery-main product-gallery-main--empty">
+        <ImagePlaceholder variant="product" label={productName} />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -65,7 +80,7 @@ export default function ProductImageGallery({ images, productName }: Props) {
         style={{ opacity: mainOpacity, transition: "opacity 0.13s ease" }}
       >
         <Image
-          src={selected.imageUrl}
+          src={selectedSrc}
           alt={selected.altText ?? productName}
           fill
           style={{ objectFit: "cover" }}
@@ -81,8 +96,14 @@ export default function ProductImageGallery({ images, productName }: Props) {
       </div>
 
       {total > 1 && (
-        <div className="product-gallery-thumbs" role="list" aria-label="Xem ảnh sản phẩm">
-          {images.map((image, index) => {
+        <div
+          className="product-gallery-thumbs"
+          role="list"
+          aria-label="Xem ảnh sản phẩm"
+        >
+          {gallery.map((image, index) => {
+            if (!isValidImageSrc(image.imageUrl)) return null;
+
             const isSelected = index === selectedIndex;
             const isHovered = hoveredThumb === index && !isSelected;
 

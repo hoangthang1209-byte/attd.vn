@@ -1,11 +1,14 @@
-/** Client / partner logos — UI config only. Replace placeholders with real assets in /public/uploads/clients/ */
+/** Client / partner logos — add entries with real images in /public/uploads/clients/ */
+
+import { resolveUploadImage } from "@/lib/imagePaths";
 
 export type ClientLogo = {
   id: string;
-  name: string;
   /** Filename in /public/uploads/clients/ or full URL path */
-  logo?: string;
-  url?: string;
+  image: string;
+  companyName: string;
+  website?: string;
+  isVisible: boolean;
 };
 
 export const CLIENT_LOGOS_SECTION = {
@@ -14,17 +17,33 @@ export const CLIENT_LOGOS_SECTION = {
     "Phục vụ đại lý, xưởng in, agency và doanh nghiệp trên toàn quốc.",
 } as const;
 
-export const CLIENT_LOGOS: ClientLogo[] = [
-  { id: "c1", name: "Đại lý đồng phục Miền Bắc" },
-  { id: "c2", name: "Xưởng in thêu TP.HCM" },
-  { id: "c3", name: "Agency sự kiện doanh nghiệp" },
-  { id: "c4", name: "Công ty quà tặng DN" },
-  { id: "c5", name: "Thương hiệu thời trang B2B" },
-  { id: "c6", name: "Đối tác phân phối vùng miền" },
-  { id: "c7", name: "Xưởng gia công OEM" },
-  { id: "c8", name: "Đại lý quà tặng doanh nghiệp" },
-  { id: "c9", name: "Công ty tổ chức sự kiện" },
-  { id: "c10", name: "Đối tác in ấn quảng cáo" },
-  { id: "c11", name: "Nhà cung cấp đồng phục" },
-  { id: "c12", name: "Đại lý blank apparel" },
-];
+/**
+ * Add real client logos here. Example:
+ * { id: "c1", image: "partner-a.png", companyName: "Công ty ABC", website: "https://...", isVisible: true }
+ */
+export const CLIENT_LOGOS: ClientLogo[] = [];
+
+export type VisibleClientLogo = ClientLogo & { imageSrc: string };
+
+/** Visible entries that have a resolvable image — no placeholders shown publicly. */
+export function getVisibleClientLogos(): VisibleClientLogo[] {
+  return CLIENT_LOGOS.filter((entry) => {
+    if (!entry.isVisible) return false;
+    const imageSrc = resolveUploadImage("clients", entry.image);
+    return Boolean(imageSrc);
+  }).map((entry) => ({
+    ...entry,
+    imageSrc: resolveUploadImage("clients", entry.image)!,
+  }));
+}
+
+export function hasVisibleClientLogos(): boolean {
+  return getVisibleClientLogos().length > 0;
+}
+
+/** Readiness: entries marked visible with image filename set. */
+export function countClientLogoCandidates(): { total: number; withImage: number; visible: number } {
+  const withImage = CLIENT_LOGOS.filter((e) => Boolean(e.image?.trim())).length;
+  const visible = CLIENT_LOGOS.filter((e) => e.isVisible).length;
+  return { total: CLIENT_LOGOS.length, withImage, visible };
+}

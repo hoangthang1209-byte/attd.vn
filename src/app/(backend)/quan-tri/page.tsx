@@ -1,7 +1,5 @@
+import { redirect } from "next/navigation";
+
 export default function QuanTriPage() {
-    return (
-      <div>
-        Trang quản trị ATTD
-      </div>
-    );
-  }
+  redirect("/quan-tri/dashboard");
+}

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import { CTA } from "@/lib/ctaConfig";
+import { getZaloUrl } from "@/lib/companyInfo";
 
 export const metadata: Metadata = {
   title: `Quà tặng doanh nghiệp | ${SITE_NAME}`,
@@ -16,8 +18,6 @@ export const metadata: Metadata = {
     images: buildOgImages(),
   },
 };
-
-const ZALO = "https://zalo.me/0934337667";
 
 const categories = [
   { name: "Áo thun trơn", detail: "Nhiều màu, nhiều size, chất liệu cotton cao cấp. Phù hợp làm đồng phục và quà tặng." },
@@ -101,7 +101,7 @@ export default function CorporateGiftsPage() {
               Nhận báo giá
             </TrackedLink>
             <TrackedLink
-              href={ZALO}
+              href={getZaloUrl()}
               trackEvent="contact_zalo"
               trackSource="CORPORATE_GIFTS_PAGE"
               external
@@ -339,7 +339,7 @@ export default function CorporateGiftsPage() {
               </p>
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                 <TrackedLink
-                  href={ZALO}
+                  href={getZaloUrl()}
                   trackEvent="contact_zalo"
                   trackSource="CORPORATE_GIFTS_PAGE"
                   external
