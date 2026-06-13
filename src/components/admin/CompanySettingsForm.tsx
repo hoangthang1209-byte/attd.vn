@@ -22,7 +22,7 @@ type Props = {
 export default function CompanySettingsForm({ initial }: Props) {
   const router = useRouter();
   const [form, setForm] = useState(initial);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [loading, setLoading] = useState(false);
 
   function update(field: keyof typeof form, value: string) {
@@ -32,7 +32,7 @@ export default function CompanySettingsForm({ initial }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setMessage("");
+    setMessage(null);
 
     const res = await fetch("/api/settings/company", {
       method: "PATCH",
@@ -42,10 +42,11 @@ export default function CompanySettingsForm({ initial }: Props) {
 
     setLoading(false);
     if (!res.ok) {
-      setMessage("Lưu thất bại");
+      const data = await res.json().catch(() => ({}));
+      setMessage({ type: "error", text: data.message ?? "Lưu thất bại" });
       return;
     }
-    setMessage("Đã lưu thông tin công ty");
+    setMessage({ type: "success", text: "Đã lưu thông tin công ty" });
     router.refresh();
   }
 
@@ -76,8 +77,10 @@ export default function CompanySettingsForm({ initial }: Props) {
           />
         </div>
       ))}
-      {message && <p className="admin-message">{message}</p>}
-      <button type="submit" className="btn-primary" disabled={loading}>
+      {message && (
+        <p className={`admin-message admin-message--${message.type}`}>{message.text}</p>
+      )}
+      <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
         {loading ? "Đang lưu..." : "Lưu thay đổi"}
       </button>
     </form>

@@ -21,7 +21,7 @@ export default async function ProductEditPage({
   return (
     <div style={{ padding: "32px", maxWidth: "640px" }}>
       <Link
-        href={`/quan-tri/san-pham/${id}`}
+        href={`/admin/san-pham/${id}`}
         style={{ fontSize: "14px", color: "#6b7280" }}
       >
         ← Quay lại

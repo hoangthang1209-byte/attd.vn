@@ -45,8 +45,45 @@ export async function PATCH(
       orderBy: { sortOrder: "asc" },
     });
 
-    // Move target to front; keep relative order of others
     const reordered = [image, ...allImages.filter((img) => img.id !== id)];
+
+    await prisma.$transaction(
+      reordered.map((img, index) =>
+        prisma.productImage.update({
+          where: { id: img.id },
+          data: { sortOrder: index },
+        })
+      )
+    );
+
+    return NextResponse.json({ success: true });
+  }
+
+  if (body.action === "moveUp" || body.action === "moveDown") {
+    const image = await prisma.productImage.findUnique({ where: { id } });
+    if (!image) {
+      return NextResponse.json(
+        { message: "Không tìm thấy ảnh" },
+        { status: 404 }
+      );
+    }
+
+    const allImages = await prisma.productImage.findMany({
+      where: { productId: image.productId },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    const currentIndex = allImages.findIndex((img) => img.id === id);
+    const targetIndex =
+      body.action === "moveUp" ? currentIndex - 1 : currentIndex + 1;
+
+    if (currentIndex === -1 || targetIndex < 0 || targetIndex >= allImages.length) {
+      return NextResponse.json({ success: true });
+    }
+
+    const reordered = [...allImages];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
 
     await prisma.$transaction(
       reordered.map((img, index) =>

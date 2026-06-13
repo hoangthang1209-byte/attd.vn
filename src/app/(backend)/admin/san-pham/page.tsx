@@ -36,7 +36,7 @@ export default async function ProductsPage() {
 
               <td>{product.category?.name}</td>
               <td>
-                <Link href={`/quan-tri/san-pham/${product.id}`}>
+                <Link href={`/admin/san-pham/${product.id}`}>
                   Quản lý
                 </Link>
               </td>

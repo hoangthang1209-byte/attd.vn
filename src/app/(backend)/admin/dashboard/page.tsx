@@ -26,28 +26,28 @@ export default async function DashboardPage() {
       label: "Sản phẩm",
       value: totalProducts,
       sub: `${activeProducts} đang publish`,
-      href: "/quan-tri/products",
+      href: "/admin/products",
       action: "Quản lý sản phẩm",
     },
     {
       label: "Thư viện ảnh",
       value: totalMedia,
       sub: "Media assets",
-      href: "/quan-tri/media",
+      href: "/admin/media",
       action: "Mở thư viện",
     },
     {
       label: "Logo khách hàng",
       value: totalClientLogos,
       sub: "Client logos",
-      href: "/quan-tri/client-logos",
+      href: "/admin/client-logos",
       action: "Quản lý logo",
     },
     {
       label: "Dự án tiêu biểu",
       value: totalCaseStudies,
       sub: "Case studies",
-      href: "/quan-tri/case-studies",
+      href: "/admin/case-studies",
       action: "Quản lý dự án",
     },
   ];
@@ -70,10 +70,10 @@ export default async function DashboardPage() {
       <div className="admin-quick-actions">
         <h2 className="admin-subtitle">Thiết lập nhanh</h2>
         <div className="admin-quick-grid">
-          <Link href="/quan-tri/settings/company">Thông tin công ty</Link>
-          <Link href="/quan-tri/settings/trust">Chỉ số tin cậy</Link>
-          <Link href="/quan-tri/media">Tải ảnh lên</Link>
-          <Link href="/quan-tri/khach-hang-tiem-nang">CRM leads</Link>
+          <Link href="/admin/settings/company">Thông tin công ty</Link>
+          <Link href="/admin/settings/trust">Chỉ số tin cậy</Link>
+          <Link href="/admin/media">Tải ảnh lên</Link>
+          <Link href="/admin/khach-hang-tiem-nang">CRM leads</Link>
         </div>
       </div>
     </AdminShell>

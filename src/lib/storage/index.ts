@@ -11,6 +11,10 @@ export function getStorageAdapter(): StorageAdapter {
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     adapter = new VercelBlobStorageAdapter();
+  } else if (process.env.VERCEL) {
+    throw new Error(
+      "BLOB_READ_WRITE_TOKEN is required for media uploads on Vercel. Configure it in project settings."
+    );
   } else {
     adapter = new LocalStorageAdapter();
   }

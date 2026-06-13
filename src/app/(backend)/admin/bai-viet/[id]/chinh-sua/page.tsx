@@ -17,7 +17,7 @@ export default async function EditPostPage({
     <div style={{ padding: "32px", maxWidth: "900px" }}>
       <div style={{ marginBottom: "24px" }}>
         <Link
-          href="/quan-tri/bai-viet"
+          href="/admin/bai-viet"
           style={{ fontSize: "14px", color: "#6b7280", textDecoration: "none" }}
         >
           ← Quay lại danh sách

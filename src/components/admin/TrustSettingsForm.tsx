@@ -16,7 +16,7 @@ type Props = {
 export default function TrustSettingsForm({ initial }: Props) {
   const router = useRouter();
   const [form, setForm] = useState(initial);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [loading, setLoading] = useState(false);
 
   function updateNumber(
@@ -32,7 +32,7 @@ export default function TrustSettingsForm({ initial }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setMessage("");
+    setMessage(null);
 
     const res = await fetch("/api/settings/trust", {
       method: "PATCH",
@@ -42,10 +42,11 @@ export default function TrustSettingsForm({ initial }: Props) {
 
     setLoading(false);
     if (!res.ok) {
-      setMessage("Lưu thất bại");
+      const data = await res.json().catch(() => ({}));
+      setMessage({ type: "error", text: data.message ?? "Lưu thất bại" });
       return;
     }
-    setMessage("Đã lưu chỉ số tin cậy");
+    setMessage({ type: "success", text: "Đã lưu chỉ số tin cậy — trang chủ sẽ cập nhật" });
     router.refresh();
   }
 
@@ -81,8 +82,10 @@ export default function TrustSettingsForm({ initial }: Props) {
           />
         </div>
       ))}
-      {message && <p className="admin-message">{message}</p>}
-      <button type="submit" className="btn-primary" disabled={loading}>
+      {message && (
+        <p className={`admin-message admin-message--${message.type}`}>{message.text}</p>
+      )}
+      <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
         {loading ? "Đang lưu..." : "Lưu thay đổi"}
       </button>
     </form>

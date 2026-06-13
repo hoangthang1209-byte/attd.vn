@@ -9,7 +9,7 @@ import { getHotlineTel, getHotlineDisplay, getZaloUrl } from "@/lib/companyInfo"
 export default function FloatingContactWidget() {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/quan-tri")) {
+  if (pathname.startsWith("/admin") || pathname.startsWith("/quan-tri")) {
     return null;
   }
 

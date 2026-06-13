@@ -35,11 +35,11 @@ export interface StorageAdapter {
   delete(url: string, storageKey: string): Promise<void>;
 }
 
-export const ALLOWED_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-];
+export {
+  ALLOWED_IMAGE_TYPES,
+  ALLOWED_IMAGE_EXTENSIONS,
+  inferImageMimeType,
+  validateImageUpload,
+} from "@/lib/imageValidation";
 
 export const MAX_IMAGE_SIZE = 4 * 1024 * 1024;

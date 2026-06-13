@@ -14,9 +14,12 @@ type Study = {
   isVisible: boolean;
 };
 
+type Message = { text: string; type: "success" | "error" };
+
 export default function CaseStudiesManager() {
   const router = useRouter();
   const [studies, setStudies] = useState<Study[]>([]);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     title: "",
     category: "",
@@ -26,11 +29,19 @@ export default function CaseStudiesManager() {
     imageUrl: "",
     isVisible: false,
   });
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<Message | null>(null);
 
   async function load() {
-    const res = await fetch("/api/case-studies");
-    setStudies(await res.json());
+    setLoading(true);
+    try {
+      const res = await fetch("/api/case-studies");
+      const data = await res.json();
+      setStudies(Array.isArray(data) ? data : []);
+    } catch {
+      setMessage({ type: "error", text: "Không thể tải danh sách dự án" });
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -39,13 +50,15 @@ export default function CaseStudiesManager() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    setMessage(null);
     const res = await fetch("/api/case-studies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
+    const data = await res.json();
     if (!res.ok) {
-      setMessage("Tạo dự án thất bại");
+      setMessage({ type: "error", text: data.message ?? "Tạo dự án thất bại" });
       return;
     }
     setForm({
@@ -57,16 +70,24 @@ export default function CaseStudiesManager() {
       imageUrl: "",
       isVisible: false,
     });
-    setMessage("Đã thêm dự án");
+    setMessage({ type: "success", text: "Đã thêm dự án" });
     await load();
     router.refresh();
   }
 
   async function toggleVisible(id: string, isVisible: boolean) {
-    await fetch(`/api/case-studies/${id}`, {
+    const res = await fetch(`/api/case-studies/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isVisible }),
+    });
+    if (!res.ok) {
+      setMessage({ type: "error", text: "Cập nhật trạng thái thất bại" });
+      return;
+    }
+    setMessage({
+      type: "success",
+      text: isVisible ? "Dự án đang hiển thị trên trang chủ" : "Dự án đã ẩn",
     });
     await load();
     router.refresh();
@@ -74,7 +95,12 @@ export default function CaseStudiesManager() {
 
   async function handleDelete(id: string) {
     if (!confirm("Xóa dự án này?")) return;
-    await fetch(`/api/case-studies/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/case-studies/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setMessage({ type: "error", text: "Xóa thất bại" });
+      return;
+    }
+    setMessage({ type: "success", text: "Đã xóa dự án" });
     await load();
     router.refresh();
   }
@@ -93,8 +119,9 @@ export default function CaseStudiesManager() {
           ] as const
         ).map(([key, label]) => (
           <div key={key} className="admin-form-group">
-            <label>{label}</label>
+            <label htmlFor={key}>{label}</label>
             <input
+              id={key}
               className="admin-input"
               value={form[key]}
               onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
@@ -103,8 +130,9 @@ export default function CaseStudiesManager() {
           </div>
         ))}
         <div className="admin-form-group">
-          <label>Tóm tắt</label>
+          <label htmlFor="summary">Tóm tắt</label>
           <textarea
+            id="summary"
             className="admin-input admin-textarea"
             value={form.summary}
             onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))}
@@ -120,49 +148,64 @@ export default function CaseStudiesManager() {
           />
           Xuất bản (hiển thị công khai)
         </label>
-        <button type="submit" className="btn-primary">Thêm dự án</button>
+        <button type="submit" className="admin-btn admin-btn--primary">Thêm dự án</button>
       </form>
 
-      {message && <p className="admin-message">{message}</p>}
+      {message && (
+        <p className={`admin-message admin-message--${message.type}`}>{message.text}</p>
+      )}
 
-      <div className="admin-table-wrap" style={{ marginTop: 32 }}>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Ảnh</th>
-              <th>Tiêu đề</th>
-              <th>Category</th>
-              <th>Trạng thái</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {studies.map((study) => (
-              <tr key={study.id}>
-                <td>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={study.imageUrl} alt="" className="admin-thumb" />
-                </td>
-                <td>{study.title}</td>
-                <td>{study.category}</td>
-                <td>
-                  <button
-                    type="button"
-                    onClick={() => toggleVisible(study.id, !study.isVisible)}
-                  >
-                    {study.isVisible ? "Published" : "Hidden"}
-                  </button>
-                </td>
-                <td>
-                  <button type="button" onClick={() => handleDelete(study.id)}>
-                    Xóa
-                  </button>
-                </td>
+      {loading ? (
+        <p className="admin-loading">Đang tải...</p>
+      ) : studies.length === 0 ? (
+        <div className="admin-empty-state">
+          <p>Chưa có dự án tiêu biểu.</p>
+          <p className="admin-empty-hint">Thêm dự án và bật xuất bản để hiển thị trên trang chủ.</p>
+        </div>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Ảnh</th>
+                <th>Tiêu đề</th>
+                <th>Category</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {studies.map((study) => (
+                <tr key={study.id}>
+                  <td>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={study.imageUrl} alt="" className="admin-thumb" />
+                  </td>
+                  <td>{study.title}</td>
+                  <td>{study.category}</td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => toggleVisible(study.id, !study.isVisible)}
+                    >
+                      {study.isVisible ? "Published" : "Hidden"}
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="admin-btn--danger"
+                      onClick={() => handleDelete(study.id)}
+                    >
+                      Xóa
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   listCaseStudies,
   createCaseStudy,
@@ -36,6 +37,8 @@ export async function POST(request: Request) {
       isVisible: body.isVisible === true,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0,
     });
+
+    revalidatePath("/");
 
     return NextResponse.json(study, { status: 201 });
   } catch (err) {

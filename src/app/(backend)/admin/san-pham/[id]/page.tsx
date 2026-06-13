@@ -15,7 +15,7 @@ export default async function ProductAdminDetailPage({
   return (
     <div style={{ padding: "32px", maxWidth: "800px" }}>
       <Link
-        href="/quan-tri/san-pham"
+        href="/admin/san-pham"
         style={{ fontSize: "14px", color: "#6b7280" }}
       >
         ← Quay lại danh sách sản phẩm
@@ -27,7 +27,7 @@ export default async function ProductAdminDetailPage({
             {product.name}
           </h1>
           <Link
-            href={`/quan-tri/san-pham/${id}/chinh-sua`}
+            href={`/admin/san-pham/${id}/chinh-sua`}
             style={{
               padding: "8px 16px",
               border: "1px solid #e5e7eb",
@@ -113,7 +113,7 @@ export default async function ProductAdminDetailPage({
       ) : (
         <p style={{ fontSize: "14px", color: "#9ca3af", marginBottom: "32px" }}>
           Chưa cấu hình SEO.{" "}
-          <a href={`/quan-tri/san-pham/${id}/chinh-sua`} style={{ color: "#6b7280", textDecoration: "underline" }}>
+          <a href={`/admin/san-pham/${id}/chinh-sua`} style={{ color: "#6b7280", textDecoration: "underline" }}>
             Chỉnh sửa
           </a>{" "}
           để thêm.

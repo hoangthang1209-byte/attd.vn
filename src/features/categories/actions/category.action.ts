@@ -14,7 +14,7 @@ export async function createCategory(
     },
   });
 
-  revalidatePath("/quan-tri/danh-muc");
+  revalidatePath("/admin/danh-muc");
 }
 
 export async function deleteCategory(
@@ -26,5 +26,5 @@ export async function deleteCategory(
     },
   });
 
-  revalidatePath("/quan-tri/danh-muc");
+  revalidatePath("/admin/danh-muc");
 }

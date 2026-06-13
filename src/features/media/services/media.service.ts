@@ -1,27 +1,32 @@
 import { prisma } from "@/lib/prisma";
 import type { MediaFolder } from "@prisma/client";
+import { getStorageAdapter } from "@/lib/storage";
 import {
-  getStorageAdapter,
-  ALLOWED_IMAGE_TYPES,
   MAX_IMAGE_SIZE,
   MEDIA_TO_STORAGE_FOLDER,
   STORAGE_FOLDER_TO_MEDIA,
+  validateImageUpload,
   type StorageFolderKey,
-} from "@/lib/storage";
+} from "@/lib/storage/types";
 
 export async function listMediaAssets(options?: {
   folder?: MediaFolder;
   search?: string;
 }) {
-  return prisma.mediaAsset.findMany({
-    where: {
-      ...(options?.folder ? { folder: options.folder } : {}),
-      ...(options?.search
-        ? { filename: { contains: options.search, mode: "insensitive" } }
-        : {}),
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  try {
+    return await prisma.mediaAsset.findMany({
+      where: {
+        ...(options?.folder ? { folder: options.folder } : {}),
+        ...(options?.search
+          ? { filename: { contains: options.search, mode: "insensitive" } }
+          : {}),
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (err) {
+    console.error("[media.service] listMediaAssets failed:", err);
+    return [];
+  }
 }
 
 export async function getMediaAssetById(id: string) {
@@ -35,20 +40,25 @@ export async function uploadMediaAsset(input: {
 }) {
   const { folder, file, altText } = input;
 
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    throw new Error(`Định dạng không hỗ trợ: ${file.type}`);
-  }
-  if (file.size > MAX_IMAGE_SIZE) {
-    throw new Error("File quá lớn. Tối đa 4 MB.");
+  const validation = validateImageUpload({
+    filename: file.name,
+    mimeType: file.type,
+    sizeBytes: file.size,
+    maxSizeBytes: MAX_IMAGE_SIZE,
+  });
+
+  if ("error" in validation) {
+    throw new Error(validation.error);
   }
 
+  const mimeType = validation.mimeType;
   const buffer = Buffer.from(await file.arrayBuffer());
   const storage = getStorageAdapter();
   const { url, storageKey } = await storage.upload(
     folder,
     file.name,
     buffer,
-    file.type
+    mimeType
   );
 
   try {
@@ -57,7 +67,7 @@ export async function uploadMediaAsset(input: {
         filename: file.name,
         url,
         storageKey,
-        mimeType: file.type,
+        mimeType,
         sizeBytes: file.size,
         folder: STORAGE_FOLDER_TO_MEDIA[folder],
         altText: altText?.trim() || null,
@@ -65,6 +75,12 @@ export async function uploadMediaAsset(input: {
     });
   } catch (err) {
     await storage.delete(url, storageKey);
+    const detail = err instanceof Error ? err.message : String(err);
+    if (detail.includes("MediaAsset") || detail.includes("does not exist")) {
+      throw new Error(
+        "Bảng MediaAsset chưa tồn tại. Chạy: npx prisma migrate deploy"
+      );
+    }
     throw err;
   }
 }

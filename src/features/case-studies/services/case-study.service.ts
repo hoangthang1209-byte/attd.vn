@@ -6,9 +6,14 @@ import {
 import { resolveUploadImage, isValidImageSrc } from "@/lib/imagePaths";
 
 export async function listCaseStudies() {
-  return prisma.caseStudyRecord.findMany({
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-  });
+  try {
+    return await prisma.caseStudyRecord.findMany({
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    });
+  } catch (err) {
+    console.error("[case-study.service] listCaseStudies failed:", err);
+    return [];
+  }
 }
 
 export async function getCaseStudyById(id: string) {

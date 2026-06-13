@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   updateCaseStudy,
   deleteCaseStudy,
@@ -29,6 +30,8 @@ export async function PATCH(
       ...(typeof body.sortOrder === "number" ? { sortOrder: body.sortOrder } : {}),
     });
 
+    revalidatePath("/");
+
     return NextResponse.json(study);
   } catch (err) {
     console.error("[api/case-studies/[id]] PATCH failed:", err);
@@ -44,6 +47,7 @@ export async function DELETE(
 
   try {
     await deleteCaseStudy(id);
+    revalidatePath("/");
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });

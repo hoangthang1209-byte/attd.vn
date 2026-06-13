@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   updateClientLogo,
   deleteClientLogo,
@@ -32,6 +33,8 @@ export async function PATCH(
       ...(typeof body.sortOrder === "number" ? { sortOrder: body.sortOrder } : {}),
     });
 
+    revalidatePath("/");
+
     return NextResponse.json(logo);
   } catch (err) {
     console.error("[api/client-logos/[id]] PATCH failed:", err);
@@ -47,6 +50,7 @@ export async function DELETE(
 
   try {
     await deleteClientLogo(id);
+    revalidatePath("/");
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });

@@ -83,8 +83,8 @@ export default function ProductAdminTable({ products }: { products: ProductRow[]
                 </td>
                 <td>{new Date(product.updatedAt).toLocaleDateString("vi-VN")}</td>
                 <td className="admin-actions">
-                  <a href={`/quan-tri/san-pham/${product.id}`}>Ảnh</a>
-                  <a href={`/quan-tri/san-pham/${product.id}/chinh-sua`}>Sửa</a>
+                  <a href={`/admin/san-pham/${product.id}`}>Ảnh</a>
+                  <a href={`/admin/san-pham/${product.id}/chinh-sua`}>Sửa</a>
                   <button type="button" onClick={() => handleDelete(product.id, product.name)}>
                     Xóa
                   </button>

@@ -20,7 +20,7 @@ export default async function AdminPostsPage() {
         </h1>
 
         <Link
-          href="/quan-tri/bai-viet/tao-moi"
+          href="/admin/bai-viet/tao-moi"
           style={{
             padding: "10px 20px",
             background: "#111827",
@@ -38,7 +38,7 @@ export default async function AdminPostsPage() {
       {posts.length === 0 ? (
         <p style={{ color: "#9ca3af", fontSize: "14px" }}>
           Chưa có bài viết nào.{" "}
-          <Link href="/quan-tri/bai-viet/tao-moi" style={{ color: "#374151" }}>
+          <Link href="/admin/bai-viet/tao-moi" style={{ color: "#374151" }}>
             Tạo ngay
           </Link>
         </p>
@@ -108,7 +108,7 @@ export default async function AdminPostsPage() {
                   <td style={{ padding: "12px" }}>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                       <Link
-                        href={`/quan-tri/bai-viet/${post.id}/chinh-sua`}
+                        href={`/admin/bai-viet/${post.id}/chinh-sua`}
                         style={{
                           fontSize: "13px",
                           color: "#374151",

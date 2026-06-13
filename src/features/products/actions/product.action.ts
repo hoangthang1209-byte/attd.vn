@@ -16,5 +16,5 @@ export async function createProduct(
     },
   });
 
-  revalidatePath("/quan-tri/san-pham");
+  revalidatePath("/admin/san-pham");
 }

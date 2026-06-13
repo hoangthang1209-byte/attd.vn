@@ -1,16 +1,16 @@
 import Link from "next/link";
 
 const NAV = [
-  { href: "/quan-tri/dashboard", label: "Dashboard" },
-  { href: "/quan-tri/media", label: "Thư viện ảnh" },
-  { href: "/quan-tri/products", label: "Sản phẩm" },
-  { href: "/quan-tri/client-logos", label: "Logo khách hàng" },
-  { href: "/quan-tri/case-studies", label: "Dự án tiêu biểu" },
-  { href: "/quan-tri/settings/company", label: "Thông tin công ty" },
-  { href: "/quan-tri/settings/trust", label: "Chỉ số tin cậy" },
-  { href: "/quan-tri/khach-hang-tiem-nang", label: "CRM" },
-  { href: "/quan-tri/bai-viet", label: "Bài viết" },
-  { href: "/quan-tri/danh-muc", label: "Danh mục" },
+  { href: "/admin/dashboard", label: "Dashboard" },
+  { href: "/admin/media", label: "Thư viện ảnh" },
+  { href: "/admin/products", label: "Sản phẩm" },
+  { href: "/admin/client-logos", label: "Logo khách hàng" },
+  { href: "/admin/case-studies", label: "Dự án tiêu biểu" },
+  { href: "/admin/settings/company", label: "Thông tin công ty" },
+  { href: "/admin/settings/trust", label: "Chỉ số tin cậy" },
+  { href: "/admin/khach-hang-tiem-nang", label: "CRM" },
+  { href: "/admin/bai-viet", label: "Bài viết" },
+  { href: "/admin/danh-muc", label: "Danh mục" },
 ];
 
 export default function AdminShell({
@@ -23,7 +23,7 @@ export default function AdminShell({
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
-        <Link href="/quan-tri/dashboard" className="admin-brand">
+        <Link href="/admin/dashboard" className="admin-brand">
           ATTD CMS
         </Link>
         <nav className="admin-nav">

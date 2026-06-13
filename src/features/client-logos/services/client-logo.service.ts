@@ -6,9 +6,14 @@ import {
 import { resolveUploadImage, isValidImageSrc } from "@/lib/imagePaths";
 
 export async function listClientLogos() {
-  return prisma.clientLogoRecord.findMany({
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-  });
+  try {
+    return await prisma.clientLogoRecord.findMany({
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    });
+  } catch (err) {
+    console.error("[client-logo.service] listClientLogos failed:", err);
+    return [];
+  }
 }
 
 export async function getClientLogoById(id: string) {

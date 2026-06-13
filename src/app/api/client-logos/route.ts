@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   listClientLogos,
   createClientLogo,
@@ -32,6 +33,8 @@ export async function POST(request: Request) {
       isVisible: body.isVisible !== false,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0,
     });
+
+    revalidatePath("/");
 
     return NextResponse.json(logo, { status: 201 });
   } catch (err) {

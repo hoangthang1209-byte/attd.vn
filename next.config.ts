@@ -13,6 +13,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/quan-tri",
+        destination: "/admin",
+        permanent: true,
+      },
+      {
+        source: "/quan-tri/:path*",
+        destination: "/admin/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

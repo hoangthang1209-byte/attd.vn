@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import {
+  ALLOWED_IMAGE_EXTENSIONS,
+  inferImageMimeType,
+} from "@/lib/imageValidation";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
 const MAX_SIZE = 4 * 1024 * 1024;
 
 type ProductImage = {
@@ -19,26 +21,7 @@ type Props = {
   images: ProductImage[];
 };
 
-type UploadStatus = "idle" | "uploading" | "error";
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 12px",
-  border: "1px solid #e5e7eb",
-  borderRadius: "8px",
-  fontSize: "14px",
-  background: "#fff",
-  boxSizing: "border-box",
-};
-
-const btnStyle: React.CSSProperties = {
-  padding: "8px 16px",
-  borderRadius: "8px",
-  border: "1px solid #e5e7eb",
-  background: "#fff",
-  fontSize: "13px",
-  cursor: "pointer",
-};
+type UploadStatus = "idle" | "uploading" | "error" | "success";
 
 export default function ProductImageManager({ productId, images }: Props) {
   const router = useRouter();
@@ -49,15 +32,17 @@ export default function ProductImageManager({ productId, images }: Props) {
   const [altText, setAltText] = useState("");
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
   const [uploadError, setUploadError] = useState("");
+  const [uploadSuccess, setUploadSuccess] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!inferImageMimeType(file.name, file.type)) {
       setUploadError(
-        `Định dạng không hỗ trợ. Chỉ chấp nhận: ${ALLOWED_EXTENSIONS.join(", ")}`
+        `Định dạng không hỗ trợ. Chỉ chấp nhận: ${ALLOWED_IMAGE_EXTENSIONS.join(", ")}`
       );
       setSelectedFile(null);
       setPreview(null);
@@ -74,6 +59,7 @@ export default function ProductImageManager({ productId, images }: Props) {
     }
 
     setUploadError("");
+    setUploadSuccess("");
     setSelectedFile(file);
     setPreview(URL.createObjectURL(file));
   }
@@ -82,6 +68,7 @@ export default function ProductImageManager({ productId, images }: Props) {
     if (!selectedFile) return;
     setUploadStatus("uploading");
     setUploadError("");
+    setUploadSuccess("");
 
     const formData = new FormData();
     formData.append("file", selectedFile);
@@ -104,7 +91,8 @@ export default function ProductImageManager({ productId, images }: Props) {
       setSelectedFile(null);
       setPreview(null);
       setAltText("");
-      setUploadStatus("idle");
+      setUploadStatus("success");
+      setUploadSuccess(`Đã tải lên thành công: ${selectedFile.name}`);
       if (fileInputRef.current) fileInputRef.current.value = "";
       router.refresh();
     } catch {
@@ -113,25 +101,35 @@ export default function ProductImageManager({ productId, images }: Props) {
     }
   }
 
-  async function handleSetPrimary(id: string) {
+  async function runImageAction(
+    id: string,
+    action: "setPrimary" | "moveUp" | "moveDown" | "delete",
+    successText: string
+  ) {
     setBusyId(id);
+    setActionMessage("");
     try {
-      await fetch(`/api/images/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "setPrimary" }),
-      });
-      router.refresh();
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm("Xóa ảnh này?")) return;
-    setBusyId(id);
-    try {
-      await fetch(`/api/images/${id}`, { method: "DELETE" });
+      if (action === "delete") {
+        if (!confirm("Xóa ảnh này?")) return;
+        const res = await fetch(`/api/images/${id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json();
+          setActionMessage(data.message ?? "Xóa thất bại");
+          return;
+        }
+      } else {
+        const res = await fetch(`/api/images/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          setActionMessage(data.message ?? "Thao tác thất bại");
+          return;
+        }
+      }
+      setActionMessage(successText);
       router.refresh();
     } finally {
       setBusyId(null);
@@ -139,86 +137,53 @@ export default function ProductImageManager({ productId, images }: Props) {
   }
 
   return (
-    <div>
-      {/* Upload form */}
-      <div
-        style={{
-          padding: "24px",
-          border: "1px solid #e5e7eb",
-          borderRadius: "12px",
-          marginBottom: "32px",
-          background: "#fafafa",
-        }}
-      >
-        <h3 style={{ margin: "0 0 16px", fontSize: "16px" }}>Thêm hình ảnh</h3>
+    <div className="admin-panel">
+      <div className="admin-form admin-form--wide">
+        <h3 className="admin-subtitle">Thêm hình ảnh</h3>
 
-        <div style={{ marginBottom: "12px" }}>
+        <div className="admin-form-group">
           <input
             ref={fileInputRef}
             type="file"
-            accept={ALLOWED_EXTENSIONS.join(",")}
+            accept={ALLOWED_IMAGE_EXTENSIONS.join(",")}
             onChange={handleFileChange}
-            style={{ fontSize: "14px" }}
+            className="admin-input"
           />
-          <div style={{ marginTop: "4px", fontSize: "12px", color: "#9ca3af" }}>
-            JPG, PNG, WebP · Tối đa 4 MB
-          </div>
+          <p className="admin-field-hint">JPG, PNG, WebP · Tối đa 4 MB</p>
         </div>
 
         {uploadError && (
-          <div
-            style={{
-              marginBottom: "12px",
-              padding: "10px 14px",
-              background: "#fee2e2",
-              border: "1px solid #fecaca",
-              borderRadius: "8px",
-              color: "#dc2626",
-              fontSize: "13px",
-            }}
-          >
-            {uploadError}
-          </div>
+          <p className="admin-message admin-message--error">{uploadError}</p>
+        )}
+        {uploadSuccess && (
+          <p className="admin-message admin-message--success">{uploadSuccess}</p>
         )}
 
         {preview && (
-          <div style={{ marginBottom: "12px" }}>
+          <div className="admin-media-preview admin-media-preview--sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={preview}
-              alt="Preview"
-              style={{
-                width: "100px",
-                height: "100px",
-                objectFit: "cover",
-                borderRadius: "8px",
-                border: "1px solid #e5e7eb",
-              }}
-            />
+            <img src={preview} alt="Preview" />
           </div>
         )}
 
         {selectedFile && (
           <>
-            <div style={{ marginBottom: "12px" }}>
+            <div className="admin-form-group">
+              <label htmlFor="altText">Alt text (tùy chọn)</label>
               <input
+                id="altText"
                 type="text"
                 value={altText}
                 onChange={(e) => setAltText(e.target.value)}
-                placeholder="Alt text (tùy chọn — hỗ trợ SEO)"
-                style={inputStyle}
+                placeholder="Mô tả ảnh — hỗ trợ SEO"
+                className="admin-input"
               />
             </div>
             <button
+              type="button"
               onClick={handleUpload}
               disabled={uploadStatus === "uploading"}
-              style={{
-                ...btnStyle,
-                background: "var(--primary)",
-                color: "#fff",
-                border: "none",
-                opacity: uploadStatus === "uploading" ? 0.7 : 1,
-              }}
+              className="admin-btn admin-btn--primary"
             >
               {uploadStatus === "uploading" ? "Đang tải lên..." : "Tải lên"}
             </button>
@@ -226,103 +191,89 @@ export default function ProductImageManager({ productId, images }: Props) {
         )}
       </div>
 
-      {/* Image list */}
-      <div>
-        <h3 style={{ margin: "0 0 16px", fontSize: "16px" }}>
-          Hình ảnh ({images.length})
-        </h3>
+      <div style={{ marginTop: 32 }}>
+        <h3 className="admin-subtitle">Hình ảnh ({images.length})</h3>
 
-        {images.length === 0 && (
-          <p style={{ color: "#9ca3af", fontSize: "14px" }}>
-            Chưa có hình ảnh nào.
-          </p>
+        {actionMessage && (
+          <p className="admin-message admin-message--info">{actionMessage}</p>
         )}
 
-        {images.map((image, index) => (
-          <div
-            key={image.id}
-            style={{
-              display: "flex",
-              gap: "16px",
-              alignItems: "center",
-              padding: "16px 0",
-              borderBottom: "1px solid #e5e7eb",
-              opacity: busyId === image.id ? 0.5 : 1,
-            }}
-          >
-            {/* Thumbnail — plain img for admin (no next/image optimization needed) */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={image.imageUrl}
-              alt={image.altText ?? ""}
-              style={{
-                width: "80px",
-                height: "80px",
-                objectFit: "cover",
-                borderRadius: "8px",
-                border:
-                  index === 0
-                    ? "2px solid var(--primary)"
-                    : "1px solid #e5e7eb",
-                flexShrink: 0,
-              }}
-            />
-
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {index === 0 && (
-                <span
-                  style={{
-                    display: "inline-block",
-                    padding: "2px 8px",
-                    background: "#dcfce7",
-                    color: "#16a34a",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    borderRadius: "4px",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Ảnh chính
-                </span>
-              )}
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "#6b7280",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {image.imageUrl.split("/").pop()}
-              </div>
-              {image.altText && (
-                <div style={{ fontSize: "12px", color: "#374151", marginTop: "2px" }}>
-                  {image.altText}
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-              {index !== 0 && (
-                <button
-                  onClick={() => handleSetPrimary(image.id)}
-                  disabled={busyId !== null}
-                  style={btnStyle}
-                >
-                  Đặt làm ảnh chính
-                </button>
-              )}
-              <button
-                onClick={() => handleDelete(image.id)}
-                disabled={busyId !== null}
-                style={{ ...btnStyle, color: "#dc2626" }}
-              >
-                Xóa
-              </button>
-            </div>
+        {images.length === 0 ? (
+          <div className="admin-empty-state">
+            <p>Chưa có hình ảnh nào.</p>
+            <p className="admin-empty-hint">Tải ảnh lên để hiển thị trên trang sản phẩm.</p>
           </div>
-        ))}
+        ) : (
+          images.map((image, index) => (
+            <div
+              key={image.id}
+              className="admin-image-row"
+              style={{ opacity: busyId === image.id ? 0.5 : 1 }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image.imageUrl}
+                alt={image.altText ?? ""}
+                className={`admin-thumb admin-thumb--lg${index === 0 ? " admin-thumb--primary" : ""}`}
+              />
+
+              <div className="admin-image-row-meta">
+                {index === 0 && (
+                  <span className="admin-badge admin-badge--success">Ảnh chính</span>
+                )}
+                <div className="admin-image-row-url">
+                  {image.imageUrl.split("/").pop()}
+                </div>
+                {image.altText && (
+                  <div className="admin-image-row-alt">{image.altText}</div>
+                )}
+              </div>
+
+              <div className="admin-image-row-actions">
+                {index > 0 && (
+                  <button
+                    type="button"
+                    disabled={busyId !== null}
+                    className="admin-btn admin-btn--sm"
+                    onClick={() => runImageAction(image.id, "moveUp", "Đã di chuyển lên")}
+                  >
+                    ↑
+                  </button>
+                )}
+                {index < images.length - 1 && (
+                  <button
+                    type="button"
+                    disabled={busyId !== null}
+                    className="admin-btn admin-btn--sm"
+                    onClick={() => runImageAction(image.id, "moveDown", "Đã di chuyển xuống")}
+                  >
+                    ↓
+                  </button>
+                )}
+                {index !== 0 && (
+                  <button
+                    type="button"
+                    disabled={busyId !== null}
+                    className="admin-btn admin-btn--sm"
+                    onClick={() =>
+                      runImageAction(image.id, "setPrimary", "Đã đặt làm ảnh chính")
+                    }
+                  >
+                    Ảnh chính
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={busyId !== null}
+                  className="admin-btn admin-btn--sm admin-btn--danger"
+                  onClick={() => runImageAction(image.id, "delete", "Đã xóa ảnh")}
+                >
+                  Xóa
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

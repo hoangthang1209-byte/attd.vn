@@ -73,7 +73,7 @@ export default async function KhachHangTiemNangPage() {
     orderBy: { createdAt: "desc" },
   });
   console.log(
-    `[/quan-tri/khach-hang-tiem-nang] loaded ${rawLeads.length} leads`
+    `[/admin/khach-hang-tiem-nang] loaded ${rawLeads.length} leads`
   );
 
   // Serialize: convert non-JSON-safe types (Date, Decimal) to plain strings
@@ -143,7 +143,7 @@ export default async function KhachHangTiemNangPage() {
         </div>
 
         <Link
-          href="/quan-tri"
+          href="/admin"
           style={{ fontSize: "14px", color: "#6b7280", textDecoration: "none" }}
         >
           ← Dashboard
