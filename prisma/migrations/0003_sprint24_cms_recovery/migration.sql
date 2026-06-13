@@ -1,8 +1,14 @@
--- CreateEnum
-CREATE TYPE "MediaFolder" AS ENUM ('PRODUCTS', 'CATEGORIES', 'CLIENTS', 'CASE_STUDIES');
+-- Sprint 24 CMS Recovery (idempotent)
+-- Safe to run when PostStatus / DealerLeadStatus / LeadPipelineStatus already exist.
+-- Does NOT recreate those enums. Creates MediaFolder + CMS tables only if missing.
 
--- CreateTable
-CREATE TABLE "MediaAsset" (
+DO $$ BEGIN
+    CREATE TYPE "MediaFolder" AS ENUM ('PRODUCTS', 'CATEGORIES', 'CLIENTS', 'CASE_STUDIES');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "MediaAsset" (
     "id" TEXT NOT NULL,
     "filename" TEXT NOT NULL,
     "url" TEXT NOT NULL,
@@ -17,8 +23,7 @@ CREATE TABLE "MediaAsset" (
     CONSTRAINT "MediaAsset_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "ClientLogoRecord" (
+CREATE TABLE IF NOT EXISTS "ClientLogoRecord" (
     "id" TEXT NOT NULL,
     "companyName" TEXT NOT NULL,
     "website" TEXT,
@@ -31,8 +36,7 @@ CREATE TABLE "ClientLogoRecord" (
     CONSTRAINT "ClientLogoRecord_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "CaseStudyRecord" (
+CREATE TABLE IF NOT EXISTS "CaseStudyRecord" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "category" TEXT NOT NULL,
@@ -48,8 +52,7 @@ CREATE TABLE "CaseStudyRecord" (
     CONSTRAINT "CaseStudyRecord_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "CompanySettings" (
+CREATE TABLE IF NOT EXISTS "CompanySettings" (
     "id" TEXT NOT NULL DEFAULT 'default',
     "brandName" TEXT NOT NULL DEFAULT 'ATTD',
     "legalName" TEXT NOT NULL DEFAULT '',
@@ -67,8 +70,7 @@ CREATE TABLE "CompanySettings" (
     CONSTRAINT "CompanySettings_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "TrustMetricsSettings" (
+CREATE TABLE IF NOT EXISTS "TrustMetricsSettings" (
     "id" TEXT NOT NULL DEFAULT 'default',
     "clientsCount" INTEGER,
     "partnerCount" INTEGER,
@@ -80,8 +82,6 @@ CREATE TABLE "TrustMetricsSettings" (
     CONSTRAINT "TrustMetricsSettings_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE INDEX "MediaAsset_folder_idx" ON "MediaAsset"("folder");
+CREATE INDEX IF NOT EXISTS "MediaAsset_folder_idx" ON "MediaAsset"("folder");
 
--- CreateIndex
-CREATE INDEX "MediaAsset_filename_idx" ON "MediaAsset"("filename");
+CREATE INDEX IF NOT EXISTS "MediaAsset_filename_idx" ON "MediaAsset"("filename");

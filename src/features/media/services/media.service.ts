@@ -76,9 +76,13 @@ export async function uploadMediaAsset(input: {
   } catch (err) {
     await storage.delete(url, storageKey);
     const detail = err instanceof Error ? err.message : String(err);
-    if (detail.includes("MediaAsset") || detail.includes("does not exist")) {
+    if (
+      detail.includes("MediaAsset") ||
+      detail.includes("does not exist") ||
+      detail.includes("P2021")
+    ) {
       throw new Error(
-        "Bảng MediaAsset chưa tồn tại. Chạy: npx prisma migrate deploy"
+        "CMS tables chưa sẵn sàng — xem bảng chẩn đoán trên trang Media Library"
       );
     }
     throw err;

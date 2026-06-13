@@ -18,7 +18,7 @@ const FOLDERS = [
 
 type Message = { text: string; type: "success" | "error" | "info" };
 
-export default function MediaLibraryClient() {
+export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boolean }) {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [folder, setFolder] = useState("");
   const [search, setSearch] = useState("");
@@ -117,6 +117,11 @@ export default function MediaLibraryClient() {
 
   return (
     <div className="admin-panel">
+      {!cmsReady && (
+        <p className="admin-message admin-message--error">
+          Upload bị tắt cho đến khi CMS tables được tạo. Xem bảng chẩn đoán phía trên.
+        </p>
+      )}
       <div className="admin-toolbar">
         <select
           value={folder}
@@ -149,13 +154,13 @@ export default function MediaLibraryClient() {
             </option>
           ))}
         </select>
-        <label className={`admin-btn admin-btn--primary admin-upload-btn${uploading ? " admin-btn--disabled" : ""}`}>
+        <label className={`admin-btn admin-btn--primary admin-upload-btn${uploading || !cmsReady ? " admin-btn--disabled" : ""}`}>
           {uploading ? "Đang tải lên..." : "Tải ảnh lên"}
           <input
             type="file"
             accept={ALLOWED_IMAGE_EXTENSIONS.join(",")}
             hidden
-            disabled={uploading}
+            disabled={uploading || !cmsReady}
             onChange={handleUpload}
           />
         </label>

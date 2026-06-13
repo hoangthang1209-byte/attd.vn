@@ -1,19 +1,22 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { countMediaAssets } from "@/features/media/services/media.service";
 import { countClientLogos } from "@/features/client-logos/services/client-logo.service";
 import { countCaseStudies } from "@/features/case-studies/services/case-study.service";
+import { getCmsHealth } from "@/features/admin/services/cms-health.service";
 import AdminShell from "@/components/admin/AdminShell";
+import CmsHealthCard from "@/components/admin/CmsHealthCard";
 
 export default async function DashboardPage() {
   const [
+    health,
     totalProducts,
     totalMedia,
     totalClientLogos,
     totalCaseStudies,
     activeProducts,
   ] = await Promise.all([
+    getCmsHealth(),
     prisma.product.count(),
     countMediaAssets(),
     countClientLogos(),
@@ -55,6 +58,7 @@ export default async function DashboardPage() {
   return (
     <AdminShell title="Dashboard">
       <div className="admin-dashboard-grid">
+        <CmsHealthCard health={health} />
         {cmsCards.map((card) => (
           <div key={card.href} className="admin-dashboard-card">
             <p className="admin-dashboard-label">{card.label}</p>
