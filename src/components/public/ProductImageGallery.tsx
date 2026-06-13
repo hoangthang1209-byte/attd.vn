@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import ImagePlaceholder from "@/components/public/ImagePlaceholder";
 
 type GalleryImage = {
   id: string;
@@ -24,7 +25,6 @@ export default function ProductImageGallery({ images, productName }: Props) {
 
   const total = images.length;
 
-  // Clean up any pending fade timer on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -35,14 +35,12 @@ export default function ProductImageGallery({ images, productName }: Props) {
     if (index === selectedIndex) return;
     if (timerRef.current) clearTimeout(timerRef.current);
 
-    // Fade out → swap → fade in
     setMainOpacity(0);
     timerRef.current = setTimeout(() => {
       setSelectedIndex(index);
       setMainOpacity(1);
     }, 130);
 
-    // Bring the clicked thumbnail into view on horizontal scroll
     thumbRefs.current[index]?.scrollIntoView({
       behavior: "smooth",
       block: "nearest",
@@ -52,20 +50,8 @@ export default function ProductImageGallery({ images, productName }: Props) {
 
   if (total === 0) {
     return (
-      <div
-        style={{
-          aspectRatio: "1 / 1",
-          background: "#f9fafb",
-          borderRadius: 12,
-          border: "1px solid #e5e7eb",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 14,
-          color: "#9ca3af",
-        }}
-      >
-        Hình ảnh sản phẩm
+      <div className="product-gallery-main product-gallery-main--empty">
+        <ImagePlaceholder variant="product" label={productName} />
       </div>
     );
   }
@@ -74,18 +60,9 @@ export default function ProductImageGallery({ images, productName }: Props) {
 
   return (
     <div>
-      {/* ── Main image ─────────────────────────────────────────────────────── */}
       <div
-        style={{
-          position: "relative",
-          aspectRatio: "1 / 1",
-          borderRadius: 12,
-          overflow: "hidden",
-          background: "#f9fafb",
-          border: "1px solid #e5e7eb",
-          opacity: mainOpacity,
-          transition: "opacity 0.13s ease",
-        }}
+        className="product-gallery-main"
+        style={{ opacity: mainOpacity, transition: "opacity 0.13s ease" }}
       >
         <Image
           src={selected.imageUrl}
@@ -96,46 +73,15 @@ export default function ProductImageGallery({ images, productName }: Props) {
           priority
         />
 
-        {/* Image counter badge */}
         {total > 1 && (
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              bottom: "12px",
-              right: "12px",
-              background: "rgba(0, 0, 0, 0.45)",
-              color: "#fff",
-              fontSize: "12px",
-              fontWeight: 600,
-              lineHeight: 1,
-              padding: "5px 10px",
-              borderRadius: "20px",
-              pointerEvents: "none",
-              userSelect: "none",
-            }}
-          >
+          <div className="product-gallery-counter" aria-hidden="true">
             {selectedIndex + 1} / {total}
           </div>
         )}
       </div>
 
-      {/* ── Thumbnail strip ─────────────────────────────────────────────────── */}
       {total > 1 && (
-        <div
-          role="list"
-          aria-label="Xem ảnh sản phẩm"
-          style={{
-            display: "flex",
-            gap: "8px",
-            marginTop: "12px",
-            overflowX: "auto",
-            // Extra bottom padding gives scrollbar clearance and breathing room
-            paddingBottom: "6px",
-            // Prevent thumbnail strip from collapsing on short content
-            minHeight: "88px",
-          }}
-        >
+        <div className="product-gallery-thumbs" role="list" aria-label="Xem ảnh sản phẩm">
           {images.map((image, index) => {
             const isSelected = index === selectedIndex;
             const isHovered = hoveredThumb === index && !isSelected;
@@ -152,26 +98,10 @@ export default function ProductImageGallery({ images, productName }: Props) {
                 onMouseLeave={() => setHoveredThumb(null)}
                 aria-label={`Xem ảnh ${index + 1}`}
                 aria-pressed={isSelected}
+                className={`product-gallery-thumb${isSelected ? " product-gallery-thumb--active" : ""}`}
                 style={{
-                  position: "relative",
-                  width: "72px",
-                  height: "72px",
-                  flexShrink: 0,
-                  borderRadius: 10,
-                  overflow: "hidden",
-                  border: "none",
-                  padding: 0,
-                  cursor: isSelected ? "default" : "pointer",
-                  background: "#f9fafb",
-                  boxShadow: isSelected
-                    ? "0 0 0 2px #dc2626"
-                    : "0 0 0 1px #e5e7eb",
-                  // Dim unselected; slightly brighten on hover
                   opacity: isSelected ? 1 : isHovered ? 0.82 : 0.55,
-                  // Subtle lift on hover
                   transform: isHovered ? "scale(1.05)" : "scale(1)",
-                  transition:
-                    "opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease",
                 }}
               >
                 <Image

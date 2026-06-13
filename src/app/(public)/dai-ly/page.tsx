@@ -117,7 +117,11 @@ export default function DaiLyPage() {
 
             {/* Right: Form */}
             <div>
-              <DealerLeadForm source="DEALER_FORM" title="Đăng ký đại lý" />
+              <DealerLeadForm
+                source="DEALER_FORM"
+                title="Đăng ký đại lý"
+                submitLabel="Gửi đăng ký"
+              />
             </div>
           </div>
         </div>

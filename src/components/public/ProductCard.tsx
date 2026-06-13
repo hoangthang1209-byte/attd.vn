@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import ImagePlaceholder from "@/components/public/ImagePlaceholder";
 
 type ProductCardProps = {
   id: string;
@@ -8,6 +9,7 @@ type ProductCardProps = {
   productCode?: string | null;
   skuCount?: number;
   category?: string;
+  imageUrl?: string | null;
 };
 
 export default function ProductCard({
@@ -16,11 +18,20 @@ export default function ProductCard({
   productCode,
   skuCount = 0,
   category,
+  imageUrl,
 }: ProductCardProps) {
   return (
     <Link href={`/san-pham/${slug}`} className="product-card">
       <div className="product-card-media">
-        <span className="product-card-code">{productCode ?? "ATTD"}</span>
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt={name} className="product-card-img" />
+        ) : (
+          <ImagePlaceholder
+            variant="product"
+            label={productCode ?? undefined}
+          />
+        )}
       </div>
 
       <div className="product-card-body">

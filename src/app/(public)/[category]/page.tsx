@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/public/ProductCard";
 import InternalLinkBlock from "@/components/public/InternalLinkBlock";
+import TrustBlock from "@/components/public/TrustBlock";
+import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
 import CollectionSchema from "@/components/seo/CollectionSchema";
@@ -123,27 +125,20 @@ export default async function CategoryPage({ params }: PageProps) {
 
           <p
             className="section-description"
-            style={{ marginBottom: 48, maxWidth: 720 }}
+            style={{ marginBottom: 32, maxWidth: 720 }}
           >
             {content?.shortIntro ??
               cat.description ??
               `Nguồn hàng ${cat.name.toLowerCase()} dành cho đại lý, xưởng in và doanh nghiệp.`}
           </p>
 
+          <TrustBlock variant="strip" />
+
           {cat.products.length === 0 ? (
-            <div
-              style={{
-                padding: "64px 0",
-                textAlign: "center",
-                color: "#9ca3af",
-                fontSize: 15,
-                border: "1px dashed #e5e7eb",
-                borderRadius: 12,
-                background: "#f9fafb",
-              }}
-            >
-              Chưa có sản phẩm trong danh mục này.
-            </div>
+            <EmptyState
+              title="Chưa có sản phẩm trong danh mục này"
+              description="Liên hệ ATTD để được tư vấn nguồn hàng và báo giá theo nhu cầu."
+            />
           ) : (
             <div
               style={{
@@ -223,15 +218,10 @@ export default async function CategoryPage({ params }: PageProps) {
                 {cat.description}
               </p>
             ) : (
-              <p
-                style={{
-                  fontSize: "15px",
-                  lineHeight: "1.75",
-                  color: "#9ca3af",
-                }}
-              >
-                Dữ liệu danh mục đang được cập nhật.
-              </p>
+              <EmptyState
+                title="Dữ liệu danh mục đang được cập nhật"
+                description="Liên hệ ATTD để nhận tư vấn nguồn hàng và báo giá cho danh mục này."
+              />
             )}
           </div>
         </section>

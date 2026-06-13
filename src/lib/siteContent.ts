@@ -49,6 +49,28 @@ export const FOOTER_TRUST = {
   ],
 } as const;
 
+/** Reusable trust bullets for product & category pages */
+export const TRUST_BLOCK = {
+  title: "Vì sao chọn ATTD",
+  items: [
+    "Nguồn hàng ổn định",
+    "Hỗ trợ đại lý",
+    "Hỗ trợ in thêu",
+    "Giao hàng toàn quốc",
+  ],
+} as const;
+
+/** Banner before final homepage CTA */
+export const TRUST_BANNER = {
+  items: [
+    "Hỗ trợ đại lý toàn quốc",
+    "Kho hàng nhiều danh mục",
+    "Hỗ trợ in và thêu",
+    "Giao hàng toàn quốc",
+    "Tư vấn nhanh",
+  ],
+} as const;
+
 export const HERO_MOSAIC = [
   {
     slug: "ao-thun-tron",

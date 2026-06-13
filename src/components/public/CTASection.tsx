@@ -1,4 +1,6 @@
+import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import { CTA } from "@/lib/ctaConfig";
 
 type CTASectionProps = {
   title?: string;
@@ -6,58 +8,46 @@ type CTASectionProps = {
   primaryLabel?: string;
   primaryHref?: string;
   trackSource?: string;
+  showSecondary?: boolean;
 };
 
 export default function CTASection({
   title = "Trở thành đại lý ATTD",
   description = "Đăng ký tài khoản đại lý để nhận chính sách giá tốt hơn và cập nhật nguồn hàng mới nhất.",
-  primaryLabel = "Đăng ký đại lý",
-  primaryHref = "/dai-ly",
+  primaryLabel = CTA.primary.label,
+  primaryHref = CTA.primary.href,
   trackSource = "HOMEPAGE",
+  showSecondary = true,
 }: CTASectionProps) {
   return (
     <section className="section-compact">
       <div className="container">
-        <div
-          className="premium-card-static"
-          style={{
-            padding: "48px 40px",
-            textAlign: "center",
-            background: "#111827",
-            border: "none",
-            color: "#ffffff",
-          }}
-        >
-          <h2
-            style={{
-              margin: "0 0 16px",
-              fontSize: "clamp(24px, 3vw, 32px)",
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {title}
-          </h2>
-          <p
-            style={{
-              margin: "0 auto 32px",
-              maxWidth: 520,
-              fontSize: "16px",
-              lineHeight: 1.7,
-              color: "#9ca3af",
-            }}
-          >
-            {description}
-          </p>
-          <TrackedLink
-            href={primaryHref}
-            trackEvent="dealer_registration_click"
-            trackSource={trackSource}
-            className="btn-primary"
-            style={{ background: "#dc2626" }}
-          >
-            {primaryLabel}
-          </TrackedLink>
+        <div className="cta-section-card">
+          <h2 className="cta-section-title">{title}</h2>
+          <p className="cta-section-desc">{description}</p>
+          <div className="cta-section-actions">
+            <TrackedLink
+              href={primaryHref}
+              trackEvent={CTA.primary.event}
+              trackSource={trackSource}
+              className="btn-primary"
+            >
+              {primaryLabel}
+            </TrackedLink>
+            {showSecondary && (
+              <TrackedLink
+                href={CTA.secondary.href}
+                trackEvent={CTA.secondary.event}
+                trackSource={trackSource}
+                className="btn-secondary cta-section-btn-secondary"
+              >
+                {CTA.secondary.label}
+              </TrackedLink>
+            )}
+            <Link href={CTA.tertiary.href} className="btn-tertiary cta-section-btn-tertiary">
+              {CTA.tertiary.label}
+            </Link>
+          </div>
         </div>
       </div>
     </section>

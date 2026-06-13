@@ -1,5 +1,7 @@
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import { CTA } from "@/lib/ctaConfig";
+import { CONTACT_ZALO_URL } from "@/lib/navConfig";
 
 type InternalLink = {
   href: string;
@@ -20,24 +22,12 @@ export default function StickyInquiryBox({
   return (
     <div className="product-sticky-sidebar">
       {stockLabel && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 20,
-          }}
-        >
+        <div className="product-stock-badge">
           <span
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: stockColor,
-              flexShrink: 0,
-            }}
+            className="product-stock-dot"
+            style={{ background: stockColor }}
           />
-          <span style={{ fontSize: 14, color: stockColor, fontWeight: 500 }}>
+          <span className="product-stock-label" style={{ color: stockColor }}>
             {stockLabel}
           </span>
         </div>
@@ -50,23 +40,23 @@ export default function StickyInquiryBox({
         </p>
         <div className="btn-row">
           <TrackedLink
-            href="/lien-he"
-            trackEvent="contact_quote"
+            href={CTA.primary.href}
+            trackEvent={CTA.primary.event}
             trackSource="PRODUCT_PAGE"
             className="btn-primary"
           >
-            Liên hệ báo giá
+            {CTA.primary.label}
           </TrackedLink>
           <TrackedLink
-            href="/dai-ly"
-            trackEvent="dealer_registration_click"
+            href={CTA.secondary.href}
+            trackEvent={CTA.secondary.event}
             trackSource="PRODUCT_PAGE"
             className="btn-secondary"
           >
-            Đăng ký đại lý
+            {CTA.secondary.label}
           </TrackedLink>
           <TrackedLink
-            href="https://zalo.me/0934337667"
+            href={CONTACT_ZALO_URL}
             trackEvent="contact_zalo"
             trackSource="PRODUCT_PAGE"
             external
@@ -76,29 +66,15 @@ export default function StickyInquiryBox({
           >
             Chat Zalo
           </TrackedLink>
+          <Link href={CTA.tertiary.href} className="btn-tertiary btn-row-tertiary">
+            {CTA.tertiary.label}
+          </Link>
         </div>
       </div>
 
-      <div
-        style={{
-          paddingTop: 20,
-          borderTop: "1px solid #e5e7eb",
-        }}
-      >
-        <span
-          style={{
-            display: "block",
-            fontSize: 12,
-            fontWeight: 600,
-            color: "#9ca3af",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            marginBottom: 12,
-          }}
-        >
-          Tìm hiểu thêm
-        </span>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="inquiry-links">
+        <span className="inquiry-links-label">Tìm hiểu thêm</span>
+        <div className="inquiry-links-list">
           {internalLinks.map((l) => (
             <Link
               key={l.href}

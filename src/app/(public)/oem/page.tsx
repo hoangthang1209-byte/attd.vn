@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import { CTA } from "@/lib/ctaConfig";
 
 export const metadata: Metadata = {
   title: `OEM & Private Label | ${SITE_NAME}`,
@@ -100,12 +101,21 @@ export default function OemPage() {
 
           <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
             <TrackedLink
-              href="/lien-he"
-              trackEvent="contact_quote"
+              href={CTA.primary.href}
+              trackEvent={CTA.primary.event}
               trackSource="OEM_PAGE"
               className="btn-primary"
             >
-              Liên hệ báo giá
+              {CTA.primary.label}
+            </TrackedLink>
+            <TrackedLink
+              href={CTA.secondary.href}
+              trackEvent={CTA.secondary.event}
+              trackSource="OEM_PAGE"
+              className="btn-secondary"
+              style={{ background: "transparent", borderColor: "#4b5563", color: "#fff" }}
+            >
+              {CTA.secondary.label}
             </TrackedLink>
             <TrackedLink
               href={ZALO}

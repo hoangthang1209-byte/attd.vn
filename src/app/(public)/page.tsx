@@ -6,6 +6,9 @@ import CTASection from "@/components/public/CTASection";
 import HeroSection from "@/components/public/HeroSection";
 import SocialProofSection from "@/components/public/SocialProofSection";
 import SourcingProcessSection from "@/components/public/SourcingProcessSection";
+import ClientLogoWall from "@/components/public/ClientLogoWall";
+import CaseStudySection from "@/components/public/CaseStudySection";
+import TrustBanner from "@/components/public/TrustBanner";
 import {
   Shirt,
   CircleDot,
@@ -127,6 +130,9 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <ClientLogoWall />
+      <CaseStudySection />
+      <TrustBanner />
       <CTASection />
     </main>
   );

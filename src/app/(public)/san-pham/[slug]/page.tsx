@@ -6,6 +6,8 @@ import ProductCard from "@/components/public/ProductCard";
 import ProductImageGallery from "@/components/public/ProductImageGallery";
 import StickyInquiryBox from "@/components/public/StickyInquiryBox";
 import ProductFaqList from "@/components/public/ProductFaqList";
+import TrustBlock from "@/components/public/TrustBlock";
+import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
 import {
@@ -391,10 +393,17 @@ export default async function ProductDetailPage({ params }: PageProps) {
               )}
             </>
           ) : (
-            <p style={{ fontSize: "15px", color: "#9ca3af", margin: 0 }}>
-              Thông tin sản phẩm đang được cập nhật.
-            </p>
+            <EmptyState
+              title="Thông tin sản phẩm đang được cập nhật"
+              description="Liên hệ ATTD để nhận báo giá và tư vấn chi tiết về sản phẩm này."
+            />
           )}
+        </div>
+      </section>
+
+      <section className="section-compact">
+        <div className="container" style={{ maxWidth: 760 }}>
+          <TrustBlock />
         </div>
       </section>
 

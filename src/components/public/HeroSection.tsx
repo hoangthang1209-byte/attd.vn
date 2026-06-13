@@ -1,6 +1,7 @@
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import { HERO_MOSAIC } from "@/lib/siteContent";
+import { CTA } from "@/lib/ctaConfig";
 
 export default function HeroSection() {
   return (
@@ -17,17 +18,25 @@ export default function HeroSection() {
               toàn quốc. Blank apparel, gia công in thêu và giao hàng B2B.
             </p>
             <div className="hero-cta-row">
-              <Link href="/nguon-hang" className="btn-primary">
-                Xem nguồn hàng
-              </Link>
               <TrackedLink
-                href="/dai-ly"
-                trackEvent="dealer_registration_click"
+                href={CTA.primary.href}
+                trackEvent={CTA.primary.event}
+                trackSource="HOMEPAGE"
+                className="btn-primary"
+              >
+                {CTA.primary.label}
+              </TrackedLink>
+              <TrackedLink
+                href={CTA.secondary.href}
+                trackEvent={CTA.secondary.event}
                 trackSource="HOMEPAGE"
                 className="btn-secondary"
               >
-                Đăng ký đại lý
+                {CTA.secondary.label}
               </TrackedLink>
+              <Link href={CTA.tertiary.href} className="btn-tertiary">
+                {CTA.tertiary.label}
+              </Link>
             </div>
           </div>
 
