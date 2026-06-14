@@ -5,10 +5,16 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BlogPostStatus } from "@prisma/client";
+import BlogAiReadinessPanel from "@/components/admin/BlogAiReadinessPanel";
+import BlogAiRecommendationsPanel from "@/components/admin/BlogAiRecommendationsPanel";
 import BlogFaqBuilder from "@/components/admin/BlogFaqBuilder";
 import BlogSeoPanel from "@/components/admin/BlogSeoPanel";
 import BlogTagInput from "@/components/admin/BlogTagInput";
+import AiContentFactory from "@/components/admin/blog-editor/AiContentFactory";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
+import type { GeneratedArticle } from "@/features/blog/ai-article-generator";
+import type { AiFaqResult, AiSeoResult, AiTagsResult } from "@/features/blog/ai-provider";
+import type { SeoRecommendations } from "@/features/blog/seo-recommendations";
 import { generateDemoBlogArticle } from "@/features/blog/demo-article-generator";
 import { contentToEditorMarkdown } from "@/features/blog/html-to-markdown";
 import { getPublishWarnings, calculateSeoScore } from "@/features/blog/seo-score";
@@ -82,6 +88,7 @@ export default function BlogPostEditor(props: Props) {
 
   const [saving, setSaving] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(initial?.updatedAt ?? null);
+  const [aiRecommendations, setAiRecommendations] = useState<SeoRecommendations | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
     null
   );
@@ -103,6 +110,42 @@ export default function BlogPostEditor(props: Props) {
   function handleTitleChange(value: string) {
     setTitle(value);
     if (!slugEdited) setSlug(toSlug(value));
+  }
+
+  function applyAiArticle(result: GeneratedArticle) {
+    const hasExisting = Boolean(title.trim() || markdown.trim());
+    if (hasExisting) {
+      const proceed = window.confirm("Thay thế nội dung hiện tại bằng bài viết AI?");
+      if (!proceed) return;
+    }
+    setTitle(result.title);
+    if (!slugEdited) setSlug(result.slug);
+    setExcerpt(result.excerpt);
+    setMarkdown(result.markdown);
+    setTags(normalizeBlogTags(result.tags));
+    setFaqJson(result.faqJson);
+    setMetaTitle(result.metaTitle);
+    setMetaDescription(result.metaDescription);
+    if (aiRecommendations?.suggestedCategoryIds.length) {
+      setCategoryIds((prev) => [
+        ...new Set([...prev, ...aiRecommendations.suggestedCategoryIds]),
+      ]);
+    }
+  }
+
+  function applyAiSeo(result: AiSeoResult) {
+    if (result.title) setTitle(result.title);
+    if (result.excerpt) setExcerpt(result.excerpt);
+    setMetaTitle(result.metaTitle);
+    setMetaDescription(result.metaDescription);
+  }
+
+  function applyAiFaq(result: AiFaqResult) {
+    setFaqJson(result.faqJson);
+  }
+
+  function applyAiTags(result: AiTagsResult) {
+    setTags(normalizeBlogTags(result.tags));
   }
 
   function applyDemoArticle() {
@@ -255,6 +298,16 @@ export default function BlogPostEditor(props: Props) {
 
       <div className="admin-form-grid">
         <div className="admin-form-main">
+          <AiContentFactory
+            categories={categories}
+            onApplyArticle={applyAiArticle}
+            onApplySeo={applyAiSeo}
+            onApplyFaq={applyAiFaq}
+            onApplyTags={applyAiTags}
+            onRecommendationsChange={setAiRecommendations}
+            onMessage={(text, type) => setMessage({ text, type })}
+          />
+
           <div className="admin-field">
             <label className="admin-label">
               Tiêu đề <span className="admin-required">*</span>
@@ -318,6 +371,27 @@ export default function BlogPostEditor(props: Props) {
         </div>
 
         <aside className="admin-form-sidebar">
+          <BlogAiReadinessPanel
+            content={markdown}
+            faqJson={faqJson}
+            tags={tags}
+            metaTitle={metaTitle}
+            metaDescription={metaDescription}
+          />
+
+          <BlogAiRecommendationsPanel
+            recommendations={aiRecommendations}
+            categories={categories}
+            selectedCategoryIds={categoryIds}
+            onApplyTags={(nextTags) => setTags(normalizeBlogTags(nextTags))}
+            onApplyFaqs={() => {
+              if (aiRecommendations?.suggestedFaqs) {
+                setFaqJson(aiRecommendations.suggestedFaqs);
+              }
+            }}
+            onApplyCategories={setCategoryIds}
+          />
+
           <BlogSeoPanel
             title={title}
             slug={slug}

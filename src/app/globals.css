@@ -5283,3 +5283,204 @@ body:has(.mobile-action-bar) .site-footer {
   box-sizing: border-box;
 }
 
+/* ── AI Content Factory (Sprint 24.7.0) ───────────────────────────────────── */
+
+.admin-ai-factory {
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #c7d2fe;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%);
+}
+
+.admin-ai-factory-header {
+  margin-bottom: 16px;
+}
+
+.admin-ai-factory-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e1b4b;
+}
+
+.admin-ai-factory-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-ai-factory-field--full {
+  grid-column: 1 / -1;
+}
+
+.admin-ai-factory-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.admin-ai-factory-options,
+.admin-ai-factory-length {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-ai-factory-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-radio-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.admin-ai-factory-blueprint {
+  margin-bottom: 16px;
+}
+
+.admin-ai-factory-blueprint-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-ai-factory-blueprint-row select {
+  flex: 1;
+}
+
+.admin-ai-factory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-ai-factory-prompts {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.admin-ai-factory-prompts summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #4338ca;
+}
+
+.admin-ai-factory-prompt-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.admin-ai-factory-prompt-preview {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+}
+
+.admin-ai-rec-block {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-ai-rec-block:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.admin-ai-rec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.admin-ai-rec-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-ai-rec-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.admin-ai-rec-list--faqs {
+  list-style: none;
+  padding-left: 0;
+}
+
+.admin-ai-rec-list--faqs li {
+  margin-bottom: 8px;
+}
+
+.admin-ai-rec-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-ai-rec-chips li {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-ai-readiness-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.admin-ai-readiness-list .is-ok {
+  color: #15803d;
+  font-weight: 600;
+}
+
+@media (max-width: 960px) {
+  .admin-ai-factory-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-ai-factory-actions {
+    flex-direction: column;
+  }
+
+  .admin-ai-factory-actions .admin-btn {
+    width: 100%;
+  }
+}
+
