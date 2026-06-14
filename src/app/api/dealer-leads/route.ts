@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { createCrmLead } from "@/features/crm/services/crm-lead.service";
+import { mapFormSourceToCrmSource } from "@/features/crm/labels";
 
 // ─── POST /api/dealer-leads (public) ─────────────────────────────────────────
 
@@ -89,6 +91,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         landingPage,
       },
       select: { id: true },
+    });
+
+    await createCrmLead({
+      fullName: contactName,
+      phone,
+      email,
+      company: companyName,
+      source: mapFormSourceToCrmSource(source),
+      message,
     });
 
     const total = await prisma.dealerLead.count();

@@ -5,8 +5,9 @@ const STATUS_CONFIG: Record<
   { label: string; color: string; background: string }
 > = {
   NEW: { label: "Mới", color: "#2563eb", background: "#dbeafe" },
-  PROCESSING: { label: "Đang xử lý", color: "#d97706", background: "#fef3c7" },
-  QUOTED: { label: "Đã báo giá", color: "#7c3aed", background: "#ede9fe" },
+  CONTACTED: { label: "Đã liên hệ", color: "#d97706", background: "#fef3c7" },
+  QUOTING: { label: "Đang báo giá", color: "#7c3aed", background: "#ede9fe" },
+  NEGOTIATING: { label: "Đàm phán", color: "#ea580c", background: "#ffedd5" },
   WON: { label: "Đã chốt", color: "#16a34a", background: "#dcfce7" },
   LOST: { label: "Đã hủy", color: "#6b7280", background: "#f3f4f6" },
 };
@@ -107,7 +108,7 @@ export default async function LeadAdminPage() {
                     }}
                   >
                     <td style={{ padding: "12px 16px", fontWeight: 500 }}>
-                      {lead.name}
+                      {lead.fullName}
                     </td>
 
                     <td style={{ padding: "12px 16px" }}>

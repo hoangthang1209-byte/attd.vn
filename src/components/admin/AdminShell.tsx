@@ -7,7 +7,7 @@ const MAIN_NAV = [
   { href: "/admin/client-logos", label: "Logo khách hàng" },
   { href: "/admin/case-studies", label: "Dự án tiêu biểu" },
   { href: "/admin/landing-pages", label: "Landing pages" },
-  { href: "/admin/khach-hang-tiem-nang", label: "CRM" },
+  { href: "/admin/crm", label: "CRM" },
   { href: "/admin/bai-viet", label: "Bài viết" },
   { href: "/admin/danh-muc", label: "Danh mục" },
 ];

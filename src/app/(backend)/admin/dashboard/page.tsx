@@ -77,7 +77,7 @@ export default async function DashboardPage() {
           <Link href="/admin/settings/company">Thông tin công ty</Link>
           <Link href="/admin/settings/trust">Chỉ số tin cậy</Link>
           <Link href="/admin/media">Tải ảnh lên</Link>
-          <Link href="/admin/khach-hang-tiem-nang">CRM leads</Link>
+          <Link href="/admin/crm">CRM leads</Link>
         </div>
       </div>
     </AdminShell>

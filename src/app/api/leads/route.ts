@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { createCrmLead } from "@/features/crm/services/crm-lead.service";
 
 export async function GET() {
   const leads = await prisma.lead.findMany({
@@ -24,16 +25,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const lead = await prisma.lead.create({
-    data: {
-      name: body.name.trim(),
-      phone: body.phone.trim(),
-      email: body.email?.trim() || null,
-      company: body.company?.trim() || null,
-      message: body.message?.trim() || null,
-      source: "CONTACT_FORM",
-    },
+  const fullName = body.name.trim();
+  const phone = body.phone.trim();
+  const email = body.email?.trim() || null;
+  const company = body.company?.trim() || null;
+  const message = body.message?.trim() || null;
+
+  const lead = await createCrmLead({
+    fullName,
+    phone,
+    email,
+    company,
+    source: "CONTACT",
+    message,
   });
+
+  if (!lead) {
+    return NextResponse.json(
+      { message: "Không thể lưu lead. Vui lòng thử lại." },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json(lead, { status: 201 });
 }

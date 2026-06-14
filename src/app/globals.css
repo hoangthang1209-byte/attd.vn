@@ -3415,5 +3415,119 @@ body:has(.mobile-action-bar) .site-footer {
   word-break: break-all;
 }
 
+.admin-crm-kpi-grid,
+.admin-crm-reminder-grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-crm-kpi-grid {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.admin-crm-reminder-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.admin-dashboard-card--warning {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.admin-dashboard-card--danger {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.admin-crm-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.admin-crm-filters .admin-input {
+  min-width: 180px;
+}
+
+.admin-crm-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-crm-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+
+.admin-crm-info-grid dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-crm-info-grid dd {
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.admin-crm-message {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.admin-crm-inline-form,
+.admin-crm-note-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.admin-textarea {
+  min-width: min(100%, 420px);
+  resize: vertical;
+}
+
+.admin-crm-notes {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-crm-notes li {
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-crm-notes time {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.admin-crm-notes p {
+  margin: 0;
+  line-height: 1.6;
+  color: #0f172a;
+}
 
 
