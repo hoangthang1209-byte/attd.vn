@@ -33,8 +33,11 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   }
 
   const raw = body as Record<string, unknown>;
-  const patch: { status?: Parameters<typeof updateCrmLead>[1]["status"]; followUpAt?: Date | null } =
-    {};
+  const patch: {
+    status?: Parameters<typeof updateCrmLead>[1]["status"];
+    followUpAt?: Date | null;
+    estimatedValue?: number | null;
+  } = {};
 
   if (raw.status !== undefined) {
     if (typeof raw.status !== "string" || !isValidLeadStatus(raw.status)) {
@@ -57,7 +60,30 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
   }
 
-  if (patch.status === undefined && patch.followUpAt === undefined) {
+  if (raw.estimatedValue !== undefined) {
+    if (raw.estimatedValue === null || raw.estimatedValue === "") {
+      patch.estimatedValue = null;
+    } else if (typeof raw.estimatedValue === "number") {
+      if (!Number.isFinite(raw.estimatedValue) || raw.estimatedValue < 0) {
+        return NextResponse.json({ message: "Giá trị không hợp lệ" }, { status: 400 });
+      }
+      patch.estimatedValue = raw.estimatedValue;
+    } else if (typeof raw.estimatedValue === "string") {
+      const parsed = Number(raw.estimatedValue.replace(/[^\d.]/g, ""));
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return NextResponse.json({ message: "Giá trị không hợp lệ" }, { status: 400 });
+      }
+      patch.estimatedValue = parsed;
+    } else {
+      return NextResponse.json({ message: "Giá trị không hợp lệ" }, { status: 400 });
+    }
+  }
+
+  if (
+    patch.status === undefined &&
+    patch.followUpAt === undefined &&
+    patch.estimatedValue === undefined
+  ) {
     return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });
   }
 

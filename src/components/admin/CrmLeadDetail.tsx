@@ -4,24 +4,15 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LeadStatus } from "@prisma/client";
-import {
-  CRM_SOURCE_LABELS,
-  CRM_STATUS_LABELS,
-} from "@/features/crm/labels";
+import LeadSourceDisplay from "@/components/admin/LeadSourceDisplay";
+import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
+import { CRM_STATUS_LABELS } from "@/features/crm/labels";
+import { formatCrmCurrency, formatCrmDateTime } from "@/features/crm/format";
 import {
   CRM_LEAD_STATUSES,
   type CrmLeadNoteRecord,
   type CrmLeadRecord,
 } from "@/features/crm/types";
-
-function formatNoteTime(iso: string) {
-  return new Date(iso).toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function toDatetimeLocalValue(iso: string | null) {
   if (!iso) return "";
@@ -36,9 +27,13 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
   const [notes, setNotes] = useState<CrmLeadNoteRecord[]>(initialLead.notes ?? []);
   const [status, setStatus] = useState<LeadStatus>(initialLead.status);
   const [followUpAt, setFollowUpAt] = useState(toDatetimeLocalValue(initialLead.followUpAt));
+  const [estimatedValue, setEstimatedValue] = useState(
+    initialLead.estimatedValue ? initialLead.estimatedValue.replace(/[^\d]/g, "") : ""
+  );
   const [noteContent, setNoteContent] = useState("");
   const [savingStatus, setSavingStatus] = useState(false);
   const [savingFollowUp, setSavingFollowUp] = useState(false);
+  const [savingValue, setSavingValue] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
     null
@@ -95,6 +90,35 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
     }
   }
 
+  async function saveEstimatedValue() {
+    setSavingValue(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/crm/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          estimatedValue: estimatedValue.trim() ? Number(estimatedValue) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({ type: "error", text: data.message ?? "Cập nhật thất bại" });
+        return;
+      }
+      setLead(data.lead);
+      setEstimatedValue(
+        data.lead.estimatedValue ? data.lead.estimatedValue.replace(/[^\d]/g, "") : ""
+      );
+      setMessage({ type: "success", text: "Đã cập nhật giá trị" });
+      router.refresh();
+    } catch {
+      setMessage({ type: "error", text: "Cập nhật thất bại" });
+    } finally {
+      setSavingValue(false);
+    }
+  }
+
   async function addNote(event: React.FormEvent) {
     event.preventDefault();
     if (!noteContent.trim()) return;
@@ -133,12 +157,11 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
       )}
 
       <section className="admin-crm-section">
-        <h2 className="admin-subtitle">Thông tin lead</h2>
+        <div className="admin-crm-detail-header">
+          <h2 className="admin-subtitle">{lead.fullName}</h2>
+          <LeadStatusBadge status={lead.status} />
+        </div>
         <dl className="admin-crm-info-grid">
-          <div>
-            <dt>Họ tên</dt>
-            <dd>{lead.fullName}</dd>
-          </div>
           <div>
             <dt>Số điện thoại</dt>
             <dd>{lead.phone}</dd>
@@ -148,22 +171,28 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
             <dd>{lead.email || "—"}</dd>
           </div>
           <div>
-            <dt>C ty</dt>
+            <dt>Công ty</dt>
             <dd>{lead.company || "—"}</dd>
           </div>
           <div>
             <dt>Nguồn</dt>
-            <dd>{CRM_SOURCE_LABELS[lead.source]}</dd>
+            <dd>
+              <LeadSourceDisplay lead={lead} />
+            </dd>
+          </div>
+          <div>
+            <dt>Giá trị</dt>
+            <dd>{formatCrmCurrency(lead.estimatedValue)}</dd>
           </div>
           <div>
             <dt>Ngày tạo</dt>
-            <dd>{formatNoteTime(lead.createdAt)}</dd>
+            <dd>{formatCrmDateTime(lead.createdAt)}</dd>
           </div>
         </dl>
         {lead.message && (
           <div className="admin-crm-message">
             <p className="admin-dashboard-label">Tin nhắn</p>
-            <p>{lead.message}</p>
+            <p style={{ whiteSpace: "pre-wrap" }}>{lead.message}</p>
           </div>
         )}
       </section>
@@ -209,6 +238,28 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
       </section>
 
       <section className="admin-crm-section">
+        <h2 className="admin-subtitle">Giá trị dự kiến</h2>
+        <div className="admin-crm-inline-form">
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="Ví dụ: 20000000"
+            value={estimatedValue}
+            onChange={(e) => setEstimatedValue(e.target.value.replace(/[^\d]/g, ""))}
+            className="admin-input"
+          />
+          <button
+            type="button"
+            className="admin-btn"
+            onClick={() => void saveEstimatedValue()}
+            disabled={savingValue}
+          >
+            {savingValue ? "Đang lưu..." : "Lưu giá trị"}
+          </button>
+        </div>
+      </section>
+
+      <section className="admin-crm-section">
         <h2 className="admin-subtitle">Ghi chú</h2>
         <form className="admin-crm-note-form" onSubmit={addNote}>
           <textarea
@@ -231,7 +282,7 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
           <ul className="admin-crm-notes">
             {notes.map((note) => (
               <li key={note.id}>
-                <time>{formatNoteTime(note.createdAt)}</time>
+                <time>{formatCrmDateTime(note.createdAt)}</time>
                 <p>{note.content}</p>
               </li>
             ))}

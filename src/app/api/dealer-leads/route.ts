@@ -94,12 +94,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     });
 
     await createCrmLead({
+      id: created.id,
       fullName: contactName,
       phone,
       email,
       company: companyName,
       source: mapFormSourceToCrmSource(source),
       message,
+      landingPage,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      referrer,
     });
 
     const total = await prisma.dealerLead.count();

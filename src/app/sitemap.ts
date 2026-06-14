@@ -30,7 +30,7 @@ function dedup(entries: MetadataRoute.Sitemap): MetadataRoute.Sitemap {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [categories, products, posts] = await Promise.all([
+  const [categories, products, blogPosts, legacyPosts] = await Promise.all([
     // Layer 1: filter empty slugs at the DB level
     prisma.category.findMany({
       where: { slug: { not: "" } },
@@ -42,12 +42,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       select: { slug: true, updatedAt: true },
       orderBy: { updatedAt: "desc" },
     }),
+    prisma.blogPost.findMany({
+      where: { status: "PUBLISHED", slug: { not: "" } },
+      select: { slug: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+    }),
     prisma.post.findMany({
       where: { status: "PUBLISHED", slug: { not: "" } },
       select: { slug: true, updatedAt: true },
       orderBy: { updatedAt: "desc" },
     }),
   ]);
+
+  const posts =
+    blogPosts.length > 0
+      ? blogPosts
+      : legacyPosts;
 
   const staticRoutes: MetadataRoute.Sitemap = [
     {

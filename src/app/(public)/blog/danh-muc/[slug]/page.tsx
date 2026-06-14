@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
+import { notFound } from "next/navigation";
+import { getPublishedPostsByCategorySlug } from "@/features/blog/services/blog-public.service";
 import { SITE_NAME, canonicalUrl } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: `Blog | ${SITE_NAME}`,
-  description:
-    "Kiến thức đồng phục, quà tặng doanh nghiệp và nguồn hàng B2B.",
-  alternates: {
-    canonical: canonicalUrl("/blog"),
-  },
+type PageProps = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ page?: string }>;
 };
 
 const PER_PAGE = 9;
@@ -22,43 +19,73 @@ function formatDate(date: Date): string {
   }).format(new Date(date));
 }
 
-export default async function BlogPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: string }>;
-}) {
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const result = await getPublishedPostsByCategorySlug(slug, 1, 1);
+  if (!result) return {};
+
+  const title = `${result.category.name} | Blog | ${SITE_NAME}`;
+  const description =
+    result.category.description ??
+    `Bài viết về ${result.category.name} — kiến thức B2B từ ATTD.`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: canonicalUrl(`/blog/danh-muc/${slug}`),
+    },
+  };
+}
+
+export default async function BlogCategoryPage({ params, searchParams }: PageProps) {
+  const { slug } = await params;
   const { page: pageParam } = await searchParams;
   const currentPage = Math.max(1, parseInt(pageParam ?? "1", 10));
 
-  const { posts, total, totalPages } = await getPublishedBlogPosts(
-    currentPage,
-    PER_PAGE
-  );
+  const result = await getPublishedPostsByCategorySlug(slug, currentPage, PER_PAGE);
+  if (!result) notFound();
+
+  const { category, posts, total, totalPages } = result;
 
   return (
     <main>
       <section className="section" style={{ paddingBottom: "24px" }}>
         <div className="container">
-          <h1 className="section-title">Blog</h1>
-          <p className="section-description">
-            Kiến thức đồng phục, quà tặng doanh nghiệp và nguồn hàng B2B.
-          </p>
+          <nav
+            style={{
+              fontSize: "13px",
+              color: "#6b7280",
+              marginBottom: "16px",
+              display: "flex",
+              gap: "6px",
+              flexWrap: "wrap",
+            }}
+          >
+            <Link href="/" style={{ color: "#6b7280", textDecoration: "none" }}>
+              Trang chủ
+            </Link>
+            <span>/</span>
+            <Link href="/blog" style={{ color: "#6b7280", textDecoration: "none" }}>
+              Blog
+            </Link>
+            <span>/</span>
+            <span style={{ color: "#111827" }}>{category.name}</span>
+          </nav>
+
+          <h1 className="section-title">{category.name}</h1>
+          {category.description && (
+            <p className="section-description">{category.description}</p>
+          )}
         </div>
       </section>
 
       <section style={{ paddingBottom: "64px" }}>
         <div className="container">
           {posts.length === 0 ? (
-            <div
-              style={{
-                padding: "80px 0",
-                textAlign: "center",
-                color: "#9ca3af",
-                fontSize: "15px",
-              }}
-            >
-              Chưa có bài viết nào.
-            </div>
+            <p style={{ color: "#9ca3af", textAlign: "center", padding: "48px 0" }}>
+              Chưa có bài viết trong danh mục này.
+            </p>
           ) : (
             <div
               style={{
@@ -83,7 +110,6 @@ export default async function BlogPage({
                       height: "100%",
                       display: "flex",
                       flexDirection: "column",
-                      transition: "box-shadow 0.2s",
                     }}
                   >
                     {post.featuredImageUrl ? (
@@ -98,49 +124,19 @@ export default async function BlogPage({
                         }}
                       />
                     ) : (
-                      <div
-                        style={{
-                          height: "200px",
-                          background: "#f3f4f6",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#d1d5db",
-                          fontSize: "13px",
-                        }}
-                      >
-                        ATTD Blog
-                      </div>
+                      <div style={{ height: "200px", background: "#f3f4f6" }} />
                     )}
 
-                    <div
-                      style={{
-                        padding: "20px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "10px",
-                        flex: 1,
-                      }}
-                    >
+                    <div style={{ padding: "20px", flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
                       <time
                         dateTime={new Date(post.publishedAt ?? post.createdAt).toISOString()}
                         style={{ fontSize: "12px", color: "#9ca3af" }}
                       >
                         {formatDate(post.publishedAt ?? post.createdAt)}
                       </time>
-
-                      <h2
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 700,
-                          lineHeight: 1.4,
-                          color: "#111827",
-                          margin: 0,
-                        }}
-                      >
+                      <h2 style={{ fontSize: "16px", fontWeight: 700, margin: 0, color: "#111827" }}>
                         {post.title}
                       </h2>
-
                       {post.excerpt && (
                         <p
                           style={{
@@ -157,15 +153,7 @@ export default async function BlogPage({
                           {post.excerpt}
                         </p>
                       )}
-
-                      <span
-                        style={{
-                          marginTop: "auto",
-                          fontSize: "13px",
-                          color: "#6b7280",
-                          fontWeight: 500,
-                        }}
-                      >
+                      <span style={{ marginTop: "auto", fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
                         Đọc thêm →
                       </span>
                     </div>
@@ -176,17 +164,10 @@ export default async function BlogPage({
           )}
 
           {totalPages > 1 && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: "8px",
-                alignItems: "center",
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "center", gap: "8px", alignItems: "center" }}>
               {currentPage > 1 && (
                 <Link
-                  href={`/blog?page=${currentPage - 1}`}
+                  href={`/blog/danh-muc/${slug}?page=${currentPage - 1}`}
                   style={{
                     padding: "8px 20px",
                     border: "1px solid #e5e7eb",
@@ -200,14 +181,12 @@ export default async function BlogPage({
                   ← Trước
                 </Link>
               )}
-
               <span style={{ fontSize: "14px", color: "#6b7280" }}>
                 Trang {currentPage} / {totalPages}
               </span>
-
               {currentPage < totalPages && (
                 <Link
-                  href={`/blog?page=${currentPage + 1}`}
+                  href={`/blog/danh-muc/${slug}?page=${currentPage + 1}`}
                   style={{
                     padding: "8px 20px",
                     border: "1px solid #e5e7eb",
@@ -225,14 +204,7 @@ export default async function BlogPage({
           )}
 
           {total > 0 && (
-            <p
-              style={{
-                textAlign: "center",
-                fontSize: "13px",
-                color: "#9ca3af",
-                marginTop: "16px",
-              }}
-            >
+            <p style={{ textAlign: "center", fontSize: "13px", color: "#9ca3af", marginTop: "16px" }}>
               {total} bài viết
             </p>
           )}

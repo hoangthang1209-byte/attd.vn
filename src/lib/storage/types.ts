@@ -5,7 +5,8 @@ export type StorageFolderKey =
   | "categories"
   | "clients"
   | "case-studies"
-  | "branding";
+  | "branding"
+  | "blog";
 
 export const STORAGE_FOLDER_TO_MEDIA: Record<StorageFolderKey, MediaFolder> = {
   products: "PRODUCTS",
@@ -13,6 +14,7 @@ export const STORAGE_FOLDER_TO_MEDIA: Record<StorageFolderKey, MediaFolder> = {
   clients: "CLIENTS",
   "case-studies": "CASE_STUDIES",
   branding: "BRANDING",
+  blog: "BLOG",
 };
 
 export const MEDIA_TO_STORAGE_FOLDER: Record<MediaFolder, StorageFolderKey> = {
@@ -21,6 +23,7 @@ export const MEDIA_TO_STORAGE_FOLDER: Record<MediaFolder, StorageFolderKey> = {
   CLIENTS: "clients",
   CASE_STUDIES: "case-studies",
   BRANDING: "branding",
+  BLOG: "blog",
 };
 
 export type UploadResult = {

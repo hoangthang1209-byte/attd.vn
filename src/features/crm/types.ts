@@ -10,6 +10,12 @@ export type CrmLeadRecord = {
   status: LeadStatus;
   message: string | null;
   followUpAt: string | null;
+  estimatedValue: string | null;
+  landingPage: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  referrer: string | null;
   createdAt: string;
   updatedAt: string;
   notes?: CrmLeadNoteRecord[];
@@ -24,12 +30,20 @@ export type CrmLeadNoteRecord = {
 
 export type CrmLeadKpis = Record<LeadStatus, number>;
 
+export type CrmLeadValueKpis = {
+  pipelineTotal: string | null;
+  wonTotal: string | null;
+};
+
 export type CrmLeadReminders = {
   dueToday: number;
   overdue: number;
+  dueTodayLeads: CrmLeadRecord[];
+  overdueLeads: CrmLeadRecord[];
 };
 
 export type CreateCrmLeadInput = {
+  id?: string;
   fullName: string;
   phone: string;
   email?: string | null;
@@ -38,6 +52,21 @@ export type CreateCrmLeadInput = {
   message?: string | null;
   status?: LeadStatus;
   followUpAt?: Date | null;
+  estimatedValue?: number | null;
+  landingPage?: string | null;
+  utmSource?: string | null;
+  utmMedium?: string | null;
+  utmCampaign?: string | null;
+  referrer?: string | null;
+};
+
+export type ListCrmLeadsResult = {
+  leads: CrmLeadRecord[];
+  total: number;
+  kpis: CrmLeadKpis;
+  valueKpis: CrmLeadValueKpis;
+  reminders: CrmLeadReminders;
+  error?: string;
 };
 
 export const CRM_LEAD_STATUSES: LeadStatus[] = [

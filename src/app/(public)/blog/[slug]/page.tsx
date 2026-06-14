@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ArticleSchema, { buildArticleDescription } from "@/components/seo/ArticleSchema";
 import {
-  getPostBySlug,
-  getRelatedPosts,
-} from "@/features/posts/services/post.service";
+  getPublishedBlogPostBySlug,
+  getRelatedBlogPosts,
+  resolveBlogOgImage,
+} from "@/features/blog/services/blog-public.service";
 import {
   SITE_NAME,
   DEFAULT_DESCRIPTION,
@@ -26,32 +28,35 @@ function formatDate(date: Date): string {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const post = await getPostBySlug(slug);
+  const post = await getPublishedBlogPostBySlug(slug);
   if (!post || post.status !== "PUBLISHED") return {};
 
-  const title = post.seoTitle ?? `${post.title} | ${SITE_NAME}`;
-  const description =
-    post.seoDescription ?? post.excerpt ?? DEFAULT_DESCRIPTION;
-  const ogImages = buildOgImages(post.imageUrl);
+  const title = post.metaTitle ?? `${post.title} | ${SITE_NAME}`;
+  const description = buildArticleDescription(post.metaDescription, post.excerpt);
+  const ogImage = await resolveBlogOgImage(post);
+  const ogImages = buildOgImages(ogImage);
+  const canonical =
+    post.canonicalUrl?.trim() || canonicalUrl(`/blog/${slug}`);
+  const publishedAt = post.publishedAt ?? post.createdAt;
+  const modifiedAt = post.updatedAt;
 
   return {
     title,
     description,
-    alternates: {
-      canonical: canonicalUrl(`/blog/${slug}`),
-    },
+    alternates: { canonical },
     openGraph: {
-      title: post.seoTitle ?? post.title,
+      title: post.metaTitle ?? post.title,
       description,
-      url: canonicalUrl(`/blog/${slug}`),
+      url: canonical,
       siteName: SITE_NAME,
       images: ogImages,
       type: "article",
-      publishedTime: post.createdAt.toISOString(),
-      modifiedTime: post.updatedAt.toISOString(),
+      publishedTime: publishedAt.toISOString(),
+      modifiedTime: modifiedAt.toISOString(),
     },
     twitter: {
       card: "summary_large_image",
+      images: ogImages,
     },
   };
 }
@@ -59,39 +64,29 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function BlogDetailPage({ params }: PageProps) {
   const { slug } = await params;
   const [post, related] = await Promise.all([
-    getPostBySlug(slug),
-    getRelatedPosts(slug),
+    getPublishedBlogPostBySlug(slug),
+    getRelatedBlogPosts(slug),
   ]);
 
   if (!post || post.status !== "PUBLISHED") notFound();
 
-  const articleJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    headline: post.title,
-    description: post.seoDescription ?? post.excerpt ?? DEFAULT_DESCRIPTION,
-    ...(post.imageUrl && { image: post.imageUrl }),
-    datePublished: post.createdAt.toISOString(),
-    dateModified: post.updatedAt.toISOString(),
-    author: {
-      "@type": "Organization",
-      name: SITE_NAME,
-    },
-    publisher: {
-      "@type": "Organization",
-      name: SITE_NAME,
-    },
-    url: canonicalUrl(`/blog/${slug}`),
-  };
+  const publishedAt = post.publishedAt ?? post.createdAt;
+  const description = buildArticleDescription(post.metaDescription, post.excerpt);
+  const heroImage = post.featuredImageUrl;
+  const schemaImage = (await resolveBlogOgImage(post)) ?? heroImage ?? undefined;
+  const categories = "categories" in post ? post.categories : [];
 
   return (
     <main>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      <ArticleSchema
+        headline={post.title}
+        description={description}
+        slug={slug}
+        image={schemaImage}
+        datePublished={publishedAt.toISOString()}
+        dateModified={post.updatedAt.toISOString()}
       />
 
-      {/* Breadcrumb */}
       <div
         style={{
           borderBottom: "1px solid #e5e7eb",
@@ -107,6 +102,7 @@ export default async function BlogDetailPage({ params }: PageProps) {
             display: "flex",
             gap: "6px",
             alignItems: "center",
+            flexWrap: "wrap",
           }}
         >
           <Link href="/" style={{ color: "#6b7280", textDecoration: "none" }}>
@@ -116,6 +112,17 @@ export default async function BlogDetailPage({ params }: PageProps) {
           <Link href="/blog" style={{ color: "#6b7280", textDecoration: "none" }}>
             Blog
           </Link>
+          {categories.length > 0 && (
+            <>
+              <span>/</span>
+              <Link
+                href={`/blog/danh-muc/${categories[0].category.slug}`}
+                style={{ color: "#6b7280", textDecoration: "none" }}
+              >
+                {categories[0].category.name}
+              </Link>
+            </>
+          )}
           <span>/</span>
           <span
             style={{
@@ -131,15 +138,14 @@ export default async function BlogDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Article */}
       <article>
         <section className="section" style={{ paddingBottom: "32px" }}>
           <div className="container" style={{ maxWidth: "760px" }}>
             <time
-              dateTime={post.createdAt.toISOString()}
+              dateTime={publishedAt.toISOString()}
               style={{ fontSize: "13px", color: "#9ca3af" }}
             >
-              {formatDate(post.createdAt)}
+              {formatDate(publishedAt)}
             </time>
 
             <h1
@@ -168,10 +174,10 @@ export default async function BlogDetailPage({ params }: PageProps) {
               </p>
             )}
 
-            {post.imageUrl && (
+            {heroImage && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={post.imageUrl}
+                src={heroImage}
                 alt={post.title}
                 style={{
                   width: "100%",
@@ -185,15 +191,9 @@ export default async function BlogDetailPage({ params }: PageProps) {
 
             {post.content ? (
               <div
-                style={{
-                  fontSize: "16px",
-                  lineHeight: 1.85,
-                  color: "#374151",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {post.content}
-              </div>
+                className="prose-blog"
+                dangerouslySetInnerHTML={{ __html: post.content }}
+              />
             ) : (
               <p style={{ fontSize: "15px", color: "#9ca3af" }}>
                 Nội dung đang được cập nhật.
@@ -203,7 +203,6 @@ export default async function BlogDetailPage({ params }: PageProps) {
         </section>
       </article>
 
-      {/* Related posts */}
       {related.length > 0 && (
         <section
           style={{
@@ -245,10 +244,10 @@ export default async function BlogDetailPage({ params }: PageProps) {
                       background: "#fff",
                     }}
                   >
-                    {p.imageUrl ? (
+                    {p.featuredImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={p.imageUrl}
+                        src={p.featuredImageUrl}
                         alt={p.title}
                         style={{
                           width: "100%",
@@ -257,17 +256,12 @@ export default async function BlogDetailPage({ params }: PageProps) {
                         }}
                       />
                     ) : (
-                      <div
-                        style={{
-                          height: "160px",
-                          background: "#f3f4f6",
-                        }}
-                      />
+                      <div style={{ height: "160px", background: "#f3f4f6" }} />
                     )}
 
                     <div style={{ padding: "16px" }}>
                       <time
-                        dateTime={new Date(p.createdAt).toISOString()}
+                        dateTime={new Date(p.publishedAt ?? p.createdAt).toISOString()}
                         style={{
                           fontSize: "11px",
                           color: "#9ca3af",
@@ -279,7 +273,7 @@ export default async function BlogDetailPage({ params }: PageProps) {
                           day: "2-digit",
                           month: "2-digit",
                           year: "numeric",
-                        }).format(new Date(p.createdAt))}
+                        }).format(new Date(p.publishedAt ?? p.createdAt))}
                       </time>
 
                       <h3
@@ -302,7 +296,6 @@ export default async function BlogDetailPage({ params }: PageProps) {
         </section>
       )}
 
-      {/* B2B Resource Links */}
       <section
         style={{
           borderTop: "1px solid #e5e7eb",
@@ -324,13 +317,7 @@ export default async function BlogDetailPage({ params }: PageProps) {
             Tài nguyên hữu ích
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "12px",
-            }}
-          >
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
             {[
               { href: "/nguon-hang", label: "Nguồn hàng sỉ B2B" },
               { href: "/oem", label: "OEM & Private Label" },
@@ -358,7 +345,6 @@ export default async function BlogDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* Back to blog */}
       <div
         style={{
           padding: "32px 0",
