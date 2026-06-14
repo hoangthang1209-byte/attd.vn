@@ -5298,10 +5298,117 @@ body:has(.mobile-action-bar) .site-footer {
 }
 
 .admin-ai-factory-title {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
   font-size: 18px;
   font-weight: 800;
   color: #1e1b4b;
+}
+
+.admin-ai-factory-helper {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.admin-ai-factory-form {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.admin-ai-factory-goals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.admin-ai-factory-goal {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-ai-factory-goal:has(input:checked) {
+  border-color: #6366f1;
+  background: #eef2ff;
+}
+
+.admin-ai-factory-primary-action {
+  margin-top: 16px;
+}
+
+.admin-ai-factory-cta {
+  width: 100%;
+  padding: 14px 20px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.admin-ai-factory--busy {
+  opacity: 0.92;
+}
+
+.admin-ai-factory-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-ai-factory-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #c7d2fe;
+  border-top-color: #4338ca;
+  border-radius: 50%;
+  animation: admin-ai-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes admin-ai-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.admin-ai-factory-advanced {
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+.admin-ai-factory-advanced > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #64748b;
+  padding: 8px 0;
+}
+
+.admin-ai-factory-advanced-inner {
+  border: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.admin-ai-factory-advanced-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.admin-editor-section {
+  scroll-margin-top: 24px;
 }
 
 .admin-ai-factory-grid {
@@ -5468,6 +5575,33 @@ body:has(.mobile-action-bar) .site-footer {
 .admin-ai-readiness-list .is-ok {
   color: #15803d;
   font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .admin-ai-factory {
+    padding: 16px;
+  }
+
+  .admin-ai-factory-cta {
+    width: 100%;
+  }
+
+  .admin-ai-factory-advanced-actions {
+    flex-direction: column;
+  }
+
+  .admin-ai-factory-advanced-actions .admin-btn {
+    width: 100%;
+  }
+
+  .admin-ai-factory-blueprint-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-form-grid {
+    overflow-x: hidden;
+  }
 }
 
 @media (max-width: 960px) {

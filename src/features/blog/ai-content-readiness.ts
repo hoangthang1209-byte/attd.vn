@@ -1,3 +1,4 @@
+import { getPublishReadiness } from "@/features/blog/content-health";
 import { internalLinkCount } from "@/features/blog/seo-score-utils";
 import { countH2InContent, countWordsInContent } from "@/features/blog/word-count";
 import type { BlogFaqItem } from "@/features/blog/types";
@@ -14,6 +15,7 @@ export type AiContentReadinessResult = {
   checks: AiReadinessCheck[];
   passedCount: number;
   totalCount: number;
+  score: number;
 };
 
 function countInlineFaqs(content: string): number {
@@ -63,18 +65,15 @@ export function calculateAiContentReadiness(input: {
 
   const passedCount = checks.filter((c) => c.ok).length;
   const totalCount = checks.length;
-  const ratio = passedCount / totalCount;
+  const score = Math.round((passedCount / totalCount) * 100);
+  const readiness = getPublishReadiness(score);
 
-  let level: "red" | "yellow" | "green" = "red";
-  let label = "Needs Work";
-
-  if (ratio >= 0.85 && words >= 1200 && hasMetaTitle && hasMetaDescription) {
-    level = "green";
-    label = "Ready To Publish";
-  } else if (ratio >= 0.55) {
-    level = "yellow";
-    label = "Almost Ready";
-  }
-
-  return { level, label, checks, passedCount, totalCount };
+  return {
+    level: readiness.level,
+    label: readiness.label,
+    checks,
+    passedCount,
+    totalCount,
+    score,
+  };
 }

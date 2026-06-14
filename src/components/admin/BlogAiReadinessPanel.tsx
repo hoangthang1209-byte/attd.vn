@@ -21,7 +21,7 @@ export default function BlogAiReadinessPanel(props: BlogAiReadinessPanelProps) {
         {result.label}
       </p>
       <p className="admin-field-hint">
-        {result.passedCount}/{result.totalCount} checks passed
+        {result.passedCount}/{result.totalCount} checks · {result.score}/100
       </p>
       <ul className="admin-ai-readiness-list">
         {result.checks.map((check) => (

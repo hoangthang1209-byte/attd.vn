@@ -53,11 +53,11 @@ export type PublishReadiness = {
 };
 
 export function getPublishReadiness(score: number): PublishReadiness {
-  if (score >= 81) {
-    return { level: "green", label: "Ready to publish" };
+  if (score >= 90) {
+    return { level: "green", label: "Sẵn sàng xuất bản" };
   }
-  if (score >= 51) {
-    return { level: "yellow", label: "Almost ready" };
+  if (score >= 60) {
+    return { level: "yellow", label: "Gần hoàn thiện" };
   }
-  return { level: "red", label: "Needs work" };
+  return { level: "red", label: "Cần bổ sung" };
 }

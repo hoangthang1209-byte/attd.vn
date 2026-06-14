@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BlogPostStatus } from "@prisma/client";
@@ -89,6 +89,7 @@ export default function BlogPostEditor(props: Props) {
   const [saving, setSaving] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(initial?.updatedAt ?? null);
   const [aiRecommendations, setAiRecommendations] = useState<SeoRecommendations | null>(null);
+  const editorSectionRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
     null
   );
@@ -112,11 +113,11 @@ export default function BlogPostEditor(props: Props) {
     if (!slugEdited) setSlug(toSlug(value));
   }
 
-  function applyAiArticle(result: GeneratedArticle) {
+  function applyAiArticle(result: GeneratedArticle): boolean {
     const hasExisting = Boolean(title.trim() || markdown.trim());
     if (hasExisting) {
       const proceed = window.confirm("Thay thế nội dung hiện tại bằng bài viết AI?");
-      if (!proceed) return;
+      if (!proceed) return false;
     }
     setTitle(result.title);
     if (!slugEdited) setSlug(result.slug);
@@ -131,6 +132,7 @@ export default function BlogPostEditor(props: Props) {
         ...new Set([...prev, ...aiRecommendations.suggestedCategoryIds]),
       ]);
     }
+    return true;
   }
 
   function applyAiSeo(result: AiSeoResult) {
@@ -306,8 +308,12 @@ export default function BlogPostEditor(props: Props) {
             onApplyTags={applyAiTags}
             onRecommendationsChange={setAiRecommendations}
             onMessage={(text, type) => setMessage({ text, type })}
+            onScrollToEditor={() => {
+              editorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
           />
 
+          <div ref={editorSectionRef} className="admin-editor-section" id="blog-editor-section">
           <div className="admin-field">
             <label className="admin-label">
               Tiêu đề <span className="admin-required">*</span>
@@ -367,6 +373,7 @@ export default function BlogPostEditor(props: Props) {
           <div className="admin-field">
             <label className="admin-label">Tags</label>
             <BlogTagInput tags={tags} onChange={setTags} />
+          </div>
           </div>
         </div>
 
