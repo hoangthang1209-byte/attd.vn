@@ -1,6 +1,7 @@
 import type { BlogPostStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeBlogContent } from "@/features/blog/markdown";
+import { parseFaqJson, parseTagsJson } from "@/features/blog/content-processor";
 import { revalidateBlogPaths } from "@/features/blog/revalidate";
 import type {
   BlogCategoryRecord,
@@ -42,6 +43,8 @@ function mapPost(row: {
   ogImageUrl: string | null;
   status: BlogPostStatus;
   publishedAt: Date | null;
+  faqJson: unknown;
+  tags: unknown;
   createdAt: Date;
   updatedAt: Date;
   categories: {
@@ -69,6 +72,8 @@ function mapPost(row: {
     ogImageUrl: row.ogImageUrl,
     status: row.status,
     publishedAt: row.publishedAt?.toISOString() ?? null,
+    faqJson: parseFaqJson(row.faqJson),
+    tags: parseTagsJson(row.tags),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     categories: row.categories.map((item) => mapCategory(item.category)),
@@ -161,6 +166,8 @@ export async function createBlogPost(input: BlogPostInput): Promise<BlogPostReco
       ogImageUrl: input.ogImageUrl?.trim() || null,
       status,
       publishedAt: status === "PUBLISHED" ? new Date() : null,
+      faqJson: input.faqJson ?? [],
+      tags: input.tags ?? [],
       categories: input.categoryIds?.length
         ? {
             create: input.categoryIds.map((categoryId) => ({ categoryId })),
@@ -210,6 +217,8 @@ export async function updateBlogPost(
         : {}),
       ...(input.ogImageUrl !== undefined ? { ogImageUrl: input.ogImageUrl?.trim() || null } : {}),
       ...(input.status !== undefined ? { status: input.status, publishedAt } : {}),
+      ...(input.faqJson !== undefined ? { faqJson: input.faqJson } : {}),
+      ...(input.tags !== undefined ? { tags: input.tags } : {}),
     },
     include: postInclude,
   });

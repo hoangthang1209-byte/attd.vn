@@ -25,14 +25,15 @@ function formatDate(date: Date): string {
 export default async function BlogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; tag?: string }>;
 }) {
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, tag } = await searchParams;
   const currentPage = Math.max(1, parseInt(pageParam ?? "1", 10));
 
-  const { posts, total, totalPages } = await getPublishedBlogPosts(
+  const { posts, total, totalPages, activeTag } = await getPublishedBlogPosts(
     currentPage,
-    PER_PAGE
+    PER_PAGE,
+    tag
   );
 
   return (
@@ -43,6 +44,12 @@ export default async function BlogPage({
           <p className="section-description">
             Kiến thức đồng phục, quà tặng doanh nghiệp và nguồn hàng B2B.
           </p>
+          {activeTag && (
+            <p className="blog-list-tag-filter">
+              Đang lọc theo tag: <strong>#{activeTag}</strong>{" "}
+              <Link href="/blog">Xóa lọc</Link>
+            </p>
+          )}
         </div>
       </section>
 
@@ -186,7 +193,10 @@ export default async function BlogPage({
             >
               {currentPage > 1 && (
                 <Link
-                  href={`/blog?page=${currentPage - 1}`}
+                  href={`/blog?${new URLSearchParams({
+                    ...(activeTag ? { tag: activeTag } : {}),
+                    page: String(currentPage - 1),
+                  }).toString()}`}
                   style={{
                     padding: "8px 20px",
                     border: "1px solid #e5e7eb",
@@ -207,7 +217,10 @@ export default async function BlogPage({
 
               {currentPage < totalPages && (
                 <Link
-                  href={`/blog?page=${currentPage + 1}`}
+                  href={`/blog?${new URLSearchParams({
+                    ...(activeTag ? { tag: activeTag } : {}),
+                    page: String(currentPage + 1),
+                  }).toString()}`}
                   style={{
                     padding: "8px 20px",
                     border: "1px solid #e5e7eb",

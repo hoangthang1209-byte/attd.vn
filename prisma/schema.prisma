@@ -217,6 +217,8 @@ model BlogPost {
   ogImageUrl       String?
   status           BlogPostStatus     @default(DRAFT)
   publishedAt      DateTime?
+  faqJson          Json               @default("[]")
+  tags             Json               @default("[]")
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   categories       BlogPostCategory[]

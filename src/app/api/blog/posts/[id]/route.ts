@@ -6,6 +6,7 @@ import {
   setBlogPostStatus,
   updateBlogPost,
 } from "@/features/blog/services/blog-admin.service";
+import { parseBlogFaqInput, parseBlogTagsInput, sanitizeBlogFaq } from "@/features/blog/parse-input";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -59,6 +60,9 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     ? raw.categoryIds.filter((cid): cid is string => typeof cid === "string")
     : undefined;
 
+  const faqJson = parseBlogFaqInput(raw.faqJson);
+  const tags = parseBlogTagsInput(raw.tags);
+
   try {
     const post = await updateBlogPost(id, {
       ...(typeof raw.title === "string" ? { title: raw.title } : {}),
@@ -92,6 +96,8 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         : {}),
       ...(status ? { status } : {}),
       ...(categoryIds !== undefined ? { categoryIds } : {}),
+      ...(faqJson !== undefined ? { faqJson: sanitizeBlogFaq(faqJson) } : {}),
+      ...(tags !== undefined ? { tags } : {}),
     });
 
     if (!post) {

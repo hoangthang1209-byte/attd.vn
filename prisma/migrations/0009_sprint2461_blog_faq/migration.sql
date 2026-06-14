@@ -1,0 +1,7 @@
+-- Sprint 24.6.1 — Blog FAQ + Tags
+
+ALTER TABLE "BlogPost"
+  ADD COLUMN IF NOT EXISTS "faqJson" JSONB NOT NULL DEFAULT '[]';
+
+ALTER TABLE "BlogPost"
+  ADD COLUMN IF NOT EXISTS "tags" JSONB NOT NULL DEFAULT '[]';

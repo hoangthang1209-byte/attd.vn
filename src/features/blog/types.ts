@@ -1,5 +1,10 @@
 import type { BlogPostStatus } from "@prisma/client";
 
+export type BlogFaqItem = {
+  question: string;
+  answer: string;
+};
+
 export type BlogCategoryRecord = {
   id: string;
   name: string;
@@ -24,6 +29,8 @@ export type BlogPostRecord = {
   ogImageUrl: string | null;
   status: BlogPostStatus;
   publishedAt: string | null;
+  faqJson: BlogFaqItem[];
+  tags: string[];
   createdAt: string;
   updatedAt: string;
   categories: BlogCategoryRecord[];
@@ -56,6 +63,8 @@ export type BlogPostInput = {
   ogImageUrl?: string | null;
   status?: BlogPostStatus;
   categoryIds?: string[];
+  faqJson?: BlogFaqItem[];
+  tags?: string[];
 };
 
 export const BLOG_POST_STATUSES: BlogPostStatus[] = ["DRAFT", "REVIEW", "PUBLISHED"];

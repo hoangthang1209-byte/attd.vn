@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
+import { tagMatchesFilter } from "@/features/blog/content-processor";
 
 const LIST_SELECT = {
   id: true,
@@ -11,10 +12,57 @@ const LIST_SELECT = {
   createdAt: true,
   updatedAt: true,
   status: true,
+  tags: true,
 } as const;
 
-export async function getPublishedBlogPosts(page: number, perPage = 9) {
+const RELATED_SELECT = {
+  id: true,
+  title: true,
+  slug: true,
+  excerpt: true,
+  featuredImageUrl: true,
+  publishedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  status: true,
+  categories: {
+    include: {
+      category: {
+        select: { id: true, name: true, slug: true },
+      },
+    },
+  },
+} as const;
+
+export async function getPublishedBlogPosts(page: number, perPage = 9, tag?: string) {
   const where = { status: "PUBLISHED" as const, slug: { not: "" } };
+
+  if (tag?.trim()) {
+    const allPosts = await prisma.blogPost.findMany({
+      where,
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+      select: LIST_SELECT,
+    });
+
+    const filtered = allPosts.filter((post) => {
+      if (!Array.isArray(post.tags)) return false;
+      return post.tags.some(
+        (entry) => typeof entry === "string" && tagMatchesFilter(entry, tag)
+      );
+    });
+
+    const total = filtered.length;
+    const posts = filtered.slice((page - 1) * perPage, page * perPage);
+
+    return {
+      posts: posts.map(({ tags: _tags, ...post }) => post),
+      total,
+      totalPages: Math.ceil(total / perPage),
+      perPage,
+      activeTag: tag,
+    };
+  }
+
   const [posts, total] = await Promise.all([
     prisma.blogPost.findMany({
       where,
@@ -27,7 +75,13 @@ export async function getPublishedBlogPosts(page: number, perPage = 9) {
   ]);
 
   if (total > 0) {
-    return { posts, total, totalPages: Math.ceil(total / perPage), perPage };
+    return {
+      posts: posts.map(({ tags: _tags, ...post }) => post),
+      total,
+      totalPages: Math.ceil(total / perPage),
+      perPage,
+      activeTag: null,
+    };
   }
 
   const [legacyPosts, legacyTotal] = await Promise.all([
@@ -65,6 +119,7 @@ export async function getPublishedBlogPosts(page: number, perPage = 9) {
     total: legacyTotal,
     totalPages: Math.ceil(legacyTotal / perPage),
     perPage,
+    activeTag: null,
   };
 }
 
@@ -99,24 +154,62 @@ export async function getPublishedBlogPostBySlug(slug: string) {
     publishedAt: legacy.createdAt,
     createdAt: legacy.createdAt,
     updatedAt: legacy.updatedAt,
+    faqJson: [],
+    tags: [],
     categories: [],
   };
 }
 
-export async function getRelatedBlogPosts(currentSlug: string) {
+export async function getRelatedBlogPosts(currentSlug: string, categoryIds: string[] = []) {
+  const baseWhere = {
+    status: "PUBLISHED" as const,
+    slug: { not: currentSlug },
+  };
+
+  if (categoryIds.length > 0) {
+    const sameCategory = await prisma.blogPost.findMany({
+      where: {
+        ...baseWhere,
+        categories: { some: { categoryId: { in: categoryIds } } },
+      },
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+      take: 4,
+      select: RELATED_SELECT,
+    });
+
+    if (sameCategory.length >= 4) {
+      return sameCategory.map(mapRelatedPost);
+    }
+
+    const excludeIds = sameCategory.map((post) => post.id);
+    const others = await prisma.blogPost.findMany({
+      where: {
+        ...baseWhere,
+        id: { notIn: excludeIds },
+      },
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+      take: 4 - sameCategory.length,
+      select: RELATED_SELECT,
+    });
+
+    return [...sameCategory, ...others].map(mapRelatedPost);
+  }
+
   const posts = await prisma.blogPost.findMany({
-    where: { status: "PUBLISHED", slug: { not: currentSlug } },
-    orderBy: { publishedAt: "desc" },
-    take: 3,
-    select: LIST_SELECT,
+    where: baseWhere,
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    take: 4,
+    select: RELATED_SELECT,
   });
 
-  if (posts.length > 0) return posts;
+  if (posts.length > 0) {
+    return posts.map(mapRelatedPost);
+  }
 
   const legacy = await prisma.post.findMany({
     where: { status: "PUBLISHED", slug: { not: currentSlug } },
     orderBy: { createdAt: "desc" },
-    take: 3,
+    take: 4,
     select: {
       id: true,
       title: true,
@@ -139,7 +232,34 @@ export async function getRelatedBlogPosts(currentSlug: string) {
     createdAt: post.createdAt,
     updatedAt: post.updatedAt,
     status: "PUBLISHED" as const,
+    categories: [],
   }));
+}
+
+function mapRelatedPost(post: {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  featuredImageUrl: string | null;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  status: "DRAFT" | "REVIEW" | "PUBLISHED";
+  categories: { category: { id: string; name: string; slug: string } }[];
+}) {
+  return {
+    id: post.id,
+    title: post.title,
+    slug: post.slug,
+    excerpt: post.excerpt,
+    featuredImageUrl: post.featuredImageUrl,
+    publishedAt: post.publishedAt,
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+    status: post.status,
+    categories: post.categories.map((item) => item.category),
+  };
 }
 
 export async function getPublishedPostsByCategorySlug(
@@ -171,7 +291,7 @@ export async function getPublishedPostsByCategorySlug(
 
   return {
     category,
-    posts,
+    posts: posts.map(({ tags: _tags, ...post }) => post),
     total,
     totalPages: Math.ceil(total / perPage),
     perPage,

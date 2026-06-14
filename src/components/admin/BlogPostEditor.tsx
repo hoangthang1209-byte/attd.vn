@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BlogPostStatus } from "@prisma/client";
 import BlogContentEditor from "@/components/admin/BlogContentEditor";
+import BlogFaqBuilder from "@/components/admin/BlogFaqBuilder";
+import BlogSeoPanel from "@/components/admin/BlogSeoPanel";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
+import { tagsToInput } from "@/features/blog/content-processor";
 import { BLOG_POST_STATUSES, BLOG_STATUS_LABELS } from "@/features/blog/types";
-import type { BlogCategoryRecord, BlogPostRecord } from "@/features/blog/types";
+import type { BlogCategoryRecord, BlogFaqItem, BlogPostRecord } from "@/features/blog/types";
 import { toSlug } from "@/lib/slug";
 
 type Props =
@@ -42,12 +45,19 @@ export default function BlogPostEditor(props: Props) {
   const [categoryIds, setCategoryIds] = useState<string[]>(
     initial?.categories.map((c) => c.id) ?? []
   );
+  const [faqJson, setFaqJson] = useState<BlogFaqItem[]>(initial?.faqJson ?? []);
+  const [tagsInput, setTagsInput] = useState(tagsToInput(initial?.tags ?? []));
   const [categories, setCategories] = useState<BlogCategoryRecord[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
     null
   );
+
+  const tags = tagsInput
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 
   const loadCategories = useCallback(async () => {
     const res = await fetch("/api/blog/categories");
@@ -96,6 +106,8 @@ export default function BlogPostEditor(props: Props) {
         canonicalUrl: canonicalUrl.trim() || null,
         status: nextStatus ?? status,
         categoryIds,
+        faqJson,
+        tags,
       };
 
       const url = isEdit ? `/api/blog/posts/${initial!.id}` : "/api/blog/posts";
@@ -180,9 +192,34 @@ export default function BlogPostEditor(props: Props) {
             <label className="admin-label">Nội dung</label>
             <BlogContentEditor value={content} onChange={setContent} />
           </div>
+
+          <div className="admin-sidebar-card">
+            <BlogFaqBuilder items={faqJson} onChange={setFaqJson} />
+          </div>
+
+          <div className="admin-field">
+            <label className="admin-label">Tags</label>
+            <input
+              className="admin-input"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              placeholder="nguon hang, ao thun tron, OEM"
+            />
+            <p className="admin-field-hint">Phân tách bằng dấu phẩy. Hiển thị dạng #tag trên trang bài viết.</p>
+          </div>
         </div>
 
         <aside className="admin-form-sidebar">
+          <BlogSeoPanel
+            title={title}
+            metaTitle={metaTitle}
+            metaDescription={metaDescription}
+            featuredImageUrl={featuredImage?.url ?? null}
+            content={content}
+            faqJson={faqJson}
+            tags={tags}
+          />
+
           <div className="admin-sidebar-card">
             <h3 className="admin-sidebar-title">Xuất bản</h3>
             <select
@@ -199,7 +236,7 @@ export default function BlogPostEditor(props: Props) {
             <div className="admin-form-actions admin-form-actions--stack">
               <button
                 type="button"
-                className="admin-btn"
+                className="admin-btn admin-btn--primary"
                 disabled={saving}
                 onClick={() => void save()}
               >
