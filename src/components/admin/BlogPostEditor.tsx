@@ -1,17 +1,28 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BlogPostStatus } from "@prisma/client";
-import BlogContentEditor from "@/components/admin/BlogContentEditor";
 import BlogFaqBuilder from "@/components/admin/BlogFaqBuilder";
 import BlogSeoPanel from "@/components/admin/BlogSeoPanel";
+import BlogTagInput from "@/components/admin/BlogTagInput";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
-import { tagsToInput } from "@/features/blog/content-processor";
+import { contentToEditorMarkdown } from "@/features/blog/html-to-markdown";
+import { getPublishWarnings } from "@/features/blog/seo-score";
+import { normalizeBlogTags } from "@/features/blog/tags";
 import { BLOG_POST_STATUSES, BLOG_STATUS_LABELS } from "@/features/blog/types";
 import type { BlogCategoryRecord, BlogFaqItem, BlogPostRecord } from "@/features/blog/types";
 import { toSlug } from "@/lib/slug";
+
+const BlogVisualEditor = dynamic(
+  () => import("@/components/admin/blog-editor/BlogVisualEditor"),
+  {
+    ssr: false,
+    loading: () => <p className="admin-loading">Đang tải editor...</p>,
+  }
+);
 
 type Props =
   | { mode: "create" }
@@ -31,7 +42,7 @@ export default function BlogPostEditor(props: Props) {
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [slugEdited, setSlugEdited] = useState(isEdit);
   const [excerpt, setExcerpt] = useState(initial?.excerpt ?? "");
-  const [content, setContent] = useState(initial?.content ?? "");
+  const [markdown, setMarkdown] = useState("");
   const [featuredImage, setFeaturedImage] = useState<MediaPickerValue | null>(
     toMediaValue(initial?.featuredImageUrl ?? null)
   );
@@ -46,7 +57,7 @@ export default function BlogPostEditor(props: Props) {
     initial?.categories.map((c) => c.id) ?? []
   );
   const [faqJson, setFaqJson] = useState<BlogFaqItem[]>(initial?.faqJson ?? []);
-  const [tagsInput, setTagsInput] = useState(tagsToInput(initial?.tags ?? []));
+  const [tags, setTags] = useState<string[]>(normalizeBlogTags(initial?.tags ?? []));
   const [categories, setCategories] = useState<BlogCategoryRecord[]>([]);
 
   const [saving, setSaving] = useState(false);
@@ -54,10 +65,9 @@ export default function BlogPostEditor(props: Props) {
     null
   );
 
-  const tags = tagsInput
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+  useEffect(() => {
+    setMarkdown(contentToEditorMarkdown(initial?.content));
+  }, [initial?.content]);
 
   const loadCategories = useCallback(async () => {
     const res = await fetch("/api/blog/categories");
@@ -92,13 +102,30 @@ export default function BlogPostEditor(props: Props) {
       return;
     }
 
+    if (nextStatus === "PUBLISHED") {
+      const warnings = getPublishWarnings({
+        featuredImageUrl: featuredImage?.url ?? null,
+        metaTitle,
+        metaDescription,
+        content: markdown,
+      });
+      if (warnings.length > 0) {
+        const proceed = window.confirm(
+          `Cảnh báo trước khi publish:\n\n- ${warnings.join("\n- ")}\n\nVẫn publish?`
+        );
+        if (!proceed) return;
+      }
+    }
+
+    const normalizedTags = normalizeBlogTags(tags);
+
     setSaving(true);
     try {
       const payload = {
         title: title.trim(),
         slug: slug.trim(),
         excerpt: excerpt.trim() || null,
-        content: content.trim() || null,
+        content: markdown.trim() || null,
         featuredImageUrl: featuredImage?.url ?? null,
         ogImageUrl: ogImage?.url ?? null,
         metaTitle: metaTitle.trim() || null,
@@ -107,7 +134,7 @@ export default function BlogPostEditor(props: Props) {
         status: nextStatus ?? status,
         categoryIds,
         faqJson,
-        tags,
+        tags: normalizedTags,
       };
 
       const url = isEdit ? `/api/blog/posts/${initial!.id}` : "/api/blog/posts";
@@ -125,6 +152,7 @@ export default function BlogPostEditor(props: Props) {
         return;
       }
 
+      setTags(normalizedTags);
       setMessage({ type: "success", text: isEdit ? "Đã lưu bài viết." : "Đã tạo bài viết." });
 
       if (!isEdit && data.post?.id) {
@@ -190,7 +218,7 @@ export default function BlogPostEditor(props: Props) {
 
           <div className="admin-field">
             <label className="admin-label">Nội dung</label>
-            <BlogContentEditor value={content} onChange={setContent} />
+            <BlogVisualEditor value={markdown} onChange={setMarkdown} />
           </div>
 
           <div className="admin-sidebar-card">
@@ -199,23 +227,19 @@ export default function BlogPostEditor(props: Props) {
 
           <div className="admin-field">
             <label className="admin-label">Tags</label>
-            <input
-              className="admin-input"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-              placeholder="nguon hang, ao thun tron, OEM"
-            />
-            <p className="admin-field-hint">Phân tách bằng dấu phẩy. Hiển thị dạng #tag trên trang bài viết.</p>
+            <BlogTagInput tags={tags} onChange={setTags} />
           </div>
         </div>
 
         <aside className="admin-form-sidebar">
           <BlogSeoPanel
             title={title}
+            slug={slug}
+            excerpt={excerpt}
             metaTitle={metaTitle}
             metaDescription={metaDescription}
             featuredImageUrl={featuredImage?.url ?? null}
-            content={content}
+            content={markdown}
             faqJson={faqJson}
             tags={tags}
           />

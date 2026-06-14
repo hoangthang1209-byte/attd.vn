@@ -1,4 +1,5 @@
 import { parseFaqJson, parseTagsInput, parseTagsJson } from "@/features/blog/content-processor";
+import { normalizeBlogTags } from "@/features/blog/tags";
 import type { BlogFaqItem } from "@/features/blog/types";
 
 export function parseBlogFaqInput(value: unknown): BlogFaqItem[] | undefined {
@@ -8,8 +9,8 @@ export function parseBlogFaqInput(value: unknown): BlogFaqItem[] | undefined {
 
 export function parseBlogTagsInput(value: unknown): string[] | undefined {
   if (value === undefined) return undefined;
-  if (Array.isArray(value)) return parseTagsJson(value);
-  if (typeof value === "string") return parseTagsInput(value);
+  if (Array.isArray(value)) return normalizeBlogTags(parseTagsJson(value));
+  if (typeof value === "string") return normalizeBlogTags(parseTagsInput(value));
   return [];
 }
 
