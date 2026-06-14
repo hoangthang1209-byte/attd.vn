@@ -9,6 +9,7 @@ import BlogFaqBuilder from "@/components/admin/BlogFaqBuilder";
 import BlogSeoPanel from "@/components/admin/BlogSeoPanel";
 import BlogTagInput from "@/components/admin/BlogTagInput";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
+import { generateDemoBlogArticle } from "@/features/blog/demo-article-generator";
 import { contentToEditorMarkdown } from "@/features/blog/html-to-markdown";
 import { getPublishWarnings, calculateSeoScore } from "@/features/blog/seo-score";
 import { getPublishReadiness } from "@/features/blog/content-health";
@@ -83,6 +84,24 @@ export default function BlogPostEditor(props: Props) {
   function handleTitleChange(value: string) {
     setTitle(value);
     if (!slugEdited) setSlug(toSlug(value));
+  }
+
+  function applyDemoArticle() {
+    const hasExisting = Boolean(title.trim() || markdown.trim() || excerpt.trim());
+    if (hasExisting) {
+      const proceed = window.confirm(
+        "Thay thế tiêu đề, tóm tắt, nội dung và tags bằng bài demo SEO?"
+      );
+      if (!proceed) return;
+    }
+
+    const demo = generateDemoBlogArticle();
+    setTitle(demo.title);
+    if (!slugEdited) setSlug(toSlug(demo.title));
+    setExcerpt(demo.excerpt);
+    setMarkdown(demo.markdown);
+    setTags(normalizeBlogTags(demo.tags));
+    setMessage({ type: "success", text: "Đã tạo bài demo markdown (~1.650 từ)." });
   }
 
   function toggleCategory(id: string) {
@@ -230,7 +249,16 @@ export default function BlogPostEditor(props: Props) {
           </div>
 
           <div className="admin-field">
-            <label className="admin-label">Nội dung</label>
+            <div className="admin-field-header-row">
+              <label className="admin-label">Nội dung</label>
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-btn--small"
+                onClick={applyDemoArticle}
+              >
+                Tạo bài demo
+              </button>
+            </div>
             <BlogVisualEditor value={markdown} onChange={setMarkdown} />
           </div>
 
