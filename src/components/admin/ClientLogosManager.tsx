@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
 
 type Logo = {
   id: string;
@@ -17,10 +18,10 @@ export default function ClientLogosManager() {
   const router = useRouter();
   const [logos, setLogos] = useState<Logo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<MediaPickerValue | null>(null);
   const [form, setForm] = useState({
     companyName: "",
     website: "",
-    imageUrl: "",
     isVisible: true,
   });
   const [message, setMessage] = useState<Message | null>(null);
@@ -44,18 +45,27 @@ export default function ClientLogosManager() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (!selectedImage?.url) {
+      setMessage({ type: "error", text: "Vui lòng chọn ảnh logo" });
+      return;
+    }
+
     setMessage(null);
     const res = await fetch("/api/client-logos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        imageUrl: selectedImage.url,
+      }),
     });
     const data = await res.json();
     if (!res.ok) {
       setMessage({ type: "error", text: data.message ?? "Tạo logo thất bại" });
       return;
     }
-    setForm({ companyName: "", website: "", imageUrl: "", isVisible: true });
+    setForm({ companyName: "", website: "", isVisible: true });
+    setSelectedImage(null);
     setMessage({ type: "success", text: "Đã thêm logo — cập nhật trên trang chủ nếu bật hiển thị" });
     await load();
     router.refresh();
@@ -114,20 +124,13 @@ export default function ClientLogosManager() {
             onChange={(e) => setForm((p) => ({ ...p, website: e.target.value }))}
           />
         </div>
-        <div className="admin-form-group">
-          <label htmlFor="imageUrl">URL ảnh (từ thư viện media)</label>
-          <input
-            id="imageUrl"
-            className="admin-input"
-            value={form.imageUrl}
-            onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))}
-            placeholder="/uploads/clients/... hoặc URL Blob"
-            required
-          />
-          <p className="admin-field-hint">
-            Tải ảnh tại Media Library, copy URL rồi dán vào đây.
-          </p>
-        </div>
+        <MediaPicker
+          value={selectedImage}
+          onChange={setSelectedImage}
+          folder="clients"
+          label="Logo"
+          required
+        />
         <label className="admin-checkbox">
           <input
             type="checkbox"
@@ -171,14 +174,14 @@ export default function ClientLogosManager() {
                   </td>
                   <td>{logo.companyName}</td>
                   <td>{logo.website ?? "—"}</td>
-                <td>
-                  <button
-                    type="button"
-                    onClick={() => toggleVisible(logo.id, !logo.isVisible)}
-                  >
-                    {logo.isVisible ? "Đang hiện" : "Đang ẩn"}
-                  </button>
-                </td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => toggleVisible(logo.id, !logo.isVisible)}
+                    >
+                      {logo.isVisible ? "Đang hiện" : "Đang ẩn"}
+                    </button>
+                  </td>
                   <td>
                     <button
                       type="button"

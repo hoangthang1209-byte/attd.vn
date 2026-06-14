@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
 
 type Study = {
   id: string;
@@ -20,13 +21,13 @@ export default function CaseStudiesManager() {
   const router = useRouter();
   const [studies, setStudies] = useState<Study[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<MediaPickerValue | null>(null);
   const [form, setForm] = useState({
     title: "",
     category: "",
     quantity: "",
     timeline: "",
     summary: "",
-    imageUrl: "",
     isVisible: false,
   });
   const [message, setMessage] = useState<Message | null>(null);
@@ -50,11 +51,19 @@ export default function CaseStudiesManager() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (!selectedImage?.url) {
+      setMessage({ type: "error", text: "Vui lòng chọn ảnh dự án" });
+      return;
+    }
+
     setMessage(null);
     const res = await fetch("/api/case-studies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        imageUrl: selectedImage.url,
+      }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -67,9 +76,9 @@ export default function CaseStudiesManager() {
       quantity: "",
       timeline: "",
       summary: "",
-      imageUrl: "",
       isVisible: false,
     });
+    setSelectedImage(null);
     setMessage({ type: "success", text: "Đã thêm dự án" });
     await load();
     router.refresh();
@@ -115,7 +124,6 @@ export default function CaseStudiesManager() {
             ["category", "Ngành / loại hình"],
             ["quantity", "Số lượng"],
             ["timeline", "Thời gian"],
-            ["imageUrl", "URL ảnh"],
           ] as const
         ).map(([key, label]) => (
           <div key={key} className="admin-form-group">
@@ -129,6 +137,13 @@ export default function CaseStudiesManager() {
             />
           </div>
         ))}
+        <MediaPicker
+          value={selectedImage}
+          onChange={setSelectedImage}
+          folder="case-studies"
+          label="Ảnh dự án"
+          required
+        />
         <div className="admin-form-group">
           <label htmlFor="summary">Tóm tắt</label>
           <textarea
