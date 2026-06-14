@@ -2,9 +2,7 @@ import {
   countH2InContent,
   countWordsInContent,
 } from "@/features/blog/word-count";
-import { countPotentialInternalLinks } from "@/features/blog/internal-links";
-import { renderBlogPreviewFromMarkdown } from "@/features/blog/preview-content";
-import { isHtmlContent } from "@/features/blog/markdown";
+import { internalLinkCount } from "@/features/blog/seo-score-utils";
 import type { BlogFaqItem } from "@/features/blog/types";
 
 export type SeoChecklistItem = {
@@ -27,14 +25,6 @@ export type SeoScoreInput = {
   faqJson: BlogFaqItem[];
   tags: string[];
 };
-
-function internalLinkCount(content: string): number {
-  if (!content.trim()) return 0;
-  const html = isHtmlContent(content)
-    ? content
-    : renderBlogPreviewFromMarkdown(content);
-  return countPotentialInternalLinks(html);
-}
 
 export function calculateSeoScore(input: SeoScoreInput): SeoScoreResult {
   let score = 0;

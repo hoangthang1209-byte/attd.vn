@@ -10,7 +10,8 @@ import BlogSeoPanel from "@/components/admin/BlogSeoPanel";
 import BlogTagInput from "@/components/admin/BlogTagInput";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
 import { contentToEditorMarkdown } from "@/features/blog/html-to-markdown";
-import { getPublishWarnings } from "@/features/blog/seo-score";
+import { getPublishWarnings, calculateSeoScore } from "@/features/blog/seo-score";
+import { getPublishReadiness } from "@/features/blog/content-health";
 import { normalizeBlogTags } from "@/features/blog/tags";
 import { BLOG_POST_STATUSES, BLOG_STATUS_LABELS } from "@/features/blog/types";
 import type { BlogCategoryRecord, BlogFaqItem, BlogPostRecord } from "@/features/blog/types";
@@ -170,6 +171,18 @@ export default function BlogPostEditor(props: Props) {
     }
   }
 
+  const publishReadiness = getPublishReadiness(
+    calculateSeoScore({
+      title,
+      metaTitle,
+      metaDescription,
+      featuredImageUrl: featuredImage?.url ?? null,
+      content: markdown,
+      faqJson,
+      tags,
+    }).score
+  );
+
   return (
     <div className="admin-panel">
       {message && (
@@ -246,6 +259,11 @@ export default function BlogPostEditor(props: Props) {
 
           <div className="admin-sidebar-card">
             <h3 className="admin-sidebar-title">Xuất bản</h3>
+            <p
+              className={`admin-publish-readiness admin-publish-readiness--${publishReadiness.level}`}
+            >
+              {publishReadiness.label}
+            </p>
             <select
               className="admin-input"
               value={status}

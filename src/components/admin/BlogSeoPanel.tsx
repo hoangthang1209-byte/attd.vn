@@ -1,6 +1,7 @@
 "use client";
 
 import type { BlogFaqItem } from "@/features/blog/types";
+import { calculateContentHealth, getPublishReadiness } from "@/features/blog/content-health";
 import { calculateSeoScore } from "@/features/blog/seo-score";
 import { countWordsInContent } from "@/features/blog/word-count";
 import { SITE_NAME } from "@/lib/seo";
@@ -19,6 +20,8 @@ type BlogSeoPanelProps = {
 
 export default function BlogSeoPanel(props: BlogSeoPanelProps) {
   const result = calculateSeoScore(props);
+  const readiness = getPublishReadiness(result.score);
+  const health = calculateContentHealth(props.content, props.faqJson, props.tags);
   const wordCount = countWordsInContent(props.content);
   const serpTitle = props.metaTitle.trim() || `${props.title.trim() || "Tiêu đề bài viết"} | ${SITE_NAME}`;
   const serpDescription =
@@ -33,7 +36,21 @@ export default function BlogSeoPanel(props: BlogSeoPanelProps) {
       <p className={`admin-seo-score admin-seo-score--${result.level}`}>
         SEO Score: {result.score}/100
       </p>
+      <p className={`admin-publish-readiness admin-publish-readiness--${readiness.level}`}>
+        {readiness.label}
+      </p>
       <p className="admin-seo-word-count">{wordCount.toLocaleString("vi-VN")} từ</p>
+
+      <div className="admin-content-health">
+        <p className="admin-content-health-title">Content Health</p>
+        <ul className="admin-content-health-list">
+          {health.metrics.map((metric) => (
+            <li key={metric.label} className={metric.ok ? "is-ok" : ""}>
+              {metric.label}: {metric.value.toLocaleString("vi-VN")} {metric.ok ? "✓" : "○"}
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <div className="admin-serp-preview">
         <p className="admin-serp-preview-label">Google Search Preview</p>
