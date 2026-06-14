@@ -141,7 +141,11 @@ export async function seedDefaultSettings() {
     workingHours: staticCompanyInfo.workingHours,
   });
   await upsertTrustMetricsSettings(staticTrust);
-  await seedBrandingSettings();
+  try {
+    await seedBrandingSettings();
+  } catch (err) {
+    console.error("[settings.service] seedBrandingSettings skipped:", err);
+  }
 }
 
 export type BrandingSettingsData = {
@@ -205,13 +209,30 @@ export async function getBrandingSettings(): Promise<BrandingSettingsData> {
     });
     if (row) return mapDbToBranding(row);
   } catch {
-    // DB unavailable — fall back to static config
+    // DB unavailable or table missing — fall back to static config
   }
   return staticBranding;
 }
 
+export async function isBrandingTableReady(): Promise<boolean> {
+  try {
+    const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'BrandingSettings'
+      ) AS "exists"
+    `;
+    return rows[0]?.exists === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function getBrandingSettingsRecord(): Promise<BrandingSettingsRecord | null> {
   try {
+    if (!(await isBrandingTableReady())) return null;
     const row = await prisma.brandingSettings.findUnique({
       where: { id: "default" },
     });
@@ -233,16 +254,23 @@ export async function upsertBrandingSettings(data: {
   youtubeUrl?: string | null;
   tiktokUrl?: string | null;
   linkedinUrl?: string | null;
-}) {
-  return prisma.brandingSettings.upsert({
-    where: { id: "default" },
-    create: { id: "default", ...data },
-    update: data,
-  });
+}): Promise<BrandingSettingsRecord | null> {
+  try {
+    if (!(await isBrandingTableReady())) return null;
+    const row = await prisma.brandingSettings.upsert({
+      where: { id: "default" },
+      create: { id: "default", ...data },
+      update: data,
+    });
+    return mapDbToBranding(row);
+  } catch (err) {
+    console.error("[settings.service] upsertBrandingSettings failed:", err);
+    return null;
+  }
 }
 
-export async function seedBrandingSettings() {
-  await upsertBrandingSettings({
+export async function seedBrandingSettings(): Promise<boolean> {
+  const result = await upsertBrandingSettings({
     companyTagline: staticCompanyInfo.tagline,
     headerLogoUrl: null,
     footerLogoUrl: null,
@@ -254,4 +282,49 @@ export async function seedBrandingSettings() {
     tiktokUrl: null,
     linkedinUrl: null,
   });
+  return result != null;
+}
+
+export type BrandingAdminInitial = BrandingSettingsData & {
+  facebookUrl: string;
+  zaloUrl: string;
+  youtubeUrl: string;
+  tiktokUrl: string;
+  linkedinUrl: string;
+};
+
+function toBrandingAdminInitial(source: BrandingSettingsData): BrandingAdminInitial {
+  return {
+    ...source,
+    facebookUrl: source.facebookUrl ?? "",
+    zaloUrl: source.zaloUrl ?? "",
+    youtubeUrl: source.youtubeUrl ?? "",
+    tiktokUrl: source.tiktokUrl ?? "",
+    linkedinUrl: source.linkedinUrl ?? "",
+  };
+}
+
+export async function loadBrandingAdminInitial(): Promise<{
+  tableReady: boolean;
+  initial: BrandingAdminInitial;
+}> {
+  const tableReady = await isBrandingTableReady();
+
+  if (!tableReady) {
+    return {
+      tableReady: false,
+      initial: toBrandingAdminInitial(await getBrandingSettings()),
+    };
+  }
+
+  let record = await getBrandingSettingsRecord();
+  if (!record) {
+    await seedBrandingSettings();
+    record = await getBrandingSettingsRecord();
+  }
+
+  return {
+    tableReady: true,
+    initial: toBrandingAdminInitial(record ?? (await getBrandingSettings())),
+  };
 }

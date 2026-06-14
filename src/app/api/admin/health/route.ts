@@ -8,6 +8,7 @@ export async function GET() {
     databaseConnected: health.databaseConnected,
     databaseError: health.databaseError,
     tables: health.tables,
+    brandingTable: health.tables.BrandingSettings,
     blobConfigured: health.blobConfigured,
     ready: health.ready,
     status: health.status,

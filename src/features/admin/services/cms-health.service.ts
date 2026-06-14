@@ -179,12 +179,22 @@ export async function getCmsHealth(): Promise<CmsHealthReport> {
 
   const appliedMigrations = databaseConnected ? await getAppliedMigrations() : [];
   const failedMigration = databaseConnected ? await getFailedMigration() : null;
-  const pendingMigration =
-    appliedMigrations.includes("0002_sprint24_cms") || failedMigration?.name === "0002_sprint24_cms"
-      ? failedMigration
+
+  let pendingMigration: string | null = null;
+  if (databaseConnected) {
+    if (!tables.BrandingSettings) {
+      pendingMigration = appliedMigrations.includes("0004_sprint243_branding")
+        ? "0004_sprint243_branding (table still missing)"
+        : "0004_sprint243_branding";
+    } else if (
+      !appliedMigrations.includes("0002_sprint24_cms") ||
+      failedMigration?.name === "0002_sprint24_cms"
+    ) {
+      pendingMigration = failedMigration
         ? "0002_sprint24_cms (failed)"
-        : null
-      : "0002_sprint24_cms";
+        : "0002_sprint24_cms";
+    }
+  }
 
   const { status, statusLabel, ready } = resolveStatus(
     databaseConnected,

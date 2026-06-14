@@ -3354,6 +3354,17 @@ body:has(.mobile-action-bar) .site-footer {
   max-width: 640px;
 }
 
+.admin-branding-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.admin-branding-fieldset:disabled {
+  opacity: 0.72;
+}
+
 .admin-branding-section {
   margin-bottom: 32px;
   padding-bottom: 24px;

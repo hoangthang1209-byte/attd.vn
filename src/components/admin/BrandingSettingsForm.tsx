@@ -20,6 +20,7 @@ type Props = {
     faviconUrl: string | null;
     defaultOgImageUrl: string | null;
   };
+  readOnly?: boolean;
 };
 
 function urlToPickerValue(url: string | null): MediaPickerValue | null {
@@ -39,7 +40,7 @@ function isValidWebsite(value: string): boolean {
   }
 }
 
-export default function BrandingSettingsForm({ initial }: Props) {
+export default function BrandingSettingsForm({ initial, readOnly = false }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<BrandingFormState>({
     companyTagline: initial.companyTagline,
@@ -72,6 +73,7 @@ export default function BrandingSettingsForm({ initial }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (readOnly) return;
     setMessage(null);
 
     if (form.companyTagline.length > 160) {
@@ -125,6 +127,7 @@ export default function BrandingSettingsForm({ initial }: Props) {
 
   return (
     <form className="admin-form admin-branding-form" onSubmit={handleSubmit}>
+      <fieldset disabled={readOnly} className="admin-branding-fieldset">
       <section className="admin-branding-section">
         <h2 className="admin-subtitle">Logo Header</h2>
         <MediaPicker
@@ -215,9 +218,14 @@ export default function BrandingSettingsForm({ initial }: Props) {
         <p className={`admin-message admin-message--${message.type}`}>{message.text}</p>
       )}
 
-      <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
+      <button
+        type="submit"
+        className="admin-btn admin-btn--primary"
+        disabled={readOnly || loading}
+      >
         {loading ? "Đang lưu…" : "Lưu thay đổi"}
       </button>
+      </fieldset>
     </form>
   );
 }

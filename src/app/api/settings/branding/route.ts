@@ -3,6 +3,8 @@ import { revalidatePath } from "next/cache";
 import {
   getBrandingSettingsRecord,
   upsertBrandingSettings,
+  isBrandingTableReady,
+  getBrandingSettings,
 } from "@/features/settings/services/settings.service";
 
 function isValidWebsiteUrl(value: string): boolean {
@@ -53,13 +55,28 @@ function validateBranding(input: {
   return null;
 }
 
+const MIGRATION_MESSAGE =
+  "BrandingSettings table chưa tồn tại. Chạy prisma migrate deploy.";
+
 export async function GET() {
-  const settings = await getBrandingSettingsRecord();
-  return NextResponse.json(settings);
+  const tableReady = await isBrandingTableReady();
+  const settings = tableReady
+    ? await getBrandingSettingsRecord()
+    : await getBrandingSettings();
+
+  return NextResponse.json({
+    tableReady,
+    settings,
+  });
 }
 
 export async function PATCH(request: Request) {
   try {
+    const tableReady = await isBrandingTableReady();
+    if (!tableReady) {
+      return NextResponse.json({ message: MIGRATION_MESSAGE }, { status: 503 });
+    }
+
     const body = await request.json();
 
     const companyTagline =
@@ -79,7 +96,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: validationError }, { status: 400 });
     }
 
-    await upsertBrandingSettings({
+    const settings = await upsertBrandingSettings({
       ...(body.headerLogoUrl !== undefined
         ? { headerLogoUrl: optionalUrl(body.headerLogoUrl) ?? null }
         : {}),
@@ -100,11 +117,14 @@ export async function PATCH(request: Request) {
       linkedinUrl: merged.linkedinUrl,
     });
 
+    if (!settings) {
+      return NextResponse.json({ message: MIGRATION_MESSAGE }, { status: 503 });
+    }
+
     revalidatePath("/", "layout");
     revalidatePath("/");
 
-    const settings = await getBrandingSettingsRecord();
-    return NextResponse.json(settings);
+    return NextResponse.json({ tableReady: true, settings });
   } catch (err) {
     console.error("[api/settings/branding] PATCH failed:", err);
     return NextResponse.json({ message: "Lưu thất bại" }, { status: 500 });
