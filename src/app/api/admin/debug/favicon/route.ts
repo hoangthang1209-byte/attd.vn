@@ -47,7 +47,8 @@ export async function GET() {
       },
       hardcodedFiles: {
         publicFaviconIco: false,
-        appFaviconIco: false,
+        appFaviconIcoStatic: false,
+        appFaviconIcoRoute: true,
         appIconFile: false,
         appIconTsx: true,
         appAppleIconTsx: true,

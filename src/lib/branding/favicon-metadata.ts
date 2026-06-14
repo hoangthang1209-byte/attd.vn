@@ -99,6 +99,6 @@ export function describeRenderedIconLinks(resolution: FaviconResolution): string
     `<link rel="shortcut icon" href="${href}" />`,
     `<link rel="apple-touch-icon" href="${href}" />`,
     `<link rel="icon" href="${SITE_URL}${DEFAULT_FAVICON_PATH}" /> (app/icon.tsx)`,
-    `<link rel="icon" href="${SITE_URL}/favicon.ico" /> (rewrite → /icon)`,
+    `<link rel="icon" href="${SITE_URL}/favicon.ico" /> (app/favicon.ico/route.ts)`,
   ];
 }

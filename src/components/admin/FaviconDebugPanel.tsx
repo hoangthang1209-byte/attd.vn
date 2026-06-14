@@ -119,7 +119,8 @@ export default function FaviconDebugPanel() {
         <h2 className="admin-subtitle">Hardcoded favicon files audit</h2>
         <ul className="admin-favicon-debug-links">
           <li>public/favicon.ico — {data.hardcodedFiles.publicFaviconIco ? "exists" : "missing"}</li>
-          <li>app/favicon.ico — {data.hardcodedFiles.appFaviconIco ? "exists" : "missing"}</li>
+          <li>app/favicon.ico (static) — {data.hardcodedFiles.appFaviconIcoStatic ? "exists (remove)" : "removed"}</li>
+          <li>app/favicon.ico/route.ts — {data.hardcodedFiles.appFaviconIcoRoute ? "active (CMS)" : "missing"}</li>
           <li>app/icon.tsx — {data.hardcodedFiles.appIconTsx ? "active (CMS proxy)" : "missing"}</li>
           <li>app/apple-icon.tsx — {data.hardcodedFiles.appAppleIconTsx ? "active (CMS proxy)" : "missing"}</li>
         </ul>
@@ -127,7 +128,8 @@ export default function FaviconDebugPanel() {
 
       <p className="admin-field-hint">
         Browser cache: hard refresh (Cmd+Shift+R) or open incognito after CMS save.
-        Favicon requests hit <code>/favicon.ico</code> → rewritten to <code>/icon</code>.
+        Favicon requests are served by <code>/favicon.ico</code> (CMS route handler) and{" "}
+        <code>/icon</code>.
       </p>
     </div>
   );
