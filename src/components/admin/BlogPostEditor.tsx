@@ -16,6 +16,7 @@ import { getPublishReadiness } from "@/features/blog/content-health";
 import { normalizeBlogTags } from "@/features/blog/tags";
 import { BLOG_POST_STATUSES, BLOG_STATUS_LABELS } from "@/features/blog/types";
 import type { BlogCategoryRecord, BlogFaqItem, BlogPostRecord } from "@/features/blog/types";
+import { canonicalUrl as buildCanonicalUrl } from "@/lib/seo";
 import { toSlug } from "@/lib/slug";
 
 const BlogVisualEditor = dynamic(
@@ -33,6 +34,23 @@ type Props =
 function toMediaValue(url: string | null): MediaPickerValue | null {
   if (!url) return null;
   return { id: url, url, filename: url.split("/").pop() ?? "image" };
+}
+
+function formatUpdatedAt(iso: string): string {
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+function statusBadgeClass(status: BlogPostStatus): string {
+  if (status === "PUBLISHED") return "admin-badge--published";
+  if (status === "REVIEW") return "admin-badge--review";
+  return "admin-badge--draft";
 }
 
 export default function BlogPostEditor(props: Props) {
@@ -63,6 +81,7 @@ export default function BlogPostEditor(props: Props) {
   const [categories, setCategories] = useState<BlogCategoryRecord[]>([]);
 
   const [saving, setSaving] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(initial?.updatedAt ?? null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
     null
   );
@@ -108,6 +127,19 @@ export default function BlogPostEditor(props: Props) {
     setCategoryIds((prev) =>
       prev.includes(id) ? prev.filter((cid) => cid !== id) : [...prev, id]
     );
+  }
+
+  async function copyArticleUrl() {
+    const trimmedSlug = slug.trim();
+    if (!trimmedSlug) return;
+
+    const url = buildCanonicalUrl(`/blog/${trimmedSlug}`);
+    try {
+      await navigator.clipboard.writeText(url);
+      setMessage({ type: "success", text: "Đã sao chép URL bài viết." });
+    } catch {
+      setMessage({ type: "error", text: "Không thể sao chép URL." });
+    }
   }
 
   async function save(nextStatus?: BlogPostStatus) {
@@ -175,6 +207,10 @@ export default function BlogPostEditor(props: Props) {
       setTags(normalizedTags);
       setMessage({ type: "success", text: isEdit ? "Đã lưu bài viết." : "Đã tạo bài viết." });
 
+      if (typeof data.post?.updatedAt === "string") {
+        setUpdatedAt(data.post.updatedAt);
+      }
+
       if (!isEdit && data.post?.id) {
         router.push(`/admin/blog/${data.post.id}`);
         router.refresh();
@@ -202,11 +238,20 @@ export default function BlogPostEditor(props: Props) {
     }).score
   );
 
+  const trimmedSlug = slug.trim();
+  const publicArticlePath = trimmedSlug ? `/blog/${trimmedSlug}` : null;
+
   return (
     <div className="admin-panel">
       {message && (
         <p className={`admin-message admin-message--${message.type}`}>{message.text}</p>
       )}
+
+      <div className="admin-editor-nav">
+        <Link href="/admin/blog" className="admin-btn admin-btn--secondary admin-btn--small">
+          ← Danh sách bài viết
+        </Link>
+      </div>
 
       <div className="admin-form-grid">
         <div className="admin-form-main">
@@ -286,12 +331,22 @@ export default function BlogPostEditor(props: Props) {
           />
 
           <div className="admin-sidebar-card">
-            <h3 className="admin-sidebar-title">Xuất bản</h3>
+            <div className="admin-publish-card-header">
+              <h3 className="admin-sidebar-title">Xuất bản</h3>
+              <span className={`admin-badge ${statusBadgeClass(status)}`}>
+                {BLOG_STATUS_LABELS[status]}
+              </span>
+            </div>
             <p
               className={`admin-publish-readiness admin-publish-readiness--${publishReadiness.level}`}
             >
               {publishReadiness.label}
             </p>
+            {updatedAt && (
+              <p className="admin-publish-updated">
+                Cập nhật lần cuối: {formatUpdatedAt(updatedAt)}
+              </p>
+            )}
             <select
               className="admin-input"
               value={status}
@@ -322,15 +377,24 @@ export default function BlogPostEditor(props: Props) {
                   Publish
                 </button>
               )}
-              {isEdit && (
-                <a
-                  href={`/blog/${slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="admin-link-button"
-                >
-                  Xem
-                </a>
+              {publicArticlePath && (
+                <>
+                  <a
+                    href={publicArticlePath}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="admin-btn admin-btn--secondary"
+                  >
+                    Xem bài viết
+                  </a>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary"
+                    onClick={() => void copyArticleUrl()}
+                  >
+                    Sao chép URL
+                  </button>
+                </>
               )}
             </div>
           </div>
