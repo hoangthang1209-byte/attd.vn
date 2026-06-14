@@ -62,6 +62,10 @@ export default function LandingPagesManager() {
     return new Date(iso).toLocaleString("vi-VN");
   }
 
+  function landingPageFrontendUrl(slug: string) {
+    return `/${slug}`;
+  }
+
   return (
     <div className="admin-panel">
       {!tableReady && (
@@ -104,6 +108,15 @@ export default function LandingPagesManager() {
                   <td>
                     <div className="admin-table-actions">
                       <Link href={`/admin/landing-pages/${page.slug}`}>Sửa</Link>
+                      <a
+                        href={landingPageFrontendUrl(page.slug)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="admin-link-button"
+                        title="Mở trang thực tế"
+                      >
+                        Xem
+                      </a>
                       <button
                         type="button"
                         onClick={() => togglePublish(page.slug, !page.isPublished)}

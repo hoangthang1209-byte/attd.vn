@@ -3323,7 +3323,8 @@ body:has(.mobile-action-bar) .site-footer {
   flex-wrap: wrap;
 }
 
-.admin-table-actions button {
+.admin-table-actions button,
+.admin-table-actions .admin-link-button {
   padding: 6px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
@@ -3332,8 +3333,15 @@ body:has(.mobile-action-bar) .site-footer {
   cursor: pointer;
 }
 
-.admin-table-actions button:hover {
+.admin-table-actions button:hover,
+.admin-table-actions .admin-link-button:hover {
   background: #f8fafc;
+}
+
+.admin-table-actions .admin-link-button {
+  color: inherit;
+  text-decoration: none;
+  display: inline-block;
 }
 
 .admin-nav-group-label {
