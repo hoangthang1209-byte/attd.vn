@@ -171,14 +171,14 @@ export default function ClientLogosManager() {
                   </td>
                   <td>{logo.companyName}</td>
                   <td>{logo.website ?? "—"}</td>
-                  <td>
-                    <button
-                      type="button"
-                      onClick={() => toggleVisible(logo.id, !logo.isVisible)}
-                    >
-                      {logo.isVisible ? "Đang hiện" : "Đang ẩn"}
-                    </button>
-                  </td>
+                <td>
+                  <button
+                    type="button"
+                    onClick={() => toggleVisible(logo.id, !logo.isVisible)}
+                  >
+                    {logo.isVisible ? "Đang hiện" : "Đang ẩn"}
+                  </button>
+                </td>
                   <td>
                     <button
                       type="button"

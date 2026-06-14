@@ -30,7 +30,7 @@ export async function PATCH(request: Request) {
       ).trim(),
     });
 
-    revalidatePath("/");
+    revalidatePath("/", "layout");
 
     const settings = await getTrustMetricsSettings();
     return NextResponse.json(settings);

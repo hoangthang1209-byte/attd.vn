@@ -33,7 +33,7 @@ export async function PATCH(
       ...(typeof body.sortOrder === "number" ? { sortOrder: body.sortOrder } : {}),
     });
 
-    revalidatePath("/");
+    revalidatePath("/", "layout");
 
     return NextResponse.json(logo);
   } catch (err) {
@@ -50,7 +50,7 @@ export async function DELETE(
 
   try {
     await deleteClientLogo(id);
-    revalidatePath("/");
+    revalidatePath("/", "layout");
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });

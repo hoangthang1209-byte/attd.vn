@@ -18,6 +18,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+/** Static at build; refresh on CMS revalidatePath or hourly ISR fallback. */
+export const revalidate = 3600;
+
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "ao-thun-tron": Shirt,
   "ao-polo-tron": CircleDot,

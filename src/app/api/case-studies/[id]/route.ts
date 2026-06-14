@@ -30,7 +30,7 @@ export async function PATCH(
       ...(typeof body.sortOrder === "number" ? { sortOrder: body.sortOrder } : {}),
     });
 
-    revalidatePath("/");
+    revalidatePath("/", "layout");
 
     return NextResponse.json(study);
   } catch (err) {
@@ -47,7 +47,7 @@ export async function DELETE(
 
   try {
     await deleteCaseStudy(id);
-    revalidatePath("/");
+    revalidatePath("/", "layout");
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });

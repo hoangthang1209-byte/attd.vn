@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0,
     });
 
-    revalidatePath("/");
+    revalidatePath("/", "layout");
 
     return NextResponse.json(study, { status: 201 });
   } catch (err) {

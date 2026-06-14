@@ -54,9 +54,12 @@ export async function getVisibleClientLogosFromDb(): Promise<VisibleClientLogo[]
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
 
-    if (rows.length === 0) return getStaticVisibleClientLogos();
+    if (rows.length === 0) {
+      // Only fall back to static config when DB has no visible rows at all
+      return getStaticVisibleClientLogos();
+    }
 
-    return rows
+    const mapped = rows
       .filter((row) => isValidImageSrc(row.imageUrl))
       .map((row) => ({
         id: row.id,
@@ -66,6 +69,8 @@ export async function getVisibleClientLogosFromDb(): Promise<VisibleClientLogo[]
         isVisible: row.isVisible,
         imageSrc: row.imageUrl,
       }));
+
+    return mapped;
   } catch {
     return getStaticVisibleClientLogos();
   }
