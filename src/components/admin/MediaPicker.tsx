@@ -181,6 +181,7 @@ export default function MediaPicker({
                 <option value="case-studies">Case studies</option>
                 <option value="products">Products</option>
                 <option value="categories">Categories</option>
+                <option value="branding">Branding</option>
               </select>
               <input
                 type="search"

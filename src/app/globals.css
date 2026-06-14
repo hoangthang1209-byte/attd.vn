@@ -3296,7 +3296,79 @@ body:has(.mobile-action-bar) .site-footer {
   margin: 0;
 }
 
+.admin-edit-panel {
+  background: #fff;
+  border-radius: 12px;
+  width: min(520px, 100%);
+  max-height: min(90vh, 900px);
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
 
+.admin-edit-panel-form {
+  padding: 20px;
+}
+
+.admin-edit-panel-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.admin-table-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-table-actions button {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.admin-table-actions button:hover {
+  background: #f8fafc;
+}
+
+.admin-nav-group-label {
+  margin: 16px 12px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.admin-nav-link--nested {
+  padding-left: 20px;
+  font-size: 13px;
+}
+
+.admin-branding-form {
+  max-width: 640px;
+}
+
+.admin-branding-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-branding-section:last-of-type {
+  border-bottom: none;
+}
+
+.admin-branding-og-preview .admin-media-picker-preview img {
+  max-width: 100%;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+}
 
 
 

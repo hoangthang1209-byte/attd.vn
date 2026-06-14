@@ -27,6 +27,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (summary.length < 20) {
+      return NextResponse.json(
+        { message: "Tóm tắt phải có ít nhất 20 ký tự" },
+        { status: 400 }
+      );
+    }
+
     const study = await createCaseStudy({
       title,
       category,

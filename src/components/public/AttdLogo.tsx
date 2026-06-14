@@ -1,8 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 
+const DEFAULT_LOGO_SRC = "/attd-logo.svg";
+
 type AttdLogoProps = {
   variant?: "desktop" | "mobile";
+  src?: string | null;
   onClick?: () => void;
   className?: string;
 };
@@ -14,10 +17,13 @@ const SIZES = {
 
 export default function AttdLogo({
   variant = "desktop",
+  src,
   onClick,
   className = "",
 }: AttdLogoProps) {
   const { height, width } = SIZES[variant];
+  const logoSrc = src?.trim() || DEFAULT_LOGO_SRC;
+  const isDefaultSvg = logoSrc === DEFAULT_LOGO_SRC || logoSrc.endsWith(".svg");
 
   return (
     <Link
@@ -26,15 +32,25 @@ export default function AttdLogo({
       onClick={onClick}
       aria-label="ATTD — Trang chủ"
     >
-      <Image
-        src="/attd-logo.svg"
-        alt="ATTD"
-        width={width}
-        height={height}
-        priority
-        className="attd-logo-img"
-        style={{ width: "auto", height }}
-      />
+      {isDefaultSvg ? (
+        <Image
+          src={logoSrc}
+          alt="ATTD"
+          width={width}
+          height={height}
+          priority
+          className="attd-logo-img"
+          style={{ width: "auto", height }}
+        />
+      ) : (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={logoSrc}
+          alt="ATTD"
+          className="attd-logo-img"
+          style={{ width: "auto", height }}
+        />
+      )}
     </Link>
   );
 }

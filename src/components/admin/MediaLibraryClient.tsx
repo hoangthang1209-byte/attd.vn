@@ -14,6 +14,7 @@ const FOLDERS = [
   { value: "categories", label: "Categories" },
   { value: "clients", label: "Clients" },
   { value: "case-studies", label: "Case studies" },
+  { value: "branding", label: "Branding" },
 ];
 
 type Message = { text: string; type: "success" | "error" | "info" };

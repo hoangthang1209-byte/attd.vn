@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SITE_URL, SITE_NAME } from "@/lib/seo";
+import { getBrandingSettings } from "@/features/settings/services/settings.service";
 import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
 import AttributionTracker from "@/components/analytics/AttributionTracker";
 
@@ -15,11 +16,31 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "ATTD - Kho sỉ đồng phục và quà tặng doanh nghiệp",
-  description:
-    "Nguồn hàng B2B cho đại lý, xưởng in và doanh nghiệp trên toàn quốc. Hàng có sẵn, nhiều màu, nhiều size, giá sỉ tận kho.",
-};
+const DEFAULT_TITLE = "ATTD - Kho sỉ đồng phục và quà tặng doanh nghiệp";
+const DEFAULT_DESCRIPTION =
+  "Nguồn hàng B2B cho đại lý, xưởng in và doanh nghiệp trên toàn quốc. Hàng có sẵn, nhiều màu, nhiều size, giá sỉ tận kho.";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getBrandingSettings();
+  const ogImage =
+    branding.defaultOgImageUrl ?? process.env.NEXT_PUBLIC_DEFAULT_OG_IMAGE ?? undefined;
+  const favicon = branding.faviconUrl ?? "/favicon.ico";
+
+  return {
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    ...(ogImage
+      ? {
+          openGraph: {
+            images: [{ url: ogImage }],
+          },
+        }
+      : {}),
+    icons: {
+      icon: favicon,
+    },
+  };
+}
 
 const orgJsonLd = {
   "@context": "https://schema.org",

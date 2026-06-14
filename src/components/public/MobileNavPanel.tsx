@@ -15,14 +15,21 @@ import {
   getZaloUrl,
 } from "@/lib/companyInfo";
 import { CTA } from "@/lib/ctaConfig";
-import { SITE_TAGLINE } from "@/lib/siteContent";
+import { companyInfo } from "@/lib/companyInfo";
 
 type MobileNavPanelProps = {
   open: boolean;
   onClose: () => void;
+  headerLogoUrl?: string | null;
+  companyTagline?: string;
 };
 
-export default function MobileNavPanel({ open, onClose }: MobileNavPanelProps) {
+export default function MobileNavPanel({
+  open,
+  onClose,
+  headerLogoUrl,
+  companyTagline,
+}: MobileNavPanelProps) {
   useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden";
@@ -61,8 +68,8 @@ export default function MobileNavPanel({ open, onClose }: MobileNavPanelProps) {
       >
         <div className="mobile-nav-header">
           <div className="mobile-nav-brand">
-            <AttdLogo variant="mobile" onClick={onClose} />
-            <p className="mobile-nav-tagline">{SITE_TAGLINE}</p>
+            <AttdLogo variant="mobile" src={headerLogoUrl} onClick={onClose} />
+            <p className="mobile-nav-tagline">{companyTagline ?? companyInfo.tagline}</p>
           </div>
           <button
             type="button"

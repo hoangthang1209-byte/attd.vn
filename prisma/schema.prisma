@@ -176,6 +176,7 @@ enum MediaFolder {
   CATEGORIES
   CLIENTS
   CASE_STUDIES
+  BRANDING
 }
 
 model MediaAsset {
@@ -243,6 +244,22 @@ model TrustMetricsSettings {
   experienceYears Int?
   sectionTitle    String   @default("Tại sao đại lý và doanh nghiệp chọn ATTD?")
   updatedAt       DateTime @updatedAt
+}
+
+model BrandingSettings {
+  id                String   @id @default("default")
+  headerLogoUrl     String?
+  footerLogoUrl     String?
+  faviconUrl        String?
+  defaultOgImageUrl String?
+  companyTagline    String   @default("")
+  facebookUrl       String?
+  zaloUrl           String?
+  youtubeUrl        String?
+  tiktokUrl         String?
+  linkedinUrl       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 enum PostStatus {

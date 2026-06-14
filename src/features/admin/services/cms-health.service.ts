@@ -7,6 +7,7 @@ export const CMS_TABLES = [
   "CaseStudyRecord",
   "CompanySettings",
   "TrustMetricsSettings",
+  "BrandingSettings",
 ] as const;
 
 export type CmsTableName = (typeof CMS_TABLES)[number];

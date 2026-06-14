@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
+import CaseStudyEditModal from "@/components/admin/CaseStudyEditModal";
 
 type Study = {
   id: string;
@@ -22,6 +23,7 @@ export default function CaseStudiesManager() {
   const [studies, setStudies] = useState<Study[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<MediaPickerValue | null>(null);
+  const [editingStudy, setEditingStudy] = useState<Study | null>(null);
   const [form, setForm] = useState({
     title: "",
     category: "",
@@ -53,6 +55,10 @@ export default function CaseStudiesManager() {
     e.preventDefault();
     if (!selectedImage?.url) {
       setMessage({ type: "error", text: "Vui lòng chọn ảnh dự án" });
+      return;
+    }
+    if (form.summary.trim().length < 20) {
+      setMessage({ type: "error", text: "Tóm tắt phải có ít nhất 20 ký tự" });
       return;
     }
 
@@ -114,6 +120,12 @@ export default function CaseStudiesManager() {
     router.refresh();
   }
 
+  function handleEditSaved() {
+    setMessage({ type: "success", text: "✓ Đã cập nhật case study" });
+    void load();
+    router.refresh();
+  }
+
   return (
     <div className="admin-panel">
       <form className="admin-form" onSubmit={handleCreate}>
@@ -152,8 +164,10 @@ export default function CaseStudiesManager() {
             value={form.summary}
             onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))}
             required
+            minLength={20}
             rows={4}
           />
+          <p className="admin-field-hint">Tối thiểu 20 ký tự</p>
         </div>
         <label className="admin-checkbox">
           <input
@@ -203,17 +217,22 @@ export default function CaseStudiesManager() {
                       type="button"
                       onClick={() => toggleVisible(study.id, !study.isVisible)}
                     >
-                      {study.isVisible ? "Published" : "Hidden"}
+                      {study.isVisible ? "Hiện" : "Ẩn"}
                     </button>
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="admin-btn--danger"
-                      onClick={() => handleDelete(study.id)}
-                    >
-                      Xóa
-                    </button>
+                    <div className="admin-table-actions">
+                      <button type="button" onClick={() => setEditingStudy(study)}>
+                        Sửa
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn--danger"
+                        onClick={() => handleDelete(study.id)}
+                      >
+                        Xóa
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -221,6 +240,12 @@ export default function CaseStudiesManager() {
           </table>
         </div>
       )}
+
+      <CaseStudyEditModal
+        study={editingStudy}
+        onClose={() => setEditingStudy(null)}
+        onSaved={handleEditSaved}
+      />
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import AttdLogo from "@/components/public/AttdLogo";
-import { getCompanySettings } from "@/features/settings/services/settings.service";
+import {
+  getCompanySettings,
+  getBrandingSettings,
+} from "@/features/settings/services/settings.service";
 import { FOOTER_TRUST } from "@/lib/siteContent";
 
 const FOOTER_PRODUCTS = [
@@ -27,7 +30,10 @@ const FOOTER_KNOWLEDGE = [
 ];
 
 export default async function Footer() {
-  const company = await getCompanySettings();
+  const [company, branding] = await Promise.all([
+    getCompanySettings(),
+    getBrandingSettings(),
+  ]);
 
   return (
     <footer className="site-footer">
@@ -45,8 +51,8 @@ export default async function Footer() {
 
         <div className="site-footer-grid">
           <div className="site-footer-col site-footer-col--brand">
-            <AttdLogo variant="desktop" className="site-footer-logo" />
-            <p className="site-footer-tagline">{company.tagline}</p>
+            <AttdLogo variant="desktop" src={branding.footerLogoUrl} className="site-footer-logo" />
+            <p className="site-footer-tagline">{branding.companyTagline}</p>
             <p className="site-footer-text">
               Nguồn hàng B2B cho đại lý, xưởng in, agency và doanh nghiệp trên
               toàn quốc.

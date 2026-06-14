@@ -14,7 +14,12 @@ import {
 } from "@/lib/navConfig";
 import { CTA } from "@/lib/ctaConfig";
 
-export default function Header() {
+type HeaderProps = {
+  headerLogoUrl?: string | null;
+  companyTagline?: string;
+};
+
+export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -32,8 +37,8 @@ export default function Header() {
       <header className={`site-header${scrolled ? " site-header--scrolled" : ""}`}>
         <div className="container">
           <div className="site-header-inner">
-            <AttdLogo variant="desktop" className="site-header-logo-desktop" />
-            <AttdLogo variant="mobile" className="site-header-logo-mobile" />
+            <AttdLogo variant="desktop" src={headerLogoUrl} className="site-header-logo-desktop" />
+            <AttdLogo variant="mobile" src={headerLogoUrl} className="site-header-logo-mobile" />
 
             <nav className="site-nav-center" aria-label="Main navigation">
               {NAV_MEGA_MENUS.map((item) => (
@@ -71,7 +76,12 @@ export default function Header() {
         </div>
       </header>
 
-      <MobileNavPanel open={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <MobileNavPanel
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        headerLogoUrl={headerLogoUrl}
+        companyTagline={companyTagline}
+      />
     </>
   );
 }

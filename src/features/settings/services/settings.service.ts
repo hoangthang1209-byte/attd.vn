@@ -141,4 +141,117 @@ export async function seedDefaultSettings() {
     workingHours: staticCompanyInfo.workingHours,
   });
   await upsertTrustMetricsSettings(staticTrust);
+  await seedBrandingSettings();
+}
+
+export type BrandingSettingsData = {
+  headerLogoUrl: string | null;
+  footerLogoUrl: string | null;
+  faviconUrl: string | null;
+  defaultOgImageUrl: string | null;
+  companyTagline: string;
+  facebookUrl: string | null;
+  zaloUrl: string | null;
+  youtubeUrl: string | null;
+  tiktokUrl: string | null;
+  linkedinUrl: string | null;
+};
+
+export type BrandingSettingsRecord = BrandingSettingsData;
+
+const staticBranding: BrandingSettingsData = {
+  headerLogoUrl: null,
+  footerLogoUrl: null,
+  faviconUrl: null,
+  defaultOgImageUrl: null,
+  companyTagline: staticCompanyInfo.tagline,
+  facebookUrl: null,
+  zaloUrl: null,
+  youtubeUrl: null,
+  tiktokUrl: null,
+  linkedinUrl: null,
+};
+
+function mapDbToBranding(row: {
+  headerLogoUrl: string | null;
+  footerLogoUrl: string | null;
+  faviconUrl: string | null;
+  defaultOgImageUrl: string | null;
+  companyTagline: string;
+  facebookUrl: string | null;
+  zaloUrl: string | null;
+  youtubeUrl: string | null;
+  tiktokUrl: string | null;
+  linkedinUrl: string | null;
+}): BrandingSettingsData {
+  return {
+    headerLogoUrl: row.headerLogoUrl,
+    footerLogoUrl: row.footerLogoUrl,
+    faviconUrl: row.faviconUrl,
+    defaultOgImageUrl: row.defaultOgImageUrl,
+    companyTagline: row.companyTagline.trim() || staticCompanyInfo.tagline,
+    facebookUrl: row.facebookUrl,
+    zaloUrl: row.zaloUrl,
+    youtubeUrl: row.youtubeUrl,
+    tiktokUrl: row.tiktokUrl,
+    linkedinUrl: row.linkedinUrl,
+  };
+}
+
+export async function getBrandingSettings(): Promise<BrandingSettingsData> {
+  try {
+    const row = await prisma.brandingSettings.findUnique({
+      where: { id: "default" },
+    });
+    if (row) return mapDbToBranding(row);
+  } catch {
+    // DB unavailable — fall back to static config
+  }
+  return staticBranding;
+}
+
+export async function getBrandingSettingsRecord(): Promise<BrandingSettingsRecord | null> {
+  try {
+    const row = await prisma.brandingSettings.findUnique({
+      where: { id: "default" },
+    });
+    if (!row) return null;
+    return mapDbToBranding(row);
+  } catch {
+    return null;
+  }
+}
+
+export async function upsertBrandingSettings(data: {
+  headerLogoUrl?: string | null;
+  footerLogoUrl?: string | null;
+  faviconUrl?: string | null;
+  defaultOgImageUrl?: string | null;
+  companyTagline?: string;
+  facebookUrl?: string | null;
+  zaloUrl?: string | null;
+  youtubeUrl?: string | null;
+  tiktokUrl?: string | null;
+  linkedinUrl?: string | null;
+}) {
+  return prisma.brandingSettings.upsert({
+    where: { id: "default" },
+    create: { id: "default", ...data },
+    update: data,
+  });
+}
+
+export async function seedBrandingSettings() {
+  await upsertBrandingSettings({
+    companyTagline: staticCompanyInfo.tagline,
+    headerLogoUrl: null,
+    footerLogoUrl: null,
+    faviconUrl: null,
+    defaultOgImageUrl: null,
+    facebookUrl: null,
+    zaloUrl: null,
+    youtubeUrl: null,
+    tiktokUrl: null,
+    linkedinUrl: null,
+  });
 }

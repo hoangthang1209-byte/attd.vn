@@ -54,6 +54,7 @@ export default function CmsDiagnosticsPanel({ health }: Props) {
             ["CaseStudyRecord", "CaseStudyRecord table exists"],
             ["CompanySettings", "CompanySettings table exists"],
             ["TrustMetricsSettings", "TrustMetricsSettings table exists"],
+            ["BrandingSettings", "BrandingSettings table exists"],
           ] as const
         ).map(([key, label]) => (
           <div key={key} className="admin-health-row">
