@@ -38,6 +38,8 @@ export interface WholesaleContent {
   ctaDescription: string;
   /** Page-specific cluster cross-links shown in footer */
   internalLinks: InternalLink[];
+  primaryCta?: { label: string; href: string };
+  secondaryCta?: { label: string; href: string };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

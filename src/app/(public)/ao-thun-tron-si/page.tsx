@@ -1,35 +1,20 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import WholesaleLandingPage from "@/components/seo/WholesaleLandingPage";
-import { getWholesaleContent } from "@/lib/wholesaleContent";
 import { canonicalUrl } from "@/lib/seo";
+import {
+  buildWholesaleMetadata,
+  loadWholesalePage,
+} from "@/features/landing-pages/load-wholesale-page";
 
 const SLUG = "ao-thun-tron-si";
 
-export function generateMetadata(): Metadata {
-  const content = getWholesaleContent(SLUG);
-  if (!content) return {};
-  const url = canonicalUrl(`/${SLUG}`);
-  return {
-    title: content.seoTitle,
-    description: content.metaDescription,
-    alternates: { canonical: url },
-    openGraph: {
-      title: content.seoTitle,
-      description: content.metaDescription,
-      url,
-      type: "website",
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: content.seoTitle,
-      description: content.metaDescription,
-    },
-  };
+export async function generateMetadata(): Promise<Metadata> {
+  return buildWholesaleMetadata(SLUG);
 }
 
-export default function AoThunTronSiPage() {
-  const content = getWholesaleContent(SLUG);
+export default async function AoThunTronSiPage() {
+  const content = await loadWholesalePage(SLUG);
   if (!content) notFound();
   return (
     <WholesaleLandingPage

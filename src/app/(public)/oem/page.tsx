@@ -1,23 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
+import { canonicalUrl, buildOgImages } from "@/lib/seo";
+import { CTA } from "@/lib/ctaConfig";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import TrackedLink from "@/components/analytics/TrackedLink";
-import { CTA } from "@/lib/ctaConfig";
+import FaqSchema from "@/components/seo/FaqSchema";
 import { getZaloUrl } from "@/lib/companyInfo";
+import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
 
-export const metadata: Metadata = {
-  title: `OEM & Private Label | ${SITE_NAME}`,
-  description:
-    "ATTD cung cấp sản phẩm trơn cho OEM và Private Label. Hàng trơn chất lượng cao, nhiều màu, nhiều size, sẵn kho, phù hợp gắn nhãn riêng cho thương hiệu của bạn.",
-  alternates: { canonical: canonicalUrl("/oem") },
-  openGraph: {
-    title: `OEM & Private Label | ${SITE_NAME}`,
-    description:
-      "Nguồn hàng trơn cho OEM và Private Label. Áo thun, polo, tote, nón — sẵn kho, giao nhanh.",
-    images: buildOgImages(),
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const landing = await resolveBespokeLanding("oem");
+  return {
+    title: landing.metaTitle,
+    description: landing.metaDescription,
+    alternates: { canonical: canonicalUrl("/oem") },
+    openGraph: {
+      title: landing.metaTitle,
+      description: landing.metaDescription,
+      images: buildOgImages(),
+    },
+  };
+}
 
 const steps = [
   { n: "01", title: "Liên hệ tư vấn", body: "Gửi yêu cầu qua form hoặc Zalo. Đội ngũ ATTD phản hồi trong vòng 24 giờ." },
@@ -33,28 +36,13 @@ const capabilities = [
   { title: "Tư vấn chọn chất liệu", body: "Cotton 100%, Cotton/Poly blend, Polyester — theo mục đích sử dụng." },
 ];
 
-const faqs = [
-  {
-    q: "OEM tại ATTD có nghĩa là gì?",
-    a: "ATTD cung cấp sản phẩm trơn (blank apparel) phù hợp cho các thương hiệu muốn gắn nhãn riêng. Chúng tôi không cung cấp dịch vụ in ấn — ATTD là nhà cung cấp nguồn hàng.",
-  },
-  {
-    q: "Số lượng tối thiểu (MOQ) là bao nhiêu?",
-    a: "MOQ phụ thuộc vào từng dòng sản phẩm. Liên hệ để được tư vấn cụ thể theo nhu cầu.",
-  },
-  {
-    q: "Có thể yêu cầu màu riêng không?",
-    a: "ATTD cung cấp theo bảng màu có sẵn. Với đơn hàng lớn, có thể tư vấn thêm phương án.",
-  },
-  {
-    q: "Thời gian giao hàng bao lâu?",
-    a: "Hàng có sẵn kho: 2–5 ngày làm việc toàn quốc. Đơn có gắn nhãn: theo thoả thuận.",
-  },
-];
+export default async function OemPage() {
+  const landing = await resolveBespokeLanding("oem");
+  const faqItems = landing.faq.map((item) => ({ q: item.question, a: item.answer }));
 
-export default function OemPage() {
   return (
     <main>
+      {faqItems.length > 0 && <FaqSchema items={landing.faq} />}
       {/* Hero */}
       <section
         className="section"
@@ -83,7 +71,7 @@ export default function OemPage() {
               maxWidth: "700px",
             }}
           >
-            OEM & Private Label cho thương hiệu của bạn
+            {landing.heroTitle}
           </h1>
 
           <p
@@ -95,26 +83,26 @@ export default function OemPage() {
               margin: "0 0 36px",
             }}
           >
-            ATTD cung cấp sản phẩm trơn chất lượng cao — áo thun, polo, tote bag, nón — sẵn kho, hỗ trợ gắn nhãn thương hiệu và đóng gói theo yêu cầu.
+            {landing.heroDescription}
           </p>
 
           <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
             <TrackedLink
-              href={CTA.primary.href}
+              href={landing.primaryCtaHref}
               trackEvent={CTA.primary.event}
               trackSource="OEM_PAGE"
               className="btn-primary"
             >
-              {CTA.primary.label}
+              {landing.primaryCtaLabel}
             </TrackedLink>
             <TrackedLink
-              href={CTA.secondary.href}
+              href={landing.secondaryCtaHref}
               trackEvent={CTA.secondary.event}
               trackSource="OEM_PAGE"
               className="btn-secondary"
               style={{ background: "transparent", borderColor: "#4b5563", color: "#fff" }}
             >
-              {CTA.secondary.label}
+              {landing.secondaryCtaLabel}
             </TrackedLink>
             <TrackedLink
               href={getZaloUrl()}
@@ -317,7 +305,7 @@ export default function OemPage() {
           <div
             style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "28px" }}
           >
-            {faqs.map(({ q, a }) => (
+            {faqItems.map(({ q, a }) => (
               <details
                 key={q}
                 style={{
@@ -366,6 +354,16 @@ export default function OemPage() {
           </div>
         </div>
       </section>
+
+      {landing.seoContent && (
+        <section className="section" style={{ borderTop: "1px solid #e5e7eb" }}>
+          <div
+            className="container"
+            style={{ maxWidth: "860px" }}
+            dangerouslySetInnerHTML={{ __html: landing.seoContent }}
+          />
+        </section>
+      )}
 
       {/* CTA + Form */}
       <section className="section" style={{ borderTop: "1px solid #e5e7eb" }}>

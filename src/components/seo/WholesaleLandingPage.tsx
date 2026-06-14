@@ -429,7 +429,7 @@ export default function WholesaleLandingPage({
             }}
           >
             <Link
-              href="/dai-ly"
+              href={content.primaryCta?.href ?? "/dai-ly"}
               style={{
                 display: "inline-block",
                 padding: "13px 28px",
@@ -441,10 +441,10 @@ export default function WholesaleLandingPage({
                 textDecoration: "none",
               }}
             >
-              Đăng ký đại lý
+              {content.primaryCta?.label ?? "Đăng ký đại lý"}
             </Link>
             <Link
-              href="/lien-he"
+              href={content.secondaryCta?.href ?? "/lien-he"}
               style={{
                 display: "inline-block",
                 padding: "13px 28px",
@@ -457,7 +457,7 @@ export default function WholesaleLandingPage({
                 textDecoration: "none",
               }}
             >
-              Liên hệ tư vấn
+              {content.secondaryCta?.label ?? "Liên hệ tư vấn"}
             </Link>
           </div>
 

@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
+import { canonicalUrl } from "@/lib/seo";
+import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
 
-export const metadata: Metadata = {
-  title: "Đăng ký đại lý | ATTD",
-  description:
-    "Trở thành đại lý ATTD để nhận chính sách giá sỉ tốt nhất, nguồn hàng ổn định và hỗ trợ kinh doanh toàn diện.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const landing = await resolveBespokeLanding("dai-ly");
+  return {
+    title: landing.metaTitle,
+    description: landing.metaDescription,
+    alternates: { canonical: canonicalUrl("/dai-ly") },
+  };
+}
 
 const BENEFITS = [
   {
@@ -26,7 +31,9 @@ const BENEFITS = [
   },
 ];
 
-export default function DaiLyPage() {
+export default async function DaiLyPage() {
+  const landing = await resolveBespokeLanding("dai-ly");
+
   return (
     <main>
       <section className="section">
@@ -35,7 +42,6 @@ export default function DaiLyPage() {
             className="grid grid-cols-1 lg:grid-cols-2"
             style={{ gap: "64px", alignItems: "start" }}
           >
-            {/* Left: Info */}
             <div>
               <div
                 style={{
@@ -62,7 +68,7 @@ export default function DaiLyPage() {
                   margin: "0 0 16px",
                 }}
               >
-                Trở thành đại lý ATTD
+                {landing.heroTitle}
               </h1>
 
               <p
@@ -73,9 +79,7 @@ export default function DaiLyPage() {
                   margin: "0 0 40px",
                 }}
               >
-                Nguồn hàng đồng phục và quà tặng doanh nghiệp dành cho đại lý,
-                xưởng in và doanh nghiệp trên toàn quốc. Đăng ký để nhận chính
-                sách giá và hỗ trợ tốt nhất.
+                {landing.heroDescription}
               </p>
 
               <div
@@ -86,28 +90,11 @@ export default function DaiLyPage() {
                 }}
               >
                 {BENEFITS.map((benefit) => (
-                  <div
-                    key={benefit.title}
-                    className="card"
-                    style={{ padding: "20px" }}
-                  >
-                    <h3
-                      style={{
-                        margin: "0 0 8px",
-                        fontSize: "15px",
-                        fontWeight: 600,
-                      }}
-                    >
+                  <div key={benefit.title} className="card" style={{ padding: "20px" }}>
+                    <h3 style={{ margin: "0 0 8px", fontSize: "15px", fontWeight: 600 }}>
                       {benefit.title}
                     </h3>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: "14px",
-                        color: "#6b7280",
-                        lineHeight: 1.6,
-                      }}
-                    >
+                    <p style={{ margin: 0, fontSize: "14px", color: "#6b7280", lineHeight: 1.6 }}>
                       {benefit.description}
                     </p>
                   </div>
@@ -115,7 +102,6 @@ export default function DaiLyPage() {
               </div>
             </div>
 
-            {/* Right: Form */}
             <div>
               <DealerLeadForm
                 source="DEALER_FORM"
@@ -126,6 +112,16 @@ export default function DaiLyPage() {
           </div>
         </div>
       </section>
+
+      {landing.seoContent && (
+        <section className="section" style={{ borderTop: "1px solid #e5e7eb" }}>
+          <div
+            className="container"
+            style={{ maxWidth: "860px" }}
+            dangerouslySetInnerHTML={{ __html: landing.seoContent }}
+          />
+        </section>
+      )}
     </main>
   );
 }

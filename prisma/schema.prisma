@@ -262,6 +262,25 @@ model BrandingSettings {
   updatedAt         DateTime @updatedAt
 }
 
+model LandingPageContent {
+  id                  String   @id @default(cuid())
+  slug                String   @unique
+  title               String
+  metaTitle           String   @default("")
+  metaDescription     String   @default("")
+  heroTitle           String   @default("")
+  heroDescription     String   @default("")
+  seoContent          String   @default("") @db.Text
+  faqJson             Json     @default("[]")
+  primaryCtaLabel     String   @default("")
+  primaryCtaHref      String   @default("")
+  secondaryCtaLabel   String   @default("")
+  secondaryCtaHref    String   @default("")
+  isPublished         Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
 enum PostStatus {
   PUBLISHED
   DRAFT

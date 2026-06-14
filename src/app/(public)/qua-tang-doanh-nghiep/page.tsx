@@ -1,23 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
+import { canonicalUrl, buildOgImages } from "@/lib/seo";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import TrackedLink from "@/components/analytics/TrackedLink";
-import { CTA } from "@/lib/ctaConfig";
+import FaqSchema from "@/components/seo/FaqSchema";
 import { getZaloUrl } from "@/lib/companyInfo";
+import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
 
-export const metadata: Metadata = {
-  title: `Quà tặng doanh nghiệp | ${SITE_NAME}`,
-  description:
-    "Nguồn hàng quà tặng doanh nghiệp B2B: áo thun, polo, tote bag, nón và phụ kiện. Số lượng linh hoạt, giao nhanh toàn quốc, hỗ trợ gắn nhãn thương hiệu.",
-  alternates: { canonical: canonicalUrl("/qua-tang-doanh-nghiep") },
-  openGraph: {
-    title: `Quà tặng doanh nghiệp | ${SITE_NAME}`,
-    description:
-      "Nguồn hàng quà tặng doanh nghiệp B2B — áo thun, tote bag, nón và phụ kiện. Hàng sẵn kho, giao nhanh.",
-    images: buildOgImages(),
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const landing = await resolveBespokeLanding("qua-tang-doanh-nghiep");
+  return {
+    title: landing.metaTitle,
+    description: landing.metaDescription,
+    alternates: { canonical: canonicalUrl("/qua-tang-doanh-nghiep") },
+    openGraph: {
+      title: landing.metaTitle,
+      description: landing.metaDescription,
+      images: buildOgImages(),
+    },
+  };
+}
 
 const categories = [
   { name: "Áo thun trơn", detail: "Nhiều màu, nhiều size, chất liệu cotton cao cấp. Phù hợp làm đồng phục và quà tặng." },
@@ -45,9 +47,12 @@ const branding = [
   },
 ];
 
-export default function CorporateGiftsPage() {
+export default async function CorporateGiftsPage() {
+  const landing = await resolveBespokeLanding("qua-tang-doanh-nghiep");
+
   return (
     <main>
+      {landing.faq.length > 0 && <FaqSchema items={landing.faq} />}
       {/* Hero */}
       <section
         className="section"
@@ -76,7 +81,7 @@ export default function CorporateGiftsPage() {
               maxWidth: "700px",
             }}
           >
-            Nguồn hàng quà tặng doanh nghiệp B2B
+            {landing.heroTitle}
           </h1>
 
           <p
@@ -88,20 +93,20 @@ export default function CorporateGiftsPage() {
               margin: "0 0 36px",
             }}
           >
-            ATTD cung cấp áo thun, polo, tote bag, nón và phụ kiện — hàng sẵn kho, hỗ trợ gắn nhãn thương hiệu và đóng gói theo yêu cầu doanh nghiệp.
+            {landing.heroDescription}
           </p>
 
           <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
             <TrackedLink
-              href="/lien-he"
+              href={landing.primaryCtaHref}
               trackEvent="contact_quote"
               trackSource="CORPORATE_GIFTS_PAGE"
               className="btn-primary"
             >
-              Nhận báo giá
+              {landing.primaryCtaLabel}
             </TrackedLink>
             <TrackedLink
-              href={getZaloUrl()}
+              href={landing.secondaryCtaHref}
               trackEvent="contact_zalo"
               trackSource="CORPORATE_GIFTS_PAGE"
               external
@@ -117,7 +122,7 @@ export default function CorporateGiftsPage() {
                 fontWeight: 600,
               }}
             >
-              Chat Zalo
+              {landing.secondaryCtaLabel}
             </TrackedLink>
           </div>
         </div>
@@ -357,6 +362,16 @@ export default function CorporateGiftsPage() {
           </div>
         </div>
       </section>
+
+      {landing.seoContent && (
+        <section className="section" style={{ borderTop: "1px solid #e5e7eb" }}>
+          <div
+            className="container"
+            style={{ maxWidth: "860px" }}
+            dangerouslySetInnerHTML={{ __html: landing.seoContent }}
+          />
+        </section>
+      )}
     </main>
   );
 }

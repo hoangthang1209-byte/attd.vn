@@ -40,6 +40,8 @@ export interface CollectionContent {
   wholesaleCluster?: WholesaleCluster;
   /** Optional knowledge cluster links (fabric, size, color guides) */
   knowledgeCluster?: WholesaleCluster;
+  primaryCta?: { label: string; href: string };
+  secondaryCta?: { label: string; href: string };
 }
 
 const content: Record<string, CollectionContent> = {

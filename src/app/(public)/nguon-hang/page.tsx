@@ -1,24 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCategories } from "@/features/categories/services/category.service";
-import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
+import { canonicalUrl, buildOgImages } from "@/lib/seo";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import TrackedLink from "@/components/analytics/TrackedLink";
-import { CTA } from "@/lib/ctaConfig";
-import { getZaloUrl } from "@/lib/companyInfo";
+import FaqSchema from "@/components/seo/FaqSchema";
+import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
 
-export const metadata: Metadata = {
-  title: `Nguồn hàng sỉ | ${SITE_NAME}`,
-  description:
-    "Kho nguồn hàng sỉ đồng phục trơn cho đại lý và xưởng in toàn quốc. Áo thun, polo, tote bag, nón — hàng có sẵn, giá sỉ tận kho, giao nhanh.",
-  alternates: { canonical: canonicalUrl("/nguon-hang") },
-  openGraph: {
-    title: `Nguồn hàng sỉ | ${SITE_NAME}`,
-    description:
-      "Kho sỉ đồng phục trơn B2B — hàng có sẵn, nhiều màu, nhiều size, giá sỉ tận kho.",
-    images: buildOgImages(),
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const landing = await resolveBespokeLanding("nguon-hang");
+  return {
+    title: landing.metaTitle,
+    description: landing.metaDescription,
+    alternates: { canonical: canonicalUrl("/nguon-hang") },
+    openGraph: {
+      title: landing.metaTitle,
+      description: landing.metaDescription,
+      images: buildOgImages(),
+    },
+  };
+}
 
 const whyItems = [
   {
@@ -64,9 +65,11 @@ const dealerBenefits = [
 
 export default async function WholesalePage() {
   const categories = await getCategories();
+  const landing = await resolveBespokeLanding("nguon-hang");
 
   return (
     <main>
+      {landing.faq.length > 0 && <FaqSchema items={landing.faq} />}
       {/* Hero */}
       <section
         className="section"
@@ -95,7 +98,7 @@ export default async function WholesalePage() {
               maxWidth: "700px",
             }}
           >
-            Nguồn hàng sỉ đồng phục trơn cho đại lý và xưởng in
+            {landing.heroTitle}
           </h1>
 
           <p
@@ -107,20 +110,20 @@ export default async function WholesalePage() {
               margin: "0 0 36px",
             }}
           >
-            ATTD là kho sỉ B2B chuyên cung cấp áo thun, polo, tote bag và nón trơn chất lượng cao. Hàng sẵn kho, giao nhanh toàn quốc.
+            {landing.heroDescription}
           </p>
 
           <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
             <TrackedLink
-              href="/dai-ly"
+              href={landing.primaryCtaHref}
               trackEvent="dealer_registration_click"
               trackSource="WHOLESALE_PAGE"
               className="btn-primary"
             >
-              Đăng ký đại lý
+              {landing.primaryCtaLabel}
             </TrackedLink>
             <TrackedLink
-              href={getZaloUrl()}
+              href={landing.secondaryCtaHref}
               trackEvent="contact_zalo"
               trackSource="WHOLESALE_PAGE"
               external
@@ -136,7 +139,7 @@ export default async function WholesalePage() {
                 fontWeight: 600,
               }}
             >
-              Chat Zalo
+              {landing.secondaryCtaLabel}
             </TrackedLink>
           </div>
         </div>
@@ -376,6 +379,16 @@ export default async function WholesalePage() {
           </div>
         </div>
       </section>
+
+      {landing.seoContent && (
+        <section className="section" style={{ borderTop: "1px solid #e5e7eb" }}>
+          <div
+            className="container"
+            style={{ maxWidth: "860px" }}
+            dangerouslySetInnerHTML={{ __html: landing.seoContent }}
+          />
+        </section>
+      )}
     </main>
   );
 }

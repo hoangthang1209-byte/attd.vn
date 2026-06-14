@@ -10,7 +10,7 @@ import CollectionSchema from "@/components/seo/CollectionSchema";
 import CollectionSEOContent from "@/components/seo/CollectionSEOContent";
 import ItemListSchema from "@/components/seo/ItemListSchema";
 import { getCategoryBySlug } from "@/features/categories/services/category.service";
-import { getCollectionContent } from "@/lib/collectionContent";
+import { loadCollectionContent } from "@/features/landing-pages/load-collection-cms";
 import {
   SITE_NAME,
   DEFAULT_DESCRIPTION,
@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { category } = await params;
   const [cat, content] = await Promise.all([
     getCategoryBySlug(category),
-    Promise.resolve(getCollectionContent(category)),
+    loadCollectionContent(category),
   ]);
   if (!cat) return {};
 
@@ -72,7 +72,7 @@ export default async function CategoryPage({ params }: PageProps) {
   const { category } = await params;
   const [cat, content] = await Promise.all([
     getCategoryBySlug(category),
-    Promise.resolve(getCollectionContent(category)),
+    loadCollectionContent(category),
   ]);
 
   if (!cat) notFound();
