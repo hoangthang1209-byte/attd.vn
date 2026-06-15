@@ -7417,3 +7417,79 @@ body:has(.mobile-action-bar) .site-footer {
 
 .admin-error { color: #dc2626; font-size: 13px; margin: 0; }
 .admin-required { color: #dc2626; }
+
+/* ─── Sprint 24.9.3: Media Library & Attributes ──────────────────────────── */
+
+.admin-media-page { display: flex; flex-direction: column; gap: 20px; }
+
+/* Dropzone */
+.admin-media-dropzone {
+  border: 2px dashed #d1d5db; border-radius: 10px; padding: 32px 20px;
+  text-align: center; cursor: pointer; transition: border-color .2s, background .2s;
+  background: #f9fafb;
+}
+.admin-media-dropzone:hover, .admin-media-dropzone.is-dragging {
+  border-color: #4f46e5; background: #eef2ff;
+}
+.admin-media-dropzone-inner { display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.admin-media-dropzone-icon { font-size: 32px; }
+
+/* Upload queue */
+.admin-media-queue { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; }
+.admin-media-queue-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.admin-media-queue-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+.admin-media-queue-item {
+  display: flex; gap: 8px; align-items: center; padding: 4px 8px;
+  border-radius: 4px; font-size: 12px; background: #f9fafb;
+}
+.admin-media-queue-item.status-done { background: #d1fae5; }
+.admin-media-queue-item.status-error { background: #fee2e2; }
+.admin-media-queue-item.status-warn { background: #fef3c7; }
+.admin-media-queue-item.status-uploading { background: #eff6ff; }
+.admin-media-queue-name { font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-media-queue-size { color: #9ca3af; white-space: nowrap; }
+.admin-media-queue-status { color: #374151; white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Grid improvements */
+.admin-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.admin-media-grid--picker { max-height: 400px; overflow-y: auto; }
+.admin-media-card { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #fff; }
+.admin-media-card--selectable { cursor: pointer; transition: border-color .15s; }
+.admin-media-card--selectable:hover { border-color: #4f46e5; }
+.admin-media-card--selectable.is-selected { border-color: #4f46e5; outline: 2px solid #4f46e5; }
+.admin-media-preview { aspect-ratio: 1; overflow: hidden; background: #f3f4f6; }
+.admin-media-preview img { width: 100%; height: 100%; object-fit: cover; }
+.admin-media-meta { padding: 8px; }
+.admin-media-filename { font-size: 11px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 0 2px; color: #374151; }
+.admin-media-actions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+
+/* Media picker */
+.admin-media-picker { display: flex; flex-direction: column; gap: 8px; }
+.admin-media-picker-preview { display: flex; gap: 12px; align-items: flex-start; }
+.admin-media-picker-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; }
+.admin-media-picker-actions { display: flex; gap: 6px; flex-direction: column; }
+.admin-media-picker-empty {
+  display: flex; align-items: center; gap: 8px; padding: 16px; border: 2px dashed #d1d5db;
+  border-radius: 8px; cursor: pointer; color: #6b7280; font-size: 13px; background: #f9fafb;
+}
+.admin-media-picker-empty:hover { border-color: #4f46e5; background: #eef2ff; }
+
+/* Modal */
+.admin-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.admin-modal {
+  background: #fff; border-radius: 12px; padding: 24px; max-width: 600px; width: 100%;
+  max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.admin-modal--wide { max-width: 900px; }
+.admin-modal-header { display: flex; align-items: center; justify-content: space-between; }
+
+/* Admin input size variant */
+.admin-input--sm { padding: 4px 8px; font-size: 12px; }
+
+/* Empty state */
+.admin-empty-state { text-align: center; padding: 40px; color: #6b7280; }
+.admin-empty-hint { font-size: 12px; }

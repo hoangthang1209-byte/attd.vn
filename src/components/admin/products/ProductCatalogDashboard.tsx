@@ -30,6 +30,8 @@ type ProductRow = {
   category: { id: string; name: string; slug: string; skuCode: string | null };
   variants: ProductVariantRow[];
   images: { imageUrl: string }[];
+  featuredImage?: string | null;
+  gallery?: string[];
 };
 
 type KpiData = {
@@ -222,8 +224,8 @@ export default function ProductCatalogDashboard() {
                   <tr key={p.id}>
                     <td>
                       <div className="admin-catalog-product-name">
-                        {p.images[0] && (
-                          <img src={p.images[0].imageUrl} alt={p.name} className="admin-catalog-thumb" />
+                        {(p.featuredImage ?? p.images[0]?.imageUrl ?? (p.gallery ?? [])[0]) && (
+                          <img src={p.featuredImage ?? p.images[0]?.imageUrl ?? (p.gallery ?? [])[0]} alt={p.name} className="admin-catalog-thumb" />
                         )}
                         <span>{p.name}</span>
                       </div>

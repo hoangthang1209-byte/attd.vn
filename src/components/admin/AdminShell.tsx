@@ -4,33 +4,47 @@ import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 const NAV_GROUPS = [
   {
     label: null as string | null,
-    items: [{ href: "/admin/dashboard", label: "Dashboard" }],
+    items: [{ href: "/admin/dashboard", label: "Tổng quan" }],
   },
   {
-    label: "Content",
+    label: "Sản phẩm",
     items: [
-      { href: "/admin/media", label: "Thư viện ảnh" },
-      { href: "/admin/products", label: "Sản phẩm" },
+      { href: "/admin/products", label: "Danh sách sản phẩm" },
       { href: "/admin/products/new", label: "Thêm sản phẩm" },
       { href: "/admin/products/import", label: "Nhập Excel/CSV" },
-      { href: "/admin/danh-muc", label: "Danh mục" },
-      { href: "/admin/landing-pages", label: "Landing pages" },
-      { href: "/admin/blog", label: "Blog" },
-      { href: "/admin/seo-planning", label: "SEO Planning" },
-      { href: "/admin/seo/brief-generator", label: "SEO Brief Generator" },
-      { href: "/admin/knowledge-base", label: "Knowledge Base" },
+      { href: "/admin/danh-muc", label: "Danh mục sản phẩm" },
+      { href: "/admin/products/attributes", label: "Thuộc tính sản phẩm" },
+      { href: "/admin/media", label: "Thư viện Media" },
     ],
   },
   {
-    label: "Sales",
+    label: "Knowledge Base",
     items: [
-      { href: "/admin/crm", label: "CRM" },
+      { href: "/admin/knowledge-base", label: "Danh sách KB" },
+      { href: "/admin/knowledge-base?import=1", label: "Nhập dữ liệu KB" },
+      { href: "/admin/knowledge-base/context-preview", label: "Xem trước ngữ cảnh AI" },
+    ],
+  },
+  {
+    label: "SEO & Content",
+    items: [
+      { href: "/admin/blog", label: "Blog" },
+      { href: "/admin/landing-pages", label: "Landing pages" },
+      { href: "/admin/seo-planning", label: "SEO Planning" },
+      { href: "/admin/seo/brief-generator", label: "SEO Brief Generator" },
+      { href: "/admin/ai-content-factory", label: "AI Content Factory" },
+    ],
+  },
+  {
+    label: "CRM / Lead",
+    items: [
+      { href: "/admin/crm", label: "CRM & Lead" },
       { href: "/admin/client-logos", label: "Logo khách hàng" },
       { href: "/admin/case-studies", label: "Dự án tiêu biểu" },
     ],
   },
   {
-    label: "Settings",
+    label: "Cài đặt",
     items: [
       { href: "/admin/settings/company", label: "Thông tin công ty" },
       { href: "/admin/settings/trust", label: "Chỉ số tin cậy" },

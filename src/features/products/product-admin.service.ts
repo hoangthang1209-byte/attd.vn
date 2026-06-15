@@ -62,6 +62,7 @@ export type ProductInput = {
   supportsOem?: boolean;
   tags?: string[];
   featuredImage?: string;
+  gallery?: string[];
   status?: ProductStatus;
   metadata?: Record<string, unknown> | null;
   variants?: VariantInput[];
@@ -169,7 +170,7 @@ export async function listProductsAdmin(params: ProductListParams = {}) {
             colorName: true, sizeName: true,
           },
         },
-        images: { select: { imageUrl: true }, orderBy: { sortOrder: "asc" }, take: 1 },
+        images: { select: { imageUrl: true }, orderBy: { sortOrder: "asc" as const }, take: 1 },
       },
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * pageSize,
@@ -268,6 +269,7 @@ export async function createProductAdmin(input: ProductInput) {
       supportsOem: input.supportsOem ?? false,
       tags: input.tags ?? [],
       featuredImage: input.featuredImage,
+      gallery: input.gallery ?? [],
       status: input.status ?? "DRAFT",
       ...(input.metadata ? { metadata: input.metadata as Prisma.InputJsonValue } : {}),
     },
@@ -337,6 +339,7 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
   if (input.tags !== undefined) updateData.tags = input.tags;
   if (input.metadata !== undefined && input.metadata) updateData.metadata = input.metadata as Prisma.InputJsonValue;
   if (input.featuredImage !== undefined) updateData.featuredImage = input.featuredImage;
+  if (input.gallery !== undefined) updateData.gallery = input.gallery;
   if (input.status !== undefined) updateData.status = input.status;
 
   await prisma.product.update({ where: { id }, data: updateData });

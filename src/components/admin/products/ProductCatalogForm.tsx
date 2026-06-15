@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import MediaPicker from "@/components/admin/media/MediaPicker";
 
 type Category = { id: string; name: string; slug: string; skuCode: string | null };
+type AttributeOption = { id: string; type: string; name: string; code: string | null; value: string | null };
 
 type VariantFormRow = {
   id?: string;
@@ -39,6 +41,8 @@ type ProductFormData = {
   supportsOem: boolean;
   tags: string;
   status: string;
+  featuredImage: string;
+  gallery: string[];
   variants: VariantFormRow[];
 };
 
@@ -53,9 +57,12 @@ type Props = {
   categories?: Category[];
 };
 
+type AttrMap = Record<string, AttributeOption[]>;
+
 export default function ProductCatalogForm({ initialData, categories: propCategories }: Props) {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>(propCategories ?? []);
+  const [attributes, setAttributes] = useState<AttrMap>({});
   const [form, setForm] = useState<ProductFormData>({
     id: initialData?.id,
     name: initialData?.name ?? "",
@@ -74,6 +81,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     supportsOem: initialData?.supportsOem ?? true,
     tags: initialData?.tags ?? "",
     status: initialData?.status ?? "DRAFT",
+    featuredImage: initialData?.featuredImage ?? "",
+    gallery: initialData?.gallery ?? [],
     variants: initialData?.variants ?? [defaultVariant()],
   });
   const [saving, setSaving] = useState(false);
@@ -85,6 +94,16 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         .then((r) => r.json())
         .then((cats: Category[]) => setCategories(cats));
     }
+    void fetch("/api/admin/products/attributes")
+      .then((r) => r.json())
+      .then((opts: AttributeOption[]) => {
+        const map: AttrMap = {};
+        for (const opt of opts) {
+          if (!map[opt.type]) map[opt.type] = [];
+          map[opt.type].push(opt);
+        }
+        setAttributes(map);
+      });
   }, [propCategories]);
 
   async function previewSku(index: number) {
@@ -156,6 +175,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       supportsOem: form.supportsOem,
       tags: form.tags.split(",").map((s) => s.trim()).filter(Boolean),
       status: form.status,
+      featuredImage: form.featuredImage || undefined,
+      gallery: form.gallery.filter(Boolean),
       variants: form.variants.map((v) => ({
         id: v.id,
         colorName: v.colorName.trim() || undefined,
@@ -215,11 +236,23 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           </div>
           <div className="admin-field">
             <label className="admin-label">Chất liệu</label>
-            <input className="admin-input" value={form.material} onChange={(e) => setField("material", e.target.value)} placeholder="CVC, Cotton 100%, Polyester pique…" />
+            {(attributes.MATERIAL?.length ?? 0) > 0 && (
+              <select className="admin-input" value={form.material} onChange={(e) => setField("material", e.target.value)} style={{ marginBottom: 4 }}>
+                <option value="">— Chọn —</option>
+                {(attributes.MATERIAL ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+              </select>
+            )}
+            <input className="admin-input" value={form.material} onChange={(e) => setField("material", e.target.value)} placeholder="CVC, Cotton 100%, Polyester pique… (nhập thủ công)" />
           </div>
           <div className="admin-field">
             <label className="admin-label">Form / Kiểu dáng</label>
-            <input className="admin-input" value={form.form} onChange={(e) => setField("form", e.target.value)} placeholder="Regular fit, Slim fit, Oversize…" />
+            {(attributes.FORM?.length ?? 0) > 0 && (
+              <select className="admin-input" value={form.form} onChange={(e) => setField("form", e.target.value)} style={{ marginBottom: 4 }}>
+                <option value="">— Chọn —</option>
+                {(attributes.FORM ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+              </select>
+            )}
+            <input className="admin-input" value={form.form} onChange={(e) => setField("form", e.target.value)} placeholder="Regular fit, Slim fit, Oversize… (nhập thủ công)" />
           </div>
           <div className="admin-field">
             <label className="admin-label">MOQ mặc định (cái)</label>
@@ -273,6 +306,54 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         </div>
       </fieldset>
 
+      {/* Featured image + gallery */}
+      <fieldset className="admin-catalog-fieldset">
+        <legend>Hình ảnh sản phẩm</legend>
+        <p className="admin-field-hint">Ảnh nên tối ưu 200–300KB trước khi upload để website tải nhanh.</p>
+
+        <div className="admin-field">
+          <label className="admin-label">Ảnh đại diện</label>
+          <MediaPicker
+            label="Ảnh đại diện"
+            value={form.featuredImage}
+            onChange={(url) => setField("featuredImage", url)}
+            folder="products"
+          />
+          <p className="admin-field-hint">Hoặc nhập URL ảnh trực tiếp:</p>
+          <input
+            className="admin-input"
+            value={form.featuredImage}
+            onChange={(e) => setField("featuredImage", e.target.value)}
+            placeholder="https://… hoặc chọn từ thư viện ảnh phía trên"
+          />
+        </div>
+
+        <div className="admin-field">
+          <label className="admin-label">Thư viện ảnh (gallery)</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {form.gallery.map((url, idx) => (
+              <div key={idx} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {url && <img src={url} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 4, border: "1px solid #e5e7eb" }} />}
+                <input
+                  className="admin-input"
+                  value={url}
+                  onChange={(e) => {
+                    const next = [...form.gallery];
+                    next[idx] = e.target.value;
+                    setField("gallery", next);
+                  }}
+                  placeholder="URL ảnh gallery"
+                />
+                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setField("gallery", form.gallery.filter((_, i) => i !== idx))}>✕</button>
+              </div>
+            ))}
+            <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" style={{ alignSelf: "flex-start" }} onClick={() => setField("gallery", [...form.gallery, ""])}>
+              + Thêm ảnh gallery
+            </button>
+          </div>
+        </div>
+      </fieldset>
+
       {/* Variants */}
       <fieldset className="admin-catalog-fieldset">
         <legend>Biến thể / SKU</legend>
@@ -295,23 +376,51 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
             <div className="admin-catalog-variant-fields">
               <div className="admin-field">
                 <label className="admin-label">Màu sắc</label>
-                <input className="admin-input" value={v.colorName} onChange={(e) => updateVariant(i, { colorName: e.target.value })} placeholder="Đen, Trắng, Xanh navy…" />
+                {(attributes.COLOR?.length ?? 0) > 0 ? (
+                  <select className="admin-input" value={v.colorName} onChange={(e) => {
+                    const opt = attributes.COLOR?.find((o) => o.name === e.target.value);
+                    updateVariant(i, { colorName: e.target.value, colorCode: opt?.code ?? v.colorCode });
+                  }}>
+                    <option value="">— Chọn hoặc nhập thủ công —</option>
+                    {(attributes.COLOR ?? []).map((o) => <option key={o.id} value={o.name}>{o.name} ({o.code})</option>)}
+                  </select>
+                ) : null}
+                <input className="admin-input" value={v.colorName} onChange={(e) => updateVariant(i, { colorName: e.target.value })} placeholder="Đen, Trắng, Xanh navy… (nhập thủ công)" style={{ marginTop: 4 }} />
               </div>
               <div className="admin-field">
                 <label className="admin-label">Mã màu</label>
                 <input className="admin-input" value={v.colorCode} onChange={(e) => updateVariant(i, { colorCode: e.target.value })} placeholder="BLK, WHT, NVY…" />
+                <p className="admin-field-hint">SKU sử dụng mã màu này. Chuẩn: BLK, WHT, NVY…</p>
               </div>
               <div className="admin-field">
                 <label className="admin-label">Size</label>
-                <input className="admin-input" value={v.sizeName} onChange={(e) => updateVariant(i, { sizeName: e.target.value })} placeholder="S, M, L, XL, OneSize…" />
+                {(attributes.SIZE?.length ?? 0) > 0 ? (
+                  <select className="admin-input" value={v.sizeName} onChange={(e) => updateVariant(i, { sizeName: e.target.value })}>
+                    <option value="">— Chọn hoặc nhập thủ công —</option>
+                    {(attributes.SIZE ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+                  </select>
+                ) : null}
+                <input className="admin-input" value={v.sizeName} onChange={(e) => updateVariant(i, { sizeName: e.target.value })} placeholder="S, M, L, XL, OneSize…" style={{ marginTop: 4 }} />
               </div>
               <div className="admin-field">
                 <label className="admin-label">Kích thước</label>
-                <input className="admin-input" value={v.dimensions} onChange={(e) => updateVariant(i, { dimensions: e.target.value })} placeholder="35x40cm" />
+                {(attributes.DIMENSION?.length ?? 0) > 0 ? (
+                  <select className="admin-input" value={v.dimensions} onChange={(e) => updateVariant(i, { dimensions: e.target.value })}>
+                    <option value="">— Chọn hoặc nhập thủ công —</option>
+                    {(attributes.DIMENSION ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+                  </select>
+                ) : null}
+                <input className="admin-input" value={v.dimensions} onChange={(e) => updateVariant(i, { dimensions: e.target.value })} placeholder="35x40cm" style={{ marginTop: 4 }} />
               </div>
               <div className="admin-field">
                 <label className="admin-label">Dung tích</label>
-                <input className="admin-input" value={v.capacity} onChange={(e) => updateVariant(i, { capacity: e.target.value })} placeholder="500ml" />
+                {(attributes.CAPACITY?.length ?? 0) > 0 ? (
+                  <select className="admin-input" value={v.capacity} onChange={(e) => updateVariant(i, { capacity: e.target.value })}>
+                    <option value="">— Chọn hoặc nhập thủ công —</option>
+                    {(attributes.CAPACITY ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+                  </select>
+                ) : null}
+                <input className="admin-input" value={v.capacity} onChange={(e) => updateVariant(i, { capacity: e.target.value })} placeholder="500ml" style={{ marginTop: 4 }} />
               </div>
               <div className="admin-field">
                 <label className="admin-label">Giá sỉ (VND)</label>

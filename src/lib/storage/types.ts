@@ -6,7 +6,8 @@ export type StorageFolderKey =
   | "clients"
   | "case-studies"
   | "branding"
-  | "blog";
+  | "blog"
+  | "general";
 
 export const STORAGE_FOLDER_TO_MEDIA: Record<StorageFolderKey, MediaFolder> = {
   products: "PRODUCTS",
@@ -15,6 +16,7 @@ export const STORAGE_FOLDER_TO_MEDIA: Record<StorageFolderKey, MediaFolder> = {
   "case-studies": "CASE_STUDIES",
   branding: "BRANDING",
   blog: "BLOG",
+  general: "GENERAL",
 };
 
 export const MEDIA_TO_STORAGE_FOLDER: Record<MediaFolder, StorageFolderKey> = {
@@ -24,11 +26,20 @@ export const MEDIA_TO_STORAGE_FOLDER: Record<MediaFolder, StorageFolderKey> = {
   CASE_STUDIES: "case-studies",
   BRANDING: "branding",
   BLOG: "blog",
+  GENERAL: "general",
 };
 
 export type UploadResult = {
   url: string;
   storageKey: string;
+  /** Cloudinary publicId if using Cloudinary */
+  publicId?: string;
+  /** Thumbnail URL (Cloudinary transformation) */
+  thumbnailUrl?: string;
+  /** Image width in pixels */
+  width?: number;
+  /** Image height in pixels */
+  height?: number;
 };
 
 export interface StorageAdapter {
@@ -48,4 +59,5 @@ export {
   validateImageUpload,
 } from "@/lib/imageValidation";
 
-export const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
+export const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB per sprint 24.9.3
+export const LARGE_IMAGE_WARNING_SIZE = 500 * 1024; // 500KB — show warning

@@ -57,6 +57,7 @@ model Product {
   supportsOem        Boolean          @default(false)
   tags               String[]
   featuredImage      String?
+  gallery            String[]  @default([])
   metadata           Json?
   categoryId         String
   status             ProductStatus    @default(ACTIVE)
@@ -278,22 +279,42 @@ enum MediaFolder {
   CASE_STUDIES
   BRANDING
   BLOG
+  GENERAL
+}
+
+enum MediaUsageType {
+  PRODUCT
+  BLOG
+  KNOWLEDGE_BASE
+  GENERAL
 }
 
 model MediaAsset {
-  id         String      @id @default(cuid())
-  filename   String
-  url        String
-  storageKey String
-  mimeType   String
-  sizeBytes  Int
-  folder     MediaFolder
-  altText    String?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id           String         @id @default(cuid())
+  filename     String
+  originalName String?
+  url          String
+  thumbnailUrl String?
+  storageKey   String
+  publicId     String?
+  mimeType     String
+  format       String?
+  sizeBytes    Int
+  width        Int?
+  height       Int?
+  folder       MediaFolder
+  usageType    MediaUsageType @default(GENERAL)
+  altText      String?
+  title        String?
+  tags         String[]       @default([])
+  uploadedBy   String?
+  metadata     Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@index([folder])
   @@index([filename])
+  @@index([usageType])
 }
 
 model ClientLogoRecord {
@@ -502,6 +523,39 @@ enum KnowledgeBaseSourceType {
   STAFF_NOTE
   CUSTOMER_FEEDBACK
   MANUAL_INPUT
+}
+
+enum ProductAttributeType {
+  COLOR
+  SIZE
+  MATERIAL
+  FORM
+  FIT
+  DIMENSION
+  CAPACITY
+  UNIT
+}
+
+enum ProductAttributeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model ProductAttributeOption {
+  id        String                 @id @default(cuid())
+  type      ProductAttributeType
+  name      String
+  code      String?
+  value     String?
+  metadata  Json?
+  sortOrder Int                    @default(0)
+  status    ProductAttributeStatus @default(ACTIVE)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  @@unique([type, name])
+  @@index([type])
+  @@index([status])
 }
 
 enum ProductImportJobStatus {
