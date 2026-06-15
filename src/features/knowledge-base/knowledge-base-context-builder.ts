@@ -97,12 +97,35 @@ export function buildAiContextFromKnowledgeBase(
         )
       : 0;
 
+  const verifiedCount = selected.filter((entry) => entry.isVerified).length;
+  const unverifiedCount = selected.length - verifiedCount;
+
+  const missingKnowledge: string[] = [];
+  if (!selected.some((entry) => entry.type === "PRODUCT" || entry.type === "MATERIAL")) {
+    missingKnowledge.push("Thiếu dữ liệu sản phẩm");
+  }
+  if (!selected.some((entry) => entry.type === "OEM" || entry.type === "MANUFACTURING")) {
+    missingKnowledge.push("Thiếu chính sách OEM");
+  }
+  if (!selected.some((entry) => entry.type === "POLICY" || entry.type === "PRICING")) {
+    missingKnowledge.push("Thiếu chính sách MOQ / pricing");
+  }
+  if (!selected.some((entry) => entry.type === "CASE_STUDY")) {
+    missingKnowledge.push("Thiếu case study");
+  }
+  if (selected.some((entry) => !entry.structuredData || Object.keys(entry.structuredData).length === 0)) {
+    missingKnowledge.push("Thiếu dữ liệu chi tiết ở một số mục");
+  }
+
   return {
     selectedEntries: selected,
     contextText,
     warnings,
     completenessScore,
     completenessLabel: getCompletenessLabel(completenessScore),
+    verifiedCount,
+    unverifiedCount,
+    missingKnowledge,
   };
 }
 

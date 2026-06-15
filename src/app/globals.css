@@ -6313,6 +6313,115 @@ body:has(.mobile-action-bar) .site-footer {
   gap: 20px;
 }
 
+.admin-kb-editor-nav-top {
+  margin-bottom: 4px;
+}
+
+.admin-kb-back-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3730a3;
+  text-decoration: none;
+}
+
+.admin-kb-back-link:hover {
+  text-decoration: underline;
+}
+
+.admin-kb-editor-nav-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.admin-kb-templates {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.admin-kb-templates-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.admin-kb-detail-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-kb-detail-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-kb-detail-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-kb-auto-result {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.admin-kb-completeness {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  margin-bottom: 12px;
+}
+
+.admin-kb-completeness-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.admin-kb-completeness-score {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3730a3;
+}
+
+.admin-kb-completeness-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.admin-kb-completeness-list .is-ok {
+  color: #166534;
+}
+
+.admin-kb-completeness-list .is-warn {
+  color: #b45309;
+}
+
+.admin-kb-completeness-list .is-missing {
+  color: #64748b;
+}
+
+.admin-kb-context-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .admin-kb-related-section {
   padding-top: 12px;
   border-top: 1px solid #e5e7eb;
@@ -6433,6 +6542,15 @@ body:has(.mobile-action-bar) .site-footer {
 
   .admin-kb-entry-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-kb-editor-nav-bottom {
+    flex-direction: column;
+  }
+
+  .admin-kb-editor-nav-bottom .admin-btn {
+    width: 100%;
+    text-align: center;
   }
 }
 

@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { computeDashboardKpis } from "@/features/knowledge-base/knowledge-base-completeness-checklist";
+import { calculateKnowledgeCompleteness } from "@/features/knowledge-base/knowledge-base-utils";
 
 export const DEFAULT_KNOWLEDGE_CATEGORIES = [
   {
@@ -245,17 +247,37 @@ export async function deleteKnowledgeBaseCategory(id: string) {
 }
 
 export async function getKnowledgeBaseKpisFromDb() {
-  const [totalEntries, activeEntries, verifiedEntries, draftEntries, highPriorityEntries] =
+  const [totalEntries, activeEntries, verifiedEntries, draftEntries, highPriorityEntries, allEntries] =
     await Promise.all([
       prisma.knowledgeBaseEntry.count(),
       prisma.knowledgeBaseEntry.count({ where: { status: "ACTIVE" } }),
       prisma.knowledgeBaseEntry.count({ where: { isVerified: true } }),
       prisma.knowledgeBaseEntry.count({ where: { status: "DRAFT" } }),
       prisma.knowledgeBaseEntry.count({ where: { priority: "HIGH" } }),
+      prisma.knowledgeBaseEntry.findMany({
+        select: {
+          title: true,
+          summary: true,
+          content: true,
+          structuredData: true,
+          tags: true,
+          categoryId: true,
+          type: true,
+          isVerified: true,
+        },
+      }),
     ]);
 
-  const aiReadyScore =
-    totalEntries > 0 ? Math.round((verifiedEntries / totalEntries) * 100) : 0;
+  const scoredEntries = allEntries.map((entry) => ({
+    isVerified: entry.isVerified,
+    completenessScore: calculateKnowledgeCompleteness({
+      ...entry,
+      structuredData: (entry.structuredData as Record<string, unknown> | null) ?? null,
+    }),
+  }));
+
+  const dashboardKpis = computeDashboardKpis(scoredEntries);
+  const aiReadyScore = dashboardKpis.aiReadyPercent;
 
   return {
     totalEntries,
@@ -264,5 +286,8 @@ export async function getKnowledgeBaseKpisFromDb() {
     draftEntries,
     highPriorityEntries,
     aiReadyScore,
+    verifiedPercent: dashboardKpis.verifiedPercent,
+    aiReadyPercent: dashboardKpis.aiReadyPercent,
+    missingDataCount: dashboardKpis.missingDataCount,
   };
 }

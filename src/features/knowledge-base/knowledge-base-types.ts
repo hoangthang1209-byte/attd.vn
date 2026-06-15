@@ -105,6 +105,9 @@ export type KnowledgeBaseContextPreviewResult = {
   warnings: string[];
   completenessScore: number;
   completenessLabel: string;
+  verifiedCount: number;
+  unverifiedCount: number;
+  missingKnowledge: string[];
 };
 
 export type KnowledgeBaseKpis = {
@@ -114,6 +117,9 @@ export type KnowledgeBaseKpis = {
   draftEntries: number;
   highPriorityEntries: number;
   aiReadyScore: number;
+  verifiedPercent: number;
+  aiReadyPercent: number;
+  missingDataCount: number;
 };
 
 export type KnowledgeReadinessResult = {

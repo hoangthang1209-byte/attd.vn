@@ -4,12 +4,12 @@ type Props = { kpis: KnowledgeBaseKpis };
 
 export default function KnowledgeBaseKpisPanel({ kpis }: Props) {
   const cards = [
-    { label: "Tổng entry", value: kpis.totalEntries },
-    { label: "Đang dùng", value: kpis.activeEntries },
-    { label: "Đã kiểm chứng", value: kpis.verifiedEntries },
+    { label: "Tổng mục", value: kpis.totalEntries },
+    { label: "Đang sử dụng", value: kpis.activeEntries },
+    { label: "Đã kiểm chứng", value: `${kpis.verifiedPercent ?? 0}%` },
+    { label: "Sẵn sàng cho AI", value: `${kpis.aiReadyPercent ?? kpis.aiReadyScore}%` },
+    { label: "Cần bổ sung", value: kpis.missingDataCount ?? 0 },
     { label: "Nháp", value: kpis.draftEntries },
-    { label: "Ưu tiên cao", value: kpis.highPriorityEntries },
-    { label: "AI-ready score", value: `${kpis.aiReadyScore}%` },
   ];
 
   return (

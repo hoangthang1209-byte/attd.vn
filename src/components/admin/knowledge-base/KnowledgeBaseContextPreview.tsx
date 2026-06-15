@@ -32,6 +32,9 @@ export default function KnowledgeBaseContextPreview() {
 
   return (
     <div className="admin-kb-context-preview">
+      <p className="admin-field-hint">
+        Xem trước dữ liệu doanh nghiệp sẽ được gửi cho AI khi viết nội dung.
+      </p>
       <div className="admin-kb-context-form">
         <input className="admin-input" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Từ khóa" />
         <select className="admin-input" value={blueprintId} onChange={(e) => setBlueprintId(e.target.value as ContentBlueprintId)}>
@@ -54,18 +57,35 @@ export default function KnowledgeBaseContextPreview() {
         />
         <label className="admin-radio-item">
           <input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} />
-          <span>Chỉ entry đã kiểm chứng</span>
+          <span>Chỉ mục đã kiểm chứng</span>
         </label>
         <button type="button" className="admin-btn admin-btn--primary" disabled={loading} onClick={() => void runPreview()}>
-          {loading ? "Đang tạo preview…" : "Preview context"}
+          {loading ? "Đang tạo preview…" : "Xem preview"}
         </button>
       </div>
 
       {preview && (
         <div className="admin-kb-context-result">
-          <p className="admin-field-hint">
-            Completeness: {preview.completenessScore}/100 — {preview.completenessLabel}
-          </p>
+          <div className="admin-kb-context-stats">
+            <p className="admin-field-hint">
+              Mức độ sẵn sàng cho AI: {preview.completenessScore}/100 — {preview.completenessLabel}
+            </p>
+            <p className="admin-field-hint">
+              Đã chọn {preview.selectedEntries.length} mục — Đã kiểm chứng: {preview.verifiedCount ?? 0} — Chưa kiểm chứng: {preview.unverifiedCount ?? 0}
+            </p>
+          </div>
+
+          {preview.missingKnowledge && preview.missingKnowledge.length > 0 && (
+            <div className="admin-kb-readiness">
+              <h4 className="admin-subtitle">Thiếu dữ liệu gì?</h4>
+              <ul className="admin-kb-warning-list">
+                {preview.missingKnowledge.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {preview.warnings.length > 0 && (
             <ul className="admin-kb-warning-list">
               {preview.warnings.map((warning) => (
@@ -73,11 +93,15 @@ export default function KnowledgeBaseContextPreview() {
               ))}
             </ul>
           )}
+
           <div className="admin-kb-context-selected">
-            <h4 className="admin-subtitle">Selected entries</h4>
+            <h4 className="admin-subtitle">Mục đã chọn</h4>
             <ul>
               {preview.selectedEntries.map((entry) => (
-                <li key={entry.id}>{entry.title}</li>
+                <li key={entry.id}>
+                  {entry.title}
+                  {entry.isVerified ? " ✓" : " (chưa kiểm chứng)"}
+                </li>
               ))}
             </ul>
           </div>

@@ -31,6 +31,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
     usageScope: "",
     priority: "",
     verifiedOnly: false,
+    needsImprovement: false,
   });
 
   const load = useCallback(async () => {
@@ -44,6 +45,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
       if (filters.usageScope) params.set("usageScope", filters.usageScope);
       if (filters.priority) params.set("priority", filters.priority);
       if (filters.verifiedOnly) params.set("verifiedOnly", "1");
+      if (filters.needsImprovement) params.set("needsImprovement", "1");
 
       const res = await fetch(`/api/admin/knowledge-base?${params.toString()}`);
       const data = await res.json();
@@ -61,8 +63,8 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
   const tabs: { id: TabId; label: string }[] = [
     { id: "entries", label: "Dữ liệu doanh nghiệp" },
     { id: "categories", label: "Danh mục" },
-    { id: "context", label: "Context Preview" },
-    { id: "starter", label: "Import Starter Data" },
+    { id: "context", label: "Xem dữ liệu AI sẽ dùng" },
+    { id: "starter", label: "Nhập dữ liệu mẫu ATTD" },
   ];
 
   return (

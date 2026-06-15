@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import type { KnowledgeBaseCategoryRecord } from "@/features/knowledge-base/knowledge-base-types";
 import { KNOWLEDGE_USAGE_SCOPES } from "@/features/knowledge-base/knowledge-base-types";
+import {
+  FILTER_ENTRY_TYPES,
+  getEntryStatusLabel,
+  getEntryTypeLabel,
+  getPriorityLabel,
+} from "@/features/knowledge-base/knowledge-base-utils";
 
 type Filters = {
   search: string;
@@ -12,16 +18,13 @@ type Filters = {
   usageScope: string;
   priority: string;
   verifiedOnly: boolean;
+  needsImprovement: boolean;
 };
 
 type Props = {
   filters: Filters;
   onChange: (filters: Filters) => void;
 };
-
-const ENTRY_TYPES = [
-  "COMPANY", "PRODUCT", "OEM", "DEALER", "POLICY", "LOGISTICS", "BRAND_VOICE", "SEO_CONTEXT", "FAQ", "CASE_STUDY",
-];
 
 export default function KnowledgeBaseFilters({ filters, onChange }: Props) {
   const [categories, setCategories] = useState<KnowledgeBaseCategoryRecord[]>([]);
@@ -56,8 +59,8 @@ export default function KnowledgeBaseFilters({ filters, onChange }: Props) {
         onChange={(e) => onChange({ ...filters, type: e.target.value })}
       >
         <option value="">Tất cả loại</option>
-        {ENTRY_TYPES.map((type) => (
-          <option key={type} value={type}>{type}</option>
+        {FILTER_ENTRY_TYPES.map((type) => (
+          <option key={type} value={type}>{getEntryTypeLabel(type)}</option>
         ))}
       </select>
       <select
@@ -66,16 +69,16 @@ export default function KnowledgeBaseFilters({ filters, onChange }: Props) {
         onChange={(e) => onChange({ ...filters, status: e.target.value })}
       >
         <option value="">Tất cả trạng thái</option>
-        <option value="DRAFT">Nháp</option>
-        <option value="ACTIVE">Đang dùng</option>
-        <option value="ARCHIVED">Lưu trữ</option>
+        {(["DRAFT", "ACTIVE", "ARCHIVED"] as const).map((status) => (
+          <option key={status} value={status}>{getEntryStatusLabel(status)}</option>
+        ))}
       </select>
       <select
         className="admin-input"
         value={filters.usageScope}
         onChange={(e) => onChange({ ...filters, usageScope: e.target.value })}
       >
-        <option value="">Tất cả phạm vi</option>
+        <option value="">Tất cả mục đích</option>
         {KNOWLEDGE_USAGE_SCOPES.map((scope) => (
           <option key={scope.id} value={scope.id}>{scope.label}</option>
         ))}
@@ -86,9 +89,9 @@ export default function KnowledgeBaseFilters({ filters, onChange }: Props) {
         onChange={(e) => onChange({ ...filters, priority: e.target.value })}
       >
         <option value="">Tất cả ưu tiên</option>
-        <option value="HIGH">Cao</option>
-        <option value="MEDIUM">Trung bình</option>
-        <option value="LOW">Thấp</option>
+        {(["HIGH", "MEDIUM", "LOW"] as const).map((priority) => (
+          <option key={priority} value={priority}>{getPriorityLabel(priority)}</option>
+        ))}
       </select>
       <label className="admin-radio-item">
         <input
@@ -96,7 +99,15 @@ export default function KnowledgeBaseFilters({ filters, onChange }: Props) {
           checked={filters.verifiedOnly}
           onChange={(e) => onChange({ ...filters, verifiedOnly: e.target.checked })}
         />
-        <span>Chỉ entry đã kiểm chứng</span>
+        <span>Chỉ mục đã kiểm chứng</span>
+      </label>
+      <label className="admin-radio-item">
+        <input
+          type="checkbox"
+          checked={filters.needsImprovement}
+          onChange={(e) => onChange({ ...filters, needsImprovement: e.target.checked })}
+        />
+        <span>Chỉ hiển thị mục cần bổ sung</span>
       </label>
     </div>
   );

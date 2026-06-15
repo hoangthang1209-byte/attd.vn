@@ -87,13 +87,13 @@ export default function KnowledgeBaseEntryCard({ entry, onChanged }: Props) {
           Sửa
         </Link>
         <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void duplicateEntry()}>
-          Duplicate
+          Nhân bản
         </button>
         <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void archiveEntry()}>
-          Archive
+          Lưu trữ
         </button>
         <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void deleteEntry()}>
-          Delete
+          Xóa
         </button>
       </div>
     </article>

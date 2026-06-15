@@ -35,9 +35,14 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    const needsImprovement = searchParams.get("needsImprovement") === "1";
+    const filteredEntries = needsImprovement
+      ? entries.filter((entry) => (entry.completenessScore ?? 0) < 40)
+      : entries;
+
     const kpis = await getKnowledgeBaseKpisFromDb();
 
-    return NextResponse.json({ ...result, entries, kpis });
+    return NextResponse.json({ ...result, entries: filteredEntries, kpis });
   } catch (err) {
     console.error("[GET /api/admin/knowledge-base]", err);
     return NextResponse.json({ message: "Không thể tải Knowledge Base", entries: [] }, { status: 500 });
