@@ -10,7 +10,11 @@ import BlogAiRecommendationsPanel from "@/components/admin/BlogAiRecommendations
 import BlogFaqBuilder from "@/components/admin/BlogFaqBuilder";
 import BlogSeoPanel from "@/components/admin/BlogSeoPanel";
 import BlogTagInput from "@/components/admin/BlogTagInput";
+import BlogClusterGenerator from "@/components/admin/BlogClusterGenerator";
 import AiContentFactory from "@/components/admin/blog-editor/AiContentFactory";
+import type { ClusterArticle } from "@/features/blog/content-clusters";
+import type { ClusterType } from "@/features/blog/content-clusters-types";
+import { clusterArticleToHandoff, type ClusterHandoffRequest } from "@/features/blog/cluster-handoff";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
 import type { GeneratedArticle } from "@/features/blog/ai-article-generator";
 import type { AiFaqResult, AiSeoResult, AiTagsResult } from "@/features/blog/ai-provider";
@@ -90,6 +94,8 @@ export default function BlogPostEditor(props: Props) {
   const [updatedAt, setUpdatedAt] = useState<string | null>(initial?.updatedAt ?? null);
   const [aiRecommendations, setAiRecommendations] = useState<SeoRecommendations | null>(null);
   const editorSectionRef = useRef<HTMLDivElement>(null);
+  const factorySectionRef = useRef<HTMLDivElement>(null);
+  const [clusterHandoff, setClusterHandoff] = useState<ClusterHandoffRequest | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
     null
   );
@@ -185,6 +191,11 @@ export default function BlogPostEditor(props: Props) {
     } catch {
       setMessage({ type: "error", text: "Không thể sao chép URL." });
     }
+  }
+
+  function handleClusterCreateArticle(article: ClusterArticle, clusterType: ClusterType) {
+    setClusterHandoff(clusterArticleToHandoff(article, clusterType));
+    factorySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function save(nextStatus?: BlogPostStatus) {
@@ -300,18 +311,27 @@ export default function BlogPostEditor(props: Props) {
 
       <div className="admin-form-grid">
         <div className="admin-form-main">
-          <AiContentFactory
-            categories={categories}
-            onApplyArticle={applyAiArticle}
-            onApplySeo={applyAiSeo}
-            onApplyFaq={applyAiFaq}
-            onApplyTags={applyAiTags}
-            onRecommendationsChange={setAiRecommendations}
-            onMessage={(text, type) => setMessage({ text, type })}
-            onScrollToEditor={() => {
-              editorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-          />
+          <div ref={factorySectionRef} className="admin-factory-section">
+            <AiContentFactory
+              categories={categories}
+              onApplyArticle={applyAiArticle}
+              onApplySeo={applyAiSeo}
+              onApplyFaq={applyAiFaq}
+              onApplyTags={applyAiTags}
+              onRecommendationsChange={setAiRecommendations}
+              onMessage={(text, type) => setMessage({ text, type })}
+              onScrollToEditor={() => {
+                editorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              handoff={clusterHandoff}
+              onHandoffConsumed={() => setClusterHandoff(null)}
+            />
+
+            <BlogClusterGenerator
+              onCreateArticle={handleClusterCreateArticle}
+              onMessage={(text, type) => setMessage({ text, type })}
+            />
+          </div>
 
           <div ref={editorSectionRef} className="admin-editor-section" id="blog-editor-section">
           <div className="admin-field">

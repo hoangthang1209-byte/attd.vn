@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { AiAudienceOptions, AiPromptInput, AiContentLength } from "@/features/blog/ai-prompts";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { AiPromptInput, AiContentLength } from "@/features/blog/ai-prompts";
+import type { BusinessGoal } from "@/features/blog/ai-factory-types";
+import { BUSINESS_GOAL_OPTIONS, getBusinessGoalConfig } from "@/features/blog/ai-factory-types";
 import type { ContentBlueprintId } from "@/features/blog/content-blueprints";
 import { CONTENT_BLUEPRINTS } from "@/features/blog/content-blueprints";
 import {
@@ -13,52 +15,10 @@ import {
 import type { GeneratedArticle } from "@/features/blog/ai-article-generator";
 import type { SeoRecommendations } from "@/features/blog/seo-recommendations";
 import { generateSeoRecommendations } from "@/features/blog/seo-recommendations";
+import type { ClusterHandoffRequest } from "@/features/blog/cluster-handoff";
 import type { BlogCategoryRecord } from "@/features/blog/types";
 
-export type BusinessGoal =
-  | "seo-traffic"
-  | "oem-leads"
-  | "dealer-recruitment"
-  | "corporate-uniform"
-  | "corporate-gift";
-
-const BUSINESS_GOALS: {
-  id: BusinessGoal;
-  label: string;
-  searchIntent: string;
-  audiences: AiAudienceOptions;
-}[] = [
-  {
-    id: "seo-traffic",
-    label: "Thu hút traffic SEO",
-    searchIntent: "informational + commercial B2B",
-    audiences: { b2bDealer: true, oem: false, corporateUniform: false, corporateGift: false },
-  },
-  {
-    id: "oem-leads",
-    label: "Tìm khách OEM",
-    searchIntent: "commercial OEM sourcing",
-    audiences: { b2bDealer: false, oem: true, corporateUniform: false, corporateGift: false },
-  },
-  {
-    id: "dealer-recruitment",
-    label: "Tuyển đại lý",
-    searchIntent: "commercial dealer recruitment",
-    audiences: { b2bDealer: true, oem: false, corporateUniform: false, corporateGift: false },
-  },
-  {
-    id: "corporate-uniform",
-    label: "Đồng phục doanh nghiệp",
-    searchIntent: "commercial corporate uniform",
-    audiences: { b2bDealer: false, oem: false, corporateUniform: true, corporateGift: false },
-  },
-  {
-    id: "corporate-gift",
-    label: "Quà tặng doanh nghiệp",
-    searchIntent: "commercial corporate gift",
-    audiences: { b2bDealer: false, oem: false, corporateUniform: false, corporateGift: true },
-  },
-];
+export type { BusinessGoal } from "@/features/blog/ai-factory-types";
 
 type AiContentFactoryProps = {
   categories: BlogCategoryRecord[];
@@ -69,6 +29,8 @@ type AiContentFactoryProps = {
   onRecommendationsChange: (rec: SeoRecommendations | null) => void;
   onMessage: (text: string, type: "success" | "error") => void;
   onScrollToEditor?: () => void;
+  handoff?: ClusterHandoffRequest | null;
+  onHandoffConsumed?: () => void;
 };
 
 export default function AiContentFactory({
@@ -80,6 +42,8 @@ export default function AiContentFactory({
   onRecommendationsChange,
   onMessage,
   onScrollToEditor,
+  handoff,
+  onHandoffConsumed,
 }: AiContentFactoryProps) {
   const [keyword, setKeyword] = useState("");
   const [businessGoal, setBusinessGoal] = useState<BusinessGoal>("seo-traffic");
@@ -87,8 +51,9 @@ export default function AiContentFactory({
   const [blueprintId, setBlueprintId] = useState<ContentBlueprintId>(CONTENT_BLUEPRINTS[0].id);
   const [loading, setLoading] = useState<string | null>(null);
   const [promptPreview, setPromptPreview] = useState<string | null>(null);
+  const handoffProcessedRef = useRef<string | null>(null);
 
-  const goalConfig = BUSINESS_GOALS.find((g) => g.id === businessGoal) ?? BUSINESS_GOALS[0];
+  const goalConfig = getBusinessGoalConfig(businessGoal);
 
   const promptInput: AiPromptInput = useMemo(
     () => ({
@@ -113,6 +78,31 @@ export default function AiContentFactory({
     );
   }
 
+  function buildPromptInput(
+    kw: string,
+    goal: BusinessGoal,
+    wordLength: AiContentLength = length
+  ): AiPromptInput {
+    const config = getBusinessGoalConfig(goal);
+    return {
+      keyword: kw.trim(),
+      searchIntent: config.searchIntent,
+      audiences: config.audiences,
+      length: wordLength,
+    };
+  }
+
+  async function runCompleteGeneration(input: AiPromptInput) {
+    refreshRecommendations(input.keyword);
+    const result = await aiContentProvider.generateArticle(input);
+    const applied = onApplyArticle(result);
+    if (applied) {
+      onMessage("Đã tạo bài viết hoàn chỉnh — xem và chỉnh sửa bên dưới.", "success");
+      onScrollToEditor?.();
+    }
+    return applied;
+  }
+
   async function handleGenerateComplete() {
     if (!keyword.trim()) {
       onMessage("Vui lòng nhập từ khóa chính.", "error");
@@ -121,13 +111,7 @@ export default function AiContentFactory({
 
     setLoading("complete");
     try {
-      refreshRecommendations();
-      const result = await aiContentProvider.generateArticle(promptInput);
-      const applied = onApplyArticle(result);
-      if (applied) {
-        onMessage("Đã tạo bài viết hoàn chỉnh — xem và chỉnh sửa bên dưới.", "success");
-        onScrollToEditor?.();
-      }
+      await runCompleteGeneration(promptInput);
     } catch (error) {
       onMessage(error instanceof Error ? error.message : "Tạo bài viết thất bại.", "error");
     } finally {
@@ -210,7 +194,7 @@ export default function AiContentFactory({
     const blueprint = CONTENT_BLUEPRINTS.find((b) => b.id === blueprintId);
     if (!blueprint) return;
     setKeyword(blueprint.exampleKeyword);
-    const matchedGoal = BUSINESS_GOALS.find((g) => {
+    const matchedGoal = BUSINESS_GOAL_OPTIONS.find((g) => {
       if (blueprint.audienceOption === "oem") return g.id === "oem-leads";
       if (blueprint.audienceOption === "corporate-uniform") return g.id === "corporate-uniform";
       if (blueprint.audienceOption === "corporate-gift") return g.id === "corporate-gift";
@@ -220,6 +204,35 @@ export default function AiContentFactory({
     if (matchedGoal) setBusinessGoal(matchedGoal.id);
     refreshRecommendations(blueprint.exampleKeyword);
   }
+
+  useEffect(() => {
+    if (!handoff) return;
+    const token = `${handoff.keyword}:${handoff.businessGoal}:${handoff.blueprintId}:${handoff.autoGenerate}`;
+    if (handoffProcessedRef.current === token) return;
+    handoffProcessedRef.current = token;
+
+    setKeyword(handoff.keyword);
+    setBusinessGoal(handoff.businessGoal);
+    setBlueprintId(handoff.blueprintId);
+
+    const input = buildPromptInput(handoff.keyword, handoff.businessGoal);
+
+    if (handoff.autoGenerate) {
+      setLoading("complete");
+      void runCompleteGeneration(input)
+        .catch((error) => {
+          onMessage(error instanceof Error ? error.message : "Tạo bài viết thất bại.", "error");
+        })
+        .finally(() => {
+          setLoading(null);
+          onHandoffConsumed?.();
+        });
+      return;
+    }
+
+    refreshRecommendations(handoff.keyword);
+    onHandoffConsumed?.();
+  }, [handoff, onHandoffConsumed, onMessage]);
 
   return (
     <div className={`admin-ai-factory ${isBusy ? "admin-ai-factory--busy" : ""}`}>
@@ -255,7 +268,7 @@ export default function AiContentFactory({
         <div className="admin-field">
           <p className="admin-label">Mục tiêu bài viết</p>
           <div className="admin-ai-factory-goals">
-            {BUSINESS_GOALS.map((goal) => (
+            {BUSINESS_GOAL_OPTIONS.map((goal) => (
               <label key={goal.id} className="admin-radio-item admin-ai-factory-goal">
                 <input
                   type="radio"

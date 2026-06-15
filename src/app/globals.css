@@ -5618,3 +5618,252 @@ body:has(.mobile-action-bar) .site-footer {
   }
 }
 
+/* ── Content Cluster Generator (Sprint 24.7.1) ────────────────────────────── */
+
+.admin-factory-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scroll-margin-top: 24px;
+}
+
+.admin-cluster-generator {
+  padding: 20px;
+  border: 1px solid #bbf7d0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%);
+}
+
+.admin-cluster-generator-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #14532d;
+}
+
+.admin-cluster-generator-form {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-cluster-generator-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-cluster-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.admin-cluster-results {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-cluster-score-card {
+  padding: 14px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #d1fae5;
+}
+
+.admin-cluster-score-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.admin-cluster-score-value {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.admin-cluster-score-value--green {
+  color: #15803d;
+}
+
+.admin-cluster-score-value--yellow {
+  color: #b45309;
+}
+
+.admin-cluster-score-value--red {
+  color: #b91c1c;
+}
+
+.admin-cluster-score-metrics {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.admin-cluster-section-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.admin-cluster-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-cluster-tree-supporting {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 20px;
+  border-left: 2px solid #d1fae5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-cluster-article-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-cluster-article-row--pillar {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.admin-cluster-article-main {
+  flex: 1;
+  min-width: 200px;
+}
+
+.admin-cluster-node-tag {
+  display: inline-block;
+  margin-bottom: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #166534;
+}
+
+.admin-cluster-priority {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-cluster-priority--high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.admin-cluster-priority--medium {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.admin-cluster-priority--low {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.admin-cluster-link-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.admin-cluster-link-card {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+}
+
+.admin-cluster-link-from {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.admin-cluster-link-arrow {
+  margin: 0 0 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admin-cluster-link-to {
+  margin: 0;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.admin-cluster-roadmap-week {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-cluster-roadmap-week-label {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.admin-cluster-roadmap-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.admin-cluster-roadmap-list li {
+  margin-bottom: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .admin-cluster-generator-actions {
+    flex-direction: column;
+  }
+
+  .admin-cluster-examples {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-cluster-examples .admin-btn {
+    width: 100%;
+  }
+
+  .admin-cluster-article-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-cluster-link-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
