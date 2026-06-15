@@ -17,6 +17,9 @@ import type { SeoRecommendations } from "@/features/blog/seo-recommendations";
 import { generateSeoRecommendations } from "@/features/blog/seo-recommendations";
 import type { ClusterHandoffRequest } from "@/features/blog/cluster-handoff";
 import type { BlogCategoryRecord } from "@/features/blog/types";
+import KnowledgeBaseContextPanel, {
+  useKnowledgeContextForAi,
+} from "@/components/admin/blog-editor/KnowledgeBaseContextPanel";
 
 export type { BusinessGoal } from "@/features/blog/ai-factory-types";
 
@@ -52,6 +55,7 @@ export default function AiContentFactory({
   const [loading, setLoading] = useState<string | null>(null);
   const [promptPreview, setPromptPreview] = useState<string | null>(null);
   const handoffProcessedRef = useRef<string | null>(null);
+  const knowledgeContext = useKnowledgeContextForAi(keyword, blueprintId);
 
   const goalConfig = getBusinessGoalConfig(businessGoal);
 
@@ -61,8 +65,17 @@ export default function AiContentFactory({
       searchIntent: goalConfig.searchIntent,
       audiences: goalConfig.audiences,
       length,
+      knowledgeContext: knowledgeContext?.contextText,
+      knowledgeEntryIds: knowledgeContext?.entryIds,
     }),
-    [goalConfig.audiences, goalConfig.searchIntent, keyword, length]
+    [
+      goalConfig.audiences,
+      goalConfig.searchIntent,
+      keyword,
+      length,
+      knowledgeContext?.contextText,
+      knowledgeContext?.entryIds,
+    ]
   );
 
   const isBusy = loading !== null;
@@ -89,6 +102,8 @@ export default function AiContentFactory({
       searchIntent: config.searchIntent,
       audiences: config.audiences,
       length: wordLength,
+      knowledgeContext: knowledgeContext?.contextText,
+      knowledgeEntryIds: knowledgeContext?.entryIds,
     };
   }
 
@@ -242,6 +257,7 @@ export default function AiContentFactory({
           Nhập từ khóa chính, chọn mục tiêu bài viết và nhấn &lsquo;Tạo bài viết hoàn chỉnh&rsquo;.
           Hệ thống sẽ tự tạo tiêu đề, nội dung, SEO, FAQ và tags.
         </p>
+        <KnowledgeBaseContextPanel keyword={keyword} blueprintId={blueprintId} />
       </div>
 
       <fieldset className="admin-ai-factory-form" disabled={isBusy}>

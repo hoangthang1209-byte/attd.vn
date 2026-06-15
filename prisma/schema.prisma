@@ -418,3 +418,118 @@ enum LeadPipelineStatus {
   WON
   LOST
 }
+
+// ── Sprint 24.8 — Business Knowledge Base ───────────────────────────────────
+
+enum KnowledgeBaseEntryType {
+  COMPANY
+  PRODUCT
+  MATERIAL
+  MANUFACTURING
+  OEM
+  WHOLESALE
+  DEALER
+  PRICING
+  POLICY
+  CASE_STUDY
+  FAQ
+  SALES_SCRIPT
+  SEO_CONTEXT
+  BRAND_VOICE
+  LOGISTICS
+  QUALITY_CONTROL
+  CUSTOMER_SEGMENT
+  COMPETITOR_NOTE
+}
+
+enum KnowledgeBaseEntryStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum KnowledgeBasePriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum KnowledgeBaseSourceType {
+  INTERNAL
+  WEBSITE
+  DOCUMENT
+  STAFF_NOTE
+  CUSTOMER_FEEDBACK
+  MANUAL_INPUT
+}
+
+model KnowledgeBaseCategory {
+  id          String               @id @default(cuid())
+  name        String
+  slug        String               @unique
+  description String?
+  sortOrder   Int                  @default(0)
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  entries     KnowledgeBaseEntry[]
+
+  @@index([sortOrder])
+}
+
+model KnowledgeBaseSource {
+  id        String                  @id @default(cuid())
+  name      String
+  type      KnowledgeBaseSourceType
+  url       String?
+  note      String?
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  entries   KnowledgeBaseEntry[]
+}
+
+model KnowledgeBaseEntry {
+  id                      String                   @id @default(cuid())
+  title                   String
+  slug                    String                   @unique
+  summary                 String?
+  content                 String?                  @db.Text
+  structuredData          Json?
+  categoryId              String
+  category                KnowledgeBaseCategory    @relation(fields: [categoryId], references: [id])
+  type                    KnowledgeBaseEntryType
+  status                  KnowledgeBaseEntryStatus @default(DRAFT)
+  priority                KnowledgeBasePriority    @default(MEDIUM)
+  sourceId                String?
+  source                  KnowledgeBaseSource?     @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  tags                    String[]                 @default([])
+  relatedProductIds       String[]                 @default([])
+  relatedLandingPageSlugs String[]                 @default([])
+  relatedBlogPostIds      String[]                 @default([])
+  usageScope              String[]                 @default([])
+  isFeatured              Boolean                  @default(false)
+  isVerified              Boolean                  @default(false)
+  verifiedAt              DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  usageLogs               KnowledgeBaseUsageLog[]
+
+  @@index([categoryId])
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+  @@index([isVerified])
+}
+
+model KnowledgeBaseUsageLog {
+  id         String             @id @default(cuid())
+  entryId    String
+  entry      KnowledgeBaseEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  usedFor    String
+  targetType String
+  targetId   String?
+  createdAt  DateTime           @default(now())
+
+  @@index([entryId])
+  @@index([createdAt])
+}

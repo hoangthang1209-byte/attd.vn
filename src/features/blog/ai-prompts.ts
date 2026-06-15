@@ -16,6 +16,8 @@ export type AiPromptInput = {
   searchIntent?: string;
   audiences: AiAudienceOptions;
   length: AiContentLength;
+  knowledgeContext?: string;
+  knowledgeEntryIds?: string[];
 };
 
 const ATTD_POSITIONING = `
@@ -73,6 +75,8 @@ Target audience: ${audienceLabels(input.audiences).join(", ")}
 Target length: ~${input.length} từ
 
 ${blueprintContext(blueprint)}
+
+${input.knowledgeContext ? `\n---\nBUSINESS KNOWLEDGE BASE\n---\n${input.knowledgeContext}\n` : ""}
 
 ---
 OUTPUT RULES

@@ -1,14 +1,24 @@
 import type { SeoCampaign } from "@/features/blog/seo-planning-types";
+import type { KnowledgeBaseEntryRecord, KnowledgeReadinessResult } from "@/features/knowledge-base/knowledge-base-types";
 import { getCampaignProgressSummary } from "@/features/blog/seo-planning";
 import { CLUSTER_TYPE_META } from "@/features/blog/cluster-handoff";
+import { calculateKnowledgeReadinessForCampaign } from "@/features/knowledge-base/knowledge-base-context-builder";
 
 type SeoCampaignSummaryProps = {
   campaign: SeoCampaign;
+  knowledgeEntries?: KnowledgeBaseEntryRecord[];
 };
 
-export default function SeoCampaignSummary({ campaign }: SeoCampaignSummaryProps) {
+export default function SeoCampaignSummary({
+  campaign,
+  knowledgeEntries = [],
+}: SeoCampaignSummaryProps) {
   const progress = getCampaignProgressSummary(campaign);
   const clusterLabel = CLUSTER_TYPE_META[campaign.clusterType].label;
+  const readiness: KnowledgeReadinessResult | null =
+    knowledgeEntries.length > 0
+      ? calculateKnowledgeReadinessForCampaign(campaign, knowledgeEntries)
+      : null;
 
   return (
     <div className="admin-seo-campaign-summary">
@@ -35,6 +45,26 @@ export default function SeoCampaignSummary({ campaign }: SeoCampaignSummaryProps
           </p>
         </div>
       </div>
+
+      {readiness && (
+        <div className="admin-kb-readiness">
+          <p className="admin-field-hint">Knowledge readiness</p>
+          <p>
+            Product: {readiness.productData} · OEM: {readiness.oemData} · Dealer:{" "}
+            {readiness.dealerData} · Policies: {readiness.policyData}
+          </p>
+          <p>
+            Score: {readiness.score}% — {readiness.label}
+          </p>
+          {readiness.warnings.length > 0 && (
+            <ul className="admin-kb-warning-list">
+              {readiness.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

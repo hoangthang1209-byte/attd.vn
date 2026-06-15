@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ContentCluster } from "@/features/blog/content-clusters";
 import type { BlogPostListItem } from "@/features/blog/types";
 import type { SeoCampaign } from "@/features/blog/seo-planning-types";
+import type { KnowledgeBaseEntryRecord } from "@/features/knowledge-base/knowledge-base-types";
 import {
   calculatePlanningKpis,
   enrichCampaignsWithPosts,
@@ -40,13 +41,19 @@ export default function SeoPlanningDashboard() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("board");
   const [loading, setLoading] = useState(true);
+  const [knowledgeEntries, setKnowledgeEntries] = useState<KnowledgeBaseEntryRecord[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/blog/posts");
-      const data = await res.json();
+      const [postsRes, kbRes] = await Promise.all([
+        fetch("/api/blog/posts"),
+        fetch("/api/admin/knowledge-base?pageSize=200"),
+      ]);
+      const data = await postsRes.json();
+      const kbData = await kbRes.json();
       const posts: BlogPostListItem[] = Array.isArray(data.posts) ? data.posts : [];
+      setKnowledgeEntries(Array.isArray(kbData.entries) ? kbData.entries : []);
 
       const demo = generateDemoSeoCampaigns();
       const enriched = enrichCampaignsWithPosts(demo.campaigns, posts);
@@ -118,7 +125,7 @@ export default function SeoPlanningDashboard() {
 
       {selectedCampaign && selectedCluster && progress && linkCoverage && calendar && (
         <section className="admin-seo-campaign-detail">
-          <SeoCampaignSummary campaign={selectedCampaign} />
+          <SeoCampaignSummary campaign={selectedCampaign} knowledgeEntries={knowledgeEntries} />
 
           <div className="admin-seo-tabs" role="tablist">
             {TABS.map((tab) => (

@@ -6185,3 +6185,254 @@ body:has(.mobile-action-bar) .site-footer {
   }
 }
 
+/* ── Knowledge Base (Sprint 24.8) ─────────────────────────────────────────── */
+
+.admin-kb-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-kb-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-kb-toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-kb-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.admin-kb-kpi-card {
+  margin: 0;
+}
+
+.admin-kb-tab-panel {
+  padding-top: 8px;
+}
+
+.admin-kb-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-kb-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.admin-kb-entry-card {
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.admin-kb-entry-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-kb-entry-card-header h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.admin-kb-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: #64748b;
+  margin: 8px 0;
+}
+
+.admin-kb-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.admin-kb-tag {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.admin-kb-tag--scope {
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.admin-kb-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-kb-badge--verified {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.admin-kb-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.admin-kb-empty,
+.admin-kb-starter {
+  padding: 20px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.admin-kb-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-kb-related-section {
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.admin-kb-scope-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-kb-scope-item {
+  padding: 6px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.admin-kb-verification {
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.admin-kb-warning,
+.admin-kb-warning-list {
+  color: #b45309;
+  font-size: 13px;
+}
+
+.admin-kb-warning-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.admin-kb-category-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-kb-category-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+}
+
+.admin-kb-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-kb-category-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-kb-context-preview,
+.admin-kb-context-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-kb-context-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.admin-kb-context-result {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-kb-context-text {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 12px;
+}
+
+.admin-kb-factory-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  background: #f0fdf4;
+}
+
+.admin-kb-factory-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #166534;
+}
+
+.admin-kb-readiness {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  background: #fffbeb;
+}
+
+@media (max-width: 768px) {
+  .admin-kb-filters,
+  .admin-kb-category-form,
+  .admin-kb-context-form {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-kb-entry-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

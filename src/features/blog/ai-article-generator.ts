@@ -166,6 +166,10 @@ export function generateArticleStructure(input: AiPromptInput): GeneratedArticle
     `giúp bạn đánh giá nhà cung cấp trước khi triển khai dự án với ${blueprint.internalLinkKeywords[0]}.`,
   ].join("");
 
+  const knowledgeSection = input.knowledgeContext?.trim()
+    ? `## Bối cảnh doanh nghiệp ATTD\n\n${input.knowledgeContext.trim().split("\n").slice(0, 12).join("\n")}\n`
+    : "";
+
   const sections = blueprint.structure.map((sectionTitle, index) => {
     return `## ${sectionTitle}\n\n${sectionBody(sectionTitle, keyword, blueprint, index)}`;
   });
@@ -174,6 +178,7 @@ export function generateArticleStructure(input: AiPromptInput): GeneratedArticle
   const markdownParts = [
     intro,
     "",
+    ...(knowledgeSection ? [knowledgeSection, ""] : []),
     ...sections.flatMap((s) => [s, ""]),
     blueprint.suggestedCta,
     "",
