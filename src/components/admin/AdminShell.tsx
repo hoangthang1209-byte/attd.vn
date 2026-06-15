@@ -13,6 +13,7 @@ const NAV_GROUPS = [
       { href: "/admin/danh-muc", label: "Danh mục" },
       { href: "/admin/landing-pages", label: "Landing pages" },
       { href: "/admin/blog", label: "Blog" },
+      { href: "/admin/seo-planning", label: "SEO Planning" },
     ],
   },
   {

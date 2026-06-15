@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { BlogPostStatus } from "@prisma/client";
 import BlogAiReadinessPanel from "@/components/admin/BlogAiReadinessPanel";
 import BlogAiRecommendationsPanel from "@/components/admin/BlogAiRecommendationsPanel";
@@ -15,6 +15,7 @@ import AiContentFactory from "@/components/admin/blog-editor/AiContentFactory";
 import type { ClusterArticle } from "@/features/blog/content-clusters";
 import type { ClusterType } from "@/features/blog/content-clusters-types";
 import { clusterArticleToHandoff, type ClusterHandoffRequest } from "@/features/blog/cluster-handoff";
+import { parseHandoffFromSearchParams } from "@/features/blog/seo-planning";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
 import type { GeneratedArticle } from "@/features/blog/ai-article-generator";
 import type { AiFaqResult, AiSeoResult, AiTagsResult } from "@/features/blog/ai-provider";
@@ -65,6 +66,8 @@ function statusBadgeClass(status: BlogPostStatus): string {
 
 export default function BlogPostEditor(props: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryHandoffProcessedRef = useRef(false);
   const isEdit = props.mode === "edit";
   const initial = isEdit ? props.post : null;
 
@@ -113,6 +116,15 @@ export default function BlogPostEditor(props: Props) {
   useEffect(() => {
     void loadCategories();
   }, [loadCategories]);
+
+  useEffect(() => {
+    if (queryHandoffProcessedRef.current) return;
+    const handoff = parseHandoffFromSearchParams(searchParams);
+    if (!handoff) return;
+    queryHandoffProcessedRef.current = true;
+    setClusterHandoff(handoff);
+    factorySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [searchParams]);
 
   function handleTitleChange(value: string) {
     setTitle(value);
