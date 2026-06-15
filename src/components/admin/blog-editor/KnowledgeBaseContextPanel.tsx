@@ -71,6 +71,31 @@ export default function KnowledgeBaseContextPanel({ keyword, onContextChange }: 
     onContextChange(null);
   }
 
+  function selectAll() {
+    if (!results) return;
+    setSelectedIds(new Set(results.entries.map((e) => e.id)));
+    setApplied(false);
+    onContextChange(null);
+  }
+
+  function selectVerified() {
+    if (!results) return;
+    const ids = results.entries.filter((e) => e.isVerified).map((e) => e.id);
+    setSelectedIds(new Set(ids));
+    setApplied(false);
+    onContextChange(null);
+  }
+
+  function selectHighReadiness() {
+    if (!results) return;
+    const ids = results.entries
+      .filter((e) => e.aiReadiness.level === "HIGH" || e.aiReadiness.level === "VERIFIED")
+      .map((e) => e.id);
+    setSelectedIds(new Set(ids));
+    setApplied(false);
+    onContextChange(null);
+  }
+
   function applyContext() {
     if (!results) return;
     const selected = results.entries.filter((e) => selectedIds.has(e.id));
@@ -174,6 +199,50 @@ export default function KnowledgeBaseContextPanel({ keyword, onContextChange }: 
 
       {hasResults && (
         <>
+          {/* Selection helper toolbar */}
+          <div className="admin-kb-selection-toolbar">
+            <div className="admin-kb-selection-toolbar-actions">
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-btn--xs"
+                onClick={selectAll}
+              >
+                Chọn tất cả
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-btn--xs"
+                onClick={clearContext}
+                disabled={selectedCount === 0}
+              >
+                Bỏ chọn tất cả
+              </button>
+              {results.entries.some((e) => e.isVerified) && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  onClick={selectVerified}
+                >
+                  Chọn mục đã kiểm chứng
+                </button>
+              )}
+              {results.entries.some(
+                (e) => e.aiReadiness.level === "HIGH" || e.aiReadiness.level === "VERIFIED"
+              ) && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  onClick={selectHighReadiness}
+                >
+                  Chọn mục AI tốt
+                </button>
+              )}
+            </div>
+            <span className="admin-kb-selection-count">
+              Đã chọn: <strong>{selectedCount}</strong> / {results.entries.length} mục
+            </span>
+          </div>
+
           <div className="admin-kb-factory-results">
             {results.entries.map((entry) => {
               const isSelected = selectedIds.has(entry.id);
@@ -235,14 +304,16 @@ export default function KnowledgeBaseContextPanel({ keyword, onContextChange }: 
                   className="admin-btn admin-btn--primary admin-btn--small"
                   onClick={applyContext}
                 >
-                  {applied ? `Đã chọn ${selectedCount} mục` : `Dùng làm ngữ cảnh (${selectedCount})`}
+                  {applied
+                    ? `✓ Đã áp dụng ${selectedCount} mục`
+                    : `Dùng làm ngữ cảnh (${selectedCount})`}
                 </button>
                 <button
                   type="button"
                   className="admin-btn admin-btn--secondary admin-btn--small"
                   onClick={clearContext}
                 >
-                  Bỏ chọn
+                  Bỏ chọn tất cả
                 </button>
               </>
             ) : (

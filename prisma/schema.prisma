@@ -21,11 +21,13 @@ model Category {
   id             String     @id @default(cuid())
   name           String
   slug           String     @unique
+  skuCode        String?
   parentId       String?
   description    String?
   seoTitle       String?
   seoDescription String?
   imageUrl       String?
+  sortOrder      Int        @default(0)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   parent         Category?  @relation("CategoryTree", fields: [parentId], references: [id])
@@ -34,24 +36,38 @@ model Category {
 }
 
 model Product {
-  id               String           @id @default(cuid())
-  productCode      String?          @unique
-  name             String
-  slug             String           @unique
-  shortDescription String?
-  description      String?
-  seoTitle         String?
-  seoDescription   String?
-  gsm              Int?
-  material         String?
-  fit              String?
-  categoryId       String
-  status           ProductStatus    @default(ACTIVE)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  category         Category         @relation(fields: [categoryId], references: [id])
-  images           ProductImage[]
-  variants         ProductVariant[]
+  id                 String           @id @default(cuid())
+  productCode        String?          @unique
+  name               String
+  slug               String           @unique
+  shortDescription   String?
+  description        String?
+  seoTitle           String?
+  seoDescription     String?
+  aiSummary          String?
+  gsm                Int?
+  material           String?
+  form               String?
+  fit                String?
+  defaultMoq         Int?
+  useCases           String[]
+  targetCustomers    String[]
+  supportsPrinting   Boolean          @default(false)
+  supportsEmbroidery Boolean          @default(false)
+  supportsOem        Boolean          @default(false)
+  tags               String[]
+  featuredImage      String?
+  metadata           Json?
+  categoryId         String
+  status             ProductStatus    @default(ACTIVE)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  category           Category         @relation(fields: [categoryId], references: [id])
+  images             ProductImage[]
+  variants           ProductVariant[]
+
+  @@index([categoryId])
+  @@index([status])
 }
 
 model Color {
@@ -73,20 +89,36 @@ model Size {
 }
 
 model ProductVariant {
-  id          String      @id @default(cuid())
-  productId   String
-  colorId     String?
-  sizeId      String?
-  sku         String      @unique
-  dealerPrice Decimal?    @db.Decimal(12, 2)
-  vipPrice    Decimal?    @db.Decimal(12, 2)
-  stockQty    Int         @default(0)
-  stockStatus StockStatus @default(IN_STOCK)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  color       Color?      @relation(fields: [colorId], references: [id])
-  product     Product     @relation(fields: [productId], references: [id])
-  size        Size?       @relation(fields: [sizeId], references: [id])
+  id             String        @id @default(cuid())
+  productId      String
+  colorId        String?
+  sizeId         String?
+  sku            String        @unique
+  colorName      String?
+  colorCode      String?
+  sizeName       String?
+  dimensions     String?
+  capacity       String?
+  wholesalePrice Decimal?      @db.Decimal(12, 2)
+  dealerPrice    Decimal?      @db.Decimal(12, 2)
+  vipPrice       Decimal?      @db.Decimal(12, 2)
+  costPrice      Decimal?      @db.Decimal(12, 2)
+  priceTiers     Json?
+  stockQty       Int           @default(0)
+  stockStatus    StockStatus   @default(IN_STOCK)
+  weight         Decimal?      @db.Decimal(8, 3)
+  internalNote   String?
+  variantStatus  VariantStatus @default(ACTIVE)
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  color          Color?        @relation(fields: [colorId], references: [id])
+  product        Product       @relation(fields: [productId], references: [id])
+  size           Size?         @relation(fields: [sizeId], references: [id])
+
+  @@index([productId])
+  @@index([stockStatus])
+  @@index([variantStatus])
 }
 
 model ProductImage {
@@ -372,6 +404,7 @@ enum UserRole {
 enum ProductStatus {
   ACTIVE
   DRAFT
+  INACTIVE
   ARCHIVED
 }
 
@@ -379,6 +412,13 @@ enum StockStatus {
   IN_STOCK
   LOW_STOCK
   OUT_OF_STOCK
+  PREORDER
+}
+
+enum VariantStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
 }
 
 enum LeadSource {
@@ -462,6 +502,32 @@ enum KnowledgeBaseSourceType {
   STAFF_NOTE
   CUSTOMER_FEEDBACK
   MANUAL_INPUT
+}
+
+enum ProductImportJobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model ProductImportJob {
+  id               String                 @id @default(cuid())
+  fileName         String
+  status           ProductImportJobStatus @default(PENDING)
+  totalRows        Int                    @default(0)
+  createdProducts  Int                    @default(0)
+  updatedProducts  Int                    @default(0)
+  createdVariants  Int                    @default(0)
+  updatedVariants  Int                    @default(0)
+  skippedRows      Int                    @default(0)
+  invalidRows      Int                    @default(0)
+  duplicateRows    Int                    @default(0)
+  createdCategories Int                   @default(0)
+  errors           Json?
+  metadata         Json?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 }
 
 model KnowledgeBaseCategory {

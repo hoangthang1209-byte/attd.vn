@@ -7282,3 +7282,138 @@ body:has(.mobile-action-bar) .site-footer {
 .admin-kb-warning--no-context {
   margin-top: 0;
 }
+
+/* ===== KB Context Panel — Selection Toolbar ===== */
+
+.admin-kb-selection-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 0 8px;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 8px;
+}
+
+.admin-kb-selection-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.admin-kb-selection-count {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.admin-kb-selection-count strong {
+  color: #111827;
+}
+
+.admin-btn--xs {
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ─── Sprint 24.9.2: Product Catalog ──────────────────────────────────────── */
+
+.admin-catalog-page { display: flex; flex-direction: column; gap: 16px; }
+
+/* KPI bar */
+.admin-catalog-kpi-bar {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;
+}
+.admin-catalog-kpi {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 80px; padding: 8px 12px; background: #fff;
+  border: 1px solid #e5e7eb; border-radius: 6px;
+}
+.admin-catalog-kpi strong { font-size: 24px; font-weight: 700; color: #111827; }
+.admin-catalog-kpi span { font-size: 11px; color: #6b7280; text-align: center; }
+.admin-catalog-kpi--warn strong { color: #d97706; }
+.admin-catalog-kpi--danger strong { color: #dc2626; }
+.admin-catalog-kpi--ok strong { color: #059669; }
+
+/* Toolbar */
+.admin-catalog-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.admin-catalog-toolbar-left { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Filters */
+.admin-catalog-filters {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+}
+.admin-catalog-filters .admin-input { min-width: 140px; max-width: 200px; }
+
+/* Table */
+.admin-catalog-table-wrap { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 8px; }
+.admin-catalog-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.admin-catalog-table th {
+  background: #f3f4f6; color: #374151; font-weight: 600;
+  padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+.admin-catalog-table td {
+  padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle;
+}
+.admin-catalog-table tr:last-child td { border-bottom: none; }
+.admin-catalog-table tr.is-invalid td { background: #fff5f5; }
+.admin-catalog-table tr:hover td { background: #f9fafb; }
+
+.admin-catalog-product-name { display: flex; align-items: center; gap: 8px; }
+.admin-catalog-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; border: 1px solid #e5e7eb; }
+.admin-catalog-code { font-family: monospace; font-size: 12px; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; }
+.admin-catalog-code.is-taken { background: #fee2e2; color: #dc2626; }
+.admin-catalog-code.is-ok { background: #d1fae5; color: #065f46; }
+.admin-catalog-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.admin-catalog-actions-cell { display: flex; gap: 6px; }
+
+/* Form */
+.admin-catalog-form { display: flex; flex-direction: column; gap: 24px; max-width: 900px; }
+.admin-catalog-fieldset {
+  border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; display: flex;
+  flex-direction: column; gap: 16px;
+}
+.admin-catalog-fieldset legend {
+  font-weight: 600; font-size: 14px; color: #374151; padding: 0 8px;
+}
+.admin-seo-brief-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .admin-seo-brief-form-grid { grid-template-columns: 1fr; } }
+.admin-catalog-toggles { display: flex; gap: 16px; flex-wrap: wrap; }
+.admin-catalog-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #374151; cursor: pointer; }
+
+/* Variants */
+.admin-catalog-variant-row {
+  border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  background: #fafafa;
+}
+.admin-catalog-variant-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.admin-catalog-variant-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 640px) { .admin-catalog-variant-fields { grid-template-columns: 1fr; } }
+
+/* Bulk Import */
+.admin-bulk-import-page { display: flex; flex-direction: column; gap: 20px; }
+.admin-bulk-import-steps { display: flex; gap: 0; }
+.admin-bulk-import-step {
+  padding: 8px 20px; font-size: 12px; font-weight: 500;
+  background: #f3f4f6; border: 1px solid #e5e7eb; color: #9ca3af;
+  border-right: none;
+}
+.admin-bulk-import-step:first-child { border-radius: 6px 0 0 6px; }
+.admin-bulk-import-step:last-child { border-right: 1px solid #e5e7eb; border-radius: 0 6px 6px 0; }
+.admin-bulk-import-step.is-active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+.admin-bulk-import-step.is-done { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+
+.admin-catalog-mapping-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 700px) { .admin-catalog-mapping-grid { grid-template-columns: 1fr; } }
+.admin-catalog-import-options { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+
+.admin-error { color: #dc2626; font-size: 13px; margin: 0; }
+.admin-required { color: #dc2626; }
