@@ -3,13 +3,17 @@ import type { KnowledgeBaseKpis } from "@/features/knowledge-base/knowledge-base
 type Props = { kpis: KnowledgeBaseKpis };
 
 export default function KnowledgeBaseKpisPanel({ kpis }: Props) {
+  const lastImport = kpis.lastImportAt
+    ? new Date(kpis.lastImportAt).toLocaleDateString("vi-VN")
+    : "—";
+
   const cards = [
-    { label: "Tổng mục", value: kpis.totalEntries },
-    { label: "Đang sử dụng", value: kpis.activeEntries },
-    { label: "Đã kiểm chứng", value: `${kpis.verifiedPercent ?? 0}%` },
-    { label: "Sẵn sàng cho AI", value: `${kpis.aiReadyPercent ?? kpis.aiReadyScore}%` },
-    { label: "Cần bổ sung", value: kpis.missingDataCount ?? 0 },
-    { label: "Nháp", value: kpis.draftEntries },
+    { label: "Total Entries", value: kpis.totalEntries },
+    { label: "Verified %", value: `${kpis.verifiedPercent ?? 0}%` },
+    { label: "AI Ready %", value: `${kpis.aiReadyPercent ?? kpis.aiReadyScore}%` },
+    { label: "Missing Data", value: kpis.missingDataCount ?? 0 },
+    { label: "Last Import", value: lastImport },
+    { label: "Entries Added This Week", value: kpis.entriesAddedThisWeek ?? 0 },
   ];
 
   return (
@@ -18,6 +22,9 @@ export default function KnowledgeBaseKpisPanel({ kpis }: Props) {
         <div key={card.label} className="admin-dashboard-card admin-kb-kpi-card">
           <p className="admin-dashboard-label">{card.label}</p>
           <p className="admin-dashboard-value">{card.value}</p>
+          {card.label === "Last Import" && kpis.lastImportFilename && (
+            <p className="admin-field-hint">{kpis.lastImportFilename}</p>
+          )}
         </div>
       ))}
     </div>

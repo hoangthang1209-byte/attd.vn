@@ -247,8 +247,19 @@ export async function deleteKnowledgeBaseCategory(id: string) {
 }
 
 export async function getKnowledgeBaseKpisFromDb() {
-  const [totalEntries, activeEntries, verifiedEntries, draftEntries, highPriorityEntries, allEntries] =
-    await Promise.all([
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  const [
+    totalEntries,
+    activeEntries,
+    verifiedEntries,
+    draftEntries,
+    highPriorityEntries,
+    allEntries,
+    entriesAddedThisWeek,
+    lastImport,
+  ] = await Promise.all([
       prisma.knowledgeBaseEntry.count(),
       prisma.knowledgeBaseEntry.count({ where: { status: "ACTIVE" } }),
       prisma.knowledgeBaseEntry.count({ where: { isVerified: true } }),
@@ -265,6 +276,11 @@ export async function getKnowledgeBaseKpisFromDb() {
           type: true,
           isVerified: true,
         },
+      }),
+      prisma.knowledgeBaseEntry.count({ where: { createdAt: { gte: weekAgo } } }),
+      prisma.knowledgeBaseImportJob.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true, filename: true },
       }),
     ]);
 
@@ -289,5 +305,8 @@ export async function getKnowledgeBaseKpisFromDb() {
     verifiedPercent: dashboardKpis.verifiedPercent,
     aiReadyPercent: dashboardKpis.aiReadyPercent,
     missingDataCount: dashboardKpis.missingDataCount,
+    lastImportAt: lastImport?.createdAt.toISOString() ?? null,
+    lastImportFilename: lastImport?.filename ?? null,
+    entriesAddedThisWeek,
   };
 }

@@ -10,8 +10,10 @@ import KnowledgeBaseEmptyState from "@/components/admin/knowledge-base/Knowledge
 import KnowledgeBaseCategoryManager from "@/components/admin/knowledge-base/KnowledgeBaseCategoryManager";
 import KnowledgeBaseContextPreview from "@/components/admin/knowledge-base/KnowledgeBaseContextPreview";
 import KnowledgeBaseStarterImport from "@/components/admin/knowledge-base/KnowledgeBaseStarterImport";
+import KnowledgeBaseBulkImport from "@/components/admin/knowledge-base/KnowledgeBaseBulkImport";
+import KnowledgeBaseBulkToolbar from "@/components/admin/knowledge-base/KnowledgeBaseBulkToolbar";
 
-type TabId = "entries" | "categories" | "context" | "starter";
+type TabId = "entries" | "categories" | "context" | "starter" | "bulk";
 
 type Props = {
   initialEntries: KnowledgeBaseEntryRecord[];
@@ -23,6 +25,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
   const [entries, setEntries] = useState(initialEntries);
   const [kpis, setKpis] = useState(initialKpis);
   const [loading, setLoading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filters, setFilters] = useState({
     search: "",
     categoryId: "",
@@ -51,6 +54,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
       const data = await res.json();
       setEntries(Array.isArray(data.entries) ? data.entries : []);
       if (data.kpis) setKpis(data.kpis);
+      setSelectedIds([]);
     } finally {
       setLoading(false);
     }
@@ -60,8 +64,17 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
     void load();
   }, [load]);
 
+  function handleSelect(id: string, checked: boolean) {
+    setSelectedIds((prev) => (checked ? [...prev, id] : prev.filter((item) => item !== id)));
+  }
+
+  function handleSelectAll(checked: boolean) {
+    setSelectedIds(checked ? entries.map((entry) => entry.id) : []);
+  }
+
   const tabs: { id: TabId; label: string }[] = [
     { id: "entries", label: "Dữ liệu doanh nghiệp" },
+    { id: "bulk", label: "Bulk Import" },
     { id: "categories", label: "Danh mục" },
     { id: "context", label: "Xem dữ liệu AI sẽ dùng" },
     { id: "starter", label: "Nhập dữ liệu mẫu ATTD" },
@@ -97,15 +110,27 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
         {activeTab === "entries" && (
           <>
             <KnowledgeBaseFilters filters={filters} onChange={setFilters} />
+            <KnowledgeBaseBulkToolbar
+              selectedIds={selectedIds}
+              onChanged={load}
+              onClear={() => setSelectedIds([])}
+            />
             {loading ? (
               <p className="admin-loading">Đang tải…</p>
             ) : entries.length === 0 ? (
               <KnowledgeBaseEmptyState onImported={load} />
             ) : (
-              <KnowledgeBaseEntryList entries={entries} onChanged={load} />
+              <KnowledgeBaseEntryList
+                entries={entries}
+                onChanged={load}
+                selectedIds={selectedIds}
+                onSelect={handleSelect}
+                onSelectAll={handleSelectAll}
+              />
             )}
           </>
         )}
+        {activeTab === "bulk" && <KnowledgeBaseBulkImport onImported={load} />}
         {activeTab === "categories" && <KnowledgeBaseCategoryManager />}
         {activeTab === "context" && <KnowledgeBaseContextPreview />}
         {activeTab === "starter" && <KnowledgeBaseStarterImport onImported={load} />}

@@ -120,6 +120,9 @@ export type KnowledgeBaseKpis = {
   verifiedPercent: number;
   aiReadyPercent: number;
   missingDataCount: number;
+  lastImportAt: string | null;
+  lastImportFilename: string | null;
+  entriesAddedThisWeek: number;
 };
 
 export type KnowledgeReadinessResult = {

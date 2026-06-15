@@ -12,13 +12,15 @@ import { KNOWLEDGE_USAGE_SCOPES } from "@/features/knowledge-base/knowledge-base
 type Props = {
   entry: KnowledgeBaseEntryRecord;
   onChanged: () => void;
+  selected?: boolean;
+  onSelect?: (id: string, checked: boolean) => void;
 };
 
 function scopeLabel(scope: string): string {
   return KNOWLEDGE_USAGE_SCOPES.find((s) => s.id === scope)?.label ?? scope;
 }
 
-export default function KnowledgeBaseEntryCard({ entry, onChanged }: Props) {
+export default function KnowledgeBaseEntryCard({ entry, onChanged, selected, onSelect }: Props) {
   async function archiveEntry() {
     await fetch(`/api/admin/knowledge-base/${entry.id}`, {
       method: "PATCH",
@@ -50,8 +52,17 @@ export default function KnowledgeBaseEntryCard({ entry, onChanged }: Props) {
   }
 
   return (
-    <article className="admin-kb-entry-card">
+    <article className={`admin-kb-entry-card ${selected ? "is-selected" : ""}`}>
       <div className="admin-kb-entry-card-header">
+        {onSelect && (
+          <label className="admin-kb-select-item">
+            <input
+              type="checkbox"
+              checked={selected ?? false}
+              onChange={(e) => onSelect(entry.id, e.target.checked)}
+            />
+          </label>
+        )}
         <h3>{entry.title}</h3>
         {entry.isVerified && <span className="admin-kb-badge admin-kb-badge--verified">Đã kiểm chứng</span>}
       </div>

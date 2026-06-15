@@ -533,3 +533,16 @@ model KnowledgeBaseUsageLog {
   @@index([entryId])
   @@index([createdAt])
 }
+
+model KnowledgeBaseImportJob {
+  id        String   @id @default(cuid())
+  filename  String
+  rows      Int
+  imported  Int      @default(0)
+  skipped   Int      @default(0)
+  errors    Json     @default("[]")
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
