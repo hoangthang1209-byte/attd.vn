@@ -18,14 +18,23 @@ import { generateSeoRecommendations } from "@/features/blog/seo-recommendations"
 import type { ClusterHandoffRequest } from "@/features/blog/cluster-handoff";
 import type { BlogCategoryRecord } from "@/features/blog/types";
 import KnowledgeBaseContextPanel, {
-  useKnowledgeContextForAi,
+  type KnowledgeContextSelection,
 } from "@/components/admin/blog-editor/KnowledgeBaseContextPanel";
+import type { KnowledgeAuditSnapshot } from "@/features/ai/ai-prompt-composer";
+import KnowledgeBaseAiReadinessBadge from "@/components/admin/knowledge-base/KnowledgeBaseAiReadinessBadge";
 
 export type { BusinessGoal } from "@/features/blog/ai-factory-types";
 
+export type AiGenerationMetadata = {
+  usedKnowledgeEntryIds: string[];
+  knowledgeContextSnapshot: KnowledgeAuditSnapshot | null;
+  knowledgeReadinessAverage: number;
+  knowledgeWarnings: string[];
+};
+
 type AiContentFactoryProps = {
   categories: BlogCategoryRecord[];
-  onApplyArticle: (result: GeneratedArticle) => boolean;
+  onApplyArticle: (result: GeneratedArticle, metadata: AiGenerationMetadata) => boolean;
   onApplySeo: (result: AiSeoResult) => void;
   onApplyFaq: (result: AiFaqResult) => void;
   onApplyTags: (result: AiTagsResult) => void;
@@ -54,8 +63,9 @@ export default function AiContentFactory({
   const [blueprintId, setBlueprintId] = useState<ContentBlueprintId>(CONTENT_BLUEPRINTS[0].id);
   const [loading, setLoading] = useState<string | null>(null);
   const [promptPreview, setPromptPreview] = useState<string | null>(null);
+  const [kbContext, setKbContext] = useState<KnowledgeContextSelection | null>(null);
+  const [lastAudit, setLastAudit] = useState<KnowledgeAuditSnapshot | null>(null);
   const handoffProcessedRef = useRef<string | null>(null);
-  const knowledgeContext = useKnowledgeContextForAi(keyword, blueprintId);
 
   const goalConfig = getBusinessGoalConfig(businessGoal);
 
@@ -65,20 +75,22 @@ export default function AiContentFactory({
       searchIntent: goalConfig.searchIntent,
       audiences: goalConfig.audiences,
       length,
-      knowledgeContext: knowledgeContext?.contextText,
-      knowledgeEntryIds: knowledgeContext?.entryIds,
+      knowledgeContext: kbContext?.contextText,
+      knowledgeEntryIds: kbContext?.entryIds,
     }),
-    [
-      goalConfig.audiences,
-      goalConfig.searchIntent,
-      keyword,
-      length,
-      knowledgeContext?.contextText,
-      knowledgeContext?.entryIds,
-    ]
+    [goalConfig.audiences, goalConfig.searchIntent, keyword, length, kbContext]
   );
 
   const isBusy = loading !== null;
+
+  function buildMetadata(): AiGenerationMetadata {
+    return {
+      usedKnowledgeEntryIds: kbContext?.entryIds ?? [],
+      knowledgeContextSnapshot: kbContext?.auditSnapshot ?? null,
+      knowledgeReadinessAverage: kbContext?.averageReadinessScore ?? 0,
+      knowledgeWarnings: kbContext?.warnings ?? [],
+    };
+  }
 
   function refreshRecommendations(nextKeyword?: string) {
     const kw = (nextKeyword ?? keyword).trim();
@@ -102,15 +114,17 @@ export default function AiContentFactory({
       searchIntent: config.searchIntent,
       audiences: config.audiences,
       length: wordLength,
-      knowledgeContext: knowledgeContext?.contextText,
-      knowledgeEntryIds: knowledgeContext?.entryIds,
+      knowledgeContext: kbContext?.contextText,
+      knowledgeEntryIds: kbContext?.entryIds,
     };
   }
 
   async function runCompleteGeneration(input: AiPromptInput) {
     refreshRecommendations(input.keyword);
     const result = await aiContentProvider.generateArticle(input);
-    const applied = onApplyArticle(result);
+    const metadata = buildMetadata();
+    setLastAudit(metadata.knowledgeContextSnapshot);
+    const applied = onApplyArticle(result, metadata);
     if (applied) {
       onMessage("Đã tạo bài viết hoàn chỉnh — xem và chỉnh sửa bên dưới.", "success");
       onScrollToEditor?.();
@@ -123,7 +137,12 @@ export default function AiContentFactory({
       onMessage("Vui lòng nhập từ khóa chính.", "error");
       return;
     }
-
+    if (!kbContext) {
+      onMessage(
+        "Chưa chọn ngữ cảnh Knowledge Base. Nội dung có thể chưa sát dữ liệu nội bộ ATTD.",
+        "error"
+      );
+    }
     setLoading("complete");
     try {
       await runCompleteGeneration(promptInput);
@@ -254,10 +273,9 @@ export default function AiContentFactory({
       <div className="admin-ai-factory-header">
         <h3 className="admin-ai-factory-title">AI Content Factory</h3>
         <p className="admin-ai-factory-helper">
-          Nhập từ khóa chính, chọn mục tiêu bài viết và nhấn &lsquo;Tạo bài viết hoàn chỉnh&rsquo;.
-          Hệ thống sẽ tự tạo tiêu đề, nội dung, SEO, FAQ và tags.
+          Nhập từ khóa chính, chọn ngữ cảnh Knowledge Base, chọn mục tiêu và nhấn
+          &lsquo;Tạo bài viết hoàn chỉnh&rsquo;.
         </p>
-        <KnowledgeBaseContextPanel keyword={keyword} blueprintId={blueprintId} />
       </div>
 
       <fieldset className="admin-ai-factory-form" disabled={isBusy}>
@@ -280,6 +298,29 @@ export default function AiContentFactory({
             placeholder="Ví dụ: Nguồn hàng áo thun trơn"
           />
         </div>
+
+        {/* Knowledge Base Context Section */}
+        <KnowledgeBaseContextPanel
+          keyword={keyword}
+          onContextChange={setKbContext}
+        />
+
+        {!kbContext && keyword.trim() && (
+          <p className="admin-kb-warning admin-kb-warning--no-context">
+            Chưa chọn ngữ cảnh Knowledge Base. Nội dung có thể chưa sát dữ liệu nội bộ ATTD.
+          </p>
+        )}
+
+        {kbContext && kbContext.warnings.length > 0 && (
+          <div className="admin-kb-factory-warnings">
+            <p className="admin-label">Cảnh báo dữ liệu</p>
+            <ul className="admin-kb-warning-list">
+              {kbContext.warnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="admin-field">
           <p className="admin-label">Mục tiêu bài viết</p>
@@ -314,6 +355,61 @@ export default function AiContentFactory({
         <div className="admin-ai-factory-loading" role="status" aria-live="polite">
           <span className="admin-ai-factory-spinner" aria-hidden />
           <span>Đang tạo bài viết…</span>
+        </div>
+      )}
+
+      {/* AI Audit Panel — shown after generation */}
+      {lastAudit && (
+        <div className="admin-kb-factory-audit">
+          <p className="admin-label">Nguồn Knowledge Base đã dùng</p>
+          <p className="admin-field-hint">
+            Điểm sẵn sàng trung bình:{" "}
+            <strong>{lastAudit.averageReadinessScore}/100</strong>
+          </p>
+          {lastAudit.warnings.length > 0 && (
+            <div>
+              <p className="admin-label">Cảnh báo dữ liệu</p>
+              <ul className="admin-kb-warning-list">
+                {lastAudit.warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="admin-kb-factory-audit-entries">
+            {lastAudit.entries.map((e) => (
+              <div key={e.id} className="admin-kb-factory-audit-entry">
+                <span className="admin-kb-factory-entry-title">{e.title}</span>
+                <KnowledgeBaseAiReadinessBadge
+                  readiness={{
+                    score: e.aiReadinessScore,
+                    level: e.aiReadinessScore >= 90
+                      ? "VERIFIED"
+                      : e.aiReadinessScore >= 70
+                        ? "HIGH"
+                        : e.aiReadinessScore >= 40
+                          ? "MEDIUM"
+                          : "LOW",
+                    label: e.aiReadinessScore >= 90
+                      ? "Đã kiểm chứng"
+                      : e.aiReadinessScore >= 70
+                        ? "Tốt cho AI"
+                        : e.aiReadinessScore >= 40
+                          ? "Có thể dùng"
+                          : "Chưa sẵn sàng",
+                  }}
+                  showScore={false}
+                />
+                {e.isVerified && (
+                  <span className="admin-kb-badge admin-kb-badge--verified">✓</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="admin-field-hint" style={{ fontSize: 11 }}>
+            Entry đã chọn: {lastAudit.entries.length} — Được tạo lúc:{" "}
+            {new Date(lastAudit.generatedAt).toLocaleString("vi-VN")}
+          </p>
         </div>
       )}
 

@@ -6790,17 +6790,134 @@ body:has(.mobile-action-bar) .site-footer {
 
 .admin-kb-factory-panel {
   margin-top: 12px;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid #bbf7d0;
   border-radius: 10px;
   background: #f0fdf4;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .admin-kb-factory-title {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 13px;
   font-weight: 700;
   color: #166534;
+}
+
+.admin-kb-factory-search-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-kb-factory-search-row .admin-input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.admin-kb-factory-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.admin-kb-factory-entry {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid #d1fae5;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.admin-kb-factory-entry.is-selected {
+  border-color: #34d399;
+  background: #ecfdf5;
+}
+
+.admin-kb-factory-entry-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-kb-factory-entry-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.admin-kb-factory-entry-title {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+}
+
+.admin-kb-factory-match-reasons {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.admin-kb-factory-preview-text {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.4;
+  margin: 4px 0 0;
+}
+
+.admin-kb-factory-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-kb-factory-warnings {
+  padding: 8px 12px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  font-size: 12px;
+}
+
+.admin-kb-factory-audit {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+}
+
+.admin-kb-factory-audit-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.admin-kb-factory-audit-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.admin-kb-warning--no-context {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #9a3412;
 }
 
 .admin-kb-readiness {

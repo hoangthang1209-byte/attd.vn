@@ -65,6 +65,7 @@ export type BlogPostInput = {
   categoryIds?: string[];
   faqJson?: BlogFaqItem[];
   tags?: string[];
+  aiMetadata?: Record<string, unknown> | null;
 };
 
 export const BLOG_POST_STATUSES: BlogPostStatus[] = ["DRAFT", "REVIEW", "PUBLISHED"];

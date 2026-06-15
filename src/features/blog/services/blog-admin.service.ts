@@ -168,6 +168,7 @@ export async function createBlogPost(input: BlogPostInput): Promise<BlogPostReco
       publishedAt: status === "PUBLISHED" ? new Date() : null,
       faqJson: input.faqJson ?? [],
       tags: input.tags ?? [],
+      aiMetadata: (input.aiMetadata ?? undefined) as Prisma.InputJsonValue | undefined,
       categories: input.categoryIds?.length
         ? {
             create: input.categoryIds.map((categoryId) => ({ categoryId })),
@@ -219,6 +220,9 @@ export async function updateBlogPost(
       ...(input.status !== undefined ? { status: input.status, publishedAt } : {}),
       ...(input.faqJson !== undefined ? { faqJson: input.faqJson } : {}),
       ...(input.tags !== undefined ? { tags: input.tags } : {}),
+      ...(input.aiMetadata !== undefined
+        ? { aiMetadata: (input.aiMetadata ?? undefined) as Prisma.InputJsonValue | undefined }
+        : {}),
     },
     include: postInclude,
   });

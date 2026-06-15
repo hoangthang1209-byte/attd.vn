@@ -119,6 +119,10 @@ export async function POST(req: NextRequest) {
       categoryIds,
       faqJson: faqJson ? sanitizeBlogFaq(faqJson) : [],
       tags: tags ?? [],
+      aiMetadata:
+        raw.aiMetadata && typeof raw.aiMetadata === "object" && !Array.isArray(raw.aiMetadata)
+          ? (raw.aiMetadata as Record<string, unknown>)
+          : null,
     });
     return NextResponse.json({ post }, { status: 201 });
   } catch (err: unknown) {

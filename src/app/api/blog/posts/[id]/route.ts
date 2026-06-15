@@ -98,6 +98,14 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       ...(categoryIds !== undefined ? { categoryIds } : {}),
       ...(faqJson !== undefined ? { faqJson: sanitizeBlogFaq(faqJson) } : {}),
       ...(tags !== undefined ? { tags } : {}),
+      ...(raw.aiMetadata !== undefined
+        ? {
+            aiMetadata:
+              raw.aiMetadata && typeof raw.aiMetadata === "object" && !Array.isArray(raw.aiMetadata)
+                ? (raw.aiMetadata as Record<string, unknown>)
+                : null,
+          }
+        : {}),
     });
 
     if (!post) {

@@ -219,6 +219,7 @@ model BlogPost {
   publishedAt      DateTime?
   faqJson          Json               @default("[]")
   tags             Json               @default("[]")
+  aiMetadata       Json?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   categories       BlogPostCategory[]

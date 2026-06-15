@@ -19,6 +19,7 @@ import { parseHandoffFromSearchParams } from "@/features/blog/seo-planning";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
 import type { GeneratedArticle } from "@/features/blog/ai-article-generator";
 import type { AiFaqResult, AiSeoResult, AiTagsResult } from "@/features/blog/ai-provider";
+import type { AiGenerationMetadata } from "@/components/admin/blog-editor/AiContentFactory";
 import type { SeoRecommendations } from "@/features/blog/seo-recommendations";
 import { generateDemoBlogArticle } from "@/features/blog/demo-article-generator";
 import { contentToEditorMarkdown } from "@/features/blog/html-to-markdown";
@@ -99,6 +100,7 @@ export default function BlogPostEditor(props: Props) {
   const editorSectionRef = useRef<HTMLDivElement>(null);
   const factorySectionRef = useRef<HTMLDivElement>(null);
   const [clusterHandoff, setClusterHandoff] = useState<ClusterHandoffRequest | null>(null);
+  const [aiMetadata, setAiMetadata] = useState<AiGenerationMetadata | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
     null
   );
@@ -131,7 +133,7 @@ export default function BlogPostEditor(props: Props) {
     if (!slugEdited) setSlug(toSlug(value));
   }
 
-  function applyAiArticle(result: GeneratedArticle): boolean {
+  function applyAiArticle(result: GeneratedArticle, metadata: AiGenerationMetadata): boolean {
     const hasExisting = Boolean(title.trim() || markdown.trim());
     if (hasExisting) {
       const proceed = window.confirm("Thay thế nội dung hiện tại bằng bài viết AI?");
@@ -150,6 +152,7 @@ export default function BlogPostEditor(props: Props) {
         ...new Set([...prev, ...aiRecommendations.suggestedCategoryIds]),
       ]);
     }
+    setAiMetadata(metadata);
     return true;
   }
 
@@ -255,6 +258,7 @@ export default function BlogPostEditor(props: Props) {
         categoryIds,
         faqJson,
         tags: normalizedTags,
+        aiMetadata: aiMetadata ?? undefined,
       };
 
       const url = isEdit ? `/api/blog/posts/${initial!.id}` : "/api/blog/posts";
