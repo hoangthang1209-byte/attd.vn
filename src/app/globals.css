@@ -6292,6 +6292,124 @@ body:has(.mobile-action-bar) .site-footer {
   color: #166534;
 }
 
+.admin-kb-badge--ai {
+  font-size: 10px;
+}
+
+.admin-kb-badge--ai-low {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.admin-kb-badge--ai-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.admin-kb-badge--ai-high {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.admin-kb-badge--ai-verified {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.admin-kb-ai-readiness-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+  flex-wrap: wrap;
+}
+
+.admin-kb-context-search {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-kb-context-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.admin-kb-context-query-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-kb-context-query-row .admin-input {
+  flex: 1;
+  min-width: 240px;
+}
+
+.admin-kb-context-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.admin-kb-context-filters {
+  margin-top: 4px;
+}
+
+.admin-kb-context-filter-group {
+  margin-top: 12px;
+}
+
+.admin-kb-context-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-kb-context-result-card {
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-kb-context-result-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.admin-kb-context-result-header h4 {
+  margin: 0;
+  flex: 1;
+}
+
+.admin-kb-context-score {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4338ca;
+}
+
+.admin-kb-context-reasons {
+  font-size: 13px;
+  margin: 6px 0;
+}
+
+.admin-kb-context-preview-text {
+  font-size: 13px;
+  color: #475569;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
 .admin-kb-entry-actions {
   display: flex;
   flex-wrap: wrap;
@@ -6559,10 +6677,27 @@ body:has(.mobile-action-bar) .site-footer {
   margin-bottom: 10px;
 }
 
-.admin-kb-bulk-actions {
+.admin-kb-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  background: #f8fafc;
+}
+
+.admin-kb-dropzone.is-dragover {
+  border-color: #6366f1;
+  background: #eef2ff;
+}
+
+.admin-kb-import-header {
+  margin-bottom: 8px;
+}
+
+.admin-kb-preview-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .admin-kb-related-section {

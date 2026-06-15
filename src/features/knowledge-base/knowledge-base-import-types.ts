@@ -12,6 +12,18 @@ export type ImportValidationIssue = {
   message: string;
 };
 
+export type DuplicateBehavior = "skip" | "update" | "copy";
+
+export type ColumnMapping = Record<string, string>;
+
+export type ImportDefaultValues = {
+  type?: KnowledgeBaseEntryType;
+  status?: KnowledgeBaseEntryStatus;
+  priority?: KnowledgeBasePriority;
+  usageScope?: string[];
+  isVerified?: boolean;
+};
+
 export type ImportRowCandidate = {
   rowNumber: number;
   title: string;
@@ -27,66 +39,74 @@ export type ImportRowCandidate = {
   usageScope: string[];
   isVerified: boolean;
   structuredData: Record<string, unknown> | null;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  sourceType: string | null;
+  sourceNote: string | null;
+  sourceId?: string | null;
 };
 
 export type ImportPreviewRow = ImportRowCandidate & {
   issues: ImportValidationIssue[];
-  duplicateSlug?: boolean;
-  duplicateTitle?: boolean;
-  similarTitle?: boolean;
+  duplicateSlug: boolean;
+  duplicateTitle: boolean;
+  strongDuplicate: boolean;
+  similarTitle: boolean;
   existingEntryId?: string;
   canImport: boolean;
+  duplicateStrategy: DuplicateBehavior;
 };
-
-export type DuplicateBehavior = "skip" | "update" | "copy";
-
-export type ColumnMapping = Record<string, string>;
 
 export type ImportMappingPreset = {
   id: string;
   label: string;
   description: string;
   mapping: ColumnMapping;
+  defaults: ImportDefaultValues;
 };
 
 export const KB_IMPORT_FIELDS = [
-  { key: "title", label: "Tiêu đề" },
-  { key: "slug", label: "Slug" },
-  { key: "summary", label: "Tóm tắt" },
-  { key: "content", label: "Nội dung" },
-  { key: "type", label: "Loại" },
-  { key: "category", label: "Danh mục" },
-  { key: "status", label: "Trạng thái" },
-  { key: "priority", label: "Ưu tiên" },
+  { key: "title", label: "Tiêu đề (title)" },
+  { key: "content", label: "Nội dung (content)" },
+  { key: "category", label: "Danh mục (category)" },
+  { key: "type", label: "Loại (type)" },
+  { key: "status", label: "Trạng thái (status)" },
+  { key: "priority", label: "Ưu tiên (priority)" },
   { key: "tags", label: "Tags" },
-  { key: "usageScope", label: "Mục đích sử dụng" },
-  { key: "isVerified", label: "Đã kiểm chứng" },
+  { key: "usageScope", label: "Mục đích sử dụng (usageScope)" },
+  { key: "isVerified", label: "Đã kiểm chứng (isVerified)" },
+  { key: "source", label: "Tên nguồn (source)" },
+  { key: "sourceUrl", label: "Đường dẫn nguồn (sourceUrl)" },
+  { key: "sourceType", label: "Loại nguồn (sourceType)" },
+  { key: "sourceNote", label: "Ghi chú nguồn (sourceNote)" },
+  { key: "structuredData", label: "Dữ liệu chi tiết JSON (structuredData)" },
+  { key: "structuredData.materials", label: "Chất liệu (materials)" },
+  { key: "structuredData.printMethods", label: "Phương pháp in (printMethods)" },
+  { key: "structuredData.owner", label: "Người phụ trách (owner)" },
   { key: "structuredData.moq", label: "MOQ" },
   { key: "structuredData.leadTime", label: "Lead time" },
-  { key: "structuredData.material", label: "Chất liệu" },
-  { key: "structuredData.form", label: "Form dáng" },
-  { key: "structuredData.colors", label: "Màu sắc" },
-  { key: "structuredData.sizes", label: "Kích thước" },
-  { key: "structuredData.useCases", label: "Ứng dụng" },
-  { key: "structuredData.services", label: "Dịch vụ hỗ trợ" },
-  { key: "structuredData.targetAudience", label: "Đối tượng" },
-  { key: "structuredData.pricingPolicy", label: "Chính sách giá" },
-  { key: "structuredData.policyName", label: "Chính sách áp dụng" },
-  { key: "structuredData.conditions", label: "Điều kiện" },
-  { key: "structuredData.questions", label: "Câu hỏi (FAQ)" },
-  { key: "structuredData.answers", label: "Câu trả lời (FAQ)" },
-  { key: "structuredData.notes", label: "Ghi chú chi tiết" },
+  { key: "structuredData.material", label: "Chất liệu (material)" },
 ] as const;
+
+export type KnowledgeBaseImportJobStatus = "PENDING" | "COMPLETED" | "FAILED" | "PARTIAL";
 
 export type KnowledgeBaseImportJobRecord = {
   id: string;
-  filename: string;
-  rows: number;
-  imported: number;
-  skipped: number;
-  errors: string[];
+  fileName: string;
+  fileType: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  createdRows: number;
+  updatedRows: number;
+  skippedRows: number;
+  duplicateRows: number;
+  status: KnowledgeBaseImportJobStatus;
+  errorMessage: string | null;
   createdBy: string | null;
   createdAt: string;
+  updatedAt: string;
+  metadata: Record<string, unknown> | null;
 };
 
 export type ImportPreviewResult = {
@@ -94,15 +114,26 @@ export type ImportPreviewResult = {
   summary: {
     total: number;
     valid: number;
-    errors: number;
+    invalid: number;
     warnings: number;
     duplicates: number;
   };
 };
 
 export type ImportExecuteResult = {
-  imported: number;
+  totalRows: number;
+  created: number;
+  updated: number;
   skipped: number;
+  invalid: number;
+  duplicates: number;
+  failed: number;
   errors: string[];
   jobId: string;
+  status: KnowledgeBaseImportJobStatus;
+  createdCategoryCount: number;
+  linkedSourceCount: number;
+  createdSourceCount: number;
 };
+
+export type PreviewFilter = "all" | "valid" | "invalid" | "duplicate";

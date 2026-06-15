@@ -7,6 +7,7 @@ import {
   getEntryTypeLabel,
   getPriorityLabel,
 } from "@/features/knowledge-base/knowledge-base-utils";
+import KnowledgeBaseAiReadinessBadge from "@/components/admin/knowledge-base/KnowledgeBaseAiReadinessBadge";
 import { KNOWLEDGE_USAGE_SCOPES } from "@/features/knowledge-base/knowledge-base-types";
 
 type Props = {
@@ -64,6 +65,7 @@ export default function KnowledgeBaseEntryCard({ entry, onChanged, selected, onS
           </label>
         )}
         <h3>{entry.title}</h3>
+        {entry.aiReadiness && <KnowledgeBaseAiReadinessBadge readiness={entry.aiReadiness} />}
         {entry.isVerified && <span className="admin-kb-badge admin-kb-badge--verified">Đã kiểm chứng</span>}
       </div>
       {entry.summary && <p className="admin-field-hint">{entry.summary}</p>}

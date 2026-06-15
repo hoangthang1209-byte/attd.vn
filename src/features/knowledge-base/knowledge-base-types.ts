@@ -56,6 +56,13 @@ export type KnowledgeBaseEntryRecord = {
   status: KnowledgeBaseEntryStatus;
   priority: KnowledgeBasePriority;
   sourceId: string | null;
+  source?: {
+    id: string;
+    name: string;
+    url: string | null;
+    type: KnowledgeBaseSourceType;
+    note: string | null;
+  } | null;
   tags: string[];
   relatedProductIds: string[];
   relatedLandingPageSlugs: string[];
@@ -68,6 +75,13 @@ export type KnowledgeBaseEntryRecord = {
   updatedAt: string;
   completenessScore?: number;
   completenessLabel?: string;
+  aiReadiness?: {
+    score: number;
+    level: import("@/features/knowledge-base/knowledge-base-ai-readiness").AiReadinessLevel;
+    label: string;
+    reasons: string[];
+    missing: string[];
+  };
 };
 
 export type KnowledgeBaseEntryInput = {

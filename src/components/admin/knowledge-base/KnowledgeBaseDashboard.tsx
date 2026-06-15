@@ -10,10 +10,9 @@ import KnowledgeBaseEmptyState from "@/components/admin/knowledge-base/Knowledge
 import KnowledgeBaseCategoryManager from "@/components/admin/knowledge-base/KnowledgeBaseCategoryManager";
 import KnowledgeBaseContextPreview from "@/components/admin/knowledge-base/KnowledgeBaseContextPreview";
 import KnowledgeBaseStarterImport from "@/components/admin/knowledge-base/KnowledgeBaseStarterImport";
-import KnowledgeBaseBulkImport from "@/components/admin/knowledge-base/KnowledgeBaseBulkImport";
 import KnowledgeBaseBulkToolbar from "@/components/admin/knowledge-base/KnowledgeBaseBulkToolbar";
 
-type TabId = "entries" | "categories" | "context" | "starter" | "bulk";
+type TabId = "entries" | "categories" | "context" | "starter";
 
 type Props = {
   initialEntries: KnowledgeBaseEntryRecord[];
@@ -35,6 +34,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
     priority: "",
     verifiedOnly: false,
     needsImprovement: false,
+    aiReadinessFilter: "",
   });
 
   const load = useCallback(async () => {
@@ -49,6 +49,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
       if (filters.priority) params.set("priority", filters.priority);
       if (filters.verifiedOnly) params.set("verifiedOnly", "1");
       if (filters.needsImprovement) params.set("needsImprovement", "1");
+      if (filters.aiReadinessFilter) params.set("aiReadinessFilter", filters.aiReadinessFilter);
 
       const res = await fetch(`/api/admin/knowledge-base?${params.toString()}`);
       const data = await res.json();
@@ -74,7 +75,6 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "entries", label: "Dữ liệu doanh nghiệp" },
-    { id: "bulk", label: "Bulk Import" },
     { id: "categories", label: "Danh mục" },
     { id: "context", label: "Xem dữ liệu AI sẽ dùng" },
     { id: "starter", label: "Nhập dữ liệu mẫu ATTD" },
@@ -85,6 +85,12 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
       <div className="admin-kb-toolbar">
         <KnowledgeBaseKpisPanel kpis={kpis} />
         <div className="admin-kb-toolbar-actions">
+          <Link href="/admin/knowledge-base/import" className="admin-btn admin-btn--secondary">
+            Nhập dữ liệu hàng loạt
+          </Link>
+          <Link href="/admin/knowledge-base/context-preview" className="admin-btn admin-btn--secondary">
+            Xem trước ngữ cảnh AI
+          </Link>
           <Link href="/admin/knowledge-base/new" className="admin-btn admin-btn--primary">
             + Thêm dữ liệu
           </Link>
@@ -130,7 +136,6 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
             )}
           </>
         )}
-        {activeTab === "bulk" && <KnowledgeBaseBulkImport onImported={load} />}
         {activeTab === "categories" && <KnowledgeBaseCategoryManager />}
         {activeTab === "context" && <KnowledgeBaseContextPreview />}
         {activeTab === "starter" && <KnowledgeBaseStarterImport onImported={load} />}

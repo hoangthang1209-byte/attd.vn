@@ -42,6 +42,7 @@ type EditorState = {
   relatedLandingPageSlugs: string[];
   relatedBlogPostIds: string[];
   isVerified: boolean;
+  sourceId: string | null;
 };
 
 function buildState(initial: KnowledgeBaseEntryRecord | null, mode: Props["mode"]): EditorState {
@@ -61,6 +62,7 @@ function buildState(initial: KnowledgeBaseEntryRecord | null, mode: Props["mode"
     relatedLandingPageSlugs: initial?.relatedLandingPageSlugs ?? [],
     relatedBlogPostIds: initial?.relatedBlogPostIds ?? [],
     isVerified: initial?.isVerified ?? false,
+    sourceId: initial?.sourceId ?? null,
   };
 }
 
@@ -268,6 +270,9 @@ export default function KnowledgeBaseEntryEditor(props: Props) {
             type={state.type}
             structuredData={state.structuredData}
             isVerified={state.isVerified}
+            usageScope={state.usageScope}
+            sourceId={state.sourceId}
+            priority={state.priority}
           />
 
           <div className="admin-field">

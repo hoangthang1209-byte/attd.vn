@@ -534,15 +534,31 @@ model KnowledgeBaseUsageLog {
   @@index([createdAt])
 }
 
+enum KnowledgeBaseImportJobStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
 model KnowledgeBaseImportJob {
-  id        String   @id @default(cuid())
-  filename  String
-  rows      Int
-  imported  Int      @default(0)
-  skipped   Int      @default(0)
-  errors    Json     @default("[]")
-  createdBy String?
-  createdAt DateTime @default(now())
+  id            String                       @id @default(cuid())
+  fileName      String                       @map("filename")
+  fileType      String                       @default("csv")
+  totalRows     Int                          @default(0) @map("rows")
+  validRows     Int                          @default(0)
+  invalidRows   Int                          @default(0)
+  createdRows   Int                          @default(0) @map("imported")
+  updatedRows   Int                          @default(0)
+  skippedRows   Int                          @default(0) @map("skipped")
+  duplicateRows Int                          @default(0)
+  status        KnowledgeBaseImportJobStatus @default(PENDING)
+  errorMessage  String?
+  errors        Json                         @default("[]")
+  metadata      Json?
+  createdBy     String?
+  createdAt     DateTime                     @default(now())
+  updatedAt     DateTime                     @default(now()) @updatedAt
 
   @@index([createdAt])
 }

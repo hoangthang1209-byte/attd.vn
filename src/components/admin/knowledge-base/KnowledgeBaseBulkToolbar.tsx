@@ -29,7 +29,7 @@ export default function KnowledgeBaseBulkToolbar({ selectedIds, onChanged, onCle
   if (selectedIds.length === 0) return null;
 
   async function runBulk(
-    action: "verify" | "archive" | "delete" | "changeCategory" | "changeStatus" | "changePriority",
+    action: "verify" | "unverify" | "archive" | "delete" | "changeCategory" | "changeStatus" | "changePriority",
     extra?: Record<string, string>
   ) {
     if (action === "delete" && !window.confirm(`Xóa ${selectedIds.length} mục đã chọn?`)) {
@@ -61,6 +61,9 @@ export default function KnowledgeBaseBulkToolbar({ selectedIds, onChanged, onCle
       <div className="admin-kb-bulk-toolbar-actions">
         <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" disabled={loading} onClick={() => void runBulk("verify")}>
           Kiểm chứng
+        </button>
+        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" disabled={loading} onClick={() => void runBulk("unverify")}>
+          Bỏ kiểm chứng
         </button>
         <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" disabled={loading} onClick={() => void runBulk("archive")}>
           Lưu trữ

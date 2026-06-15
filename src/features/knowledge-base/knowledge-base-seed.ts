@@ -96,7 +96,10 @@ export type KnowledgeBaseListParams = {
 
 function mapEntry(
   entry: Prisma.KnowledgeBaseEntryGetPayload<{
-    include: { category: { select: { id: true; name: true; slug: true } } };
+    include: {
+      category: { select: { id: true; name: true; slug: true } };
+      source: { select: { id: true; name: true; url: true; type: true; note: true } };
+    };
   }>
 ) {
   return {
@@ -106,8 +109,14 @@ function mapEntry(
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
     category: entry.category,
+    source: entry.source ?? null,
   };
 }
+
+const entryInclude = {
+  category: { select: { id: true, name: true, slug: true } },
+  source: { select: { id: true, name: true, url: true, type: true, note: true } },
+} as const;
 
 export async function listKnowledgeBaseEntries(params: KnowledgeBaseListParams = {}) {
   const page = Math.max(1, params.page ?? 1);
@@ -133,7 +142,7 @@ export async function listKnowledgeBaseEntries(params: KnowledgeBaseListParams =
   const [entries, total] = await Promise.all([
     prisma.knowledgeBaseEntry.findMany({
       where,
-      include: { category: { select: { id: true, name: true, slug: true } } },
+      include: entryInclude,
       orderBy: [{ updatedAt: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -147,7 +156,7 @@ export async function listKnowledgeBaseEntries(params: KnowledgeBaseListParams =
 export async function getKnowledgeBaseEntryById(id: string) {
   const entry = await prisma.knowledgeBaseEntry.findUnique({
     where: { id },
-    include: { category: { select: { id: true, name: true, slug: true } } },
+    include: entryInclude,
   });
   return entry ? mapEntry(entry) : null;
 }
@@ -160,7 +169,7 @@ export async function createKnowledgeBaseEntry(
       ...data,
       verifiedAt: data.isVerified ? new Date() : null,
     },
-    include: { category: { select: { id: true, name: true, slug: true } } },
+    include: entryInclude,
   });
   return mapEntry(entry);
 }
@@ -183,7 +192,7 @@ export async function updateKnowledgeBaseEntry(
             ? existing?.verifiedAt ?? new Date()
             : null,
     },
-    include: { category: { select: { id: true, name: true, slug: true } } },
+    include: entryInclude,
   });
   return mapEntry(entry);
 }
@@ -280,7 +289,7 @@ export async function getKnowledgeBaseKpisFromDb() {
       prisma.knowledgeBaseEntry.count({ where: { createdAt: { gte: weekAgo } } }),
       prisma.knowledgeBaseImportJob.findFirst({
         orderBy: { createdAt: "desc" },
-        select: { createdAt: true, filename: true },
+        select: { createdAt: true, fileName: true },
       }),
     ]);
 
@@ -306,7 +315,7 @@ export async function getKnowledgeBaseKpisFromDb() {
     aiReadyPercent: dashboardKpis.aiReadyPercent,
     missingDataCount: dashboardKpis.missingDataCount,
     lastImportAt: lastImport?.createdAt.toISOString() ?? null,
-    lastImportFilename: lastImport?.filename ?? null,
+    lastImportFilename: lastImport?.fileName ?? null,
     entriesAddedThisWeek,
   };
 }

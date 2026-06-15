@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { previewKnowledgeBaseImport } from "@/features/knowledge-base/knowledge-base-import-service";
-import type { ColumnMapping } from "@/features/knowledge-base/knowledge-base-import-types";
+import type { ColumnMapping, DuplicateBehavior, ImportDefaultValues } from "@/features/knowledge-base/knowledge-base-import-types";
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -13,13 +13,22 @@ export async function POST(req: NextRequest) {
   const raw = body as Record<string, unknown>;
   const rawRows = Array.isArray(raw.rows) ? (raw.rows as Record<string, string>[]) : [];
   const mapping = (raw.mapping ?? {}) as ColumnMapping;
+  const defaults = (raw.defaults ?? {}) as ImportDefaultValues;
+  const duplicateBehavior = (raw.duplicateBehavior ?? "skip") as DuplicateBehavior;
+  const autoCreateCategories = raw.autoCreateCategories === true;
 
   if (rawRows.length === 0) {
     return NextResponse.json({ message: "Không có dữ liệu để xem trước." }, { status: 400 });
   }
 
   try {
-    const preview = await previewKnowledgeBaseImport({ rawRows, mapping });
+    const preview = await previewKnowledgeBaseImport({
+      rawRows,
+      mapping,
+      defaults,
+      duplicateBehavior,
+      autoCreateCategories,
+    });
     return NextResponse.json(preview);
   } catch (err) {
     console.error("[POST /api/admin/knowledge-base/import/preview]", err);

@@ -19,6 +19,7 @@ type Filters = {
   priority: string;
   verifiedOnly: boolean;
   needsImprovement: boolean;
+  aiReadinessFilter: string;
 };
 
 type Props = {
@@ -92,6 +93,17 @@ export default function KnowledgeBaseFilters({ filters, onChange }: Props) {
         {(["HIGH", "MEDIUM", "LOW"] as const).map((priority) => (
           <option key={priority} value={priority}>{getPriorityLabel(priority)}</option>
         ))}
+      </select>
+      <select
+        className="admin-input"
+        value={filters.aiReadinessFilter}
+        onChange={(e) => onChange({ ...filters, aiReadinessFilter: e.target.value })}
+      >
+        <option value="">Tất cả AI readiness</option>
+        <option value="low">Chưa sẵn sàng (thấp)</option>
+        <option value="high">Tốt cho AI (cao)</option>
+        <option value="verified">Đã kiểm chứng</option>
+        <option value="missing_source">Thiếu nguồn tham khảo</option>
       </select>
       <label className="admin-radio-item">
         <input

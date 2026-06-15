@@ -10,6 +10,8 @@ import {
   calculateKnowledgeCompleteness,
   getCompletenessLabel,
 } from "@/features/knowledge-base/knowledge-base-utils";
+import { enrichEntryWithAiReadiness } from "@/features/knowledge-base/knowledge-base-ai-readiness";
+import { getEntrySourceInfo } from "@/features/knowledge-base/knowledge-base-source-utils";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -28,17 +30,34 @@ export async function GET(req: NextRequest) {
 
     const entries = result.entries.map((entry) => {
       const completenessScore = calculateKnowledgeCompleteness(entry);
-      return {
+      return enrichEntryWithAiReadiness({
         ...entry,
         completenessScore,
         completenessLabel: getCompletenessLabel(completenessScore),
-      };
+      });
     });
 
     const needsImprovement = searchParams.get("needsImprovement") === "1";
-    const filteredEntries = needsImprovement
+    const aiReadinessFilter = searchParams.get("aiReadinessFilter") ?? "";
+
+    let filteredEntries = needsImprovement
       ? entries.filter((entry) => (entry.completenessScore ?? 0) < 40)
       : entries;
+
+    if (aiReadinessFilter === "low") {
+      filteredEntries = filteredEntries.filter((entry) => entry.aiReadiness?.level === "LOW");
+    } else if (aiReadinessFilter === "high") {
+      filteredEntries = filteredEntries.filter((entry) =>
+        entry.aiReadiness?.level === "HIGH" || entry.aiReadiness?.level === "VERIFIED"
+      );
+    } else if (aiReadinessFilter === "verified") {
+      filteredEntries = filteredEntries.filter((entry) => entry.aiReadiness?.level === "VERIFIED");
+    } else if (aiReadinessFilter === "missing_source") {
+      filteredEntries = filteredEntries.filter((entry) => {
+        const source = getEntrySourceInfo(entry);
+        return !source.name && !source.url;
+      });
+    }
 
     const kpis = await getKnowledgeBaseKpisFromDb();
 
