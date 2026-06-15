@@ -7493,3 +7493,24 @@ body:has(.mobile-action-bar) .site-footer {
 /* Empty state */
 .admin-empty-state { text-align: center; padding: 40px; color: #6b7280; }
 .admin-empty-hint { font-size: 12px; }
+
+/* ─── Patch 24.9.3a: Import Template Section ─────────────────────────────── */
+.admin-import-template-section {
+  border: 1px solid #e0e7ff; border-radius: 10px; padding: 16px 20px;
+  background: #f5f7ff; margin-bottom: 20px;
+}
+.admin-import-template-header { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.admin-import-template-icon { font-size: 24px; flex-shrink: 0; margin-top: 2px; }
+.admin-import-template-title { font-size: 14px; font-weight: 600; color: #1e1b4b; margin: 0 0 2px; }
+.admin-import-template-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.admin-import-template-card {
+  background: #fff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 10px 14px;
+  min-width: 140px; display: flex; flex-direction: column; gap: 6px;
+}
+.admin-import-template-card-label { font-size: 13px; font-weight: 600; color: #312e81; }
+.admin-import-template-card-desc { font-size: 11px; color: #6b7280; margin: 0; }
+.admin-import-template-card-actions { display: flex; gap: 6px; }
+.admin-import-template-notes {
+  margin: 12px 0 0; padding: 10px 14px; background: #ede9fe; border-radius: 6px;
+  font-size: 12px; color: #4c1d95; list-style: disc inside; display: flex; flex-direction: column; gap: 3px;
+}

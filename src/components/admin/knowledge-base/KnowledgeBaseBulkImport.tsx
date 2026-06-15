@@ -29,6 +29,7 @@ import {
   getEntryTypeLabel,
   getPriorityLabel,
 } from "@/features/knowledge-base/knowledge-base-utils";
+import ImportTemplateSection from "@/components/admin/ImportTemplateSection";
 
 type Step = 1 | 2 | 3;
 
@@ -185,6 +186,26 @@ export default function KnowledgeBaseBulkImport() {
 
       {step === 1 && (
         <div className="admin-kb-bulk-panel">
+          <ImportTemplateSection
+            heading="File mẫu Knowledge Base"
+            apiBase="/api/admin/knowledge-base/import/templates"
+            templates={[
+              { id: "faq", label: "Mẫu FAQ", description: "Câu hỏi thường gặp cho khách B2B" },
+              { id: "product-knowledge", label: "Mẫu kiến thức sản phẩm", description: "Nguồn hàng, chất liệu, sản phẩm sỉ" },
+              { id: "sop", label: "Mẫu quy trình/SOP", description: "Báo giá, đặt hàng, giao hàng" },
+              { id: "b2b-knowledge", label: "Mẫu Knowledge ATTD B2B", description: "Định vị thương hiệu B2B" },
+            ]}
+            notes={[
+              "Các cột bắt buộc: title, content",
+              "type: FAQ | PRODUCT | OEM | DEALER | POLICY | BRAND",
+              "status: DRAFT | PUBLISHED | ARCHIVED",
+              "priority: LOW | MEDIUM | HIGH | CRITICAL",
+              "usageScope: SEO_PLANNING | SALES | CRM | PRODUCT | SUPPORT | INTERNAL",
+              "isVerified: true/false hoặc có/không",
+              "tags: cách nhau bằng dấu phẩy",
+              "structuredData: để trống hoặc nhập JSON hợp lệ",
+            ]}
+          />
           <h3 className="admin-subtitle">Nhập dữ liệu hàng loạt</h3>
           <p className="admin-field-hint">Hỗ trợ .xlsx, .csv, .json</p>
 

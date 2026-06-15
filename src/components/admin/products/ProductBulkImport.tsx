@@ -2,8 +2,10 @@
 
 import { useRef, useState } from "react";
 import { PRODUCT_IMPORT_PRESETS } from "@/features/products/product-import-presets";
+import { PRODUCT_IMPORT_TEMPLATES } from "@/features/products/product-import-templates";
 import type { ProductImportPresetId } from "@/features/products/product-import-types";
 import { mapRawRowToImportRow } from "@/features/products/product-import-utils";
+import ImportTemplateSection from "@/components/admin/ImportTemplateSection";
 
 type ImportRow = Record<string, unknown>;
 type PreviewRow = {
@@ -215,6 +217,21 @@ export default function ProductBulkImport() {
 
       {/* Step 1: Upload */}
       {step === "upload" && (
+        <>
+        <ImportTemplateSection
+          heading="File mẫu sản phẩm"
+          apiBase="/api/admin/products/import/templates"
+          templates={PRODUCT_IMPORT_TEMPLATES.slice(0, 3).map((t) => ({ id: t.id, label: t.label, description: "" }))}
+          notes={[
+            "Các cột bắt buộc: category, productName",
+            "Nếu productCode để trống, hệ thống sẽ tự tạo SKU",
+            "Nếu danh mục chưa có, bật \"Tự tạo danh mục mới\" phía dưới",
+            "priceTiers có thể nhập JSON: [{\"minQty\":50,\"price\":45000}]",
+            "Ảnh nên là URL Cloudinary hoặc URL ảnh hợp lệ",
+            "stockStatus: IN_STOCK | LOW_STOCK | OUT_OF_STOCK | PREORDER",
+            "status: ACTIVE | DRAFT | INACTIVE | ARCHIVED",
+          ]}
+        />
         <div className="admin-catalog-fieldset">
           <h3 className="admin-subtitle">Tải file sản phẩm</h3>
           <div className="admin-field">
@@ -239,6 +256,7 @@ export default function ProductBulkImport() {
             />
           </div>
         </div>
+        </>
       )}
 
       {/* Step 2: Column mapping */}
