@@ -58,6 +58,7 @@ model Product {
   tags               String[]
   featuredImage      String?
   gallery            String[]  @default([])
+  leadTime           String?
   metadata           Json?
   categoryId         String
   status             ProductStatus    @default(ACTIVE)
@@ -107,6 +108,7 @@ model ProductVariant {
   priceTiers     Json?
   stockQty       Int           @default(0)
   stockStatus    StockStatus   @default(IN_STOCK)
+  imageUrl       String?
   weight         Decimal?      @db.Decimal(8, 3)
   internalNote   String?
   variantStatus  VariantStatus @default(ACTIVE)

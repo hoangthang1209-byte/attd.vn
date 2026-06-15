@@ -35,6 +35,7 @@ export type VariantInput = {
   stockQty?: number;
   stockStatus?: StockStatus;
   weight?: number | null;
+  imageUrl?: string | null;
   internalNote?: string;
   variantStatus?: VariantStatus;
   metadata?: Record<string, unknown> | null;
@@ -61,8 +62,9 @@ export type ProductInput = {
   supportsEmbroidery?: boolean;
   supportsOem?: boolean;
   tags?: string[];
-  featuredImage?: string;
+  featuredImage?: string | null;
   gallery?: string[];
+  leadTime?: string | null;
   status?: ProductStatus;
   metadata?: Record<string, unknown> | null;
   variants?: VariantInput[];
@@ -268,8 +270,9 @@ export async function createProductAdmin(input: ProductInput) {
       supportsEmbroidery: input.supportsEmbroidery ?? false,
       supportsOem: input.supportsOem ?? false,
       tags: input.tags ?? [],
-      featuredImage: input.featuredImage,
+      featuredImage: input.featuredImage ?? null,
       gallery: input.gallery ?? [],
+      leadTime: input.leadTime ?? null,
       status: input.status ?? "DRAFT",
       ...(input.metadata ? { metadata: input.metadata as Prisma.InputJsonValue } : {}),
     },
@@ -295,6 +298,7 @@ export async function createProductAdmin(input: ProductInput) {
           stockQty: v.stockQty ?? 0,
           stockStatus: v.stockStatus ?? "IN_STOCK",
           weight: v.weight != null ? v.weight : undefined,
+          imageUrl: v.imageUrl ?? null,
           internalNote: v.internalNote,
           variantStatus: v.variantStatus ?? "ACTIVE",
           ...(v.metadata ? { metadata: v.metadata as Prisma.InputJsonValue } : {}),
@@ -340,6 +344,7 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
   if (input.metadata !== undefined && input.metadata) updateData.metadata = input.metadata as Prisma.InputJsonValue;
   if (input.featuredImage !== undefined) updateData.featuredImage = input.featuredImage;
   if (input.gallery !== undefined) updateData.gallery = input.gallery;
+  if (input.leadTime !== undefined) updateData.leadTime = input.leadTime;
   if (input.status !== undefined) updateData.status = input.status;
 
   await prisma.product.update({ where: { id }, data: updateData });
@@ -373,6 +378,7 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
             stockQty: v.stockQty,
             stockStatus: v.stockStatus,
             weight: v.weight != null ? v.weight : undefined,
+            imageUrl: v.imageUrl ?? null,
             internalNote: v.internalNote,
             variantStatus: v.variantStatus,
           },
@@ -395,6 +401,7 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
             stockQty: v.stockQty ?? 0,
             stockStatus: v.stockStatus ?? "IN_STOCK",
             weight: v.weight != null ? v.weight : undefined,
+            imageUrl: v.imageUrl ?? null,
             internalNote: v.internalNote,
             variantStatus: v.variantStatus ?? "ACTIVE",
             ...(v.metadata ? { metadata: v.metadata as Prisma.InputJsonValue } : {}),

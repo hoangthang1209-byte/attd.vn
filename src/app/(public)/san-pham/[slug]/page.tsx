@@ -311,8 +311,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 </div>
               )}
 
-              {/* SKU summary */}
-              {skuCount > 0 && (
+              {/* SKU summary + B2B info */}
+              {(skuCount > 0 || product.defaultMoq || product.leadTime) && (
                 <div
                   style={{
                     display: "flex",
@@ -326,9 +326,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     borderBottom: "1px solid #f3f4f6",
                   }}
                 >
-                  <span>
-                    <strong>{skuCount}</strong> SKU
-                  </span>
+                  {skuCount > 0 && (
+                    <span>
+                      <strong>{skuCount}</strong> SKU
+                    </span>
+                  )}
                   {uniqueColors.length > 0 && (
                     <span>
                       <strong>{uniqueColors.length}</strong> màu
@@ -336,6 +338,16 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   )}
                   {uniqueSizes.length > 0 && (
                     <span>Size: {uniqueSizes.join(", ")}</span>
+                  )}
+                  {product.defaultMoq != null && (
+                    <span>
+                      MOQ: <strong>{product.defaultMoq} cái</strong>
+                    </span>
+                  )}
+                  {product.leadTime && (
+                    <span>
+                      Giao hàng: <strong>{product.leadTime}</strong>
+                    </span>
                   )}
                 </div>
               )}

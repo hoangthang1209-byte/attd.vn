@@ -32,6 +32,7 @@ type ProductRow = {
   images: { imageUrl: string }[];
   featuredImage?: string | null;
   gallery?: string[];
+  leadTime?: string | null;
 };
 
 type KpiData = {
@@ -203,6 +204,7 @@ export default function ProductCatalogDashboard() {
                 <th>SKU</th>
                 <th>Tồn kho</th>
                 <th>MOQ</th>
+                <th>Lead-time</th>
                 <th>Tính năng</th>
                 <th>Cập nhật</th>
                 <th>Thao tác</th>
@@ -245,6 +247,7 @@ export default function ProductCatalogDashboard() {
                       ) : <span className="admin-field-hint">—</span>}
                     </td>
                     <td><span className="admin-field-hint">{p.defaultMoq ? `${p.defaultMoq} cái` : "—"}</span></td>
+                    <td><span className="admin-field-hint" style={{ whiteSpace: "nowrap" }}>{p.leadTime ?? "—"}</span></td>
                     <td>
                       <div className="admin-catalog-badges">
                         {p.supportsPrinting && <span className="admin-kb-tag">In</span>}
@@ -262,6 +265,25 @@ export default function ProductCatalogDashboard() {
                         >
                           Sửa
                         </button>
+                        {p.slug ? (
+                          <a
+                            href={`/san-pham/${p.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                          >
+                            Xem
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                            disabled
+                            title="Sản phẩm chưa có slug"
+                          >
+                            Xem
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="admin-btn admin-btn--secondary admin-btn--xs"

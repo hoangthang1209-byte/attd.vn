@@ -7514,3 +7514,11 @@ body:has(.mobile-action-bar) .site-footer {
   margin: 12px 0 0; padding: 10px 14px; background: #ede9fe; border-radius: 6px;
   font-size: 12px; color: #4c1d95; list-style: disc inside; display: flex; flex-direction: column; gap: 3px;
 }
+
+/* ─── Patch 24.9.3b: Product gallery picker, variant images ─────────────── */
+.admin-catalog-gallery-picker { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+.admin-catalog-gallery-row { display: flex; gap: 6px; align-items: center; }
+.admin-catalog-gallery-row .admin-input { flex: 1; min-width: 0; }
+
+/* "Xem" button in dashboard */
+.admin-catalog-actions-cell { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }

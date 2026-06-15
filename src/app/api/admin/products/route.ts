@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
       form: raw.form ? String(raw.form) : undefined,
       fit: raw.fit ? String(raw.fit) : undefined,
       defaultMoq: raw.defaultMoq ? Number(raw.defaultMoq) : undefined,
+      leadTime: raw.leadTime ? String(raw.leadTime) : undefined,
       useCases: Array.isArray(raw.useCases) ? raw.useCases as string[] : [],
       targetCustomers: Array.isArray(raw.targetCustomers) ? raw.targetCustomers as string[] : [],
       supportsPrinting: Boolean(raw.supportsPrinting),
@@ -53,6 +54,8 @@ export async function POST(req: NextRequest) {
       supportsOem: Boolean(raw.supportsOem),
       tags: Array.isArray(raw.tags) ? raw.tags as string[] : [],
       status: raw.status ? String(raw.status) as "ACTIVE" | "DRAFT" | "INACTIVE" | "ARCHIVED" : "DRAFT",
+      featuredImage: raw.featuredImage ? String(raw.featuredImage) : undefined,
+      gallery: Array.isArray(raw.gallery) ? raw.gallery as string[] : [],
       variants: Array.isArray(raw.variants) ? raw.variants as Parameters<typeof createProductAdmin>[0]["variants"] : [],
     });
     return NextResponse.json(product, { status: 201 });

@@ -28,6 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       form: raw.form !== undefined ? String(raw.form) : undefined,
       fit: raw.fit !== undefined ? String(raw.fit) : undefined,
       defaultMoq: raw.defaultMoq !== undefined ? Number(raw.defaultMoq) || null : undefined,
+      leadTime: raw.leadTime !== undefined ? String(raw.leadTime) || null : undefined,
       useCases: Array.isArray(raw.useCases) ? raw.useCases as string[] : undefined,
       targetCustomers: Array.isArray(raw.targetCustomers) ? raw.targetCustomers as string[] : undefined,
       supportsPrinting: raw.supportsPrinting !== undefined ? Boolean(raw.supportsPrinting) : undefined,
@@ -35,6 +36,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       supportsOem: raw.supportsOem !== undefined ? Boolean(raw.supportsOem) : undefined,
       tags: Array.isArray(raw.tags) ? raw.tags as string[] : undefined,
       status: raw.status ? String(raw.status) as "ACTIVE" | "DRAFT" | "INACTIVE" | "ARCHIVED" : undefined,
+      featuredImage: raw.featuredImage !== undefined ? (String(raw.featuredImage) || null) : undefined,
+      gallery: Array.isArray(raw.gallery) ? raw.gallery as string[] : undefined,
       variants: Array.isArray(raw.variants) ? raw.variants as Parameters<typeof updateProductAdmin>[1]["variants"] : undefined,
     });
     return NextResponse.json(updated);
