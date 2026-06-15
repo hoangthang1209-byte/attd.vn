@@ -15,6 +15,7 @@ const NAV_GROUPS = [
       { href: "/admin/landing-pages", label: "Landing pages" },
       { href: "/admin/blog", label: "Blog" },
       { href: "/admin/seo-planning", label: "SEO Planning" },
+      { href: "/admin/seo/brief-generator", label: "SEO Brief Generator" },
       { href: "/admin/knowledge-base", label: "Knowledge Base" },
     ],
   },

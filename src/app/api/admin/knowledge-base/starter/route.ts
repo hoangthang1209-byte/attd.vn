@@ -6,7 +6,7 @@ export async function POST() {
     const result = await importKnowledgeBaseStarterData();
     return NextResponse.json({
       ok: true,
-      message: `Đã tạo ${result.created} entry mẫu (${result.skipped} đã tồn tại).`,
+      message: `Đã tạo ${result.created} entry mẫu — bỏ qua ${result.skipped} entry đã tồn tại (tổng ${result.total} entry mẫu có sẵn).`,
       ...result,
     });
   } catch (err) {
