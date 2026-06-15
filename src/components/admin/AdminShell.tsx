@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 
 const NAV_GROUPS = [
   {
@@ -45,9 +46,12 @@ export default function AdminShell({
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
-        <Link href="/admin/dashboard" className="admin-brand">
-          ATTD CMS
-        </Link>
+        <div className="admin-sidebar-top">
+          <Link href="/admin/dashboard" className="admin-brand">
+            ATTD CMS
+          </Link>
+          <AdminLogoutButton />
+        </div>
         <nav className="admin-nav">
           {NAV_GROUPS.map((group) => (
             <div key={group.label ?? "root"} className="admin-nav-group">

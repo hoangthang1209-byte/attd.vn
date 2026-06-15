@@ -6436,3 +6436,52 @@ body:has(.mobile-action-bar) .site-footer {
   }
 }
 
+/* ── Admin Security Gate (Sprint 24.8.1) ───────────────────────────────────── */
+
+.admin-login-page {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.admin-login-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 28px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+}
+
+.admin-login-title {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.admin-login-submit {
+  width: 100%;
+}
+
+.admin-sidebar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.admin-logout-btn {
+  flex-shrink: 0;
+}
+
