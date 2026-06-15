@@ -7522,3 +7522,23 @@ body:has(.mobile-action-bar) .site-footer {
 
 /* "Xem" button in dashboard */
 .admin-catalog-actions-cell { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+
+/* ─── Patch 24.9.3c: Demo Content Seeder ────────────────────────────────── */
+.admin-demo-page { display: flex; flex-direction: column; gap: 20px; }
+.admin-demo-intro p { font-size: 13px; color: #6b7280; margin: 4px 0 12px; }
+.admin-demo-quick-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-demo-status-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.admin-demo-status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin: 12px 0; }
+.admin-demo-status-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 8px; text-align: center; background: #fff; }
+.admin-demo-status-count { font-size: 24px; font-weight: 700; color: #4f46e5; line-height: 1.2; }
+.admin-demo-status-total { font-size: 12px; color: #9ca3af; }
+.admin-demo-status-label { font-size: 11px; font-weight: 500; color: #374151; margin-top: 4px; }
+.admin-demo-totals { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
+.admin-demo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-demo-results { display: flex; flex-direction: column; gap: 4px; }
+.admin-demo-result-row { display: flex; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+.admin-demo-result-label { font-weight: 500; min-width: 140px; color: #374151; }
+.admin-demo-result-stat { font-size: 12px; white-space: nowrap; }
+.admin-demo-result-created { color: #065f46; }
+.admin-demo-result-updated { color: #1e40af; }
+.admin-demo-result-skipped { color: #9ca3af; }
