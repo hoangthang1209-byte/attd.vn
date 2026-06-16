@@ -14,6 +14,7 @@ export type NavLink = {
 
 export type MegaMenuLink = NavLink & {
   description?: string;
+  imageUrl?: string;
 };
 
 export type MegaMenuColumn = {
@@ -22,6 +23,9 @@ export type MegaMenuColumn = {
   featured?: {
     title: string;
     text: string;
+    ctaHref?: string;
+    ctaLabel?: string;
+    imageUrl?: string;
   };
 };
 
@@ -32,179 +36,55 @@ export type NavMegaMenu = {
   columns: MegaMenuColumn[];
 };
 
-export const NAV_MEGA_MENUS: NavMegaMenu[] = [
-  {
-    id: "san-pham",
-    label: "Sản phẩm",
-    href: "/san-pham",
-    columns: [
-      {
-        title: "Tất cả sản phẩm",
-        links: [
-          {
-            href: "/san-pham",
-            label: "Danh mục sản phẩm sỉ",
-            description: "Xem toàn bộ catalog B2B",
-          },
-        ],
-      },
-      {
-        title: "Blank apparel",
-        links: [
-          {
-            href: "/ao-thun-tron",
-            label: "Áo thun trơn",
-            description: "Cotton, CVC, TC — blank cho xưởng in",
-          },
-          {
-            href: "/ao-polo-tron",
-            label: "Áo polo trơn",
-            description: "Pique, đồng phục doanh nghiệp",
-          },
-        ],
-      },
-      {
-        title: "Quà tặng & phụ kiện",
-        links: [
-          { href: "/non", label: "Nón" },
-          { href: "/tote", label: "Tote" },
-          { href: "/bandana", label: "Bandana" },
-          { href: "/binh-giu-nhiet", label: "Bình giữ nhiệt" },
-        ],
-      },
-      {
-        featured: {
-          title: "Nguồn hàng B2B",
-          text: "Blank apparel trơn cho đại lý, xưởng in, agency và doanh nghiệp — hỗ trợ in thêu theo yêu cầu.",
-        },
-        links: [],
-      },
-    ],
-  },
-  {
-    id: "kho-hang",
-    label: "Kho hàng",
-    columns: [
-      {
-        title: "Kho blank",
-        links: [
-          {
-            href: "/kho-ao-thun-tron",
-            label: "Kho áo thun trơn",
-            description: "Tồn kho đa màu, giao nhanh",
-          },
-          {
-            href: "/kho-ao-polo-tron",
-            label: "Kho áo polo trơn",
-            description: "Polo sẵn kho cho đồng phục",
-          },
-        ],
-      },
-      {
-        title: "Giá sỉ",
-        links: [
-          {
-            href: "/ao-thun-tron-si",
-            label: "Áo thun trơn sỉ",
-            description: "Giá theo bậc số lượng",
-          },
-          {
-            href: "/ao-polo-tron-si",
-            label: "Áo polo trơn sỉ",
-            description: "Chính sách đại lý",
-          },
-        ],
-      },
-      {
-        featured: {
-          title: "Wholesale apparel",
-          text: "Kho hàng blank sẵn nguồn — phục vụ đại lý và xưởng in trên toàn quốc.",
-        },
-        links: [],
-      },
-    ],
-  },
-  {
-    id: "nguon-hang",
-    label: "Nguồn hàng",
-    columns: [
-      {
-        links: [
-          {
-            href: "/nguon-hang-ao-thun-tron",
-            label: "Nguồn hàng áo thun trơn",
-            description: "Nhà cung cấp trực tiếp B2B",
-          },
-          {
-            href: "/nguon-hang",
-            label: "Tổng quan nguồn hàng",
-            description: "Giải pháp sourcing ATTD",
-          },
-        ],
-      },
-      {
-        links: [
-          {
-            href: "/oem",
-            label: "OEM",
-            description: "Private label & gia công",
-          },
-          {
-            href: "/chinh-sach-dai-ly",
-            label: "Chính sách đại lý",
-            description: "Quyền lợi đối tác",
-          },
-        ],
-      },
-      {
-        featured: {
-          title: "B2B Sourcing",
-          text: "Nguồn hàng ổn định cho đại lý đồng phục, xưởng in thêu và doanh nghiệp.",
-        },
-        links: [],
-      },
-    ],
-  },
-  {
-    id: "kien-thuc",
-    label: "Kiến thức",
-    columns: [
-      {
-        title: "Hướng dẫn",
-        links: [
-          {
-            href: "/bang-mau-ao-thun-tron",
-            label: "Bảng màu áo thun",
-            description: "Chọn màu đồng phục",
-          },
-          {
-            href: "/size-ao-thun-tron",
-            label: "Size áo thun",
-            description: "Bảng size chuẩn",
-          },
-        ],
-      },
-      {
-        title: "Chất liệu vải",
-        links: [
-          {
-            href: "/vai-cotton-2-chieu",
-            label: "Vải cotton 2 chiều",
-          },
-          { href: "/vai-cvc-la-gi", label: "Vải CVC" },
-          { href: "/vai-tc-la-gi", label: "Vải TC" },
-        ],
-      },
-      {
-        featured: {
-          title: "Kiến thức blank",
-          text: "Tài liệu tham khảo cho đại lý và xưởng in khi tư vấn khách hàng doanh nghiệp.",
-        },
-        links: [],
-      },
-    ],
-  },
+/** Primary nav links (direct, no dropdown). */
+export const NAV_PRIMARY_LINKS: NavLink[] = [
+  { href: "/nguon-hang", label: "Nguồn hàng" },
+  { href: "/oem", label: "OEM" },
+  { href: "/dai-ly", label: "Đại lý" },
+  { href: "/blog", label: "Kiến thức" },
+  { href: "/lien-he", label: "Liên hệ" },
 ];
+
+/** Sản phẩm mega menu — visual B2B marketplace nav. */
+export const NAV_SAN_PHAM_MENU: NavMegaMenu = {
+  id: "san-pham",
+  label: "Sản phẩm",
+  href: "/san-pham",
+  columns: [
+    {
+      title: "Sản phẩm chủ lực",
+      links: [
+        { href: "/ao-thun-tron", label: "Áo thun trơn", description: "Blank CVC, TC, Cotton" },
+        { href: "/ao-polo-tron", label: "Áo polo trơn", description: "Pique đồng phục DN" },
+        { href: "/non", label: "Nón đồng phục", description: "Snapback, bucket, lưỡi trai" },
+        { href: "/tote", label: "Tote bag", description: "Canvas, vải không dệt" },
+        { href: "/binh-giu-nhiet", label: "Bình giữ nhiệt", description: "Inox, Tritan quà tặng" },
+      ],
+    },
+    {
+      title: "Nguồn hàng B2B",
+      links: [
+        { href: "/san-pham", label: "Kho sỉ đồng phục", description: "Xem toàn bộ catalog" },
+        { href: "/qua-tang-doanh-nghiep", label: "Quà tặng doanh nghiệp", description: "Gift set, combo" },
+        { href: "/oem", label: "OEM / Private Label", description: "Gia công nhãn hiệu" },
+        { href: "/gift-set-doanh-nghiep", label: "Gift set DN", description: "Onboarding, hội nghị" },
+        { href: "/dai-ly", label: "Đại lý đồng phục", description: "Chính sách đối tác" },
+      ],
+    },
+    {
+      featured: {
+        title: "Cần báo giá sỉ?",
+        text: "Tìm nguồn hàng cho đại lý, agency, xưởng in và doanh nghiệp.",
+        ctaHref: "/san-pham",
+        ctaLabel: "Xem tất cả sản phẩm",
+      },
+      links: [],
+    },
+  ],
+};
+
+/** @deprecated Use NAV_SAN_PHAM_MENU + NAV_PRIMARY_LINKS */
+export const NAV_MEGA_MENUS: NavMegaMenu[] = [NAV_SAN_PHAM_MENU];
 
 /** Flat link list for mobile accordion. */
 export function getMegaMenuLinks(menu: NavMegaMenu): NavLink[] {
@@ -233,7 +113,6 @@ export const CONTACT_ZALO_URL = getZaloUrl();
 export const CONTACT_EMAIL = getEmail();
 
 export function shouldShowMobileActionBar(pathname: string): boolean {
-  if (pathname === "/") return false;
   if (pathname.startsWith("/blog")) return false;
   if (pathname.startsWith("/admin") || pathname.startsWith("/quan-tri")) return false;
   return true;

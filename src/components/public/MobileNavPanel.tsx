@@ -6,7 +6,8 @@ import { X, ChevronDown, Phone, MessageCircle } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
 import {
-  NAV_MEGA_MENUS,
+  NAV_SAN_PHAM_MENU,
+  NAV_PRIMARY_LINKS,
   getMegaMenuLinks,
 } from "@/lib/navConfig";
 import {
@@ -82,50 +83,43 @@ export default function MobileNavPanel({
         </div>
 
         <nav className="mobile-nav-body" aria-label="Mobile navigation">
-          {NAV_MEGA_MENUS.map((section) => (
-            <details key={section.id} className="mobile-nav-accordion">
-              <summary className="mobile-nav-accordion-trigger">
-                {section.label}
-                <ChevronDown size={18} className="mobile-nav-accordion-icon" />
-              </summary>
-              <div className="mobile-nav-accordion-content">
-                {section.href && (
-                  <Link
-                    href={section.href}
-                    className="mobile-nav-sublink mobile-nav-sublink--primary"
-                    onClick={onClose}
-                  >
-                    Xem tất cả {section.label.toLowerCase()} →
-                  </Link>
-                )}
-                {getMegaMenuLinks(section).map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="mobile-nav-sublink"
-                    onClick={onClose}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            </details>
-          ))}
+          <Link
+            href="/san-pham"
+            className="mobile-nav-sublink mobile-nav-sublink--primary mobile-nav-sublink--top"
+            onClick={onClose}
+          >
+            Xem danh mục sản phẩm →
+          </Link>
 
-          <Link
-            href="/dai-ly"
-            className="mobile-nav-sublink mobile-nav-sublink--solo"
-            onClick={onClose}
-          >
-            Đại lý
-          </Link>
-          <Link
-            href="/lien-he"
-            className="mobile-nav-sublink mobile-nav-sublink--solo"
-            onClick={onClose}
-          >
-            Liên hệ
-          </Link>
+          <details className="mobile-nav-accordion" open>
+            <summary className="mobile-nav-accordion-trigger">
+              {NAV_SAN_PHAM_MENU.label}
+              <ChevronDown size={18} className="mobile-nav-accordion-icon" />
+            </summary>
+            <div className="mobile-nav-accordion-content">
+              {getMegaMenuLinks(NAV_SAN_PHAM_MENU).map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="mobile-nav-sublink"
+                  onClick={onClose}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+
+          {NAV_PRIMARY_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="mobile-nav-sublink mobile-nav-sublink--solo"
+              onClick={onClose}
+            >
+              {link.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="mobile-nav-footer">
@@ -140,13 +134,13 @@ export default function MobileNavPanel({
               {CTA.primary.label}
             </TrackedLink>
             <TrackedLink
-              href={CTA.secondary.href}
-              trackEvent={CTA.secondary.event}
+              href="/lien-he"
+              trackEvent="contact_quote"
               trackSource="MOBILE_NAV"
               className="btn-secondary mobile-nav-cta"
               onClick={onClose}
             >
-              {CTA.secondary.label}
+              Liên hệ báo giá
             </TrackedLink>
           </div>
 

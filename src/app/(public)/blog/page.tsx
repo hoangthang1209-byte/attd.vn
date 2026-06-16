@@ -67,114 +67,44 @@ export default async function BlogPage({
               Chưa có bài viết nào.
             </div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                gap: "24px",
-                marginBottom: "48px",
-              }}
-            >
+            <div className="blog-card-grid">
               {posts.map((post) => (
                 <Link
                   key={post.id}
                   href={`/blog/${post.slug}`}
-                  style={{ textDecoration: "none", color: "inherit" }}
+                  className="blog-card-premium"
                 >
-                  <article
-                    style={{
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "12px",
-                      overflow: "hidden",
-                      background: "#fff",
-                      height: "100%",
-                      display: "flex",
-                      flexDirection: "column",
-                      transition: "box-shadow 0.2s",
-                    }}
-                  >
-                    {post.featuredImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={post.featuredImageUrl}
-                        alt={post.title}
-                        style={{
-                          width: "100%",
-                          height: "200px",
-                          objectFit: "cover",
-                        }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          height: "200px",
-                          background: "#f3f4f6",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#d1d5db",
-                          fontSize: "13px",
-                        }}
-                      >
-                        ATTD Blog
-                      </div>
-                    )}
+                  <article>
+                    <div className="blog-card-premium-img">
+                      {post.featuredImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={post.featuredImageUrl}
+                          alt={post.title}
+                          className="blog-card-premium-photo"
+                        />
+                      ) : (
+                        <div className="blog-card-premium-placeholder" aria-hidden>
+                          ATTD
+                        </div>
+                      )}
+                    </div>
 
-                    <div
-                      style={{
-                        padding: "20px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "10px",
-                        flex: 1,
-                      }}
-                    >
+                    <div className="blog-card-premium-body">
                       <time
                         dateTime={new Date(post.publishedAt ?? post.createdAt).toISOString()}
-                        style={{ fontSize: "12px", color: "#9ca3af" }}
+                        className="blog-card-premium-date"
                       >
                         {formatDate(post.publishedAt ?? post.createdAt)}
                       </time>
 
-                      <h2
-                        style={{
-                          fontSize: "16px",
-                          fontWeight: 700,
-                          lineHeight: 1.4,
-                          color: "#111827",
-                          margin: 0,
-                        }}
-                      >
-                        {post.title}
-                      </h2>
+                      <h2 className="blog-card-premium-title">{post.title}</h2>
 
                       {post.excerpt && (
-                        <p
-                          style={{
-                            fontSize: "14px",
-                            color: "#6b7280",
-                            lineHeight: 1.6,
-                            margin: 0,
-                            display: "-webkit-box",
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                          }}
-                        >
-                          {post.excerpt}
-                        </p>
+                        <p className="blog-card-premium-excerpt">{post.excerpt}</p>
                       )}
 
-                      <span
-                        style={{
-                          marginTop: "auto",
-                          fontSize: "13px",
-                          color: "#6b7280",
-                          fontWeight: 500,
-                        }}
-                      >
-                        Đọc thêm →
-                      </span>
+                      <span className="blog-card-premium-link">Đọc thêm →</span>
                     </div>
                   </article>
                 </Link>

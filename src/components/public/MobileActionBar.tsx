@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Phone, MessageCircle, UserPlus } from "lucide-react";
+import { Phone, MessageCircle, FileText } from "lucide-react";
 import { shouldShowMobileActionBar } from "@/lib/navConfig";
 import { getHotlineTel, getZaloUrl } from "@/lib/companyInfo";
 import { CTA } from "@/lib/ctaConfig";
@@ -16,11 +16,11 @@ export default function MobileActionBar() {
   return (
     <div className="mobile-action-bar" role="navigation" aria-label="Liên hệ nhanh">
       <a
-        href={`tel:${getHotlineTel()}`}
-        className="mobile-action-bar-btn mobile-action-bar-btn--call"
+        href="/lien-he"
+        className="mobile-action-bar-btn mobile-action-bar-btn--quote"
       >
-        <Phone size={20} strokeWidth={2} aria-hidden />
-        Gọi ngay
+        <FileText size={20} strokeWidth={2} aria-hidden />
+        Báo giá
       </a>
       <a
         href={getZaloUrl()}
@@ -35,7 +35,7 @@ export default function MobileActionBar() {
         href={CTA.primary.href}
         className="mobile-action-bar-btn mobile-action-bar-btn--dealer"
       >
-        <UserPlus size={20} strokeWidth={2} aria-hidden />
+        <Phone size={20} strokeWidth={2} aria-hidden />
         Đại lý
       </a>
     </div>

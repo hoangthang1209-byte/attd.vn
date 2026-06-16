@@ -3,9 +3,10 @@ import Link from "next/link";
 import { getCategories } from "@/features/categories/services/category.service";
 import { canonicalUrl, buildOgImages } from "@/lib/seo";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
-import TrackedLink from "@/components/analytics/TrackedLink";
 import FaqSchema from "@/components/seo/FaqSchema";
+import LandingHeroVisual from "@/components/public/LandingHeroVisual";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
+import { getLandingDemoImage } from "@/features/demo/demo-image-map";
 
 export async function generateMetadata(): Promise<Metadata> {
   const landing = await resolveBespokeLanding("nguon-hang");
@@ -70,80 +71,14 @@ export default async function WholesalePage() {
   return (
     <main>
       {landing.faq.length > 0 && <FaqSchema items={landing.faq} />}
-      {/* Hero */}
-      <section
-        className="section"
-        style={{ background: "#111827", color: "#fff" }}
-      >
-        <div className="container">
-          <p
-            style={{
-              fontSize: "13px",
-              fontWeight: 600,
-              letterSpacing: "0.1em",
-              color: "#9ca3af",
-              marginBottom: "16px",
-              textTransform: "uppercase",
-            }}
-          >
-            B2B Wholesale
-          </p>
-
-          <h1
-            style={{
-              fontSize: "clamp(32px, 5vw, 52px)",
-              fontWeight: 800,
-              lineHeight: 1.15,
-              margin: "0 0 20px",
-              maxWidth: "700px",
-            }}
-          >
-            {landing.heroTitle}
-          </h1>
-
-          <p
-            style={{
-              fontSize: "18px",
-              color: "#d1d5db",
-              lineHeight: 1.7,
-              maxWidth: "600px",
-              margin: "0 0 36px",
-            }}
-          >
-            {landing.heroDescription}
-          </p>
-
-          <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-            <TrackedLink
-              href={landing.primaryCtaHref}
-              trackEvent="dealer_registration_click"
-              trackSource="WHOLESALE_PAGE"
-              className="btn-primary"
-            >
-              {landing.primaryCtaLabel}
-            </TrackedLink>
-            <TrackedLink
-              href={landing.secondaryCtaHref}
-              trackEvent="contact_zalo"
-              trackSource="WHOLESALE_PAGE"
-              external
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                padding: "10px 24px",
-                border: "1px solid #4b5563",
-                borderRadius: "8px",
-                color: "#fff",
-                textDecoration: "none",
-                fontSize: "14px",
-                fontWeight: 600,
-              }}
-            >
-              {landing.secondaryCtaLabel}
-            </TrackedLink>
-          </div>
-        </div>
-      </section>
+      <LandingHeroVisual
+        eyebrow="B2B Wholesale"
+        title={landing.heroTitle}
+        description={landing.heroDescription}
+        imageUrl={getLandingDemoImage("nguon-hang")}
+        primaryCta={{ href: landing.primaryCtaHref, label: landing.primaryCtaLabel }}
+        secondaryCta={{ href: landing.secondaryCtaHref, label: landing.secondaryCtaLabel }}
+      />
 
       {/* Why ATTD */}
       <section className="section">

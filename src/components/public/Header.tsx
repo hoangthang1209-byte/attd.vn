@@ -8,9 +8,8 @@ import AttdLogo from "@/components/public/AttdLogo";
 import NavMegaMenuPanel from "@/components/public/NavMegaMenu";
 import MobileNavPanel from "@/components/public/MobileNavPanel";
 import {
-  NAV_MEGA_MENUS,
-  NAV_DEALER_LINK,
-  NAV_CONTACT_LINK,
+  NAV_SAN_PHAM_MENU,
+  NAV_PRIMARY_LINKS,
 } from "@/lib/navConfig";
 import { CTA } from "@/lib/ctaConfig";
 
@@ -34,32 +33,37 @@ export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
 
   return (
     <>
-      <header className={`site-header${scrolled ? " site-header--scrolled" : ""}`}>
+      <header className={`site-header site-header--premium${scrolled ? " site-header--scrolled" : ""}`}>
         <div className="container">
           <div className="site-header-inner">
             <AttdLogo variant="desktop" src={headerLogoUrl} className="site-header-logo-desktop" />
             <AttdLogo variant="mobile" src={headerLogoUrl} className="site-header-logo-mobile" />
 
             <nav className="site-nav-center" aria-label="Main navigation">
-              {NAV_MEGA_MENUS.map((item) => (
-                <NavMegaMenuPanel key={item.id} item={item} />
+              <NavMegaMenuPanel item={NAV_SAN_PHAM_MENU} />
+              {NAV_PRIMARY_LINKS.map((link) => (
+                <Link key={link.href} href={link.href} className="site-nav-link">
+                  {link.label}
+                </Link>
               ))}
-              <Link href={NAV_DEALER_LINK.href} className="site-nav-link">
-                {NAV_DEALER_LINK.label}
-              </Link>
             </nav>
 
             <div className="site-nav-actions">
-              <Link href={NAV_CONTACT_LINK.href} className="site-nav-link">
-                {NAV_CONTACT_LINK.label}
-              </Link>
+              <TrackedLink
+                href="/lien-he"
+                trackEvent="contact_quote"
+                trackSource="HEADER"
+                className="btn-secondary site-nav-cta-secondary"
+              >
+                Liên hệ báo giá
+              </TrackedLink>
               <TrackedLink
                 href={CTA.primary.href}
                 trackEvent={CTA.primary.event}
                 trackSource="HEADER"
                 className="btn-primary site-nav-cta"
               >
-                {CTA.primary.label}
+                Đăng ký đại lý
               </TrackedLink>
             </div>
 

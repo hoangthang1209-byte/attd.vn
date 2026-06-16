@@ -5,8 +5,10 @@ import { CTA } from "@/lib/ctaConfig";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import FaqSchema from "@/components/seo/FaqSchema";
+import LandingHeroVisual from "@/components/public/LandingHeroVisual";
 import { getZaloUrl } from "@/lib/companyInfo";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
+import { getLandingDemoImage } from "@/features/demo/demo-image-map";
 
 export async function generateMetadata(): Promise<Metadata> {
   const landing = await resolveBespokeLanding("oem");
@@ -43,89 +45,14 @@ export default async function OemPage() {
   return (
     <main>
       {faqItems.length > 0 && <FaqSchema items={landing.faq} />}
-      {/* Hero */}
-      <section
-        className="section"
-        style={{ background: "#111827", color: "#fff" }}
-      >
-        <div className="container">
-          <p
-            style={{
-              fontSize: "13px",
-              fontWeight: 600,
-              letterSpacing: "0.1em",
-              color: "#9ca3af",
-              marginBottom: "16px",
-              textTransform: "uppercase",
-            }}
-          >
-            Nguồn hàng B2B
-          </p>
-
-          <h1
-            style={{
-              fontSize: "clamp(32px, 5vw, 52px)",
-              fontWeight: 800,
-              lineHeight: 1.15,
-              margin: "0 0 20px",
-              maxWidth: "700px",
-            }}
-          >
-            {landing.heroTitle}
-          </h1>
-
-          <p
-            style={{
-              fontSize: "18px",
-              color: "#d1d5db",
-              lineHeight: 1.7,
-              maxWidth: "600px",
-              margin: "0 0 36px",
-            }}
-          >
-            {landing.heroDescription}
-          </p>
-
-          <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-            <TrackedLink
-              href={landing.primaryCtaHref}
-              trackEvent={CTA.primary.event}
-              trackSource="OEM_PAGE"
-              className="btn-primary"
-            >
-              {landing.primaryCtaLabel}
-            </TrackedLink>
-            <TrackedLink
-              href={landing.secondaryCtaHref}
-              trackEvent={CTA.secondary.event}
-              trackSource="OEM_PAGE"
-              className="btn-secondary"
-              style={{ background: "transparent", borderColor: "#4b5563", color: "#fff" }}
-            >
-              {landing.secondaryCtaLabel}
-            </TrackedLink>
-            <TrackedLink
-              href={getZaloUrl()}
-              trackEvent="contact_zalo"
-              trackSource="OEM_PAGE"
-              external
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                padding: "10px 24px",
-                border: "1px solid #4b5563",
-                borderRadius: "8px",
-                color: "#fff",
-                textDecoration: "none",
-                fontSize: "14px",
-                fontWeight: 600,
-              }}
-            >
-              Chat Zalo
-            </TrackedLink>
-          </div>
-        </div>
-      </section>
+      <LandingHeroVisual
+        eyebrow="OEM / Private Label"
+        title={landing.heroTitle}
+        description={landing.heroDescription}
+        imageUrl={getLandingDemoImage("oem")}
+        primaryCta={{ href: landing.primaryCtaHref, label: landing.primaryCtaLabel }}
+        secondaryCta={{ href: getZaloUrl(), label: "Chat Zalo" }}
+      />
 
       {/* OEM Capabilities */}
       <section className="section">

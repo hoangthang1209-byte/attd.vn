@@ -6,6 +6,7 @@ import BlogFaqSection from "@/components/blog/BlogFaqSection";
 import BlogTableOfContents from "@/components/blog/BlogTableOfContents";
 import BlogTags from "@/components/blog/BlogTags";
 import RelatedPosts from "@/components/blog/RelatedPosts";
+import BlogArticleCta from "@/components/public/BlogArticleCta";
 import ArticleSchema, { buildArticleDescription } from "@/components/seo/ArticleSchema";
 import FaqSchema from "@/components/seo/FaqSchema";
 import { parseFaqJson, parseTagsJson } from "@/features/blog/content-processor";
@@ -156,6 +157,8 @@ export default async function BlogDetailPage({ params }: PageProps) {
           </div>
         </section>
       </article>
+
+      <BlogArticleCta />
 
       <RelatedPosts posts={related} />
 

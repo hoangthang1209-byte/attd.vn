@@ -17,6 +17,15 @@ type SeedSummary = {
   caseStudies: GroupResult;
 };
 
+type ImageUpdateSummary = {
+  productsUpdated: number;
+  variantsUpdated: number;
+  categoriesUpdated: number;
+  blogPostsUpdated: number;
+  landingPagesUpdated: number;
+  skippedRealImages: number;
+};
+
 type StatusData = {
   demo: { products: number; variants: number; blogPosts: number; kbEntries: number; clientLogos: number; caseStudies: number };
   total: { products: number; variants: number; blogPosts: number; kbEntries: number; clientLogos: number; caseStudies: number; categories: number; blogCategories: number; kbCategories: number; landingPages: number };
@@ -59,6 +68,8 @@ export default function DemoContentSeeder() {
   const [result, setResult] = useState<SeedSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteResult, setDeleteResult] = useState<Record<string, number> | null>(null);
+  const [updatingImages, setUpdatingImages] = useState(false);
+  const [imageResult, setImageResult] = useState<ImageUpdateSummary | null>(null);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -89,6 +100,22 @@ export default function DemoContentSeeder() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSeeding(false);
+    }
+  }
+
+  async function handleUpdateImages() {
+    setUpdatingImages(true);
+    setError(null);
+    setImageResult(null);
+    try {
+      const res = await fetch("/api/admin/demo/images", { method: "POST" });
+      const data = await res.json() as { ok: boolean; summary?: ImageUpdateSummary; message?: string };
+      if (!data.ok) throw new Error(data.message ?? "Lỗi cập nhật ảnh demo");
+      setImageResult(data.summary ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUpdatingImages(false);
     }
   }
 
@@ -176,6 +203,51 @@ export default function DemoContentSeeder() {
           ))}
         </div>
       </div>
+
+      {/* Demo images */}
+      <div className="admin-catalog-fieldset">
+        <span className="admin-subtitle" style={{ display: "block", marginBottom: 8 }}>Ảnh demo sản phẩm &amp; bài viết</span>
+        <p className="admin-field-hint" style={{ marginBottom: 12 }}>
+          Cập nhật ảnh demo B2B (Unsplash) cho sản phẩm, gallery, biến thể, danh mục và blog.
+          Không ghi đè ảnh thật (Cloudinary / ảnh do staff upload).
+        </p>
+        <button
+          type="button"
+          className="admin-btn admin-btn--primary"
+          disabled={seeding || deleting || updatingImages}
+          onClick={() => void handleUpdateImages()}
+        >
+          {updatingImages ? "⏳ Đang cập nhật…" : "🖼 Cập nhật ảnh demo"}
+        </button>
+      </div>
+
+      {imageResult && (
+        <div className="admin-catalog-fieldset" style={{ borderColor: "#bfdbfe", background: "#eff6ff" }}>
+          <p className="admin-subtitle" style={{ margin: "0 0 12px", color: "#1e40af" }}>✓ Kết quả cập nhật ảnh demo</p>
+          <div className="admin-demo-results">
+            <div className="admin-demo-result-row">
+              <span className="admin-demo-result-label">Sản phẩm</span>
+              <span className="admin-demo-result-stat admin-demo-result-updated">{imageResult.productsUpdated} đã cập nhật</span>
+            </div>
+            <div className="admin-demo-result-row">
+              <span className="admin-demo-result-label">Biến thể</span>
+              <span className="admin-demo-result-stat admin-demo-result-updated">{imageResult.variantsUpdated} đã cập nhật</span>
+            </div>
+            <div className="admin-demo-result-row">
+              <span className="admin-demo-result-label">Danh mục</span>
+              <span className="admin-demo-result-stat admin-demo-result-updated">{imageResult.categoriesUpdated} đã cập nhật</span>
+            </div>
+            <div className="admin-demo-result-row">
+              <span className="admin-demo-result-label">Bài viết</span>
+              <span className="admin-demo-result-stat admin-demo-result-updated">{imageResult.blogPostsUpdated} đã cập nhật</span>
+            </div>
+            <div className="admin-demo-result-row">
+              <span className="admin-demo-result-label">Đã bỏ qua ảnh thật</span>
+              <span className="admin-demo-result-stat admin-demo-result-skipped">{imageResult.skippedRealImages}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Result panel */}
       {result && (

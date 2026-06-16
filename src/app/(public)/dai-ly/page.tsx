@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
+import LandingHeroVisual from "@/components/public/LandingHeroVisual";
 import { canonicalUrl } from "@/lib/seo";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
+import { getLandingDemoImage } from "@/features/demo/demo-image-map";
 
 export async function generateMetadata(): Promise<Metadata> {
   const landing = await resolveBespokeLanding("dai-ly");
@@ -36,73 +38,34 @@ export default async function DaiLyPage() {
 
   return (
     <main>
-      <section className="section">
+      <LandingHeroVisual
+        eyebrow="Chương trình đại lý"
+        title={landing.heroTitle}
+        description={landing.heroDescription}
+        imageUrl={getLandingDemoImage("dai-ly")}
+        dark={false}
+        primaryCta={{ href: "/lien-he", label: "Liên hệ báo giá" }}
+        secondaryCta={{ href: "#dealer-form", label: "Đăng ký đại lý" }}
+      />
+
+      <section className="section landing-benefits-section">
         <div className="container">
-          <div
-            className="grid grid-cols-1 lg:grid-cols-2"
-            style={{ gap: "64px", alignItems: "start" }}
-          >
+          <div className="landing-benefits-grid">
             <div>
-              <div
-                style={{
-                  display: "inline-block",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "var(--primary)",
-                  background: "#fff0f0",
-                  padding: "4px 12px",
-                  borderRadius: "20px",
-                  marginBottom: "16px",
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Chương trình đại lý
-              </div>
-
-              <h1
-                style={{
-                  fontSize: "40px",
-                  fontWeight: 700,
-                  lineHeight: 1.2,
-                  margin: "0 0 16px",
-                }}
-              >
-                {landing.heroTitle}
-              </h1>
-
-              <p
-                style={{
-                  fontSize: "17px",
-                  color: "#6b7280",
-                  lineHeight: 1.7,
-                  margin: "0 0 40px",
-                }}
-              >
-                {landing.heroDescription}
-              </p>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                }}
-              >
+              <h2 className="section-title" style={{ marginBottom: 24 }}>
+                Quyền lợi đại lý ATTD
+              </h2>
+              <div className="landing-benefits-cards">
                 {BENEFITS.map((benefit) => (
-                  <div key={benefit.title} className="card" style={{ padding: "20px" }}>
-                    <h3 style={{ margin: "0 0 8px", fontSize: "15px", fontWeight: 600 }}>
-                      {benefit.title}
-                    </h3>
-                    <p style={{ margin: 0, fontSize: "14px", color: "#6b7280", lineHeight: 1.6 }}>
-                      {benefit.description}
-                    </p>
+                  <div key={benefit.title} className="card landing-benefit-card">
+                    <h3 className="landing-benefit-title">{benefit.title}</h3>
+                    <p className="landing-benefit-desc">{benefit.description}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div>
+            <div id="dealer-form">
               <DealerLeadForm
                 source="DEALER_FORM"
                 title="Đăng ký đại lý"

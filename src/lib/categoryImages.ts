@@ -4,6 +4,10 @@
  */
 
 import { resolveUploadImage, isValidImageSrc } from "@/lib/imagePaths";
+import {
+  categoryDemoImages,
+  getLandingDemoImage,
+} from "@/features/demo/demo-image-map";
 
 export type CategoryImageConfig = {
   /** Hero banner filename or path */
@@ -29,7 +33,8 @@ export function getCategoryHeroImage(
 
   if (configHero && isValidImageSrc(configHero)) return configHero;
   if (dbImageUrl && isValidImageSrc(dbImageUrl)) return dbImageUrl.trim();
-  return null;
+  if (categoryDemoImages[slug]) return categoryDemoImages[slug];
+  return getLandingDemoImage(slug);
 }
 
 export function getCategoryGalleryImages(slug: string): string[] {
