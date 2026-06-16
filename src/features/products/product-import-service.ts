@@ -284,10 +284,8 @@ export async function executeProductImport(
   }
 
   if (jobId) {
-    await prisma.productImportJob.update({
-      where: { id: jobId },
-      data: { ...result, status: "DONE" },
-    });
+    const { updateProductImportJobExecute } = await import("@/features/products/product-import-job-service");
+    await updateProductImportJobExecute(jobId, result);
   }
 
   return result;

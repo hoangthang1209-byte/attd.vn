@@ -565,25 +565,48 @@ enum ProductImportJobStatus {
   PROCESSING
   DONE
   FAILED
+  UPLOADED
+  PREVIEWED
+  VALIDATED
+  COMPLETED
+  PARTIAL
 }
 
 model ProductImportJob {
-  id               String                 @id @default(cuid())
-  fileName         String
-  status           ProductImportJobStatus @default(PENDING)
-  totalRows        Int                    @default(0)
-  createdProducts  Int                    @default(0)
-  updatedProducts  Int                    @default(0)
-  createdVariants  Int                    @default(0)
-  updatedVariants  Int                    @default(0)
-  skippedRows      Int                    @default(0)
-  invalidRows      Int                    @default(0)
-  duplicateRows    Int                    @default(0)
-  createdCategories Int                   @default(0)
-  errors           Json?
-  metadata         Json?
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
+  id                String                 @id @default(cuid())
+  fileName          String
+  fileType          String?
+  fileSize          Int?
+  uploadedBy        String?
+  preset            String?
+  duplicateStrategy String?
+  status            ProductImportJobStatus @default(PENDING)
+  totalRows         Int                    @default(0)
+  validRows         Int                    @default(0)
+  createdProducts   Int                    @default(0)
+  updatedProducts   Int                    @default(0)
+  createdVariants   Int                    @default(0)
+  updatedVariants   Int                    @default(0)
+  skippedRows       Int                    @default(0)
+  invalidRows       Int                    @default(0)
+  duplicateRows     Int                    @default(0)
+  createdCategories Int                    @default(0)
+  errorCount        Int                    @default(0)
+  warningCount      Int                    @default(0)
+  originalFileUrl   String?
+  originalFileKey   String?
+  feedbackFileUrl   String?
+  feedbackFileKey   String?
+  errors            Json?
+  metadata          Json?
+  summaryJson       Json?
+  errorsJson        Json?
+  warningsJson      Json?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
 }
 
 model KnowledgeBaseCategory {

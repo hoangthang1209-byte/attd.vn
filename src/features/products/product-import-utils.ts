@@ -132,6 +132,19 @@ export function validateImportRow(row: ProductImportRow): ProductImportValidatio
   if (row.dealerPrice !== undefined && row.dealerPrice < 0) {
     errors.push({ field: "dealerPrice", message: "Giá đại lý không hợp lệ." });
   }
+  if (row.featuredImage && !/^https?:\/\/.+/i.test(row.featuredImage)) {
+    errors.push({ field: "featuredImage", message: "URL ảnh không hợp lệ." });
+  }
+  if (row.priceTiers) {
+    try {
+      const parsed = JSON.parse(row.priceTiers);
+      if (!Array.isArray(parsed)) {
+        errors.push({ field: "priceTiers", message: "priceTiers phải là mảng JSON." });
+      }
+    } catch {
+      errors.push({ field: "priceTiers", message: "priceTiers không phải JSON hợp lệ." });
+    }
+  }
 
   return errors;
 }

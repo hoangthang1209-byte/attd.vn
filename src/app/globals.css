@@ -7410,6 +7410,15 @@ body:has(.mobile-action-bar) .site-footer {
 .admin-bulk-import-step:last-child { border-right: 1px solid #e5e7eb; border-radius: 0 6px 6px 0; }
 .admin-bulk-import-step.is-active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
 .admin-bulk-import-step.is-done { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+.admin-bulk-import-tabs { display: flex; gap: 0; margin-bottom: 4px; }
+.admin-bulk-import-tab {
+  padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer;
+  border: 1px solid #e5e7eb; background: #f9fafb; color: #374151;
+}
+.admin-bulk-import-tab:first-child { border-radius: 6px 0 0 6px; }
+.admin-bulk-import-tab:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+.admin-bulk-import-tab.is-active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+.admin-import-history { display: flex; flex-direction: column; gap: 16px; }
 
 .admin-catalog-mapping-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 @media (max-width: 700px) { .admin-catalog-mapping-grid { grid-template-columns: 1fr; } }
