@@ -182,6 +182,7 @@ export default async function CategoryPage({ params }: PageProps) {
                 gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
                 gap: 24,
               }}
+              className="hp-product-grid"
             >
               {cat.products.map((product) => (
                 <ProductCard

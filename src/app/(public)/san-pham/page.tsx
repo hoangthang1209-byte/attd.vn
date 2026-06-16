@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getProductsForPublicListing } from "@/features/products/services/product.service";
-import { getCategories } from "@/features/categories/services/category.service";
+import { getCategoriesWithCounts } from "@/features/categories/services/category.service";
 import ProductCard from "@/components/public/ProductCard";
+import CatalogPopularCategories from "@/components/public/CatalogPopularCategories";
 import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import TrustBlock from "@/components/public/TrustBlock";
@@ -33,7 +34,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
   const [{ products, total, perPage }, categories] = await Promise.all([
     getProductsForPublicListing({ categorySlug: category, search: q, page }),
-    getCategories(),
+    getCategoriesWithCounts(),
   ]);
 
   const totalPages = Math.ceil(total / perPage);
@@ -75,6 +76,19 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
           </div>
         </div>
       </section>
+
+      {!category && !q && (
+        <CatalogPopularCategories
+          categories={categories.map((c) => ({
+            id: c.id,
+            name: c.name,
+            slug: c.slug,
+            imageUrl: c.imageUrl,
+            description: c.description,
+            productCount: c._count.products,
+          }))}
+        />
+      )}
 
       {/* ── Filter + Search ──────────────────────────────────────────────── */}
       <section className="catalog-filter-bar">
@@ -200,18 +214,20 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
       </section>
 
       {/* ── CTA ──────────────────────────────────────────────────────────── */}
-      <section className="section-alt section-compact">
-        <div className="container" style={{ maxWidth: 680, textAlign: "center" }}>
-          <h2 className="section-title" style={{ fontSize: 24, marginBottom: 12 }}>
-            Không tìm thấy sản phẩm cần?
-          </h2>
-          <p className="section-description" style={{ marginBottom: 24 }}>
-            ATTD.vn có hơn 100 mã sản phẩm đồng phục và quà tặng — liên hệ để
-            được tư vấn nguồn hàng phù hợp.
-          </p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-            <Link href="/lien-he" className="btn-primary">Liên hệ báo giá</Link>
-            <Link href="/dai-ly" className="btn-secondary">Đăng ký đại lý</Link>
+      <section className="catalog-suggest-cta">
+        <div className="container">
+          <div className="catalog-suggest-inner">
+            <h2 className="catalog-suggest-title">
+              Chưa tìm thấy sản phẩm phù hợp?
+            </h2>
+            <p className="catalog-suggest-desc">
+              Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, MOQ và lead-time.
+              {total > 0 && ` Hiện có ${total} sản phẩm đang mở trên catalog.`}
+            </p>
+            <div className="catalog-suggest-btns">
+              <Link href="/lien-he" className="btn-primary">Liên hệ báo giá sỉ</Link>
+              <Link href="/dai-ly" className="btn-secondary">Đăng ký đại lý</Link>
+            </div>
           </div>
         </div>
       </section>

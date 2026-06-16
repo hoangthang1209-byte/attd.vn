@@ -7794,3 +7794,51 @@ body:has(.mobile-action-bar) .site-footer {
   .hp-product-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .hp-blog-grid { grid-template-columns: 1fr; }
 }
+
+/* ─── Patch 24.9.4a (cont): Discovery strip, catalog polish ───────────────── */
+
+/* Marketplace discovery strip */
+.hp-discovery { padding: 56px 0; background: #111827; color: #fff; }
+.hp-discovery-inner { display: grid; grid-template-columns: 1fr 1.1fr; gap: 40px; align-items: center; }
+.hp-discovery-title { font-size: clamp(20px, 2.5vw, 28px); font-weight: 800; letter-spacing: -0.03em; margin: 0 0 12px; color: #fff; }
+.hp-discovery-desc { font-size: 15px; color: rgba(255,255,255,.72); line-height: 1.65; margin: 0 0 24px; max-width: 440px; }
+.hp-discovery-stats { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 24px; }
+.hp-discovery-stat { display: flex; flex-direction: column; gap: 2px; }
+.hp-discovery-stat-value { font-size: 28px; font-weight: 800; color: #fff; line-height: 1; }
+.hp-discovery-stat-label { font-size: 12px; color: rgba(255,255,255,.55); }
+.hp-discovery-cta { display: inline-flex; }
+.hp-discovery-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.hp-discovery-chip { display: flex; flex-direction: column; gap: 4px; padding: 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 10px; text-decoration: none; color: #fff; transition: background .15s, transform .15s; }
+.hp-discovery-chip:hover { background: rgba(255,255,255,.12); transform: translateY(-2px); }
+.hp-discovery-chip-img { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: rgba(255,255,255,.08); }
+.hp-discovery-chip-photo { object-fit: cover; }
+.hp-discovery-chip-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: rgba(255,255,255,.35); letter-spacing: .06em; background: linear-gradient(135deg, #dc2626, #991b1b); }
+.hp-discovery-chip-name { font-size: 11px; font-weight: 600; line-height: 1.3; color: rgba(255,255,255,.9); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hp-discovery-chip-meta { font-size: 10px; color: rgba(255,255,255,.45); }
+
+@media (max-width: 900px) {
+  .hp-discovery-inner { grid-template-columns: 1fr; }
+  .hp-discovery-chips { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 640px) {
+  .hp-discovery-chips { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Catalog popular categories strip */
+.catalog-popular-cats { padding: 24px 0 8px; background: var(--section-bg); border-bottom: 1px solid var(--border); }
+.catalog-popular-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; margin: 0 0 14px; }
+.catalog-popular-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.catalog-popular-oem { min-height: 0; }
+
+/* Catalog suggest CTA */
+.catalog-suggest-cta { padding: 56px 0; background: var(--section-bg); border-top: 1px solid var(--border); }
+.catalog-suggest-inner { max-width: 640px; margin: 0 auto; text-align: center; }
+.catalog-suggest-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 10px; }
+.catalog-suggest-desc { font-size: 15px; color: #6b7280; line-height: 1.65; margin: 0 0 24px; }
+.catalog-suggest-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* Product inquiry price note */
+.inquiry-box-price-note { font-size: 12px; color: #6b7280; line-height: 1.55; margin: 0 0 14px; padding: 10px 12px; background: #f9fafb; border-radius: 8px; border: 1px solid #f3f4f6; }
+
+/* Mobile nav primary sublink */
+.mobile-nav-sublink--primary { font-weight: 700 !important; color: var(--primary) !important; border-bottom: 1px solid #f3f4f6; margin-bottom: 4px; padding-bottom: 10px !important; }

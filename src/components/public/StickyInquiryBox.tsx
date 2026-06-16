@@ -38,6 +38,10 @@ export default function StickyInquiryBox({
           Liên hệ ATTD để nhận báo giá sỉ dành cho đại lý, xưởng in và doanh
           nghiệp. Hỗ trợ tư vấn nguồn hàng và gia công theo yêu cầu.
         </p>
+        <p className="inquiry-box-price-note">
+          Giá thay đổi theo số lượng, tồn kho và yêu cầu in/thêu/OEM.
+          Liên hệ để nhận báo giá sỉ — không hiển thị giá công khai.
+        </p>
         <div className="btn-row">
           <TrackedLink
             href={CTA.primary.href}

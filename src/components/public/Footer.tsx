@@ -7,6 +7,7 @@ import {
 import { FOOTER_TRUST } from "@/lib/siteContent";
 
 const FOOTER_PRODUCTS = [
+  { href: "/san-pham", label: "Tất cả sản phẩm" },
   { href: "/ao-thun-tron", label: "Áo thun trơn" },
   { href: "/ao-polo-tron", label: "Áo polo trơn" },
   { href: "/non", label: "Nón" },

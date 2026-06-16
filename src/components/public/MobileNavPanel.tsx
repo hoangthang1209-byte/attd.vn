@@ -89,6 +89,15 @@ export default function MobileNavPanel({
                 <ChevronDown size={18} className="mobile-nav-accordion-icon" />
               </summary>
               <div className="mobile-nav-accordion-content">
+                {section.href && (
+                  <Link
+                    href={section.href}
+                    className="mobile-nav-sublink mobile-nav-sublink--primary"
+                    onClick={onClose}
+                  >
+                    Xem tất cả {section.label.toLowerCase()} →
+                  </Link>
+                )}
                 {getMegaMenuLinks(section).map((link) => (
                   <Link
                     key={link.href}

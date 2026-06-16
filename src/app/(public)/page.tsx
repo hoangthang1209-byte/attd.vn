@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getCategoriesWithCounts } from "@/features/categories/services/category.service";
-import { getProductsForPublicListing } from "@/features/products/services/product.service";
+import { getProductsForPublicListing, getPublicCatalogStats } from "@/features/products/services/product.service";
 import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
 import HeroSection from "@/components/public/HeroSection";
 import type { HeroMosaicItem } from "@/components/public/HeroSection";
@@ -10,7 +10,7 @@ import SocialProofSection from "@/components/public/SocialProofSection";
 import ClientLogoWall from "@/components/public/ClientLogoWall";
 import CaseStudySection from "@/components/public/CaseStudySection";
 import TrustBanner from "@/components/public/TrustBanner";
-import CTASection from "@/components/public/CTASection";
+import MarketplaceDiscoveryStrip from "@/components/public/MarketplaceDiscoveryStrip";
 import ProductCard from "@/components/public/ProductCard";
 import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
 import { isValidImageSrc } from "@/lib/imagePaths";
@@ -106,10 +106,12 @@ export default async function HomePage() {
     categories,
     { products: featuredProducts },
     { posts: blogPosts },
+    catalogStats,
   ] = await Promise.all([
     getCategoriesWithCounts(),
     getProductsForPublicListing({ page: 1, perPage: 12 }),
     getPublishedBlogPosts(1, 4),
+    getPublicCatalogStats(),
   ]);
 
   // Build hero mosaic from first 6 featured products
@@ -262,6 +264,19 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ── 5. Marketplace discovery strip ─────────────────────────────── */}
+      <MarketplaceDiscoveryStrip
+        productCount={catalogStats.productCount}
+        variantCount={catalogStats.variantCount}
+        categoryCount={catalogStats.categoryCount}
+        chips={featuredProducts.map((p) => ({
+          slug: p.slug,
+          name: p.name,
+          imageUrl: getPrimaryProductImageFromProduct(p),
+          skuCount: p.variants.length,
+        }))}
+      />
 
       {/* ── 6. Why ATTD ──────────────────────────────────────────────── */}
       <section className="hp-section">

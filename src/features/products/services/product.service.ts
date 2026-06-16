@@ -86,6 +86,18 @@ export async function getProductsForPublicListing(params: {
   return { products, total, page, perPage };
 }
 
+/** Lightweight counts for homepage marketplace strip. */
+export async function getPublicCatalogStats() {
+  const [productCount, variantCount, categoryCount] = await Promise.all([
+    prisma.product.count({ where: { status: "ACTIVE", slug: { not: "" } } }),
+    prisma.productVariant.count({
+      where: { product: { status: "ACTIVE", slug: { not: "" } } },
+    }),
+    prisma.category.count(),
+  ]);
+  return { productCount, variantCount, categoryCount };
+}
+
 /** Returns up to `limit` active products in the same category, excluding the given product. */
 export async function getRelatedProducts(
   categoryId: string,

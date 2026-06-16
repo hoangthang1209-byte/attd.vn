@@ -39,6 +39,16 @@ export const NAV_MEGA_MENUS: NavMegaMenu[] = [
     href: "/san-pham",
     columns: [
       {
+        title: "Tất cả sản phẩm",
+        links: [
+          {
+            href: "/san-pham",
+            label: "Danh mục sản phẩm sỉ",
+            description: "Xem toàn bộ catalog B2B",
+          },
+        ],
+      },
+      {
         title: "Blank apparel",
         links: [
           {
