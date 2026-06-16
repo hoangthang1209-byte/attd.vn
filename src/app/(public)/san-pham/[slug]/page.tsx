@@ -16,7 +16,10 @@ import {
   canonicalUrl,
   buildOgImages,
 } from "@/lib/seo";
-import { getPrimaryProductImage } from "@/lib/productImages";
+import {
+  buildProductImages,
+  getPrimaryProductImageFromProduct,
+} from "@/lib/productImages";
 import {
   getCatalogProduct,
   isCatalogProduct,
@@ -44,14 +47,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     product?.shortDescription ??
     product?.description ??
     DEFAULT_DESCRIPTION;
-  const ogImages = buildOgImages(product?.images[0]?.imageUrl);
+
+  const primaryImage = product ? getPrimaryProductImageFromProduct(product) : null;
+  const ogImages = buildOgImages(primaryImage ?? product?.images[0]?.imageUrl);
 
   return {
     title,
     description,
-    alternates: {
-      canonical: canonicalUrl(`/san-pham/${slug}`),
-    },
+    alternates: { canonical: canonicalUrl(`/san-pham/${slug}`) },
     openGraph: {
       title: catalog?.seoTitle ?? product?.seoTitle ?? catalog?.name ?? product?.name,
       description,
@@ -69,6 +72,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
+const STOCK_LABELS: Record<string, string> = {
+  IN_STOCK: "Còn hàng",
+  LOW_STOCK: "Sắp hết hàng",
+  OUT_OF_STOCK: "Hết hàng / Đặt trước",
+};
+const STOCK_COLORS: Record<string, string> = {
+  IN_STOCK: "#16a34a",
+  LOW_STOCK: "#d97706",
+  OUT_OF_STOCK: "#dc2626",
+};
+const STOCK_STATUS_LABEL: Record<string, string> = {
+  IN_STOCK: "Còn hàng",
+  LOW_STOCK: "Sắp hết",
+  OUT_OF_STOCK: "Hết hàng",
+};
+
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
   const catalog = getCatalogProduct(slug);
@@ -77,35 +96,30 @@ export default async function ProductDetailPage({ params }: PageProps) {
   if (!product) notFound();
 
   const displayName = catalog?.name ?? product.name;
-  const displayShortDescription =
-    catalog?.shortDescription ?? product.shortDescription;
+  const displayShortDescription = catalog?.shortDescription ?? product.shortDescription;
   const displayContent = catalog?.content ?? product.description;
   const categoryName = catalog?.categoryName ?? product.category.name;
   const categorySlug = catalog?.categorySlug ?? product.category.slug;
 
-  // Fetch related products in parallel (non-blocking)
-  const relatedProducts = await getRelatedProducts(
-    product.category.id,
-    product.id,
-    4
-  );
+  // Unified image list (legacy ProductImage + new featuredImage/gallery)
+  const unifiedImages = buildProductImages(product);
+
+  const relatedProducts = await getRelatedProducts(product.category.id, product.id, 4);
 
   const uniqueColors = [
     ...new Set(
       product.variants
-        .map((v) => v.color?.name)
+        .map((v) => v.colorName ?? v.color?.name)
         .filter((c): c is string => Boolean(c))
     ),
   ];
-
   const uniqueSizes = [
     ...new Set(
       product.variants
-        .map((v) => v.size?.name)
+        .map((v) => v.sizeName ?? v.size?.name)
         .filter((s): s is string => Boolean(s))
     ),
   ];
-
   const skuCount = product.variants.length;
 
   const stockStatuses = product.variants.map((v) => v.stockStatus);
@@ -118,25 +132,14 @@ export default async function ProductDetailPage({ params }: PageProps) {
       ? "LOW_STOCK"
       : "OUT_OF_STOCK";
 
-  const stockLabel =
-    aggregateStock === "IN_STOCK"
-      ? "Còn hàng"
-      : aggregateStock === "LOW_STOCK"
-      ? "Sắp hết hàng"
-      : aggregateStock === "OUT_OF_STOCK"
-      ? "Hết hàng"
-      : null;
+  const stockLabel = aggregateStock ? STOCK_LABELS[aggregateStock] : null;
+  const stockColor = aggregateStock ? STOCK_COLORS[aggregateStock] : "#16a34a";
 
-  const stockColor =
-    aggregateStock === "IN_STOCK"
-      ? "#16a34a"
-      : aggregateStock === "LOW_STOCK"
-      ? "#d97706"
-      : "#dc2626";
-
-  const hasSpecs =
-    !isCatalogProduct(slug) &&
-    (product.gsm || product.material || product.fit);
+  const hasSpecs = !isCatalogProduct(slug) && (product.material || product.form || product.fit);
+  const hasB2bInfo = product.defaultMoq || product.leadTime || skuCount > 0 || uniqueColors.length > 0;
+  const hasFeatures = product.supportsPrinting || product.supportsEmbroidery || product.supportsOem;
+  const hasUseCases = Array.isArray(product.useCases) && (product.useCases as string[]).length > 0;
+  const hasTargetCustomers = Array.isArray(product.targetCustomers) && (product.targetCustomers as string[]).length > 0;
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -155,52 +158,57 @@ export default async function ProductDetailPage({ params }: PageProps) {
     ...((catalog?.sku ?? product.productCode) && {
       sku: catalog?.sku ?? product.productCode,
     }),
-    ...(product.images.length > 0 && {
-      image: product.images.map((img) => img.imageUrl),
+    ...(unifiedImages.length > 0 && {
+      image: unifiedImages.map((img) => img.imageUrl),
     }),
     url: canonicalUrl(`/san-pham/${slug}`),
   };
 
-  const legacyFaqItems = [
+  const faqItems = catalog?.faqs ?? [
     {
       question: "Sản phẩm có nhận in logo không?",
-      answer: "Có. ATTD hỗ trợ in logo theo yêu cầu.",
+      answer: product.supportsPrinting
+        ? "Có. Sản phẩm này hỗ trợ in logo theo yêu cầu."
+        : "Liên hệ ATTD để được tư vấn kỹ thuật in phù hợp.",
     },
     {
-      question: "Số lượng tối thiểu là bao nhiêu?",
-      answer: "Liên hệ để được tư vấn theo từng dòng sản phẩm.",
+      question: "Số lượng tối thiểu (MOQ) là bao nhiêu?",
+      answer: product.defaultMoq
+        ? `MOQ là ${product.defaultMoq} cái. Liên hệ để biết chính sách ưu đãi theo số lượng.`
+        : "Liên hệ ATTD để được tư vấn MOQ theo từng dòng sản phẩm.",
     },
     {
-      question: "Có hỗ trợ gửi mẫu không?",
-      answer: "Có thể hỗ trợ gửi mẫu tùy sản phẩm.",
+      question: "Thời gian giao hàng là bao lâu?",
+      answer: product.leadTime
+        ? product.leadTime
+        : "Hàng có sẵn kho giao trong 1–3 ngày. Đặt hàng số lượng lớn hoặc gia công theo yêu cầu: 5–20 ngày.",
     },
-  ];
-
-  const faqItems = catalog?.faqs ?? legacyFaqItems;
-
-  const legacyInternalLinks = [
-    { href: "/nguon-hang", label: "Nguồn hàng sỉ" },
-    { href: "/chinh-sach-dai-ly", label: "Chính sách đại lý" },
-    { href: "/oem", label: "OEM & Private Label" },
-    { href: "/qua-tang-doanh-nghiep", label: "Quà tặng DN" },
+    {
+      question: "Có hỗ trợ giao hàng toàn quốc không?",
+      answer: "Có. ATTD giao hàng toàn quốc qua đơn vị vận chuyển đối tác.",
+    },
   ];
 
   const internalLinks = catalog
     ? getCatalogInternalLinks(catalog.categorySlug)
-    : legacyInternalLinks;
+    : [
+        { href: "/nguon-hang", label: "Nguồn hàng sỉ" },
+        { href: "/chinh-sach-dai-ly", label: "Chính sách đại lý" },
+        { href: "/oem", label: "OEM & Private Label" },
+        { href: "/qua-tang-doanh-nghiep", label: "Quà tặng DN" },
+      ];
 
   return (
     <main>
-      {/* ── Structured Data ──────────────────────────────────────────────── */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
       />
       <FaqSchema items={faqItems} />
 
-      {/* ── Breadcrumb (visual + BreadcrumbList JSON-LD) ─────────────────── */}
       <Breadcrumb
         items={[
+          { name: "Sản phẩm", href: "/san-pham" },
           { name: categoryName, href: `/${categorySlug}` },
           { name: displayName, href: `/san-pham/${slug}` },
         ]}
@@ -209,145 +217,108 @@ export default async function ProductDetailPage({ params }: PageProps) {
       {/* ── Product Hero ─────────────────────────────────────────────────── */}
       <section className="section-compact">
         <div className="container">
-          <div
-            className="grid grid-cols-1 lg:grid-cols-2"
-            style={{ gap: 56, alignItems: "start" }}
-          >
-            <ProductImageGallery
-              images={product.images}
-              productName={displayName}
-            />
+          <div className="product-detail-layout">
+            {/* Left: Gallery */}
+            <div className="product-detail-gallery">
+              <ProductImageGallery
+                images={unifiedImages}
+                productName={displayName}
+              />
+            </div>
 
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  alignItems: "center",
-                  marginBottom: 16,
-                  flexWrap: "wrap",
-                }}
-              >
+            {/* Right: Info */}
+            <div className="product-detail-info">
+              {/* Category + code */}
+              <div className="product-detail-meta">
                 {(catalog?.sku ?? product.productCode) && (
                   <span className="product-meta-pill">
                     {catalog?.sku ?? product.productCode}
                   </span>
                 )}
-                <Link
-                  href={`/${categorySlug}`}
-                  style={{ fontSize: 14, color: "#6b7280", fontWeight: 500 }}
-                >
+                <Link href={`/${categorySlug}`} className="product-detail-cat-link">
                   {categoryName}
                 </Link>
               </div>
 
-              <h1
-                style={{
-                  fontSize: "clamp(28px, 3.5vw, 36px)",
-                  fontWeight: 700,
-                  lineHeight: 1.15,
-                  letterSpacing: "-0.02em",
-                  margin: "0 0 20px",
-                }}
-              >
-                {displayName}
-              </h1>
+              <h1 className="product-detail-title">{displayName}</h1>
 
               {displayShortDescription && (
-                <p
-                  style={{
-                    color: "#6b7280",
-                    lineHeight: 1.75,
-                    fontSize: 16,
-                    margin: "0 0 28px",
-                  }}
-                >
-                  {displayShortDescription}
-                </p>
+                <p className="product-detail-short-desc">{displayShortDescription}</p>
               )}
 
+              {/* Specs table */}
               {hasSpecs && (
-                <div className="premium-card-static" style={{ marginBottom: 24, padding: 20 }}>
-                  <dl
-                    style={{
-                      margin: 0,
-                      display: "grid",
-                      gridTemplateColumns: "auto 1fr",
-                      gap: "8px 20px",
-                      alignItems: "baseline",
-                    }}
-                  >
-                    {product.gsm && (
-                      <>
-                        <dt style={{ color: "#6b7280", fontSize: "14px", whiteSpace: "nowrap" }}>
-                          GSM
-                        </dt>
-                        <dd style={{ margin: 0, fontWeight: 500 }}>
-                          {product.gsm} gsm
-                        </dd>
-                      </>
-                    )}
+                <div className="product-specs-card">
+                  <dl className="product-specs-dl">
                     {product.material && (
                       <>
-                        <dt style={{ color: "#6b7280", fontSize: "14px", whiteSpace: "nowrap" }}>
-                          Chất liệu
-                        </dt>
-                        <dd style={{ margin: 0, fontWeight: 500 }}>
-                          {product.material}
-                        </dd>
+                        <dt>Chất liệu</dt>
+                        <dd>{product.material}</dd>
+                      </>
+                    )}
+                    {product.form && (
+                      <>
+                        <dt>Kiểu dáng</dt>
+                        <dd>{product.form}</dd>
                       </>
                     )}
                     {product.fit && (
                       <>
-                        <dt style={{ color: "#6b7280", fontSize: "14px", whiteSpace: "nowrap" }}>
-                          Form
-                        </dt>
-                        <dd style={{ margin: 0, fontWeight: 500 }}>
-                          {product.fit}
-                        </dd>
+                        <dt>Form</dt>
+                        <dd>{product.fit}</dd>
+                      </>
+                    )}
+                    {product.gsm && (
+                      <>
+                        <dt>GSM</dt>
+                        <dd>{product.gsm} gsm</dd>
                       </>
                     )}
                   </dl>
                 </div>
               )}
 
-              {/* SKU summary + B2B info */}
-              {(skuCount > 0 || product.defaultMoq || product.leadTime) && (
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 20,
-                    flexWrap: "wrap",
-                    fontSize: 14,
-                    color: "#374151",
-                    marginBottom: 28,
-                    padding: "16px 0",
-                    borderTop: "1px solid #f3f4f6",
-                    borderBottom: "1px solid #f3f4f6",
-                  }}
-                >
+              {/* B2B summary strip */}
+              {hasB2bInfo && (
+                <div className="product-b2b-strip">
                   {skuCount > 0 && (
-                    <span>
-                      <strong>{skuCount}</strong> SKU
-                    </span>
+                    <div className="product-b2b-item">
+                      <span className="product-b2b-value">{skuCount}</span>
+                      <span className="product-b2b-label">SKU</span>
+                    </div>
                   )}
                   {uniqueColors.length > 0 && (
-                    <span>
-                      <strong>{uniqueColors.length}</strong> màu
-                    </span>
-                  )}
-                  {uniqueSizes.length > 0 && (
-                    <span>Size: {uniqueSizes.join(", ")}</span>
+                    <div className="product-b2b-item">
+                      <span className="product-b2b-value">{uniqueColors.length}</span>
+                      <span className="product-b2b-label">Màu sắc</span>
+                    </div>
                   )}
                   {product.defaultMoq != null && (
-                    <span>
-                      MOQ: <strong>{product.defaultMoq} cái</strong>
-                    </span>
+                    <div className="product-b2b-item">
+                      <span className="product-b2b-value">{product.defaultMoq}</span>
+                      <span className="product-b2b-label">MOQ (cái)</span>
+                    </div>
                   )}
                   {product.leadTime && (
-                    <span>
-                      Giao hàng: <strong>{product.leadTime}</strong>
-                    </span>
+                    <div className="product-b2b-item">
+                      <span className="product-b2b-value" style={{ fontSize: 13 }}>{product.leadTime}</span>
+                      <span className="product-b2b-label">Giao hàng</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Feature support badges */}
+              {hasFeatures && (
+                <div className="product-feature-badges">
+                  {product.supportsPrinting && (
+                    <span className="product-feature-badge">✓ In logo</span>
+                  )}
+                  {product.supportsEmbroidery && (
+                    <span className="product-feature-badge">✓ Thêu vi tính</span>
+                  )}
+                  {product.supportsOem && (
+                    <span className="product-feature-badge product-feature-badge--oem">✓ OEM / Private Label</span>
                   )}
                 </div>
               )}
@@ -362,47 +333,118 @@ export default async function ProductDetailPage({ params }: PageProps) {
         </div>
       </section>
 
+      {/* ── Variants Table ───────────────────────────────────────────────── */}
+      {product.variants.length > 0 && (
+        <section className="section-alt section-compact">
+          <div className="container" style={{ maxWidth: 900 }}>
+            <h2 className="product-section-title">Biến thể & SKU</h2>
+            <p className="product-section-desc">
+              Giá sỉ theo từng biến thể — liên hệ ATTD để nhận báo giá chi
+              tiết theo số lượng và yêu cầu gia công.
+            </p>
+            <div className="product-variant-table-wrap">
+              <table className="product-variant-table">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Màu sắc</th>
+                    <th>Size / Dung tích / Kích thước</th>
+                    <th>Tình trạng</th>
+                    <th>Giá</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {product.variants.map((v) => {
+                    const sizeInfo = v.sizeName ?? v.size?.name ?? v.capacity ?? v.dimensions;
+                    const colorInfo = v.colorName ?? v.color?.name;
+                    const statusLabel = STOCK_STATUS_LABEL[v.stockStatus] ?? "—";
+                    const statusColor = STOCK_COLORS[v.stockStatus] ?? "#6b7280";
+                    return (
+                      <tr key={v.id}>
+                        <td><code className="product-sku-code">{v.sku}</code></td>
+                        <td>
+                          {colorInfo ? (
+                            <span className="product-variant-color">
+                              {v.colorCode && (
+                                <span
+                                  className="product-color-dot"
+                                  style={{ background: v.colorCode.startsWith("#") ? v.colorCode : undefined }}
+                                />
+                              )}
+                              {colorInfo}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td>{sizeInfo ?? "—"}</td>
+                        <td>
+                          <span className="product-stock-chip" style={{ color: statusColor, borderColor: statusColor }}>
+                            {statusLabel}
+                          </span>
+                        </td>
+                        <td className="product-variant-price">Liên hệ</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── B2B Specs ────────────────────────────────────────────────────── */}
+      {(hasUseCases || hasTargetCustomers || hasFeatures) && (
+        <section className="section-compact">
+          <div className="container" style={{ maxWidth: 900 }}>
+            <h2 className="product-section-title">Thông tin B2B & Ứng dụng</h2>
+            <div className="product-b2b-spec-grid">
+              {hasUseCases && (
+                <div className="product-b2b-spec-block">
+                  <h3 className="product-b2b-spec-heading">Ứng dụng phổ biến</h3>
+                  <ul className="product-b2b-spec-list">
+                    {(product.useCases as string[]).map((u) => (
+                      <li key={u}>{u}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {hasTargetCustomers && (
+                <div className="product-b2b-spec-block">
+                  <h3 className="product-b2b-spec-heading">Đối tượng phù hợp</h3>
+                  <ul className="product-b2b-spec-list">
+                    {(product.targetCustomers as string[]).map((t) => (
+                      <li key={t}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {hasFeatures && (
+                <div className="product-b2b-spec-block">
+                  <h3 className="product-b2b-spec-heading">Hỗ trợ gia công</h3>
+                  <ul className="product-b2b-spec-list">
+                    {product.supportsPrinting && <li>✓ In logo (silk-screen / DTG / chuyển nhiệt)</li>}
+                    {product.supportsEmbroidery && <li>✓ Thêu vi tính</li>}
+                    {product.supportsOem && <li>✓ OEM / Private Label</li>}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── Product Description ───────────────────────────────────────────── */}
       <section className="section-alt section-compact">
         <div className="container" style={{ maxWidth: 760 }}>
-          <h2
-            className="section-title"
-            style={{ fontSize: 24, marginBottom: 32 }}
-          >
-            Mô tả sản phẩm
-          </h2>
+          <h2 className="product-section-title">Mô tả sản phẩm</h2>
 
           {displayContent || displayShortDescription ? (
             <>
               {displayShortDescription && (
-                <p
-                  style={{
-                    fontSize: "16px",
-                    lineHeight: 1.75,
-                    color: "#374151",
-                    fontWeight: 500,
-                    margin: "0 0 20px",
-                  }}
-                >
-                  {displayShortDescription}
-                </p>
+                <p className="product-desc-lead">{displayShortDescription}</p>
               )}
-
               {displayContent && (
-                <div
-                  style={{
-                    fontSize: "15px",
-                    lineHeight: 1.8,
-                    color: "#4b5563",
-                    whiteSpace: "pre-wrap",
-                    borderTop: displayShortDescription
-                      ? "1px solid #e5e7eb"
-                      : undefined,
-                    paddingTop: displayShortDescription ? "20px" : undefined,
-                  }}
-                >
-                  {displayContent}
-                </div>
+                <div className="product-desc-body">{displayContent}</div>
               )}
             </>
           ) : (
@@ -420,35 +462,20 @@ export default async function ProductDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      <section className="section-compact">
+      {/* ── FAQ ──────────────────────────────────────────────────────────── */}
+      <section className="section-alt section-compact">
         <div className="container" style={{ maxWidth: 760 }}>
-          <h2
-            className="section-title"
-            style={{ fontSize: 24, marginBottom: 32 }}
-          >
-            Hỏi đáp thường gặp
-          </h2>
+          <h2 className="product-section-title">Hỏi đáp thường gặp</h2>
           <ProductFaqList items={faqItems} />
         </div>
       </section>
 
+      {/* ── Related Products ─────────────────────────────────────────────── */}
       {relatedProducts.length > 0 && (
-        <section className="section-alt section-compact">
+        <section className="section-compact">
           <div className="container">
-            <h2
-              className="section-title"
-              style={{ fontSize: 24, marginBottom: 32 }}
-            >
-              Sản phẩm liên quan
-            </h2>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                gap: 24,
-              }}
-            >
+            <h2 className="product-section-title">Sản phẩm liên quan</h2>
+            <div className="product-related-grid">
               {relatedProducts.map((related) => (
                 <ProductCard
                   key={related.id}
@@ -457,17 +484,19 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   name={related.name}
                   skuCount={related.variants.length}
                   category={categoryName}
-                  imageUrl={getPrimaryProductImage(related.images)}
+                  imageUrl={getPrimaryProductImageFromProduct(related)}
+                  moq={related.defaultMoq}
+                  leadTime={related.leadTime}
+                  supportsPrinting={related.supportsPrinting}
+                  supportsEmbroidery={related.supportsEmbroidery}
+                  supportsOem={related.supportsOem}
                 />
               ))}
             </div>
-
             <div style={{ marginTop: 28 }}>
               <Link href={`/${categorySlug}`} className="link-chip">
                 Xem tất cả {categoryName}
-                <span aria-hidden style={{ color: "#9ca3af" }}>
-                  →
-                </span>
+                <span aria-hidden style={{ color: "#9ca3af" }}>→</span>
               </Link>
             </div>
           </div>

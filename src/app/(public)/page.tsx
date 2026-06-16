@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { getCategories } from "@/features/categories/services/category.service";
+import { getProductsForPublicListing } from "@/features/products/services/product.service";
 import SectionHeader from "@/components/public/SectionHeader";
 import CategoryCard from "@/components/public/CategoryCard";
 import ClusterLinkGrid from "@/components/public/ClusterLinkGrid";
@@ -9,6 +11,8 @@ import SourcingProcessSection from "@/components/public/SourcingProcessSection";
 import ClientLogoWall from "@/components/public/ClientLogoWall";
 import CaseStudySection from "@/components/public/CaseStudySection";
 import TrustBanner from "@/components/public/TrustBanner";
+import ProductCard from "@/components/public/ProductCard";
+import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
 import {
   Shirt,
   CircleDot,
@@ -86,7 +90,10 @@ const KNOWLEDGE_LINKS = [
 ];
 
 export default async function HomePage() {
-  const categories = await getCategories();
+  const [categories, { products: featuredProducts }] = await Promise.all([
+    getCategories(),
+    getProductsForPublicListing({ page: 1, perPage: 6 }),
+  ]);
 
   return (
     <main>
@@ -132,6 +139,53 @@ export default async function HomePage() {
           <ClusterLinkGrid links={KNOWLEDGE_LINKS} />
         </div>
       </section>
+
+      {/* Featured products */}
+      {featuredProducts.length > 0 && (
+        <section className="section-compact">
+          <div className="container">
+            <SectionHeader
+              title="Sản phẩm nổi bật"
+              description="Nguồn hàng đồng phục và quà tặng B2B — giá sỉ ổn định, giao nhanh toàn quốc."
+            />
+            <div className="catalog-product-grid">
+              {featuredProducts.map((product) => {
+                const stockStatuses = product.variants.map((v) => v.stockStatus);
+                const stock = stockStatuses.includes("IN_STOCK")
+                  ? "IN_STOCK"
+                  : stockStatuses.includes("LOW_STOCK")
+                  ? "LOW_STOCK"
+                  : stockStatuses.length > 0
+                  ? "OUT_OF_STOCK"
+                  : undefined;
+                return (
+                  <ProductCard
+                    key={product.id}
+                    id={product.id}
+                    slug={product.slug}
+                    name={product.name}
+                    productCode={product.productCode}
+                    skuCount={product.variants.length}
+                    category={product.category.name}
+                    imageUrl={getPrimaryProductImageFromProduct(product)}
+                    moq={product.defaultMoq}
+                    leadTime={product.leadTime}
+                    stockStatus={stock}
+                    supportsPrinting={product.supportsPrinting}
+                    supportsEmbroidery={product.supportsEmbroidery}
+                    supportsOem={product.supportsOem}
+                  />
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 28, textAlign: "center" }}>
+              <Link href="/san-pham" className="btn-secondary">
+                Xem tất cả sản phẩm →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       <ClientLogoWall />
       <CaseStudySection />

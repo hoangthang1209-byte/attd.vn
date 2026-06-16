@@ -63,6 +63,47 @@ export function resolveProductImages(
 
 export { isAcceptableAspectRatio, isValidImageSrc };
 
+// ─── New-style image fields (featuredImage + gallery on Product model) ────────
+
+export type ProductWithNewImages = {
+  featuredImage?: string | null;
+  gallery?: string[] | unknown;
+  images: ProductImageRecord[];
+};
+
+/**
+ * Build a unified ProductImageRecord[] from both legacy `images` relation
+ * AND new `featuredImage` / `gallery` fields.
+ * Legacy ProductImage records take priority if they exist.
+ */
+export function buildProductImages(
+  product: ProductWithNewImages
+): ProductImageRecord[] {
+  const legacyImages = getProductGalleryImages(product.images);
+  if (legacyImages.length > 0) return legacyImages;
+
+  const result: ProductImageRecord[] = [];
+  if (product.featuredImage && isValidImageSrc(product.featuredImage as string)) {
+    result.push({ id: "featured", imageUrl: product.featuredImage as string, altText: null, sortOrder: 0 });
+  }
+  const gallery = Array.isArray(product.gallery) ? product.gallery as string[] : [];
+  for (let i = 0; i < gallery.length; i++) {
+    const url = gallery[i];
+    if (url && isValidImageSrc(url)) {
+      result.push({ id: `gallery-${i}`, imageUrl: url, altText: null, sortOrder: i + 1 });
+    }
+  }
+  return result;
+}
+
+/** Primary image URL using new-style image fields with legacy fallback. */
+export function getPrimaryProductImageFromProduct(
+  product: ProductWithNewImages
+): string | null {
+  const images = buildProductImages(product);
+  return images[0]?.imageUrl ?? null;
+}
+
 export type ProductImageStats = {
   total: number;
   withImages: number;

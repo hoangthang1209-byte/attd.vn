@@ -21,7 +21,7 @@ import {
   getCategoryHeroImage,
   getCategoryGalleryImages,
 } from "@/lib/categoryImages";
-import { getPrimaryProductImage } from "@/lib/productImages";
+import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
 import { isValidImageSrc } from "@/lib/imagePaths";
 
 type PageProps = {
@@ -192,7 +192,12 @@ export default async function CategoryPage({ params }: PageProps) {
                   productCode={product.productCode}
                   skuCount={product.variants.length}
                   category={cat.name}
-                  imageUrl={getPrimaryProductImage(product.images)}
+                  imageUrl={getPrimaryProductImageFromProduct(product)}
+                  moq={product.defaultMoq}
+                  leadTime={product.leadTime}
+                  supportsPrinting={product.supportsPrinting}
+                  supportsEmbroidery={product.supportsEmbroidery}
+                  supportsOem={product.supportsOem}
                 />
               ))}
             </div>

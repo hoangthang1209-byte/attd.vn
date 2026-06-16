@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export async function getProducts() {
@@ -41,6 +42,50 @@ export async function getProductById(id: string) {
   });
 }
 
+/** Public product listing with optional category/search filter and pagination. */
+export async function getProductsForPublicListing(params: {
+  categorySlug?: string;
+  search?: string;
+  page?: number;
+  perPage?: number;
+} = {}) {
+  const { categorySlug, search, page = 1, perPage = 24 } = params;
+
+  const where: Prisma.ProductWhereInput = {
+    status: "ACTIVE",
+    slug: { not: "" },
+    ...(categorySlug && { category: { slug: categorySlug } }),
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: "insensitive" } },
+        { productCode: { contains: search, mode: "insensitive" } },
+        { tags: { has: search } },
+      ],
+    }),
+  };
+
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      include: {
+        category: true,
+        images: {
+          select: { imageUrl: true, altText: true },
+          orderBy: { sortOrder: "asc" },
+          take: 1,
+        },
+        variants: { select: { id: true, stockStatus: true, colorName: true, sizeName: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: perPage,
+      skip: (page - 1) * perPage,
+    }),
+    prisma.product.count({ where }),
+  ]);
+
+  return { products, total, page, perPage };
+}
+
 /** Returns up to `limit` active products in the same category, excluding the given product. */
 export async function getRelatedProducts(
   categoryId: string,
@@ -54,8 +99,11 @@ export async function getRelatedProducts(
       status: "ACTIVE",
       slug: { not: "" },
     },
-    include: {
-      variants: { select: { id: true } },
+    select: {
+      id: true, name: true, slug: true, productCode: true,
+      featuredImage: true, gallery: true, defaultMoq: true, leadTime: true,
+      supportsPrinting: true, supportsEmbroidery: true, supportsOem: true,
+      variants: { select: { id: true, stockStatus: true } },
       images: {
         select: { imageUrl: true, altText: true },
         orderBy: { sortOrder: "asc" },

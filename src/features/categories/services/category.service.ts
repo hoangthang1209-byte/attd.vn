@@ -14,10 +14,14 @@ export async function getCategoryBySlug(slug: string) {
     include: {
       products: {
         where: { status: "ACTIVE" },
-        include: {
-          variants: { select: { id: true } },
+        select: {
+          id: true, name: true, slug: true, productCode: true,
+          featuredImage: true, gallery: true,
+          defaultMoq: true, leadTime: true,
+          supportsPrinting: true, supportsEmbroidery: true, supportsOem: true,
+          variants: { select: { id: true, stockStatus: true } },
           images: {
-            select: { imageUrl: true },
+            select: { imageUrl: true, altText: true },
             orderBy: { sortOrder: "asc" },
             take: 1,
           },
