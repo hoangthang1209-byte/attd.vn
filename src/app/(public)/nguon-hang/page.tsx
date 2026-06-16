@@ -24,32 +24,32 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const whyItems = [
   {
-    icon: "📦",
+    marker: "01",
     title: "Kho hàng có sẵn",
     body: "Hàng luôn sẵn kho, không cần chờ sản xuất. Đặt hàng và nhận ngay trong 2–5 ngày.",
   },
   {
-    icon: "🎨",
+    marker: "02",
     title: "Nhiều màu — nhiều size",
     body: "Bảng màu phong phú, đủ size từ XS đến 4XL. Phù hợp nhiều nhu cầu khách hàng.",
   },
   {
-    icon: "💰",
+    marker: "03",
     title: "Giá sỉ tận kho",
     body: "Giá cạnh tranh dành cho đại lý và xưởng in. Chính sách chiết khấu theo số lượng.",
   },
   {
-    icon: "🚚",
+    marker: "04",
     title: "Giao hàng toàn quốc",
     body: "Hợp tác với đơn vị vận chuyển uy tín, giao nhanh đến 63 tỉnh thành.",
   },
   {
-    icon: "✅",
+    marker: "05",
     title: "Chất lượng ổn định",
     body: "Sản phẩm kiểm tra chất lượng trước khi xuất kho. Đổi trả nếu có lỗi từ nhà sản xuất.",
   },
   {
-    icon: "🤝",
+    marker: "06",
     title: "Hỗ trợ tư vấn",
     body: "Đội ngũ ATTD hỗ trợ chọn hàng, tư vấn số lượng phù hợp và xử lý đơn hàng nhanh chóng.",
   },
@@ -85,7 +85,7 @@ export default async function WholesalePage() {
         <div className="container">
           <h2 className="section-title">Tại sao chọn ATTD?</h2>
           <p className="section-description">
-            Hơn 1.000 SKU nguồn hàng trơn, hàng có sẵn kho, giao nhanh toàn quốc.
+            Hơn 1.000 mã nguồn hàng trơn, hàng có sẵn kho, giao nhanh toàn quốc.
           </p>
 
           <div
@@ -97,30 +97,10 @@ export default async function WholesalePage() {
             }}
           >
             {whyItems.map((item) => (
-              <div key={item.title} className="card">
-                <div style={{ fontSize: "28px", marginBottom: "10px" }}>
-                  {item.icon}
-                </div>
-                <h3
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 700,
-                    color: "#111827",
-                    marginBottom: "8px",
-                  }}
-                >
-                  {item.title}
-                </h3>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    color: "#6b7280",
-                    lineHeight: 1.6,
-                    margin: 0,
-                  }}
-                >
-                  {item.body}
-                </p>
+              <div key={item.title} className="card landing-benefit-card">
+                <span className="landing-benefit-marker">{item.marker}</span>
+                <h3 className="landing-benefit-title">{item.title}</h3>
+                <p className="landing-benefit-desc">{item.body}</p>
               </div>
             ))}
           </div>

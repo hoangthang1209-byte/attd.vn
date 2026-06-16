@@ -82,10 +82,10 @@ export default function ProductCard({
         {/* B2B info row */}
         <div className="product-card-b2b">
           {skuCount > 0 && (
-            <span className="product-card-meta">{skuCount} SKU</span>
+            <span className="product-card-meta">{skuCount} lựa chọn</span>
           )}
           {moq != null && (
-            <span className="product-card-meta">MOQ {moq}</span>
+            <span className="product-card-meta">Tối thiểu {moq}</span>
           )}
           {leadTime && (
             <span className="product-card-meta product-card-leadtime">{leadTime}</span>
@@ -108,7 +108,7 @@ export default function ProductCard({
         )}
 
         <div className="product-card-footer">
-          <span className="product-card-price">Liên hệ báo giá</span>
+          <span className="product-card-price">Liên hệ báo giá sỉ</span>
           <span className="product-card-link">
             Xem chi tiết
             <ArrowRight size={14} strokeWidth={2} />

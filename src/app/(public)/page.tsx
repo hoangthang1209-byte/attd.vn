@@ -9,7 +9,6 @@ import CategoryCard from "@/components/public/CategoryCard";
 import SocialProofSection from "@/components/public/SocialProofSection";
 import ClientLogoWall from "@/components/public/ClientLogoWall";
 import CaseStudySection from "@/components/public/CaseStudySection";
-import TrustBanner from "@/components/public/TrustBanner";
 import MarketplaceDiscoveryStrip from "@/components/public/MarketplaceDiscoveryStrip";
 import ProductCard from "@/components/public/ProductCard";
 import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
@@ -22,7 +21,7 @@ export const revalidate = 3600;
 const B2B_AUDIENCES = [
   {
     key: "dai-ly",
-    icon: "🏪",
+    accent: "01",
     title: "Đại lý đồng phục",
     desc: "Nguồn hàng blank ổn định, giá sỉ theo bậc, chính sách đại lý rõ ràng.",
     tags: ["Áo thun trơn", "Áo polo trơn", "Nón đồng phục"],
@@ -31,7 +30,7 @@ const B2B_AUDIENCES = [
   },
   {
     key: "agency",
-    icon: "🎁",
+    accent: "02",
     title: "Agency quà tặng",
     desc: "Danh mục quà tặng đa dạng, hỗ trợ in logo và đóng gói theo yêu cầu.",
     tags: ["Tote bag", "Bình giữ nhiệt", "Gift set DN"],
@@ -40,7 +39,7 @@ const B2B_AUDIENCES = [
   },
   {
     key: "xuong-in",
-    icon: "🖨️",
+    accent: "03",
     title: "Xưởng in / thêu",
     desc: "Blank apparel trơn chuẩn chất, tồn kho đa màu, giao nhanh cho đơn sản xuất.",
     tags: ["Áo thun blank", "Nón trơn", "Túi vải"],
@@ -49,7 +48,7 @@ const B2B_AUDIENCES = [
   },
   {
     key: "doanh-nghiep",
-    icon: "🏢",
+    accent: "04",
     title: "Doanh nghiệp",
     desc: "Đồng phục, quà tặng onboarding và sự kiện — số lượng lớn, báo giá nhanh.",
     tags: ["Đồng phục", "Onboarding gift", "Quà sự kiện"],
@@ -60,41 +59,35 @@ const B2B_AUDIENCES = [
 
 const WHY_ATTD = [
   {
-    icon: "📦",
-    title: "MOQ & lead-time rõ ràng",
-    desc: "Mỗi sản phẩm hiển thị MOQ tối thiểu và thời gian giao hàng ngay trên catalog.",
+    title: "Số lượng tối thiểu & thời gian giao rõ ràng",
+    desc: "Mỗi sản phẩm hiển thị số lượng tối thiểu và thời gian giao/sản xuất ngay trên catalog.",
   },
   {
-    icon: "🖨️",
     title: "Hỗ trợ in / thêu / OEM",
     desc: "Silk-screen, DTG, chuyển nhiệt, thêu vi tính và Private Label theo yêu cầu.",
   },
   {
-    icon: "🗂️",
     title: "Danh mục B2B đa dạng",
     desc: "Áo thun, polo, nón, tote, bình giữ nhiệt, bandana và gift set doanh nghiệp.",
   },
   {
-    icon: "📊",
     title: "Dữ liệu sản phẩm đầy đủ",
-    desc: "Biến thể màu/size, chất liệu, GSM, tình trạng kho — đủ để tư vấn khách hàng.",
+    desc: "Lựa chọn màu/size, chất liệu, GSM, tình trạng hàng — đủ để tư vấn khách hàng.",
   },
   {
-    icon: "💬",
     title: "Báo giá theo số lượng",
     desc: "Giá sỉ điều chỉnh theo bậc số lượng — liên hệ để nhận bảng giá chi tiết.",
   },
   {
-    icon: "🚚",
     title: "Giao hàng toàn quốc",
     desc: "Hàng tồn kho giao 1–3 ngày. Đơn gia công tùy theo quy mô và yêu cầu.",
   },
 ];
 
 const SOURCING_STEPS = [
-  { n: "01", title: "Chọn sản phẩm", desc: "Duyệt catalog, chọn danh mục và biến thể phù hợp." },
-  { n: "02", title: "Gửi báo giá", desc: "Gửi nhu cầu — ATTD phản hồi MOQ, lead-time và đơn giá sỉ." },
-  { n: "03", title: "Kiểm tra kho", desc: "ATTD xác nhận tồn kho, màu sắc và size có sẵn." },
+  { n: "01", title: "Chọn sản phẩm", desc: "Duyệt catalog, chọn danh mục và lựa chọn màu/size phù hợp." },
+  { n: "02", title: "Gửi báo giá", desc: "Gửi nhu cầu — ATTD phản hồi số lượng tối thiểu, thời gian giao và báo giá sỉ." },
+  { n: "03", title: "Kiểm tra kho", desc: "ATTD xác nhận tình trạng hàng, màu sắc và size có sẵn." },
   { n: "04", title: "In / thêu / OEM", desc: "Phối hợp gia công logo theo file thiết kế nếu cần." },
   { n: "05", title: "Giao hàng", desc: "Giao toàn quốc hoặc nhận tại kho theo thỏa thuận." },
 ];
@@ -186,8 +179,8 @@ export default async function HomePage() {
               <div>
                 <h2 className="hp-section-title">Sản phẩm sỉ nổi bật</h2>
                 <p className="hp-section-desc">
-                  Xem nhanh MOQ, lead-time, tình trạng và khả năng in/thêu/OEM.
-                  Giá liên hệ theo số lượng.
+                  Xem nhanh số lượng tối thiểu, thời gian giao/sản xuất, tình trạng hàng
+                  và khả năng in/thêu/OEM. Giá liên hệ theo số lượng.
                 </p>
               </div>
               <Link href="/san-pham" className="hp-view-all">
@@ -248,7 +241,7 @@ export default async function HomePage() {
           <div className="hp-audience-grid">
             {B2B_AUDIENCES.map((a) => (
               <div key={a.key} className="hp-audience-card">
-                <div className="hp-audience-icon">{a.icon}</div>
+                <span className="hp-audience-accent">{a.accent}</span>
                 <h3 className="hp-audience-title">{a.title}</h3>
                 <p className="hp-audience-desc">{a.desc}</p>
                 <div className="hp-audience-tags">
@@ -285,9 +278,9 @@ export default async function HomePage() {
             <h2 className="hp-section-title">Vì sao đại lý &amp; agency chọn nguồn hàng từ ATTD?</h2>
           </div>
           <div className="hp-why-grid">
-            {WHY_ATTD.map((item) => (
+            {WHY_ATTD.map((item, i) => (
               <div key={item.title} className="hp-why-card">
-                <span className="hp-why-icon">{item.icon}</span>
+                <span className="hp-why-marker">{String(i + 1).padStart(2, "0")}</span>
                 <h3 className="hp-why-title">{item.title}</h3>
                 <p className="hp-why-desc">{item.desc}</p>
               </div>
@@ -373,13 +366,11 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── 9. Client logos + Case studies ──────────────────────────── */}
+      {/* ── Client logos + Case studies ──────────────────────────────── */}
       <ClientLogoWall />
       <CaseStudySection />
 
-      {/* ── 10. Trust + Final CTA ────────────────────────────────────── */}
-      <TrustBanner />
-
+      {/* ── Final CTA ────────────────────────────────────── */}
       <section className="hp-final-cta">
         <div className="container">
           <div className="hp-final-cta-inner">
@@ -387,7 +378,8 @@ export default async function HomePage() {
               Bạn cần nguồn hàng đồng phục hoặc quà tặng doanh nghiệp?
             </h2>
             <p className="hp-final-cta-desc">
-              Gửi nhu cầu, ATTD sẽ tư vấn danh mục phù hợp, MOQ, lead-time và báo giá theo số lượng.
+              Gửi nhu cầu, ATTD sẽ tư vấn danh mục phù hợp, số lượng tối thiểu,
+              thời gian giao/sản xuất và báo giá theo số lượng.
             </p>
             <div className="hp-final-cta-btns">
               <Link href="/lien-he" className="btn-primary">Liên hệ báo giá sỉ</Link>

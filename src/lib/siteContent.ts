@@ -42,7 +42,7 @@ export const FOOTER_TRUST = {
 
 /** Reusable trust bullets for product & category pages */
 export const TRUST_BLOCK = {
-  title: "Vì sao chọn ATTD",
+  title: "Cam kết B2B",
   items: [
     "Nguồn hàng ổn định",
     "Hỗ trợ đại lý",

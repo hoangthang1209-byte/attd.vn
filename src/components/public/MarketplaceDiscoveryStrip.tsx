@@ -31,8 +31,8 @@ export default function MarketplaceDiscoveryStrip({
               Một nơi để tìm nguồn hàng đồng phục &amp; quà tặng
             </h2>
             <p className="hp-discovery-desc">
-              Duyệt danh mục, xem biến thể màu/size, MOQ và lead-time — sau đó
-              gửi yêu cầu báo giá sỉ phù hợp nhu cầu đại lý, agency hoặc doanh nghiệp.
+              Duyệt danh mục, xem lựa chọn màu/size, số lượng tối thiểu và thời gian giao/sản xuất —
+              sau đó gửi yêu cầu báo giá sỉ phù hợp nhu cầu đại lý, agency hoặc doanh nghiệp.
             </p>
             <div className="hp-discovery-stats">
               {productCount > 0 && (
@@ -44,7 +44,7 @@ export default function MarketplaceDiscoveryStrip({
               {variantCount > 0 && (
                 <div className="hp-discovery-stat">
                   <span className="hp-discovery-stat-value">{variantCount}+</span>
-                  <span className="hp-discovery-stat-label">biến thể SKU</span>
+                  <span className="hp-discovery-stat-label">lựa chọn sản phẩm</span>
                 </div>
               )}
               {categoryCount > 0 && (
@@ -85,7 +85,7 @@ export default function MarketplaceDiscoveryStrip({
                   </div>
                   <span className="hp-discovery-chip-name">{chip.name}</span>
                   {chip.skuCount != null && chip.skuCount > 0 && (
-                    <span className="hp-discovery-chip-meta">{chip.skuCount} SKU</span>
+                    <span className="hp-discovery-chip-meta">{chip.skuCount} lựa chọn</span>
                   )}
                 </Link>
               );

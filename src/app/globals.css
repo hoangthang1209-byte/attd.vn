@@ -8424,3 +8424,200 @@ body:has(.mobile-action-bar) .site-footer {
 /* Admin demo image result */
 .admin-demo-result-updated { color: #1d4ed8; font-weight: 600; }
 .admin-demo-result-skipped { color: #6b7280; font-weight: 500; }
+
+/* ─── Patch 24.9.4d — Category CMS, UX cleanup, loading indicator ─────────── */
+
+/* Navigation progress */
+.nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 500;
+  pointer-events: none;
+}
+
+.nav-progress-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), #f87171);
+  animation: nav-progress-slide 1.2s ease-in-out infinite;
+  transform-origin: left;
+}
+
+@keyframes nav-progress-slide {
+  0% { transform: scaleX(0.15); opacity: 0.6; }
+  50% { transform: scaleX(0.65); opacity: 1; }
+  100% { transform: scaleX(0.95); opacity: 0.8; }
+}
+
+.nav-progress-spinner-wrap {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-progress-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fecaca;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: nav-progress-spin 0.7s linear infinite;
+}
+
+.nav-progress-spinner--lg {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+}
+
+@keyframes nav-progress-spin {
+  to { transform: rotate(360deg); }
+}
+
+.nav-progress-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.public-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  padding: 48px 24px;
+}
+
+.public-loading-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.public-loading-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+/* Homepage lower sections — premium accents */
+.hp-audience-accent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 14px;
+}
+
+.hp-why-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--section-bg);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.hp-audience-card {
+  padding: 28px 24px !important;
+}
+
+.hp-why-card {
+  padding: 24px !important;
+}
+
+.hp-why-icon { display: none; }
+
+/* Landing / policy benefit markers */
+.landing-benefit-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.landing-benefit-card {
+  padding: 20px !important;
+}
+
+/* Admin category management */
+.admin-category-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.admin-category-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-category-form {
+  margin-bottom: 8px;
+}
+
+.admin-category-image-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 480px;
+}
+
+.admin-category-thumb-preview {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.admin-category-list-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.admin-success {
+  color: #065f46;
+  font-size: 14px;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  border-radius: 8px;
+  border: 1px solid #bbf7d0;
+}

@@ -20,32 +20,32 @@ export const metadata: Metadata = {
 
 const benefits = [
   {
-    icon: "💸",
+    marker: "01",
     title: "Giá sỉ tận kho",
     body: "Đại lý được mua hàng với giá sỉ tốt hơn giá lẻ. Chiết khấu thêm theo số lượng mỗi đơn hàng.",
   },
   {
-    icon: "🔔",
+    marker: "02",
     title: "Cập nhật hàng mới ưu tiên",
     body: "Đại lý được thông báo trước khi có hàng mới, màu mới, hoặc sản phẩm mới về kho.",
   },
   {
-    icon: "🎯",
+    marker: "03",
     title: "Tư vấn chọn hàng tận tình",
     body: "Đội ngũ ATTD hỗ trợ đại lý chọn mẫu, chọn màu và số lượng phù hợp với thị trường.",
   },
   {
-    icon: "🔄",
+    marker: "04",
     title: "Chính sách đổi trả",
     body: "Hỗ trợ đổi trả nếu sản phẩm có lỗi từ nhà sản xuất. Xử lý nhanh chóng trong vòng 3–5 ngày.",
   },
   {
-    icon: "🚚",
+    marker: "05",
     title: "Giao hàng toàn quốc",
     body: "63 tỉnh thành, hợp tác đơn vị vận chuyển uy tín. Cung cấp mã vận đơn sau khi xuất kho.",
   },
   {
-    icon: "📞",
+    marker: "06",
     title: "Hỗ trợ trực tiếp qua Zalo",
     body: "Đặt hàng và trao đổi trực tiếp qua Zalo. Không cần tài khoản, không cần phần mềm quản lý.",
   },
@@ -173,30 +173,10 @@ export default function DealerPolicyPage() {
             }}
           >
             {benefits.map((b) => (
-              <div key={b.title} className="card">
-                <div style={{ fontSize: "28px", marginBottom: "10px" }}>
-                  {b.icon}
-                </div>
-                <h3
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 700,
-                    color: "#111827",
-                    marginBottom: "8px",
-                  }}
-                >
-                  {b.title}
-                </h3>
-                <p
-                  style={{
-                    fontSize: "14px",
-                    color: "#6b7280",
-                    lineHeight: 1.6,
-                    margin: 0,
-                  }}
-                >
-                  {b.body}
-                </p>
+              <div key={b.title} className="card landing-benefit-card">
+                <span className="landing-benefit-marker">{b.marker}</span>
+                <h3 className="landing-benefit-title">{b.title}</h3>
+                <p className="landing-benefit-desc">{b.body}</p>
               </div>
             ))}
           </div>

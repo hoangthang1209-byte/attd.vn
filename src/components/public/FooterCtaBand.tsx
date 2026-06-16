@@ -10,7 +10,7 @@ export default function FooterCtaBand() {
               Cần nguồn hàng đồng phục &amp; quà tặng?
             </h2>
             <p className="footer-cta-desc">
-              Gửi yêu cầu để ATTD tư vấn MOQ, lead-time và báo giá sỉ theo số lượng.
+              Gửi yêu cầu để ATTD tư vấn số lượng tối thiểu, thời gian giao/sản xuất và báo giá sỉ theo số lượng.
             </p>
           </div>
           <div className="footer-cta-btns">
@@ -23,7 +23,7 @@ export default function FooterCtaBand() {
           </div>
         </div>
         <div className="footer-trust-chips">
-          {["MOQ rõ ràng", "Hỗ trợ in/thêu/OEM", "Giao hàng toàn quốc", "B2B wholesale"].map(
+          {["Số lượng tối thiểu rõ ràng", "Hỗ trợ in/thêu/OEM", "Giao hàng toàn quốc", "B2B wholesale"].map(
             (chip) => (
               <span key={chip} className="footer-trust-chip">
                 {chip}

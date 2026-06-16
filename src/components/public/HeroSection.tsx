@@ -17,7 +17,7 @@ type HeroSectionProps = {
 };
 
 const TRUST_CHIPS = [
-  "MOQ rõ ràng",
+  "Số lượng tối thiểu rõ ràng",
   "Hỗ trợ in / thêu / OEM",
   "Danh mục B2B đa dạng",
   "Giao hàng toàn quốc",

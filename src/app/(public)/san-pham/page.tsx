@@ -121,7 +121,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
               type="search"
               name="q"
               defaultValue={q}
-              placeholder="Tìm tên sản phẩm, mã SKU…"
+              placeholder="Tìm tên sản phẩm, mã hàng…"
               className="catalog-search-input"
             />
             <button type="submit" className="catalog-search-btn">
@@ -221,7 +221,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
               Chưa tìm thấy sản phẩm phù hợp?
             </h2>
             <p className="catalog-suggest-desc">
-              Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, MOQ và lead-time.
+              Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, số lượng tối thiểu và thời gian giao/sản xuất.
               {total > 0 && ` Hiện có ${total} sản phẩm đang mở trên catalog.`}
             </p>
             <div className="catalog-suggest-btns">

@@ -425,7 +425,10 @@ export async function deleteProductAdmin(id: string) {
 export async function listProductCategories() {
   const cats = await prisma.category.findMany({
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    include: { _count: { select: { products: true } } },
+    include: {
+      _count: { select: { products: true } },
+      parent: { select: { id: true, name: true } },
+    },
   });
   return cats.map((c) => ({
     id: c.id,
@@ -433,9 +436,100 @@ export async function listProductCategories() {
     slug: c.slug,
     skuCode: c.skuCode,
     description: c.description,
+    seoTitle: c.seoTitle,
+    seoDescription: c.seoDescription,
+    imageUrl: c.imageUrl,
     sortOrder: c.sortOrder,
+    parentId: c.parentId,
+    parentName: c.parent?.name ?? null,
     productCount: c._count.products,
   }));
+}
+
+export async function getProductCategoryById(id: string) {
+  const c = await prisma.category.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { products: true } },
+      parent: { select: { id: true, name: true } },
+    },
+  });
+  if (!c) return null;
+  return {
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    skuCode: c.skuCode,
+    description: c.description,
+    seoTitle: c.seoTitle,
+    seoDescription: c.seoDescription,
+    imageUrl: c.imageUrl,
+    sortOrder: c.sortOrder,
+    parentId: c.parentId,
+    parentName: c.parent?.name ?? null,
+    productCount: c._count.products,
+  };
+}
+
+export type CategoryAdminInput = {
+  name: string;
+  slug: string;
+  skuCode?: string | null;
+  description?: string | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  imageUrl?: string | null;
+  sortOrder?: number;
+  parentId?: string | null;
+};
+
+export async function createProductCategory(data: CategoryAdminInput) {
+  return prisma.category.create({
+    data: {
+      name: data.name,
+      slug: data.slug,
+      skuCode: data.skuCode ?? null,
+      description: data.description ?? null,
+      seoTitle: data.seoTitle ?? null,
+      seoDescription: data.seoDescription ?? null,
+      imageUrl: data.imageUrl ?? null,
+      sortOrder: data.sortOrder ?? 0,
+      parentId: data.parentId ?? null,
+    },
+  });
+}
+
+export async function updateProductCategory(id: string, data: CategoryAdminInput) {
+  return prisma.category.update({
+    where: { id },
+    data: {
+      name: data.name,
+      slug: data.slug,
+      skuCode: data.skuCode ?? null,
+      description: data.description ?? null,
+      seoTitle: data.seoTitle ?? null,
+      seoDescription: data.seoDescription ?? null,
+      imageUrl: data.imageUrl ?? null,
+      sortOrder: data.sortOrder ?? 0,
+      parentId: data.parentId ?? null,
+    },
+  });
+}
+
+export async function deleteProductCategory(id: string) {
+  const cat = await prisma.category.findUnique({
+    where: { id },
+    include: { _count: { select: { products: true, children: true } } },
+  });
+  if (!cat) return { ok: false as const, reason: "not_found" as const };
+  if (cat._count.products > 0) {
+    return { ok: false as const, reason: "has_products" as const, count: cat._count.products };
+  }
+  if (cat._count.children > 0) {
+    return { ok: false as const, reason: "has_children" as const };
+  }
+  await prisma.category.delete({ where: { id } });
+  return { ok: true as const };
 }
 
 export async function upsertProductCategory(data: {

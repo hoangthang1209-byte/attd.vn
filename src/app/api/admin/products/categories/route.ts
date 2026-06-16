@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listProductCategories, upsertProductCategory } from "@/features/products/product-admin.service";
+import {
+  listProductCategories,
+  createProductCategory,
+  type CategoryAdminInput,
+} from "@/features/products/product-admin.service";
 
 export async function GET() {
   try {
@@ -11,21 +15,40 @@ export async function GET() {
   }
 }
 
+function parseBody(raw: Record<string, unknown>): CategoryAdminInput | null {
+  if (!raw.name || !raw.slug) return null;
+  const name = String(raw.name).trim();
+  const slug = String(raw.slug).trim();
+  if (!name || !slug) return null;
+  return {
+    name,
+    slug,
+    skuCode: raw.skuCode != null ? String(raw.skuCode).trim() || null : null,
+    description: raw.description != null ? String(raw.description).trim() || null : null,
+    seoTitle: raw.seoTitle != null ? String(raw.seoTitle).trim().slice(0, 255) || null : null,
+    seoDescription:
+      raw.seoDescription != null
+        ? String(raw.seoDescription).trim().slice(0, 500) || null
+        : null,
+    imageUrl: raw.imageUrl != null ? String(raw.imageUrl).trim() || null : null,
+    sortOrder: raw.sortOrder != null ? Number(raw.sortOrder) || 0 : 0,
+    parentId: raw.parentId != null ? String(raw.parentId).trim() || null : null,
+  };
+}
+
 export async function POST(req: NextRequest) {
   let body: unknown;
-  try { body = await req.json(); } catch { return NextResponse.json({ message: "Invalid JSON" }, { status: 400 }); }
-  const raw = body as Record<string, unknown>;
-  if (!raw.name) return NextResponse.json({ message: "Tên danh mục là bắt buộc." }, { status: 400 });
-  const name = String(raw.name).trim();
-  const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   try {
-    const cat = await upsertProductCategory({
-      name,
-      slug,
-      skuCode: raw.skuCode ? String(raw.skuCode) : undefined,
-      description: raw.description ? String(raw.description) : undefined,
-      sortOrder: raw.sortOrder ? Number(raw.sortOrder) : undefined,
-    });
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
+  }
+  const data = parseBody(body as Record<string, unknown>);
+  if (!data) {
+    return NextResponse.json({ message: "Tên danh mục và slug là bắt buộc." }, { status: 400 });
+  }
+  try {
+    const cat = await createProductCategory(data);
     return NextResponse.json(cat, { status: 201 });
   } catch (err) {
     console.error("[POST /api/admin/products/categories]", err);

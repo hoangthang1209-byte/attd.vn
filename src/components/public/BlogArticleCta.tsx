@@ -10,7 +10,7 @@ export default function BlogArticleCta() {
               Cần nguồn hàng cho nội dung này?
             </h2>
             <p className="blog-article-cta-desc">
-              Liên hệ ATTD để được tư vấn MOQ, lead-time và báo giá sỉ theo số lượng.
+              Liên hệ ATTD để được tư vấn sản phẩm, số lượng tối thiểu và báo giá sỉ theo số lượng.
             </p>
           </div>
           <Link href="/lien-he" className="btn-primary">

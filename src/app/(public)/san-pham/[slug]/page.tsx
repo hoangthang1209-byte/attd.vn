@@ -6,7 +6,6 @@ import ProductCard from "@/components/public/ProductCard";
 import ProductImageGallery from "@/components/public/ProductImageGallery";
 import StickyInquiryBox from "@/components/public/StickyInquiryBox";
 import ProductFaqList from "@/components/public/ProductFaqList";
-import TrustBlock from "@/components/public/TrustBlock";
 import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
@@ -172,10 +171,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
         : "Liên hệ ATTD để được tư vấn kỹ thuật in phù hợp.",
     },
     {
-      question: "Số lượng tối thiểu (MOQ) là bao nhiêu?",
+      question: "Số lượng tối thiểu là bao nhiêu?",
       answer: product.defaultMoq
-        ? `MOQ là ${product.defaultMoq} cái. Liên hệ để biết chính sách ưu đãi theo số lượng.`
-        : "Liên hệ ATTD để được tư vấn MOQ theo từng dòng sản phẩm.",
+        ? `Số lượng tối thiểu là ${product.defaultMoq} cái. Liên hệ để biết chính sách ưu đãi theo số lượng.`
+        : "Liên hệ ATTD để được tư vấn số lượng tối thiểu theo từng dòng sản phẩm.",
     },
     {
       question: "Thời gian giao hàng là bao lâu?",
@@ -284,7 +283,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   {skuCount > 0 && (
                     <div className="product-b2b-item">
                       <span className="product-b2b-value">{skuCount}</span>
-                      <span className="product-b2b-label">SKU</span>
+                      <span className="product-b2b-label">Số lựa chọn</span>
                     </div>
                   )}
                   {uniqueColors.length > 0 && (
@@ -296,13 +295,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   {product.defaultMoq != null && (
                     <div className="product-b2b-item">
                       <span className="product-b2b-value">{product.defaultMoq}</span>
-                      <span className="product-b2b-label">MOQ (cái)</span>
+                      <span className="product-b2b-label">Số lượng tối thiểu</span>
                     </div>
                   )}
                   {product.leadTime && (
                     <div className="product-b2b-item">
                       <span className="product-b2b-value" style={{ fontSize: 13 }}>{product.leadTime}</span>
-                      <span className="product-b2b-label">Giao hàng</span>
+                      <span className="product-b2b-label">Thời gian giao/sản xuất</span>
                     </div>
                   )}
                 </div>
@@ -337,20 +336,20 @@ export default async function ProductDetailPage({ params }: PageProps) {
       {product.variants.length > 0 && (
         <section className="section-alt section-compact">
           <div className="container" style={{ maxWidth: 900 }}>
-            <h2 className="product-section-title">Biến thể & SKU</h2>
+            <h2 className="product-section-title">Lựa chọn sản phẩm</h2>
             <p className="product-section-desc">
-              Giá sỉ theo từng biến thể — liên hệ ATTD để nhận báo giá chi
+              Báo giá sỉ theo từng lựa chọn màu/size — liên hệ ATTD để nhận báo giá chi
               tiết theo số lượng và yêu cầu gia công.
             </p>
             <div className="product-variant-table-wrap">
               <table className="product-variant-table">
                 <thead>
                   <tr>
-                    <th>SKU</th>
+                    <th>Mã sản phẩm</th>
                     <th>Màu sắc</th>
                     <th>Size / Dung tích / Kích thước</th>
                     <th>Tình trạng</th>
-                    <th>Giá</th>
+                    <th>Báo giá</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -381,7 +380,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                             {statusLabel}
                           </span>
                         </td>
-                        <td className="product-variant-price">Liên hệ</td>
+                        <td className="product-variant-price">Liên hệ báo giá sỉ</td>
                       </tr>
                     );
                   })}
@@ -453,12 +452,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
               description="Liên hệ ATTD để nhận báo giá và tư vấn chi tiết về sản phẩm này."
             />
           )}
-        </div>
-      </section>
-
-      <section className="section-compact">
-        <div className="container" style={{ maxWidth: 760 }}>
-          <TrustBlock />
         </div>
       </section>
 
