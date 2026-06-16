@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { NavMegaMenu } from "@/lib/navConfig";
+import { useRouter } from "next/navigation";
 
 type NavMegaMenuProps = {
   item: NavMegaMenu;
@@ -12,6 +13,7 @@ type NavMegaMenuProps = {
 export default function NavMegaMenuPanel({ item }: NavMegaMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -42,7 +44,13 @@ export default function NavMegaMenuPanel({ item }: NavMegaMenuProps) {
         className="nav-dropdown-trigger"
         aria-expanded={open}
         aria-haspopup="true"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (item.href) {
+            router.push(item.href);
+          } else {
+            setOpen((v) => !v);
+          }
+        }}
       >
         {item.label}
         <ChevronDown

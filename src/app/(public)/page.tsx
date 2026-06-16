@@ -1,154 +1,199 @@
 import Link from "next/link";
-import { getCategories } from "@/features/categories/services/category.service";
+import Image from "next/image";
+import { getCategoriesWithCounts } from "@/features/categories/services/category.service";
 import { getProductsForPublicListing } from "@/features/products/services/product.service";
-import SectionHeader from "@/components/public/SectionHeader";
-import CategoryCard from "@/components/public/CategoryCard";
-import ClusterLinkGrid from "@/components/public/ClusterLinkGrid";
-import CTASection from "@/components/public/CTASection";
+import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
 import HeroSection from "@/components/public/HeroSection";
+import type { HeroMosaicItem } from "@/components/public/HeroSection";
+import CategoryCard from "@/components/public/CategoryCard";
 import SocialProofSection from "@/components/public/SocialProofSection";
-import SourcingProcessSection from "@/components/public/SourcingProcessSection";
 import ClientLogoWall from "@/components/public/ClientLogoWall";
 import CaseStudySection from "@/components/public/CaseStudySection";
 import TrustBanner from "@/components/public/TrustBanner";
+import CTASection from "@/components/public/CTASection";
 import ProductCard from "@/components/public/ProductCard";
 import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
-import {
-  Shirt,
-  CircleDot,
-  HardHat,
-  ShoppingBag,
-  Thermometer,
-  type LucideIcon,
-} from "lucide-react";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
-/** Static at build; refresh on CMS revalidatePath or hourly ISR fallback. */
 export const revalidate = 3600;
 
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  "ao-thun-tron": Shirt,
-  "ao-polo-tron": CircleDot,
-  non: HardHat,
-  tote: ShoppingBag,
-  "binh-giu-nhiet": Thermometer,
-};
+/* ── Static content ─────────────────────────────────────────────────────── */
 
-const WHOLESALE_LINKS = [
+const B2B_AUDIENCES = [
   {
-    href: "/kho-ao-thun-tron",
-    title: "Kho áo thun trơn",
-    desc: "Tồn kho đa màu, giao hàng toàn quốc cho đại lý và xưởng in",
+    key: "dai-ly",
+    icon: "🏪",
+    title: "Đại lý đồng phục",
+    desc: "Nguồn hàng blank ổn định, giá sỉ theo bậc, chính sách đại lý rõ ràng.",
+    tags: ["Áo thun trơn", "Áo polo trơn", "Nón đồng phục"],
+    href: "/dai-ly",
+    cta: "Đăng ký đại lý",
   },
   {
-    href: "/ao-thun-tron-si",
-    title: "Áo thun trơn sỉ",
-    desc: "Giá sỉ theo bậc, chính sách ưu đãi cho đại lý",
+    key: "agency",
+    icon: "🎁",
+    title: "Agency quà tặng",
+    desc: "Danh mục quà tặng đa dạng, hỗ trợ in logo và đóng gói theo yêu cầu.",
+    tags: ["Tote bag", "Bình giữ nhiệt", "Gift set DN"],
+    href: "/qua-tang-doanh-nghiep",
+    cta: "Xem quà tặng",
   },
   {
-    href: "/nguon-hang-ao-thun-tron",
-    title: "Nguồn hàng áo thun trơn",
-    desc: "Nhà cung cấp trực tiếp cho xưởng in và agency",
+    key: "xuong-in",
+    icon: "🖨️",
+    title: "Xưởng in / thêu",
+    desc: "Blank apparel trơn chuẩn chất, tồn kho đa màu, giao nhanh cho đơn sản xuất.",
+    tags: ["Áo thun blank", "Nón trơn", "Túi vải"],
+    href: "/nguon-hang",
+    cta: "Xem nguồn hàng",
   },
   {
-    href: "/kho-ao-polo-tron",
-    title: "Kho áo polo trơn",
-    desc: "Polo trơn sẵn kho, phù hợp đồng phục doanh nghiệp",
-  },
-  {
-    href: "/ao-polo-tron-si",
-    title: "Áo polo trơn sỉ",
-    desc: "Giá sỉ cạnh tranh, hỗ trợ thêu logo theo yêu cầu",
+    key: "doanh-nghiep",
+    icon: "🏢",
+    title: "Doanh nghiệp",
+    desc: "Đồng phục, quà tặng onboarding và sự kiện — số lượng lớn, báo giá nhanh.",
+    tags: ["Đồng phục", "Onboarding gift", "Quà sự kiện"],
+    href: "/lien-he",
+    cta: "Liên hệ báo giá",
   },
 ];
 
-const KNOWLEDGE_LINKS = [
+const WHY_ATTD = [
   {
-    href: "/bang-mau-ao-thun-tron",
-    title: "Bảng màu áo thun trơn",
-    desc: "Hướng dẫn chọn màu đồng phục và tips in ấn",
+    icon: "📦",
+    title: "MOQ & lead-time rõ ràng",
+    desc: "Mỗi sản phẩm hiển thị MOQ tối thiểu và thời gian giao hàng ngay trên catalog.",
   },
   {
-    href: "/size-ao-thun-tron",
-    title: "Size áo thun trơn",
-    desc: "Bảng size chuẩn và hướng dẫn đặt hàng đúng size",
+    icon: "🖨️",
+    title: "Hỗ trợ in / thêu / OEM",
+    desc: "Silk-screen, DTG, chuyển nhiệt, thêu vi tính và Private Label theo yêu cầu.",
   },
   {
-    href: "/vai-cotton-2-chieu",
-    title: "Vải cotton 2 chiều",
-    desc: "Đặc điểm, ưu nhược điểm và ứng dụng",
+    icon: "🗂️",
+    title: "Danh mục B2B đa dạng",
+    desc: "Áo thun, polo, nón, tote, bình giữ nhiệt, bandana và gift set doanh nghiệp.",
   },
   {
-    href: "/vai-cvc-la-gi",
-    title: "Vải CVC là gì?",
-    desc: "So sánh CVC với cotton và TC chi tiết",
+    icon: "📊",
+    title: "Dữ liệu sản phẩm đầy đủ",
+    desc: "Biến thể màu/size, chất liệu, GSM, tình trạng kho — đủ để tư vấn khách hàng.",
   },
   {
-    href: "/vai-tc-la-gi",
-    title: "Vải TC là gì?",
-    desc: "Thành phần, ưu nhược điểm và khi nào nên dùng",
+    icon: "💬",
+    title: "Báo giá theo số lượng",
+    desc: "Giá sỉ điều chỉnh theo bậc số lượng — liên hệ để nhận bảng giá chi tiết.",
+  },
+  {
+    icon: "🚚",
+    title: "Giao hàng toàn quốc",
+    desc: "Hàng tồn kho giao 1–3 ngày. Đơn gia công tùy theo quy mô và yêu cầu.",
   },
 ];
+
+const SOURCING_STEPS = [
+  { n: "01", title: "Chọn sản phẩm", desc: "Duyệt catalog, chọn danh mục và biến thể phù hợp." },
+  { n: "02", title: "Gửi báo giá", desc: "Gửi nhu cầu — ATTD phản hồi MOQ, lead-time và đơn giá sỉ." },
+  { n: "03", title: "Kiểm tra kho", desc: "ATTD xác nhận tồn kho, màu sắc và size có sẵn." },
+  { n: "04", title: "In / thêu / OEM", desc: "Phối hợp gia công logo theo file thiết kế nếu cần." },
+  { n: "05", title: "Giao hàng", desc: "Giao toàn quốc hoặc nhận tại kho theo thỏa thuận." },
+];
+
+/* ── Page ────────────────────────────────────────────────────────────────── */
 
 export default async function HomePage() {
-  const [categories, { products: featuredProducts }] = await Promise.all([
-    getCategories(),
-    getProductsForPublicListing({ page: 1, perPage: 6 }),
+  const [
+    categories,
+    { products: featuredProducts },
+    { posts: blogPosts },
+  ] = await Promise.all([
+    getCategoriesWithCounts(),
+    getProductsForPublicListing({ page: 1, perPage: 12 }),
+    getPublishedBlogPosts(1, 4),
   ]);
+
+  // Build hero mosaic from first 6 featured products
+  const heroMosaicItems: HeroMosaicItem[] = featuredProducts.slice(0, 6).map((p) => ({
+    slug: p.category.slug,
+    label: p.name,
+    description: p.category.name,
+    imageUrl: getPrimaryProductImageFromProduct(p),
+  }));
+
+  const STOCK_LABELS: Record<string, string> = {
+    IN_STOCK: "Còn hàng",
+    LOW_STOCK: "Sắp hết",
+    OUT_OF_STOCK: "Hết hàng",
+  };
 
   return (
     <main>
-      <HeroSection />
-      <SocialProofSection />
-      <SourcingProcessSection />
+      {/* ── 1. Product-first hero ──────────────────────────────────────── */}
+      <HeroSection mosaicItems={heroMosaicItems.length ? heroMosaicItems : undefined} />
 
-      <section className="section-alt section-compact">
+      {/* ── 2. Social proof strip ─────────────────────────────────────── */}
+      <SocialProofSection />
+
+      {/* ── 3. Category marketplace ───────────────────────────────────── */}
+      <section className="hp-section hp-section--alt">
         <div className="container">
-          <SectionHeader
-            title="Danh mục nổi bật"
-            description="Blank apparel và quà tặng doanh nghiệp — nguồn hàng cho đại lý và xưởng gia công."
-          />
-          <div className="category-grid">
-            {categories.map((category) => (
+          <div className="hp-section-header">
+            <h2 className="hp-section-title">Tìm nguồn hàng theo danh mục</h2>
+            <p className="hp-section-desc">
+              Blank apparel và quà tặng doanh nghiệp — nguồn hàng B2B ổn định cho đại lý và xưởng gia công.
+            </p>
+          </div>
+          <div className="hp-market-cats">
+            {categories.map((cat) => (
               <CategoryCard
-                key={category.id}
-                name={category.name}
-                slug={category.slug}
-                icon={CATEGORY_ICONS[category.slug]}
+                key={cat.id}
+                name={cat.name}
+                slug={cat.slug}
+                imageUrl={cat.imageUrl}
+                count={cat._count.products}
+                description={cat.description ?? undefined}
+                variant="grid"
               />
             ))}
+            {/* OEM / Private Label static card */}
+            <Link href="/oem" className="market-cat-card market-cat-card--oem">
+              <div className="market-cat-card-img">
+                <div
+                  className="market-cat-card-gradient"
+                  style={{ background: "linear-gradient(145deg, #374151, #111827)" }}
+                />
+                <div className="market-cat-card-overlay" />
+              </div>
+              <div className="market-cat-card-body">
+                <h3 className="market-cat-card-name">OEM / Private Label</h3>
+                <p className="market-cat-card-desc">Gia công nhãn hiệu riêng</p>
+                <div className="market-cat-card-footer">
+                  <span className="market-cat-card-cta">Xem →</span>
+                </div>
+              </div>
+            </Link>
           </div>
         </div>
       </section>
 
-      <section className="section-compact">
-        <div className="container">
-          <SectionHeader
-            title="Kho hàng & nguồn hàng"
-            description="Tìm hiểu chi tiết về kho hàng, giá sỉ và nguồn cung cấp cho đại lý, xưởng in và doanh nghiệp."
-          />
-          <ClusterLinkGrid links={WHOLESALE_LINKS} />
-        </div>
-      </section>
-
-      <section className="section-alt section-compact">
-        <div className="container">
-          <SectionHeader
-            title="Kiến thức áo thun"
-            description="Hướng dẫn chọn màu sắc, size và chất liệu vải cho đại lý và xưởng in."
-          />
-          <ClusterLinkGrid links={KNOWLEDGE_LINKS} />
-        </div>
-      </section>
-
-      {/* Featured products */}
+      {/* ── 4. Featured products ──────────────────────────────────────── */}
       {featuredProducts.length > 0 && (
-        <section className="section-compact">
+        <section className="hp-section">
           <div className="container">
-            <SectionHeader
-              title="Sản phẩm nổi bật"
-              description="Nguồn hàng đồng phục và quà tặng B2B — giá sỉ ổn định, giao nhanh toàn quốc."
-            />
-            <div className="catalog-product-grid">
+            <div className="hp-section-header">
+              <div>
+                <h2 className="hp-section-title">Sản phẩm sỉ nổi bật</h2>
+                <p className="hp-section-desc">
+                  Xem nhanh MOQ, lead-time, tình trạng và khả năng in/thêu/OEM.
+                  Giá liên hệ theo số lượng.
+                </p>
+              </div>
+              <Link href="/san-pham" className="hp-view-all">
+                Xem tất cả →
+              </Link>
+            </div>
+
+            <div className="hp-product-grid">
               {featuredProducts.map((product) => {
                 const stockStatuses = product.variants.map((v) => v.stockStatus);
                 const stock = stockStatuses.includes("IN_STOCK")
@@ -171,6 +216,7 @@ export default async function HomePage() {
                     moq={product.defaultMoq}
                     leadTime={product.leadTime}
                     stockStatus={stock}
+                    stockLabel={stock ? STOCK_LABELS[stock] : undefined}
                     supportsPrinting={product.supportsPrinting}
                     supportsEmbroidery={product.supportsEmbroidery}
                     supportsOem={product.supportsOem}
@@ -178,19 +224,164 @@ export default async function HomePage() {
                 );
               })}
             </div>
-            <div style={{ marginTop: 28, textAlign: "center" }}>
+
+            <div className="hp-view-all-row">
               <Link href="/san-pham" className="btn-secondary">
-                Xem tất cả sản phẩm →
+                Xem tất cả sản phẩm sỉ →
               </Link>
             </div>
           </div>
         </section>
       )}
 
+      {/* ── 5. B2B Audience blocks ────────────────────────────────────── */}
+      <section className="hp-section hp-section--alt">
+        <div className="container">
+          <div className="hp-section-header">
+            <h2 className="hp-section-title">Nguồn hàng cho từng nhu cầu B2B</h2>
+            <p className="hp-section-desc">
+              Dù bạn là đại lý, agency, xưởng in hay doanh nghiệp — ATTD có danh mục và chính sách phù hợp.
+            </p>
+          </div>
+          <div className="hp-audience-grid">
+            {B2B_AUDIENCES.map((a) => (
+              <div key={a.key} className="hp-audience-card">
+                <div className="hp-audience-icon">{a.icon}</div>
+                <h3 className="hp-audience-title">{a.title}</h3>
+                <p className="hp-audience-desc">{a.desc}</p>
+                <div className="hp-audience-tags">
+                  {a.tags.map((t) => (
+                    <span key={t} className="hp-audience-tag">{t}</span>
+                  ))}
+                </div>
+                <Link href={a.href} className="hp-audience-cta">
+                  {a.cta} →
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 6. Why ATTD ──────────────────────────────────────────────── */}
+      <section className="hp-section">
+        <div className="container">
+          <div className="hp-section-header">
+            <h2 className="hp-section-title">Vì sao đại lý &amp; agency chọn nguồn hàng từ ATTD?</h2>
+          </div>
+          <div className="hp-why-grid">
+            {WHY_ATTD.map((item) => (
+              <div key={item.title} className="hp-why-card">
+                <span className="hp-why-icon">{item.icon}</span>
+                <h3 className="hp-why-title">{item.title}</h3>
+                <p className="hp-why-desc">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 7. Sourcing process ───────────────────────────────────────── */}
+      <section className="hp-section hp-section--alt hp-section--compact">
+        <div className="container">
+          <div className="hp-section-header">
+            <h2 className="hp-section-title">Quy trình lấy nguồn hàng</h2>
+          </div>
+          <div className="hp-process-steps">
+            {SOURCING_STEPS.map((step, i) => (
+              <div key={step.n} className="hp-process-step">
+                <div className="hp-process-num">{step.n}</div>
+                {i < SOURCING_STEPS.length - 1 && (
+                  <div className="hp-process-connector" aria-hidden />
+                )}
+                <h3 className="hp-process-title">{step.title}</h3>
+                <p className="hp-process-desc">{step.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 8. Blog preview ──────────────────────────────────────────── */}
+      {blogPosts && blogPosts.length > 0 && (
+        <section className="hp-section">
+          <div className="container">
+            <div className="hp-section-header">
+              <div>
+                <h2 className="hp-section-title">Kiến thức nguồn hàng B2B</h2>
+                <p className="hp-section-desc">
+                  Hướng dẫn chọn sản phẩm, chất liệu và chiến lược sourcing cho đại lý.
+                </p>
+              </div>
+              <Link href="/blog" className="hp-view-all">Xem tất cả →</Link>
+            </div>
+            <div className="hp-blog-grid">
+              {blogPosts.slice(0, 4).map((post) => {
+                const imgUrl =
+                  typeof post.featuredImageUrl === "string" && isValidImageSrc(post.featuredImageUrl)
+                    ? post.featuredImageUrl
+                    : null;
+                const date = post.publishedAt
+                  ? new Date(post.publishedAt).toLocaleDateString("vi-VN", {
+                      year: "numeric", month: "long", day: "numeric",
+                    })
+                  : "";
+                return (
+                  <Link key={post.id} href={`/blog/${post.slug}`} className="hp-blog-card">
+                    <div className="hp-blog-card-img">
+                      {imgUrl ? (
+                        <Image
+                          src={imgUrl}
+                          alt={post.title}
+                          fill
+                          className="hp-blog-card-photo"
+                          sizes="(max-width: 640px) 100vw, 300px"
+                        />
+                      ) : (
+                        <div className="hp-blog-card-placeholder" aria-hidden>
+                          <span>ATTD</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="hp-blog-card-body">
+                      {date && <p className="hp-blog-card-date">{date}</p>}
+                      <h3 className="hp-blog-card-title">{post.title}</h3>
+                      {post.excerpt && (
+                        <p className="hp-blog-card-excerpt">{post.excerpt}</p>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── 9. Client logos + Case studies ──────────────────────────── */}
       <ClientLogoWall />
       <CaseStudySection />
+
+      {/* ── 10. Trust + Final CTA ────────────────────────────────────── */}
       <TrustBanner />
-      <CTASection />
+
+      <section className="hp-final-cta">
+        <div className="container">
+          <div className="hp-final-cta-inner">
+            <h2 className="hp-final-cta-title">
+              Bạn cần nguồn hàng đồng phục hoặc quà tặng doanh nghiệp?
+            </h2>
+            <p className="hp-final-cta-desc">
+              Gửi nhu cầu, ATTD sẽ tư vấn danh mục phù hợp, MOQ, lead-time và báo giá theo số lượng.
+            </p>
+            <div className="hp-final-cta-btns">
+              <Link href="/lien-he" className="btn-primary">Liên hệ báo giá sỉ</Link>
+              <Link href="/dai-ly" className="btn-secondary">Đăng ký đại lý</Link>
+              <Link href="/san-pham" className="btn-tertiary">Xem danh mục sản phẩm</Link>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

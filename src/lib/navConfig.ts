@@ -28,6 +28,7 @@ export type MegaMenuColumn = {
 export type NavMegaMenu = {
   id: string;
   label: string;
+  href?: string;
   columns: MegaMenuColumn[];
 };
 
@@ -35,6 +36,7 @@ export const NAV_MEGA_MENUS: NavMegaMenu[] = [
   {
     id: "san-pham",
     label: "Sản phẩm",
+    href: "/san-pham",
     columns: [
       {
         title: "Blank apparel",

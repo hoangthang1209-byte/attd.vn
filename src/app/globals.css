@@ -7660,3 +7660,137 @@ body:has(.mobile-action-bar) .site-footer {
   .product-b2b-spec-grid { grid-template-columns: 1fr; }
   .product-related-grid { grid-template-columns: 1fr 1fr; }
 }
+
+/* ─── Patch 24.9.4a: Product-First Homepage ──────────────────────────────── */
+
+/* ── Hero v2: product image mosaic ────────────────────────────────────────── */
+.hero-trust-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 20px 0 28px; }
+.hero-trust-chip { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: rgba(255,255,255,.9); letter-spacing: .02em; }
+
+/* Mosaic v2: CSS grid 3x2 */
+.hero-mosaic-v2 { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 160px); gap: 8px; }
+.hero-tile { position: relative; border-radius: 10px; overflow: hidden; text-decoration: none; }
+.hero-tile--tall { grid-column: 1; grid-row: 1 / span 2; }
+.hero-tile--sm { }
+.hero-tile-img { object-fit: cover; }
+.hero-tile-gradient { position: absolute; inset: 0; }
+.hero-tile-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.7) 0%, rgba(0,0,0,.15) 50%, transparent 100%); }
+.hero-tile-content { position: absolute; bottom: 0; left: 0; right: 0; padding: 10px 12px; }
+.hero-tile-label { display: block; font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2; }
+.hero-tile-desc { display: block; font-size: 11px; color: rgba(255,255,255,.75); margin-top: 2px; }
+.hero-tile:hover .hero-tile-overlay { background: linear-gradient(to top, rgba(0,0,0,.8) 0%, rgba(0,0,0,.3) 60%, transparent 100%); }
+
+@media (max-width: 900px) {
+  .hero-mosaic-v2 { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 120px); }
+  .hero-tile--tall { grid-column: 1; grid-row: 1 / span 2; }
+}
+@media (max-width: 640px) {
+  .hero-mosaic-v2 { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 100px); }
+  .hero-tile--tall { grid-column: 1 / span 2; grid-row: 1; height: 140px; }
+}
+
+/* ── Shared homepage section helpers ────────────────────────────────────── */
+.hp-section { padding: 64px 0; }
+.hp-section--alt { background: var(--section-bg); }
+.hp-section--compact { padding: 48px 0; }
+.hp-section-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 36px; flex-wrap: wrap; }
+.hp-section-title { font-size: clamp(20px, 2.5vw, 28px); font-weight: 800; letter-spacing: -0.03em; margin: 0 0 6px; color: #111827; }
+.hp-section-desc { font-size: 15px; color: #6b7280; line-height: 1.6; margin: 0; max-width: 520px; }
+.hp-view-all { font-size: 14px; font-weight: 600; color: var(--primary); text-decoration: none; white-space: nowrap; }
+.hp-view-all:hover { text-decoration: underline; }
+.hp-view-all-row { text-align: center; margin-top: 32px; }
+
+/* ── Category marketplace grid ────────────────────────────────────────── */
+.hp-market-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+
+.market-cat-card { display: flex; flex-direction: column; border-radius: var(--radius-xl); overflow: hidden; text-decoration: none; color: inherit; background: #fff; border: 1px solid var(--border); transition: box-shadow .18s, transform .18s; }
+.market-cat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-3px); }
+.market-cat-card-img { position: relative; aspect-ratio: 4/3; overflow: hidden; }
+.market-cat-card-photo { object-fit: cover; }
+.market-cat-card-gradient { position: absolute; inset: 0; }
+.market-cat-card-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.12); }
+.market-cat-card:hover .market-cat-card-overlay { background: rgba(0,0,0,.22); }
+.market-cat-card-body { padding: 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.market-cat-card-name { font-size: 14px; font-weight: 700; color: #111827; margin: 0; }
+.market-cat-card-desc { font-size: 12px; color: #6b7280; margin: 0; line-height: 1.4; }
+.market-cat-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 8px; }
+.market-cat-card-count { font-size: 11px; color: #9ca3af; }
+.market-cat-card-cta { font-size: 12px; font-weight: 600; color: var(--primary); }
+
+/* ── Featured product grid (homepage) ────────────────────────────────── */
+.hp-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+
+/* ── B2B audience blocks ─────────────────────────────────────────────── */
+.hp-audience-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.hp-audience-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 28px 24px; display: flex; flex-direction: column; gap: 10px; transition: box-shadow .18s; }
+.hp-audience-card:hover { box-shadow: var(--shadow-md); }
+.hp-audience-icon { font-size: 32px; line-height: 1; }
+.hp-audience-title { font-size: 18px; font-weight: 800; color: #111827; margin: 0; letter-spacing: -0.02em; }
+.hp-audience-desc { font-size: 14px; color: #6b7280; line-height: 1.6; margin: 0; }
+.hp-audience-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.hp-audience-tag { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 4px; background: #f3f4f6; color: #374151; }
+.hp-audience-cta { font-size: 13px; font-weight: 700; color: var(--primary); text-decoration: none; margin-top: auto; }
+.hp-audience-cta:hover { text-decoration: underline; }
+
+@media (max-width: 640px) { .hp-audience-grid { grid-template-columns: 1fr; } }
+
+/* ── Why ATTD cards ──────────────────────────────────────────────────── */
+.hp-why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.hp-why-card { padding: 24px 20px; background: var(--section-bg); border-radius: var(--radius-xl); border: 1px solid var(--border); }
+.hp-why-icon { font-size: 28px; display: block; margin-bottom: 12px; }
+.hp-why-title { font-size: 15px; font-weight: 700; color: #111827; margin: 0 0 6px; }
+.hp-why-desc { font-size: 13px; color: #6b7280; line-height: 1.6; margin: 0; }
+
+@media (max-width: 900px) { .hp-why-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .hp-why-grid { grid-template-columns: 1fr; } }
+
+/* ── Sourcing process steps ──────────────────────────────────────────── */
+.hp-process-steps { display: flex; gap: 0; position: relative; }
+.hp-process-step { flex: 1; padding: 0 20px 0 0; position: relative; }
+.hp-process-num { font-size: 13px; font-weight: 800; color: var(--primary); letter-spacing: .06em; margin-bottom: 8px; }
+.hp-process-connector { position: absolute; top: 8px; left: calc(100% - 20px); width: 24px; height: 2px; background: #e5e7eb; z-index: 0; }
+.hp-process-title { font-size: 14px; font-weight: 700; color: #111827; margin: 0 0 4px; }
+.hp-process-desc { font-size: 13px; color: #6b7280; line-height: 1.55; margin: 0; }
+
+@media (max-width: 900px) {
+  .hp-process-steps { flex-direction: column; gap: 20px; }
+  .hp-process-step { padding: 0; padding-left: 48px; position: relative; }
+  .hp-process-num { position: absolute; left: 0; top: 0; background: var(--primary); color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .hp-process-connector { display: none; }
+}
+
+/* ── Blog preview cards ──────────────────────────────────────────────── */
+.hp-blog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.hp-blog-card { display: flex; flex-direction: column; border-radius: var(--radius-xl); overflow: hidden; text-decoration: none; color: inherit; background: #fff; border: 1px solid var(--border); transition: box-shadow .18s, transform .15s; }
+.hp-blog-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.hp-blog-card-img { position: relative; aspect-ratio: 16/9; overflow: hidden; background: var(--section-bg); }
+.hp-blog-card-photo { object-fit: cover; }
+.hp-blog-card-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: rgba(255,255,255,.5); font-size: 20px; font-weight: 800; letter-spacing: .08em; }
+.hp-blog-card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.hp-blog-card-date { font-size: 12px; color: #9ca3af; margin: 0; }
+.hp-blog-card-title { font-size: 14px; font-weight: 700; color: #111827; line-height: 1.4; margin: 0; }
+.hp-blog-card-excerpt { font-size: 13px; color: #6b7280; line-height: 1.55; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── Final CTA section ───────────────────────────────────────────────── */
+.hp-final-cta { padding: 72px 0; background: #111827; }
+.hp-final-cta-inner { text-align: center; max-width: 620px; margin: 0 auto; }
+.hp-final-cta-title { font-size: clamp(22px, 3vw, 32px); font-weight: 800; color: #fff; letter-spacing: -0.02em; margin: 0 0 12px; }
+.hp-final-cta-desc { font-size: 16px; color: rgba(255,255,255,.7); line-height: 1.65; margin: 0 0 28px; }
+.hp-final-cta-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.hp-final-cta .btn-secondary { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.3); color: #fff; }
+.hp-final-cta .btn-secondary:hover { background: rgba(255,255,255,.18); }
+.hp-final-cta .btn-tertiary { color: rgba(255,255,255,.65); }
+
+/* ── Responsive: homepage grids ──────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hp-market-cats { grid-template-columns: repeat(3, 1fr); }
+  .hp-product-grid { grid-template-columns: repeat(2, 1fr); }
+  .hp-blog-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .hp-section { padding: 44px 0; }
+  .hp-section-header { flex-direction: column; align-items: flex-start; }
+  .hp-market-cats { grid-template-columns: repeat(2, 1fr); }
+  .hp-product-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .hp-blog-grid { grid-template-columns: 1fr; }
+}
