@@ -99,6 +99,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!propCategories) {
@@ -171,11 +173,80 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     setField("gallery", arr);
   }
 
+  function isValidImageUrl(value: string): boolean {
+    return /^https?:\/\/.+/i.test(value.trim());
+  }
+
+  function parseNumberField(value: string): number | undefined {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const n = parseFloat(trimmed.replace(/[,\s]/g, ""));
+    return Number.isFinite(n) ? n : undefined;
+  }
+
+  function validateFormLocally(): Record<string, string> {
+    const errors: Record<string, string> = {};
+    if (!form.name.trim()) errors.name = "Tên sản phẩm là bắt buộc.";
+    if (!form.categoryId) errors.categoryId = "Vui lòng chọn danh mục.";
+
+    if (form.featuredImage.trim() && !isValidImageUrl(form.featuredImage)) {
+      errors.featuredImage = "URL ảnh không hợp lệ. Vui lòng dùng link ảnh bắt đầu bằng https://.";
+    }
+
+    form.gallery.forEach((url, index) => {
+      if (url.trim() && !isValidImageUrl(url)) {
+        errors[`gallery.${index}`] = "URL ảnh gallery không hợp lệ.";
+      }
+    });
+
+    if (form.defaultMoq.trim() && parseNumberField(form.defaultMoq) === undefined) {
+      errors.defaultMoq = "MOQ phải là số.";
+    }
+
+    form.variants.forEach((v, index) => {
+      const prefix = `variants.${index}`;
+      if (v.wholesalePrice.trim() && parseNumberField(v.wholesalePrice) === undefined) {
+        errors[`${prefix}.wholesalePrice`] = "Giá sỉ phải là số.";
+      }
+      if (v.dealerPrice.trim() && parseNumberField(v.dealerPrice) === undefined) {
+        errors[`${prefix}.dealerPrice`] = "Giá đại lý phải là số.";
+      }
+      if (v.stockQty.trim() && !Number.isInteger(Number(v.stockQty))) {
+        errors[`${prefix}.stockQty`] = "Tồn kho phải là số.";
+      }
+      if (v.imageUrl.trim() && !isValidImageUrl(v.imageUrl)) {
+        errors[`${prefix}.imageUrl`] = "Ảnh biến thể không hợp lệ.";
+      }
+    });
+
+    return errors;
+  }
+
+  function fieldLabel(field: string): string {
+    if (field.startsWith("variants.") && field.endsWith(".imageUrl")) return "Ảnh biến thể";
+    if (field.endsWith(".dealerPrice")) return "Giá đại lý";
+    if (field.endsWith(".wholesalePrice")) return "Giá sỉ";
+    if (field.endsWith(".stockQty")) return "Tồn kho";
+    if (field === "featuredImage") return "Ảnh đại diện";
+    if (field === "productCode") return "Mã sản phẩm";
+    if (field === "categoryId") return "Danh mục";
+    if (field === "name") return "Tên sản phẩm";
+    return field;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError("Tên sản phẩm là bắt buộc."); return; }
-    if (!form.categoryId) { setError("Vui lòng chọn danh mục."); return; }
     setError(null);
+    setErrorDetail(null);
+    setFieldErrors({});
+
+    const localErrors = validateFormLocally();
+    if (Object.keys(localErrors).length > 0) {
+      setFieldErrors(localErrors);
+      setError("Không thể tạo sản phẩm. Vui lòng kiểm tra các trường được đánh dấu.");
+      return;
+    }
+
     setSaving(true);
 
     const payload = {
@@ -187,7 +258,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       material: form.material.trim() || undefined,
       form: form.form.trim() || undefined,
       fit: form.fit.trim() || undefined,
-      defaultMoq: form.defaultMoq ? Number(form.defaultMoq) : undefined,
+      defaultMoq: form.defaultMoq.trim() ? parseNumberField(form.defaultMoq) : undefined,
       leadTime: form.leadTime.trim() || undefined,
       useCases: form.useCases.split(",").map((s) => s.trim()).filter(Boolean),
       targetCustomers: form.targetCustomers.split(",").map((s) => s.trim()).filter(Boolean),
@@ -196,8 +267,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       supportsOem: form.supportsOem,
       tags: form.tags.split(",").map((s) => s.trim()).filter(Boolean),
       status: form.status,
-      featuredImage: form.featuredImage || undefined,
-      gallery: form.gallery.filter(Boolean),
+      featuredImage: form.featuredImage.trim() || undefined,
+      gallery: form.gallery.map((url) => url.trim()).filter(Boolean),
       variants: form.variants.map((v) => ({
         id: v.id,
         colorName: v.colorName.trim() || undefined,
@@ -205,9 +276,9 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         sizeName: v.sizeName.trim() || undefined,
         dimensions: v.dimensions.trim() || undefined,
         capacity: v.capacity.trim() || undefined,
-        wholesalePrice: v.wholesalePrice ? Number(v.wholesalePrice) : undefined,
-        dealerPrice: v.dealerPrice ? Number(v.dealerPrice) : undefined,
-        stockQty: Number(v.stockQty) || 0,
+        wholesalePrice: v.wholesalePrice.trim() ? parseNumberField(v.wholesalePrice) : undefined,
+        dealerPrice: v.dealerPrice.trim() ? parseNumberField(v.dealerPrice) : undefined,
+        stockQty: v.stockQty.trim() ? parseInt(v.stockQty, 10) : 0,
         stockStatus: v.stockStatus,
         internalNote: v.internalNote.trim() || undefined,
         imageUrl: v.imageUrl.trim() || undefined,
@@ -222,12 +293,27 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json() as { id?: string; slug?: string; message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Lỗi lưu sản phẩm.");
+      const data = await res.json() as {
+        id?: string;
+        slug?: string;
+        message?: string;
+        error?: string;
+        detail?: string;
+        fieldErrors?: Record<string, string>;
+      };
+
+      if (!res.ok) {
+        setError(data.error ?? data.message ?? "Không thể lưu sản phẩm.");
+        setErrorDetail(data.detail ?? null);
+        setFieldErrors(data.fieldErrors ?? {});
+        return;
+      }
+
       router.push("/admin/products");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi lưu sản phẩm.");
+      setError("Không thể lưu sản phẩm.");
+      setErrorDetail(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
     }
@@ -566,7 +652,24 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         </button>
       </fieldset>
 
-      {error && <p className="admin-error">{error}</p>}
+      {error && (
+        <div className="admin-catalog-fieldset admin-import-error-panel">
+          <p className="admin-error">{error}</p>
+          {Object.keys(fieldErrors).length > 0 && (
+            <ul className="admin-kb-warning-list">
+              {Object.entries(fieldErrors).map(([field, message]) => (
+                <li key={field}><strong>{fieldLabel(field)}:</strong> {message}</li>
+              ))}
+            </ul>
+          )}
+          {errorDetail && (
+            <details className="admin-import-error-detail">
+              <summary>Chi tiết lỗi</summary>
+              <pre>{errorDetail}</pre>
+            </details>
+          )}
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>

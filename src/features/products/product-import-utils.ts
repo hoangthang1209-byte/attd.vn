@@ -6,6 +6,7 @@ import type {
   ProductImportDuplicateInfo,
 } from "@/features/products/product-import-types";
 import type { ProductImportPreset } from "@/features/products/product-import-presets";
+import { getSuggestedFix } from "@/features/products/product-import-feedback";
 import {
   generateSku,
   getCategorySkuCode,
@@ -109,40 +110,90 @@ export function mapRawRowToImportRow(
   };
 }
 
+function validationError(
+  field: string,
+  message: string,
+): ProductImportValidationError {
+  return {
+    field,
+    message,
+    severity: "error",
+    suggestedFix: getSuggestedFix({ field, message }),
+  };
+}
+
+function isInvalidNumericRaw(val: unknown): boolean {
+  if (val == null || val === "") return false;
+  if (typeof val === "number") return Number.isNaN(val);
+  const str = String(val).trim();
+  if (!str) return false;
+  const n = parseFloat(str.replace(/[,\s]/g, ""));
+  return Number.isNaN(n);
+}
+
+export function validateRawFieldValues(
+  raw: Record<string, unknown>,
+  mapping: ProductImportColumnMapping,
+): ProductImportValidationError[] {
+  const errors: ProductImportValidationError[] = [];
+  const checks: { field: keyof ProductImportColumnMapping; label: string }[] = [
+    { field: "stockQty", label: "stockQty" },
+    { field: "wholesalePrice", label: "Giá sỉ" },
+    { field: "dealerPrice", label: "Giá đại lý" },
+    { field: "costPrice", label: "Giá vốn" },
+    { field: "defaultMoq", label: "MOQ" },
+    { field: "weight", label: "weight" },
+  ];
+
+  for (const { field, label } of checks) {
+    const col = mapping[field];
+    if (!col) continue;
+    const val = raw[col];
+    if (isInvalidNumericRaw(val)) {
+      errors.push(validationError(String(field), `${label} phải là số hợp lệ.`));
+    }
+  }
+
+  return errors;
+}
+
 // ─── Validate a row ───────────────────────────────────────────────────────────
 
 export function validateImportRow(row: ProductImportRow): ProductImportValidationError[] {
   const errors: ProductImportValidationError[] = [];
 
   if (!row.productName) {
-    errors.push({ field: "productName", message: "Tên sản phẩm là bắt buộc." });
+    errors.push(validationError("productName", "Tên sản phẩm là bắt buộc."));
   }
   if (!row.category) {
-    errors.push({ field: "category", message: "Danh mục là bắt buộc." });
+    errors.push(validationError("category", "Danh mục là bắt buộc."));
   }
   if (row.defaultMoq !== undefined && row.defaultMoq < 1) {
-    errors.push({ field: "defaultMoq", message: "MOQ phải >= 1." });
+    errors.push(validationError("defaultMoq", "MOQ phải >= 1."));
   }
   if (row.stockQty !== undefined && row.stockQty < 0) {
-    errors.push({ field: "stockQty", message: "Số lượng tồn không được âm." });
+    errors.push(validationError("stockQty", "Số lượng tồn không được âm."));
   }
   if (row.wholesalePrice !== undefined && row.wholesalePrice < 0) {
-    errors.push({ field: "wholesalePrice", message: "Giá sỉ không hợp lệ." });
+    errors.push(validationError("wholesalePrice", "Giá sỉ không hợp lệ."));
   }
   if (row.dealerPrice !== undefined && row.dealerPrice < 0) {
-    errors.push({ field: "dealerPrice", message: "Giá đại lý không hợp lệ." });
+    errors.push(validationError("dealerPrice", "Giá đại lý không hợp lệ."));
   }
   if (row.featuredImage && !/^https?:\/\/.+/i.test(row.featuredImage)) {
-    errors.push({ field: "featuredImage", message: "URL ảnh không hợp lệ." });
+    errors.push(validationError("featuredImage", "URL ảnh không hợp lệ."));
+  }
+  if (row.stockStatus && !["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK", "PREORDER"].includes(row.stockStatus)) {
+    errors.push(validationError("stockStatus", "Trạng thái tồn kho không hợp lệ."));
   }
   if (row.priceTiers) {
     try {
       const parsed = JSON.parse(row.priceTiers);
       if (!Array.isArray(parsed)) {
-        errors.push({ field: "priceTiers", message: "priceTiers phải là mảng JSON." });
+        errors.push(validationError("priceTiers", "priceTiers phải là mảng JSON."));
       }
     } catch {
-      errors.push({ field: "priceTiers", message: "priceTiers không phải JSON hợp lệ." });
+      errors.push(validationError("priceTiers", "priceTiers không phải JSON hợp lệ."));
     }
   }
 

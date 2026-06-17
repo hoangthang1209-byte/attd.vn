@@ -85,7 +85,7 @@ export default function ProductCard({
             <span className="product-card-meta">{skuCount} lựa chọn</span>
           )}
           {moq != null && (
-            <span className="product-card-meta">Tối thiểu {moq}</span>
+            <span className="product-card-meta">Tối thiểu {moq} cái</span>
           )}
           {leadTime && (
             <span className="product-card-meta product-card-leadtime">{leadTime}</span>

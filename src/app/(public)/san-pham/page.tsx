@@ -3,10 +3,12 @@ import Link from "next/link";
 import { getProductsForPublicListing } from "@/features/products/services/product.service";
 import { getCategoriesWithCounts } from "@/features/categories/services/category.service";
 import ProductCard from "@/components/public/ProductCard";
-import CatalogPopularCategories from "@/components/public/CatalogPopularCategories";
+import ProductFilterSidebar from "@/components/marketplace/ProductFilterSidebar";
+import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
+import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
+import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
 import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
-import TrustBlock from "@/components/public/TrustBlock";
 import { SITE_NAME, DEFAULT_DESCRIPTION, canonicalUrl } from "@/lib/seo";
 import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
 
@@ -25,33 +27,62 @@ const STOCK_LABELS: Record<string, string> = {
 };
 
 type Props = {
-  searchParams: Promise<{ category?: string; q?: string; page?: string }>;
+  searchParams: Promise<{
+    category?: string;
+    q?: string;
+    search?: string;
+    page?: string;
+    inStock?: string;
+    print?: string;
+    embroidery?: string;
+    oem?: string;
+    material?: string;
+  }>;
 };
 
 export default async function ProductCatalogPage({ searchParams }: Props) {
-  const { category, q, page: pageStr } = await searchParams;
+  const params = await searchParams;
+  const { category, page: pageStr, inStock, print, embroidery, oem, material } = params;
+  const q = params.q ?? params.search;
   const page = Math.max(1, Number(pageStr) || 1);
 
+  const filters = {
+    inStock: inStock === "1",
+    print: print === "1",
+    embroidery: embroidery === "1",
+    oem: oem === "1",
+    material,
+  };
+
   const [{ products, total, perPage }, categories] = await Promise.all([
-    getProductsForPublicListing({ categorySlug: category, search: q, page }),
+    getProductsForPublicListing({
+      categorySlug: category,
+      search: q,
+      page,
+      ...filters,
+    }),
     getCategoriesWithCounts(),
   ]);
 
   const totalPages = Math.ceil(total / perPage);
   const activeCategory = categories.find((c) => c.slug === category);
 
-  function buildUrl(params: { category?: string; q?: string; page?: number }) {
+  function buildUrl(nextPage?: number) {
     const p = new URLSearchParams();
-    if (params.category) p.set("category", params.category);
-    if (params.q) p.set("q", params.q);
-    if (params.page && params.page > 1) p.set("page", String(params.page));
+    if (category) p.set("category", category);
+    if (q) p.set("q", q);
+    if (filters.inStock) p.set("inStock", "1");
+    if (filters.print) p.set("print", "1");
+    if (filters.embroidery) p.set("embroidery", "1");
+    if (filters.oem) p.set("oem", "1");
+    if (material) p.set("material", material);
+    if (nextPage && nextPage > 1) p.set("page", String(nextPage));
     const qs = p.toString();
     return `/san-pham${qs ? `?${qs}` : ""}`;
   }
 
   return (
-    <main>
-      {/* ── Breadcrumb ──────────────────────────────────────────────────── */}
+    <main className="mp-catalog">
       <Breadcrumb
         items={[
           { name: "Sản phẩm", href: "/san-pham" },
@@ -59,178 +90,103 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
         ]}
       />
 
-      {/* ── Hero ────────────────────────────────────────────────────────── */}
-      <section className="catalog-hero">
+      <section className="mp-catalog-hero">
         <div className="container">
-          <div className="catalog-hero-inner">
-            <div>
-              <h1 className="catalog-hero-title">
-                {activeCategory ? activeCategory.name : "Danh mục sản phẩm sỉ"}
-              </h1>
-              <p className="catalog-hero-desc">
-                {activeCategory?.description ??
-                  "Nguồn hàng đồng phục & quà tặng B2B — áo thun, polo, nón, tote, bình giữ nhiệt, bandana và gift set cho đại lý, xưởng in, agency và doanh nghiệp."}
+          <MarketplaceSectionHeader
+            title={activeCategory ? activeCategory.name : "Kho sản phẩm sỉ B2B"}
+            description={
+              activeCategory?.description ??
+              "Tìm nguồn hàng đồng phục & quà tặng — lọc theo danh mục, tình trạng hàng và khả năng gia công."
+            }
+          />
+          <MarketplaceSearchBar defaultValue={q ?? ""} size="large" />
+        </div>
+      </section>
+
+      <section className="mp-catalog-body">
+        <div className="container">
+          <div className="mp-catalog-layout">
+            <ProductFilterSidebar
+              categories={categories.map((c) => ({
+                slug: c.slug,
+                name: c.name,
+                count: c._count.products,
+              }))}
+              activeCategory={category}
+              searchQuery={q}
+              filters={filters}
+            />
+
+            <div className="mp-catalog-main">
+              <p className="mp-catalog-count">
+                {total > 0
+                  ? `${total} sản phẩm${q ? ` cho "${q}"` : ""}${activeCategory ? ` · ${activeCategory.name}` : ""}`
+                  : "Không tìm thấy sản phẩm"}
               </p>
-            </div>
-            <TrustBlock variant="strip" />
-          </div>
-        </div>
-      </section>
 
-      {!category && !q && (
-        <CatalogPopularCategories
-          categories={categories.map((c) => ({
-            id: c.id,
-            name: c.name,
-            slug: c.slug,
-            imageUrl: c.imageUrl,
-            description: c.description,
-            productCount: c._count.products,
-          }))}
-        />
-      )}
+              {products.length === 0 ? (
+                <EmptyState
+                  title="Chưa tìm thấy sản phẩm phù hợp"
+                  description="Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, số lượng tối thiểu và thời gian giao/sản xuất."
+                />
+              ) : (
+                <div className="mp-product-grid">
+                  {products.map((product) => {
+                    const stockStatuses = product.variants.map((v) => v.stockStatus);
+                    const stock = stockStatuses.includes("IN_STOCK")
+                      ? "IN_STOCK"
+                      : stockStatuses.includes("LOW_STOCK")
+                      ? "LOW_STOCK"
+                      : stockStatuses.length > 0
+                      ? "OUT_OF_STOCK"
+                      : null;
 
-      {/* ── Filter + Search ──────────────────────────────────────────────── */}
-      <section className="catalog-filter-bar">
-        <div className="container">
-          {/* Category tabs */}
-          <div className="catalog-cat-tabs">
-            <Link
-              href={buildUrl({ q })}
-              className={`catalog-cat-tab${!category ? " catalog-cat-tab--active" : ""}`}
-            >
-              Tất cả
-            </Link>
-            {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                href={buildUrl({ category: cat.slug, q })}
-                className={`catalog-cat-tab${category === cat.slug ? " catalog-cat-tab--active" : ""}`}
-              >
-                {cat.name}
-              </Link>
-            ))}
-          </div>
-
-          {/* Search form */}
-          <form method="GET" action="/san-pham" className="catalog-search-form">
-            {category && (
-              <input type="hidden" name="category" value={category} />
-            )}
-            <input
-              type="search"
-              name="q"
-              defaultValue={q}
-              placeholder="Tìm tên sản phẩm, mã hàng…"
-              className="catalog-search-input"
-            />
-            <button type="submit" className="catalog-search-btn">
-              Tìm kiếm
-            </button>
-            {(q || category) && (
-              <Link href="/san-pham" className="catalog-search-clear">
-                ✕ Bỏ lọc
-              </Link>
-            )}
-          </form>
-
-          <p className="catalog-count">
-            {total > 0
-              ? `${total} sản phẩm${q ? ` cho "${q}"` : ""}${activeCategory ? ` trong ${activeCategory.name}` : ""}`
-              : "Không tìm thấy sản phẩm"}
-          </p>
-        </div>
-      </section>
-
-      {/* ── Product Grid ─────────────────────────────────────────────────── */}
-      <section className="section-compact">
-        <div className="container">
-          {products.length === 0 ? (
-            <EmptyState
-              title={q ? `Không tìm thấy sản phẩm cho "${q}"` : "Chưa có sản phẩm"}
-              description="Liên hệ ATTD để được tư vấn nguồn hàng và báo giá."
-            />
-          ) : (
-            <div className="catalog-product-grid">
-              {products.map((product) => {
-                const stockStatuses = product.variants.map((v) => v.stockStatus);
-                const stock =
-                  stockStatuses.includes("IN_STOCK")
-                    ? "IN_STOCK"
-                    : stockStatuses.includes("LOW_STOCK")
-                    ? "LOW_STOCK"
-                    : stockStatuses.length > 0
-                    ? "OUT_OF_STOCK"
-                    : null;
-
-                return (
-                  <ProductCard
-                    key={product.id}
-                    id={product.id}
-                    slug={product.slug}
-                    name={product.name}
-                    productCode={product.productCode}
-                    skuCount={product.variants.length}
-                    category={product.category.name}
-                    imageUrl={getPrimaryProductImageFromProduct(product)}
-                    moq={product.defaultMoq}
-                    leadTime={product.leadTime}
-                    stockStatus={stock ?? undefined}
-                    stockLabel={stock ? STOCK_LABELS[stock] : undefined}
-                    supportsPrinting={product.supportsPrinting}
-                    supportsEmbroidery={product.supportsEmbroidery}
-                    supportsOem={product.supportsOem}
-                  />
-                );
-              })}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="catalog-pagination">
-              {page > 1 && (
-                <Link
-                  href={buildUrl({ category, q, page: page - 1 })}
-                  className="catalog-page-btn"
-                >
-                  ← Trang trước
-                </Link>
+                    return (
+                      <ProductCard
+                        key={product.id}
+                        id={product.id}
+                        slug={product.slug}
+                        name={product.name}
+                        productCode={product.productCode}
+                        skuCount={product.variants.length}
+                        category={product.category.name}
+                        imageUrl={getPrimaryProductImageFromProduct(product)}
+                        moq={product.defaultMoq}
+                        leadTime={product.leadTime}
+                        stockStatus={stock ?? undefined}
+                        stockLabel={stock ? STOCK_LABELS[stock] : undefined}
+                        supportsPrinting={product.supportsPrinting}
+                        supportsEmbroidery={product.supportsEmbroidery}
+                        supportsOem={product.supportsOem}
+                      />
+                    );
+                  })}
+                </div>
               )}
-              <span className="catalog-page-info">
-                Trang {page} / {totalPages}
-              </span>
-              {page < totalPages && (
-                <Link
-                  href={buildUrl({ category, q, page: page + 1 })}
-                  className="catalog-page-btn"
-                >
-                  Trang tiếp →
-                </Link>
+
+              {totalPages > 1 && (
+                <div className="mp-catalog-pagination">
+                  {page > 1 && (
+                    <Link href={buildUrl(page - 1)} className="mp-page-btn">
+                      Trang trước
+                    </Link>
+                  )}
+                  <span className="mp-page-info">
+                    Trang {page} / {totalPages}
+                  </span>
+                  {page < totalPages && (
+                    <Link href={buildUrl(page + 1)} className="mp-page-btn">
+                      Trang tiếp
+                    </Link>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* ── CTA ──────────────────────────────────────────────────────────── */}
-      <section className="catalog-suggest-cta">
-        <div className="container">
-          <div className="catalog-suggest-inner">
-            <h2 className="catalog-suggest-title">
-              Chưa tìm thấy sản phẩm phù hợp?
-            </h2>
-            <p className="catalog-suggest-desc">
-              Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, số lượng tối thiểu và thời gian giao/sản xuất.
-              {total > 0 && ` Hiện có ${total} sản phẩm đang mở trên catalog.`}
-            </p>
-            <div className="catalog-suggest-btns">
-              <Link href="/lien-he" className="btn-primary">Liên hệ báo giá sỉ</Link>
-              <Link href="/dai-ly" className="btn-secondary">Đăng ký đại lý</Link>
-            </div>
           </div>
         </div>
       </section>
+
+      <MarketplaceRFQStrip />
     </main>
   );
 }

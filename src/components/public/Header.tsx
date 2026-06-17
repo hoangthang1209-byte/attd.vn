@@ -7,16 +7,17 @@ import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
 import NavMegaMenuPanel from "@/components/public/NavMegaMenu";
 import MobileNavPanel from "@/components/public/MobileNavPanel";
-import {
-  NAV_SAN_PHAM_MENU,
-  NAV_PRIMARY_LINKS,
-} from "@/lib/navConfig";
+import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
+import MarketplaceCategoryNav from "@/components/marketplace/MarketplaceCategoryNav";
+import { NAV_SAN_PHAM_MENU } from "@/lib/navConfig";
 import { CTA } from "@/lib/ctaConfig";
 
 type HeaderProps = {
   headerLogoUrl?: string | null;
   companyTagline?: string;
 };
+
+const MEGA_MENU = { ...NAV_SAN_PHAM_MENU, label: "Tất cả danh mục" };
 
 export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -33,27 +34,35 @@ export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
 
   return (
     <>
-      <header className={`site-header site-header--premium${scrolled ? " site-header--scrolled" : ""}`}>
+      <header className={`mp-header${scrolled ? " mp-header--scrolled" : ""}`}>
+        <div className="mp-header-top">
+          <div className="container mp-header-top-inner">
+            <p className="mp-header-tagline">
+              Kho sỉ đồng phục &amp; quà tặng doanh nghiệp
+            </p>
+            <div className="mp-header-top-links">
+              <Link href="/dai-ly">Đại lý</Link>
+              <Link href="/oem">OEM</Link>
+              <Link href="/lien-he">Liên hệ</Link>
+            </div>
+          </div>
+        </div>
+
         <div className="container">
-          <div className="site-header-inner">
+          <div className="mp-header-main">
             <AttdLogo variant="desktop" src={headerLogoUrl} className="site-header-logo-desktop" />
             <AttdLogo variant="mobile" src={headerLogoUrl} className="site-header-logo-mobile" />
 
-            <nav className="site-nav-center" aria-label="Main navigation">
-              <NavMegaMenuPanel item={NAV_SAN_PHAM_MENU} />
-              {NAV_PRIMARY_LINKS.map((link) => (
-                <Link key={link.href} href={link.href} className="site-nav-link">
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
+            <div className="mp-header-search-desktop">
+              <MarketplaceSearchBar />
+            </div>
 
-            <div className="site-nav-actions">
+            <div className="mp-header-actions">
               <TrackedLink
                 href="/lien-he"
                 trackEvent="contact_quote"
                 trackSource="HEADER"
-                className="btn-secondary site-nav-cta-secondary"
+                className="btn-secondary mp-header-cta-secondary"
               >
                 Liên hệ báo giá
               </TrackedLink>
@@ -61,7 +70,7 @@ export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
                 href={CTA.primary.href}
                 trackEvent={CTA.primary.event}
                 trackSource="HEADER"
-                className="btn-primary site-nav-cta"
+                className="btn-primary mp-header-cta-primary"
               >
                 Đăng ký đại lý
               </TrackedLink>
@@ -72,10 +81,21 @@ export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
               aria-label="Mở menu"
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen(true)}
-              className="site-nav-toggle"
+              className="site-nav-toggle mp-header-menu-btn"
             >
               <Menu size={20} />
             </button>
+          </div>
+
+          <div className="mp-header-search-mobile">
+            <MarketplaceSearchBar />
+          </div>
+        </div>
+
+        <div className="mp-header-cats">
+          <div className="container mp-header-cats-inner">
+            <NavMegaMenuPanel item={MEGA_MENU} />
+            <MarketplaceCategoryNav />
           </div>
         </div>
       </header>

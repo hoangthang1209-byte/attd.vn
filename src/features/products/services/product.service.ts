@@ -48,8 +48,23 @@ export async function getProductsForPublicListing(params: {
   search?: string;
   page?: number;
   perPage?: number;
+  inStock?: boolean;
+  supportsPrinting?: boolean;
+  supportsEmbroidery?: boolean;
+  supportsOem?: boolean;
+  material?: string;
 } = {}) {
-  const { categorySlug, search, page = 1, perPage = 24 } = params;
+  const {
+    categorySlug,
+    search,
+    page = 1,
+    perPage = 24,
+    inStock,
+    supportsPrinting,
+    supportsEmbroidery,
+    supportsOem,
+    material,
+  } = params;
 
   const where: Prisma.ProductWhereInput = {
     status: "ACTIVE",
@@ -61,6 +76,17 @@ export async function getProductsForPublicListing(params: {
         { productCode: { contains: search, mode: "insensitive" } },
         { tags: { has: search } },
       ],
+    }),
+    ...(supportsPrinting && { supportsPrinting: true }),
+    ...(supportsEmbroidery && { supportsEmbroidery: true }),
+    ...(supportsOem && { supportsOem: true }),
+    ...(material && {
+      material: { contains: material, mode: "insensitive" },
+    }),
+    ...(inStock && {
+      variants: {
+        some: { stockStatus: { in: ["IN_STOCK", "LOW_STOCK"] } },
+      },
     }),
   };
 

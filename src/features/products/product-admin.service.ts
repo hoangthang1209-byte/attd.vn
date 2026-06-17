@@ -6,6 +6,7 @@ import {
   getCategorySkuCode,
   generateProductCode,
 } from "@/features/products/product-sku-utils";
+import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -240,12 +241,19 @@ export async function getProductAdminKpis() {
 // ─── Create ───────────────────────────────────────────────────────────────────
 
 export async function createProductAdmin(input: ProductInput) {
-  const slug = await ensureUniqueSlug(input.slug ?? toSlug(input.name));
   const category = await prisma.category.findUnique({
     where: { id: input.categoryId },
     select: { name: true, skuCode: true },
   });
-  const categorySkuCode = getCategorySkuCode(category?.name ?? "", category?.skuCode);
+  if (!category) {
+    throw new ProductAdminValidationError(
+      "Không thể tạo sản phẩm. Vui lòng kiểm tra các trường được đánh dấu.",
+      { categoryId: "Danh mục không tồn tại." },
+    );
+  }
+
+  const slug = await ensureUniqueSlug(input.slug ?? toSlug(input.name));
+  const categorySkuCode = getCategorySkuCode(category.name, category.skuCode);
   const productCode = input.productCode ?? generateProductCode(input.name, input.material);
 
   const product = await prisma.product.create({
@@ -298,7 +306,7 @@ export async function createProductAdmin(input: ProductInput) {
           stockQty: v.stockQty ?? 0,
           stockStatus: v.stockStatus ?? "IN_STOCK",
           weight: v.weight != null ? v.weight : undefined,
-          imageUrl: v.imageUrl ?? null,
+          imageUrl: v.imageUrl?.trim() ? v.imageUrl.trim() : null,
           internalNote: v.internalNote,
           variantStatus: v.variantStatus ?? "ACTIVE",
           ...(v.metadata ? { metadata: v.metadata as Prisma.InputJsonValue } : {}),
@@ -313,12 +321,18 @@ export async function createProductAdmin(input: ProductInput) {
 // ─── Update ───────────────────────────────────────────────────────────────────
 
 export async function updateProductAdmin(id: string, input: Partial<ProductInput>) {
-  const category = input.categoryId
-    ? await prisma.category.findUnique({
-        where: { id: input.categoryId },
-        select: { name: true, skuCode: true },
-      })
-    : null;
+  if (input.categoryId) {
+    const category = await prisma.category.findUnique({
+      where: { id: input.categoryId },
+      select: { id: true },
+    });
+    if (!category) {
+      throw new ProductAdminValidationError(
+        "Không thể cập nhật sản phẩm. Vui lòng kiểm tra các trường được đánh dấu.",
+        { categoryId: "Danh mục không tồn tại." },
+      );
+    }
+  }
 
   const updateData: Prisma.ProductUpdateInput = {};
   if (input.name !== undefined) updateData.name = input.name;
@@ -349,15 +363,18 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
 
   await prisma.product.update({ where: { id }, data: updateData });
 
-  if (input.variants && category !== undefined) {
+  if (input.variants) {
     const product = await prisma.product.findUnique({
       where: { id },
       select: { productCode: true, name: true, material: true, categoryId: true },
     });
-    const cat = category ?? await prisma.category.findUnique({
-      where: { id: product?.categoryId ?? undefined },
-      select: { name: true, skuCode: true },
-    });
+    const categoryId = input.categoryId ?? product?.categoryId;
+    const cat = categoryId
+      ? await prisma.category.findUnique({
+          where: { id: categoryId },
+          select: { name: true, skuCode: true },
+        })
+      : null;
     const catCode = getCategorySkuCode(cat?.name ?? "", cat?.skuCode);
     const prodCode = product?.productCode ?? generateProductCode(product?.name ?? "", product?.material);
 
@@ -378,7 +395,7 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
             stockQty: v.stockQty,
             stockStatus: v.stockStatus,
             weight: v.weight != null ? v.weight : undefined,
-            imageUrl: v.imageUrl ?? null,
+            imageUrl: v.imageUrl !== undefined ? (v.imageUrl?.trim() ? v.imageUrl.trim() : null) : undefined,
             internalNote: v.internalNote,
             variantStatus: v.variantStatus,
           },
@@ -401,7 +418,7 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
             stockQty: v.stockQty ?? 0,
             stockStatus: v.stockStatus ?? "IN_STOCK",
             weight: v.weight != null ? v.weight : undefined,
-            imageUrl: v.imageUrl ?? null,
+            imageUrl: v.imageUrl?.trim() ? v.imageUrl.trim() : null,
             internalNote: v.internalNote,
             variantStatus: v.variantStatus ?? "ACTIVE",
             ...(v.metadata ? { metadata: v.metadata as Prisma.InputJsonValue } : {}),

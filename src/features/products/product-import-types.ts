@@ -45,6 +45,8 @@ export type ProductImportRow = {
 export type ProductImportValidationError = {
   field: string;
   message: string;
+  severity?: "error" | "warning";
+  suggestedFix?: string;
 };
 
 export type ProductImportDuplicateInfo = {

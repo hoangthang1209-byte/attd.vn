@@ -4,7 +4,9 @@ import type { Metadata } from "next";
 import { getProductBySlug, getRelatedProducts } from "@/features/products/services/product.service";
 import ProductCard from "@/components/public/ProductCard";
 import ProductImageGallery from "@/components/public/ProductImageGallery";
-import StickyInquiryBox from "@/components/public/StickyInquiryBox";
+import ProductInquiryPanel from "@/components/marketplace/ProductInquiryPanel";
+import ProductOptionTable from "@/components/marketplace/ProductOptionTable";
+import ProductSpecTable from "@/components/marketplace/ProductSpecTable";
 import ProductFaqList from "@/components/public/ProductFaqList";
 import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
@@ -21,8 +23,6 @@ import {
 } from "@/lib/productImages";
 import {
   getCatalogProduct,
-  isCatalogProduct,
-  getCatalogInternalLinks,
 } from "@/lib/productCatalog";
 
 type PageProps = {
@@ -81,11 +81,6 @@ const STOCK_COLORS: Record<string, string> = {
   LOW_STOCK: "#d97706",
   OUT_OF_STOCK: "#dc2626",
 };
-const STOCK_STATUS_LABEL: Record<string, string> = {
-  IN_STOCK: "Còn hàng",
-  LOW_STOCK: "Sắp hết",
-  OUT_OF_STOCK: "Hết hàng",
-};
 
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
@@ -105,20 +100,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   const relatedProducts = await getRelatedProducts(product.category.id, product.id, 4);
 
-  const uniqueColors = [
-    ...new Set(
-      product.variants
-        .map((v) => v.colorName ?? v.color?.name)
-        .filter((c): c is string => Boolean(c))
-    ),
-  ];
-  const uniqueSizes = [
-    ...new Set(
-      product.variants
-        .map((v) => v.sizeName ?? v.size?.name)
-        .filter((s): s is string => Boolean(s))
-    ),
-  ];
   const skuCount = product.variants.length;
 
   const stockStatuses = product.variants.map((v) => v.stockStatus);
@@ -134,11 +115,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const stockLabel = aggregateStock ? STOCK_LABELS[aggregateStock] : null;
   const stockColor = aggregateStock ? STOCK_COLORS[aggregateStock] : "#16a34a";
 
-  const hasSpecs = !isCatalogProduct(slug) && (product.material || product.form || product.fit);
-  const hasB2bInfo = product.defaultMoq || product.leadTime || skuCount > 0 || uniqueColors.length > 0;
   const hasFeatures = product.supportsPrinting || product.supportsEmbroidery || product.supportsOem;
-  const hasUseCases = Array.isArray(product.useCases) && (product.useCases as string[]).length > 0;
-  const hasTargetCustomers = Array.isArray(product.targetCustomers) && (product.targetCustomers as string[]).length > 0;
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -188,15 +165,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
     },
   ];
 
-  const internalLinks = catalog
-    ? getCatalogInternalLinks(catalog.categorySlug)
-    : [
-        { href: "/nguon-hang", label: "Nguồn hàng sỉ" },
-        { href: "/chinh-sach-dai-ly", label: "Chính sách đại lý" },
-        { href: "/oem", label: "OEM & Private Label" },
-        { href: "/qua-tang-doanh-nghiep", label: "Quà tặng DN" },
-      ];
-
   return (
     <main>
       <script
@@ -213,229 +181,123 @@ export default async function ProductDetailPage({ params }: PageProps) {
         ]}
       />
 
-      {/* ── Product Hero ─────────────────────────────────────────────────── */}
-      <section className="section-compact">
+      <section className="mp-product-detail">
         <div className="container">
-          <div className="product-detail-layout">
-            {/* Left: Gallery */}
-            <div className="product-detail-gallery">
+          <div className="mp-product-detail-layout">
+            <div className="mp-product-detail-gallery">
               <ProductImageGallery
                 images={unifiedImages}
                 productName={displayName}
               />
             </div>
 
-            {/* Right: Info */}
-            <div className="product-detail-info">
-              {/* Category + code */}
-              <div className="product-detail-meta">
-                {(catalog?.sku ?? product.productCode) && (
-                  <span className="product-meta-pill">
-                    {catalog?.sku ?? product.productCode}
-                  </span>
-                )}
-                <Link href={`/${categorySlug}`} className="product-detail-cat-link">
+            <div className="mp-product-detail-summary">
+              <div className="mp-product-detail-meta">
+                <Link href={`/${categorySlug}`} className="mp-product-detail-cat">
                   {categoryName}
                 </Link>
+                {(catalog?.sku ?? product.productCode) && (
+                  <span className="mp-product-detail-code">
+                    Mã sản phẩm: {catalog?.sku ?? product.productCode}
+                  </span>
+                )}
               </div>
 
-              <h1 className="product-detail-title">{displayName}</h1>
+              <h1 className="mp-product-detail-title">{displayName}</h1>
 
               {displayShortDescription && (
-                <p className="product-detail-short-desc">{displayShortDescription}</p>
+                <p className="mp-product-detail-desc">{displayShortDescription}</p>
               )}
 
-              {/* Specs table */}
-              {hasSpecs && (
-                <div className="product-specs-card">
-                  <dl className="product-specs-dl">
-                    {product.material && (
-                      <>
-                        <dt>Chất liệu</dt>
-                        <dd>{product.material}</dd>
-                      </>
-                    )}
-                    {product.form && (
-                      <>
-                        <dt>Kiểu dáng</dt>
-                        <dd>{product.form}</dd>
-                      </>
-                    )}
-                    {product.fit && (
-                      <>
-                        <dt>Form</dt>
-                        <dd>{product.fit}</dd>
-                      </>
-                    )}
-                    {product.gsm && (
-                      <>
-                        <dt>GSM</dt>
-                        <dd>{product.gsm} gsm</dd>
-                      </>
-                    )}
-                  </dl>
-                </div>
-              )}
+              <dl className="mp-product-facts">
+                {skuCount > 0 && (
+                  <div className="mp-product-fact">
+                    <dt>Số lựa chọn sản phẩm</dt>
+                    <dd>{skuCount}</dd>
+                  </div>
+                )}
+                {product.defaultMoq != null && (
+                  <div className="mp-product-fact">
+                    <dt>Số lượng tối thiểu</dt>
+                    <dd>{product.defaultMoq} cái</dd>
+                  </div>
+                )}
+                {product.leadTime && (
+                  <div className="mp-product-fact">
+                    <dt>Thời gian giao/sản xuất</dt>
+                    <dd>{product.leadTime}</dd>
+                  </div>
+                )}
+                {stockLabel && (
+                  <div className="mp-product-fact">
+                    <dt>Tình trạng hàng</dt>
+                    <dd style={{ color: stockColor }}>{stockLabel}</dd>
+                  </div>
+                )}
+              </dl>
 
-              {/* B2B summary strip */}
-              {hasB2bInfo && (
-                <div className="product-b2b-strip">
-                  {skuCount > 0 && (
-                    <div className="product-b2b-item">
-                      <span className="product-b2b-value">{skuCount}</span>
-                      <span className="product-b2b-label">Số lựa chọn</span>
-                    </div>
-                  )}
-                  {uniqueColors.length > 0 && (
-                    <div className="product-b2b-item">
-                      <span className="product-b2b-value">{uniqueColors.length}</span>
-                      <span className="product-b2b-label">Màu sắc</span>
-                    </div>
-                  )}
-                  {product.defaultMoq != null && (
-                    <div className="product-b2b-item">
-                      <span className="product-b2b-value">{product.defaultMoq}</span>
-                      <span className="product-b2b-label">Số lượng tối thiểu</span>
-                    </div>
-                  )}
-                  {product.leadTime && (
-                    <div className="product-b2b-item">
-                      <span className="product-b2b-value" style={{ fontSize: 13 }}>{product.leadTime}</span>
-                      <span className="product-b2b-label">Thời gian giao/sản xuất</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Feature support badges */}
               {hasFeatures && (
-                <div className="product-feature-badges">
+                <div className="mp-product-service-badges">
                   {product.supportsPrinting && (
-                    <span className="product-feature-badge">✓ In logo</span>
+                    <span className="mp-product-service-badge">In logo</span>
                   )}
                   {product.supportsEmbroidery && (
-                    <span className="product-feature-badge">✓ Thêu vi tính</span>
+                    <span className="mp-product-service-badge">Thêu</span>
                   )}
                   {product.supportsOem && (
-                    <span className="product-feature-badge product-feature-badge--oem">✓ OEM / Private Label</span>
+                    <span className="mp-product-service-badge mp-product-service-badge--oem">OEM</span>
                   )}
                 </div>
               )}
 
-              <StickyInquiryBox
+              <ProductInquiryPanel
                 stockLabel={stockLabel}
                 stockColor={stockColor}
-                internalLinks={internalLinks}
+                productName={displayName}
               />
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Variants Table ───────────────────────────────────────────────── */}
-      {product.variants.length > 0 && (
-        <section className="section-alt section-compact">
-          <div className="container" style={{ maxWidth: 900 }}>
-            <h2 className="product-section-title">Lựa chọn sản phẩm</h2>
-            <p className="product-section-desc">
-              Báo giá sỉ theo từng lựa chọn màu/size — liên hệ ATTD để nhận báo giá chi
-              tiết theo số lượng và yêu cầu gia công.
-            </p>
-            <div className="product-variant-table-wrap">
-              <table className="product-variant-table">
-                <thead>
-                  <tr>
-                    <th>Mã sản phẩm</th>
-                    <th>Màu sắc</th>
-                    <th>Size / Dung tích / Kích thước</th>
-                    <th>Tình trạng</th>
-                    <th>Báo giá</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {product.variants.map((v) => {
-                    const sizeInfo = v.sizeName ?? v.size?.name ?? v.capacity ?? v.dimensions;
-                    const colorInfo = v.colorName ?? v.color?.name;
-                    const statusLabel = STOCK_STATUS_LABEL[v.stockStatus] ?? "—";
-                    const statusColor = STOCK_COLORS[v.stockStatus] ?? "#6b7280";
-                    return (
-                      <tr key={v.id}>
-                        <td><code className="product-sku-code">{v.sku}</code></td>
-                        <td>
-                          {colorInfo ? (
-                            <span className="product-variant-color">
-                              {v.colorCode && (
-                                <span
-                                  className="product-color-dot"
-                                  style={{ background: v.colorCode.startsWith("#") ? v.colorCode : undefined }}
-                                />
-                              )}
-                              {colorInfo}
-                            </span>
-                          ) : "—"}
-                        </td>
-                        <td>{sizeInfo ?? "—"}</td>
-                        <td>
-                          <span className="product-stock-chip" style={{ color: statusColor, borderColor: statusColor }}>
-                            {statusLabel}
-                          </span>
-                        </td>
-                        <td className="product-variant-price">Liên hệ báo giá sỉ</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-      )}
+      <section className="mp-section mp-section--compact">
+        <div className="container">
+          <ProductOptionTable
+            variants={product.variants.map((v) => ({
+              id: v.id,
+              sku: v.sku,
+              colorName: v.colorName ?? v.color?.name,
+              colorCode: v.colorCode,
+              sizeName: v.sizeName ?? v.size?.name,
+              dimensions: v.dimensions,
+              capacity: v.capacity,
+              stockStatus: v.stockStatus,
+            }))}
+          />
+        </div>
+      </section>
 
-      {/* ── B2B Specs ────────────────────────────────────────────────────── */}
-      {(hasUseCases || hasTargetCustomers || hasFeatures) && (
-        <section className="section-compact">
-          <div className="container" style={{ maxWidth: 900 }}>
-            <h2 className="product-section-title">Thông tin B2B & Ứng dụng</h2>
-            <div className="product-b2b-spec-grid">
-              {hasUseCases && (
-                <div className="product-b2b-spec-block">
-                  <h3 className="product-b2b-spec-heading">Ứng dụng phổ biến</h3>
-                  <ul className="product-b2b-spec-list">
-                    {(product.useCases as string[]).map((u) => (
-                      <li key={u}>{u}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {hasTargetCustomers && (
-                <div className="product-b2b-spec-block">
-                  <h3 className="product-b2b-spec-heading">Đối tượng phù hợp</h3>
-                  <ul className="product-b2b-spec-list">
-                    {(product.targetCustomers as string[]).map((t) => (
-                      <li key={t}>{t}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {hasFeatures && (
-                <div className="product-b2b-spec-block">
-                  <h3 className="product-b2b-spec-heading">Hỗ trợ gia công</h3>
-                  <ul className="product-b2b-spec-list">
-                    {product.supportsPrinting && <li>✓ In logo (silk-screen / DTG / chuyển nhiệt)</li>}
-                    {product.supportsEmbroidery && <li>✓ Thêu vi tính</li>}
-                    {product.supportsOem && <li>✓ OEM / Private Label</li>}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
+      <section className="mp-section mp-section--alt mp-section--compact">
+        <div className="container">
+          <ProductSpecTable
+            material={product.material}
+            form={product.form}
+            fit={product.fit}
+            gsm={product.gsm}
+            defaultMoq={product.defaultMoq}
+            leadTime={product.leadTime}
+            useCases={product.useCases as string[]}
+            targetCustomers={product.targetCustomers as string[]}
+            supportsPrinting={product.supportsPrinting}
+            supportsEmbroidery={product.supportsEmbroidery}
+            supportsOem={product.supportsOem}
+          />
+        </div>
+      </section>
 
-      {/* ── Product Description ───────────────────────────────────────────── */}
-      <section className="section-alt section-compact">
-        <div className="container" style={{ maxWidth: 760 }}>
-          <h2 className="product-section-title">Mô tả sản phẩm</h2>
+      <section className="mp-section mp-section--compact">
+        <div className="container mp-product-desc">
+          <h2 className="mp-section-title">Mô tả sản phẩm</h2>
 
           {displayContent || displayShortDescription ? (
             <>
@@ -455,20 +317,18 @@ export default async function ProductDetailPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* ── FAQ ──────────────────────────────────────────────────────────── */}
-      <section className="section-alt section-compact">
-        <div className="container" style={{ maxWidth: 760 }}>
-          <h2 className="product-section-title">Hỏi đáp thường gặp</h2>
+      <section className="mp-section mp-section--alt mp-section--compact">
+        <div className="container mp-product-faq">
+          <h2 className="mp-section-title">Hỏi đáp thường gặp</h2>
           <ProductFaqList items={faqItems} />
         </div>
       </section>
 
-      {/* ── Related Products ─────────────────────────────────────────────── */}
       {relatedProducts.length > 0 && (
-        <section className="section-compact">
+        <section className="mp-section mp-section--compact">
           <div className="container">
-            <h2 className="product-section-title">Sản phẩm liên quan</h2>
-            <div className="product-related-grid">
+            <h2 className="mp-section-title">Sản phẩm liên quan</h2>
+            <div className="mp-product-grid">
               {relatedProducts.map((related) => (
                 <ProductCard
                   key={related.id}

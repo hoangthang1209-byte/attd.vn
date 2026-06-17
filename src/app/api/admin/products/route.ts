@@ -4,6 +4,20 @@ import {
   createProductAdmin,
   getProductAdminKpis,
 } from "@/features/products/product-admin.service";
+import {
+  formatProductAdminApiError,
+  parseProductInput,
+  ProductAdminValidationError,
+} from "@/features/products/product-admin-input";
+
+function logProductAdminError(action: "create" | "update", err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  const code = err && typeof err === "object" && "code" in err ? String((err as { code?: string }).code) : "unknown";
+  console.error(`[POST /api/admin/products] action=${action} code=${code} message=${message}`);
+  if (err instanceof Error && err.stack) {
+    console.error(err.stack);
+  }
+}
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
@@ -30,37 +44,23 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   let body: unknown;
-  try { body = await req.json(); } catch { return NextResponse.json({ message: "Invalid JSON" }, { status: 400 }); }
-  const raw = body as Record<string, unknown>;
-  if (!raw.name || !raw.categoryId) {
-    return NextResponse.json({ message: "Tên và danh mục là bắt buộc." }, { status: 400 });
-  }
   try {
-    const product = await createProductAdmin({
-      name: String(raw.name),
-      categoryId: String(raw.categoryId),
-      productCode: raw.productCode ? String(raw.productCode) : undefined,
-      shortDescription: raw.shortDescription ? String(raw.shortDescription) : undefined,
-      description: raw.description ? String(raw.description) : undefined,
-      material: raw.material ? String(raw.material) : undefined,
-      form: raw.form ? String(raw.form) : undefined,
-      fit: raw.fit ? String(raw.fit) : undefined,
-      defaultMoq: raw.defaultMoq ? Number(raw.defaultMoq) : undefined,
-      leadTime: raw.leadTime ? String(raw.leadTime) : undefined,
-      useCases: Array.isArray(raw.useCases) ? raw.useCases as string[] : [],
-      targetCustomers: Array.isArray(raw.targetCustomers) ? raw.targetCustomers as string[] : [],
-      supportsPrinting: Boolean(raw.supportsPrinting),
-      supportsEmbroidery: Boolean(raw.supportsEmbroidery),
-      supportsOem: Boolean(raw.supportsOem),
-      tags: Array.isArray(raw.tags) ? raw.tags as string[] : [],
-      status: raw.status ? String(raw.status) as "ACTIVE" | "DRAFT" | "INACTIVE" | "ARCHIVED" : "DRAFT",
-      featuredImage: raw.featuredImage ? String(raw.featuredImage) : undefined,
-      gallery: Array.isArray(raw.gallery) ? raw.gallery as string[] : [],
-      variants: Array.isArray(raw.variants) ? raw.variants as Parameters<typeof createProductAdmin>[0]["variants"] : [],
-    });
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: "Invalid JSON", message: "Invalid JSON" }, { status: 400 });
+  }
+
+  try {
+    const input = parseProductInput(body as Record<string, unknown>, "create");
+    const product = await createProductAdmin(input);
     return NextResponse.json(product, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/admin/products]", err);
-    return NextResponse.json({ message: "Không thể tạo sản phẩm." }, { status: 500 });
+    logProductAdminError("create", err);
+    if (err instanceof ProductAdminValidationError) {
+      const formatted = formatProductAdminApiError(err);
+      return NextResponse.json({ ...formatted, message: formatted.error }, { status: formatted.status });
+    }
+    const formatted = formatProductAdminApiError(err);
+    return NextResponse.json({ ...formatted, message: formatted.error }, { status: formatted.status });
   }
 }

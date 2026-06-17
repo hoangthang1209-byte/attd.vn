@@ -6,7 +6,8 @@ import type {
   ProductImportPreviewRow,
   ProductImportExecuteResult,
 } from "@/features/products/product-import-types";
-import { normalizeCategoryName, validateImportRow } from "@/features/products/product-import-utils";
+import { normalizeCategoryName, validateImportRow, validateRawFieldValues } from "@/features/products/product-import-utils";
+import { getSuggestedFix } from "@/features/products/product-import-feedback";
 import {
   generateSku,
   ensureUniqueSku,
@@ -52,7 +53,8 @@ async function ensureUniqueProductCode(baseCode: string): Promise<string> {
 
 export async function previewProductImport(
   rows: ProductImportRow[],
-  options: ProductImportOptions
+  options: ProductImportOptions,
+  rawRows?: Record<string, unknown>[],
 ): Promise<ProductImportPreviewRow[]> {
   const allCategories = await prisma.category.findMany({
     select: { id: true, name: true, slug: true, skuCode: true },
@@ -71,13 +73,22 @@ export async function previewProductImport(
   const allVariants = await prisma.productVariant.findMany({ select: { sku: true } });
   const existingSkus = new Set(allVariants.map((v) => v.sku));
 
-  return rows.map((row) => {
+  return rows.map((row, index) => {
     const errors = validateImportRow(row);
+    const raw = rawRows?.[index];
+    if (raw) {
+      errors.push(...validateRawFieldValues(raw, options.columnMapping));
+    }
     const normalizedCategory = normalizeCategoryName(row.category);
     const catData = categoryMap.get(normalizedCategory.toLowerCase()) ?? null;
 
     if (!catData && !options.autoCreateCategories) {
-      errors.push({ field: "category", message: `Danh mục "${normalizedCategory}" chưa tồn tại.` });
+      errors.push({
+        field: "category",
+        message: `Danh mục "${normalizedCategory}" chưa tồn tại.`,
+        severity: "error",
+        suggestedFix: getSuggestedFix({ field: "category", message: "" }),
+      });
     }
 
     const catSkuCode = getCategorySkuCode(normalizedCategory, catData?.skuCode);

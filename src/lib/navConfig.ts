@@ -36,6 +36,21 @@ export type NavMegaMenu = {
   columns: MegaMenuColumn[];
 };
 
+/** Category nav row for marketplace header. */
+export type MarketplaceCategoryNavItem = NavLink & {
+  mega?: boolean;
+};
+
+export const MARKETPLACE_CATEGORY_NAV: MarketplaceCategoryNavItem[] = [
+  { href: "/ao-thun-tron", label: "Áo thun trơn" },
+  { href: "/ao-polo-tron", label: "Áo polo" },
+  { href: "/non", label: "Nón" },
+  { href: "/tote", label: "Tote bag" },
+  { href: "/binh-giu-nhiet", label: "Bình giữ nhiệt" },
+  { href: "/gift-set-doanh-nghiep", label: "Gift set" },
+  { href: "/oem", label: "OEM" },
+];
+
 /** Primary nav links (direct, no dropdown). */
 export const NAV_PRIMARY_LINKS: NavLink[] = [
   { href: "/nguon-hang", label: "Nguồn hàng" },
@@ -73,10 +88,10 @@ export const NAV_SAN_PHAM_MENU: NavMegaMenu = {
     },
     {
       featured: {
-        title: "Cần báo giá sỉ?",
-        text: "Tìm nguồn hàng cho đại lý, agency, xưởng in và doanh nghiệp.",
-        ctaHref: "/san-pham",
-        ctaLabel: "Xem tất cả sản phẩm",
+        title: "Gửi yêu cầu nguồn hàng",
+        text: "Gửi yêu cầu nguồn hàng, ATTD tư vấn số lượng tối thiểu, thời gian giao/sản xuất và báo giá sỉ.",
+        ctaHref: "/lien-he",
+        ctaLabel: "Gửi yêu cầu báo giá",
       },
       links: [],
     },

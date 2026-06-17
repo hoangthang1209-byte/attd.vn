@@ -17,8 +17,8 @@ type HeroSectionProps = {
 };
 
 const TRUST_CHIPS = [
-  "Số lượng tối thiểu rõ ràng",
-  "Hỗ trợ in / thêu / OEM",
+  "MOQ rõ ràng",
+  "In/thêu/OEM",
   "Danh mục B2B đa dạng",
   "Giao hàng toàn quốc",
 ];
@@ -45,21 +45,32 @@ export default function HeroSection({ mosaicItems }: HeroSectionProps) {
   const tiles = mosaicItems?.length ? mosaicItems.slice(0, 6) : FALLBACK_MOSAIC;
 
   return (
-    <section className="hero-section">
+    <section className="hero-section hero-home">
       <div className="container">
         <div className="hero-grid">
-          {/* ── Left: copy + CTAs ───────────────────────────────────────── */}
-          <div className="hero-content">
-            <p className="hero-eyebrow">B2B SOURCING PLATFORM</p>
+          <div className="hero-copy">
+            <p className="hero-eyebrow">
+              <span className="hero-eyebrow-text hero-eyebrow-text--desktop">
+                B2B SOURCING PLATFORM
+              </span>
+              <span className="hero-eyebrow-text hero-eyebrow-text--mobile">
+                KHO NGUỒN HÀNG B2B
+              </span>
+            </p>
             <h1 className="hero-headline">
               KHO SỈ ĐỒNG PHỤC &amp; QUÀ TẶNG DOANH NGHIỆP
             </h1>
-            <p className="hero-subheadline">
+            <p className="hero-subheadline hero-subheadline--desktop">
               Nguồn hàng B2B cho đại lý đồng phục, agency quà tặng, xưởng
               in/thêu và doanh nghiệp mua số lượng lớn trên toàn quốc.
             </p>
+            <p className="hero-subheadline hero-subheadline--mobile">
+              Nguồn hàng cho đại lý, agency, xưởng in/thêu và doanh nghiệp mua
+              số lượng lớn.
+            </p>
+          </div>
 
-            {/* Trust chips */}
+          <div className="hero-meta">
             <div className="hero-trust-chips">
               {TRUST_CHIPS.map((chip) => (
                 <span key={chip} className="hero-trust-chip">{chip}</span>
@@ -68,23 +79,36 @@ export default function HeroSection({ mosaicItems }: HeroSectionProps) {
 
             <div className="hero-cta-row">
               <Link href="/san-pham" className="btn-primary">
-                Xem danh mục sản phẩm
+                <span className="hero-cta-label hero-cta-label--desktop">
+                  Xem danh mục sản phẩm
+                </span>
+                <span className="hero-cta-label hero-cta-label--mobile">
+                  Xem sản phẩm
+                </span>
               </Link>
               <TrackedLink
-                href={CTA.primary.href}
-                trackEvent={CTA.primary.event}
+                href={CTA.secondary.href}
+                trackEvent={CTA.secondary.event}
                 trackSource="HERO"
                 className="btn-secondary"
               >
-                Liên hệ báo giá sỉ
+                <span className="hero-cta-label hero-cta-label--desktop">
+                  Liên hệ báo giá sỉ
+                </span>
+                <span className="hero-cta-label hero-cta-label--mobile">
+                  Liên hệ báo giá
+                </span>
               </TrackedLink>
-              <Link href="/dai-ly" className="btn-tertiary">
+              <Link href={CTA.primary.href} className="btn-tertiary hero-dealer-cta">
                 Đăng ký đại lý
               </Link>
             </div>
+
+            <Link href={CTA.primary.href} className="hero-dealer-link">
+              Đăng ký đại lý →
+            </Link>
           </div>
 
-          {/* ── Right: product image mosaic ─────────────────────────────── */}
           <div className="hero-mosaic-v2" aria-label="Danh mục sản phẩm">
             {tiles.map((item, i) => {
               const hasImg = item.imageUrl && isValidImageSrc(item.imageUrl);
@@ -103,7 +127,7 @@ export default function HeroSection({ mosaicItems }: HeroSectionProps) {
                       alt={item.label}
                       fill
                       className="hero-tile-img"
-                      sizes={isFirst ? "(max-width: 640px) 100vw, 340px" : "180px"}
+                      sizes={isFirst ? "(max-width: 768px) 100vw, 340px" : "180px"}
                       priority={isFirst}
                     />
                   ) : (

@@ -52,12 +52,15 @@ export class CloudinaryStorageAdapter implements StorageAdapter {
     const dataUri = `data:${contentType};base64,${base64}`;
     const cloudFolder = cloudinaryFolder(folder);
 
+    const isImage = contentType.startsWith("image/");
+    const resourceType = isImage ? "image" : "raw";
+
     const result = await new Promise<CloudinaryUploadResponse>((resolve, reject) => {
       cloudinary.uploader.upload(
         dataUri,
         {
           folder: cloudFolder,
-          resource_type: "image",
+          resource_type: resourceType,
           use_filename: true,
           unique_filename: true,
           overwrite: false,
@@ -70,14 +73,16 @@ export class CloudinaryStorageAdapter implements StorageAdapter {
       );
     });
 
-    const thumbnailUrl = cloudinary.url(result.public_id, {
-      width: 400,
-      height: 400,
-      crop: "fill",
-      quality: "auto",
-      fetch_format: "auto",
-      secure: true,
-    });
+    const thumbnailUrl = isImage
+      ? cloudinary.url(result.public_id, {
+          width: 400,
+          height: 400,
+          crop: "fill",
+          quality: "auto",
+          fetch_format: "auto",
+          secure: true,
+        })
+      : undefined;
 
     return {
       url: result.secure_url,
@@ -93,7 +98,8 @@ export class CloudinaryStorageAdapter implements StorageAdapter {
     const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
     const { v2: cloudinary } = await import("cloudinary");
     cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret, secure: true });
-    await cloudinary.uploader.destroy(storageKey).catch((err) => {
+    await cloudinary.uploader.destroy(storageKey, { resource_type: "image" }).catch(() => undefined);
+    await cloudinary.uploader.destroy(storageKey, { resource_type: "raw" }).catch((err) => {
       console.warn("[cloudinary] destroy failed:", err);
     });
   }

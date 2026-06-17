@@ -179,14 +179,23 @@ export default function ProductImportHistory({ onRetryUpload, refreshKey = 0 }: 
                         Tải file gốc
                       </a>
                     )}
-                    {job.hasFeedbackFile && (
-                      <a
-                        href={`/api/admin/products/import/jobs/${job.id}/download-feedback`}
-                        className="admin-link-button"
-                        download
-                      >
-                        Tải file lỗi
-                      </a>
+                    {(job.hasFeedbackFile || job.errorCount > 0 || job.invalidRows > 0) && (
+                      <>
+                        <a
+                          href={`/api/admin/products/import/jobs/${job.id}/download-feedback`}
+                          className="admin-link-button"
+                          download
+                        >
+                          Tải file lỗi Excel
+                        </a>
+                        <a
+                          href={`/api/admin/products/import/jobs/${job.id}/download-feedback?format=csv`}
+                          className="admin-link-button"
+                          download
+                        >
+                          Tải CSV
+                        </a>
+                      </>
                     )}
                     {onRetryUpload && (
                       <button type="button" className="admin-link-button" onClick={onRetryUpload}>
@@ -233,14 +242,26 @@ export default function ProductImportHistory({ onRetryUpload, refreshKey = 0 }: 
                     Tải file gốc
                   </a>
                 )}
-                {detail.hasFeedbackFile && (
-                  <a
-                    href={`/api/admin/products/import/jobs/${detail.id}/download-feedback`}
-                    className="admin-btn admin-btn--secondary"
-                    download
-                  >
-                    Tải file feedback
-                  </a>
+                {(detail.hasFeedbackFile || detail.errorCount > 0 || detail.invalidRows > 0) && (
+                  <>
+                    <a
+                      href={`/api/admin/products/import/jobs/${detail.id}/download-feedback`}
+                      className="admin-btn admin-btn--secondary"
+                      download
+                    >
+                      Tải file lỗi Excel
+                    </a>
+                    <a
+                      href={`/api/admin/products/import/jobs/${detail.id}/download-feedback?format=csv`}
+                      className="admin-link-button"
+                      download
+                    >
+                      Tải CSV
+                    </a>
+                  </>
+                )}
+                {(detail.hasFeedbackFile || detail.errorCount > 0) && (
+                  <p className="admin-field-hint">File feedback Excel có sẵn — ô đỏ là lỗi, ô vàng là cảnh báo.</p>
                 )}
               </div>
 

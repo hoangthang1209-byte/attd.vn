@@ -6,8 +6,11 @@ import {
   compactPreviewRows,
   expandCompactPreviewRows,
   generateProductImportFeedbackCsv,
+  collectRowFeedbackIssues,
   type CompactPreviewRow,
+  type FeedbackJobMeta,
 } from "@/features/products/product-import-feedback";
+import { generateProductImportFeedbackExcel } from "@/features/products/product-import-feedback-excel";
 
 export type ProductImportJobSummary = {
   id: string;
@@ -68,6 +71,46 @@ export async function storeImportOriginalFile(
   return { url: result.url, storageKey: result.storageKey };
 }
 
+export async function tryStoreImportOriginalFile(
+  buffer: Buffer,
+  fileName: string,
+): Promise<{ url: string; storageKey: string } | null> {
+  try {
+    return await storeImportOriginalFile(buffer, fileName);
+  } catch (err) {
+    console.error("[product-import] storeImportOriginalFile failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export async function storeImportFeedbackBuffer(
+  buffer: Buffer,
+  fileName: string,
+  contentType: string,
+): Promise<{ url: string; storageKey: string }> {
+  const adapter = getStorageAdapter();
+  const result = await adapter.upload(
+    "general",
+    `import-feedback-${Date.now()}-${fileName}`,
+    buffer,
+    contentType,
+  );
+  return { url: result.url, storageKey: result.storageKey };
+}
+
+export async function tryStoreImportFeedbackBuffer(
+  buffer: Buffer,
+  fileName: string,
+  contentType: string,
+): Promise<{ url: string; storageKey: string } | null> {
+  try {
+    return await storeImportFeedbackBuffer(buffer, fileName, contentType);
+  } catch (err) {
+    console.error("[product-import] storeImportFeedbackBuffer failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 export async function storeImportFeedbackFile(
   csvContent: string,
   fileName: string,
@@ -81,6 +124,36 @@ export async function storeImportFeedbackFile(
     "text/csv",
   );
   return { url: result.url, storageKey: result.storageKey };
+}
+
+export async function tryStoreImportFeedbackFile(
+  csvContent: string,
+  fileName: string,
+): Promise<{ url: string; storageKey: string } | null> {
+  try {
+    return await storeImportFeedbackFile(csvContent, fileName);
+  } catch (err) {
+    console.error("[product-import] storeImportFeedbackFile failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export function isPrismaSchemaMismatchError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: string; message?: string };
+  return (
+    e.code === "P2022" ||
+    e.code === "P2010" ||
+    (typeof e.message === "string" &&
+      (e.message.includes("column") ||
+        e.message.includes("Unknown argument") ||
+        e.message.includes("does not exist")))
+  );
+}
+
+export function prismaErrorDetail(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
 export function resolvePreviewStatus(
@@ -134,7 +207,8 @@ export async function updateProductImportJobPreview(
     newProducts: number;
     newVariants: number;
   },
-): Promise<void> {
+): Promise<{ feedbackDownloadUrl: string | null; feedbackCsvDownloadUrl: string | null; warnings: string[] }> {
+  const warnings: string[] = [];
   const compact = compactPreviewRows(rows);
   const errorCount = rows.filter((r) => r.finalAction === "invalid").length;
   const warningCount = rows.filter((r) => r.duplicateInfo && r.isValid).length;
@@ -144,11 +218,52 @@ export async function updateProductImportJobPreview(
   let feedbackFileKey: string | null = null;
 
   if (errorCount > 0 || warningCount > 0) {
-    const csv = generateProductImportFeedbackCsv(rows);
     const job = await prisma.productImportJob.findUnique({ where: { id: jobId } });
-    const stored = await storeImportFeedbackFile(csv, job?.fileName ?? "import.csv");
-    feedbackFileUrl = stored.url;
-    feedbackFileKey = stored.storageKey;
+    const meta: FeedbackJobMeta = {
+      fileName: job?.fileName ?? "import.csv",
+      uploadedAt: job?.createdAt ?? new Date(),
+      preset: options.presetId ?? job?.preset,
+      status: status,
+      totalRows: summary.total,
+      validRows: summary.valid,
+      invalidRows: summary.invalid,
+      errorCount,
+      warningCount,
+    };
+
+    try {
+      const excelBuffer = await generateProductImportFeedbackExcel(rows, meta);
+      const excelName = (job?.fileName ?? "import.csv").replace(/\.[^.]+$/, "") + "-feedback.xlsx";
+      const stored = await tryStoreImportFeedbackBuffer(
+        excelBuffer,
+        excelName,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      if (stored) {
+        feedbackFileUrl = stored.url;
+        feedbackFileKey = stored.storageKey;
+      } else {
+        const csv = generateProductImportFeedbackCsv(rows);
+        const csvStored = await tryStoreImportFeedbackFile(csv, job?.fileName ?? "import.csv");
+        if (csvStored) {
+          feedbackFileUrl = csvStored.url;
+          feedbackFileKey = csvStored.storageKey;
+        } else {
+          warnings.push("Không lưu được file feedback lên storage, vẫn có thể tải qua API.");
+        }
+      }
+    } catch (err) {
+      console.error("[product-import] generateProductImportFeedbackExcel failed:", err instanceof Error ? err.message : err);
+      const csv = generateProductImportFeedbackCsv(rows);
+      const csvStored = await tryStoreImportFeedbackFile(csv, job?.fileName ?? "import.csv");
+      if (csvStored) {
+        feedbackFileUrl = csvStored.url;
+        feedbackFileKey = csvStored.storageKey;
+        warnings.push("Không tạo được file Excel, đã lưu CSV fallback.");
+      } else {
+        warnings.push("Không lưu được file feedback lên storage, vẫn có thể tải qua API.");
+      }
+    }
   }
 
   await prisma.productImportJob.update({
@@ -186,6 +301,22 @@ export async function updateProductImportJobPreview(
       },
     },
   });
+
+  const feedbackDownloadUrl =
+    errorCount > 0 || warningCount > 0
+      ? `/api/admin/products/import/jobs/${jobId}/download-feedback`
+      : null;
+
+  const feedbackCsvDownloadUrl =
+    errorCount > 0 || warningCount > 0
+      ? `/api/admin/products/import/jobs/${jobId}/download-feedback?format=csv`
+      : null;
+
+  return {
+    feedbackDownloadUrl,
+    feedbackCsvDownloadUrl,
+    warnings,
+  };
 }
 
 export async function updateProductImportJobExecute(
@@ -200,10 +331,44 @@ export async function updateProductImportJobExecute(
   let feedbackFileKey: string | undefined;
 
   if (previewRows && (result.invalidRows > 0 || result.errors.length > 0 || result.skippedRows > 0)) {
-    const csv = generateProductImportFeedbackCsv(previewRows);
-    const stored = await storeImportFeedbackFile(csv, job?.fileName ?? "import.csv");
-    feedbackFileUrl = stored.url;
-    feedbackFileKey = stored.storageKey;
+    const meta: FeedbackJobMeta = {
+      fileName: job?.fileName ?? "import.csv",
+      uploadedAt: job?.createdAt ?? new Date(),
+      preset: job?.preset,
+      status: status,
+      totalRows: job?.totalRows ?? previewRows.length,
+      validRows: job?.validRows ?? 0,
+      invalidRows: result.invalidRows,
+      errorCount: result.invalidRows + result.errors.length,
+      warningCount: job?.warningCount ?? 0,
+    };
+    try {
+      const excelBuffer = await generateProductImportFeedbackExcel(previewRows, meta);
+      const excelName = (job?.fileName ?? "import.csv").replace(/\.[^.]+$/, "") + "-feedback.xlsx";
+      const stored = await tryStoreImportFeedbackBuffer(
+        excelBuffer,
+        excelName,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      if (stored) {
+        feedbackFileUrl = stored.url;
+        feedbackFileKey = stored.storageKey;
+      } else {
+        const csv = generateProductImportFeedbackCsv(previewRows);
+        const csvStored = await tryStoreImportFeedbackFile(csv, job?.fileName ?? "import.csv");
+        if (csvStored) {
+          feedbackFileUrl = csvStored.url;
+          feedbackFileKey = csvStored.storageKey;
+        }
+      }
+    } catch {
+      const csv = generateProductImportFeedbackCsv(previewRows);
+      const csvStored = await tryStoreImportFeedbackFile(csv, job?.fileName ?? "import.csv");
+      if (csvStored) {
+        feedbackFileUrl = csvStored.url;
+        feedbackFileKey = csvStored.storageKey;
+      }
+    }
   }
 
   await prisma.productImportJob.update({
@@ -278,6 +443,36 @@ export function getPreviewRowsFromJob(job: {
   const meta = job.metadata as { previewRows?: CompactPreviewRow[] };
   if (!Array.isArray(meta.previewRows)) return null;
   return expandCompactPreviewRows(meta.previewRows);
+}
+
+export async function getFeedbackExcelForJob(jobId: string): Promise<Buffer | null> {
+  const job = await getProductImportJob(jobId);
+  if (!job) return null;
+
+  const rows = getPreviewRowsFromJob(job);
+  if (!rows || rows.length === 0) return null;
+
+  const errorCount = rows.filter((r) => r.finalAction === "invalid").length;
+  const warningCount = rows.filter((r) => collectRowFeedbackIssues(r).some((i) => i.severity === "warning")).length;
+
+  const meta: FeedbackJobMeta = {
+    fileName: job.fileName,
+    uploadedAt: job.createdAt,
+    preset: job.preset,
+    status: job.status,
+    totalRows: job.totalRows,
+    validRows: job.validRows,
+    invalidRows: job.invalidRows,
+    errorCount: job.errorCount || errorCount,
+    warningCount: job.warningCount || warningCount,
+  };
+
+  try {
+    return await generateProductImportFeedbackExcel(rows, meta);
+  } catch (err) {
+    console.error("[product-import] getFeedbackExcelForJob failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 export async function getFeedbackCsvForJob(jobId: string): Promise<string | null> {

@@ -5,6 +5,10 @@ import { PRODUCT_IMPORT_PRESETS } from "@/features/products/product-import-prese
 import { PRODUCT_IMPORT_TEMPLATES } from "@/features/products/product-import-templates";
 import type { ProductImportPresetId } from "@/features/products/product-import-types";
 import { mapRawRowToImportRow } from "@/features/products/product-import-utils";
+import {
+  filterProductImportHeaders,
+  pickProductImportSheetName,
+} from "@/features/products/product-import-feedback";
 import ImportTemplateSection from "@/components/admin/ImportTemplateSection";
 import ProductImportHistory from "@/components/admin/products/ProductImportHistory";
 
@@ -27,6 +31,7 @@ type PreviewRow = {
 };
 
 type PreviewResult = {
+  ok?: boolean;
   rows: PreviewRow[];
   summary: {
     total: number;
@@ -37,6 +42,13 @@ type PreviewResult = {
     newVariants: number;
   };
   jobId?: string;
+  warnings?: string[];
+  feedbackDownloadUrl?: string;
+  feedbackCsvDownloadUrl?: string;
+  error?: string;
+  detail?: string;
+  code?: string;
+  message?: string;
 };
 
 type ExecuteResult = {
@@ -88,6 +100,10 @@ export default function ProductBulkImport() {
   const [executing, setExecuting] = useState(false);
   const [executeResult, setExecuteResult] = useState<ExecuteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
+  const [feedbackDownloadUrl, setFeedbackDownloadUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const preset = PRODUCT_IMPORT_PRESETS.find((p) => p.id === presetId) ?? PRODUCT_IMPORT_PRESETS[0];
 
@@ -100,24 +116,25 @@ export default function ProductBulkImport() {
       const text = await file.text();
       const lines = text.split(/\r?\n/).filter(Boolean);
       if (!lines.length) { setError("File CSV trống."); return; }
-      const hdr = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
-      setHeaders(hdr);
+      const allHdr = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+      setHeaders(filterProductImportHeaders(allHdr));
       const rows = lines.slice(1).map((line) => {
         const vals = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
-        return Object.fromEntries(hdr.map((h, i) => [h, vals[i] ?? ""]));
+        return Object.fromEntries(allHdr.map((h, i) => [h, vals[i] ?? ""]));
       });
       setRawRows(rows);
-      initMapping(hdr);
+      initMapping(allHdr);
       setStep("map");
     } else if (ext === "xlsx" || ext === "xls") {
       try {
         const xlsx = await import("xlsx");
         const buffer = await file.arrayBuffer();
         const wb = xlsx.read(buffer, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
+        const sheetName = pickProductImportSheetName(wb.SheetNames);
+        const ws = wb.Sheets[sheetName];
         const data = xlsx.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
         if (!data.length) { setError("File XLSX trống."); return; }
-        const hdr = Object.keys(data[0]);
+        const hdr = filterProductImportHeaders(Object.keys(data[0]));
         setHeaders(hdr);
         setRawRows(data);
         initMapping(hdr);
@@ -131,11 +148,14 @@ export default function ProductBulkImport() {
   }
 
   function initMapping(hdr: string[]) {
+    const productHeaders = filterProductImportHeaders(hdr);
     const map: Record<string, string> = {};
     const targetFields = Object.keys(preset.columnMapping) as (keyof typeof preset.columnMapping)[];
     for (const field of targetFields) {
       const expectedCol = preset.columnMapping[field] ?? field;
-      const found = hdr.find((h) => h.toLowerCase() === expectedCol.toLowerCase() || h.toLowerCase() === field.toLowerCase());
+      const found = productHeaders.find(
+        (h) => h.toLowerCase() === expectedCol.toLowerCase() || h.toLowerCase() === String(field).toLowerCase(),
+      );
       map[field] = found ?? "";
     }
     setColumnMapping(map);
@@ -143,6 +163,11 @@ export default function ProductBulkImport() {
 
   async function handlePreview() {
     setError(null);
+    setErrorDetail(null);
+    setPreviewWarnings([]);
+    setFeedbackDownloadUrl(null);
+    setPreviewLoading(true);
+
     const mappedRows = rawRows.map((raw, i) =>
       mapRawRowToImportRow(raw, columnMapping as Parameters<typeof mapRawRowToImportRow>[1], i, preset.defaults as Record<string, unknown>)
     );
@@ -160,7 +185,9 @@ export default function ProductBulkImport() {
       if (originalFile) {
         const form = new FormData();
         form.append("file", originalFile);
+        form.append("fileName", originalFile.name);
         form.append("rows", JSON.stringify(mappedRows));
+        form.append("rawRows", JSON.stringify(rawRows));
         form.append("options", JSON.stringify(options));
         if (jobId) form.append("jobId", jobId);
         res = await fetch("/api/admin/products/import/preview", { method: "POST", body: form });
@@ -168,17 +195,42 @@ export default function ProductBulkImport() {
         res = await fetch("/api/admin/products/import/preview", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rows: mappedRows, options, fileName }),
+          body: JSON.stringify({ rows: mappedRows, rawRows, options, fileName }),
         });
       }
 
-      const data = await res.json() as PreviewResult & { message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Lỗi xem trước.");
+      const data = await res.json() as PreviewResult;
+
+      if (!res.ok || data.ok === false) {
+        setError(data.error ?? data.message ?? "Không thể xem trước file import.");
+        setErrorDetail(data.detail ?? null);
+        if (data.jobId) setJobId(data.jobId);
+        if (data.code === "IMPORT_JOB_SCHEMA_MISMATCH" || (data.detail ?? "").includes("migration")) {
+          setError("Không thể tạo lịch sử import. Kiểm tra migration production.");
+        }
+        return;
+      }
+
+      if (!Array.isArray(data.rows) || !data.summary) {
+        setError("Không thể xem trước file import.");
+        setErrorDetail("Phản hồi preview không hợp lệ từ server.");
+        return;
+      }
+
       setPreview(data);
       if (data.jobId) setJobId(data.jobId);
+      if (data.warnings?.length) setPreviewWarnings(data.warnings);
+      if (data.feedbackDownloadUrl) setFeedbackDownloadUrl(data.feedbackDownloadUrl);
+      else if ((data.summary.invalid > 0 || data.summary.duplicates > 0) && data.jobId) {
+        setFeedbackDownloadUrl(`/api/admin/products/import/jobs/${data.jobId}/download-feedback`);
+      }
+      setHistoryRefreshKey((k) => k + 1);
       setStep("preview");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi xem trước.");
+      setError("Không thể xem trước file import.");
+      setErrorDetail(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPreviewLoading(false);
     }
   }
 
@@ -224,8 +276,27 @@ export default function ProductBulkImport() {
     setExecuteResult(null);
     setJobId(null);
     setError(null);
+    setErrorDetail(null);
+    setPreviewWarnings([]);
+    setFeedbackDownloadUrl(null);
     originalFileRef.current = null;
     if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function feedbackLinks(jobId: string | null, feedbackDownloadUrl: string | null) {
+    if (!jobId) return null;
+    const excelUrl = feedbackDownloadUrl ?? `/api/admin/products/import/jobs/${jobId}/download-feedback`;
+    const csvUrl = `${excelUrl}?format=csv`;
+    return (
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
+        <a href={excelUrl} className="admin-btn admin-btn--secondary" download>
+          Tải file lỗi Excel
+        </a>
+        <a href={csvUrl} className="admin-link-button" download>
+          Tải CSV
+        </a>
+      </div>
+    );
   }
 
   function switchToImportTab() {
@@ -263,7 +334,11 @@ export default function ProductBulkImport() {
       {tab === "import" && (
         <>
           <p className="admin-field-hint">
-            Nếu file có lỗi, hãy tải file feedback, sửa các dòng được đánh dấu rồi upload lại file đã chỉnh sửa.
+            Nếu file có lỗi, hãy tải file feedback Excel, sửa các ô màu đỏ/vàng rồi upload lại file đã chỉnh sửa.
+          </p>
+          <p className="admin-field-hint">
+            File feedback sẽ tô đỏ các ô lỗi và tô vàng các ô cần kiểm tra. Sửa trực tiếp trong file feedback rồi upload lại.
+            <strong> Ô màu đỏ:</strong> bắt buộc sửa. <strong>Ô màu vàng:</strong> nên kiểm tra.
           </p>
 
           {/* Step indicator */}
@@ -278,7 +353,27 @@ export default function ProductBulkImport() {
             })}
           </div>
 
-          {error && <p className="admin-error">{error}</p>}
+          {error && (
+            <div className="admin-catalog-fieldset admin-import-error-panel">
+              <p className="admin-error">{error}</p>
+              <p className="admin-field-hint">Kiểm tra lại file hoặc ánh xạ cột.</p>
+              {errorDetail && (
+                <details className="admin-import-error-detail">
+                  <summary>Chi tiết lỗi</summary>
+                  <pre>{errorDetail}</pre>
+                </details>
+              )}
+              {jobId && feedbackLinks(jobId, feedbackDownloadUrl)}
+            </div>
+          )}
+
+          {previewWarnings.length > 0 && (
+            <ul className="admin-kb-warning-list">
+              {previewWarnings.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          )}
 
           {/* Step 1: Upload */}
           {step === "upload" && (
@@ -357,7 +452,9 @@ export default function ProductBulkImport() {
               </div>
 
               <div style={{ display: "flex", gap: 12 }}>
-                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void handlePreview()}>Xem trước →</button>
+                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void handlePreview()} disabled={previewLoading}>
+                  {previewLoading ? "Đang xem trước…" : "Xem trước →"}
+                </button>
                 <button type="button" className="admin-btn admin-btn--secondary" onClick={reset}>Bắt đầu lại</button>
               </div>
             </div>
@@ -374,19 +471,12 @@ export default function ProductBulkImport() {
                 <div className="admin-catalog-kpi"><strong>{preview.summary.newProducts}</strong><span>Sản phẩm mới</span></div>
               </div>
 
-              {preview.summary.invalid > 0 && jobId && (
+              {(preview.summary.invalid > 0 || preview.summary.duplicates > 0) && (feedbackDownloadUrl || jobId) && (
                 <div style={{ marginTop: 12 }}>
                   <p className="admin-field-hint" style={{ color: "var(--admin-danger, #dc2626)" }}>
-                    Có lỗi cần sửa — tải file feedback, chỉnh sửa và upload lại.
+                    Có lỗi cần sửa — tải file feedback Excel, chỉnh sửa các ô màu đỏ/vàng và upload lại.
                   </p>
-                  <a
-                    href={`/api/admin/products/import/jobs/${jobId}/download-feedback`}
-                    className="admin-btn admin-btn--secondary"
-                    download
-                    style={{ marginTop: 8, display: "inline-block" }}
-                  >
-                    Tải file lỗi
-                  </a>
+                  {feedbackLinks(jobId, feedbackDownloadUrl)}
                 </div>
               )}
 
@@ -455,14 +545,10 @@ export default function ProductBulkImport() {
                 <div className="admin-catalog-kpi"><strong>{executeResult.createdCategories}</strong><span>Danh mục tạo</span></div>
               </div>
               {executeResult.invalidRows > 0 && jobId && (
-                <a
-                  href={`/api/admin/products/import/jobs/${jobId}/download-feedback`}
-                  className="admin-btn admin-btn--secondary"
-                  download
-                  style={{ marginTop: 12, display: "inline-block" }}
-                >
-                  Tải file feedback
-                </a>
+                <div style={{ marginTop: 12 }}>
+                  <p className="admin-field-hint">Tải file feedback để xem chi tiết các dòng lỗi.</p>
+                  {feedbackLinks(jobId, feedbackDownloadUrl)}
+                </div>
               )}
               <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
                 <a href="/admin/products" className="admin-btn admin-btn--primary">Xem danh sách sản phẩm</a>

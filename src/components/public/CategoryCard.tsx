@@ -13,6 +13,7 @@ type CategoryCardProps = {
   description?: string;
   /** Visual style: "grid" = homepage marketplace, "compact" = legacy icon */
   variant?: "grid" | "compact";
+  ctaLabel?: string;
 };
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
@@ -34,6 +35,7 @@ export default function CategoryCard({
   count,
   description,
   variant = "compact",
+  ctaLabel = "Xem nguồn hàng",
 }: CategoryCardProps) {
   const hasImage = imageUrl && isValidImageSrc(imageUrl);
   const gradient = CATEGORY_GRADIENTS[slug] ?? "linear-gradient(135deg, #374151 0%, #111827 100%)";
@@ -68,7 +70,7 @@ export default function CategoryCard({
             {count != null && (
               <span className="market-cat-card-count">{count} sản phẩm</span>
             )}
-            <span className="market-cat-card-cta">Xem →</span>
+            <span className="market-cat-card-cta">{ctaLabel}</span>
           </div>
         </div>
       </Link>

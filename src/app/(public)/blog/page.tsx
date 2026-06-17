@@ -1,26 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
+import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
+import MarketplaceFinalCta from "@/components/marketplace/MarketplaceFinalCta";
 import { SITE_NAME, canonicalUrl } from "@/lib/seo";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
 export const metadata: Metadata = {
   title: `Blog | ${SITE_NAME}`,
-  description:
-    "Kiến thức đồng phục, quà tặng doanh nghiệp và nguồn hàng B2B.",
-  alternates: {
-    canonical: canonicalUrl("/blog"),
-  },
+  description: "Kiến thức đồng phục, quà tặng doanh nghiệp và nguồn hàng B2B.",
+  alternates: { canonical: canonicalUrl("/blog") },
 };
 
 const PER_PAGE = 9;
-
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(date));
-}
 
 export default async function BlogPage({
   searchParams,
@@ -37,15 +30,17 @@ export default async function BlogPage({
   );
 
   return (
-    <main>
-      <section className="section" style={{ paddingBottom: "24px" }}>
+    <main className="mp-blog-listing">
+      <section className="mp-section mp-section--compact">
         <div className="container">
-          <h1 className="section-title">Blog</h1>
-          <p className="section-description">
-            Kiến thức đồng phục, quà tặng doanh nghiệp và nguồn hàng B2B.
-          </p>
+          <MarketplaceSectionHeader
+            title="Kiến thức nguồn hàng B2B"
+            description="Hướng dẫn chọn sản phẩm, chất liệu và chiến lược sourcing cho đại lý."
+            actionHref="/san-pham"
+            actionLabel="Xem danh mục sản phẩm"
+          />
           {activeTag && (
-            <p className="blog-list-tag-filter">
+            <p className="mp-blog-tag-filter">
               Đang lọc theo tag: <strong>#{activeTag}</strong>{" "}
               <Link href="/blog">Xóa lọc</Link>
             </p>
@@ -53,134 +48,70 @@ export default async function BlogPage({
         </div>
       </section>
 
-      <section style={{ paddingBottom: "64px" }}>
+      <section className="mp-section">
         <div className="container">
           {posts.length === 0 ? (
-            <div
-              style={{
-                padding: "80px 0",
-                textAlign: "center",
-                color: "#9ca3af",
-                fontSize: "15px",
-              }}
-            >
-              Chưa có bài viết nào.
-            </div>
+            <p className="mp-empty-text">Chưa có bài viết nào.</p>
           ) : (
-            <div className="blog-card-grid">
-              {posts.map((post) => (
-                <Link
-                  key={post.id}
-                  href={`/blog/${post.slug}`}
-                  className="blog-card-premium"
-                >
-                  <article>
-                    <div className="blog-card-premium-img">
-                      {post.featuredImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={post.featuredImageUrl}
-                          alt={post.title}
-                          className="blog-card-premium-photo"
-                        />
+            <div className="mp-blog-grid">
+              {posts.map((post) => {
+                const imgUrl =
+                  typeof post.featuredImageUrl === "string" && isValidImageSrc(post.featuredImageUrl)
+                    ? post.featuredImageUrl
+                    : null;
+                const date = post.publishedAt ?? post.createdAt;
+                return (
+                  <Link key={post.id} href={`/blog/${post.slug}`} className="mp-blog-card">
+                    <div className="mp-blog-card-img">
+                      {imgUrl ? (
+                        <Image src={imgUrl} alt={post.title} fill className="mp-blog-card-photo" sizes="400px" />
                       ) : (
-                        <div className="blog-card-premium-placeholder" aria-hidden>
-                          ATTD
-                        </div>
+                        <div className="mp-blog-card-placeholder"><span>ATTD</span></div>
                       )}
                     </div>
-
-                    <div className="blog-card-premium-body">
-                      <time
-                        dateTime={new Date(post.publishedAt ?? post.createdAt).toISOString()}
-                        className="blog-card-premium-date"
-                      >
-                        {formatDate(post.publishedAt ?? post.createdAt)}
+                    <div className="mp-blog-card-body">
+                      <time dateTime={new Date(date).toISOString()} className="mp-blog-card-date">
+                        {new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(date))}
                       </time>
-
-                      <h2 className="blog-card-premium-title">{post.title}</h2>
-
-                      {post.excerpt && (
-                        <p className="blog-card-premium-excerpt">{post.excerpt}</p>
-                      )}
-
-                      <span className="blog-card-premium-link">Đọc thêm →</span>
+                      <h2 className="mp-blog-card-title">{post.title}</h2>
+                      {post.excerpt && <p className="mp-blog-card-excerpt">{post.excerpt}</p>}
                     </div>
-                  </article>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           )}
 
           {totalPages > 1 && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: "8px",
-                alignItems: "center",
-              }}
-            >
+            <div className="mp-catalog-pagination">
               {currentPage > 1 && (
                 <Link
-                  href={`/blog?${new URLSearchParams({
-                    ...(activeTag ? { tag: activeTag } : {}),
-                    page: String(currentPage - 1),
-                  }).toString()}`}
-                  style={{
-                    padding: "8px 20px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    color: "#374151",
-                    textDecoration: "none",
-                    background: "#fff",
-                  }}
+                  href={`/blog?${new URLSearchParams({ ...(activeTag ? { tag: activeTag } : {}), page: String(currentPage - 1) }).toString()}`}
+                  className="mp-page-btn"
                 >
-                  ← Trước
+                  Trang trước
                 </Link>
               )}
-
-              <span style={{ fontSize: "14px", color: "#6b7280" }}>
-                Trang {currentPage} / {totalPages}
-              </span>
-
+              <span className="mp-page-info">Trang {currentPage} / {totalPages}</span>
               {currentPage < totalPages && (
                 <Link
-                  href={`/blog?${new URLSearchParams({
-                    ...(activeTag ? { tag: activeTag } : {}),
-                    page: String(currentPage + 1),
-                  }).toString()}`}
-                  style={{
-                    padding: "8px 20px",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    fontSize: "14px",
-                    color: "#374151",
-                    textDecoration: "none",
-                    background: "#fff",
-                  }}
+                  href={`/blog?${new URLSearchParams({ ...(activeTag ? { tag: activeTag } : {}), page: String(currentPage + 1) }).toString()}`}
+                  className="mp-page-btn"
                 >
-                  Tiếp →
+                  Trang tiếp
                 </Link>
               )}
             </div>
           )}
 
-          {total > 0 && (
-            <p
-              style={{
-                textAlign: "center",
-                fontSize: "13px",
-                color: "#9ca3af",
-                marginTop: "16px",
-              }}
-            >
-              {total} bài viết
-            </p>
-          )}
+          {total > 0 && <p className="mp-blog-total">{total} bài viết</p>}
         </div>
       </section>
+
+      <MarketplaceFinalCta
+        title="Cần nguồn hàng cho nội dung vừa đọc?"
+        description="Liên hệ ATTD để được tư vấn sản phẩm, số lượng tối thiểu và báo giá sỉ."
+      />
     </main>
   );
 }
