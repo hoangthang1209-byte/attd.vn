@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { LeadPriority, LeadSource, LeadStatus } from "@prisma/client";
+import CrmProductInterestFields, {
+  useCrmProducts,
+} from "@/components/admin/crm/CrmProductInterestFields";
+import {
+  createEmptyProductInterestRow,
+  rowHasProductInterestData,
+  type CrmProductInterestRowState,
+} from "@/features/crm/product-interest-utils";
 import {
   CRM_PRIORITY_LABELS,
   CRM_SOURCE_LABELS,
@@ -14,19 +22,9 @@ import {
   CRM_LEAD_STATUSES,
 } from "@/features/crm/types";
 
-const SERVICE_OPTIONS = [
-  { key: "inLogo", label: "In logo" },
-  { key: "embroidery", label: "Thêu" },
-  { key: "customSewing", label: "May theo yêu cầu" },
-  { key: "packaging", label: "Đóng gói" },
-  { key: "sample", label: "Cần mẫu" },
-] as const;
-
-type ProductOption = { id: string; name: string; productCode: string | null };
-
 export default function CrmLeadForm() {
   const router = useRouter();
-  const [products, setProducts] = useState<ProductOption[]>([]);
+  const products = useCrmProducts();
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
@@ -40,33 +38,20 @@ export default function CrmLeadForm() {
   const [estimatedValue, setEstimatedValue] = useState("");
   const [nextFollowUpAt, setNextFollowUpAt] = useState("");
   const [note, setNote] = useState("");
-  const [productId, setProductId] = useState("");
-  const [productNameSnapshot, setProductNameSnapshot] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [unit, setUnit] = useState("cái");
-  const [requirementNote, setRequirementNote] = useState("");
-  const [serviceNeeds, setServiceNeeds] = useState<Record<string, boolean>>({});
+  const [interestRows, setInterestRows] = useState<CrmProductInterestRowState[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void fetch("/api/admin/products?pageSize=200")
-      .then((res) => res.json())
-      .then((data) => {
-        const items = Array.isArray(data.products) ? data.products : [];
-        setProducts(
-          items.map((p: { id: string; name: string; productCode?: string | null }) => ({
-            id: p.id,
-            name: p.name,
-            productCode: p.productCode ?? null,
-          }))
-        );
-      })
-      .catch(() => setProducts([]));
-  }, []);
+  function addInterestRow() {
+    setInterestRows((rows) => [...rows, createEmptyProductInterestRow()]);
+  }
 
-  function toggleService(key: string) {
-    setServiceNeeds((prev) => ({ ...prev, [key]: !prev[key] }));
+  function updateInterestRow(index: number, row: CrmProductInterestRowState) {
+    setInterestRows((rows) => rows.map((item, i) => (i === index ? row : item)));
+  }
+
+  function removeInterestRow(index: number) {
+    setInterestRows((rows) => rows.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -74,9 +59,20 @@ export default function CrmLeadForm() {
     setSaving(true);
     setError(null);
 
-    const selected = products.find((p) => p.id === productId);
-    const hasInterest =
-      productId || productNameSnapshot || quantity || requirementNote;
+    const productInterests = interestRows
+      .filter(rowHasProductInterestData)
+      .map((row) => {
+        const selected = products.find((p) => p.id === row.productId);
+        return {
+          productId: row.productId || null,
+          variantId: row.variantId || null,
+          productNameSnapshot: row.productNameSnapshot || selected?.name || null,
+          quantity: row.quantity ? Number(row.quantity) : null,
+          unit: row.unit,
+          requirementNote: row.requirementNote || null,
+          serviceNeeds: row.serviceNeeds,
+        };
+      });
 
     try {
       const res = await fetch("/api/crm/leads", {
@@ -97,16 +93,7 @@ export default function CrmLeadForm() {
           estimatedValue: estimatedValue ? Number(estimatedValue.replace(/[^\d]/g, "")) : null,
           nextFollowUpAt: nextFollowUpAt || null,
           note,
-          productInterest: hasInterest
-            ? {
-                productId: productId || null,
-                productNameSnapshot: productNameSnapshot || selected?.name || null,
-                quantity: quantity ? Number(quantity) : null,
-                unit,
-                requirementNote: requirementNote || null,
-                serviceNeeds,
-              }
-            : null,
+          productInterests,
         }),
       });
       const data = await res.json();
@@ -212,54 +199,38 @@ export default function CrmLeadForm() {
       </section>
 
       <section className="admin-section-card">
-        <h2>Sản phẩm quan tâm</h2>
-        <label>
-          Sản phẩm trong catalog
-          <select className="admin-input" value={productId} onChange={(e) => setProductId(e.target.value)}>
-            <option value="">— Chọn sản phẩm hoặc nhập tên bên dưới —</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.productCode ? `${p.productCode} — ` : ""}
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Tên sản phẩm (nếu chưa có trong catalog)
-          <input
-            className="admin-input"
-            value={productNameSnapshot}
-            onChange={(e) => setProductNameSnapshot(e.target.value)}
-          />
-        </label>
-        <div className="admin-form-grid">
-          <label>
-            Số lượng
-            <input type="number" min={1} className="admin-input" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-          </label>
-          <label>
-            Đơn vị
-            <input className="admin-input" value={unit} onChange={(e) => setUnit(e.target.value)} />
-          </label>
+        <div className="admin-section-header">
+          <h2>Sản phẩm quan tâm</h2>
+          <button type="button" className="admin-btn admin-btn--secondary admin-btn--sm" onClick={addInterestRow}>
+            Thêm sản phẩm quan tâm
+          </button>
         </div>
-        <label>
-          Ghi chú yêu cầu
-          <textarea className="admin-input" rows={2} value={requirementNote} onChange={(e) => setRequirementNote(e.target.value)} />
-        </label>
-        <fieldset className="admin-checkbox-group">
-          <legend>Dịch vụ kèm theo</legend>
-          {SERVICE_OPTIONS.map((opt) => (
-            <label key={opt.key} className="admin-checkbox-label">
-              <input
-                type="checkbox"
-                checked={Boolean(serviceNeeds[opt.key])}
-                onChange={() => toggleService(opt.key)}
-              />
-              {opt.label}
-            </label>
-          ))}
-        </fieldset>
+
+        {interestRows.length === 0 ? (
+          <p className="admin-empty-hint">Chưa thêm sản phẩm quan tâm. Nhấn &quot;Thêm sản phẩm quan tâm&quot; nếu cần.</p>
+        ) : (
+          <div className="admin-crm-interest-rows">
+            {interestRows.map((row, index) => (
+              <div key={row.key} className="admin-crm-interest-row">
+                <div className="admin-section-header">
+                  <strong>Dòng {index + 1}</strong>
+                  <button
+                    type="button"
+                    className="admin-link-button admin-link-button--danger"
+                    onClick={() => removeInterestRow(index)}
+                  >
+                    Xóa dòng
+                  </button>
+                </div>
+                <CrmProductInterestFields
+                  row={row}
+                  products={products}
+                  onChange={(next) => updateInterestRow(index, next)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="admin-section-card">

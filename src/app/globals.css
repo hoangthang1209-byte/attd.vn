@@ -9935,3 +9935,73 @@ body:has(.mobile-action-bar) .site-footer {
   white-space: nowrap;
 }
 
+.admin-crm-convert-panel {
+  margin-bottom: 16px;
+}
+.admin-crm-convert-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.admin-crm-convert-body {
+  display: grid;
+  gap: 12px;
+}
+.admin-crm-customer-picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.admin-crm-customer-picker-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 14px;
+}
+.admin-crm-customer-picker-item:last-child {
+  border-bottom: none;
+}
+.admin-crm-customer-picker-meta {
+  color: #6b7280;
+  font-size: 13px;
+}
+.admin-crm-interest-rows {
+  display: grid;
+  gap: 16px;
+}
+.admin-crm-interest-row {
+  padding: 12px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+}
+.admin-crm-interest-fields {
+  display: grid;
+  gap: 12px;
+}
+.admin-crm-timeline-heading {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.admin-crm-timeline-item--legacy {
+  border-left-color: #d1d5db;
+  background: #f9fafb;
+  padding: 8px 12px;
+  border-radius: 0 8px 8px 0;
+}
+.admin-badge--legacy {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+.admin-link-button--danger {
+  color: #b91c1c;
+}
+

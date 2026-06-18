@@ -1,5 +1,5 @@
 import type { LeadStatus } from "@prisma/client";
-import { CRM_STATUS_LABELS } from "@/features/crm/labels";
+import { getLeadStatusLabel } from "@/features/crm/labels";
 
 const STATUS_STYLES: Record<
   LeadStatus,
@@ -29,7 +29,7 @@ export default function LeadStatusBadge({ status }: { status: LeadStatus }) {
         borderColor: style.border,
       }}
     >
-      {CRM_STATUS_LABELS[status]}
+      {getLeadStatusLabel(status)}
     </span>
   );
 }

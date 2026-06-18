@@ -227,6 +227,7 @@ export default function CrmLeadsManager() {
                 <th>Nguồn</th>
                 <th>Trạng thái</th>
                 <th>Ưu tiên</th>
+                <th>Khách hàng</th>
                 <th>Follow-up</th>
                 <th>Ngày tạo</th>
               </tr>
@@ -260,6 +261,19 @@ export default function CrmLeadsManager() {
                   </td>
                   <td>
                     <LeadPriorityBadge priority={lead.priority} />
+                  </td>
+                  <td>
+                    {lead.customer ? (
+                      <Link
+                        href={`/admin/crm/customers/${lead.customer.id}`}
+                        className="admin-crm-row-link"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {lead.customer.code} — {lead.customer.name}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td>{formatCrmDateTime(lead.nextFollowUpAt ?? lead.followUpAt)}</td>
                   <td>{formatCrmDateTime(lead.createdAt)}</td>

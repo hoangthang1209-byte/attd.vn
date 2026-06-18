@@ -86,6 +86,11 @@ function parseProductInterest(raw: unknown): CreateProductInterestInput | null {
   };
 }
 
+function parseProductInterests(raw: unknown): CreateProductInterestInput[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(parseProductInterest).filter((item): item is CreateProductInterestInput => item !== null);
+}
+
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {
@@ -143,6 +148,9 @@ export async function POST(req: NextRequest) {
           ? Number(raw.estimatedValue.replace(/[^\d.]/g, ""))
           : null;
 
+    const productInterests = parseProductInterests(raw.productInterests);
+    const singleInterest = parseProductInterest(raw.productInterest);
+
     const lead = await createAdminLead({
       contactName: contactName || fullName || null,
       companyName: companyName || null,
@@ -157,7 +165,12 @@ export async function POST(req: NextRequest) {
       priority,
       nextFollowUpAt,
       estimatedValue: Number.isFinite(estimatedValue!) ? estimatedValue : null,
-      productInterest: parseProductInterest(raw.productInterest),
+      productInterests:
+        productInterests.length > 0
+          ? productInterests
+          : singleInterest
+            ? [singleInterest]
+            : [],
     });
 
     if (!lead) {

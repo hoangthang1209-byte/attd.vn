@@ -7,8 +7,9 @@ import type { LeadPriority, LeadStatus } from "@prisma/client";
 import LeadPriorityBadge from "@/components/admin/LeadPriorityBadge";
 import LeadSourceDisplay from "@/components/admin/LeadSourceDisplay";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
-import CrmActivityTimeline from "@/components/admin/crm/CrmActivityTimeline";
 import CrmAddActivityForm from "@/components/admin/crm/CrmAddActivityForm";
+import CrmConvertLeadPanel from "@/components/admin/crm/CrmConvertLeadPanel";
+import CrmLeadTimeline from "@/components/admin/crm/CrmLeadTimeline";
 import CrmProductInterestForm, {
   CrmProductInterestList,
 } from "@/components/admin/crm/CrmProductInterestForm";
@@ -43,10 +44,9 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
   const [note, setNote] = useState(initialLead.note ?? "");
   const [demand, setDemand] = useState(initialLead.demand ?? "");
   const [saving, setSaving] = useState(false);
-  const [converting, setConverting] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
-  const isConverted = Boolean(lead.convertedAt || lead.customerId);
+  const isLinked = Boolean(lead.customerId);
 
   async function refreshLead() {
     const res = await fetch(`/api/crm/leads/${lead.id}`);
@@ -89,27 +89,6 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
     }
   }
 
-  async function convertToCustomer() {
-    if (!confirm("Chuyển lead này thành khách hàng mới?")) return;
-    setConverting(true);
-    setMessage(null);
-    try {
-      const res = await fetch(`/api/crm/leads/${lead.id}/convert`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage({ type: "error", text: data.message ?? "Chuyển đổi thất bại" });
-        return;
-      }
-      setLead(data.lead);
-      setMessage({ type: "success", text: "Đã chuyển thành khách hàng" });
-      router.refresh();
-    } catch {
-      setMessage({ type: "error", text: "Chuyển đổi thất bại" });
-    } finally {
-      setConverting(false);
-    }
-  }
-
   return (
     <div className="admin-panel">
       <div className="admin-crm-detail-header">
@@ -121,28 +100,36 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
             <LeadPriorityBadge priority={lead.priority} />
           </div>
         </div>
-        <div className="admin-crm-detail-actions">
-          <Link href="/admin/crm/leads" className="admin-btn admin-btn--secondary">
-            ← Danh sách lead
-          </Link>
-          {!isConverted && (
-            <button
-              type="button"
-              className="admin-btn admin-btn--primary"
-              onClick={() => void convertToCustomer()}
-              disabled={converting}
-            >
-              {converting ? "Đang chuyển..." : "Chuyển thành khách hàng"}
-            </button>
-          )}
-        </div>
+        <Link href="/admin/crm/leads" className="admin-btn admin-btn--secondary">
+          ← Danh sách lead
+        </Link>
       </div>
 
-      {isConverted && lead.customerId && (
-        <p className="admin-message admin-message--success">
-          Lead đã chuyển thành khách hàng.{" "}
-          <Link href={`/admin/crm/customers/${lead.customerId}`}>Xem khách hàng</Link>
-        </p>
+      {isLinked && lead.customerId && (
+        <div className="admin-message admin-message--success">
+          <p>
+            Lead đã liên kết với khách hàng{" "}
+            <strong>
+              {lead.customer?.name || "Khách hàng"}
+              {lead.customer?.code ? ` (${lead.customer.code})` : ""}
+            </strong>
+            .{" "}
+            <Link href={`/admin/crm/customers/${lead.customerId}`}>Xem khách hàng</Link>
+          </p>
+        </div>
+      )}
+
+      {!isLinked && (
+        <CrmConvertLeadPanel
+          lead={lead}
+          onDone={(updated) => {
+            setLead(updated);
+            setStatus(updated.status);
+            setMessage({ type: "success", text: "Đã cập nhật liên kết khách hàng" });
+            router.refresh();
+          }}
+          onError={(text) => setMessage({ type: "error", text })}
+        />
       )}
 
       {message && (
@@ -253,7 +240,7 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
 
       <section className="admin-section-card">
         <h3>Hoạt động chăm sóc</h3>
-        <CrmActivityTimeline activities={lead.activities ?? []} />
+        <CrmLeadTimeline activities={lead.activities ?? []} legacyNotes={lead.notes ?? []} />
         <hr className="admin-divider" />
         <CrmAddActivityForm leadId={lead.id} onCreated={() => void refreshLead()} />
       </section>

@@ -168,6 +168,7 @@ export type CreateCrmLeadInput = {
   utmCampaign?: string | null;
   referrer?: string | null;
   productInterest?: CreateProductInterestInput | null;
+  productInterests?: CreateProductInterestInput[];
 };
 
 export type CreateProductInterestInput = {

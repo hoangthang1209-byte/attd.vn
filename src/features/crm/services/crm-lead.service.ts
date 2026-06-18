@@ -14,11 +14,13 @@ import {
   mapLeadRow,
 } from "@/features/crm/mappers";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
+import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-product-interest-snapshot";
 import {
   CRM_LEAD_PRIORITIES,
   CRM_LEAD_SOURCES,
   CRM_LEAD_STATUSES,
   type CreateCrmLeadInput,
+  type CreateProductInterestInput,
   type CrmLeadKpis,
   type CrmLeadNoteRecord,
   type CrmLeadRecord,
@@ -266,6 +268,35 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
   }
 }
 
+function qualifyLeadStatusIfNeeded(status: LeadStatus): LeadStatus {
+  if (status === "NEW" || status === "CONTACTED") return "QUALIFIED";
+  return status;
+}
+
+async function createProductInterestsForLead(
+  tx: Prisma.TransactionClient,
+  leadId: string,
+  interests: CreateProductInterestInput[]
+) {
+  if (!interests?.length) return;
+
+  for (const interest of interests) {
+    const productNameSnapshot = await resolveProductInterestSnapshot(interest);
+    await tx.cRMProductInterest.create({
+      data: {
+        leadId,
+        productId: interest.productId ?? null,
+        variantId: interest.variantId ?? null,
+        productNameSnapshot,
+        quantity: interest.quantity ?? null,
+        unit: interest.unit?.trim() || "cái",
+        requirementNote: interest.requirementNote?.trim() || null,
+        serviceNeeds: interest.serviceNeeds ?? undefined,
+      },
+    });
+  }
+}
+
 export async function createAdminLead(
   input: CreateCrmLeadInput
 ): Promise<CrmLeadRecord | null> {
@@ -316,28 +347,19 @@ export async function createAdminLead(
         },
       });
 
-      if (input.productInterest) {
-        let productNameSnapshot = input.productInterest.productNameSnapshot?.trim() || null;
-        if (input.productInterest.productId && !productNameSnapshot) {
-          const product = await tx.product.findUnique({
-            where: { id: input.productInterest.productId },
-            select: { name: true },
-          });
-          productNameSnapshot = product?.name ?? null;
-        }
+      const interests = [
+        ...(input.productInterests ?? []),
+        ...(input.productInterest ? [input.productInterest] : []),
+      ].filter(
+        (item) =>
+          item.productId ||
+          item.productNameSnapshot?.trim() ||
+          item.quantity ||
+          item.requirementNote?.trim()
+      );
 
-        await tx.cRMProductInterest.create({
-          data: {
-            leadId: row.id,
-            productId: input.productInterest.productId ?? null,
-            variantId: input.productInterest.variantId ?? null,
-            productNameSnapshot,
-            quantity: input.productInterest.quantity ?? null,
-            unit: input.productInterest.unit?.trim() || "cái",
-            requirementNote: input.productInterest.requirementNote?.trim() || null,
-            serviceNeeds: input.productInterest.serviceNeeds ?? undefined,
-          },
-        });
+      if (interests.length > 0) {
+        await createProductInterestsForLead(tx, row.id, interests);
       }
 
       return row;
@@ -433,6 +455,7 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
         where,
         orderBy: { createdAt: "desc" },
         take: limit,
+        include: { customer: true },
       }),
       prisma.lead.count({ where }),
       prisma.lead.groupBy({
@@ -639,8 +662,7 @@ export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadReco
         },
       });
 
-      const nextStatus =
-        lead.status === "NEW" || lead.status === "CONTACTED" ? "QUALIFIED" : lead.status;
+      const nextStatus = qualifyLeadStatusIfNeeded(lead.status);
 
       await tx.lead.update({
         where: { id: leadId },
@@ -670,6 +692,107 @@ export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadReco
     return getCrmLeadById(leadId);
   } catch (err) {
     console.error("[CRM] convertLeadToCustomer failed:", err);
+    return null;
+  }
+}
+
+export type LinkLeadToCustomerInput = {
+  customerId: string;
+  createContact?: boolean;
+  contactId?: string | null;
+};
+
+export async function linkLeadToExistingCustomer(
+  leadId: string,
+  input: LinkLeadToCustomerInput
+): Promise<CrmLeadRecord | null> {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead || lead.customerId) {
+    return lead ? getCrmLeadById(leadId) : null;
+  }
+
+  const customer = await prisma.customer.findUnique({
+    where: { id: input.customerId },
+    include: { contacts: true },
+  });
+  if (!customer) return null;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      let contactId = input.contactId ?? null;
+
+      if (contactId) {
+        const existing = customer.contacts.find((c) => c.id === contactId);
+        if (!existing) contactId = null;
+      }
+
+      if (!contactId) {
+        const leadPhone = lead.phone !== "—" ? lead.phone.trim() : "";
+        const leadEmail = lead.email?.trim() || "";
+
+        const matched = customer.contacts.find((contact) => {
+          if (leadPhone && contact.phone?.trim() === leadPhone) return true;
+          if (leadEmail && contact.email?.trim()?.toLowerCase() === leadEmail.toLowerCase()) {
+            return true;
+          }
+          return false;
+        });
+
+        if (matched) {
+          contactId = matched.id;
+        } else if (input.createContact !== false) {
+          const contactFullName =
+            lead.contactName?.trim() || lead.fullName || customer.name;
+          const hasContactData =
+            contactFullName || leadPhone || leadEmail || lead.zalo?.trim();
+
+          if (hasContactData) {
+            const created = await tx.contact.create({
+              data: {
+                customerId: customer.id,
+                fullName: contactFullName,
+                phone: leadPhone || null,
+                email: lead.email,
+                zalo: lead.zalo,
+                isPrimary: customer.contacts.length === 0,
+              },
+            });
+            contactId = created.id;
+          }
+        }
+      }
+
+      const nextStatus = qualifyLeadStatusIfNeeded(lead.status);
+
+      await tx.lead.update({
+        where: { id: leadId },
+        data: {
+          customerId: customer.id,
+          contactId,
+          convertedAt: lead.convertedAt ?? new Date(),
+          status: nextStatus,
+        },
+      });
+
+      await tx.cRMProductInterest.updateMany({
+        where: { leadId },
+        data: { customerId: customer.id },
+      });
+
+      await tx.cRMActivity.create({
+        data: {
+          leadId,
+          customerId: customer.id,
+          contactId,
+          type: "NOTE",
+          title: "Đã gắn lead với khách hàng có sẵn",
+        },
+      });
+    });
+
+    return getCrmLeadById(leadId);
+  } catch (err) {
+    console.error("[CRM] linkLeadToExistingCustomer failed:", err);
     return null;
   }
 }

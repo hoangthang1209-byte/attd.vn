@@ -20,16 +20,21 @@ export const CRM_STATUS_LABELS: Record<LeadStatus, string> = {
   NOT_FIT: "Không phù hợp",
 };
 
-export const CRM_PRIORITY_LABELS: Record<LeadPriority, string> = {
-  LOW: "Thấp",
-  NORMAL: "Bình thường",
-  HIGH: "Cao",
-  URGENT: "Khẩn cấp",
+/** Fallback labels for unknown/legacy status strings in UI */
+const LEGACY_STATUS_LABELS: Record<string, string> = {
+  CONTACT: "Đã liên hệ",
 };
+
+export function getLeadStatusLabel(status: LeadStatus | string): string {
+  if (status in CRM_STATUS_LABELS) {
+    return CRM_STATUS_LABELS[status as LeadStatus];
+  }
+  return LEGACY_STATUS_LABELS[status] ?? status;
+}
 
 export const CRM_SOURCE_LABELS: Record<LeadSource, string> = {
   CONTACT: "Liên hệ báo giá",
-  DEALER: "Đăng ký đại lý",
+  DEALER: "Đại lý",
   OEM: "OEM",
   SOURCING: "Nguồn hàng",
   LANDING_PAGE: "Landing page",
@@ -42,6 +47,20 @@ export const CRM_SOURCE_LABELS: Record<LeadSource, string> = {
   DIRECT: "Trực tiếp",
   OTHER: "Khác",
 };
+
+export const CRM_PRIORITY_LABELS: Record<LeadPriority, string> = {
+  LOW: "Thấp",
+  NORMAL: "Bình thường",
+  HIGH: "Cao",
+  URGENT: "Khẩn cấp",
+};
+
+export function getLeadSourceLabel(source: LeadSource | string): string {
+  if (source in CRM_SOURCE_LABELS) {
+    return CRM_SOURCE_LABELS[source as LeadSource];
+  }
+  return source;
+}
 
 export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
   DEALER: "Đại lý",

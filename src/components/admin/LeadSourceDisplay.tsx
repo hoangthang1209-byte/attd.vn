@@ -1,4 +1,4 @@
-import { CRM_SOURCE_LABELS } from "@/features/crm/labels";
+import { getLeadSourceLabel } from "@/features/crm/labels";
 import type { CrmLeadRecord } from "@/features/crm/types";
 
 function getSecondaryLines(lead: CrmLeadRecord): string[] {
@@ -38,7 +38,7 @@ export default function LeadSourceDisplay({ lead }: { lead: CrmLeadRecord }) {
 
   return (
     <div className="admin-lead-source">
-      <span className="admin-lead-source__primary">{CRM_SOURCE_LABELS[lead.source]}</span>
+      <span className="admin-lead-source__primary">{getLeadSourceLabel(lead.source)}</span>
       {secondary.map((line) => (
         <span key={line} className="admin-lead-source__secondary">
           {line}

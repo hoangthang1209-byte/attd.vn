@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { mapProductInterestRow } from "@/features/crm/mappers";
+import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-product-interest-snapshot";
 import type { CreateProductInterestInput, CrmProductInterestRecord } from "@/features/crm/types";
 
 export async function createCRMProductInterest(
@@ -10,15 +11,7 @@ export async function createCRMProductInterest(
     return null;
   }
 
-  let productNameSnapshot = input.productNameSnapshot?.trim() || null;
-
-  if (input.productId && !productNameSnapshot) {
-    const product = await prisma.product.findUnique({
-      where: { id: input.productId },
-      select: { name: true },
-    });
-    productNameSnapshot = product?.name ?? null;
-  }
+  const productNameSnapshot = await resolveProductInterestSnapshot(input);
 
   try {
     const row = await prisma.cRMProductInterest.create({
@@ -40,5 +33,15 @@ export async function createCRMProductInterest(
   } catch (err) {
     console.error("[CRM] createCRMProductInterest failed:", err);
     return null;
+  }
+}
+
+export async function createCRMProductInterests(
+  inputs: Array<
+    CreateProductInterestInput & { leadId?: string | null; customerId?: string | null }
+  >
+): Promise<void> {
+  for (const input of inputs) {
+    await createCRMProductInterest(input);
   }
 }
