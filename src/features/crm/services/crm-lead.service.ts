@@ -1,7 +1,21 @@
-import { Prisma, type LeadPipelineStatus, type LeadSource, type LeadStatus } from "@prisma/client";
+import {
+  Prisma,
+  type LeadPipelineStatus,
+  type LeadPriority,
+  type LeadSource,
+  type LeadStatus,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { generateLeadCode, generateCustomerCode } from "@/features/crm/crm-code";
 import { mapFormSourceToCrmSource } from "@/features/crm/labels";
 import {
+  decimalToString,
+  LEAD_DETAIL_INCLUDE,
+  mapLeadRow,
+} from "@/features/crm/mappers";
+import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
+import {
+  CRM_LEAD_PRIORITIES,
   CRM_LEAD_SOURCES,
   CRM_LEAD_STATUSES,
   type CreateCrmLeadInput,
@@ -21,11 +35,6 @@ function emptyReminders(): CrmLeadReminders {
   return { dueToday: 0, overdue: 0, dueTodayLeads: [], overdueLeads: [] };
 }
 
-function decimalToString(value: Prisma.Decimal | null | undefined): string | null {
-  if (value == null) return null;
-  return value.toString();
-}
-
 function mapPipelineStatusToLeadStatus(status: LeadPipelineStatus): LeadStatus {
   switch (status) {
     case "CONTACTED":
@@ -41,6 +50,21 @@ function mapPipelineStatusToLeadStatus(status: LeadPipelineStatus): LeadStatus {
     default:
       return "NEW";
   }
+}
+
+function resolveLeadIdentity(input: CreateCrmLeadInput) {
+  const contactName = input.contactName?.trim() || input.fullName?.trim() || "";
+  const companyName = input.companyName?.trim() || input.company?.trim() || "";
+  const phone = input.phone?.trim() || "";
+  const email = input.email?.trim() || "";
+
+  return {
+    contactName: contactName || null,
+    companyName: companyName || null,
+    fullName: contactName || companyName || phone || email || "Lead mới",
+    phone: phone || "—",
+    email: email || null,
+  };
 }
 
 export async function getCrmDiagnostics(): Promise<{
@@ -61,7 +85,8 @@ export async function getCrmDiagnostics(): Promise<{
   try {
     const migration = await prisma.$queryRaw<{ migration_name: string }[]>`
       SELECT migration_name FROM "_prisma_migrations"
-      WHERE migration_name = '0006_sprint245_crm' AND finished_at IS NOT NULL
+      WHERE migration_name LIKE '%crm%' AND finished_at IS NOT NULL
+      ORDER BY finished_at DESC
       LIMIT 1
     `;
     migrationApplied = migration.length > 0;
@@ -117,18 +142,25 @@ export async function syncDealerLeadsToCrm(): Promise<number> {
       messageParts.push(`Ghi chú sales: ${dealerLead.salesNote.trim()}`);
     }
 
+    const contactName = dealerLead.contactName;
+    const companyName = dealerLead.companyName;
+
     await prisma.lead.upsert({
       where: { id: dealerLead.id },
       create: {
         id: dealerLead.id,
-        fullName: dealerLead.contactName,
+        code: await generateLeadCode(),
+        fullName: contactName,
+        contactName,
         phone: dealerLead.phone,
         email: dealerLead.email,
-        company: dealerLead.companyName,
+        company: companyName,
+        companyName,
         source: mapFormSourceToCrmSource(dealerLead.source),
         status,
         message: messageParts.length > 0 ? messageParts.join("\n") : null,
         followUpAt: dealerLead.contactedAt,
+        nextFollowUpAt: dealerLead.contactedAt,
         estimatedValue: dealerLead.estimatedValue,
         landingPage: dealerLead.landingPage,
         utmSource: dealerLead.utmSource,
@@ -181,55 +213,6 @@ export async function ensureCrmLeadsSynced(): Promise<void> {
   }
 }
 
-function mapLeadRow(row: {
-  id: string;
-  fullName: string;
-  phone: string;
-  email: string | null;
-  company: string | null;
-  source: LeadSource;
-  status: LeadStatus;
-  message: string | null;
-  followUpAt: Date | null;
-  estimatedValue?: Prisma.Decimal | null;
-  landingPage?: string | null;
-  utmSource?: string | null;
-  utmMedium?: string | null;
-  utmCampaign?: string | null;
-  referrer?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  notes?: { id: string; leadId: string; content: string; createdAt: Date }[];
-}): CrmLeadRecord {
-  return {
-    id: row.id,
-    fullName: row.fullName,
-    phone: row.phone,
-    email: row.email,
-    company: row.company,
-    source: row.source,
-    status: row.status,
-    message: row.message,
-    followUpAt: row.followUpAt?.toISOString() ?? null,
-    estimatedValue: decimalToString(row.estimatedValue),
-    landingPage: row.landingPage ?? null,
-    utmSource: row.utmSource ?? null,
-    utmMedium: row.utmMedium ?? null,
-    utmCampaign: row.utmCampaign ?? null,
-    referrer: row.referrer ?? null,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-    notes: row.notes?.map(
-      (note): CrmLeadNoteRecord => ({
-        id: note.id,
-        leadId: note.leadId,
-        content: note.content,
-        createdAt: note.createdAt.toISOString(),
-      })
-    ),
-  };
-}
-
 export async function isCrmLeadTableReady(): Promise<boolean> {
   try {
     await prisma.$queryRaw`SELECT 1 FROM "Lead" LIMIT 1`;
@@ -243,18 +226,31 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
   try {
     if (!(await isCrmLeadTableReady())) return null;
 
+    const identity = resolveLeadIdentity(input);
+    const code = await generateLeadCode();
+
     const row = await prisma.lead.create({
       data: {
         ...(input.id ? { id: input.id } : {}),
-        fullName: input.fullName.trim(),
-        phone: input.phone.trim(),
-        email: input.email?.trim() || null,
-        company: input.company?.trim() || null,
-        source: input.source,
+        code,
+        fullName: identity.fullName,
+        contactName: identity.contactName,
+        companyName: identity.companyName,
+        phone: identity.phone,
+        email: identity.email,
+        zalo: input.zalo?.trim() || null,
+        company: identity.companyName,
+        source: input.source ?? "WEBSITE",
+        sourceDetail: input.sourceDetail?.trim() || null,
+        demand: input.demand?.trim() || input.message?.trim() || null,
         message: input.message?.trim() || null,
+        note: input.note?.trim() || null,
         status: input.status ?? "NEW",
-        followUpAt: input.followUpAt ?? null,
+        priority: input.priority ?? "NORMAL",
+        followUpAt: input.followUpAt ?? input.nextFollowUpAt ?? null,
+        nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
         estimatedValue: input.estimatedValue ?? null,
+        assignedTo: input.assignedTo?.trim() || null,
         landingPage: input.landingPage?.trim() || null,
         utmSource: input.utmSource?.trim() || null,
         utmMedium: input.utmMedium?.trim() || null,
@@ -270,10 +266,95 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
   }
 }
 
+export async function createAdminLead(
+  input: CreateCrmLeadInput
+): Promise<CrmLeadRecord | null> {
+  const contactName = input.contactName?.trim() || input.fullName?.trim() || "";
+  const companyName = input.companyName?.trim() || input.company?.trim() || "";
+  const phone = input.phone?.trim() || "";
+  const email = input.email?.trim() || "";
+
+  if (!contactName && !companyName && !phone && !email) {
+    return null;
+  }
+
+  try {
+    if (!(await isCrmLeadTableReady())) return null;
+
+    const identity = resolveLeadIdentity(input);
+    const code = await generateLeadCode();
+
+    const lead = await prisma.$transaction(async (tx) => {
+      const row = await tx.lead.create({
+        data: {
+          code,
+          fullName: identity.fullName,
+          contactName: identity.contactName,
+          companyName: identity.companyName,
+          phone: identity.phone,
+          email: identity.email,
+          zalo: input.zalo?.trim() || null,
+          company: identity.companyName,
+          source: input.source ?? "WEBSITE",
+          sourceDetail: input.sourceDetail?.trim() || null,
+          demand: input.demand?.trim() || null,
+          note: input.note?.trim() || null,
+          status: input.status ?? "NEW",
+          priority: input.priority ?? "NORMAL",
+          nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
+          followUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
+          estimatedValue: input.estimatedValue ?? null,
+          assignedTo: input.assignedTo?.trim() || null,
+        },
+      });
+
+      await tx.cRMActivity.create({
+        data: {
+          leadId: row.id,
+          type: "NOTE",
+          title: "Tạo lead mới",
+        },
+      });
+
+      if (input.productInterest) {
+        let productNameSnapshot = input.productInterest.productNameSnapshot?.trim() || null;
+        if (input.productInterest.productId && !productNameSnapshot) {
+          const product = await tx.product.findUnique({
+            where: { id: input.productInterest.productId },
+            select: { name: true },
+          });
+          productNameSnapshot = product?.name ?? null;
+        }
+
+        await tx.cRMProductInterest.create({
+          data: {
+            leadId: row.id,
+            productId: input.productInterest.productId ?? null,
+            variantId: input.productInterest.variantId ?? null,
+            productNameSnapshot,
+            quantity: input.productInterest.quantity ?? null,
+            unit: input.productInterest.unit?.trim() || "cái",
+            requirementNote: input.productInterest.requirementNote?.trim() || null,
+            serviceNeeds: input.productInterest.serviceNeeds ?? undefined,
+          },
+        });
+      }
+
+      return row;
+    });
+
+    return getCrmLeadById(lead.id);
+  } catch (err) {
+    console.error("[CRM] createAdminLead failed:", err);
+    return null;
+  }
+}
+
 export type ListCrmLeadsParams = {
   search?: string;
   source?: LeadSource;
   status?: LeadStatus;
+  priority?: LeadPriority;
   limit?: number;
 };
 
@@ -301,6 +382,10 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
     if (search) {
       where.OR = [
         { fullName: { contains: search, mode: "insensitive" } },
+        { contactName: { contains: search, mode: "insensitive" } },
+        { companyName: { contains: search, mode: "insensitive" } },
+        { demand: { contains: search, mode: "insensitive" } },
+        { code: { contains: search, mode: "insensitive" } },
         { phone: { contains: search, mode: "insensitive" } },
         { email: { contains: search, mode: "insensitive" } },
         { company: { contains: search, mode: "insensitive" } },
@@ -308,6 +393,7 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
     }
     if (params.source) where.source = params.source;
     if (params.status) where.status = params.status;
+    if (params.priority) where.priority = params.priority;
 
     const limit = Math.min(200, Math.max(1, params.limit ?? 100));
 
@@ -316,7 +402,21 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
     const endOfToday = new Date(startOfToday);
     endOfToday.setDate(endOfToday.getDate() + 1);
 
-    const activeFollowUp = { status: { notIn: ["WON", "LOST"] as LeadStatus[] } };
+    const activeFollowUp = { status: { notIn: ["WON", "LOST", "NOT_FIT"] as LeadStatus[] } };
+
+    const followUpFilter = {
+      OR: [
+        { nextFollowUpAt: { gte: startOfToday, lt: endOfToday } },
+        { nextFollowUpAt: null, followUpAt: { gte: startOfToday, lt: endOfToday } },
+      ],
+    };
+
+    const overdueFilter = {
+      OR: [
+        { nextFollowUpAt: { lt: startOfToday } },
+        { nextFollowUpAt: null, followUpAt: { lt: startOfToday } },
+      ],
+    };
 
     const [
       rows,
@@ -340,36 +440,24 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
         _count: { _all: true },
       }),
       prisma.lead.count({
-        where: {
-          followUpAt: { gte: startOfToday, lt: endOfToday },
-          ...activeFollowUp,
-        },
+        where: { ...activeFollowUp, ...followUpFilter },
       }),
       prisma.lead.count({
-        where: {
-          followUpAt: { lt: startOfToday },
-          ...activeFollowUp,
-        },
+        where: { ...activeFollowUp, ...overdueFilter },
       }),
       prisma.lead.findMany({
-        where: {
-          followUpAt: { gte: startOfToday, lt: endOfToday },
-          ...activeFollowUp,
-        },
-        orderBy: { followUpAt: "asc" },
+        where: { ...activeFollowUp, ...followUpFilter },
+        orderBy: [{ nextFollowUpAt: "asc" }, { followUpAt: "asc" }],
         take: 20,
       }),
       prisma.lead.findMany({
-        where: {
-          followUpAt: { lt: startOfToday },
-          ...activeFollowUp,
-        },
-        orderBy: { followUpAt: "asc" },
+        where: { ...activeFollowUp, ...overdueFilter },
+        orderBy: [{ nextFollowUpAt: "asc" }, { followUpAt: "asc" }],
         take: 20,
       }),
       prisma.lead.aggregate({
         _sum: { estimatedValue: true },
-        where: { status: { notIn: ["WON", "LOST"] } },
+        where: { status: { notIn: ["WON", "LOST", "NOT_FIT"] } },
       }),
       prisma.lead.aggregate({
         _sum: { estimatedValue: true },
@@ -418,9 +506,7 @@ export async function getCrmLeadById(id: string): Promise<CrmLeadRecord | null> 
 
   const row = await prisma.lead.findUnique({
     where: { id },
-    include: {
-      notes: { orderBy: { createdAt: "desc" } },
-    },
+    include: LEAD_DETAIL_INCLUDE,
   });
 
   return row ? mapLeadRow(row) : null;
@@ -430,28 +516,160 @@ export async function updateCrmLead(
   id: string,
   data: {
     status?: LeadStatus;
+    priority?: LeadPriority;
     followUpAt?: Date | null;
+    nextFollowUpAt?: Date | null;
     estimatedValue?: number | null;
+    contactName?: string | null;
+    companyName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    zalo?: string | null;
+    source?: LeadSource;
+    sourceDetail?: string | null;
+    demand?: string | null;
+    note?: string | null;
+    assignedTo?: string | null;
   }
 ): Promise<CrmLeadRecord | null> {
   if (!(await isCrmLeadTableReady())) return null;
 
   try {
-    const row = await prisma.lead.update({
-      where: { id },
-      data: {
-        ...(data.status !== undefined ? { status: data.status } : {}),
-        ...(data.followUpAt !== undefined ? { followUpAt: data.followUpAt } : {}),
-        ...(data.estimatedValue !== undefined
-          ? { estimatedValue: data.estimatedValue }
-          : {}),
-      },
-      include: {
-        notes: { orderBy: { createdAt: "desc" } },
-      },
+    const existing = await prisma.lead.findUnique({ where: { id } });
+    if (!existing) return null;
+
+    const row = await prisma.$transaction(async (tx) => {
+      const updated = await tx.lead.update({
+        where: { id },
+        data: {
+          ...(data.status !== undefined ? { status: data.status } : {}),
+          ...(data.priority !== undefined ? { priority: data.priority } : {}),
+          ...(data.followUpAt !== undefined ? { followUpAt: data.followUpAt } : {}),
+          ...(data.nextFollowUpAt !== undefined
+            ? { nextFollowUpAt: data.nextFollowUpAt }
+            : {}),
+          ...(data.estimatedValue !== undefined
+            ? { estimatedValue: data.estimatedValue }
+            : {}),
+          ...(data.contactName !== undefined
+            ? {
+                contactName: data.contactName?.trim() || null,
+                fullName:
+                  data.contactName?.trim() ||
+                  data.companyName?.trim() ||
+                  existing.fullName,
+              }
+            : {}),
+          ...(data.companyName !== undefined
+            ? {
+                companyName: data.companyName?.trim() || null,
+                company: data.companyName?.trim() || null,
+              }
+            : {}),
+          ...(data.phone !== undefined ? { phone: data.phone?.trim() || "—" } : {}),
+          ...(data.email !== undefined ? { email: data.email?.trim() || null } : {}),
+          ...(data.zalo !== undefined ? { zalo: data.zalo?.trim() || null } : {}),
+          ...(data.source !== undefined ? { source: data.source } : {}),
+          ...(data.sourceDetail !== undefined
+            ? { sourceDetail: data.sourceDetail?.trim() || null }
+            : {}),
+          ...(data.demand !== undefined ? { demand: data.demand?.trim() || null } : {}),
+          ...(data.note !== undefined ? { note: data.note?.trim() || null } : {}),
+          ...(data.assignedTo !== undefined
+            ? { assignedTo: data.assignedTo?.trim() || null }
+            : {}),
+        },
+      });
+
+      if (data.status !== undefined && data.status !== existing.status) {
+        await tx.cRMActivity.create({
+          data: {
+            leadId: id,
+            type: "STATUS_CHANGE",
+            title: "Cập nhật trạng thái lead",
+            content: `${existing.status} → ${data.status}`,
+          },
+        });
+      }
+
+      return updated;
     });
-    return mapLeadRow(row);
+
+    return getCrmLeadById(row.id);
   } catch {
+    return null;
+  }
+}
+
+export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadRecord | null> {
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead || lead.convertedAt || lead.customerId) {
+    return lead ? getCrmLeadById(leadId) : null;
+  }
+
+  const customerName =
+    lead.companyName?.trim() || lead.company?.trim() || lead.contactName?.trim() || lead.fullName;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const customerCode = await generateCustomerCode();
+      const customer = await tx.customer.create({
+        data: {
+          code: customerCode,
+          type: "BUSINESS",
+          name: customerName,
+          phone: lead.phone !== "—" ? lead.phone : null,
+          email: lead.email,
+          status: "PROSPECT",
+          note: lead.note,
+        },
+      });
+
+      const contactFullName =
+        lead.contactName?.trim() || lead.fullName || customerName;
+
+      const contact = await tx.contact.create({
+        data: {
+          customerId: customer.id,
+          fullName: contactFullName,
+          phone: lead.phone !== "—" ? lead.phone : null,
+          email: lead.email,
+          zalo: lead.zalo,
+          isPrimary: true,
+        },
+      });
+
+      const nextStatus =
+        lead.status === "NEW" || lead.status === "CONTACTED" ? "QUALIFIED" : lead.status;
+
+      await tx.lead.update({
+        where: { id: leadId },
+        data: {
+          customerId: customer.id,
+          contactId: contact.id,
+          convertedAt: new Date(),
+          status: nextStatus,
+        },
+      });
+
+      await tx.cRMProductInterest.updateMany({
+        where: { leadId },
+        data: { customerId: customer.id },
+      });
+
+      await tx.cRMActivity.create({
+        data: {
+          leadId,
+          customerId: customer.id,
+          type: "NOTE",
+          title: "Đã chuyển lead thành khách hàng",
+        },
+      });
+    });
+
+    return getCrmLeadById(leadId);
+  } catch (err) {
+    console.error("[CRM] convertLeadToCustomer failed:", err);
     return null;
   }
 }
@@ -469,6 +687,14 @@ export async function addCrmLeadNote(
     const note = await prisma.leadNote.create({
       data: { leadId, content: trimmed },
     });
+
+    await createCRMActivity({
+      leadId,
+      type: "NOTE",
+      title: "Ghi chú nội bộ",
+      content: trimmed,
+    });
+
     return {
       id: note.id,
       leadId: note.leadId,
@@ -486,4 +712,8 @@ export function isValidLeadStatus(value: string): value is LeadStatus {
 
 export function isValidLeadSource(value: string): value is LeadSource {
   return CRM_LEAD_SOURCES.includes(value as LeadSource);
+}
+
+export function isValidLeadPriority(value: string): value is LeadPriority {
+  return CRM_LEAD_PRIORITIES.includes(value as LeadPriority);
 }

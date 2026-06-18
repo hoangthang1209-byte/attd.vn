@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getCrmLeadById,
+  isValidLeadPriority,
+  isValidLeadSource,
   isValidLeadStatus,
   updateCrmLead,
 } from "@/features/crm/services/crm-lead.service";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+function parseDate(value: unknown): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value !== "string") return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date;
+}
 
 export async function GET(_req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
@@ -33,11 +44,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   }
 
   const raw = body as Record<string, unknown>;
-  const patch: {
-    status?: Parameters<typeof updateCrmLead>[1]["status"];
-    followUpAt?: Date | null;
-    estimatedValue?: number | null;
-  } = {};
+  const patch: Parameters<typeof updateCrmLead>[1] = {};
 
   if (raw.status !== undefined) {
     if (typeof raw.status !== "string" || !isValidLeadStatus(raw.status)) {
@@ -46,19 +53,24 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     patch.status = raw.status;
   }
 
-  if (raw.followUpAt !== undefined) {
-    if (raw.followUpAt === null || raw.followUpAt === "") {
-      patch.followUpAt = null;
-    } else if (typeof raw.followUpAt === "string") {
-      const date = new Date(raw.followUpAt);
-      if (Number.isNaN(date.getTime())) {
-        return NextResponse.json({ message: "Follow-up không hợp lệ" }, { status: 400 });
-      }
-      patch.followUpAt = date;
-    } else {
-      return NextResponse.json({ message: "Follow-up không hợp lệ" }, { status: 400 });
+  if (raw.priority !== undefined) {
+    if (typeof raw.priority !== "string" || !isValidLeadPriority(raw.priority)) {
+      return NextResponse.json({ message: "Ưu tiên không hợp lệ" }, { status: 400 });
     }
+    patch.priority = raw.priority;
   }
+
+  const followUpAt = parseDate(raw.followUpAt);
+  if (raw.followUpAt !== undefined && followUpAt === undefined) {
+    return NextResponse.json({ message: "Follow-up không hợp lệ" }, { status: 400 });
+  }
+  if (followUpAt !== undefined) patch.followUpAt = followUpAt;
+
+  const nextFollowUpAt = parseDate(raw.nextFollowUpAt);
+  if (raw.nextFollowUpAt !== undefined && nextFollowUpAt === undefined) {
+    return NextResponse.json({ message: "Follow-up không hợp lệ" }, { status: 400 });
+  }
+  if (nextFollowUpAt !== undefined) patch.nextFollowUpAt = nextFollowUpAt;
 
   if (raw.estimatedValue !== undefined) {
     if (raw.estimatedValue === null || raw.estimatedValue === "") {
@@ -79,11 +91,41 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
   }
 
-  if (
-    patch.status === undefined &&
-    patch.followUpAt === undefined &&
-    patch.estimatedValue === undefined
-  ) {
+  if (raw.contactName !== undefined) {
+    patch.contactName = typeof raw.contactName === "string" ? raw.contactName : null;
+  }
+  if (raw.companyName !== undefined) {
+    patch.companyName = typeof raw.companyName === "string" ? raw.companyName : null;
+  }
+  if (raw.phone !== undefined) {
+    patch.phone = typeof raw.phone === "string" ? raw.phone : null;
+  }
+  if (raw.email !== undefined) {
+    patch.email = typeof raw.email === "string" ? raw.email : null;
+  }
+  if (raw.zalo !== undefined) {
+    patch.zalo = typeof raw.zalo === "string" ? raw.zalo : null;
+  }
+  if (raw.source !== undefined) {
+    if (typeof raw.source !== "string" || !isValidLeadSource(raw.source)) {
+      return NextResponse.json({ message: "Nguồn không hợp lệ" }, { status: 400 });
+    }
+    patch.source = raw.source;
+  }
+  if (raw.sourceDetail !== undefined) {
+    patch.sourceDetail = typeof raw.sourceDetail === "string" ? raw.sourceDetail : null;
+  }
+  if (raw.demand !== undefined) {
+    patch.demand = typeof raw.demand === "string" ? raw.demand : null;
+  }
+  if (raw.note !== undefined) {
+    patch.note = typeof raw.note === "string" ? raw.note : null;
+  }
+  if (raw.assignedTo !== undefined) {
+    patch.assignedTo = typeof raw.assignedTo === "string" ? raw.assignedTo : null;
+  }
+
+  if (Object.keys(patch).length === 0) {
     return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });
   }
 

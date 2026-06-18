@@ -36,9 +36,16 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "CRM / Lead",
+    label: "CRM",
     items: [
-      { href: "/admin/crm", label: "CRM & Lead" },
+      { href: "/admin/crm", label: "CRM" },
+      { href: "/admin/crm/leads", label: "Lead" },
+      { href: "/admin/crm/customers", label: "Khách hàng" },
+    ],
+  },
+  {
+    label: "Marketing",
+    items: [
       { href: "/admin/client-logos", label: "Logo khách hàng" },
       { href: "/admin/case-studies", label: "Dự án tiêu biểu" },
     ],

@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { LeadSource, LeadStatus } from "@prisma/client";
+import type { LeadPriority, LeadSource, LeadStatus } from "@prisma/client";
 import {
+  createAdminLead,
   createCrmLead,
   getCrmDiagnostics,
   isCrmLeadTableReady,
+  isValidLeadPriority,
   isValidLeadSource,
   isValidLeadStatus,
   listCrmLeads,
 } from "@/features/crm/services/crm-lead.service";
+import type { CreateProductInterestInput } from "@/features/crm/types";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? undefined;
   const sourceParam = searchParams.get("source") ?? undefined;
   const statusParam = searchParams.get("status") ?? undefined;
+  const priorityParam = searchParams.get("priority") ?? undefined;
   const debug = searchParams.get("debug") === "1";
 
   if (sourceParam && !isValidLeadSource(sourceParam)) {
@@ -22,6 +26,9 @@ export async function GET(req: NextRequest) {
   if (statusParam && !isValidLeadStatus(statusParam)) {
     return NextResponse.json({ message: "Trạng thái không hợp lệ" }, { status: 400 });
   }
+  if (priorityParam && !isValidLeadPriority(priorityParam)) {
+    return NextResponse.json({ message: "Ưu tiên không hợp lệ" }, { status: 400 });
+  }
 
   try {
     const tableReady = await isCrmLeadTableReady();
@@ -29,16 +36,13 @@ export async function GET(req: NextRequest) {
       search,
       source: sourceParam as LeadSource | undefined,
       status: statusParam as LeadStatus | undefined,
+      priority: priorityParam as LeadPriority | undefined,
     });
 
     if (result.error) {
       const diagnostics = debug ? await getCrmDiagnostics() : undefined;
       return NextResponse.json(
-        {
-          tableReady,
-          ...result,
-          diagnostics,
-        },
+        { tableReady, ...result, diagnostics },
         { status: tableReady ? 500 : 503 }
       );
     }
@@ -61,6 +65,27 @@ export async function GET(req: NextRequest) {
   }
 }
 
+function parseProductInterest(raw: unknown): CreateProductInterestInput | null {
+  if (!raw || typeof raw !== "object") return null;
+  const pi = raw as Record<string, unknown>;
+  const serviceNeedsRaw = pi.serviceNeeds;
+  let serviceNeeds: Record<string, boolean> | null = null;
+  if (serviceNeedsRaw && typeof serviceNeedsRaw === "object" && !Array.isArray(serviceNeedsRaw)) {
+    serviceNeeds = serviceNeedsRaw as Record<string, boolean>;
+  }
+
+  return {
+    productId: typeof pi.productId === "string" ? pi.productId : null,
+    variantId: typeof pi.variantId === "string" ? pi.variantId : null,
+    productNameSnapshot:
+      typeof pi.productNameSnapshot === "string" ? pi.productNameSnapshot : null,
+    quantity: typeof pi.quantity === "number" ? pi.quantity : null,
+    unit: typeof pi.unit === "string" ? pi.unit : null,
+    requirementNote: typeof pi.requirementNote === "string" ? pi.requirementNote : null,
+    serviceNeeds,
+  };
+}
+
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {
@@ -74,9 +99,72 @@ export async function POST(req: NextRequest) {
   }
 
   const raw = body as Record<string, unknown>;
+  const adminMode = raw.adminMode === true;
+
+  const contactName = typeof raw.contactName === "string" ? raw.contactName.trim() : "";
+  const companyName = typeof raw.companyName === "string" ? raw.companyName.trim() : "";
   const fullName = typeof raw.fullName === "string" ? raw.fullName.trim() : "";
   const phone = typeof raw.phone === "string" ? raw.phone.trim() : "";
-  const source = typeof raw.source === "string" ? raw.source : "";
+  const email = typeof raw.email === "string" ? raw.email.trim() : "";
+  const source = typeof raw.source === "string" ? raw.source : "WEBSITE";
+
+  if (adminMode) {
+    if (!contactName && !companyName && !phone && !email && !fullName) {
+      return NextResponse.json(
+        { message: "Vui lòng nhập ít nhất một trong: tên liên hệ, công ty, SĐT hoặc email" },
+        { status: 400 }
+      );
+    }
+    if (!isValidLeadSource(source)) {
+      return NextResponse.json({ message: "Nguồn không hợp lệ" }, { status: 400 });
+    }
+
+    const status =
+      typeof raw.status === "string" && isValidLeadStatus(raw.status)
+        ? raw.status
+        : undefined;
+    const priority =
+      typeof raw.priority === "string" && isValidLeadPriority(raw.priority)
+        ? raw.priority
+        : undefined;
+
+    const nextFollowUpAt =
+      typeof raw.nextFollowUpAt === "string" && raw.nextFollowUpAt
+        ? new Date(raw.nextFollowUpAt)
+        : null;
+    if (nextFollowUpAt && Number.isNaN(nextFollowUpAt.getTime())) {
+      return NextResponse.json({ message: "Follow-up không hợp lệ" }, { status: 400 });
+    }
+
+    const estimatedValue =
+      typeof raw.estimatedValue === "number"
+        ? raw.estimatedValue
+        : typeof raw.estimatedValue === "string" && raw.estimatedValue
+          ? Number(raw.estimatedValue.replace(/[^\d.]/g, ""))
+          : null;
+
+    const lead = await createAdminLead({
+      contactName: contactName || fullName || null,
+      companyName: companyName || null,
+      phone: phone || undefined,
+      email: email || null,
+      zalo: typeof raw.zalo === "string" ? raw.zalo : null,
+      source,
+      sourceDetail: typeof raw.sourceDetail === "string" ? raw.sourceDetail : null,
+      demand: typeof raw.demand === "string" ? raw.demand : null,
+      note: typeof raw.note === "string" ? raw.note : null,
+      status,
+      priority,
+      nextFollowUpAt,
+      estimatedValue: Number.isFinite(estimatedValue!) ? estimatedValue : null,
+      productInterest: parseProductInterest(raw.productInterest),
+    });
+
+    if (!lead) {
+      return NextResponse.json({ message: "Không thể tạo lead" }, { status: 500 });
+    }
+    return NextResponse.json({ lead }, { status: 201 });
+  }
 
   if (!fullName) {
     return NextResponse.json({ message: "Họ tên là bắt buộc" }, { status: 400 });
@@ -89,14 +177,10 @@ export async function POST(req: NextRequest) {
   }
 
   const status =
-    typeof raw.status === "string" && isValidLeadStatus(raw.status)
-      ? raw.status
-      : undefined;
+    typeof raw.status === "string" && isValidLeadStatus(raw.status) ? raw.status : undefined;
 
   const followUpAt =
-    typeof raw.followUpAt === "string" && raw.followUpAt
-      ? new Date(raw.followUpAt)
-      : null;
+    typeof raw.followUpAt === "string" && raw.followUpAt ? new Date(raw.followUpAt) : null;
 
   if (followUpAt && Number.isNaN(followUpAt.getTime())) {
     return NextResponse.json({ message: "Follow-up không hợp lệ" }, { status: 400 });

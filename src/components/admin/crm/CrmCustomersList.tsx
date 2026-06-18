@@ -1,0 +1,197 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { CustomerStatus, CustomerType } from "@prisma/client";
+import { CustomerStatusBadge, CustomerTypeBadge } from "@/components/admin/crm/CustomerBadges";
+import {
+  CUSTOMER_STATUS_LABELS,
+  CUSTOMER_TYPE_LABELS,
+} from "@/features/crm/labels";
+import { formatCrmDateTime } from "@/features/crm/format";
+import {
+  CRM_CUSTOMER_STATUSES,
+  CRM_CUSTOMER_TYPES,
+  type CrmCustomerRecord,
+} from "@/features/crm/types";
+
+type LoadState = "loading" | "error" | "empty" | "ready";
+
+export default function CrmCustomersList() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [customers, setCustomers] = useState<CrmCustomerRecord[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<CustomerType | "">(
+    (searchParams.get("type") as CustomerType) || ""
+  );
+  const [statusFilter, setStatusFilter] = useState<CustomerStatus | "">(
+    (searchParams.get("status") as CustomerStatus) || ""
+  );
+
+  const load = useCallback(async () => {
+    setLoadState("loading");
+    setErrorMessage(null);
+    try {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set("search", search.trim());
+      if (typeFilter) params.set("type", typeFilter);
+      if (statusFilter) params.set("status", statusFilter);
+
+      const res = await fetch(`/api/crm/customers?${params.toString()}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMessage(data.message ?? "Không thể tải khách hàng");
+        setCustomers([]);
+        setLoadState("error");
+        return;
+      }
+
+      const next = Array.isArray(data.customers) ? data.customers : [];
+      setCustomers(next);
+      setTotal(data.total ?? next.length);
+      setLoadState(next.length === 0 ? "empty" : "ready");
+    } catch {
+      setErrorMessage("Không thể tải khách hàng");
+      setCustomers([]);
+      setLoadState("error");
+    }
+  }, [search, typeFilter, statusFilter]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  function openCustomer(id: string) {
+    router.push(`/admin/crm/customers/${id}`);
+  }
+
+  return (
+    <div className="admin-panel">
+      <div className="admin-section-header">
+        <p>Tổng: {total} khách hàng</p>
+        <Link href="/admin/crm/customers/new" className="admin-btn admin-btn--primary">
+          Thêm khách hàng
+        </Link>
+      </div>
+
+      {loadState === "error" && (
+        <div className="admin-empty-state admin-empty-state--error">
+          <p>{errorMessage}</p>
+          <button type="button" className="admin-btn" onClick={() => void load()}>
+            Thử lại
+          </button>
+        </div>
+      )}
+
+      {loadState === "loading" && <p className="admin-loading">Đang tải...</p>}
+
+      {loadState !== "loading" && loadState !== "error" && (
+        <form
+          className="admin-crm-filters"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void load();
+          }}
+        >
+          <input
+            type="search"
+            placeholder="Tìm tên, mã, SĐT, email, MST..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="admin-input"
+          />
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as CustomerType | "")}
+            className="admin-input"
+          >
+            <option value="">Tất cả loại</option>
+            {CRM_CUSTOMER_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {CUSTOMER_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as CustomerStatus | "")}
+            className="admin-input"
+          >
+            <option value="">Tất cả trạng thái</option>
+            {CRM_CUSTOMER_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {CUSTOMER_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="admin-btn">
+            Lọc
+          </button>
+        </form>
+      )}
+
+      {loadState === "empty" && (
+        <div className="admin-empty-state">
+          <p>Chưa có khách hàng nào</p>
+          <Link href="/admin/crm/customers/new" className="admin-btn admin-btn--primary">
+            Thêm khách hàng
+          </Link>
+        </div>
+      )}
+
+      {loadState === "ready" && (
+        <div className="admin-table-wrap admin-table-wrap--crm">
+          <table className="admin-table admin-table--crm">
+            <thead>
+              <tr>
+                <th>Mã KH</th>
+                <th>Tên khách hàng</th>
+                <th>Loại khách</th>
+                <th>SĐT</th>
+                <th>Email</th>
+                <th>Tỉnh/TP</th>
+                <th>Trạng thái</th>
+                <th>Ngày tạo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {customers.map((customer) => (
+                <tr
+                  key={customer.id}
+                  className="admin-crm-row"
+                  onClick={() => openCustomer(customer.id)}
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openCustomer(customer.id);
+                    }
+                  }}
+                >
+                  <td>{customer.code}</td>
+                  <td>{customer.name}</td>
+                  <td>
+                    <CustomerTypeBadge type={customer.type} />
+                  </td>
+                  <td>{customer.phone || "—"}</td>
+                  <td>{customer.email || "—"}</td>
+                  <td>{customer.province || "—"}</td>
+                  <td>
+                    <CustomerStatusBadge status={customer.status} />
+                  </td>
+                  <td>{formatCrmDateTime(customer.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

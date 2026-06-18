@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { LeadSource, LeadStatus } from "@prisma/client";
+import type { LeadPriority, LeadSource, LeadStatus } from "@prisma/client";
 import CrmFollowUpWidget from "@/components/admin/CrmFollowUpWidget";
+import LeadPriorityBadge from "@/components/admin/LeadPriorityBadge";
 import LeadSourceDisplay from "@/components/admin/LeadSourceDisplay";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
-import { CRM_SOURCE_LABELS, CRM_STATUS_LABELS } from "@/features/crm/labels";
+import { CRM_PRIORITY_LABELS, CRM_SOURCE_LABELS, CRM_STATUS_LABELS, displayLeadCompanyName, displayLeadContactName } from "@/features/crm/labels";
 import { formatCrmCurrency, formatCrmDateTime } from "@/features/crm/format";
 import {
+  CRM_LEAD_PRIORITIES,
   CRM_LEAD_SOURCES,
   CRM_LEAD_STATUSES,
   type CrmLeadKpis,
@@ -23,6 +25,7 @@ type LoadState = "loading" | "error" | "empty" | "ready";
 export default function CrmLeadsManager() {
   const router = useRouter();
   const [leads, setLeads] = useState<CrmLeadRecord[]>([]);
+  const [total, setTotal] = useState(0);
   const [kpis, setKpis] = useState<CrmLeadKpis | null>(null);
   const [valueKpis, setValueKpis] = useState<CrmLeadValueKpis | null>(null);
   const [reminders, setReminders] = useState<CrmLeadReminders | null>(null);
@@ -32,6 +35,7 @@ export default function CrmLeadsManager() {
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<LeadSource | "">("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
+  const [priorityFilter, setPriorityFilter] = useState<LeadPriority | "">("");
 
   const load = useCallback(async () => {
     setLoadState("loading");
@@ -41,6 +45,7 @@ export default function CrmLeadsManager() {
       if (search.trim()) params.set("search", search.trim());
       if (sourceFilter) params.set("source", sourceFilter);
       if (statusFilter) params.set("status", statusFilter);
+      if (priorityFilter) params.set("priority", priorityFilter);
 
       const res = await fetch(`/api/crm/leads?${params.toString()}`);
       const data = await res.json();
@@ -60,6 +65,7 @@ export default function CrmLeadsManager() {
 
       const nextLeads = Array.isArray(data.leads) ? data.leads : [];
       setLeads(nextLeads);
+      setTotal(typeof data.total === "number" ? data.total : nextLeads.length);
       setKpis(data.kpis ?? null);
       setValueKpis(data.valueKpis ?? null);
       setReminders(data.reminders ?? null);
@@ -73,7 +79,7 @@ export default function CrmLeadsManager() {
       setReminders(null);
       setLoadState("error");
     }
-  }, [search, sourceFilter, statusFilter]);
+  }, [search, sourceFilter, statusFilter, priorityFilter]);
 
   useEffect(() => {
     void load();
@@ -85,11 +91,17 @@ export default function CrmLeadsManager() {
   }
 
   function openLead(id: string) {
-    router.push(`/admin/crm/${id}`);
+    router.push(`/admin/crm/leads/${id}`);
   }
 
   return (
     <div className="admin-panel">
+      <div className="admin-section-header">
+        <p>Tổng: {total} lead</p>
+        <Link href="/admin/crm/leads/new" className="admin-btn admin-btn--primary">
+          Thêm lead
+        </Link>
+      </div>
       {!tableReady && loadState !== "loading" && (
         <p className="admin-message admin-message--error" role="alert">
           Bảng CRM chưa sẵn sàng. Chạy{" "}
@@ -175,6 +187,18 @@ export default function CrmLeadsManager() {
               </option>
             ))}
           </select>
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value as LeadPriority | "")}
+            className="admin-input"
+          >
+            <option value="">Tất cả ưu tiên</option>
+            {CRM_LEAD_PRIORITIES.map((priority) => (
+              <option key={priority} value={priority}>
+                {CRM_PRIORITY_LABELS[priority]}
+              </option>
+            ))}
+          </select>
           <button type="submit" className="admin-btn">
             Lọc
           </button>
@@ -183,7 +207,10 @@ export default function CrmLeadsManager() {
 
       {loadState === "empty" && (
         <div className="admin-empty-state">
-          <p>Chưa có lead nào.</p>
+          <p>Chưa có lead nào</p>
+          <Link href="/admin/crm/leads/new" className="admin-btn admin-btn--primary">
+            Thêm lead
+          </Link>
         </div>
       )}
 
@@ -192,15 +219,16 @@ export default function CrmLeadsManager() {
           <table className="admin-table admin-table--crm">
             <thead>
               <tr>
-                <th>Tên</th>
-                <th>SĐT</th>
+                <th>Mã lead</th>
                 <th>Công ty</th>
+                <th>Người liên hệ</th>
+                <th>SĐT</th>
+                <th>Nhu cầu</th>
                 <th>Nguồn</th>
                 <th>Trạng thái</th>
+                <th>Ưu tiên</th>
                 <th>Follow-up</th>
-                <th>Giá trị</th>
                 <th>Ngày tạo</th>
-                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -217,35 +245,24 @@ export default function CrmLeadsManager() {
                     }
                   }}
                 >
-                  <td>
-                    <Link
-                      href={`/admin/crm/${lead.id}`}
-                      className="admin-crm-row-link"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {lead.fullName}
-                    </Link>
-                  </td>
+                  <td>{lead.code || "—"}</td>
+                  <td>{displayLeadCompanyName(lead) || "—"}</td>
+                  <td>{displayLeadContactName(lead)}</td>
                   <td>{lead.phone}</td>
-                  <td>{lead.company || "—"}</td>
+                  <td className="admin-table-cell-truncate">
+                    {lead.demand || lead.message || "—"}
+                  </td>
                   <td>
                     <LeadSourceDisplay lead={lead} />
                   </td>
                   <td>
                     <LeadStatusBadge status={lead.status} />
                   </td>
-                  <td>{formatCrmDateTime(lead.followUpAt)}</td>
-                  <td>{formatCrmCurrency(lead.estimatedValue)}</td>
-                  <td>{formatCrmDateTime(lead.createdAt)}</td>
                   <td>
-                    <Link
-                      href={`/admin/crm/${lead.id}`}
-                      className="admin-link-button"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      Chi tiết
-                    </Link>
+                    <LeadPriorityBadge priority={lead.priority} />
                   </td>
+                  <td>{formatCrmDateTime(lead.nextFollowUpAt ?? lead.followUpAt)}</td>
+                  <td>{formatCrmDateTime(lead.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
