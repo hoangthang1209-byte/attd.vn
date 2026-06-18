@@ -1,5 +1,6 @@
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import ProductInquiryMiniForm from "@/components/marketplace/ProductInquiryMiniForm";
 import { getZaloUrl } from "@/lib/companyInfo";
 import { CTA } from "@/lib/ctaConfig";
 
@@ -9,8 +10,23 @@ type ProductInquiryPanelProps = {
   productName?: string;
   defaultMoq?: number | null;
   leadTime?: string | null;
-  skuCount?: number;
+  supportsPrinting?: boolean;
+  supportsEmbroidery?: boolean;
+  supportsOem?: boolean;
+  showMiniForm?: boolean;
 };
+
+function serviceSummary(
+  printing?: boolean,
+  embroidery?: boolean,
+  oem?: boolean
+): string | null {
+  const parts: string[] = [];
+  if (printing) parts.push("in logo");
+  if (embroidery) parts.push("thêu");
+  if (oem) parts.push("OEM");
+  return parts.length ? parts.join(" · ") : null;
+}
 
 export default function ProductInquiryPanel({
   stockLabel,
@@ -18,18 +34,22 @@ export default function ProductInquiryPanel({
   productName,
   defaultMoq,
   leadTime,
-  skuCount = 0,
+  supportsPrinting,
+  supportsEmbroidery,
+  supportsOem,
+  showMiniForm = true,
 }: ProductInquiryPanelProps) {
   const quoteHref = productName
     ? `/lien-he?product=${encodeURIComponent(productName)}`
     : "/lien-he";
+  const services = serviceSummary(supportsPrinting, supportsEmbroidery, supportsOem);
 
   return (
-    <aside className="mp-inquiry-panel mp-pdp-inquiry-panel">
-      <div className="mp-inquiry-price">
-        <p className="mp-inquiry-price-label">Liên hệ báo giá sỉ</p>
-        <p className="mp-inquiry-price-note">
-          Giá thay đổi theo số lượng, tồn kho và yêu cầu in/thêu/OEM.
+    <aside className="mp-inquiry-panel mp-pdp-inquiry-panel mp-pdp-inquiry-panel--float">
+      <div className="mp-pdp-inquiry-head">
+        <p className="mp-pdp-inquiry-title">Nhận báo giá sỉ từ ATTD</p>
+        <p className="mp-pdp-inquiry-lead">
+          Gửi nhu cầu để ATTD tư vấn số lượng tối thiểu, thời gian giao/sản xuất và báo giá theo số lượng.
         </p>
       </div>
 
@@ -52,13 +72,17 @@ export default function ProductInquiryPanel({
             <dd style={{ color: stockColor }}>{stockLabel}</dd>
           </div>
         )}
-        {skuCount > 0 && (
+        {services && (
           <div className="mp-pdp-inquiry-fact">
-            <dt>Số lựa chọn sản phẩm</dt>
-            <dd>{skuCount}</dd>
+            <dt>Hỗ trợ in/thêu/OEM</dt>
+            <dd>{services}</dd>
           </div>
         )}
       </dl>
+
+      {showMiniForm && (
+        <ProductInquiryMiniForm productName={productName} />
+      )}
 
       <div className="mp-inquiry-actions">
         <TrackedLink
@@ -83,10 +107,10 @@ export default function ProductInquiryPanel({
       </div>
 
       <ul className="mp-pdp-inquiry-trust">
-        <li>Hỗ trợ in/thêu/OEM</li>
-        <li>Giao hàng toàn quốc</li>
-        <li>Tư vấn nguồn hàng B2B</li>
         <li>Không hiển thị giá công khai</li>
+        <li>Báo giá theo số lượng</li>
+        <li>Hỗ trợ đại lý/agency/xưởng in</li>
+        <li>Giao hàng toàn quốc</li>
       </ul>
     </aside>
   );

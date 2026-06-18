@@ -1,5 +1,6 @@
 type ProductKeyAttributesProps = {
   className?: string;
+  compact?: boolean;
   categoryName?: string;
   material?: string | null;
   form?: string | null;
@@ -17,6 +18,7 @@ type ProductKeyAttributesProps = {
 
 export default function ProductKeyAttributes({
   className = "",
+  compact = false,
   categoryName,
   material,
   form,
@@ -33,15 +35,15 @@ export default function ProductKeyAttributes({
 }: ProductKeyAttributesProps) {
   const rows: { label: string; value: string; color?: string }[] = [];
 
-  if (categoryName) rows.push({ label: "Danh mục", value: categoryName });
+  if (!compact && categoryName) rows.push({ label: "Danh mục", value: categoryName });
   if (material) rows.push({ label: "Chất liệu", value: material });
   if (form) rows.push({ label: "Form / kiểu dáng", value: form });
-  if (fit) rows.push({ label: "Kiểu form", value: fit });
+  if (!compact && fit) rows.push({ label: "Kiểu form", value: fit });
   if (defaultMoq != null) rows.push({ label: "Số lượng tối thiểu", value: `${defaultMoq} cái` });
   if (leadTime) rows.push({ label: "Thời gian giao/sản xuất", value: leadTime });
   if (stockLabel) rows.push({ label: "Tình trạng hàng", value: stockLabel, color: stockColor });
-  if (colorSummary) rows.push({ label: "Màu sắc", value: colorSummary });
-  if (sizeSummary) rows.push({ label: "Size / Kích thước", value: sizeSummary });
+  if (!compact && colorSummary) rows.push({ label: "Màu sắc", value: colorSummary });
+  if (!compact && sizeSummary) rows.push({ label: "Size / Kích thước", value: sizeSummary });
   if (supportsPrinting) rows.push({ label: "Hỗ trợ in logo", value: "Có" });
   if (supportsEmbroidery) rows.push({ label: "Hỗ trợ thêu", value: "Có" });
   if (supportsOem) rows.push({ label: "Hỗ trợ OEM", value: "Có" });

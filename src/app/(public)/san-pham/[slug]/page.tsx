@@ -15,6 +15,10 @@ import ProductSpecTable from "@/components/marketplace/ProductSpecTable";
 import ProductKeyAttributes from "@/components/marketplace/ProductKeyAttributes";
 import SupplierTrustCard from "@/components/marketplace/SupplierTrustCard";
 import ProductDetailTabs from "@/components/marketplace/ProductDetailTabs";
+import ProductStatusRow from "@/components/marketplace/ProductStatusRow";
+import ProductQuoteTiers from "@/components/marketplace/ProductQuoteTiers";
+import ProductOptionChips from "@/components/marketplace/ProductOptionChips";
+import ProductHighlights from "@/components/marketplace/ProductHighlights";
 import ProductFaqList from "@/components/public/ProductFaqList";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
@@ -89,13 +93,6 @@ const STOCK_COLORS: Record<string, string> = {
   OUT_OF_STOCK: "#dc2626",
 };
 
-function summarizeValues(values: (string | null | undefined)[], max = 4): string {
-  const unique = [...new Set(values.filter(Boolean) as string[])];
-  if (unique.length === 0) return "";
-  if (unique.length <= max) return unique.join(", ");
-  return `${unique.slice(0, max - 1).join(", ")} +${unique.length - max + 1}`;
-}
-
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
   const catalog = getCatalogProduct(slug);
@@ -132,20 +129,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const stockLabel = aggregateStock ? STOCK_LABELS[aggregateStock] : null;
   const stockColor = aggregateStock ? STOCK_COLORS[aggregateStock] : "#16a34a";
 
-  const hasFeatures = product.supportsPrinting || product.supportsEmbroidery || product.supportsOem;
-
-  const colorSummary = summarizeValues(
-    product.variants.map((v) => v.colorName ?? v.color?.name)
-  );
-  const sizeSummary = summarizeValues(
-    product.variants.map((v) => v.sizeName ?? v.size?.name ?? v.capacity ?? v.dimensions)
-  );
-
   const useCases = (product.useCases as string[] | null) ?? [];
   const targetCustomers = (product.targetCustomers as string[] | null) ?? [];
 
   const keyAttributesProps = {
-    categoryName,
     material: product.material,
     form: product.form,
     fit: product.fit,
@@ -156,8 +143,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
     supportsPrinting: product.supportsPrinting,
     supportsEmbroidery: product.supportsEmbroidery,
     supportsOem: product.supportsOem,
-    colorSummary,
-    sizeSummary,
   };
 
   const variantRows = product.variants.map((v) => ({
@@ -171,6 +156,14 @@ export default async function ProductDetailPage({ params }: PageProps) {
     stockStatus: v.stockStatus,
     imageUrl: v.imageUrl,
     stockQty: v.stockQty,
+  }));
+
+  const chipVariants = variantRows.map((v) => ({
+    colorName: v.colorName,
+    colorCode: v.colorCode,
+    sizeName: v.sizeName,
+    dimensions: v.dimensions,
+    capacity: v.capacity,
   }));
 
   const productJsonLd = {
@@ -229,7 +222,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   ];
 
   return (
-    <main className="mp-pdp">
+    <main className="mp-pdp mp-pdp--anatomy">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
@@ -248,7 +241,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
       <section className="mp-pdp-hero">
         <div className="container">
-          <div className="mp-pdp-grid">
+          <div className="mp-pdp-grid mp-pdp-grid--anatomy">
             <header className="mp-pdp-head">
               <div className="mp-product-detail-meta">
                 <Link href={`/${categorySlug}`} className="mp-product-detail-cat">
@@ -261,62 +254,45 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 )}
               </div>
               <h1 className="mp-product-detail-title">{displayName}</h1>
-              {displayShortDescription && (
-                <p className="mp-product-detail-desc">{displayShortDescription}</p>
-              )}
             </header>
 
-            <div className="mp-pdp-gallery-col">
+            <div className="mp-pdp-left-col">
               <ProductGallery images={unifiedImages} productName={displayName} />
+              <SupplierTrustCard />
             </div>
 
-            <div className="mp-pdp-center-col">
-              <dl className="mp-product-facts mp-pdp-quick-facts">
-                {stockLabel && (
-                  <div className="mp-product-fact">
-                    <dt>Tình trạng hàng</dt>
-                    <dd style={{ color: stockColor }}>{stockLabel}</dd>
-                  </div>
-                )}
-                {product.defaultMoq != null && (
-                  <div className="mp-product-fact">
-                    <dt>Số lượng tối thiểu</dt>
-                    <dd>{product.defaultMoq} cái</dd>
-                  </div>
-                )}
-                {product.leadTime && (
-                  <div className="mp-product-fact">
-                    <dt>Thời gian giao/sản xuất</dt>
-                    <dd>{product.leadTime}</dd>
-                  </div>
-                )}
-                {skuCount > 0 && (
-                  <div className="mp-product-fact">
-                    <dt>Số lựa chọn sản phẩm</dt>
-                    <dd>{skuCount}</dd>
-                  </div>
-                )}
-              </dl>
+            <div className="mp-pdp-status">
+              <ProductStatusRow
+                stockLabel={stockLabel}
+                stockColor={stockColor}
+                skuCount={skuCount}
+              />
+            </div>
 
-              {hasFeatures && (
-                <div className="mp-product-service-badges">
-                  {product.supportsPrinting && (
-                    <span className="mp-product-service-badge">Hỗ trợ in logo</span>
-                  )}
-                  {product.supportsEmbroidery && (
-                    <span className="mp-product-service-badge">Hỗ trợ thêu</span>
-                  )}
-                  {product.supportsOem && (
-                    <span className="mp-product-service-badge mp-product-service-badge--oem">
-                      Hỗ trợ OEM
-                    </span>
-                  )}
-                </div>
-              )}
+            <div className="mp-pdp-quote">
+              <ProductQuoteTiers />
+            </div>
 
-              <ProductKeyAttributes
-                {...keyAttributesProps}
-                className="mp-pdp-keyattrs mp-pdp-keyattrs--desktop"
+            <div className="mp-pdp-chips">
+              <ProductOptionChips variants={chipVariants} material={product.material} />
+            </div>
+
+            <div className="mp-pdp-keyattrs-block">
+              <ProductKeyAttributes {...keyAttributesProps} compact />
+            </div>
+
+            <div className="mp-pdp-highlights-block">
+              <ProductHighlights
+                shortDescription={displayShortDescription}
+                description={displayContent}
+                material={product.material}
+                form={product.form}
+                defaultMoq={product.defaultMoq}
+                leadTime={product.leadTime}
+                useCases={useCases}
+                supportsPrinting={product.supportsPrinting}
+                supportsEmbroidery={product.supportsEmbroidery}
+                supportsOem={product.supportsOem}
               />
             </div>
 
@@ -327,9 +303,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 productName={displayName}
                 defaultMoq={product.defaultMoq}
                 leadTime={product.leadTime}
-                skuCount={skuCount}
+                supportsPrinting={product.supportsPrinting}
+                supportsEmbroidery={product.supportsEmbroidery}
+                supportsOem={product.supportsOem}
               />
-              <SupplierTrustCard />
             </aside>
           </div>
         </div>
@@ -337,7 +314,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
       <ProductDetailTabs />
 
-      <section className="mp-section mp-section--compact" id="mp-pdp-specs">
+      <section className="mp-section mp-section--compact" id="mp-pdp-info">
         <div className="container">
           <ProductSpecTable
             material={product.material}
@@ -352,21 +329,15 @@ export default async function ProductDetailPage({ params }: PageProps) {
             supportsEmbroidery={product.supportsEmbroidery}
             supportsOem={product.supportsOem}
           />
+          <div className="mp-pdp-info-keyattrs">
+            <ProductKeyAttributes {...keyAttributesProps} compact className="mp-pdp-keyattrs--lower" />
+          </div>
         </div>
       </section>
 
-      <section className="mp-section mp-section--compact">
+      <section className="mp-section mp-section--alt mp-section--compact" id="mp-pdp-options">
         <div className="container">
           <ProductOptionTable variants={variantRows} />
-        </div>
-      </section>
-
-      <section className="mp-section mp-section--alt mp-section--compact mp-pdp-keyattrs-mobile-wrap">
-        <div className="container">
-          <ProductKeyAttributes
-            {...keyAttributesProps}
-            className="mp-pdp-keyattrs mp-pdp-keyattrs--mobile"
-          />
         </div>
       </section>
 
