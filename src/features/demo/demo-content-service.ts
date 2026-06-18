@@ -511,6 +511,11 @@ export async function seedDemoContent(
     summary.caseStudies = await seedCaseStudies();
   }
 
+  if (all || groups.includes("products") || groups.includes("pricing")) {
+    const { seedPricingDemoData } = await import("@/features/pricing/services/pricing-overview.service");
+    await seedPricingDemoData();
+  }
+
   return summary;
 }
 

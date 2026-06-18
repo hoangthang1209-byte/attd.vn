@@ -44,6 +44,17 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Tính giá",
+    items: [
+      { href: "/admin/pricing", label: "Tổng quan" },
+      { href: "/admin/pricing/calculator", label: "Bộ tính giá" },
+      { href: "/admin/pricing/price-groups", label: "Nhóm giá" },
+      { href: "/admin/pricing/product-tiers", label: "Bảng giá sản phẩm" },
+      { href: "/admin/pricing/service-rules", label: "Phí dịch vụ" },
+      { href: "/admin/pricing/history", label: "Lịch sử tính giá" },
+    ],
+  },
+  {
     label: "Marketing",
     items: [
       { href: "/admin/client-logos", label: "Logo khách hàng" },
