@@ -265,7 +265,6 @@ export async function importProductStarterData(): Promise<{
 
     for (const v of item.variants) {
       const baseSku = generateSku({
-        categorySkuCode: category.skuCode ?? item.categorySlug.toUpperCase().slice(0, 4),
         productCode: item.productCode,
         colorName: v.colorName,
         colorCode: v.colorCode,

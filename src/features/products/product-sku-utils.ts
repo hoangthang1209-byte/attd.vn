@@ -31,6 +31,19 @@ const VI_MAP: Record<string, string> = {
   Đ: "D",
 };
 
+export const CATEGORY_SKU_CODE_MISSING_ERROR =
+  "Danh mục chưa có mã ID. Vui lòng cập nhật mã danh mục trước khi tạo sản phẩm.";
+
+export const CATEGORY_PRODUCT_CODE_LIMIT_ERROR =
+  "Danh mục đã đạt giới hạn 9999 mã sản phẩm.";
+
+export class ProductSkuError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProductSkuError";
+  }
+}
+
 export function normalizeSkuPart(input: string): string {
   if (!input) return "";
   return input
@@ -42,22 +55,26 @@ export function normalizeSkuPart(input: string): string {
     .slice(0, 12);
 }
 
+export function normalizeCategorySkuCode(raw: string): string {
+  return normalizeSkuPart(raw);
+}
+
 // ─── Color code table ─────────────────────────────────────────────────────────
 
 const COLOR_CODES: Record<string, string> = {
-  "den": "BLK", "black": "BLK",
-  "trang": "WHT", "white": "WHT",
-  "do": "RED", "red": "RED",
-  "xanh navy": "NVY", "navy": "NVY",
-  "xanh duong": "BLU", "blue": "BLU",
-  "xanh la": "GRN", "green": "GRN",
-  "xam": "GRY", "grey": "GRY", "gray": "GRY",
-  "vang": "YEL", "yellow": "YEL",
-  "cam": "ORG", "orange": "ORG",
-  "be": "NT", "natural": "NT", "kem": "NT", "beige": "NT",
-  "hong": "PNK", "pink": "PNK",
-  "tim": "PRP", "purple": "PRP",
-  "nau": "BRN", "brown": "BRN",
+  den: "BLK", black: "BLK",
+  trang: "WHT", white: "WHT",
+  do: "RED", red: "RED",
+  "xanh navy": "NVY", navy: "NVY",
+  "xanh duong": "BLU", blue: "BLU",
+  "xanh la": "GRN", green: "GRN",
+  xam: "GRY", grey: "GRY", gray: "GRY",
+  vang: "YEL", yellow: "YEL",
+  cam: "ORG", orange: "ORG",
+  be: "NT", natural: "NT", kem: "NT", beige: "NT",
+  hong: "PNK", pink: "PNK",
+  tim: "PRP", purple: "PRP",
+  nau: "BRN", brown: "BRN",
 };
 
 export function getColorSkuCode(colorName: string): string {
@@ -71,21 +88,20 @@ export function getColorSkuCode(colorName: string): string {
   return COLOR_CODES[normalized] ?? normalizeSkuPart(colorName).slice(0, 4);
 }
 
-// ─── Category SKU code ────────────────────────────────────────────────────────
-
+/** @deprecated Legacy fallback — do not use for new product ID generation */
 export function getCategorySkuCode(categoryName: string, skuCode?: string | null): string {
-  if (skuCode?.trim()) return skuCode.trim().toUpperCase();
+  if (skuCode?.trim()) return normalizeCategorySkuCode(skuCode);
   const CATEGORY_CODES: Record<string, string> = {
-    "ao thun": "TS", "ao thun tron": "TS", "thun": "TS",
-    "ao polo": "PO", "polo": "PO",
-    "ao khoac": "JK", "khoac": "JK", "jacket": "JK",
-    "hoodie": "HD", "sweater": "HD",
-    "non": "CAP", "mu": "CAP", "hat": "CAP",
-    "tote bag": "TOTE", "tote": "TOTE", "tui tote": "TOTE",
-    "binh giu nhiet": "BGN", "binh": "BGN",
-    "bandana": "BND", "khan": "BND",
-    "gift set": "GIFT", "combo": "GIFT", "qua tang": "GIFT",
-    "oem": "OEM",
+    "ao thun": "TS", "ao thun tron": "TS", thun: "TS",
+    "ao polo": "POLO", polo: "POLO",
+    "ao khoac": "JK", khoac: "JK", jacket: "JK",
+    hoodie: "HD", sweater: "HD",
+    non: "CAP", mu: "CAP", hat: "CAP",
+    "tote bag": "TOTE", tote: "TOTE", "tui tote": "TOTE",
+    "binh giu nhiet": "BGN", binh: "BGN",
+    bandana: "BND", khan: "BND",
+    "gift set": "GIFT", combo: "GIFT", "qua tang": "GIFT",
+    oem: "OEM",
   };
   const normalized = categoryName
     .split("")
@@ -96,29 +112,154 @@ export function getCategorySkuCode(categoryName: string, skuCode?: string | null
   for (const [key, code] of Object.entries(CATEGORY_CODES)) {
     if (normalized.includes(key)) return code;
   }
-  return normalizeSkuPart(categoryName).slice(0, 4);
+  return normalizeSkuPart(categoryName).slice(0, 6);
 }
 
-// ─── Product code from name ───────────────────────────────────────────────────
+export function requireCategorySkuCode(skuCode?: string | null): string {
+  const normalized = skuCode?.trim() ? normalizeCategorySkuCode(skuCode) : "";
+  if (!normalized) {
+    throw new ProductSkuError(CATEGORY_SKU_CODE_MISSING_ERROR);
+  }
+  return normalized;
+}
 
+export function parseProductCodeSuffix(prefix: string, productCode: string): number | null {
+  const upper = productCode.toUpperCase();
+  if (!upper.startsWith(prefix)) return null;
+  const rest = upper.slice(prefix.length);
+  if (!/^\d{4}$/.test(rest)) return null;
+  return parseInt(rest, 10);
+}
+
+export function validateProductCodeForCategory(prefix: string, productCode: string): string {
+  const upper = productCode.trim().toUpperCase();
+  const pattern = new RegExp(`^${prefix}\\d{4}$`);
+  if (!pattern.test(upper)) {
+    throw new ProductSkuError(
+      `Mã sản phẩm không hợp lệ. Phải theo định dạng ${prefix}0001.`
+    );
+  }
+  return upper;
+}
+
+export async function getMaxProductCodeSuffix(
+  categoryId: string,
+  prefix: string
+): Promise<number> {
+  const products = await prisma.product.findMany({
+    where: {
+      categoryId,
+      productCode: { startsWith: prefix },
+    },
+    select: { productCode: true },
+  });
+
+  let maxSuffix = 0;
+  for (const product of products) {
+    if (!product.productCode) continue;
+    const suffix = parseProductCodeSuffix(prefix, product.productCode);
+    if (suffix !== null && suffix > maxSuffix) maxSuffix = suffix;
+  }
+  return maxSuffix;
+}
+
+export type CategoryCodeCounter = {
+  categoryId: string;
+  prefix: string;
+  nextSuffix: number;
+};
+
+export async function initCategoryCodeCounter(categoryId: string): Promise<CategoryCodeCounter> {
+  const category = await prisma.category.findUnique({
+    where: { id: categoryId },
+    select: { skuCode: true },
+  });
+  const prefix = requireCategorySkuCode(category?.skuCode);
+  const maxSuffix = await getMaxProductCodeSuffix(categoryId, prefix);
+  return { categoryId, prefix, nextSuffix: maxSuffix + 1 };
+}
+
+export function allocateProductCodeFromCounter(counter: CategoryCodeCounter): string {
+  if (counter.nextSuffix > 9999) {
+    throw new ProductSkuError(CATEGORY_PRODUCT_CODE_LIMIT_ERROR);
+  }
+  const code = `${counter.prefix}${String(counter.nextSuffix).padStart(4, "0")}`;
+  counter.nextSuffix += 1;
+  return code;
+}
+
+export async function generateNextProductCode(
+  categoryId: string,
+  options?: { explicitCode?: string; counter?: CategoryCodeCounter }
+): Promise<string> {
+  if (options?.explicitCode?.trim()) {
+    const category = await prisma.category.findUnique({
+      where: { id: categoryId },
+      select: { skuCode: true },
+    });
+    const prefix = requireCategorySkuCode(category?.skuCode);
+    return validateProductCodeForCategory(prefix, options.explicitCode);
+  }
+
+  if (options?.counter) {
+    return allocateProductCodeFromCounter(options.counter);
+  }
+
+  const counter = await initCategoryCodeCounter(categoryId);
+  return allocateProductCodeFromCounter(counter);
+}
+
+export async function ensureUniqueProductCode(
+  categoryId: string,
+  explicitCode?: string
+): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = await generateNextProductCode(
+      categoryId,
+      attempt === 0 && explicitCode ? { explicitCode } : undefined
+    );
+
+    const existing = await prisma.product.findUnique({ where: { productCode: code } });
+    if (!existing) return code;
+
+    if (explicitCode) {
+      throw new ProductSkuError("Mã sản phẩm đã tồn tại.");
+    }
+  }
+
+  throw new ProductSkuError("Không thể tạo mã sản phẩm duy nhất. Vui lòng thử lại.");
+}
+
+export function buildProductGroupKey(
+  categoryId: string,
+  productName: string,
+  productCode?: string | null
+): string {
+  return `${categoryId}::${productName.trim().toLowerCase()}::${(productCode ?? "").trim().toUpperCase()}`;
+}
+
+/** @deprecated Legacy name-based code — kept for reading old data only */
 export function generateProductCode(productName: string, material?: string | null): string {
   const MATERIAL_CODES: Record<string, string> = {
-    "cotton": "CT", "100% cotton": "CT",
-    "cvc": "CVC",
-    "tc": "TC",
-    "polyester": "PL", "poly": "PL",
-    "pique": "PQ", "ca sau": "PQ",
-    "inox": "INX", "stainless": "INX",
-    "canvas": "CAN",
+    cotton: "CT", "100% cotton": "CT",
+    cvc: "CVC",
+    tc: "TC",
+    polyester: "PL", poly: "PL",
+    pique: "PQ", "ca sau": "PQ",
+    inox: "INX", stainless: "INX",
+    canvas: "CAN",
     "non woven": "NW",
-    "fleece": "FLC",
+    fleece: "FLC",
   };
 
   let code = "";
   if (material) {
     const matNorm = material.split("").map((c) => VI_MAP[c] ?? c).join("").toLowerCase();
     for (const [key, val] of Object.entries(MATERIAL_CODES)) {
-      if (matNorm.includes(key)) { code = val; break; }
+      if (matNorm.includes(key)) {
+        code = val;
+        break;
+      }
     }
   }
   if (!code) {
@@ -146,26 +287,26 @@ export function generateVariantCode(input: {
 }): string {
   const parts: string[] = [];
 
-  const color = input.colorCode?.trim()
-    || (input.colorName ? getColorSkuCode(input.colorName) : "");
-  if (color) parts.push(color);
+  const color =
+    input.colorCode?.trim() ||
+    (input.colorName ? getColorSkuCode(input.colorName) : "");
+  if (color) parts.push(normalizeSkuPart(color).slice(0, 6));
 
-  const size = normalizeSkuPart(input.sizeName ?? "").slice(0, 4);
+  const size = normalizeSkuPart(input.sizeName ?? "").slice(0, 6);
   if (size) parts.push(size);
 
-  const dim = normalizeSkuPart((input.dimensions ?? "").replace(/[xX×]/g, "X")).slice(0, 8);
+  const dim = normalizeSkuPart((input.dimensions ?? "").replace(/[xX×]/g, "X")).slice(0, 10);
   if (dim && !size) parts.push(dim);
 
-  const cap = normalizeSkuPart(input.capacity ?? "").slice(0, 6);
+  const cap = normalizeSkuPart(input.capacity ?? "").slice(0, 8);
   if (cap && !size && !dim) parts.push(cap);
 
   return parts.join("-");
 }
 
-// ─── Main SKU generator ───────────────────────────────────────────────────────
+// ─── Variant SKU = productCode + option suffixes ─────────────────────────────
 
 export function generateSku(input: {
-  categorySkuCode: string;
   productCode: string;
   colorName?: string | null;
   colorCode?: string | null;
@@ -173,16 +314,29 @@ export function generateSku(input: {
   dimensions?: string | null;
   capacity?: string | null;
 }): string {
-  const parts = [
-    "ATTD",
-    input.categorySkuCode.toUpperCase().slice(0, 6),
-    input.productCode.toUpperCase().slice(0, 8),
-  ];
-
+  const productCode = input.productCode.trim().toUpperCase();
   const variantCode = generateVariantCode(input);
-  if (variantCode) parts.push(variantCode);
+  return variantCode ? `${productCode}-${variantCode}` : productCode;
+}
 
-  return parts.filter(Boolean).join("-");
+export function buildVariantSkuExplanation(input: {
+  productCode: string;
+  colorName?: string | null;
+  colorCode?: string | null;
+  sizeName?: string | null;
+  dimensions?: string | null;
+  capacity?: string | null;
+}): string {
+  const variantSku = generateSku(input);
+  const parts: string[] = [`ID sản phẩm: ${input.productCode.toUpperCase()}`];
+  const suffix = generateVariantCode(input);
+  if (suffix) {
+    parts.push(`SKU lựa chọn = ID + ${suffix}`);
+  } else {
+    parts.push("Không có tùy chọn biến thể — SKU lựa chọn trùng ID sản phẩm");
+  }
+  parts.push(`Kết quả: ${variantSku}`);
+  return parts.join(" · ");
 }
 
 // ─── Uniqueness enforcement ───────────────────────────────────────────────────
@@ -203,5 +357,15 @@ export async function isSkuTaken(sku: string, excludeId?: string): Promise<boole
   const existing = await prisma.productVariant.findUnique({ where: { sku } });
   if (!existing) return false;
   if (excludeId && existing.id === excludeId) return false;
+  return true;
+}
+
+export async function isProductCodeTaken(
+  productCode: string,
+  excludeProductId?: string
+): Promise<boolean> {
+  const existing = await prisma.product.findFirst({ where: { productCode } });
+  if (!existing) return false;
+  if (excludeProductId && existing.id === excludeProductId) return false;
   return true;
 }

@@ -18,6 +18,7 @@ type PreviewRow = {
   productName: string;
   category: string;
   normalizedCategory: string;
+  productCode?: string;
   generatedSku: string;
   colorName?: string;
   sizeName?: string;
@@ -384,7 +385,8 @@ export default function ProductBulkImport() {
               templates={PRODUCT_IMPORT_TEMPLATES.slice(0, 3).map((t) => ({ id: t.id, label: t.label, description: "" }))}
               notes={[
                 "Các cột bắt buộc: category, productName",
-                "Nếu productCode để trống, hệ thống sẽ tự tạo SKU",
+                "Nếu productCode (ID sản phẩm) để trống, hệ thống tự cấp mã theo danh mục (vd. TS0001, TS0002)",
+                "Danh mục phải có mã ID (skuCode) trước khi nhập — nếu thiếu sẽ báo lỗi",
                 "Nếu danh mục chưa có, bật \"Tự tạo danh mục mới\" phía dưới",
                 "priceTiers có thể nhập JSON: [{\"minQty\":50,\"price\":45000}]",
                 "Ảnh nên là URL Cloudinary hoặc URL ảnh hợp lệ",
@@ -487,9 +489,10 @@ export default function ProductBulkImport() {
                       <th>#</th>
                       <th>Tên sản phẩm</th>
                       <th>Danh mục</th>
+                      <th>ID sản phẩm</th>
                       <th>Màu</th>
                       <th>Size</th>
-                      <th>SKU gợi ý</th>
+                      <th>SKU lựa chọn</th>
                       <th>Hành động</th>
                       <th>Lỗi</th>
                     </tr>
@@ -500,6 +503,7 @@ export default function ProductBulkImport() {
                         <td>{r.rowIndex + 1}</td>
                         <td>{r.productName}</td>
                         <td><span className="admin-field-hint">{r.normalizedCategory}</span></td>
+                        <td><code className="admin-catalog-code">{r.productCode ?? "—"}</code></td>
                         <td>{r.colorName ?? ""}</td>
                         <td>{r.sizeName ?? ""}</td>
                         <td><code className="admin-catalog-code">{r.generatedSku}</code></td>

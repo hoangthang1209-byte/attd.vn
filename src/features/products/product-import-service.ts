@@ -11,8 +11,15 @@ import { getSuggestedFix } from "@/features/products/product-import-feedback";
 import {
   generateSku,
   ensureUniqueSku,
-  getCategorySkuCode,
-  generateProductCode,
+  buildProductGroupKey,
+  validateProductCodeForCategory,
+  requireCategorySkuCode,
+  initCategoryCodeCounter,
+  allocateProductCodeFromCounter,
+  ProductSkuError,
+  CATEGORY_SKU_CODE_MISSING_ERROR,
+  isProductCodeTaken,
+  type CategoryCodeCounter,
 } from "@/features/products/product-sku-utils";
 
 function toSlug(text: string): string {
@@ -40,15 +47,52 @@ async function ensureUniqueProductSlug(baseSlug: string): Promise<string> {
   return `${baseSlug}-${Date.now()}`;
 }
 
-async function ensureUniqueProductCode(baseCode: string): Promise<string> {
-  const existing = await prisma.product.findFirst({ where: { productCode: baseCode } });
-  if (!existing) return baseCode;
-  for (let i = 2; i <= 99; i++) {
-    const candidate = `${baseCode}-${i}`;
-    const dup = await prisma.product.findFirst({ where: { productCode: candidate } });
-    if (!dup) return candidate;
+type CategoryMeta = { id: string; name: string; skuCode: string | null; prefix?: string };
+
+async function allocateProductCodesForGroups(
+  rows: ProductImportPreviewRow[],
+  categoryMap: Map<string, CategoryMeta>
+): Promise<Map<string, string>> {
+  const groupCodes = new Map<string, string>();
+  const counters = new Map<string, CategoryCodeCounter>();
+
+  for (const row of rows) {
+    if (row.finalAction !== "create" && row.finalAction !== "copy") continue;
+
+    const cat = categoryMap.get(row.normalizedCategory.toLowerCase());
+    if (!cat?.id || !cat.prefix) continue;
+
+    const groupKey = buildProductGroupKey(cat.id, row.productName, row.productCode);
+    if (groupCodes.has(groupKey)) continue;
+
+    if (row.productCode?.trim()) {
+      groupCodes.set(
+        groupKey,
+        validateProductCodeForCategory(cat.prefix, row.productCode)
+      );
+      continue;
+    }
+
+    if (!counters.has(cat.id)) {
+      counters.set(cat.id, await initCategoryCodeCounter(cat.id));
+    }
+    const counter = counters.get(cat.id)!;
+    groupCodes.set(groupKey, allocateProductCodeFromCounter(counter));
   }
-  return `${baseCode}-${Date.now()}`;
+
+  return groupCodes;
+}
+
+function resolveProductCodeForRow(
+  row: ProductImportPreviewRow,
+  categoryMap: Map<string, CategoryMeta>,
+  groupCodes: Map<string, string>
+): string | undefined {
+  const cat = categoryMap.get(row.normalizedCategory.toLowerCase());
+  if (!cat?.id) return row.productCode;
+
+  const groupKey = buildProductGroupKey(cat.id, row.productName, row.productCode);
+  return groupCodes.get(groupKey) ?? row.productCode;
 }
 
 export async function previewProductImport(
@@ -59,8 +103,16 @@ export async function previewProductImport(
   const allCategories = await prisma.category.findMany({
     select: { id: true, name: true, slug: true, skuCode: true },
   });
-  const categoryMap = new Map<string, { id: string; name: string; skuCode: string | null }>(
-    allCategories.map((c) => [c.name.toLowerCase().trim(), { id: c.id, name: c.name, skuCode: c.skuCode }])
+  const categoryMap = new Map<string, CategoryMeta>(
+    allCategories.map((c) => [
+      c.name.toLowerCase().trim(),
+      {
+        id: c.id,
+        name: c.name,
+        skuCode: c.skuCode,
+        prefix: c.skuCode?.trim() ? requireCategorySkuCode(c.skuCode) : undefined,
+      },
+    ])
   );
 
   const allProducts = await prisma.product.findMany({
@@ -69,11 +121,14 @@ export async function previewProductImport(
   const productNameCatMap = new Map<string, string>(
     allProducts.map((p) => [`${p.category.name.toLowerCase()}::${p.name.toLowerCase()}`, p.id])
   );
+  const existingProductCodes = new Set(
+    allProducts.map((p) => p.productCode).filter(Boolean) as string[]
+  );
 
   const allVariants = await prisma.productVariant.findMany({ select: { sku: true } });
   const existingSkus = new Set(allVariants.map((v) => v.sku));
 
-  return rows.map((row, index) => {
+  const previewRows: ProductImportPreviewRow[] = rows.map((row, index) => {
     const errors = validateImportRow(row);
     const raw = rawRows?.[index];
     if (raw) {
@@ -91,31 +146,37 @@ export async function previewProductImport(
       });
     }
 
-    const catSkuCode = getCategorySkuCode(normalizedCategory, catData?.skuCode);
-    const productCode = row.productCode ?? generateProductCode(row.productName, row.material);
+    if (catData && !catData.prefix) {
+      errors.push({
+        field: "category",
+        message: CATEGORY_SKU_CODE_MISSING_ERROR,
+        severity: "error",
+      });
+    }
 
-    const generatedSku = row.sku?.trim() || generateSku({
-      categorySkuCode: catSkuCode,
-      productCode,
-      colorName: row.colorName,
-      colorCode: row.colorCode,
-      sizeName: row.sizeName,
-      dimensions: row.dimensions,
-      capacity: row.capacity,
-    });
-
-    let duplicateInfo = null;
-    if (generatedSku && existingSkus.has(generatedSku)) {
-      duplicateInfo = { type: "sku" as const };
-    } else {
-      const nameKey = `${normalizedCategory.toLowerCase()}::${row.productName.toLowerCase()}`;
-      if (productNameCatMap.has(nameKey)) {
-        duplicateInfo = { type: "name+category" as const, existingId: productNameCatMap.get(nameKey) };
+    if (catData?.prefix && row.productCode?.trim()) {
+      try {
+        validateProductCodeForCategory(catData.prefix, row.productCode);
+      } catch (err) {
+        errors.push({
+          field: "productCode",
+          message: err instanceof ProductSkuError ? err.message : "Mã sản phẩm không hợp lệ.",
+          severity: "error",
+        });
       }
     }
 
     const isValid = errors.length === 0;
     const defaultStrategy = options.defaultDuplicateStrategy;
+
+    let duplicateInfo = null;
+    const nameKey = `${normalizedCategory.toLowerCase()}::${row.productName.toLowerCase()}`;
+    if (row.productCode && existingProductCodes.has(row.productCode.toUpperCase())) {
+      duplicateInfo = { type: "productCode" as const };
+    } else if (productNameCatMap.has(nameKey)) {
+      duplicateInfo = { type: "name+category" as const, existingId: productNameCatMap.get(nameKey) };
+    }
+
     const duplicateStrategy = duplicateInfo ? defaultStrategy : "skip";
 
     let finalAction: ProductImportPreviewRow["finalAction"];
@@ -129,12 +190,60 @@ export async function previewProductImport(
     return {
       ...row,
       normalizedCategory,
-      generatedSku,
+      generatedSku: "",
       validationErrors: errors,
       duplicateInfo,
       duplicateStrategy,
       finalAction,
       isValid,
+    };
+  });
+
+  const groupCodes = await allocateProductCodesForGroups(previewRows, categoryMap);
+
+  return previewRows.map((row) => {
+    const cat = categoryMap.get(row.normalizedCategory.toLowerCase());
+    const productCode = resolveProductCodeForRow(row, categoryMap, groupCodes);
+
+    const generatedSku =
+      row.sku?.trim() ||
+      (productCode
+        ? generateSku({
+            productCode,
+            colorName: row.colorName,
+            colorCode: row.colorCode,
+            sizeName: row.sizeName,
+            dimensions: row.dimensions,
+            capacity: row.capacity,
+          })
+        : "");
+
+    let duplicateInfo = row.duplicateInfo;
+    if (generatedSku && existingSkus.has(generatedSku)) {
+      duplicateInfo = { type: "sku" as const };
+    }
+
+    let finalAction = row.finalAction;
+    if (row.isValid && duplicateInfo?.type === "sku") {
+      if (options.defaultDuplicateStrategy === "skip") finalAction = "skip";
+      else if (options.defaultDuplicateStrategy === "update") finalAction = "update";
+      else finalAction = "copy";
+    }
+
+    if (productCode && existingProductCodes.has(productCode) && finalAction === "create") {
+      duplicateInfo = { type: "productCode" as const };
+      if (options.defaultDuplicateStrategy === "skip") finalAction = "skip";
+      else if (options.defaultDuplicateStrategy === "update") finalAction = "update";
+      else finalAction = "copy";
+    }
+
+    return {
+      ...row,
+      productCode,
+      generatedSku,
+      duplicateInfo,
+      finalAction,
+      isValid: row.isValid && finalAction !== "invalid",
     };
   });
 }
@@ -152,26 +261,63 @@ export async function executeProductImport(
   };
 
   const categoryCache = new Map<string, string>();
+  const categoryMetaCache = new Map<string, CategoryMeta>();
+  const groupCodes = new Map<string, string>();
+  const counters = new Map<string, CategoryCodeCounter>();
+  const productGroupCache = new Map<string, { productId: string; productCode: string }>();
 
-  async function getCategoryId(name: string): Promise<string | null> {
+  async function getCategoryMeta(name: string): Promise<CategoryMeta | null> {
     const key = name.toLowerCase().trim();
-    if (categoryCache.has(key)) return categoryCache.get(key)!;
+    if (categoryMetaCache.has(key)) return categoryMetaCache.get(key)!;
+
     let cat = await prisma.category.findFirst({
       where: { name: { equals: name, mode: "insensitive" } },
-      select: { id: true },
+      select: { id: true, name: true, skuCode: true },
     });
+
     if (!cat && options.autoCreateCategories) {
       const slug = toSlug(name);
       cat = await prisma.category.upsert({
         where: { slug },
         create: { name, slug },
         update: {},
-        select: { id: true },
+        select: { id: true, name: true, skuCode: true },
       });
       result.createdCategories++;
     }
-    if (cat) { categoryCache.set(key, cat.id); return cat.id; }
-    return null;
+
+    if (!cat) return null;
+
+    const meta: CategoryMeta = {
+      id: cat.id,
+      name: cat.name,
+      skuCode: cat.skuCode,
+      prefix: cat.skuCode?.trim() ? requireCategorySkuCode(cat.skuCode) : undefined,
+    };
+    categoryMetaCache.set(key, meta);
+    categoryCache.set(key, cat.id);
+    return meta;
+  }
+
+  async function resolveGroupProductCode(
+    cat: CategoryMeta,
+    row: ProductImportPreviewRow
+  ): Promise<string> {
+    const groupKey = buildProductGroupKey(cat.id, row.productName, row.productCode);
+    if (groupCodes.has(groupKey)) return groupCodes.get(groupKey)!;
+
+    if (row.productCode?.trim() && cat.prefix) {
+      const code = validateProductCodeForCategory(cat.prefix, row.productCode);
+      groupCodes.set(groupKey, code);
+      return code;
+    }
+
+    if (!counters.has(cat.id)) {
+      counters.set(cat.id, await initCategoryCodeCounter(cat.id));
+    }
+    const code = allocateProductCodeFromCounter(counters.get(cat.id)!);
+    groupCodes.set(groupKey, code);
+    return code;
   }
 
   for (const row of rows) {
@@ -179,17 +325,35 @@ export async function executeProductImport(
     if (row.finalAction === "skip") { result.skippedRows++; if (row.duplicateInfo) result.duplicateRows++; continue; }
 
     try {
-      const categoryId = await getCategoryId(row.normalizedCategory);
-      if (!categoryId) { result.invalidRows++; result.errors.push(`Hàng ${row.rowIndex + 1}: Không tìm được danh mục "${row.normalizedCategory}".`); continue; }
+      const cat = await getCategoryMeta(row.normalizedCategory);
+      if (!cat) {
+        result.invalidRows++;
+        result.errors.push(`Hàng ${row.rowIndex + 1}: Không tìm được danh mục "${row.normalizedCategory}".`);
+        continue;
+      }
+      if (!cat.prefix) {
+        result.invalidRows++;
+        result.errors.push(`Hàng ${row.rowIndex + 1}: ${CATEGORY_SKU_CODE_MISSING_ERROR}`);
+        continue;
+      }
 
-      const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { name: true, skuCode: true } });
-      const catSkuCode = getCategorySkuCode(category?.name ?? row.normalizedCategory, category?.skuCode);
-      const baseProductCode = row.productCode ?? generateProductCode(row.productName, row.material);
-
+      const groupKey = buildProductGroupKey(cat.id, row.productName, row.productCode);
       let productId: string;
+      let productCode: string;
 
-      if (row.finalAction === "update" && row.duplicateInfo?.existingId) {
+      const cached = productGroupCache.get(groupKey);
+      if (cached) {
+        productId = cached.productId;
+        productCode = cached.productCode;
+      } else if (row.finalAction === "update" && row.duplicateInfo?.existingId) {
         productId = row.duplicateInfo.existingId;
+        const existing = await prisma.product.findUnique({
+          where: { id: productId },
+          select: { productCode: true },
+        });
+        productCode = existing?.productCode ?? (await resolveGroupProductCode(cat, row));
+        productGroupCache.set(groupKey, { productId, productCode });
+
         await prisma.product.update({
           where: { id: productId },
           data: {
@@ -206,16 +370,29 @@ export async function executeProductImport(
         });
         result.updatedProducts++;
       } else {
-        const productCode = row.finalAction === "copy"
-          ? await ensureUniqueProductCode(baseProductCode)
-          : baseProductCode;
+        productCode = row.productCode ?? (await resolveGroupProductCode(cat, row));
+
+        if (await isProductCodeTaken(productCode)) {
+          if (row.finalAction === "copy") {
+            if (!counters.has(cat.id)) {
+              counters.set(cat.id, await initCategoryCodeCounter(cat.id));
+            }
+            productCode = allocateProductCodeFromCounter(counters.get(cat.id)!);
+          } else {
+            result.duplicateRows++;
+            result.errors.push(`Hàng ${row.rowIndex + 1}: Mã sản phẩm ${productCode} đã tồn tại.`);
+            result.invalidRows++;
+            continue;
+          }
+        }
+
         const slug = await ensureUniqueProductSlug(row.slug ?? toSlug(row.productName));
         const product = await prisma.product.create({
           data: {
             name: row.productName,
             slug,
             productCode,
-            categoryId,
+            categoryId: cat.id,
             shortDescription: row.shortDescription,
             description: row.description,
             material: row.material,
@@ -233,20 +410,22 @@ export async function executeProductImport(
           },
         });
         productId = product.id;
+        productGroupCache.set(groupKey, { productId, productCode });
         result.createdProducts++;
       }
 
       const hasVariantData = row.colorName || row.sizeName || row.dimensions || row.capacity || row.sku;
       if (hasVariantData) {
-        const baseSku = row.generatedSku || generateSku({
-          categorySkuCode: catSkuCode,
-          productCode: baseProductCode,
-          colorName: row.colorName,
-          colorCode: row.colorCode,
-          sizeName: row.sizeName,
-          dimensions: row.dimensions,
-          capacity: row.capacity,
-        });
+        const baseSku =
+          row.generatedSku ||
+          generateSku({
+            productCode,
+            colorName: row.colorName,
+            colorCode: row.colorCode,
+            sizeName: row.sizeName,
+            dimensions: row.dimensions,
+            capacity: row.capacity,
+          });
 
         const existing = await prisma.productVariant.findUnique({ where: { sku: baseSku } });
         if (existing && row.finalAction !== "update") {

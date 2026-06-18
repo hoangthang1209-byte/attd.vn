@@ -101,6 +101,11 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   const [error, setError] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [productCodePreview, setProductCodePreview] = useState<string | null>(
+    initialData?.productCode ?? null
+  );
+  const [categorySkuCode, setCategorySkuCode] = useState<string | null>(null);
+  const [productCodePreviewError, setProductCodePreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!propCategories) {
@@ -120,28 +125,83 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       });
   }, [propCategories]);
 
+  useEffect(() => {
+    if (form.id || !form.categoryId) {
+      if (!form.id) {
+        setProductCodePreview(null);
+        setCategorySkuCode(null);
+        setProductCodePreviewError(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    void fetch("/api/admin/products/sku-preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categoryId: form.categoryId }),
+    })
+      .then(async (res) => {
+        const data = await res.json() as {
+          productCodePreview?: string | null;
+          categorySkuCode?: string | null;
+          message?: string;
+        };
+        if (cancelled) return;
+        if (!res.ok) {
+          setProductCodePreview(null);
+          setCategorySkuCode(data.categorySkuCode ?? null);
+          setProductCodePreviewError(data.message ?? "Không thể xem ID dự kiến.");
+          return;
+        }
+        setProductCodePreview(data.productCodePreview ?? null);
+        setCategorySkuCode(data.categorySkuCode ?? null);
+        setProductCodePreviewError(null);
+      })
+      .catch(() => {
+        if (!cancelled) setProductCodePreviewError("Không thể xem ID dự kiến.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.categoryId, form.id]);
+
   async function previewSku(index: number) {
     const v = form.variants[index];
-    if (!form.categoryId && !form.productCode && !form.name) return;
+    if (!form.categoryId && !form.productCode && !form.id) return;
     try {
       const res = await fetch("/api/admin/products/sku-preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           categoryId: form.categoryId,
-          productName: form.name,
-          productCode: form.productCode || undefined,
-          material: form.material || undefined,
+          productCode: form.id ? (form.productCode || undefined) : undefined,
           colorName: v.colorName || undefined,
           colorCode: v.colorCode || undefined,
           sizeName: v.sizeName || undefined,
           dimensions: v.dimensions || undefined,
           capacity: v.capacity || undefined,
           excludeVariantId: v.id,
+          excludeProductId: form.id,
         }),
       });
-      const data = await res.json() as { sku: string; isTaken: boolean };
-      updateVariant(index, { skuPreview: data.sku, skuTaken: data.isTaken });
+      const data = await res.json() as {
+        sku?: string;
+        variantSkuPreview?: string | null;
+        productCodePreview?: string | null;
+        isTaken?: boolean;
+        message?: string;
+      };
+      if (!res.ok) {
+        updateVariant(index, { skuPreview: data.message ?? "Lỗi xem trước", skuTaken: false });
+        return;
+      }
+      const variantSku = data.variantSkuPreview ?? data.sku ?? "";
+      updateVariant(index, { skuPreview: variantSku, skuTaken: data.isTaken ?? false });
+      if (!form.id && data.productCodePreview) {
+        setProductCodePreview(data.productCodePreview);
+      }
     } catch { /* ignore */ }
   }
 
@@ -228,7 +288,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     if (field.endsWith(".wholesalePrice")) return "Giá sỉ";
     if (field.endsWith(".stockQty")) return "Tồn kho";
     if (field === "featuredImage") return "Ảnh đại diện";
-    if (field === "productCode") return "Mã sản phẩm";
+    if (field === "productCode") return "ID sản phẩm";
     if (field === "categoryId") return "Danh mục";
     if (field === "name") return "Tên sản phẩm";
     return field;
@@ -251,7 +311,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
 
     const payload = {
       name: form.name.trim(),
-      productCode: form.productCode.trim() || undefined,
+      ...(form.id ? { productCode: form.productCode.trim() || undefined } : {}),
       categoryId: form.categoryId,
       shortDescription: form.shortDescription.trim() || undefined,
       description: form.description.trim() || undefined,
@@ -350,9 +410,29 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
             </select>
           </div>
           <div className="admin-field">
-            <label className="admin-label">Mã sản phẩm</label>
-            <input className="admin-input" value={form.productCode} onChange={(e) => setField("productCode", e.target.value)} placeholder="CVC-BASIC (tự động nếu để trống)" />
-            <p className="admin-field-hint">SKU sẽ được tạo tự động nếu để trống</p>
+            <label className="admin-label">
+              {form.id ? "ID sản phẩm" : "ID sản phẩm tự động"}
+            </label>
+            <input
+              className="admin-input"
+              value={form.id ? form.productCode : (productCodePreview ?? "")}
+              readOnly
+              placeholder={form.categoryId ? "Đang tải ID dự kiến…" : "Chọn danh mục để xem ID dự kiến"}
+            />
+            {!form.id && form.categoryId && categorySkuCode && (
+              <p className="admin-field-hint">
+                Mã danh mục: <strong>{categorySkuCode}</strong>
+                {productCodePreview && (
+                  <> · ID sản phẩm dự kiến: <code className="admin-catalog-code">{productCodePreview}</code></>
+                )}
+              </p>
+            )}
+            {productCodePreviewError && (
+              <p className="admin-error" style={{ marginTop: 4 }}>{productCodePreviewError}</p>
+            )}
+            {!form.id && (
+              <p className="admin-field-hint">ID sản phẩm được tạo tự động khi lưu theo thứ tự danh mục (vd. TS0001, TS0002).</p>
+            )}
           </div>
           <div className="admin-field">
             <label className="admin-label">Trạng thái</label>
@@ -526,10 +606,10 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         </div>
       </fieldset>
 
-      {/* ── 4. Biến thể / SKU ────────────────────────────────────────────── */}
+      {/* ── 4. Biến thể / SKU lựa chọn ───────────────────────────────────── */}
       <fieldset className="admin-catalog-fieldset">
-        <legend>4. Biến thể / SKU</legend>
-        <p className="admin-field-hint">Nhấn "Xem SKU" để xem SKU được tạo tự động trước khi lưu. Mã màu nên theo chuẩn BLK, WHT, NVY…</p>
+        <legend>4. Biến thể / SKU lựa chọn</legend>
+        <p className="admin-field-hint">Nhấn &quot;Xem ID dự kiến&quot; để xem SKU lựa chọn trước khi lưu. Mã màu nên theo chuẩn BLK, WHT, NVY…</p>
 
         {form.variants.map((v, i) => (
           <div key={i} className="admin-catalog-variant-row">
@@ -540,7 +620,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
                   {v.skuPreview} {v.skuTaken ? "⚠ Đã tồn tại" : "✓"}
                 </code>
               )}
-              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void previewSku(i)}>Xem SKU</button>
+              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void previewSku(i)}>Xem ID dự kiến</button>
               {form.variants.length > 1 && (
                 <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => removeVariant(i)}>Xóa</button>
               )}
@@ -560,9 +640,9 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
                 <input className="admin-input" value={v.colorName} onChange={(e) => updateVariant(i, { colorName: e.target.value })} placeholder="Đen, Trắng… (nhập thủ công)" style={{ marginTop: 4 }} />
               </div>
               <div className="admin-field">
-                <label className="admin-label">Mã màu (SKU)</label>
+                <label className="admin-label">Mã màu</label>
                 <input className="admin-input" value={v.colorCode} onChange={(e) => updateVariant(i, { colorCode: e.target.value })} placeholder="BLK, WHT, NVY…" />
-                <p className="admin-field-hint">SKU sử dụng mã này</p>
+                <p className="admin-field-hint">Dùng trong SKU lựa chọn</p>
               </div>
               <div className="admin-field">
                 <label className="admin-label">Size</label>

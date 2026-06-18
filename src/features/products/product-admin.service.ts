@@ -3,8 +3,11 @@ import { prisma } from "@/lib/prisma";
 import {
   generateSku,
   ensureUniqueSku,
-  getCategorySkuCode,
-  generateProductCode,
+  ensureUniqueProductCode,
+  ProductSkuError,
+  CATEGORY_SKU_CODE_MISSING_ERROR,
+  validateProductCodeForCategory,
+  requireCategorySkuCode,
 } from "@/features/products/product-sku-utils";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 
@@ -119,12 +122,10 @@ async function ensureUniqueSlug(baseSlug: string, excludeId?: string): Promise<s
 
 async function buildVariantSku(
   variantInput: VariantInput,
-  categorySkuCode: string,
   productCode: string
 ): Promise<string> {
   if (variantInput.sku?.trim()) return variantInput.sku.trim();
   const base = generateSku({
-    categorySkuCode,
     productCode,
     colorName: variantInput.colorName,
     colorCode: variantInput.colorCode,
@@ -252,9 +253,28 @@ export async function createProductAdmin(input: ProductInput) {
     );
   }
 
+  let productCode: string;
+  try {
+    productCode = await ensureUniqueProductCode(
+      input.categoryId,
+      input.productCode?.trim() || undefined
+    );
+  } catch (err) {
+    if (err instanceof ProductSkuError) {
+      const fieldErrors: Record<string, string> = {};
+      if (err.message === CATEGORY_SKU_CODE_MISSING_ERROR) {
+        fieldErrors.categoryId = err.message;
+      } else if (input.productCode?.trim()) {
+        fieldErrors.productCode = err.message;
+      } else {
+        fieldErrors.categoryId = err.message;
+      }
+      throw new ProductAdminValidationError(err.message, fieldErrors);
+    }
+    throw err;
+  }
+
   const slug = await ensureUniqueSlug(input.slug ?? toSlug(input.name));
-  const categorySkuCode = getCategorySkuCode(category.name, category.skuCode);
-  const productCode = input.productCode ?? generateProductCode(input.name, input.material);
 
   const product = await prisma.product.create({
     data: {
@@ -289,7 +309,7 @@ export async function createProductAdmin(input: ProductInput) {
 
   if (input.variants?.length) {
     for (const v of input.variants) {
-      const sku = await buildVariantSku(v, categorySkuCode, productCode);
+      const sku = await buildVariantSku(v, productCode);
       await prisma.productVariant.create({
         data: {
           productId: product.id,
@@ -337,7 +357,28 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
   const updateData: Prisma.ProductUpdateInput = {};
   if (input.name !== undefined) updateData.name = input.name;
   if (input.slug !== undefined) updateData.slug = input.slug;
-  if (input.productCode !== undefined) updateData.productCode = input.productCode;
+  if (input.productCode !== undefined && input.productCode.trim()) {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      select: { categoryId: true, productCode: true },
+    });
+    const categoryId = input.categoryId ?? product?.categoryId;
+    if (categoryId) {
+      const cat = await prisma.category.findUnique({
+        where: { id: categoryId },
+        select: { skuCode: true },
+      });
+      try {
+        const prefix = requireCategorySkuCode(cat?.skuCode);
+        updateData.productCode = validateProductCodeForCategory(prefix, input.productCode);
+      } catch (err) {
+        if (err instanceof ProductSkuError) {
+          throw new ProductAdminValidationError(err.message, { productCode: err.message });
+        }
+        throw err;
+      }
+    }
+  }
   if (input.categoryId !== undefined) updateData.category = { connect: { id: input.categoryId } };
   if (input.shortDescription !== undefined) updateData.shortDescription = input.shortDescription;
   if (input.description !== undefined) updateData.description = input.description;
@@ -369,14 +410,13 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
       select: { productCode: true, name: true, material: true, categoryId: true },
     });
     const categoryId = input.categoryId ?? product?.categoryId;
-    const cat = categoryId
-      ? await prisma.category.findUnique({
-          where: { id: categoryId },
-          select: { name: true, skuCode: true },
-        })
-      : null;
-    const catCode = getCategorySkuCode(cat?.name ?? "", cat?.skuCode);
-    const prodCode = product?.productCode ?? generateProductCode(product?.name ?? "", product?.material);
+    const prodCode = product?.productCode;
+    if (!prodCode) {
+      throw new ProductAdminValidationError(
+        "Không thể tạo biến thể vì sản phẩm chưa có ID sản phẩm.",
+        { productCode: "Thiếu ID sản phẩm." }
+      );
+    }
 
     for (const v of input.variants) {
       if (v.id) {
@@ -401,7 +441,7 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
           },
         });
       } else {
-        const sku = await buildVariantSku(v, catCode, prodCode);
+        const sku = await buildVariantSku(v, prodCode);
         await prisma.productVariant.create({
           data: {
             productId: id,

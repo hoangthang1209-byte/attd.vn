@@ -9,8 +9,11 @@ import type { ProductImportPreset } from "@/features/products/product-import-pre
 import { getSuggestedFix } from "@/features/products/product-import-feedback";
 import {
   generateSku,
-  getCategorySkuCode,
-  generateProductCode,
+  requireCategorySkuCode,
+  validateProductCodeForCategory,
+  buildProductGroupKey,
+  CATEGORY_SKU_CODE_MISSING_ERROR,
+  ProductSkuError,
 } from "@/features/products/product-sku-utils";
 
 // ─── Parsing helpers ──────────────────────────────────────────────────────────
@@ -208,24 +211,71 @@ export function buildPreviewRows(
   existingSkus: Set<string>,
   existingProductNames: Map<string, string>,
   defaultStrategy: "skip" | "update" | "copy",
-  preset: ProductImportPreset
+  preset: ProductImportPreset,
+  categorySkuMap?: Map<string, string | null>
 ): ProductImportPreviewRow[] {
+  const groupCodes = new Map<string, string>();
+
   return rows.map((row) => {
     const errors = validateImportRow(row);
     const normalizedCategory = normalizeCategoryName(row.category);
     const categoryId = categoryMap.get(normalizedCategory.toLowerCase()) ?? null;
-    const catSkuCode = getCategorySkuCode(normalizedCategory);
-    const productCode = row.productCode ?? generateProductCode(row.productName, row.material);
+    const categorySkuCode = categoryId
+      ? categorySkuMap?.get(categoryId) ?? null
+      : null;
 
-    const generatedSku = row.sku?.trim() || generateSku({
-      categorySkuCode: catSkuCode,
-      productCode,
-      colorName: row.colorName,
-      colorCode: row.colorCode,
-      sizeName: row.sizeName,
-      dimensions: row.dimensions,
-      capacity: row.capacity,
-    });
+    let prefix: string | undefined;
+    if (categoryId && categorySkuCode?.trim()) {
+      try {
+        prefix = requireCategorySkuCode(categorySkuCode);
+      } catch (err) {
+        errors.push({
+          field: "category",
+          message: err instanceof ProductSkuError ? err.message : CATEGORY_SKU_CODE_MISSING_ERROR,
+        });
+      }
+    } else if (categoryId) {
+      errors.push({
+        field: "category",
+        message: CATEGORY_SKU_CODE_MISSING_ERROR,
+      });
+    }
+
+    if (prefix && row.productCode?.trim()) {
+      try {
+        validateProductCodeForCategory(prefix, row.productCode);
+      } catch (err) {
+        errors.push({
+          field: "productCode",
+          message: err instanceof ProductSkuError ? err.message : "Mã sản phẩm không hợp lệ.",
+        });
+      }
+    }
+
+    let productCode = row.productCode;
+    if (categoryId && prefix) {
+      const groupKey = buildProductGroupKey(categoryId, row.productName, row.productCode);
+      if (!groupCodes.has(groupKey)) {
+        if (row.productCode?.trim()) {
+          groupCodes.set(groupKey, validateProductCodeForCategory(prefix, row.productCode));
+        } else {
+          const next = groupCodes.size + 1;
+          groupCodes.set(groupKey, `${prefix}${String(next).padStart(4, "0")}`);
+        }
+      }
+      productCode = groupCodes.get(groupKey);
+    }
+
+    const generatedSku = row.sku?.trim() || (productCode
+      ? generateSku({
+          productCode,
+          colorName: row.colorName,
+          colorCode: row.colorCode,
+          sizeName: row.sizeName,
+          dimensions: row.dimensions,
+          capacity: row.capacity,
+        })
+      : "");
 
     let duplicateInfo: ProductImportDuplicateInfo | null = null;
     if (generatedSku && existingSkus.has(generatedSku)) {
@@ -257,6 +307,7 @@ export function buildPreviewRows(
 
     return {
       ...row,
+      productCode,
       normalizedCategory,
       generatedSku,
       validationErrors: errors,
@@ -272,8 +323,8 @@ export function buildPreviewRows(
 
 export function exportProductImportReportCsv(rows: ProductImportPreviewRow[]): string {
   const headers = [
-    "Hàng", "Tên sản phẩm", "Danh mục", "Danh mục chuẩn hoá", "Mã hàng",
-    "SKU gợi ý", "Màu", "Size", "Trạng thái", "Tồn kho", "Giá sỉ", "Giá ĐL",
+    "Hàng", "Tên sản phẩm", "Danh mục", "Danh mục chuẩn hoá", "ID sản phẩm",
+    "SKU lựa chọn", "Màu", "Size", "Trạng thái", "Tồn kho", "Giá sỉ", "Giá ĐL",
     "Hành động", "Trùng lặp", "Lỗi xác thực",
   ];
 
