@@ -328,21 +328,18 @@ export default async function ProductDetailPage({ params }: PageProps) {
         <section className="mp-section mp-section--compact">
           <div className="container">
             <h2 className="mp-section-title">Sản phẩm liên quan</h2>
-            <div className="mp-product-grid">
+            <div className="mp-product-grid mp-product-grid--compact">
               {relatedProducts.map((related) => (
                 <ProductCard
                   key={related.id}
                   id={related.id}
                   slug={related.slug}
                   name={related.name}
-                  skuCount={related.variants.length}
                   category={categoryName}
                   imageUrl={getPrimaryProductImageFromProduct(related)}
                   moq={related.defaultMoq}
                   leadTime={related.leadTime}
-                  supportsPrinting={related.supportsPrinting}
-                  supportsEmbroidery={related.supportsEmbroidery}
-                  supportsOem={related.supportsOem}
+                  compact
                 />
               ))}
             </div>

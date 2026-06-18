@@ -19,6 +19,8 @@ type ProductCardProps = {
   supportsPrinting?: boolean;
   supportsEmbroidery?: boolean;
   supportsOem?: boolean;
+  /** Compact image-first layout for marketplace grids */
+  compact?: boolean;
 };
 
 const STOCK_COLORS: Record<string, string> = {
@@ -31,23 +33,22 @@ export default function ProductCard({
   slug,
   name,
   productCode,
-  skuCount = 0,
-  category,
-  imageUrl,
   moq,
   leadTime,
+  category,
+  imageUrl,
   stockStatus,
   stockLabel,
-  supportsPrinting,
-  supportsEmbroidery,
-  supportsOem,
+  compact = false,
 }: ProductCardProps) {
   const hasImage = imageUrl && isValidImageSrc(imageUrl);
-  const hasBadges = supportsPrinting || supportsEmbroidery || supportsOem;
   const stockColor = stockStatus ? (STOCK_COLORS[stockStatus] ?? "#6b7280") : undefined;
 
   return (
-    <Link href={`/san-pham/${slug}`} className="product-card">
+    <Link
+      href={`/san-pham/${slug}`}
+      className={`product-card${compact ? " product-card--compact" : ""}`}
+    >
       <div className="product-card-media">
         {hasImage ? (
           <Image
@@ -55,21 +56,14 @@ export default function ProductCard({
             alt={name}
             fill
             className="product-card-img"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 280px"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
           />
         ) : (
-          <ImagePlaceholder
-            variant="product"
-            label={productCode ?? undefined}
-          />
+          <ImagePlaceholder variant="product" label={productCode ?? undefined} />
         )}
 
-        {/* Stock badge overlay */}
         {stockLabel && stockStatus !== "IN_STOCK" && (
-          <span
-            className="product-card-stock-badge"
-            style={{ background: stockColor }}
-          >
+          <span className="product-card-stock-badge" style={{ background: stockColor }}>
             {stockLabel}
           </span>
         )}
@@ -79,11 +73,7 @@ export default function ProductCard({
         {category && <p className="product-card-category">{category}</p>}
         <h3 className="product-card-title">{name}</h3>
 
-        {/* B2B info row */}
         <div className="product-card-b2b">
-          {skuCount > 0 && (
-            <span className="product-card-meta">{skuCount} lựa chọn</span>
-          )}
           {moq != null && (
             <span className="product-card-meta">Tối thiểu {moq} cái</span>
           )}
@@ -92,27 +82,14 @@ export default function ProductCard({
           )}
         </div>
 
-        {/* Feature badges */}
-        {hasBadges && (
-          <div className="product-card-badges">
-            {supportsPrinting && (
-              <span className="product-badge product-badge--print">In logo</span>
-            )}
-            {supportsEmbroidery && (
-              <span className="product-badge product-badge--emb">Thêu</span>
-            )}
-            {supportsOem && (
-              <span className="product-badge product-badge--oem">OEM</span>
-            )}
-          </div>
-        )}
-
         <div className="product-card-footer">
           <span className="product-card-price">Liên hệ báo giá sỉ</span>
-          <span className="product-card-link">
-            Xem chi tiết
-            <ArrowRight size={14} strokeWidth={2} />
-          </span>
+          {!compact && (
+            <span className="product-card-link">
+              Xem chi tiết
+              <ArrowRight size={14} strokeWidth={2} />
+            </span>
+          )}
         </div>
       </div>
     </Link>

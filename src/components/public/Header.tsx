@@ -86,13 +86,9 @@ export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
               <Menu size={20} />
             </button>
           </div>
-
-          <div className="mp-header-search-mobile">
-            <MarketplaceSearchBar />
-          </div>
         </div>
 
-        <div className="mp-header-cats">
+        <div className="mp-header-cats mp-header-cats--desktop">
           <div className="container mp-header-cats-inner">
             <NavMegaMenuPanel item={MEGA_MENU} />
             <MarketplaceCategoryNav />

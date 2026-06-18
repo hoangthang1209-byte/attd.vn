@@ -11,8 +11,8 @@ type CategoryCardProps = {
   imageUrl?: string | null;
   count?: number;
   description?: string;
-  /** Visual style: "grid" = homepage marketplace, "compact" = legacy icon */
-  variant?: "grid" | "compact";
+  /** Visual style: grid = homepage, marketplace = image-first minimal, compact = legacy icon */
+  variant?: "grid" | "marketplace" | "compact";
   ctaLabel?: string;
 };
 
@@ -40,9 +40,12 @@ export default function CategoryCard({
   const hasImage = imageUrl && isValidImageSrc(imageUrl);
   const gradient = CATEGORY_GRADIENTS[slug] ?? "linear-gradient(135deg, #374151 0%, #111827 100%)";
 
-  if (variant === "grid") {
+  if (variant === "grid" || variant === "marketplace") {
+    const countLabel =
+      count != null && count > 0 ? `${count}+ lựa chọn` : undefined;
+
     return (
-      <Link href={`/${slug}`} className="market-cat-card">
+      <Link href={`/${slug}`} className="market-cat-card market-cat-card--marketplace">
         <div className="market-cat-card-img">
           {hasImage ? (
             <Image
@@ -50,7 +53,7 @@ export default function CategoryCard({
               alt={name}
               fill
               className="market-cat-card-photo"
-              sizes="(max-width: 640px) 50vw, 200px"
+              sizes="(max-width: 640px) 50vw, 280px"
             />
           ) : (
             <div
@@ -59,19 +62,10 @@ export default function CategoryCard({
               aria-hidden
             />
           )}
-          <div className="market-cat-card-overlay" />
         </div>
-        <div className="market-cat-card-body">
+        <div className="market-cat-card-body market-cat-card-body--minimal">
           <h3 className="market-cat-card-name">{name}</h3>
-          {description && (
-            <p className="market-cat-card-desc">{description}</p>
-          )}
-          <div className="market-cat-card-footer">
-            {count != null && (
-              <span className="market-cat-card-count">{count} sản phẩm</span>
-            )}
-            <span className="market-cat-card-cta">{ctaLabel}</span>
-          </div>
+          {countLabel && <p className="market-cat-card-count-label">{countLabel}</p>}
         </div>
       </Link>
     );
