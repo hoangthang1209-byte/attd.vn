@@ -148,6 +148,7 @@ export default function ProductDetailInteractive({
     defaultMoq,
     leadTime,
     stockQty: selectedVariant?.stockQty,
+    skuCount,
     supportsPrinting,
     supportsEmbroidery,
     supportsOem,
@@ -157,119 +158,115 @@ export default function ProductDetailInteractive({
     <>
       <section className="mp-pdp-hero">
         <div className="container">
-          <div className="mp-pdp-page-grid">
-            <div className="mp-pdp-page-main">
-              <div className="mp-pdp-grid mp-pdp-grid--anatomy">
-                <header className="mp-pdp-head">
-                  <div className="mp-product-detail-meta">
-                    <Link href={`/${categorySlug}`} className="mp-product-detail-cat">
-                      {categoryName}
-                    </Link>
-                    {displayedCode && (
-                      <span className="mp-product-detail-code">
-                        Mã sản phẩm: {displayedCode}
-                      </span>
-                    )}
-                  </div>
-                  <h1 className="mp-product-detail-title">{displayName}</h1>
-                </header>
-
-                <div className="mp-pdp-left-col">
-                  <ProductGallery
-                    images={galleryImages}
-                    productName={displayName}
-                    selectedImageUrl={selectedVariant?.imageUrl}
-                  />
-                  <SupplierTrustCard />
-                </div>
-
-                <div className="mp-pdp-status">
-                  <ProductStatusRow
-                    stockLabel={variantStockLabel}
-                    stockColor={variantStockColor}
-                    skuCount={skuCount}
-                  />
-                </div>
-
-                <div className="mp-pdp-quote">
-                  <ProductQuoteTiers />
-                </div>
-
-                <div className="mp-pdp-chips">
-                  <ProductOptionSelector
-                    variants={variants}
-                    material={material}
-                    colorOptions={colorOptions}
-                    selectedColor={selectedColor}
-                    selectedSize={selectedSize}
-                    onColorSelect={handleColorSelect}
-                    onSizeSelect={handleSizeSelect}
-                  />
-                </div>
-
-                <div className="mp-pdp-keyattrs-block">
-                  <ProductKeyAttributes {...keyAttrsWithStock} compact />
-                </div>
-
-                <div className="mp-pdp-highlights-block">
-                  <ProductHighlights
-                    shortDescription={displayShortDescription}
-                    description={displayContent}
-                    material={material}
-                    form={keyAttributes.form}
-                    defaultMoq={defaultMoq}
-                    leadTime={leadTime}
-                    useCases={useCases}
-                    supportsPrinting={supportsPrinting}
-                    supportsEmbroidery={supportsEmbroidery}
-                    supportsOem={supportsOem}
-                  />
-                </div>
-
-                <div className="mp-pdp-inquiry-mobile">
-                  <ProductInquiryPanel {...inquiryProps} />
-                </div>
+          <div className="product-detail-grid">
+            <header className="product-detail-head">
+              <div className="mp-product-detail-meta">
+                <Link href={`/${categorySlug}`} className="mp-product-detail-cat">
+                  {categoryName}
+                </Link>
+                {displayedCode && (
+                  <span className="mp-product-detail-code">
+                    Mã sản phẩm: {displayedCode}
+                  </span>
+                )}
               </div>
+              <h1 className="mp-product-detail-title">{displayName}</h1>
+            </header>
 
-              <ProductDetailTabs />
-
-              <div className="mp-pdp-page-sections">
-                <section className="mp-section mp-section--compact" id="mp-pdp-info">
-                  <ProductSpecTable
-                  material={material}
-                  form={keyAttributes.form}
-                  fit={keyAttributes.fit}
-                  gsm={gsm}
-                  defaultMoq={defaultMoq}
-                  leadTime={leadTime}
-                  useCases={useCases}
-                  targetCustomers={targetCustomers}
-                  supportsPrinting={supportsPrinting}
-                  supportsEmbroidery={supportsEmbroidery}
-                  supportsOem={supportsOem}
-                />
-                <div className="mp-pdp-info-keyattrs">
-                  <ProductKeyAttributes
-                    {...keyAttrsWithStock}
-                    compact
-                    className="mp-pdp-keyattrs--lower"
-                  />
-                </div>
-                </section>
-
-                <section className="mp-section mp-section--alt mp-section--compact" id="mp-pdp-options-wrap">
-                  <ProductOptionTable
-                    variants={variants}
-                    selectedVariantId={selectedVariant?.id}
-                    onSelectVariant={selectVariantById}
-                  />
-                </section>
-              </div>
+            <div className="product-detail-gallery-col">
+              <ProductGallery
+                images={galleryImages}
+                productName={displayName}
+                selectedImageUrl={selectedVariant?.imageUrl}
+              />
+              <SupplierTrustCard />
             </div>
 
-            <aside className="mp-pdp-inquiry-aside">
+            <div className="product-detail-status">
+              <ProductStatusRow
+                stockLabel={variantStockLabel}
+                stockColor={variantStockColor}
+                skuCount={skuCount}
+              />
+            </div>
+
+            <div className="product-detail-quote">
+              <ProductQuoteTiers />
+            </div>
+
+            <div className="product-detail-options">
+              <ProductOptionSelector
+                variants={variants}
+                material={material}
+                colorOptions={colorOptions}
+                selectedColor={selectedColor}
+                selectedSize={selectedSize}
+                onColorSelect={handleColorSelect}
+                onSizeSelect={handleSizeSelect}
+              />
+            </div>
+
+            <div className="product-detail-keyattrs">
+              <ProductKeyAttributes {...keyAttrsWithStock} compact />
+            </div>
+
+            <div className="product-detail-highlights">
+              <ProductHighlights
+                shortDescription={displayShortDescription}
+                description={displayContent}
+                material={material}
+                form={keyAttributes.form}
+                defaultMoq={defaultMoq}
+                leadTime={leadTime}
+                useCases={useCases}
+                supportsPrinting={supportsPrinting}
+                supportsEmbroidery={supportsEmbroidery}
+                supportsOem={supportsOem}
+              />
+            </div>
+
+            <aside className="product-detail-inquiry-col product-detail-inquiry-col--desktop">
               <ProductInquiryPanel {...inquiryProps} />
             </aside>
+
+            <div className="product-detail-inquiry-col product-detail-inquiry-col--mobile">
+              <ProductInquiryPanel {...inquiryProps} />
+            </div>
+          </div>
+
+          <ProductDetailTabs />
+
+          <div className="mp-pdp-page-sections">
+            <section className="mp-section mp-section--compact" id="mp-pdp-info">
+              <ProductSpecTable
+                material={material}
+                form={keyAttributes.form}
+                fit={keyAttributes.fit}
+                gsm={gsm}
+                defaultMoq={defaultMoq}
+                leadTime={leadTime}
+                useCases={useCases}
+                targetCustomers={targetCustomers}
+                supportsPrinting={supportsPrinting}
+                supportsEmbroidery={supportsEmbroidery}
+                supportsOem={supportsOem}
+              />
+              <div className="mp-pdp-info-keyattrs">
+                <ProductKeyAttributes
+                  {...keyAttrsWithStock}
+                  compact
+                  className="mp-pdp-keyattrs--lower"
+                />
+              </div>
+            </section>
+
+            <section className="mp-section mp-section--alt mp-section--compact" id="mp-pdp-options-wrap">
+              <ProductOptionTable
+                variants={variants}
+                selectedVariantId={selectedVariant?.id}
+                onSelectVariant={selectVariantById}
+              />
+            </section>
           </div>
         </div>
       </section>
