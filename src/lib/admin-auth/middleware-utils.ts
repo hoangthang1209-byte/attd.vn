@@ -40,6 +40,15 @@ const PROTECTED_READ_PREFIXES = [
   "/api/variants/",
 ] as const;
 
+function isMediaApiPath(pathname: string): boolean {
+  return pathname === "/api/media" || pathname.startsWith("/api/media/");
+}
+
+function isProtectedApiPrefix(pathname: string, prefixes: readonly string[]): boolean {
+  if (isMediaApiPath(pathname)) return true;
+  return prefixes.some((prefix) => pathname.startsWith(prefix));
+}
+
 function isPublicMutationRoute(request: NextRequest): boolean {
   const { pathname } = request.nextUrl;
   const method = request.method;
@@ -93,11 +102,11 @@ export function shouldProtectApiRoute(request: NextRequest): boolean {
   }
 
   if (MUTATION_METHODS.has(method)) {
-    return PROTECTED_MUTATION_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+    return isProtectedApiPrefix(pathname, PROTECTED_MUTATION_PREFIXES);
   }
 
   if (method === "GET") {
-    return PROTECTED_READ_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+    return isProtectedApiPrefix(pathname, PROTECTED_READ_PREFIXES);
   }
 
   return false;

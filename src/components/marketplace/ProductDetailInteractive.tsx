@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import ProductGallery from "@/components/marketplace/ProductGallery";
 import ProductInquiryPanel from "@/components/marketplace/ProductInquiryPanel";
@@ -19,11 +19,11 @@ import {
   VARIANT_STOCK_COLORS,
   VARIANT_STOCK_LABELS,
   buildInteractiveGalleryImages,
-  findVariant,
+  findSelectedVariant,
   getColorOptions,
-  getInitialSelection,
   getSizeOptions,
   getVariantSizeKey,
+  warnAllVariantMismatches,
 } from "@/lib/productVariants";
 
 type KeyAttributesProps = {
@@ -84,21 +84,29 @@ export default function ProductDetailInteractive({
   targetCustomers = [],
   gsm,
 }: ProductDetailInteractiveProps) {
-  const initial = useMemo(() => getInitialSelection(variants), [variants]);
+  useEffect(() => {
+    warnAllVariantMismatches(variants);
+  }, [variants]);
+
   const colorOptions = useMemo(() => getColorOptions(variants), [variants]);
 
-  const [selectedColor, setSelectedColor] = useState<string | null>(initial.color);
-  const [selectedSize, setSelectedSize] = useState<string | null>(initial.size);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedSizeOrSpec, setSelectedSizeOrSpec] = useState<string | null>(null);
 
   const selectedVariant = useMemo(
-    () => findVariant(variants, selectedColor, selectedSize),
-    [variants, selectedColor, selectedSize]
+    () => findSelectedVariant(variants, selectedColor, selectedSizeOrSpec),
+    [variants, selectedColor, selectedSizeOrSpec]
   );
 
-  const galleryImages = useMemo(
-    () => buildInteractiveGalleryImages(baseImages, variants, selectedVariant),
-    [baseImages, variants, selectedVariant]
-  );
+  const galleryImages = useMemo(() => {
+    if (!selectedVariant) return baseImages;
+    return buildInteractiveGalleryImages(
+      baseImages,
+      variants,
+      selectedVariant,
+      true
+    );
+  }, [baseImages, variants, selectedVariant]);
 
   const variantStockLabel = selectedVariant
     ? VARIANT_STOCK_LABELS[selectedVariant.stockStatus] ?? aggregateStockLabel
@@ -107,7 +115,7 @@ export default function ProductDetailInteractive({
     ? VARIANT_STOCK_COLORS[selectedVariant.stockStatus] ?? aggregateStockColor
     : aggregateStockColor;
 
-  const displayedCode = selectedVariant?.sku ?? productCode ?? null;
+  const displayedCode = selectedVariant ? selectedVariant.sku : productCode ?? null;
 
   const keyAttrsWithStock = {
     ...keyAttributes,
@@ -120,7 +128,7 @@ export default function ProductDetailInteractive({
       const v = variants.find((item) => item.id === variantId);
       if (!v) return;
       setSelectedColor(v.colorName ?? null);
-      setSelectedSize(getVariantSizeKey(v));
+      setSelectedSizeOrSpec(getVariantSizeKey(v));
     },
     [variants]
   );
@@ -128,16 +136,17 @@ export default function ProductDetailInteractive({
   const handleColorSelect = useCallback(
     (color: string) => {
       setSelectedColor(color);
-      const sizes = getSizeOptions(variants, color);
-      const nextSize =
-        selectedSize && sizes.includes(selectedSize) ? selectedSize : sizes[0] ?? null;
-      setSelectedSize(nextSize);
+      setSelectedSizeOrSpec((prev) => {
+        if (!prev) return null;
+        const sizes = getSizeOptions(variants, color);
+        return sizes.includes(prev) ? prev : null;
+      });
     },
-    [variants, selectedSize]
+    [variants]
   );
 
   const handleSizeSelect = useCallback((size: string) => {
-    setSelectedSize(size);
+    setSelectedSizeOrSpec(size);
   }, []);
 
   const inquiryProps = {
@@ -159,79 +168,77 @@ export default function ProductDetailInteractive({
       <section className="mp-pdp-hero">
         <div className="container">
           <div className="product-detail-grid">
-            <header className="product-detail-head">
-              <div className="mp-product-detail-meta">
-                <Link href={`/${categorySlug}`} className="mp-product-detail-cat">
-                  {categoryName}
-                </Link>
-                {displayedCode && (
-                  <span className="mp-product-detail-code">
-                    Mã sản phẩm: {displayedCode}
-                  </span>
-                )}
-              </div>
-              <h1 className="mp-product-detail-title">{displayName}</h1>
-            </header>
-
-            <div className="product-detail-gallery-col">
+            <div className="product-detail-left">
               <ProductGallery
                 images={galleryImages}
                 productName={displayName}
-                selectedImageUrl={selectedVariant?.imageUrl}
+                selectedImageUrl={selectedVariant?.imageUrl ?? null}
               />
               <SupplierTrustCard />
             </div>
 
-            <div className="product-detail-status">
-              <ProductStatusRow
-                stockLabel={variantStockLabel}
-                stockColor={variantStockColor}
-                skuCount={skuCount}
-              />
+            <div className="product-detail-center">
+              <header className="product-detail-head">
+                <div className="mp-product-detail-meta">
+                  <Link href={`/${categorySlug}`} className="mp-product-detail-cat">
+                    {categoryName}
+                  </Link>
+                  {displayedCode && (
+                    <span className="mp-product-detail-code">
+                      Mã sản phẩm: {displayedCode}
+                    </span>
+                  )}
+                </div>
+                <h1 className="mp-product-detail-title">{displayName}</h1>
+              </header>
+
+              <div className="product-detail-status">
+                <ProductStatusRow
+                  stockLabel={variantStockLabel}
+                  stockColor={variantStockColor}
+                  skuCount={skuCount}
+                />
+              </div>
+
+              <div className="product-detail-quote">
+                <ProductQuoteTiers />
+              </div>
+
+              <div className="product-detail-options">
+                <ProductOptionSelector
+                  variants={variants}
+                  material={material}
+                  colorOptions={colorOptions}
+                  selectedColor={selectedColor}
+                  selectedSize={selectedSizeOrSpec}
+                  onColorSelect={handleColorSelect}
+                  onSizeSelect={handleSizeSelect}
+                />
+              </div>
+
+              <div className="product-detail-keyattrs">
+                <ProductKeyAttributes {...keyAttrsWithStock} compact />
+              </div>
+
+              <div className="product-detail-highlights">
+                <ProductHighlights
+                  shortDescription={displayShortDescription}
+                  description={displayContent}
+                  material={material}
+                  form={keyAttributes.form}
+                  defaultMoq={defaultMoq}
+                  leadTime={leadTime}
+                  useCases={useCases}
+                  supportsPrinting={supportsPrinting}
+                  supportsEmbroidery={supportsEmbroidery}
+                  supportsOem={supportsOem}
+                />
+              </div>
             </div>
 
-            <div className="product-detail-quote">
-              <ProductQuoteTiers />
-            </div>
-
-            <div className="product-detail-options">
-              <ProductOptionSelector
-                variants={variants}
-                material={material}
-                colorOptions={colorOptions}
-                selectedColor={selectedColor}
-                selectedSize={selectedSize}
-                onColorSelect={handleColorSelect}
-                onSizeSelect={handleSizeSelect}
-              />
-            </div>
-
-            <div className="product-detail-keyattrs">
-              <ProductKeyAttributes {...keyAttrsWithStock} compact />
-            </div>
-
-            <div className="product-detail-highlights">
-              <ProductHighlights
-                shortDescription={displayShortDescription}
-                description={displayContent}
-                material={material}
-                form={keyAttributes.form}
-                defaultMoq={defaultMoq}
-                leadTime={leadTime}
-                useCases={useCases}
-                supportsPrinting={supportsPrinting}
-                supportsEmbroidery={supportsEmbroidery}
-                supportsOem={supportsOem}
-              />
-            </div>
-
-            <aside className="product-detail-inquiry-col product-detail-inquiry-col--desktop">
+            <aside className="product-detail-right">
               <ProductInquiryPanel {...inquiryProps} />
             </aside>
-
-            <div className="product-detail-inquiry-col product-detail-inquiry-col--mobile">
-              <ProductInquiryPanel {...inquiryProps} />
-            </div>
           </div>
 
           <ProductDetailTabs />

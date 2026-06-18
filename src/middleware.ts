@@ -42,6 +42,7 @@ export const config = {
     "/api/blog/:path*",
     "/api/crm/:path*",
     "/api/landing-pages/:path*",
+    "/api/media",
     "/api/media/:path*",
     "/api/settings/:path*",
     "/api/client-logos/:path*",

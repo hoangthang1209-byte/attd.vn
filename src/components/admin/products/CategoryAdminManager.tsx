@@ -305,10 +305,12 @@ export default function CategoryAdminManager() {
             <label className="admin-label">Ảnh danh mục</label>
             <div className="admin-category-image-row">
               <MediaPicker
-                label="Chọn từ thư viện Media"
                 folder="categories"
+                usageType="auto"
                 value={form.imageUrl || null}
-                onChange={(url) => setForm((f) => ({ ...f, imageUrl: url }))}
+                onChange={(url) => {
+                  setForm((prev) => ({ ...prev, imageUrl: url }));
+                }}
               />
               <input
                 className="admin-input"

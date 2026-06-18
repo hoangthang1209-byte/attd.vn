@@ -53,7 +53,7 @@ export default function ProductInquiryPanel({
   const services = serviceSummary(supportsPrinting, supportsEmbroidery, supportsOem);
 
   return (
-    <aside className="mp-inquiry-panel mp-pdp-inquiry-panel mp-pdp-inquiry-panel--float mp-product-inquiry-sticky">
+    <div className="mp-inquiry-panel mp-pdp-inquiry-panel mp-pdp-inquiry-panel--float mp-product-inquiry-sticky">
       <div className="mp-pdp-inquiry-body">
         <div className="mp-pdp-inquiry-head">
           <p className="mp-pdp-inquiry-title">Nhận báo giá sỉ từ ATTD</p>
@@ -107,7 +107,9 @@ export default function ProductInquiryPanel({
           )}
         </dl>
 
-        {showMiniForm && <ProductInquiryMiniForm productName={productName} />}
+        {showMiniForm && (
+          <ProductInquiryMiniForm productName={productName} productCode={productCode} />
+        )}
       </div>
 
       <div className="mp-pdp-inquiry-footer">
@@ -140,6 +142,6 @@ export default function ProductInquiryPanel({
           <li>Giao hàng toàn quốc</li>
         </ul>
       </div>
-    </aside>
+    </div>
   );
 }

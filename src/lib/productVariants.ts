@@ -89,6 +89,62 @@ export function findVariant(
   return match ?? variants[0] ?? null;
 }
 
+/** Resolve variant from explicit user selection — no fallback to first variant. */
+export function findSelectedVariant(
+  variants: PublicVariantRow[],
+  color: string | null,
+  size: string | null
+): PublicVariantRow | null {
+  if (variants.length === 0) return null;
+
+  const hasColors = variants.some((v) => v.colorName);
+  const hasSizes = variants.some((v) => getVariantSizeKey(v));
+
+  if (hasColors && !color) return null;
+  if (hasSizes && !size) return null;
+  if (!color && !size) return null;
+
+  return (
+    variants.find((v) => {
+      const colorOk = !color || v.colorName === color;
+      const sizeKey = getVariantSizeKey(v);
+      const sizeOk = !size || sizeKey === size;
+      return colorOk && sizeOk;
+    }) ?? null
+  );
+}
+
+/** Dev-only warning when SKU token and colorCode disagree (data quality). */
+export function warnVariantColorSkuMismatch(variant: PublicVariantRow): void {
+  if (process.env.NODE_ENV === "production") return;
+
+  const sku = variant.sku?.toUpperCase() ?? "";
+  const code = variant.colorCode?.toUpperCase() ?? "";
+  if (!sku || !code) return;
+
+  const skuTokens: Record<string, string[]> = {
+    WHT: ["WHITE", "WHT"],
+    BLK: ["BLACK", "BLK"],
+    RED: ["RED"],
+    BLU: ["BLUE", "BLU"],
+  };
+
+  for (const [token, hints] of Object.entries(skuTokens)) {
+    const skuHas = hints.some((h) => sku.includes(h));
+    const codeIs = code === token || hints.includes(code);
+    if (skuHas && !codeIs) {
+      console.warn(
+        `[PDP] Variant ${variant.sku}: SKU suggests ${token} but colorCode is ${variant.colorCode}; displaying colorName "${variant.colorName}".`
+      );
+      return;
+    }
+  }
+}
+
+export function warnAllVariantMismatches(variants: PublicVariantRow[]): void {
+  for (const v of variants) warnVariantColorSkuMismatch(v);
+}
+
 export function isSizeAvailable(
   variants: PublicVariantRow[],
   color: string | null,
@@ -161,11 +217,12 @@ export function appendVariantImagesToGallery(
 export function buildInteractiveGalleryImages(
   baseImages: ProductImageRecord[],
   variants: PublicVariantRow[],
-  selectedVariant: PublicVariantRow | null
+  selectedVariant: PublicVariantRow | null,
+  prependVariantImage = false
 ): ProductImageRecord[] {
   const withVariants = appendVariantImagesToGallery(baseImages, variants);
-  return mergeGalleryWithVariantImage(
-    withVariants,
-    selectedVariant?.imageUrl
-  );
+  if (!prependVariantImage || !selectedVariant?.imageUrl) {
+    return withVariants;
+  }
+  return mergeGalleryWithVariantImage(withVariants, selectedVariant.imageUrl);
 }
