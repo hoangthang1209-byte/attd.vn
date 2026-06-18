@@ -8,17 +8,7 @@ import {
   getCrossSellProducts,
 } from "@/features/products/services/product.service";
 import ProductCard from "@/components/public/ProductCard";
-import ProductGallery from "@/components/marketplace/ProductGallery";
-import ProductInquiryPanel from "@/components/marketplace/ProductInquiryPanel";
-import ProductOptionTable from "@/components/marketplace/ProductOptionTable";
-import ProductSpecTable from "@/components/marketplace/ProductSpecTable";
-import ProductKeyAttributes from "@/components/marketplace/ProductKeyAttributes";
-import SupplierTrustCard from "@/components/marketplace/SupplierTrustCard";
-import ProductDetailTabs from "@/components/marketplace/ProductDetailTabs";
-import ProductStatusRow from "@/components/marketplace/ProductStatusRow";
-import ProductQuoteTiers from "@/components/marketplace/ProductQuoteTiers";
-import ProductOptionChips from "@/components/marketplace/ProductOptionChips";
-import ProductHighlights from "@/components/marketplace/ProductHighlights";
+import ProductDetailInteractive from "@/components/marketplace/ProductDetailInteractive";
 import ProductFaqList from "@/components/public/ProductFaqList";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
@@ -132,19 +122,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const useCases = (product.useCases as string[] | null) ?? [];
   const targetCustomers = (product.targetCustomers as string[] | null) ?? [];
 
-  const keyAttributesProps = {
-    material: product.material,
-    form: product.form,
-    fit: product.fit,
-    defaultMoq: product.defaultMoq,
-    leadTime: product.leadTime,
-    stockLabel,
-    stockColor,
-    supportsPrinting: product.supportsPrinting,
-    supportsEmbroidery: product.supportsEmbroidery,
-    supportsOem: product.supportsOem,
-  };
-
   const variantRows = product.variants.map((v) => ({
     id: v.id,
     sku: v.sku,
@@ -156,14 +133,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
     stockStatus: v.stockStatus,
     imageUrl: v.imageUrl,
     stockQty: v.stockQty,
-  }));
-
-  const chipVariants = variantRows.map((v) => ({
-    colorName: v.colorName,
-    colorCode: v.colorCode,
-    sizeName: v.sizeName,
-    dimensions: v.dimensions,
-    capacity: v.capacity,
   }));
 
   const productJsonLd = {
@@ -239,107 +208,38 @@ export default async function ProductDetailPage({ params }: PageProps) {
         />
       </div>
 
-      <section className="mp-pdp-hero">
-        <div className="container">
-          <div className="mp-pdp-grid mp-pdp-grid--anatomy">
-            <header className="mp-pdp-head">
-              <div className="mp-product-detail-meta">
-                <Link href={`/${categorySlug}`} className="mp-product-detail-cat">
-                  {categoryName}
-                </Link>
-                {(catalog?.sku ?? product.productCode) && (
-                  <span className="mp-product-detail-code">
-                    Mã sản phẩm: {catalog?.sku ?? product.productCode}
-                  </span>
-                )}
-              </div>
-              <h1 className="mp-product-detail-title">{displayName}</h1>
-            </header>
-
-            <div className="mp-pdp-left-col">
-              <ProductGallery images={unifiedImages} productName={displayName} />
-              <SupplierTrustCard />
-            </div>
-
-            <div className="mp-pdp-status">
-              <ProductStatusRow
-                stockLabel={stockLabel}
-                stockColor={stockColor}
-                skuCount={skuCount}
-              />
-            </div>
-
-            <div className="mp-pdp-quote">
-              <ProductQuoteTiers />
-            </div>
-
-            <div className="mp-pdp-chips">
-              <ProductOptionChips variants={chipVariants} material={product.material} />
-            </div>
-
-            <div className="mp-pdp-keyattrs-block">
-              <ProductKeyAttributes {...keyAttributesProps} compact />
-            </div>
-
-            <div className="mp-pdp-highlights-block">
-              <ProductHighlights
-                shortDescription={displayShortDescription}
-                description={displayContent}
-                material={product.material}
-                form={product.form}
-                defaultMoq={product.defaultMoq}
-                leadTime={product.leadTime}
-                useCases={useCases}
-                supportsPrinting={product.supportsPrinting}
-                supportsEmbroidery={product.supportsEmbroidery}
-                supportsOem={product.supportsOem}
-              />
-            </div>
-
-            <aside className="mp-pdp-sidebar">
-              <ProductInquiryPanel
-                stockLabel={stockLabel}
-                stockColor={stockColor}
-                productName={displayName}
-                defaultMoq={product.defaultMoq}
-                leadTime={product.leadTime}
-                supportsPrinting={product.supportsPrinting}
-                supportsEmbroidery={product.supportsEmbroidery}
-                supportsOem={product.supportsOem}
-              />
-            </aside>
-          </div>
-        </div>
-      </section>
-
-      <ProductDetailTabs />
-
-      <section className="mp-section mp-section--compact" id="mp-pdp-info">
-        <div className="container">
-          <ProductSpecTable
-            material={product.material}
-            form={product.form}
-            fit={product.fit}
-            gsm={product.gsm}
-            defaultMoq={product.defaultMoq}
-            leadTime={product.leadTime}
-            useCases={useCases}
-            targetCustomers={targetCustomers}
-            supportsPrinting={product.supportsPrinting}
-            supportsEmbroidery={product.supportsEmbroidery}
-            supportsOem={product.supportsOem}
-          />
-          <div className="mp-pdp-info-keyattrs">
-            <ProductKeyAttributes {...keyAttributesProps} compact className="mp-pdp-keyattrs--lower" />
-          </div>
-        </div>
-      </section>
-
-      <section className="mp-section mp-section--alt mp-section--compact" id="mp-pdp-options">
-        <div className="container">
-          <ProductOptionTable variants={variantRows} />
-        </div>
-      </section>
+      <ProductDetailInteractive
+        displayName={displayName}
+        categoryName={categoryName}
+        categorySlug={categorySlug}
+        productCode={catalog?.sku ?? product.productCode}
+        displayShortDescription={displayShortDescription}
+        displayContent={displayContent}
+        baseImages={unifiedImages}
+        variants={variantRows}
+        material={product.material}
+        defaultMoq={product.defaultMoq}
+        leadTime={product.leadTime}
+        supportsPrinting={product.supportsPrinting}
+        supportsEmbroidery={product.supportsEmbroidery}
+        supportsOem={product.supportsOem}
+        aggregateStockLabel={stockLabel}
+        aggregateStockColor={stockColor}
+        skuCount={skuCount}
+        keyAttributes={{
+          material: product.material,
+          form: product.form,
+          fit: product.fit,
+          defaultMoq: product.defaultMoq,
+          leadTime: product.leadTime,
+          supportsPrinting: product.supportsPrinting,
+          supportsEmbroidery: product.supportsEmbroidery,
+          supportsOem: product.supportsOem,
+        }}
+        useCases={useCases}
+        targetCustomers={targetCustomers}
+        gsm={product.gsm}
+      />
 
       <section className="mp-section mp-section--compact" id="mp-pdp-desc">
         <div className="container mp-pdp-desc">

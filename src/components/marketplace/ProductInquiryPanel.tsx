@@ -8,8 +8,10 @@ type ProductInquiryPanelProps = {
   stockLabel?: string | null;
   stockColor?: string;
   productName?: string;
+  productCode?: string | null;
   defaultMoq?: number | null;
   leadTime?: string | null;
+  stockQty?: number | null;
   supportsPrinting?: boolean;
   supportsEmbroidery?: boolean;
   supportsOem?: boolean;
@@ -32,28 +34,38 @@ export default function ProductInquiryPanel({
   stockLabel,
   stockColor = "#16a34a",
   productName,
+  productCode,
   defaultMoq,
   leadTime,
+  stockQty,
   supportsPrinting,
   supportsEmbroidery,
   supportsOem,
   showMiniForm = true,
 }: ProductInquiryPanelProps) {
   const quoteHref = productName
-    ? `/lien-he?product=${encodeURIComponent(productName)}`
+    ? `/lien-he?product=${encodeURIComponent(productName)}${
+        productCode ? `&code=${encodeURIComponent(productCode)}` : ""
+      }`
     : "/lien-he";
   const services = serviceSummary(supportsPrinting, supportsEmbroidery, supportsOem);
 
   return (
-    <aside className="mp-inquiry-panel mp-pdp-inquiry-panel mp-pdp-inquiry-panel--float">
+    <aside className="mp-inquiry-panel mp-pdp-inquiry-panel mp-pdp-inquiry-panel--float mp-product-inquiry-sticky">
       <div className="mp-pdp-inquiry-head">
-        <p className="mp-pdp-inquiry-title">Nhận báo giá sỉ từ ATTD</p>
+        <p className="mp-pdp-inquiry-title">Liên hệ báo giá sỉ</p>
         <p className="mp-pdp-inquiry-lead">
-          Gửi nhu cầu để ATTD tư vấn số lượng tối thiểu, thời gian giao/sản xuất và báo giá theo số lượng.
+          Giá thay đổi theo số lượng, tồn kho và yêu cầu in/thêu/OEM.
         </p>
       </div>
 
       <dl className="mp-pdp-inquiry-facts">
+        {productCode && (
+          <div className="mp-pdp-inquiry-fact">
+            <dt>Mã sản phẩm</dt>
+            <dd>{productCode}</dd>
+          </div>
+        )}
         {defaultMoq != null && (
           <div className="mp-pdp-inquiry-fact">
             <dt>Số lượng tối thiểu</dt>
@@ -70,6 +82,12 @@ export default function ProductInquiryPanel({
           <div className="mp-pdp-inquiry-fact">
             <dt>Tình trạng hàng</dt>
             <dd style={{ color: stockColor }}>{stockLabel}</dd>
+          </div>
+        )}
+        {stockQty != null && stockQty > 0 && (
+          <div className="mp-pdp-inquiry-fact">
+            <dt>Tồn kho tham khảo</dt>
+            <dd>{stockQty}</dd>
           </div>
         )}
         {services && (

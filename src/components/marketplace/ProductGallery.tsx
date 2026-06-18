@@ -13,19 +13,33 @@ import { isValidImageSrc } from "@/lib/imagePaths";
 type Props = {
   images: ProductImageRecord[];
   productName: string;
+  selectedImageUrl?: string | null;
 };
 
-export default function ProductGallery({ images, productName }: Props) {
+export default function ProductGallery({ images, productName, selectedImageUrl }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const gallery = getProductGalleryImages(images);
   const total = gallery.length;
+  const galleryKey = gallery.map((img) => img.imageUrl).join("|");
 
   useEffect(() => {
     if (selectedIndex >= total && total > 0) setSelectedIndex(0);
   }, [selectedIndex, total]);
+
+  useEffect(() => {
+    if (total === 0) return;
+
+    if (selectedImageUrl && isValidImageSrc(selectedImageUrl)) {
+      const idx = gallery.findIndex((img) => img.imageUrl === selectedImageUrl);
+      setSelectedIndex(idx >= 0 ? idx : 0);
+      return;
+    }
+
+    setSelectedIndex(0);
+  }, [selectedImageUrl, galleryKey, total, gallery]);
 
   function goTo(index: number) {
     if (total === 0) return;
