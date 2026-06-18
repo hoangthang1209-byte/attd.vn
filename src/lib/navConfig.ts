@@ -42,10 +42,11 @@ export type MarketplaceCategoryNavItem = NavLink & {
 };
 
 export const MARKETPLACE_CATEGORY_NAV: MarketplaceCategoryNavItem[] = [
-  { href: "/ao-thun-tron", label: "Áo thun trơn" },
-  { href: "/ao-polo-tron", label: "Áo polo" },
+  { href: "/ao-thun-tron", label: "Áo thun" },
+  { href: "/ao-polo-tron", label: "Polo" },
   { href: "/non", label: "Nón" },
-  { href: "/tote", label: "Tote bag" },
+  { href: "/tote", label: "Tote" },
+  { href: "/bandana", label: "Bandana" },
   { href: "/binh-giu-nhiet", label: "Bình giữ nhiệt" },
   { href: "/gift-set-doanh-nghiep", label: "Gift set" },
   { href: "/oem", label: "OEM" },

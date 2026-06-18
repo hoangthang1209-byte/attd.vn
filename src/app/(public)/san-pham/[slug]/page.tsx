@@ -1,14 +1,21 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
-import { getProductBySlug, getRelatedProducts } from "@/features/products/services/product.service";
+import {
+  getProductBySlug,
+  getRelatedProducts,
+  getCrossSellProducts,
+} from "@/features/products/services/product.service";
 import ProductCard from "@/components/public/ProductCard";
-import ProductImageGallery from "@/components/public/ProductImageGallery";
+import ProductGallery from "@/components/marketplace/ProductGallery";
 import ProductInquiryPanel from "@/components/marketplace/ProductInquiryPanel";
 import ProductOptionTable from "@/components/marketplace/ProductOptionTable";
 import ProductSpecTable from "@/components/marketplace/ProductSpecTable";
+import ProductKeyAttributes from "@/components/marketplace/ProductKeyAttributes";
+import SupplierTrustCard from "@/components/marketplace/SupplierTrustCard";
+import ProductDetailTabs from "@/components/marketplace/ProductDetailTabs";
 import ProductFaqList from "@/components/public/ProductFaqList";
-import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
 import {
@@ -20,10 +27,10 @@ import {
 import {
   buildProductImages,
   getPrimaryProductImageFromProduct,
+  getProductGalleryImages,
 } from "@/lib/productImages";
-import {
-  getCatalogProduct,
-} from "@/lib/productCatalog";
+import { getCatalogProduct } from "@/lib/productCatalog";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -82,6 +89,13 @@ const STOCK_COLORS: Record<string, string> = {
   OUT_OF_STOCK: "#dc2626",
 };
 
+function summarizeValues(values: (string | null | undefined)[], max = 4): string {
+  const unique = [...new Set(values.filter(Boolean) as string[])];
+  if (unique.length === 0) return "";
+  if (unique.length <= max) return unique.join(", ");
+  return `${unique.slice(0, max - 1).join(", ")} +${unique.length - max + 1}`;
+}
+
 export default async function ProductDetailPage({ params }: PageProps) {
   const { slug } = await params;
   const catalog = getCatalogProduct(slug);
@@ -95,10 +109,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const categoryName = catalog?.categoryName ?? product.category.name;
   const categorySlug = catalog?.categorySlug ?? product.category.slug;
 
-  // Unified image list (legacy ProductImage + new featuredImage/gallery)
   const unifiedImages = buildProductImages(product);
+  const galleryImages = getProductGalleryImages(unifiedImages);
 
-  const relatedProducts = await getRelatedProducts(product.category.id, product.id, 4);
+  const [relatedProducts, crossSellProducts] = await Promise.all([
+    getRelatedProducts(product.category.id, product.id, 4),
+    getCrossSellProducts(product.id, product.category.id, 4),
+  ]);
 
   const skuCount = product.variants.length;
 
@@ -107,15 +124,54 @@ export default async function ProductDetailPage({ params }: PageProps) {
     stockStatuses.length === 0
       ? null
       : stockStatuses.includes("IN_STOCK")
-      ? "IN_STOCK"
-      : stockStatuses.includes("LOW_STOCK")
-      ? "LOW_STOCK"
-      : "OUT_OF_STOCK";
+        ? "IN_STOCK"
+        : stockStatuses.includes("LOW_STOCK")
+          ? "LOW_STOCK"
+          : "OUT_OF_STOCK";
 
   const stockLabel = aggregateStock ? STOCK_LABELS[aggregateStock] : null;
   const stockColor = aggregateStock ? STOCK_COLORS[aggregateStock] : "#16a34a";
 
   const hasFeatures = product.supportsPrinting || product.supportsEmbroidery || product.supportsOem;
+
+  const colorSummary = summarizeValues(
+    product.variants.map((v) => v.colorName ?? v.color?.name)
+  );
+  const sizeSummary = summarizeValues(
+    product.variants.map((v) => v.sizeName ?? v.size?.name ?? v.capacity ?? v.dimensions)
+  );
+
+  const useCases = (product.useCases as string[] | null) ?? [];
+  const targetCustomers = (product.targetCustomers as string[] | null) ?? [];
+
+  const keyAttributesProps = {
+    categoryName,
+    material: product.material,
+    form: product.form,
+    fit: product.fit,
+    defaultMoq: product.defaultMoq,
+    leadTime: product.leadTime,
+    stockLabel,
+    stockColor,
+    supportsPrinting: product.supportsPrinting,
+    supportsEmbroidery: product.supportsEmbroidery,
+    supportsOem: product.supportsOem,
+    colorSummary,
+    sizeSummary,
+  };
+
+  const variantRows = product.variants.map((v) => ({
+    id: v.id,
+    sku: v.sku,
+    colorName: v.colorName ?? v.color?.name,
+    colorCode: v.colorCode,
+    sizeName: v.sizeName ?? v.size?.name,
+    dimensions: v.dimensions,
+    capacity: v.capacity,
+    stockStatus: v.stockStatus,
+    imageUrl: v.imageUrl,
+    stockQty: v.stockQty,
+  }));
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -142,56 +198,58 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   const faqItems = catalog?.faqs ?? [
     {
-      question: "Sản phẩm có nhận in logo không?",
+      question: "Sản phẩm này có hỗ trợ in logo không?",
       answer: product.supportsPrinting
-        ? "Có. Sản phẩm này hỗ trợ in logo theo yêu cầu."
-        : "Liên hệ ATTD để được tư vấn kỹ thuật in phù hợp.",
+        ? "Có. Sản phẩm này hỗ trợ in logo theo yêu cầu thương hiệu."
+        : "Liên hệ ATTD để được tư vấn phương án in phù hợp với từng dòng sản phẩm.",
     },
     {
       question: "Số lượng tối thiểu là bao nhiêu?",
       answer: product.defaultMoq
-        ? `Số lượng tối thiểu là ${product.defaultMoq} cái. Liên hệ để biết chính sách ưu đãi theo số lượng.`
+        ? `Số lượng tối thiểu là ${product.defaultMoq} cái. Liên hệ để nhận báo giá theo số lượng đặt hàng.`
         : "Liên hệ ATTD để được tư vấn số lượng tối thiểu theo từng dòng sản phẩm.",
     },
     {
-      question: "Thời gian giao hàng là bao lâu?",
+      question: "Thời gian giao/sản xuất bao lâu?",
       answer: product.leadTime
         ? product.leadTime
-        : "Hàng có sẵn kho giao trong 1–3 ngày. Đặt hàng số lượng lớn hoặc gia công theo yêu cầu: 5–20 ngày.",
+        : "Hàng có sẵn giao trong 1–3 ngày. Đơn số lượng lớn hoặc gia công in/thêu/OEM: 5–20 ngày tùy quy cách.",
     },
     {
-      question: "Có hỗ trợ giao hàng toàn quốc không?",
-      answer: "Có. ATTD giao hàng toàn quốc qua đơn vị vận chuyển đối tác.",
+      question: "ATTD có hỗ trợ đại lý không?",
+      answer:
+        "Có. ATTD hỗ trợ đại lý đồng phục, agency quà tặng và xưởng in/thêu với chính sách nguồn hàng B2B.",
+    },
+    {
+      question: "Có thể đặt OEM/private label không?",
+      answer: product.supportsOem
+        ? "Có. Sản phẩm này hỗ trợ OEM/private label theo yêu cầu."
+        : "Liên hệ ATTD để được tư vấn khả năng OEM/private label cho dòng sản phẩm bạn quan tâm.",
     },
   ];
 
   return (
-    <main>
+    <main className="mp-pdp">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
       />
       <FaqSchema items={faqItems} />
 
-      <Breadcrumb
-        items={[
-          { name: "Sản phẩm", href: "/san-pham" },
-          { name: categoryName, href: `/${categorySlug}` },
-          { name: displayName, href: `/san-pham/${slug}` },
-        ]}
-      />
+      <div className="mp-pdp-breadcrumb">
+        <Breadcrumb
+          items={[
+            { name: "Sản phẩm", href: "/san-pham" },
+            { name: categoryName, href: `/${categorySlug}` },
+            { name: displayName, href: `/san-pham/${slug}` },
+          ]}
+        />
+      </div>
 
-      <section className="mp-product-detail">
+      <section className="mp-pdp-hero">
         <div className="container">
-          <div className="mp-product-detail-layout">
-            <div className="mp-product-detail-gallery">
-              <ProductImageGallery
-                images={unifiedImages}
-                productName={displayName}
-              />
-            </div>
-
-            <div className="mp-product-detail-summary">
+          <div className="mp-pdp-grid">
+            <header className="mp-pdp-head">
               <div className="mp-product-detail-meta">
                 <Link href={`/${categorySlug}`} className="mp-product-detail-cat">
                   {categoryName}
@@ -202,18 +260,22 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   </span>
                 )}
               </div>
-
               <h1 className="mp-product-detail-title">{displayName}</h1>
-
               {displayShortDescription && (
                 <p className="mp-product-detail-desc">{displayShortDescription}</p>
               )}
+            </header>
 
-              <dl className="mp-product-facts">
-                {skuCount > 0 && (
+            <div className="mp-pdp-gallery-col">
+              <ProductGallery images={unifiedImages} productName={displayName} />
+            </div>
+
+            <div className="mp-pdp-center-col">
+              <dl className="mp-product-facts mp-pdp-quick-facts">
+                {stockLabel && (
                   <div className="mp-product-fact">
-                    <dt>Số lựa chọn sản phẩm</dt>
-                    <dd>{skuCount}</dd>
+                    <dt>Tình trạng hàng</dt>
+                    <dd style={{ color: stockColor }}>{stockLabel}</dd>
                   </div>
                 )}
                 {product.defaultMoq != null && (
@@ -228,10 +290,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     <dd>{product.leadTime}</dd>
                   </div>
                 )}
-                {stockLabel && (
+                {skuCount > 0 && (
                   <div className="mp-product-fact">
-                    <dt>Tình trạng hàng</dt>
-                    <dd style={{ color: stockColor }}>{stockLabel}</dd>
+                    <dt>Số lựa chọn sản phẩm</dt>
+                    <dd>{skuCount}</dd>
                   </div>
                 )}
               </dl>
@@ -239,45 +301,43 @@ export default async function ProductDetailPage({ params }: PageProps) {
               {hasFeatures && (
                 <div className="mp-product-service-badges">
                   {product.supportsPrinting && (
-                    <span className="mp-product-service-badge">In logo</span>
+                    <span className="mp-product-service-badge">Hỗ trợ in logo</span>
                   )}
                   {product.supportsEmbroidery && (
-                    <span className="mp-product-service-badge">Thêu</span>
+                    <span className="mp-product-service-badge">Hỗ trợ thêu</span>
                   )}
                   {product.supportsOem && (
-                    <span className="mp-product-service-badge mp-product-service-badge--oem">OEM</span>
+                    <span className="mp-product-service-badge mp-product-service-badge--oem">
+                      Hỗ trợ OEM
+                    </span>
                   )}
                 </div>
               )}
 
+              <ProductKeyAttributes
+                {...keyAttributesProps}
+                className="mp-pdp-keyattrs mp-pdp-keyattrs--desktop"
+              />
+            </div>
+
+            <aside className="mp-pdp-sidebar">
               <ProductInquiryPanel
                 stockLabel={stockLabel}
                 stockColor={stockColor}
                 productName={displayName}
+                defaultMoq={product.defaultMoq}
+                leadTime={product.leadTime}
+                skuCount={skuCount}
               />
-            </div>
+              <SupplierTrustCard />
+            </aside>
           </div>
         </div>
       </section>
 
-      <section className="mp-section mp-section--compact">
-        <div className="container">
-          <ProductOptionTable
-            variants={product.variants.map((v) => ({
-              id: v.id,
-              sku: v.sku,
-              colorName: v.colorName ?? v.color?.name,
-              colorCode: v.colorCode,
-              sizeName: v.sizeName ?? v.size?.name,
-              dimensions: v.dimensions,
-              capacity: v.capacity,
-              stockStatus: v.stockStatus,
-            }))}
-          />
-        </div>
-      </section>
+      <ProductDetailTabs />
 
-      <section className="mp-section mp-section--alt mp-section--compact">
+      <section className="mp-section mp-section--compact" id="mp-pdp-specs">
         <div className="container">
           <ProductSpecTable
             material={product.material}
@@ -286,8 +346,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
             gsm={product.gsm}
             defaultMoq={product.defaultMoq}
             leadTime={product.leadTime}
-            useCases={product.useCases as string[]}
-            targetCustomers={product.targetCustomers as string[]}
+            useCases={useCases}
+            targetCustomers={targetCustomers}
             supportsPrinting={product.supportsPrinting}
             supportsEmbroidery={product.supportsEmbroidery}
             supportsOem={product.supportsOem}
@@ -296,62 +356,146 @@ export default async function ProductDetailPage({ params }: PageProps) {
       </section>
 
       <section className="mp-section mp-section--compact">
-        <div className="container mp-product-desc">
+        <div className="container">
+          <ProductOptionTable variants={variantRows} />
+        </div>
+      </section>
+
+      <section className="mp-section mp-section--alt mp-section--compact mp-pdp-keyattrs-mobile-wrap">
+        <div className="container">
+          <ProductKeyAttributes
+            {...keyAttributesProps}
+            className="mp-pdp-keyattrs mp-pdp-keyattrs--mobile"
+          />
+        </div>
+      </section>
+
+      <section className="mp-section mp-section--compact" id="mp-pdp-desc">
+        <div className="container mp-pdp-desc">
           <h2 className="mp-section-title">Mô tả sản phẩm</h2>
 
           {displayContent || displayShortDescription ? (
-            <>
+            <div className="mp-pdp-desc-content">
               {displayShortDescription && (
                 <p className="product-desc-lead">{displayShortDescription}</p>
               )}
               {displayContent && (
                 <div className="product-desc-body">{displayContent}</div>
               )}
-            </>
+
+              {galleryImages.length > 1 && (
+                <div className="mp-pdp-desc-gallery">
+                  {galleryImages.slice(1, 5).map((img, i) =>
+                    isValidImageSrc(img.imageUrl) ? (
+                      <div key={img.id ?? i} className="mp-pdp-desc-gallery-item">
+                        <Image
+                          src={img.imageUrl}
+                          alt={img.altText ?? displayName}
+                          fill
+                          sizes="(max-width: 768px) 50vw, 240px"
+                          className="mp-pdp-desc-gallery-img"
+                        />
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              )}
+
+              {(useCases.length > 0 || targetCustomers.length > 0) && (
+                <div className="mp-pdp-desc-cards">
+                  {useCases.length > 0 && (
+                    <div className="mp-pdp-desc-card">
+                      <h3>Ứng dụng B2B</h3>
+                      <ul>
+                        {useCases.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {targetCustomers.length > 0 && (
+                    <div className="mp-pdp-desc-card">
+                      <h3>Phù hợp cho</h3>
+                      <ul>
+                        {targetCustomers.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           ) : (
-            <EmptyState
-              title="Thông tin sản phẩm đang được cập nhật"
-              description="Liên hệ ATTD để nhận báo giá và tư vấn chi tiết về sản phẩm này."
-            />
+            <p className="mp-pdp-desc-placeholder">
+              Thông tin chi tiết sẽ được ATTD cập nhật theo từng dòng sản phẩm.
+            </p>
           )}
         </div>
       </section>
 
-      <section className="mp-section mp-section--alt mp-section--compact">
+      <section className="mp-section mp-section--alt mp-section--compact" id="mp-pdp-faq">
         <div className="container mp-product-faq">
           <h2 className="mp-section-title">Hỏi đáp thường gặp</h2>
           <ProductFaqList items={faqItems} />
         </div>
       </section>
 
-      {relatedProducts.length > 0 && (
-        <section className="mp-section mp-section--compact">
-          <div className="container">
-            <h2 className="mp-section-title">Sản phẩm liên quan</h2>
-            <div className="mp-product-grid mp-product-grid--compact">
-              {relatedProducts.map((related) => (
-                <ProductCard
-                  key={related.id}
-                  id={related.id}
-                  slug={related.slug}
-                  name={related.name}
-                  category={categoryName}
-                  imageUrl={getPrimaryProductImageFromProduct(related)}
-                  moq={related.defaultMoq}
-                  leadTime={related.leadTime}
-                  compact
-                />
-              ))}
+      <div id="mp-pdp-related">
+        {relatedProducts.length > 0 && (
+          <section className="mp-section mp-section--compact">
+            <div className="container">
+              <h2 className="mp-section-title">Sản phẩm cùng danh mục</h2>
+              <div className="mp-product-grid mp-product-grid--compact">
+                {relatedProducts.map((related) => (
+                  <ProductCard
+                    key={related.id}
+                    id={related.id}
+                    slug={related.slug}
+                    name={related.name}
+                    category={categoryName}
+                    imageUrl={getPrimaryProductImageFromProduct(related)}
+                    moq={related.defaultMoq}
+                    leadTime={related.leadTime}
+                    compact
+                  />
+                ))}
+              </div>
+              <div className="mp-pdp-related-more">
+                <Link href={`/${categorySlug}`} className="link-chip">
+                  Xem tất cả {categoryName}
+                  <span aria-hidden style={{ color: "#9ca3af" }}>
+                    →
+                  </span>
+                </Link>
+              </div>
             </div>
-            <div style={{ marginTop: 28 }}>
-              <Link href={`/${categorySlug}`} className="link-chip">
-                Xem tất cả {categoryName}
-                <span aria-hidden style={{ color: "#9ca3af" }}>→</span>
-              </Link>
+          </section>
+        )}
+
+        {crossSellProducts.length > 0 && (
+          <section className="mp-section mp-section--alt mp-section--compact">
+            <div className="container">
+              <h2 className="mp-section-title">Nguồn hàng có thể đặt cùng</h2>
+              <div className="mp-product-grid mp-product-grid--compact">
+                {crossSellProducts.map((related) => (
+                  <ProductCard
+                    key={related.id}
+                    id={related.id}
+                    slug={related.slug}
+                    name={related.name}
+                    category={related.category.name}
+                    imageUrl={getPrimaryProductImageFromProduct(related)}
+                    moq={related.defaultMoq}
+                    leadTime={related.leadTime}
+                    compact
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        )}
+      </div>
     </main>
   );
 }

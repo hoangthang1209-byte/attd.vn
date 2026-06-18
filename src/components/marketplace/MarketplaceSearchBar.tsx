@@ -12,7 +12,7 @@ type MarketplaceSearchBarProps = {
 };
 
 export default function MarketplaceSearchBar({
-  placeholder = "Tìm áo thun trơn, polo, nón, tote, bình giữ nhiệt…",
+  placeholder = "Tìm áo thun, polo, nón, tote, bình giữ nhiệt...",
   defaultValue = "",
   size = "default",
   className = "",

@@ -8,11 +8,13 @@ import {
 
 const FOOTER_PRODUCTS = [
   { href: "/san-pham", label: "Tất cả sản phẩm" },
-  { href: "/ao-thun-tron", label: "Áo thun trơn" },
-  { href: "/ao-polo-tron", label: "Áo polo trơn" },
-  { href: "/non", label: "Nón đồng phục" },
-  { href: "/tote", label: "Tote bag" },
+  { href: "/ao-thun-tron", label: "Áo thun" },
+  { href: "/ao-polo-tron", label: "Polo" },
+  { href: "/non", label: "Nón" },
+  { href: "/tote", label: "Tote" },
+  { href: "/bandana", label: "Bandana" },
   { href: "/binh-giu-nhiet", label: "Bình giữ nhiệt" },
+  { href: "/gift-set-doanh-nghiep", label: "Gift set" },
 ];
 
 const FOOTER_SOURCING = [

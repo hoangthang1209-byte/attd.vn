@@ -124,6 +124,27 @@ export async function getPublicCatalogStats() {
   return { productCount, variantCount, categoryCount };
 }
 
+const PUBLIC_PRODUCT_CARD_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  productCode: true,
+  featuredImage: true,
+  gallery: true,
+  defaultMoq: true,
+  leadTime: true,
+  supportsPrinting: true,
+  supportsEmbroidery: true,
+  supportsOem: true,
+  category: { select: { name: true, slug: true } },
+  variants: { select: { id: true, stockStatus: true } },
+  images: {
+    select: { imageUrl: true, altText: true },
+    orderBy: { sortOrder: "asc" as const },
+    take: 1,
+  },
+};
+
 /** Returns up to `limit` active products in the same category, excluding the given product. */
 export async function getRelatedProducts(
   categoryId: string,
@@ -137,17 +158,26 @@ export async function getRelatedProducts(
       status: "ACTIVE",
       slug: { not: "" },
     },
-    select: {
-      id: true, name: true, slug: true, productCode: true,
-      featuredImage: true, gallery: true, defaultMoq: true, leadTime: true,
-      supportsPrinting: true, supportsEmbroidery: true, supportsOem: true,
-      variants: { select: { id: true, stockStatus: true } },
-      images: {
-        select: { imageUrl: true, altText: true },
-        orderBy: { sortOrder: "asc" },
-        take: 1,
-      },
+    select: PUBLIC_PRODUCT_CARD_SELECT,
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
+/** Cross-sell products from other categories for product detail recommendations. */
+export async function getCrossSellProducts(
+  excludeProductId: string,
+  excludeCategoryId: string,
+  limit = 4
+) {
+  return prisma.product.findMany({
+    where: {
+      id: { not: excludeProductId },
+      categoryId: { not: excludeCategoryId },
+      status: "ACTIVE",
+      slug: { not: "" },
     },
+    select: PUBLIC_PRODUCT_CARD_SELECT,
     orderBy: { createdAt: "desc" },
     take: limit,
   });
