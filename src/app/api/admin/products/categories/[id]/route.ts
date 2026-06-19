@@ -60,6 +60,11 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     return NextResponse.json(category);
   } catch (err) {
     console.error("[PUT /api/admin/products/categories/[id]]", err);
+    if (err instanceof Error && "fieldErrors" in err) {
+      const fe = (err as { fieldErrors?: Record<string, string> }).fieldErrors;
+      const message = fe?.skuCode ?? err.message;
+      return NextResponse.json({ message }, { status: 400 });
+    }
     return NextResponse.json({ message: "Không thể cập nhật danh mục." }, { status: 500 });
   }
 }

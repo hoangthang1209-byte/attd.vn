@@ -65,6 +65,7 @@ export default function CategoryAdminManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CategoryForm>(emptyForm());
   const [slugEdited, setSlugEdited] = useState(false);
+  const [skuCodeEdited, setSkuCodeEdited] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
@@ -88,6 +89,7 @@ export default function CategoryAdminManager() {
     setEditingId(null);
     setForm(emptyForm());
     setSlugEdited(false);
+    setSkuCodeEdited(false);
     setShowForm(true);
     setMessage(null);
   }
@@ -106,6 +108,7 @@ export default function CategoryAdminManager() {
       parentId: cat.parentId ?? "",
     });
     setSlugEdited(true);
+    setSkuCodeEdited(true);
     setShowForm(true);
     setMessage(null);
   }
@@ -115,6 +118,25 @@ export default function CategoryAdminManager() {
     setEditingId(null);
     setForm(emptyForm());
   }
+
+  useEffect(() => {
+    if (!showForm || skuCodeEdited || !form.name.trim()) return;
+
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({ name: form.name.trim() });
+      if (editingId) params.set("excludeId", editingId);
+      void fetch(`/api/admin/products/categories/code-preview?${params}`)
+        .then((r) => r.json())
+        .then((data: { code?: string }) => {
+          if (data.code && !skuCodeEdited) {
+            setForm((f) => ({ ...f, skuCode: data.code ?? "" }));
+          }
+        })
+        .catch(() => {});
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [form.name, showForm, skuCodeEdited, editingId]);
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -258,9 +280,17 @@ export default function CategoryAdminManager() {
               <input
                 className="admin-input"
                 value={form.skuCode}
-                onChange={(e) => setForm((f) => ({ ...f, skuCode: e.target.value }))}
-                placeholder="VD: ATTD-TSHIRT"
+                onChange={(e) => {
+                  setSkuCodeEdited(true);
+                  setForm((f) => ({ ...f, skuCode: e.target.value.toUpperCase() }));
+                }}
+                placeholder="Tự động từ tên (vd. TS, POLO, TOTE)"
               />
+              {!skuCodeEdited && form.name.trim() && (
+                <p className="admin-field-hint">
+                  Mã dự kiến sẽ được tạo tự động khi lưu. Có thể chỉnh tay nếu cần.
+                </p>
+              )}
             </div>
             <div>
               <label className="admin-label">Thứ tự hiển thị</label>
@@ -382,7 +412,7 @@ export default function CategoryAdminManager() {
                   <th>Ảnh</th>
                   <th>Tên danh mục</th>
                   <th>Slug</th>
-                  <th>Mã</th>
+                  <th>Mã danh mục</th>
                   <th>Sản phẩm</th>
                   <th>Thứ tự</th>
                   <th>Hành động</th>

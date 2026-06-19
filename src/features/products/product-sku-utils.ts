@@ -32,7 +32,10 @@ const VI_MAP: Record<string, string> = {
 };
 
 export const CATEGORY_SKU_CODE_MISSING_ERROR =
-  "Danh mục chưa có mã ID. Vui lòng cập nhật mã danh mục trước khi tạo sản phẩm.";
+  "Danh mục chưa có mã danh mục. Vui lòng cập nhật mã danh mục trước khi tạo sản phẩm.";
+
+export const CATEGORY_CODE_DUPLICATE_ERROR =
+  "Mã danh mục đã tồn tại. Vui lòng chọn mã khác.";
 
 export const CATEGORY_PRODUCT_CODE_LIMIT_ERROR =
   "Danh mục đã đạt giới hạn 9999 mã sản phẩm.";
@@ -57,6 +60,112 @@ export function normalizeSkuPart(input: string): string {
 
 export function normalizeCategorySkuCode(raw: string): string {
   return normalizeSkuPart(raw);
+}
+
+/** Normalize category/product code parts — uppercase ASCII, no accents. */
+export function normalizeCode(input: string): string {
+  return normalizeCategorySkuCode(input);
+}
+
+// ─── Category code from name ──────────────────────────────────────────────────
+
+const CATEGORY_NAME_CODES: Record<string, string> = {
+  "ao thun tron": "TS",
+  "ao thun": "TS",
+  thun: "TS",
+  "ao polo tron": "POLO",
+  "ao polo": "POLO",
+  polo: "POLO",
+  "tote bag": "TOTE",
+  "tui tote": "TOTE",
+  tote: "TOTE",
+  "binh giu nhiet": "BGN",
+  "binh giu": "BGN",
+  "non dong phuc": "NON",
+  non: "NON",
+  bandana: "BANDANA",
+  khan: "BANDANA",
+  "gift set doanh nghiep": "GIFT",
+  "gift set": "GIFT",
+  "qua tang doanh nghiep": "GIFT",
+  "qua tang": "GIFT",
+  gift: "GIFT",
+  combo: "GIFT",
+  "oem private label": "OEM",
+  oem: "OEM",
+};
+
+export function generateCategoryCodeFromName(name: string): string {
+  if (!name.trim()) return "";
+
+  const normalized = name
+    .split("")
+    .map((c) => VI_MAP[c] ?? c)
+    .join("")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s/]/g, " ");
+
+  const sortedKeys = Object.keys(CATEGORY_NAME_CODES).sort((a, b) => b.length - a.length);
+  for (const key of sortedKeys) {
+    if (normalized.includes(key)) {
+      return CATEGORY_NAME_CODES[key];
+    }
+  }
+
+  const stopWords = new Set(["ao", "co", "de", "bo", "va", "the", "set", "la", "gi"]);
+  const words = normalized.split(/\s+/).filter((w) => w.length > 1 && !stopWords.has(w));
+
+  if (words.length >= 2) {
+    return words
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 8);
+  }
+
+  if (words.length === 1) {
+    return normalizeSkuPart(words[0]).slice(0, 8);
+  }
+
+  return normalizeSkuPart(name).slice(0, 8) || "CAT";
+}
+
+export async function isCategoryCodeTaken(
+  code: string,
+  excludeCategoryId?: string
+): Promise<boolean> {
+  const normalized = normalizeCode(code);
+  if (!normalized) return false;
+
+  const existing = await prisma.category.findFirst({
+    where: {
+      skuCode: { equals: normalized, mode: "insensitive" },
+      ...(excludeCategoryId ? { NOT: { id: excludeCategoryId } } : {}),
+    },
+  });
+  return !!existing;
+}
+
+export async function ensureUniqueCategoryCode(
+  baseCode: string,
+  excludeCategoryId?: string
+): Promise<string> {
+  const base = normalizeCode(baseCode);
+  if (!base) return "";
+
+  if (!(await isCategoryCodeTaken(base, excludeCategoryId))) {
+    return base;
+  }
+
+  for (let i = 2; i <= 99; i++) {
+    const candidate = `${base}${i}`;
+    if (!(await isCategoryCodeTaken(candidate, excludeCategoryId))) {
+      return candidate;
+    }
+  }
+
+  throw new ProductSkuError(CATEGORY_CODE_DUPLICATE_ERROR);
 }
 
 // ─── Color code table ─────────────────────────────────────────────────────────
@@ -129,6 +238,11 @@ export function parseProductCodeSuffix(prefix: string, productCode: string): num
   const rest = upper.slice(prefix.length);
   if (!/^\d{4}$/.test(rest)) return null;
   return parseInt(rest, 10);
+}
+
+/** @alias parseProductCodeSuffix */
+export function extractProductSequence(productCode: string, categoryCode: string): number | null {
+  return parseProductCodeSuffix(categoryCode, productCode);
 }
 
 export function validateProductCodeForCategory(prefix: string, productCode: string): string {

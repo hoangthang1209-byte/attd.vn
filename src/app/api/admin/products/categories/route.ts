@@ -52,6 +52,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(cat, { status: 201 });
   } catch (err) {
     console.error("[POST /api/admin/products/categories]", err);
+    if (err instanceof Error && "fieldErrors" in err) {
+      const fe = (err as { fieldErrors?: Record<string, string> }).fieldErrors;
+      const message = fe?.skuCode ?? err.message;
+      return NextResponse.json({ message }, { status: 400 });
+    }
     return NextResponse.json({ message: "Không thể tạo danh mục." }, { status: 500 });
   }
 }

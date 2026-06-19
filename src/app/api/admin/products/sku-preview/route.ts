@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
     variantSkuPreview,
     productCodePreview,
     productCode: productCodePreview,
+    categoryCode: categorySkuCode,
     categorySkuCode,
     isTaken: taken,
     productCodeTaken,

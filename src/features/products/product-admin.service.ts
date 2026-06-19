@@ -6,8 +6,13 @@ import {
   ensureUniqueProductCode,
   ProductSkuError,
   CATEGORY_SKU_CODE_MISSING_ERROR,
+  CATEGORY_CODE_DUPLICATE_ERROR,
   validateProductCodeForCategory,
   requireCategorySkuCode,
+  generateCategoryCodeFromName,
+  ensureUniqueCategoryCode,
+  isCategoryCodeTaken,
+  normalizeCode,
 } from "@/features/products/product-sku-utils";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 
@@ -541,11 +546,21 @@ export type CategoryAdminInput = {
 };
 
 export async function createProductCategory(data: CategoryAdminInput) {
+  let skuCode = data.skuCode?.trim() ? normalizeCode(data.skuCode) : "";
+  if (!skuCode) {
+    const base = generateCategoryCodeFromName(data.name);
+    skuCode = await ensureUniqueCategoryCode(base);
+  } else if (await isCategoryCodeTaken(skuCode)) {
+    throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_ERROR, {
+      skuCode: CATEGORY_CODE_DUPLICATE_ERROR,
+    });
+  }
+
   return prisma.category.create({
     data: {
       name: data.name,
       slug: data.slug,
-      skuCode: data.skuCode ?? null,
+      skuCode,
       description: data.description ?? null,
       seoTitle: data.seoTitle ?? null,
       seoDescription: data.seoDescription ?? null,
@@ -557,12 +572,19 @@ export async function createProductCategory(data: CategoryAdminInput) {
 }
 
 export async function updateProductCategory(id: string, data: CategoryAdminInput) {
+  let skuCode = data.skuCode?.trim() ? normalizeCode(data.skuCode) : null;
+  if (skuCode && (await isCategoryCodeTaken(skuCode, id))) {
+    throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_ERROR, {
+      skuCode: CATEGORY_CODE_DUPLICATE_ERROR,
+    });
+  }
+
   return prisma.category.update({
     where: { id },
     data: {
       name: data.name,
       slug: data.slug,
-      skuCode: data.skuCode ?? null,
+      skuCode,
       description: data.description ?? null,
       seoTitle: data.seoTitle ?? null,
       seoDescription: data.seoDescription ?? null,
