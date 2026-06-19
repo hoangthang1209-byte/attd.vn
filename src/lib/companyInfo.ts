@@ -2,7 +2,7 @@
 
 export const companyInfo = {
   name: "ATTD",
-  legalName: "",
+  legalName: "Vietnam Clothing Manufacturing Co.,Ltd",
   tagline: "KHO SỈ ĐỒNG PHỤC & QUÀ TẶNG DOANH NGHIỆP",
   hotline: {
     raw: "0934337667",
@@ -13,8 +13,8 @@ export const companyInfo = {
     phone: "0934337667",
     url: "https://zalo.me/0934337667",
   },
-  email: "contact@attd.vn",
-  address: "",
+  email: "hi@attd.vn",
+  address: "14B Bùi Cẩm Hổ, Tân Phú, TP Hồ Chí Minh, Việt Nam",
   taxCode: "",
   workingHours: "8:00 – 17:30, Thứ 2 – Thứ 7",
 } as const;

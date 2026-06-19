@@ -1,4 +1,5 @@
 import type { Prisma, QuotePriceVatType, QuoteStatus } from "@prisma/client";
+import type { QuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
 import type { PublicQuoteDocument, PublicQuoteItem } from "@/features/quotes/types";
 import { getQuoteDesignImageUrl } from "@/features/quotes/quote-format";
 
@@ -36,7 +37,15 @@ type QuoteRow = {
   manualTotalAmount: Prisma.Decimal | null;
   customerNote: string | null;
   terms: string | null;
-  customer?: { name: string; legalName: string | null; taxCode: string | null; address: string | null; phone: string | null; email: string | null } | null;
+  customer?: {
+    code?: string;
+    name: string;
+    legalName: string | null;
+    taxCode: string | null;
+    address: string | null;
+    phone: string | null;
+    email: string | null;
+  } | null;
   contact?: { fullName: string; title: string | null; phone: string | null; email: string | null } | null;
   lead?: { fullName: string; companyName: string | null; company: string | null; phone: string; email: string | null } | null;
   items: Array<{
@@ -90,6 +99,17 @@ export function formatPublicQuoteDocument(row: QuoteRow): PublicQuoteDocument {
   const showSampleFee = items.some((i) => i.sampleFee != null && i.sampleFee > 0);
   const showSampleLeadTime = items.some((i) => i.sampleLeadTime?.trim());
 
+  const contactPhone =
+    row.customerPhoneSnapshot?.trim() ||
+    row.contact?.phone?.trim() ||
+    row.lead?.phone?.trim() ||
+    null;
+  const contactEmail =
+    row.customerEmailSnapshot?.trim() ||
+    row.contact?.email?.trim() ||
+    row.lead?.email?.trim() ||
+    null;
+
   return {
     quoteNo: row.quoteNo,
     status: row.status,
@@ -105,26 +125,21 @@ export function formatPublicQuoteDocument(row: QuoteRow): PublicQuoteDocument {
       row.lead?.companyName ||
       row.lead?.company ||
       null,
+    customerCode: row.customer?.code?.trim() || null,
     customerTaxCode: row.customerTaxCodeSnapshot?.trim() || row.customer?.taxCode || null,
     customerAddress: row.customerAddressSnapshot?.trim() || row.customer?.address || null,
+    customerCompanyPhone: row.customer?.phone?.trim() || null,
+    customerCompanyEmail: row.customer?.email?.trim() || null,
     customerContactName:
       row.customerContactNameSnapshot?.trim() ||
       row.contact?.fullName ||
       row.lead?.fullName ||
       null,
     customerContactTitle: row.customerContactTitleSnapshot?.trim() || row.contact?.title || null,
-    customerPhone:
-      row.customerPhoneSnapshot?.trim() ||
-      row.contact?.phone ||
-      row.customer?.phone ||
-      row.lead?.phone ||
-      null,
-    customerEmail:
-      row.customerEmailSnapshot?.trim() ||
-      row.contact?.email ||
-      row.customer?.email ||
-      row.lead?.email ||
-      null,
+    customerContactPhone: contactPhone,
+    customerContactEmail: contactEmail,
+    customerPhone: contactPhone,
+    customerEmail: contactEmail,
     salesName: row.salesName,
     salesPhone: row.salesPhone,
     salesEmail: row.salesEmail,
@@ -148,11 +163,7 @@ export function formatPublicQuoteDocument(row: QuoteRow): PublicQuoteDocument {
 }
 
 export type QuotePdfData = PublicQuoteDocument & {
-  company?: {
-    brandName: string;
-    address: string;
-    hotline: string;
-    email: string;
+  company?: QuoteCompanyProfile & {
     logoUrl?: string | null;
   };
 };

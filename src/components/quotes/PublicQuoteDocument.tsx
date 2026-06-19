@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { PublicQuoteDocument } from "@/features/quotes/types";
+import type { QuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
 import QuoteDocumentTable from "@/components/quotes/QuoteDocumentTable";
 import {
   downloadQuotePdfFromApi,
@@ -10,7 +11,7 @@ import {
 
 type Props = {
   token: string;
-  company: { brandName: string; hotlineDisplay: string; email: string; address: string };
+  company: QuoteCompanyProfile;
   logoUrl?: string | null;
 };
 
@@ -44,7 +45,7 @@ export default function PublicQuoteDocument({ token, company, logoUrl }: Props) 
       alert(
         err instanceof Error
           ? err.message
-          : "Không thể tạo PDF. Vui lòng thử lại.",
+          : "Không thể tạo PDF báo giá. Vui lòng thử lại.",
       );
     } finally {
       setPdfDownloading(false);

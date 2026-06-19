@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { QuoteStatus } from "@prisma/client";
 import QuoteStatusBadge from "@/components/admin/quotes/QuoteStatusBadge";
 import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
+import { QuotePartyColumns } from "@/components/quotes/QuoteDocumentSections";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
 import {
@@ -20,6 +21,21 @@ type QuoteDetail = {
   status: QuoteStatus;
   title: string | null;
   validUntil: string | null;
+  quoteDate: string | null;
+  currency: string;
+  priceVatType: string;
+  preparedBy: string | null;
+  customerCompanySnapshot: string | null;
+  customerTaxCodeSnapshot: string | null;
+  customerAddressSnapshot: string | null;
+  customerContactNameSnapshot: string | null;
+  customerContactTitleSnapshot: string | null;
+  customerPhoneSnapshot: string | null;
+  customerEmailSnapshot: string | null;
+  salesName: string | null;
+  salesPhone: string | null;
+  salesEmail: string | null;
+  salesAddress: string | null;
   customerNote: string | null;
   internalNote: string | null;
   terms: string | null;
@@ -36,7 +52,7 @@ type QuoteDetail = {
   manualTotalAmount: number | null;
   createdAt: string;
   lead: { id: string; fullName: string; code: string | null } | null;
-  customer: { id: string; name: string; code: string } | null;
+  customer: { id: string; name: string; code: string; phone: string | null; email: string | null } | null;
   contact: { id: string; fullName: string } | null;
   pricingCalculation: { id: string; code: string } | null;
   items: Array<{
@@ -132,7 +148,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
       setMessage(
         err instanceof Error
           ? err.message
-          : "Không thể tạo PDF. Vui lòng thử lại.",
+          : "Không thể tạo PDF báo giá. Vui lòng thử lại.",
       );
     } finally {
       setPdfDownloading(false);
@@ -200,6 +216,27 @@ export default function QuoteDetailView({ id }: { id: string }) {
       {quote.lead && <p className="admin-field-hint">Lead: <Link href={`/admin/crm/leads/${quote.lead.id}`}>{quote.lead.fullName}</Link></p>}
       {quote.customer && <p className="admin-field-hint">Khách hàng: <Link href={`/admin/crm/customers/${quote.customer.id}`}>{quote.customer.name}</Link></p>}
       {quote.pricingCalculation && <p className="admin-field-hint">Từ bản tính giá: <Link href={`/admin/pricing/history/${quote.pricingCalculation.id}`}>{quote.pricingCalculation.code}</Link></p>}
+
+      <div className="quote-form__card" style={{ marginTop: 16 }}>
+        <QuotePartyColumns
+          quote={{
+            customerCompany: quote.customerCompanySnapshot,
+            customerCode: quote.customer?.code ?? null,
+            customerTaxCode: quote.customerTaxCodeSnapshot,
+            customerAddress: quote.customerAddressSnapshot,
+            customerCompanyPhone: quote.customer?.phone ?? null,
+            customerCompanyEmail: quote.customer?.email ?? null,
+            customerContactName: quote.customerContactNameSnapshot,
+            customerContactTitle: quote.customerContactTitleSnapshot,
+            customerContactPhone: quote.customerPhoneSnapshot,
+            customerContactEmail: quote.customerEmailSnapshot,
+            salesName: quote.salesName,
+            salesPhone: quote.salesPhone,
+            salesEmail: quote.salesEmail,
+            salesAddress: quote.salesAddress,
+          }}
+        />
+      </div>
 
       <div className="admin-table-wrap" style={{ marginTop: 16 }}>
         <table className="admin-table">

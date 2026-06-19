@@ -1,6 +1,8 @@
 import type { LeadStatus, QuoteSourceType, QuoteStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { customerToQuoteSnapshots, contactToQuoteSnapshots } from "@/features/quotes/quote-party-utils";
+import { getCompanySettings } from "@/features/settings/services/settings.service";
 import { getPricingCalculationDetail } from "@/features/pricing/services/pricing-calculation.service";
 import {
   DEFAULT_QUOTE_TERMS,
@@ -625,7 +627,7 @@ export async function getPublicQuoteByToken(token: string, markViewed = true) {
   const row = await prisma.quote.findUnique({
     where: { publicToken: token },
     include: {
-      customer: { select: { name: true, legalName: true, taxCode: true, address: true, phone: true, email: true } },
+      customer: { select: { code: true, name: true, legalName: true, taxCode: true, address: true, phone: true, email: true } },
       contact: { select: { fullName: true, title: true, phone: true, email: true } },
       lead: { select: { fullName: true, companyName: true, company: true, phone: true, email: true } },
       items: {
@@ -659,7 +661,7 @@ export async function getQuotePdfDataById(
   const row = await prisma.quote.findUnique({
     where: { id },
     include: {
-      customer: { select: { name: true, legalName: true, taxCode: true, address: true, phone: true, email: true } },
+      customer: { select: { code: true, name: true, legalName: true, taxCode: true, address: true, phone: true, email: true } },
       contact: { select: { fullName: true, title: true, phone: true, email: true } },
       lead: { select: { fullName: true, companyName: true, company: true, phone: true, email: true } },
       items: {
@@ -679,7 +681,7 @@ export async function getQuotePdfDataByToken(
   const row = await prisma.quote.findUnique({
     where: { publicToken: token },
     include: {
-      customer: { select: { name: true, legalName: true, taxCode: true, address: true, phone: true, email: true } },
+      customer: { select: { code: true, name: true, legalName: true, taxCode: true, address: true, phone: true, email: true } },
       contact: { select: { fullName: true, title: true, phone: true, email: true } },
       lead: { select: { fullName: true, companyName: true, company: true, phone: true, email: true } },
       items: {
@@ -697,31 +699,73 @@ export async function buildQuotePrefill(params: {
   leadId?: string;
   customerId?: string;
 }) {
+  const [companySettings] = await Promise.all([getCompanySettings()]);
+  const salesDefaults = {
+    salesPhone: companySettings.hotline.display?.trim() || null,
+    salesEmail: companySettings.email?.trim() || null,
+    salesAddress: companySettings.address?.trim() || null,
+  };
+
   const basePrefill = {
     quoteDate: new Date().toISOString(),
     currency: "VND" as const,
     priceVatType: "EXCLUDING_VAT" as const,
     title: "Báo giá sản phẩm ATTD",
     validUntil: defaultValidUntil().toISOString(),
+    ...salesDefaults,
   };
+
+  async function snapshotsFromCustomer(customerId: string, contactId?: string | null) {
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      include: { contacts: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] } },
+    });
+    if (!customer) return null;
+    const contact =
+      (contactId ? customer.contacts.find((c) => c.id === contactId) : null) ??
+      customer.contacts.find((c) => c.isPrimary) ??
+      customer.contacts[0];
+    return {
+      ...customerToQuoteSnapshots(customer),
+      ...(contact
+        ? contactToQuoteSnapshots(contact, {
+            phone: customer.phone,
+            email: customer.email,
+          })
+        : {}),
+      customerId: customer.id,
+      contactId: contact?.id ?? null,
+    };
+  }
 
   if (params.pricingCalculationId) {
     const calc = await getPricingCalculationDetail(params.pricingCalculationId);
     if (!calc) return null;
+    const customerSnapshots =
+      calc.customer?.id
+        ? await snapshotsFromCustomer(calc.customer.id, calc.contact?.id)
+        : null;
     return {
       ...basePrefill,
       sourceType: "PRICING_CALCULATION" as const,
       pricingCalculationId: calc.id,
       leadId: calc.lead?.id ?? null,
-      customerId: calc.customer?.id ?? null,
-      contactId: calc.contact?.id ?? null,
+      customerId: calc.customer?.id ?? customerSnapshots?.customerId ?? null,
+      contactId: calc.contact?.id ?? customerSnapshots?.contactId ?? null,
       priceGroupId: calc.priceGroup?.id ?? null,
-      customerCompanySnapshot: null,
-      customerTaxCodeSnapshot: null,
-      customerAddressSnapshot: null,
-      customerContactNameSnapshot: calc.contact?.fullName ?? null,
-      customerPhoneSnapshot: null,
-      customerEmailSnapshot: null,
+      customerCompanySnapshot:
+        customerSnapshots?.customerCompanySnapshot ??
+        calc.contact?.fullName ??
+        null,
+      customerTaxCodeSnapshot: customerSnapshots?.customerTaxCodeSnapshot ?? null,
+      customerAddressSnapshot: customerSnapshots?.customerAddressSnapshot ?? null,
+      customerContactNameSnapshot:
+        customerSnapshots?.customerContactNameSnapshot ??
+        calc.contact?.fullName ??
+        null,
+      customerContactTitleSnapshot: customerSnapshots?.customerContactTitleSnapshot ?? null,
+      customerPhoneSnapshot: customerSnapshots?.customerPhoneSnapshot ?? null,
+      customerEmailSnapshot: customerSnapshots?.customerEmailSnapshot ?? null,
       discountAmount: calc.discountAmount,
       shippingFee: calc.shippingFee,
       vatRate: calc.vatRate,
@@ -793,18 +837,21 @@ export async function buildQuotePrefill(params: {
     });
     if (!customer) return null;
     const primary = customer.contacts[0];
+    const snapshots = {
+      ...customerToQuoteSnapshots(customer),
+      ...(primary
+        ? contactToQuoteSnapshots(primary, {
+            phone: customer.phone,
+            email: customer.email,
+          })
+        : {}),
+    };
     return {
       ...basePrefill,
       sourceType: "CUSTOMER" as const,
       customerId: customer.id,
       contactId: primary?.id ?? null,
-      customerCompanySnapshot: customer.legalName ?? customer.name,
-      customerTaxCodeSnapshot: customer.taxCode,
-      customerAddressSnapshot: customer.address,
-      customerContactNameSnapshot: primary?.fullName ?? null,
-      customerContactTitleSnapshot: primary?.title ?? null,
-      customerPhoneSnapshot: primary?.phone ?? customer.phone,
-      customerEmailSnapshot: primary?.email ?? customer.email,
+      ...snapshots,
       items: [{ productNameSnapshot: "", quantity: 100, unit: "cái", baseUnitPrice: 0, unitPrice: 0, sortOrder: 0 }],
     };
   }

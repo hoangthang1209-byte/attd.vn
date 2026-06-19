@@ -1,44 +1,25 @@
 import PDFDocument from "pdfkit";
 import type { QuotePdfData } from "@/features/quotes/quote-document";
-import { formatQuoteDate } from "@/features/quotes/format";
-import {
-  formatQuoteMoney,
-  formatQuoteMoq,
-  formatQuotePriceTypeLabel,
-} from "@/features/quotes/quote-format";
-import { quotePriceVatTypeLabel } from "@/features/quotes/labels";
 import { registerQuotePdfFonts } from "@/features/quotes/pdf/quote-pdf-fonts";
+import { generateFallbackQuotePdf } from "@/features/quotes/pdf/quote-pdf-fallback";
+import {
+  designCellLabel,
+  safeDash,
+  safeDate,
+  safeDim,
+  safeMoney,
+  safeNumber,
+  safePriceType,
+  safeText,
+} from "@/features/quotes/pdf/quote-pdf-safe";
 
-function textOrDash(value: string | null | undefined): string {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : "—";
-}
+type PdfFonts = ReturnType<typeof registerQuotePdfFonts>;
 
-function designCellLabel(item: QuotePdfData["items"][number]): string {
-  if (item.designImageUrl?.trim()) return "Có";
-  return "—";
-}
-
-function drawCell(
-  doc: InstanceType<typeof PDFDocument>,
-  text: string,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  fonts: { regularName: string; boldName: string },
-  opts: { bold?: boolean; align?: "left" | "center" | "right"; fontSize?: number } = {},
-) {
-  const fontSize = opts.fontSize ?? 7;
-  doc.font(opts.bold ? fonts.boldName : fonts.regularName, fontSize);
-  doc.rect(x, y, w, h).stroke("#cccccc");
-  doc.text(textOrDash(text), x + 2, y + 3, {
-    width: w - 4,
-    height: h - 4,
-    align: opts.align ?? "left",
-    ellipsis: true,
-  });
-}
+type TableColumn = {
+  header: string;
+  width: number;
+  value: (item: QuotePdfData["items"][number], idx: number, data: QuotePdfData) => string;
+};
 
 function renderPdfToBuffer(doc: InstanceType<typeof PDFDocument>): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -51,180 +32,308 @@ function renderPdfToBuffer(doc: InstanceType<typeof PDFDocument>): Promise<Buffe
   });
 }
 
+function drawCell(
+  doc: InstanceType<typeof PDFDocument>,
+  text: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fonts: PdfFonts,
+  opts: { bold?: boolean; align?: "left" | "center" | "right"; fontSize?: number } = {},
+) {
+  const fontSize = safeDim(opts.fontSize ?? 7, 5);
+  const width = safeDim(w, 8);
+  const height = safeDim(h, 10);
+  const posX = Number.isFinite(x) ? x : 28;
+  const posY = Number.isFinite(y) ? y : 28;
+
+  doc.font(opts.bold ? fonts.boldName : fonts.regularName, fontSize);
+  doc.rect(posX, posY, width, height).stroke("#cccccc");
+  doc.text(safeDash(text), posX + 2, posY + 2, {
+    width: safeDim(width - 4, 4),
+    height: safeDim(height - 4, 4),
+    align: opts.align ?? "left",
+    ellipsis: true,
+  });
+}
+
+function buildTableColumns(data: QuotePdfData): TableColumn[] {
+  const cols: TableColumn[] = [
+    {
+      header: "STT",
+      width: 22,
+      value: (_item, idx) => String(idx + 1),
+    },
+    {
+      header: "Thiet ke",
+      width: 34,
+      value: (item) => designCellLabel(item),
+    },
+    {
+      header: "Mau",
+      width: 44,
+      value: (item) => safeDash(item.colorSnapshot),
+    },
+    {
+      header: "Danh muc",
+      width: 52,
+      value: (item) => safeDash(item.categorySnapshot),
+    },
+    {
+      header: "San pham",
+      width: 110,
+      value: (item) => {
+        const label = [item.productNameSnapshot, item.variantNameSnapshot]
+          .map((part) => safeText(part).trim())
+          .filter(Boolean)
+          .join(" · ");
+        return label || "-";
+      },
+    },
+    {
+      header: "SKU",
+      width: 58,
+      value: (item) => safeDash(item.skuSnapshot),
+    },
+    {
+      header: "Mo ta",
+      width: 72,
+      value: (item) => safeDash(item.description),
+    },
+    {
+      header: "SL",
+      width: 26,
+      value: (item) => String(safeNumber(item.quantity)),
+    },
+    {
+      header: "DV",
+      width: 26,
+      value: (item) => safeDash(item.unit),
+    },
+    {
+      header: "Loai gia",
+      width: 52,
+      value: (_item, _idx, quote) => safePriceType(quote.priceVatType),
+    },
+    {
+      header: "Don gia",
+      width: 58,
+      value: (item, _idx, quote) => safeMoney(item.unitPrice, quote.currency),
+    },
+    {
+      header: "Tong",
+      width: 58,
+      value: (item, _idx, quote) => safeMoney(item.lineTotal, quote.currency),
+    },
+  ];
+
+  if (data.showProductionLeadTime) {
+    cols.push({
+      header: "TG SX",
+      width: 44,
+      value: (item) => safeDash(item.productionLeadTime),
+    });
+  }
+  if (data.showSampleFee) {
+    cols.push({
+      header: "Phi mau",
+      width: 44,
+      value: (item, _idx, quote) => safeMoney(item.sampleFee, quote.currency),
+    });
+  }
+  if (data.showSampleLeadTime) {
+    cols.push({
+      header: "TG mau",
+      width: 44,
+      value: (item) => safeDash(item.sampleLeadTime),
+    });
+  }
+
+  return cols;
+}
+
+function scaleColumns(columns: TableColumn[], maxWidth: number): TableColumn[] {
+  const total = columns.reduce((sum, col) => sum + col.width, 0);
+  if (total <= maxWidth || total <= 0) return columns;
+  const ratio = maxWidth / total;
+  return columns.map((col) => ({
+    ...col,
+    width: safeDim(Math.floor(col.width * ratio), 18),
+  }));
+}
+
+function drawPartyBlock(
+  doc: InstanceType<typeof PDFDocument>,
+  fonts: PdfFonts,
+  title: string,
+  fields: [string, unknown][],
+  x: number,
+  y: number,
+  width: number,
+) {
+  const blockW = safeDim(width, 80);
+  doc.font(fonts.boldName, 8).text(title, x, y, { width: blockW - 4 });
+  let rowY = y + 14;
+  doc.font(fonts.regularName, 7);
+  for (const [label, val] of fields) {
+    const display = safeText(val).trim();
+    if (display) {
+      doc.text(`${label}: ${display}`, x, rowY, { width: blockW - 6 });
+      rowY += 10;
+    }
+  }
+}
+
 export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 28 });
   const bufferPromise = renderPdfToBuffer(doc);
-
   const fonts = registerQuotePdfFonts(doc);
+  const company = data.company;
+  const pageW = safeDim(doc.page.width - 56, 500);
+  const colW = safeDim(pageW / 3, 120);
 
-  doc.font(fonts.boldName, 16).text("BẢNG BÁO GIÁ", { align: "center" });
-  doc.font(fonts.regularName, 10);
-  if (data.company?.brandName) {
-    doc.text(data.company.brandName, { align: "center" });
+  doc.font(fonts.boldName, 18).text("BANG BAO GIA", { align: "center" });
+  doc.moveDown(0.3);
+  if (safeText(company?.brandName).trim()) {
+    doc.font(fonts.boldName, 11).text(safeText(company?.brandName), { align: "center" });
   }
-  doc.moveDown(0.5);
-  doc.font(fonts.regularName, 9);
-  doc.text(`Mã báo giá: ${textOrDash(data.quoteNo)}`);
-  doc.text(`Ngày báo giá: ${formatQuoteDate(data.quoteDate)}`);
-  doc.text(`Hiệu lực đến: ${formatQuoteDate(data.validUntil)}`);
+  const legalName = safeText(company?.legalName).trim();
+  const brandName = safeText(company?.brandName).trim();
+  if (legalName && legalName !== brandName) {
+    doc.font(fonts.regularName, 9).text(legalName, { align: "center" });
+  }
+  doc.font(fonts.regularName, 8);
+  if (safeText(company?.taxCode).trim()) {
+    doc.text(`Ma so thue: ${safeText(company?.taxCode).trim()}`, { align: "center" });
+  }
+  if (safeText(company?.address).trim()) {
+    doc.text(`Dia chi: ${safeText(company?.address).trim()}`, { align: "center" });
+  }
+  const companyContact = [
+    safeText(company?.phone).trim() ? `Dien thoai: ${safeText(company?.phone).trim()}` : "",
+    safeText(company?.email).trim() ? `Email: ${safeText(company?.email).trim()}` : "",
+    safeText(company?.website).trim() ? `Website: ${safeText(company?.website).trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join("   ");
+  if (companyContact) doc.text(companyContact, { align: "center" });
+
+  doc.moveDown(0.6);
+  doc.font(fonts.regularName, 8);
   doc.text(
-    `Loại tiền: ${textOrDash(data.currency)}   Loại giá: ${quotePriceVatTypeLabel(data.priceVatType)}`,
+    `Ma bao gia: ${safeDash(data.quoteNo)}   Ngay: ${safeDate(data.quoteDate)}   Hieu luc: ${safeDate(data.validUntil)}   ${safeDash(data.currency)} · ${safePriceType(data.priceVatType)}`,
+    { align: "center" },
   );
   doc.moveDown(0.5);
 
-  const startY = doc.y;
-  doc.font(fonts.boldName, 8).text("Thông tin khách hàng", 28, startY);
-  doc.font(fonts.regularName, 7);
-  let y = startY + 12;
-  const leftFields: [string, string | null | undefined][] = [
-    ["Đơn vị", data.customerCompany],
-    ["MST", data.customerTaxCode],
-    ["Địa chỉ", data.customerAddress],
-    ["Liên hệ", data.customerContactName],
-    ["Chức vụ", data.customerContactTitle],
-    ["ĐT", data.customerPhone],
-    ["Email", data.customerEmail],
-  ];
-  for (const [label, val] of leftFields) {
-    const display = val?.trim();
-    if (display) {
-      doc.text(`${label}: ${display}`, 28, y, { width: 360 });
-      y += 10;
-    }
-  }
+  const blockY = doc.y;
+  drawPartyBlock(
+    doc,
+    fonts,
+    "Khach hang",
+    [
+      ["Cong ty", data.customerCompany],
+      ["Ma KH", data.customerCode],
+      ["MST", data.customerTaxCode],
+      ["Dia chi", data.customerAddress],
+      ["DT", data.customerCompanyPhone],
+      ["Email", data.customerCompanyEmail],
+    ],
+    28,
+    blockY,
+    colW,
+  );
+  drawPartyBlock(
+    doc,
+    fonts,
+    "Nguoi lien he",
+    [
+      ["Ho ten", data.customerContactName],
+      ["Chuc vu", data.customerContactTitle],
+      ["DT", data.customerContactPhone],
+      ["Email", data.customerContactEmail],
+    ],
+    28 + colW,
+    blockY,
+    colW,
+  );
+  drawPartyBlock(
+    doc,
+    fonts,
+    "Nhan vien tu van",
+    [
+      ["Ten", data.salesName],
+      ["DT", data.salesPhone],
+      ["Email", data.salesEmail],
+      ["Dia chi", data.salesAddress],
+    ],
+    28 + colW * 2,
+    blockY,
+    colW,
+  );
 
-  doc.font(fonts.boldName, 8).text("Nhân viên tư vấn", 400, startY);
-  doc.font(fonts.regularName, 7);
-  let sy = startY + 12;
-  const salesFields: [string, string | null | undefined][] = [
-    ["Tên", data.salesName],
-    ["ĐT", data.salesPhone],
-    ["Email", data.salesEmail],
-    ["Địa chỉ", data.salesAddress],
-  ];
-  for (const [label, val] of salesFields) {
-    const display = val?.trim();
-    if (display) {
-      doc.text(`${label}: ${display}`, 400, sy, { width: 360 });
-      sy += 10;
-    }
-  }
-
-  let tableY = Math.max(y, sy) + 16;
-
-  const headers = [
-    "STT",
-    "Thiết kế",
-    "Màu",
-    "Danh mục",
-    "Giới tính",
-    "Sản phẩm",
-    "SKU",
-    "Mô tả",
-    "MOQ",
-    "Ghi chú",
-    "SL",
-    "ĐV",
-    "Loại giá",
-    "Đơn giá",
-    "Tổng",
-  ];
-  if (data.showProductionLeadTime) headers.push("TG SX");
-  if (data.showSampleFee) headers.push("Phí mẫu");
-  if (data.showSampleLeadTime) headers.push("TG mẫu");
-
-  const pageW = doc.page.width - 56;
-  const colCount = headers.length;
-  const baseW = pageW / colCount;
+  let tableY = blockY + 72;
+  const columns = scaleColumns(buildTableColumns(data), pageW);
   const rowH = 22;
   let x = 28;
 
-  headers.forEach((h) => {
-    drawCell(doc, h, x, tableY, baseW, rowH, fonts, {
+  columns.forEach((col) => {
+    drawCell(doc, col.header, x, tableY, col.width, rowH, fonts, {
       bold: true,
       fontSize: 6,
       align: "center",
     });
-    x += baseW;
+    x += col.width;
   });
 
   tableY += rowH;
-  data.items.forEach((item, idx) => {
+  const items = Array.isArray(data.items) ? data.items : [];
+
+  items.forEach((item, idx) => {
     x = 28;
-    const priceType = formatQuotePriceTypeLabel(data.priceVatType);
-    const productLabel =
-      [item.productNameSnapshot, item.variantNameSnapshot]
-        .filter((part) => part?.trim())
-        .join(" · ") || "—";
-
-    const cells: string[] = [
-      String(idx + 1),
-      designCellLabel(item),
-      textOrDash(item.colorSnapshot),
-      textOrDash(item.categorySnapshot),
-      textOrDash(item.genderSnapshot),
-      productLabel,
-      textOrDash(item.skuSnapshot),
-      textOrDash(item.description),
-      formatQuoteMoq(item.moqSnapshot),
-      textOrDash(item.itemNote),
-      String(item.quantity ?? 0),
-      textOrDash(item.unit),
-      priceType,
-      formatQuoteMoney(item.unitPrice, data.currency),
-      formatQuoteMoney(item.lineTotal, data.currency),
-    ];
-
-    if (data.showProductionLeadTime) {
-      cells.push(textOrDash(item.productionLeadTime));
-    }
-    if (data.showSampleFee) {
-      cells.push(
-        item.sampleFee != null
-          ? formatQuoteMoney(item.sampleFee, data.currency)
-          : "—",
-      );
-    }
-    if (data.showSampleLeadTime) {
-      cells.push(textOrDash(item.sampleLeadTime));
-    }
-
-    cells.forEach((cell) => {
-      drawCell(doc, cell, x, tableY, baseW, rowH, fonts, { fontSize: 6 });
-      x += baseW;
+    columns.forEach((col) => {
+      drawCell(doc, col.value(item, idx, data), x, tableY, col.width, rowH, fonts, {
+        fontSize: 6,
+      });
+      x += col.width;
     });
     tableY += rowH;
+
+    if (tableY > doc.page.height - 80) {
+      doc.addPage({ size: "A4", layout: "landscape", margin: 28 });
+      tableY = 28;
+    }
   });
 
   tableY += 8;
   doc.font(fonts.regularName, 9);
   const displayTotal =
     data.manualOverride && data.manualTotalAmount != null
-      ? data.manualTotalAmount
-      : data.totalAmount;
-  doc.text(`Tổng cộng: ${formatQuoteMoney(displayTotal, data.currency)}`, 28, tableY, {
+      ? safeNumber(data.manualTotalAmount)
+      : safeNumber(data.totalAmount);
+  doc.text(`Tong cong: ${safeMoney(displayTotal, data.currency)}`, 28, tableY, {
     align: "right",
     width: pageW,
   });
 
-  if (data.customerNote?.trim()) {
+  const customerNote = safeText(data.customerNote).trim();
+  if (customerNote) {
     tableY += 20;
-    doc.font(fonts.boldName, 9).text("Ghi chú gửi khách:", 28, tableY);
-    doc.font(fonts.regularName, 8).text(data.customerNote.trim(), 28, tableY + 12, {
-      width: pageW,
-    });
+    doc.font(fonts.boldName, 9).text("Ghi chu gui khach:", 28, tableY);
+    doc.font(fonts.regularName, 8).text(customerNote, 28, tableY + 12, { width: pageW });
   }
 
-  if (data.terms?.trim()) {
+  const terms = safeText(data.terms).trim();
+  if (terms) {
     tableY += 40;
-    doc.font(fonts.boldName, 9).text("Điều khoản báo giá:", 28, tableY);
-    doc.font(fonts.regularName, 7).text(data.terms.trim(), 28, tableY + 12, {
-      width: pageW,
-    });
+    doc.font(fonts.boldName, 9).text("Dieu khoan bao gia:", 28, tableY);
+    doc.font(fonts.regularName, 7).text(terms, 28, tableY + 12, { width: pageW });
   }
 
-  if (data.preparedBy?.trim()) {
-    doc.font(fonts.regularName, 9).text(`Người lập: ${data.preparedBy.trim()}`, 28, doc.page.height - 60, {
+  const preparedBy = safeText(data.preparedBy).trim();
+  if (preparedBy) {
+    doc.font(fonts.regularName, 9).text(`Nguoi lap: ${preparedBy}`, 28, doc.page.height - 60, {
       align: "right",
       width: pageW,
     });
@@ -234,6 +343,36 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   return bufferPromise;
 }
 
+export type QuotePdfGenerationResult = {
+  buffer: Buffer;
+  usedFallback: boolean;
+};
+
+export async function generateQuotePdfWithFallback(
+  data: QuotePdfData,
+): Promise<QuotePdfGenerationResult> {
+  try {
+    const buffer = await generateQuotePdf(data);
+    if (!buffer || buffer.length < 100) {
+      throw new Error("Full PDF buffer empty or too small");
+    }
+    return { buffer, usedFallback: false };
+  } catch (fullError) {
+    console.error("[quote-pdf] Full PDF generation failed, using fallback PDF.", {
+      quoteNo: data.quoteNo,
+      errorName: fullError instanceof Error ? fullError.name : "UnknownError",
+      errorMessage: fullError instanceof Error ? fullError.message : String(fullError),
+      stack: fullError instanceof Error ? fullError.stack : undefined,
+    });
+    const buffer = await generateFallbackQuotePdf(data);
+    if (!buffer || buffer.length < 100) {
+      throw fullError;
+    }
+    return { buffer, usedFallback: true };
+  }
+}
+
 export function quotePdfFilename(quoteNo: string): string {
-  return `bao-gia-${quoteNo.replace(/[^a-zA-Z0-9-]/g, "")}.pdf`;
+  const safe = safeText(quoteNo).replace(/[^a-zA-Z0-9-]/g, "");
+  return `bao-gia-${safe || "attd"}.pdf`;
 }

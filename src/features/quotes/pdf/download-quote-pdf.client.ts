@@ -10,20 +10,31 @@ export async function downloadQuotePdfFromApi(
   if (!res.ok) {
     let detail = "";
     try {
-      const data = (await res.json()) as { message?: string; error?: string };
-      detail = data.message ?? data.error ?? "";
+      const data = (await res.json()) as { message?: string; error?: string; detail?: string };
+      detail = data.detail ?? data.message ?? data.error ?? "";
     } catch {
       // Response may not be JSON.
     }
 
+    console.error("[downloadQuotePdfFromApi] PDF request failed", {
+      apiUrl,
+      status: res.status,
+      statusText: res.statusText,
+      detail,
+    });
+
     if (res.status === 404) {
       throw new Error(detail || "Không tìm thấy báo giá.");
     }
-    throw new Error(detail || "Không thể tạo PDF. Vui lòng thử lại.");
+    throw new Error(detail || "Không thể tạo PDF báo giá. Vui lòng thử lại.");
   }
 
   const contentType = res.headers.get("Content-Type") ?? "";
   if (!contentType.includes("application/pdf")) {
+    console.error("[downloadQuotePdfFromApi] Invalid content type", {
+      apiUrl,
+      contentType,
+    });
     throw new Error("Phản hồi không phải file PDF hợp lệ.");
   }
 

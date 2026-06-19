@@ -29,6 +29,7 @@ export async function listCustomers(
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
+      { legalName: { contains: search, mode: "insensitive" } },
       { code: { contains: search, mode: "insensitive" } },
       { phone: { contains: search, mode: "insensitive" } },
       { email: { contains: search, mode: "insensitive" } },

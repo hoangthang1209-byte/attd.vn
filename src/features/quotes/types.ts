@@ -132,11 +132,20 @@ export type PublicQuoteDocument = {
   currency: string;
   priceVatType: QuotePriceVatType;
   customerCompany: string | null;
+  customerCode: string | null;
   customerTaxCode: string | null;
   customerAddress: string | null;
+  customerCompanyPhone: string | null;
+  customerCompanyEmail: string | null;
   customerContactName: string | null;
   customerContactTitle: string | null;
+  /** Contact person phone (Người liên hệ). */
+  customerContactPhone: string | null;
+  /** Contact person email (Người liên hệ). */
+  customerContactEmail: string | null;
+  /** @deprecated Use customerContactPhone */
   customerPhone: string | null;
+  /** @deprecated Use customerContactEmail */
   customerEmail: string | null;
   salesName: string | null;
   salesPhone: string | null;
