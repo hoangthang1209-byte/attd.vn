@@ -8,6 +8,10 @@ import QuoteStatusBadge from "@/components/admin/quotes/QuoteStatusBadge";
 import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
+import {
+  downloadQuotePdfFromApi,
+  quotePdfDownloadFilename,
+} from "@/features/quotes/pdf/download-quote-pdf.client";
 
 type QuoteDetail = {
   id: string;
@@ -118,17 +122,18 @@ export default function QuoteDetailView({ id }: { id: string }) {
   async function downloadPdf() {
     setPdfDownloading(true);
     try {
-      const res = await fetch(`/api/quotes/${id}/pdf`);
-      if (!res.ok) throw new Error("PDF failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `bao-gia-${quote?.quoteNo ?? id}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setMessage("Không thể tạo PDF. Vui lòng thử lại.");
+      const apiUrl = `/api/quotes/${encodeURIComponent(id)}/pdf`;
+      await downloadQuotePdfFromApi(
+        apiUrl,
+        quotePdfDownloadFilename(quote?.quoteNo ?? id),
+      );
+    } catch (err) {
+      console.error("[QuoteDetailView] PDF download failed", err);
+      setMessage(
+        err instanceof Error
+          ? err.message
+          : "Không thể tạo PDF. Vui lòng thử lại.",
+      );
     } finally {
       setPdfDownloading(false);
     }

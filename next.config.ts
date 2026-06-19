@@ -5,6 +5,14 @@ const BLOB_HOSTNAME =
   "0iitstjrwqim8udr.public.blob.vercel-storage.com";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/api/quotes/[id]/pdf/route": [
+      "./node_modules/dejavu-fonts-ttf/ttf/**/*",
+    ],
+    "/api/quotes/public/[token]/pdf/route": [
+      "./node_modules/dejavu-fonts-ttf/ttf/**/*",
+    ],
+  },
   images: {
     remotePatterns: [
       {

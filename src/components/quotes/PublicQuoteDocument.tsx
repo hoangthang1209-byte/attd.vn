@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import type { PublicQuoteDocument } from "@/features/quotes/types";
 import QuoteDocumentTable from "@/components/quotes/QuoteDocumentTable";
+import {
+  downloadQuotePdfFromApi,
+  quotePdfDownloadFilename,
+} from "@/features/quotes/pdf/download-quote-pdf.client";
 
 type Props = {
   token: string;
@@ -30,17 +34,18 @@ export default function PublicQuoteDocument({ token, company, logoUrl }: Props) 
   async function downloadPdf() {
     setPdfDownloading(true);
     try {
-      const res = await fetch(`/api/quotes/public/${token}/pdf`);
-      if (!res.ok) throw new Error("Không thể tạo PDF");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `bao-gia-${quote?.quoteNo ?? token}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      alert("Không thể tạo PDF. Vui lòng thử lại.");
+      const apiUrl = `/api/quotes/public/${encodeURIComponent(token)}/pdf`;
+      await downloadQuotePdfFromApi(
+        apiUrl,
+        quotePdfDownloadFilename(quote?.quoteNo ?? token),
+      );
+    } catch (err) {
+      console.error("[PublicQuoteDocument] PDF download failed", err);
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Không thể tạo PDF. Vui lòng thử lại.",
+      );
     } finally {
       setPdfDownloading(false);
     }
