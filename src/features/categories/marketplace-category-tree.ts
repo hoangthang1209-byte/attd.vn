@@ -61,9 +61,10 @@ function resolveCategoryImage(
 function mapDbChild(
   category: DbCategory,
   labelOverride?: string,
+  idOverride?: string,
 ): MarketplaceCategoryTreeChild {
   return {
-    id: category.id,
+    id: idOverride ?? category.id,
     name: labelOverride ?? category.name,
     slug: category.slug,
     imageUrl: resolveCategoryImage(category),
@@ -93,14 +94,17 @@ function mapDbParent(category: DbCategory): MarketplaceCategoryTreeNode {
 function buildChildFromStatic(
   staticChild: StaticCategoryChild,
   bySlug: Map<string, DbCategory>,
+  groupId: string,
+  childIndex: number,
 ): MarketplaceCategoryTreeChild {
+  const uniqueId = `${groupId}-${staticChild.slug}-${childIndex}`;
   const db = bySlug.get(staticChild.slug);
   if (db) {
-    return mapDbChild(db, staticChild.name);
+    return mapDbChild(db, staticChild.name, uniqueId);
   }
   const demo = categoryDemoImages[staticChild.slug];
   return {
-    id: `static-${staticChild.slug}-${staticChild.name}`,
+    id: uniqueId,
     name: staticChild.name,
     slug: staticChild.slug,
     imageUrl: demo && isValidImageSrc(demo) ? demo : PLACEHOLDER_IMAGE,
@@ -116,8 +120,8 @@ function buildTreeFromStaticGroups(
 
   return MARKETPLACE_PARENT_GROUPS.map((group) => {
     const dbParent = bySlug.get(group.slug);
-    const children = group.children.map((child) =>
-      buildChildFromStatic(child, bySlug),
+    const children = group.children.map((child, childIndex) =>
+      buildChildFromStatic(child, bySlug, group.id, childIndex),
     );
     const productCount =
       dbParent?._count.products ??
