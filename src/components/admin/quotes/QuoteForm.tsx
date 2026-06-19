@@ -6,27 +6,13 @@ import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
 import { DEFAULT_QUOTE_TERMS } from "@/features/quotes/quote-code";
 import { toDateInputValue } from "@/features/quotes/format";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
-import type { QuoteItemInput } from "@/features/quotes/types";
+import QuoteItemFormRow, { emptyQuoteItem, type QuoteItemRow } from "@/components/admin/quotes/QuoteItemFormRow";
 
 type ProductOption = { id: string; name: string };
-type VariantOption = { id: string; sku: string; colorName: string | null; sizeName: string | null };
+type VariantOption = { id: string; sku: string; colorName: string | null; colorCode: string | null; sizeName: string | null };
 type LeadOption = { id: string; fullName: string; companyName: string | null; company: string | null };
 type CustomerOption = { id: string; name: string; code: string };
 type ContactOption = { id: string; fullName: string };
-
-type ItemRow = QuoteItemInput & { key: string };
-
-const emptyItem = (): ItemRow => ({
-  key: crypto.randomUUID(),
-  productNameSnapshot: "",
-  quantity: 100,
-  unit: "cái",
-  baseUnitPrice: 0,
-  serviceFee: 0,
-  setupFee: 0,
-  unitPrice: 0,
-  discountAmount: 0,
-});
 
 type Props = {
   mode: "create" | "edit";
@@ -65,8 +51,23 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
   const [customerNote, setCustomerNote] = useState("");
   const [internalNote, setInternalNote] = useState("");
   const [terms, setTerms] = useState(DEFAULT_QUOTE_TERMS);
-  const [items, setItems] = useState<ItemRow[]>([emptyItem()]);
+  const [items, setItems] = useState<QuoteItemRow[]>([emptyQuoteItem()]);
   const [status, setStatus] = useState<string>("DRAFT");
+  const [quoteDate, setQuoteDate] = useState(toDateInputValue(new Date().toISOString()));
+  const [currency, setCurrency] = useState("VND");
+  const [priceVatType, setPriceVatType] = useState("EXCLUDING_VAT");
+  const [customerCompany, setCustomerCompany] = useState("");
+  const [customerTaxCode, setCustomerTaxCode] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [customerContactName, setCustomerContactName] = useState("");
+  const [customerContactTitle, setCustomerContactTitle] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [salesName, setSalesName] = useState("");
+  const [salesPhone, setSalesPhone] = useState("");
+  const [salesEmail, setSalesEmail] = useState("");
+  const [salesAddress, setSalesAddress] = useState("");
+  const [preparedBy, setPreparedBy] = useState("");
 
   useEffect(() => {
     void Promise.all([
@@ -101,6 +102,21 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
           setContactId((q.contactId as string) ?? "");
           setTitle(String(q.title ?? ""));
           setValidUntil(toDateInputValue(q.validUntil as string));
+          setQuoteDate(toDateInputValue(q.quoteDate as string) || toDateInputValue(new Date().toISOString()));
+          setCurrency(String(q.currency ?? "VND"));
+          setPriceVatType(String(q.priceVatType ?? "EXCLUDING_VAT"));
+          setCustomerCompany(String(q.customerCompanySnapshot ?? ""));
+          setCustomerTaxCode(String(q.customerTaxCodeSnapshot ?? ""));
+          setCustomerAddress(String(q.customerAddressSnapshot ?? ""));
+          setCustomerContactName(String(q.customerContactNameSnapshot ?? ""));
+          setCustomerContactTitle(String(q.customerContactTitleSnapshot ?? ""));
+          setCustomerPhone(String(q.customerPhoneSnapshot ?? ""));
+          setCustomerEmail(String(q.customerEmailSnapshot ?? ""));
+          setSalesName(String(q.salesName ?? ""));
+          setSalesPhone(String(q.salesPhone ?? ""));
+          setSalesEmail(String(q.salesEmail ?? ""));
+          setSalesAddress(String(q.salesAddress ?? ""));
+          setPreparedBy(String(q.preparedBy ?? ""));
           setDiscountAmount(String(q.discountAmount ?? 0));
           setShippingFee(String(q.shippingFee ?? 0));
           setVatRate(String(q.vatRate ?? 0));
@@ -122,6 +138,16 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
             productNameSnapshot: String(item.productNameSnapshot ?? ""),
             variantNameSnapshot: (item.variantNameSnapshot as string) ?? null,
             description: (item.description as string) ?? null,
+            skuSnapshot: (item.skuSnapshot as string) ?? null,
+            colorSnapshot: (item.colorSnapshot as string) ?? null,
+            categorySnapshot: (item.categorySnapshot as string) ?? null,
+            genderSnapshot: (item.genderSnapshot as string) ?? null,
+            moqSnapshot: item.moqSnapshot != null ? Number(item.moqSnapshot) : null,
+            itemNote: (item.itemNote as string) ?? null,
+            designImageUrl: (item.designImageUrl as string) ?? null,
+            productionLeadTime: (item.productionLeadTime as string) ?? null,
+            sampleFee: item.sampleFee != null ? Number(item.sampleFee) : null,
+            sampleLeadTime: (item.sampleLeadTime as string) ?? null,
             quantity: Number(item.quantity ?? 1),
             unit: String(item.unit ?? "cái"),
             baseUnitPrice: Number(item.baseUnitPrice ?? 0),
@@ -156,6 +182,16 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
         setContactId((p.contactId as string) ?? "");
         setTitle(String(p.title ?? "Báo giá sản phẩm ATTD"));
         setValidUntil(toDateInputValue(p.validUntil as string));
+        setQuoteDate(toDateInputValue(p.quoteDate as string) || toDateInputValue(new Date().toISOString()));
+        setCurrency(String(p.currency ?? "VND"));
+        setPriceVatType(String(p.priceVatType ?? "EXCLUDING_VAT"));
+        setCustomerCompany(String(p.customerCompanySnapshot ?? ""));
+        setCustomerTaxCode(String(p.customerTaxCodeSnapshot ?? ""));
+        setCustomerAddress(String(p.customerAddressSnapshot ?? ""));
+        setCustomerContactName(String(p.customerContactNameSnapshot ?? ""));
+        setCustomerContactTitle(String(p.customerContactTitleSnapshot ?? ""));
+        setCustomerPhone(String(p.customerPhoneSnapshot ?? ""));
+        setCustomerEmail(String(p.customerEmailSnapshot ?? ""));
         setDiscountAmount(String(p.discountAmount ?? 0));
         setShippingFee(String(p.shippingFee ?? 0));
         setVatRate(String(p.vatRate ?? 0));
@@ -187,6 +223,24 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
       .finally(() => setLoading(false));
   }, [mode, quoteId, prefillParams]);
 
+  async function loadProductMeta(productId: string, itemIndex: number) {
+    const res = await fetch(`/api/admin/products/${productId}`);
+    const data = await res.json() as {
+      product?: { name?: string; defaultMoq?: number; leadTime?: string | null; category?: { name?: string } };
+      variants?: VariantOption[];
+    };
+    if (data.variants) {
+      setVariantsMap((prev) => ({ ...prev, [productId]: data.variants ?? [] }));
+    }
+    setItems((prev) => prev.map((row, i) => i === itemIndex ? {
+      ...row,
+      productNameSnapshot: data.product?.name ?? row.productNameSnapshot,
+      categorySnapshot: data.product?.category?.name ?? row.categorySnapshot,
+      moqSnapshot: data.product?.defaultMoq ?? row.moqSnapshot,
+      productionLeadTime: data.product?.leadTime ?? row.productionLeadTime,
+    } : row));
+  }
+
   async function loadVariants(productId: string) {
     if (!productId || variantsMap[productId]) return;
     const res = await fetch(`/api/admin/products/${productId}`);
@@ -213,6 +267,21 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
       contactId: contactId || null,
       title,
       validUntil: validUntil || null,
+      quoteDate: quoteDate || null,
+      currency,
+      priceVatType: priceVatType as "EXCLUDING_VAT" | "INCLUDING_VAT",
+      customerCompanySnapshot: customerCompany || null,
+      customerTaxCodeSnapshot: customerTaxCode || null,
+      customerAddressSnapshot: customerAddress || null,
+      customerContactNameSnapshot: customerContactName || null,
+      customerContactTitleSnapshot: customerContactTitle || null,
+      customerPhoneSnapshot: customerPhone || null,
+      customerEmailSnapshot: customerEmail || null,
+      salesName: salesName || null,
+      salesPhone: salesPhone || null,
+      salesEmail: salesEmail || null,
+      salesAddress: salesAddress || null,
+      preparedBy: preparedBy || null,
       discountAmount: Number(discountAmount) || 0,
       shippingFee: Number(shippingFee) || 0,
       vatRate: Number(vatRate) || 0,
@@ -251,7 +320,7 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
     }
   }
 
-  function updateItem(index: number, patch: Partial<ItemRow>) {
+  function updateItem(index: number, patch: Partial<QuoteItemRow>) {
     setItems((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
@@ -287,12 +356,84 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
             </select>
           </div>
           <div className="admin-field">
+            <label className="admin-label">Tên công ty</label>
+            <input className="admin-input" value={customerCompany} onChange={(e) => setCustomerCompany(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Mã số thuế</label>
+            <input className="admin-input" value={customerTaxCode} onChange={(e) => setCustomerTaxCode(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Địa chỉ</label>
+            <input className="admin-input" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Người liên hệ</label>
+            <input className="admin-input" value={customerContactName} onChange={(e) => setCustomerContactName(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Chức vụ</label>
+            <input className="admin-input" value={customerContactTitle} onChange={(e) => setCustomerContactTitle(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Số điện thoại</label>
+            <input className="admin-input" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Email</label>
+            <input className="admin-input" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset className="admin-catalog-fieldset">
+        <legend>Cài đặt báo giá</legend>
+        <div className="admin-seo-brief-form-grid">
+          <div className="admin-field">
             <label className="admin-label">Tiêu đề báo giá</label>
             <input className="admin-input" value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="admin-field">
-            <label className="admin-label">Hiệu lực đến</label>
+            <label className="admin-label">Ngày báo giá</label>
+            <input className="admin-input" type="date" value={quoteDate} onChange={(e) => setQuoteDate(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Thời hạn báo giá / Hiệu lực đến</label>
             <input className="admin-input" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Loại tiền</label>
+            <select className="admin-input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+              <option value="VND">VND</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Loại giá</label>
+            <select className="admin-input" value={priceVatType} onChange={(e) => setPriceVatType(e.target.value)}>
+              <option value="EXCLUDING_VAT">Chưa bao gồm VAT</option>
+              <option value="INCLUDING_VAT">Đã bao gồm VAT</option>
+            </select>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Nhân viên tư vấn</label>
+            <input className="admin-input" value={salesName} onChange={(e) => setSalesName(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">SĐT tư vấn</label>
+            <input className="admin-input" value={salesPhone} onChange={(e) => setSalesPhone(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Email tư vấn</label>
+            <input className="admin-input" value={salesEmail} onChange={(e) => setSalesEmail(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Địa chỉ tư vấn</label>
+            <input className="admin-input" value={salesAddress} onChange={(e) => setSalesAddress(e.target.value)} />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Người lập</label>
+            <input className="admin-input" value={preparedBy} onChange={(e) => setPreparedBy(e.target.value)} />
           </div>
         </div>
       </fieldset>
@@ -300,71 +441,19 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
       <fieldset className="admin-catalog-fieldset">
         <legend>Sản phẩm / dịch vụ</legend>
         {items.map((item, i) => (
-          <div key={item.key} className="admin-catalog-variant-row" style={{ marginBottom: 12 }}>
-            <div className="admin-catalog-variant-header">
-              <strong>Dòng #{i + 1}</strong>
-              {items.length > 1 && (
-                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setItems(items.filter((_, idx) => idx !== i))}>Xóa</button>
-              )}
-            </div>
-            <div className="admin-catalog-variant-fields">
-              <div className="admin-field">
-                <label className="admin-label">Sản phẩm</label>
-                <select className="admin-input" value={item.productId ?? ""} onChange={(e) => {
-                  const product = products.find((p) => p.id === e.target.value);
-                  updateItem(i, { productId: e.target.value || null, variantId: null, productNameSnapshot: product?.name ?? item.productNameSnapshot });
-                  void loadVariants(e.target.value);
-                }}>
-                  <option value="">— Tùy chỉnh —</option>
-                  {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Biến thể</label>
-                <select className="admin-input" value={item.variantId ?? ""} onChange={(e) => {
-                  const variant = (variantsMap[item.productId ?? ""] ?? []).find((v) => v.id === e.target.value);
-                  updateItem(i, { variantId: e.target.value || null, variantNameSnapshot: variant ? [variant.sku, variant.colorName, variant.sizeName].filter(Boolean).join(" · ") : null });
-                }}>
-                  <option value="">— Không chọn —</option>
-                  {(variantsMap[item.productId ?? ""] ?? []).map((v) => <option key={v.id} value={v.id}>{v.sku}</option>)}
-                </select>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Tên hiển thị *</label>
-                <input className="admin-input" value={item.productNameSnapshot ?? ""} onChange={(e) => updateItem(i, { productNameSnapshot: e.target.value })} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Mô tả</label>
-                <input className="admin-input" value={item.description ?? ""} onChange={(e) => updateItem(i, { description: e.target.value })} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Số lượng</label>
-                <input className="admin-input" type="number" min="1" value={item.quantity} onChange={(e) => updateItem(i, { quantity: parseInt(e.target.value, 10) || 1 })} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Đơn vị</label>
-                <input className="admin-input" value={item.unit ?? "cái"} onChange={(e) => updateItem(i, { unit: e.target.value })} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Đơn giá gốc</label>
-                <input className="admin-input" type="number" min="0" value={item.baseUnitPrice ?? 0} onChange={(e) => updateItem(i, { baseUnitPrice: Number(e.target.value) || 0, unitPrice: Number(e.target.value) || 0 })} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Phí dịch vụ</label>
-                <input className="admin-input" type="number" min="0" value={item.serviceFee ?? 0} onChange={(e) => updateItem(i, { serviceFee: Number(e.target.value) || 0 })} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Phí setup</label>
-                <input className="admin-input" type="number" min="0" value={item.setupFee ?? 0} onChange={(e) => updateItem(i, { setupFee: Number(e.target.value) || 0 })} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Giá chỉnh tay / đơn vị</label>
-                <input className="admin-input" type="number" min="0" value={item.manualUnitPrice ?? ""} onChange={(e) => updateItem(i, { manualUnitPrice: e.target.value.trim() ? Number(e.target.value) : null })} />
-              </div>
-            </div>
-          </div>
+          <QuoteItemFormRow
+            key={item.key}
+            index={i}
+            item={item}
+            products={products}
+            variants={variantsMap[item.productId ?? ""] ?? []}
+            onChange={(patch) => updateItem(i, patch)}
+            onRemove={items.length > 1 ? () => setItems(items.filter((_, idx) => idx !== i)) : undefined}
+            onLoadVariants={loadVariants}
+            onProductSelect={(productId) => loadProductMeta(productId, i)}
+          />
         ))}
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setItems([...items, emptyItem()])}>+ Thêm dòng sản phẩm</button>
+        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setItems([...items, emptyQuoteItem()])}>+ Thêm dòng sản phẩm</button>
       </fieldset>
 
       <fieldset className="admin-catalog-fieldset">

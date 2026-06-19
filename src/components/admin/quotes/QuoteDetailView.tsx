@@ -113,6 +113,27 @@ export default function QuoteDetailView({ id }: { id: string }) {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  const [pdfDownloading, setPdfDownloading] = useState(false);
+
+  async function downloadPdf() {
+    setPdfDownloading(true);
+    try {
+      const res = await fetch(`/api/quotes/${id}/pdf`);
+      if (!res.ok) throw new Error("PDF failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bao-gia-${quote?.quoteNo ?? id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setMessage("Không thể tạo PDF. Vui lòng thử lại.");
+    } finally {
+      setPdfDownloading(false);
+    }
+  }
+
   if (loading) return <p className="admin-loading">Đang tải...</p>;
   if (error || !quote) {
     return (
@@ -151,6 +172,9 @@ export default function QuoteDetailView({ id }: { id: string }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link href={`/admin/quotes/${id}/edit`} className="admin-btn admin-btn--secondary">Chỉnh sửa</Link>
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void duplicateQuote()}>Sao chép</button>
+          <button type="button" className="admin-btn admin-btn--secondary" disabled={pdfDownloading} onClick={() => void downloadPdf()}>
+            {pdfDownloading ? "Đang tạo PDF..." : "Tải PDF báo giá"}
+          </button>
         </div>
       </div>
 
@@ -208,6 +232,9 @@ export default function QuoteDetailView({ id }: { id: string }) {
             <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void copyLink()}>{copied ? "Đã sao chép" : "Sao chép liên kết"}</button>
             <a href={url} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary admin-btn--xs">Mở trang báo giá</a>
             <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => window.open(url, "_blank")?.print()}>In / Lưu PDF</button>
+            <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={pdfDownloading} onClick={() => void downloadPdf()}>
+              {pdfDownloading ? "Đang tạo PDF..." : "Tải PDF báo giá"}
+            </button>
           </div>
         ) : (
           <p className="admin-field-hint">Liên kết sẽ được tạo khi gửi báo giá.</p>

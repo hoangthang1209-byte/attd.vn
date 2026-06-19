@@ -9,6 +9,7 @@ import {
   generateQuoteNo,
 } from "@/features/quotes/quote-code";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
+import { formatPublicQuoteDocument, formatQuotePdfData } from "@/features/quotes/quote-document";
 import type { CreateQuoteInput, QuoteItemInput, QuoteListRecord } from "@/features/quotes/types";
 
 export class QuoteValidationError extends Error {
@@ -87,6 +88,17 @@ function buildItemCreateData(
     productNameSnapshot: item.productNameSnapshot?.trim() || "Sản phẩm/dịch vụ",
     variantNameSnapshot: item.variantNameSnapshot ?? null,
     description: item.description ?? null,
+    designMediaAssetId: item.designMediaAssetId ?? null,
+    designImageUrl: item.designImageUrl ?? null,
+    skuSnapshot: item.skuSnapshot ?? null,
+    colorSnapshot: item.colorSnapshot ?? null,
+    categorySnapshot: item.categorySnapshot ?? null,
+    genderSnapshot: item.genderSnapshot ?? null,
+    moqSnapshot: item.moqSnapshot ?? null,
+    itemNote: item.itemNote ?? null,
+    productionLeadTime: item.productionLeadTime ?? null,
+    sampleFee: item.sampleFee ?? null,
+    sampleLeadTime: item.sampleLeadTime ?? null,
     quantity: item.quantity,
     unit: item.unit ?? "cái",
     baseUnitPrice: item.baseUnitPrice ?? 0,
@@ -171,7 +183,7 @@ export async function getQuoteDetail(id: string) {
       contact: { select: { id: true, fullName: true, phone: true, email: true } },
       priceGroup: { select: { id: true, name: true, code: true } },
       pricingCalculation: { select: { id: true, code: true } },
-      items: { orderBy: { sortOrder: "asc" } },
+      items: { orderBy: { sortOrder: "asc" }, include: { designMediaAsset: { select: { url: true } } } },
     },
   });
   if (!row) return null;
@@ -189,6 +201,21 @@ export async function getQuoteDetail(id: string) {
     status: row.status,
     title: row.title,
     validUntil: row.validUntil?.toISOString() ?? null,
+    quoteDate: row.quoteDate?.toISOString() ?? null,
+    currency: row.currency,
+    priceVatType: row.priceVatType,
+    customerCompanySnapshot: row.customerCompanySnapshot,
+    customerTaxCodeSnapshot: row.customerTaxCodeSnapshot,
+    customerAddressSnapshot: row.customerAddressSnapshot,
+    customerContactNameSnapshot: row.customerContactNameSnapshot,
+    customerContactTitleSnapshot: row.customerContactTitleSnapshot,
+    customerPhoneSnapshot: row.customerPhoneSnapshot,
+    customerEmailSnapshot: row.customerEmailSnapshot,
+    salesName: row.salesName,
+    salesPhone: row.salesPhone,
+    salesEmail: row.salesEmail,
+    salesAddress: row.salesAddress,
+    preparedBy: row.preparedBy,
     sentAt: row.sentAt?.toISOString() ?? null,
     viewedAt: row.viewedAt?.toISOString() ?? null,
     acceptedAt: row.acceptedAt?.toISOString() ?? null,
@@ -225,6 +252,18 @@ export async function getQuoteDetail(id: string) {
       productNameSnapshot: item.productNameSnapshot,
       variantNameSnapshot: item.variantNameSnapshot,
       description: item.description,
+      designMediaAssetId: item.designMediaAssetId,
+      designImageUrl: item.designImageUrl,
+      designMediaAsset: item.designMediaAsset,
+      skuSnapshot: item.skuSnapshot,
+      colorSnapshot: item.colorSnapshot,
+      categorySnapshot: item.categorySnapshot,
+      genderSnapshot: item.genderSnapshot,
+      moqSnapshot: item.moqSnapshot,
+      itemNote: item.itemNote,
+      productionLeadTime: item.productionLeadTime,
+      sampleFee: decimalToNum(item.sampleFee),
+      sampleLeadTime: item.sampleLeadTime,
       quantity: item.quantity,
       unit: item.unit,
       baseUnitPrice: item.baseUnitPrice.toNumber(),
@@ -275,6 +314,21 @@ export async function createQuote(input: CreateQuoteInput) {
         status: input.status ?? "DRAFT",
         title: input.title?.trim() || "Báo giá sản phẩm ATTD",
         validUntil: input.validUntil ? new Date(input.validUntil) : defaultValidUntil(),
+        quoteDate: input.quoteDate ? new Date(input.quoteDate) : new Date(),
+        currency: input.currency ?? "VND",
+        priceVatType: input.priceVatType ?? "EXCLUDING_VAT",
+        customerCompanySnapshot: input.customerCompanySnapshot ?? null,
+        customerTaxCodeSnapshot: input.customerTaxCodeSnapshot ?? null,
+        customerAddressSnapshot: input.customerAddressSnapshot ?? null,
+        customerContactNameSnapshot: input.customerContactNameSnapshot ?? null,
+        customerContactTitleSnapshot: input.customerContactTitleSnapshot ?? null,
+        customerPhoneSnapshot: input.customerPhoneSnapshot ?? null,
+        customerEmailSnapshot: input.customerEmailSnapshot ?? null,
+        salesName: input.salesName ?? null,
+        salesPhone: input.salesPhone ?? null,
+        salesEmail: input.salesEmail ?? null,
+        salesAddress: input.salesAddress ?? null,
+        preparedBy: input.preparedBy ?? null,
         subtotal: totals.subtotal,
         serviceTotal: totals.serviceTotal,
         setupTotal: totals.setupTotal,
@@ -392,6 +446,21 @@ export async function updateQuote(id: string, input: Partial<CreateQuoteInput>) 
         priceGroupId: input.priceGroupId !== undefined ? input.priceGroupId : undefined,
         title: input.title !== undefined ? (input.title?.trim() || "Báo giá sản phẩm ATTD") : undefined,
         validUntil: input.validUntil !== undefined ? (input.validUntil ? new Date(input.validUntil) : null) : undefined,
+        quoteDate: input.quoteDate !== undefined ? (input.quoteDate ? new Date(input.quoteDate) : null) : undefined,
+        currency: input.currency !== undefined ? input.currency : undefined,
+        priceVatType: input.priceVatType !== undefined ? input.priceVatType : undefined,
+        customerCompanySnapshot: input.customerCompanySnapshot !== undefined ? input.customerCompanySnapshot : undefined,
+        customerTaxCodeSnapshot: input.customerTaxCodeSnapshot !== undefined ? input.customerTaxCodeSnapshot : undefined,
+        customerAddressSnapshot: input.customerAddressSnapshot !== undefined ? input.customerAddressSnapshot : undefined,
+        customerContactNameSnapshot: input.customerContactNameSnapshot !== undefined ? input.customerContactNameSnapshot : undefined,
+        customerContactTitleSnapshot: input.customerContactTitleSnapshot !== undefined ? input.customerContactTitleSnapshot : undefined,
+        customerPhoneSnapshot: input.customerPhoneSnapshot !== undefined ? input.customerPhoneSnapshot : undefined,
+        customerEmailSnapshot: input.customerEmailSnapshot !== undefined ? input.customerEmailSnapshot : undefined,
+        salesName: input.salesName !== undefined ? input.salesName : undefined,
+        salesPhone: input.salesPhone !== undefined ? input.salesPhone : undefined,
+        salesEmail: input.salesEmail !== undefined ? input.salesEmail : undefined,
+        salesAddress: input.salesAddress !== undefined ? input.salesAddress : undefined,
+        preparedBy: input.preparedBy !== undefined ? input.preparedBy : undefined,
         subtotal: totals.subtotal,
         serviceTotal: totals.serviceTotal,
         setupTotal: totals.setupTotal,
@@ -504,6 +573,21 @@ export async function duplicateQuote(id: string) {
     customerNote: source.customerNote,
     internalNote: source.internalNote,
     terms: source.terms,
+    quoteDate: new Date().toISOString(),
+    currency: source.currency,
+    priceVatType: source.priceVatType,
+    customerCompanySnapshot: source.customerCompanySnapshot,
+    customerTaxCodeSnapshot: source.customerTaxCodeSnapshot,
+    customerAddressSnapshot: source.customerAddressSnapshot,
+    customerContactNameSnapshot: source.customerContactNameSnapshot,
+    customerContactTitleSnapshot: source.customerContactTitleSnapshot,
+    customerPhoneSnapshot: source.customerPhoneSnapshot,
+    customerEmailSnapshot: source.customerEmailSnapshot,
+    salesName: source.salesName,
+    salesPhone: source.salesPhone,
+    salesEmail: source.salesEmail,
+    salesAddress: source.salesAddress,
+    preparedBy: source.preparedBy,
     status: "DRAFT",
     items: source.items.map((item) => ({
       pricingCalculationItemId: item.pricingCalculationItemId,
@@ -511,7 +595,17 @@ export async function duplicateQuote(id: string) {
       variantId: item.variantId,
       productNameSnapshot: item.productNameSnapshot,
       variantNameSnapshot: item.variantNameSnapshot,
+      skuSnapshot: item.skuSnapshot,
+      colorSnapshot: item.colorSnapshot,
+      categorySnapshot: item.categorySnapshot,
       description: item.description,
+      designMediaAssetId: item.designMediaAssetId,
+      designImageUrl: item.designImageUrl,
+      moqSnapshot: item.moqSnapshot,
+      itemNote: item.itemNote,
+      productionLeadTime: item.productionLeadTime,
+      sampleFee: item.sampleFee,
+      sampleLeadTime: item.sampleLeadTime,
       quantity: item.quantity,
       unit: item.unit,
       baseUnitPrice: item.baseUnitPrice,
@@ -531,10 +625,13 @@ export async function getPublicQuoteByToken(token: string, markViewed = true) {
   const row = await prisma.quote.findUnique({
     where: { publicToken: token },
     include: {
-      customer: { select: { name: true } },
-      contact: { select: { fullName: true } },
-      lead: { select: { fullName: true, companyName: true, company: true } },
-      items: { orderBy: { sortOrder: "asc" } },
+      customer: { select: { name: true, legalName: true, taxCode: true, address: true, phone: true, email: true } },
+      contact: { select: { fullName: true, title: true, phone: true, email: true } },
+      lead: { select: { fullName: true, companyName: true, company: true, phone: true, email: true } },
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: { designMediaAsset: { select: { url: true } } },
+      },
     },
   });
 
@@ -552,38 +649,47 @@ export async function getPublicQuoteByToken(token: string, markViewed = true) {
     row.viewedAt = row.viewedAt ?? new Date();
   }
 
-  const customerName =
-    row.customer?.name ??
-    row.contact?.fullName ??
-    row.lead?.fullName ??
-    null;
+  return formatPublicQuoteDocument(row);
+}
 
-  return {
-    quoteNo: row.quoteNo,
-    status: row.status,
-    title: row.title,
-    validUntil: row.validUntil?.toISOString() ?? null,
-    customerName,
-    subtotal: row.subtotal.toNumber(),
-    discountAmount: row.discountAmount.toNumber(),
-    shippingFee: row.shippingFee.toNumber(),
-    vatRate: row.vatRate.toNumber(),
-    vatAmount: row.vatAmount.toNumber(),
-    totalAmount: row.totalAmount.toNumber(),
-    manualOverride: row.manualOverride,
-    manualTotalAmount: decimalToNum(row.manualTotalAmount),
-    customerNote: row.customerNote,
-    terms: row.terms,
-    items: row.items.map((item) => ({
-      productNameSnapshot: item.productNameSnapshot,
-      variantNameSnapshot: item.variantNameSnapshot,
-      description: item.description,
-      quantity: item.quantity,
-      unit: item.unit,
-      unitPrice: item.unitPrice.toNumber(),
-      lineTotal: item.lineTotal.toNumber(),
-    })),
-  };
+export async function getQuotePdfDataById(
+  id: string,
+  company?: Parameters<typeof formatQuotePdfData>[1]
+) {
+  const row = await prisma.quote.findUnique({
+    where: { id },
+    include: {
+      customer: { select: { name: true, legalName: true, taxCode: true, address: true, phone: true, email: true } },
+      contact: { select: { fullName: true, title: true, phone: true, email: true } },
+      lead: { select: { fullName: true, companyName: true, company: true, phone: true, email: true } },
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: { designMediaAsset: { select: { url: true } } },
+      },
+    },
+  });
+  if (!row) return null;
+  return formatQuotePdfData(row, company);
+}
+
+export async function getQuotePdfDataByToken(
+  token: string,
+  company?: Parameters<typeof formatQuotePdfData>[1]
+) {
+  const row = await prisma.quote.findUnique({
+    where: { publicToken: token },
+    include: {
+      customer: { select: { name: true, legalName: true, taxCode: true, address: true, phone: true, email: true } },
+      contact: { select: { fullName: true, title: true, phone: true, email: true } },
+      lead: { select: { fullName: true, companyName: true, company: true, phone: true, email: true } },
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: { designMediaAsset: { select: { url: true } } },
+      },
+    },
+  });
+  if (!row) return null;
+  return formatQuotePdfData(row, company);
 }
 
 export async function buildQuotePrefill(params: {
@@ -591,18 +697,31 @@ export async function buildQuotePrefill(params: {
   leadId?: string;
   customerId?: string;
 }) {
+  const basePrefill = {
+    quoteDate: new Date().toISOString(),
+    currency: "VND" as const,
+    priceVatType: "EXCLUDING_VAT" as const,
+    title: "Báo giá sản phẩm ATTD",
+    validUntil: defaultValidUntil().toISOString(),
+  };
+
   if (params.pricingCalculationId) {
     const calc = await getPricingCalculationDetail(params.pricingCalculationId);
     if (!calc) return null;
     return {
+      ...basePrefill,
       sourceType: "PRICING_CALCULATION" as const,
       pricingCalculationId: calc.id,
       leadId: calc.lead?.id ?? null,
       customerId: calc.customer?.id ?? null,
       contactId: calc.contact?.id ?? null,
       priceGroupId: calc.priceGroup?.id ?? null,
-      title: "Báo giá sản phẩm ATTD",
-      validUntil: defaultValidUntil().toISOString(),
+      customerCompanySnapshot: null,
+      customerTaxCodeSnapshot: null,
+      customerAddressSnapshot: null,
+      customerContactNameSnapshot: calc.contact?.fullName ?? null,
+      customerPhoneSnapshot: null,
+      customerEmailSnapshot: null,
       discountAmount: calc.discountAmount,
       shippingFee: calc.shippingFee,
       vatRate: calc.vatRate,
@@ -615,6 +734,7 @@ export async function buildQuotePrefill(params: {
         variantId: item.variantId,
         productNameSnapshot: item.productNameSnapshot,
         variantNameSnapshot: item.variantNameSnapshot,
+        skuSnapshot: item.variantNameSnapshot,
         quantity: item.quantity,
         unit: item.unit,
         baseUnitPrice: item.baseUnitPrice,
@@ -633,21 +753,30 @@ export async function buildQuotePrefill(params: {
   if (params.leadId) {
     const lead = await prisma.lead.findUnique({
       where: { id: params.leadId },
-      include: { productInterests: { include: { product: true, variant: true } } },
+      include: {
+        productInterests: { include: { product: { include: { category: true } }, variant: true } },
+      },
     });
     if (!lead) return null;
     return {
+      ...basePrefill,
       sourceType: "LEAD" as const,
       leadId: lead.id,
       customerId: lead.customerId,
       contactId: lead.contactId,
-      title: "Báo giá sản phẩm ATTD",
-      validUntil: defaultValidUntil().toISOString(),
+      customerCompanySnapshot: lead.companyName ?? lead.company ?? null,
+      customerContactNameSnapshot: lead.fullName,
+      customerPhoneSnapshot: lead.phone,
+      customerEmailSnapshot: lead.email,
       items: lead.productInterests.map((pi, index) => ({
         productId: pi.productId,
         variantId: pi.variantId,
         productNameSnapshot: pi.productNameSnapshot ?? pi.product?.name ?? "Sản phẩm quan tâm",
-        variantNameSnapshot: pi.variant?.sku ?? null,
+        variantNameSnapshot: pi.variant?.colorName ?? pi.variant?.sku ?? null,
+        skuSnapshot: pi.variant?.sku ?? null,
+        colorSnapshot: pi.variant?.colorName ?? null,
+        categorySnapshot: pi.product?.category?.name ?? null,
+        moqSnapshot: pi.quantity ?? pi.product?.defaultMoq ?? null,
         quantity: pi.quantity ?? 100,
         unit: pi.unit ?? "cái",
         baseUnitPrice: 0,
@@ -663,20 +792,26 @@ export async function buildQuotePrefill(params: {
       include: { contacts: { where: { isPrimary: true }, take: 1 } },
     });
     if (!customer) return null;
+    const primary = customer.contacts[0];
     return {
+      ...basePrefill,
       sourceType: "CUSTOMER" as const,
       customerId: customer.id,
-      contactId: customer.contacts[0]?.id ?? null,
-      title: "Báo giá sản phẩm ATTD",
-      validUntil: defaultValidUntil().toISOString(),
+      contactId: primary?.id ?? null,
+      customerCompanySnapshot: customer.legalName ?? customer.name,
+      customerTaxCodeSnapshot: customer.taxCode,
+      customerAddressSnapshot: customer.address,
+      customerContactNameSnapshot: primary?.fullName ?? null,
+      customerContactTitleSnapshot: primary?.title ?? null,
+      customerPhoneSnapshot: primary?.phone ?? customer.phone,
+      customerEmailSnapshot: primary?.email ?? customer.email,
       items: [{ productNameSnapshot: "", quantity: 100, unit: "cái", baseUnitPrice: 0, unitPrice: 0, sortOrder: 0 }],
     };
   }
 
   return {
+    ...basePrefill,
     sourceType: "MANUAL" as const,
-    title: "Báo giá sản phẩm ATTD",
-    validUntil: defaultValidUntil().toISOString(),
     items: [{ productNameSnapshot: "", quantity: 100, unit: "cái", baseUnitPrice: 0, unitPrice: 0, sortOrder: 0 }],
   };
 }

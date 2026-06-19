@@ -1,4 +1,22 @@
-import type { QuoteSourceType, QuoteStatus } from "@prisma/client";
+import type { QuotePriceVatType, QuoteSourceType, QuoteStatus } from "@prisma/client";
+
+export const QUOTE_CURRENCY_LABELS: Record<string, string> = {
+  VND: "VND",
+  USD: "USD",
+};
+
+export const QUOTE_PRICE_VAT_TYPE_LABELS: Record<QuotePriceVatType, string> = {
+  EXCLUDING_VAT: "Chưa bao gồm VAT",
+  INCLUDING_VAT: "Đã bao gồm VAT",
+};
+
+export function quoteCurrencyLabel(currency: string): string {
+  return QUOTE_CURRENCY_LABELS[currency] ?? currency;
+}
+
+export function quotePriceVatTypeLabel(type: QuotePriceVatType): string {
+  return QUOTE_PRICE_VAT_TYPE_LABELS[type] ?? type;
+}
 
 export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   DRAFT: "Nháp",

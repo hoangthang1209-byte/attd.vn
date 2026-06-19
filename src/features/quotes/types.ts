@@ -1,4 +1,4 @@
-import type { QuoteSourceType, QuoteStatus } from "@prisma/client";
+import type { QuotePriceVatType, QuoteSourceType, QuoteStatus } from "@prisma/client";
 
 export type QuoteItemInput = {
   id?: string;
@@ -8,6 +8,17 @@ export type QuoteItemInput = {
   productNameSnapshot?: string | null;
   variantNameSnapshot?: string | null;
   description?: string | null;
+  designMediaAssetId?: string | null;
+  designImageUrl?: string | null;
+  skuSnapshot?: string | null;
+  colorSnapshot?: string | null;
+  categorySnapshot?: string | null;
+  genderSnapshot?: string | null;
+  moqSnapshot?: number | null;
+  itemNote?: string | null;
+  productionLeadTime?: string | null;
+  sampleFee?: number | null;
+  sampleLeadTime?: string | null;
   quantity: number;
   unit?: string;
   baseUnitPrice?: number;
@@ -31,6 +42,21 @@ export type CreateQuoteInput = {
   status?: QuoteStatus;
   title?: string | null;
   validUntil?: string | null;
+  quoteDate?: string | null;
+  currency?: string;
+  priceVatType?: QuotePriceVatType;
+  customerCompanySnapshot?: string | null;
+  customerTaxCodeSnapshot?: string | null;
+  customerAddressSnapshot?: string | null;
+  customerContactNameSnapshot?: string | null;
+  customerContactTitleSnapshot?: string | null;
+  customerPhoneSnapshot?: string | null;
+  customerEmailSnapshot?: string | null;
+  salesName?: string | null;
+  salesPhone?: string | null;
+  salesEmail?: string | null;
+  salesAddress?: string | null;
+  preparedBy?: string | null;
   discountAmount?: number;
   shippingFee?: number;
   vatRate?: number;
@@ -75,4 +101,60 @@ export type QuoteListRecord = {
   createdAt: string;
   leadLabel: string | null;
   customerLabel: string | null;
+};
+
+export type PublicQuoteItem = {
+  designImageUrl: string | null;
+  colorSnapshot: string | null;
+  categorySnapshot: string | null;
+  genderSnapshot: string | null;
+  productNameSnapshot: string | null;
+  variantNameSnapshot: string | null;
+  skuSnapshot: string | null;
+  description: string | null;
+  moqSnapshot: number | null;
+  itemNote: string | null;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  lineTotal: number;
+  productionLeadTime: string | null;
+  sampleFee: number | null;
+  sampleLeadTime: string | null;
+};
+
+export type PublicQuoteDocument = {
+  quoteNo: string;
+  status: QuoteStatus;
+  title: string | null;
+  validUntil: string | null;
+  quoteDate: string | null;
+  currency: string;
+  priceVatType: QuotePriceVatType;
+  customerCompany: string | null;
+  customerTaxCode: string | null;
+  customerAddress: string | null;
+  customerContactName: string | null;
+  customerContactTitle: string | null;
+  customerPhone: string | null;
+  customerEmail: string | null;
+  salesName: string | null;
+  salesPhone: string | null;
+  salesEmail: string | null;
+  salesAddress: string | null;
+  preparedBy: string | null;
+  subtotal: number;
+  discountAmount: number;
+  shippingFee: number;
+  vatRate: number;
+  vatAmount: number;
+  totalAmount: number;
+  manualOverride: boolean;
+  manualTotalAmount: number | null;
+  customerNote: string | null;
+  terms: string | null;
+  items: PublicQuoteItem[];
+  showProductionLeadTime: boolean;
+  showSampleFee: boolean;
+  showSampleLeadTime: boolean;
 };
