@@ -35,6 +35,14 @@ export default function MarketplaceMegaCategoryMenu({
   }, []);
 
   useEffect(() => {
+    if (categories.length === 0 && process.env.NODE_ENV !== "production") {
+      console.info(
+        "[MegaMenu] categories prop is empty — mega menu hidden (no CMS tree, no static fallback received)",
+      );
+    }
+  }, [categories]);
+
+  useEffect(() => {
     if (categories.length === 0) return;
     setActiveParentId((current) =>
       categories.some((group) => group.id === current)

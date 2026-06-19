@@ -4,6 +4,7 @@ import {
   createProductCategory,
   type CategoryAdminInput,
 } from "@/features/products/product-admin.service";
+import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-public-category-cache";
 
 export async function GET() {
   try {
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const cat = await createProductCategory(data);
+    revalidatePublicCategoryCache();
     return NextResponse.json(cat, { status: 201 });
   } catch (err) {
     console.error("[POST /api/admin/products/categories]", err);

@@ -5,6 +5,7 @@ import {
   deleteProductCategory,
   type CategoryAdminInput,
 } from "@/features/products/product-admin.service";
+import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-public-category-cache";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -57,6 +58,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
   }
   try {
     const category = await updateProductCategory(id, data);
+    revalidatePublicCategoryCache();
     return NextResponse.json(category);
   } catch (err) {
     console.error("[PUT /api/admin/products/categories/[id]]", err);
@@ -90,6 +92,7 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext) {
       }
       return NextResponse.json({ message: "Không tìm thấy danh mục." }, { status: 404 });
     }
+    revalidatePublicCategoryCache();
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[DELETE /api/admin/products/categories/[id]]", err);

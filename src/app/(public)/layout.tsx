@@ -6,6 +6,9 @@ import NavigationProgress from "@/components/public/NavigationProgress";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
 import { getMarketplaceCategoryTree } from "@/features/categories/marketplace-category-tree";
 
+/** Category tree in header must stay fresh — matches `/san-pham` CMS hierarchy. */
+export const dynamic = "force-dynamic";
+
 export default async function PublicLayout({
   children,
 }: {

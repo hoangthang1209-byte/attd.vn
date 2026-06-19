@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 export async function getCategories() {
@@ -16,6 +17,99 @@ export async function getCategoriesWithCounts() {
       },
     },
   });
+}
+
+/** Shared child node from CMS parent/child hierarchy. */
+export type CmsCategoryTreeChild = {
+  id: string;
+  slug: string;
+  name: string;
+  skuCode: string | null;
+  imageUrl: string | null;
+  productCount: number;
+  featuredImage: string | null;
+};
+
+/** Shared parent node — single source of truth for mega menu + catalog filter. */
+export type CmsCategoryTreeNode = {
+  id: string;
+  slug: string;
+  name: string;
+  skuCode: string | null;
+  imageUrl: string | null;
+  productCount: number;
+  featuredImage: string | null;
+  children: CmsCategoryTreeChild[];
+};
+
+const cmsCategoryInclude = {
+  _count: {
+    select: { products: { where: { status: "ACTIVE" as const } } },
+  },
+  products: {
+    where: { status: "ACTIVE" as const },
+    take: 1,
+    select: { featuredImage: true },
+    orderBy: { createdAt: "desc" as const },
+  },
+} as const;
+
+type CategoryRow = Awaited<
+  ReturnType<
+    typeof prisma.category.findMany<{ include: typeof cmsCategoryInclude }>
+  >
+>[number];
+
+/**
+ * Fresh CMS parent/child category tree.
+ * Used by mega menu, mobile nav, and `/san-pham` filter sidebar.
+ * Source: `/admin/products/categories` — parentId null = parent, parentId set = child.
+ */
+export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
+  noStore();
+
+  const categories = await prisma.category.findMany({
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    include: cmsCategoryInclude,
+  });
+
+  if (categories.length === 0) return [];
+
+  const byParent = new Map<string | null, CategoryRow[]>();
+  for (const category of categories) {
+    const key = category.parentId;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(category);
+  }
+
+  function sumDescendantProductCounts(categoryId: string): number {
+    let total = 0;
+    for (const child of byParent.get(categoryId) ?? []) {
+      total += child._count.products + sumDescendantProductCounts(child.id);
+    }
+    return total;
+  }
+
+  const roots = byParent.get(null) ?? [];
+
+  return roots.map((parent) => ({
+    id: parent.id,
+    slug: parent.slug,
+    name: parent.name,
+    skuCode: parent.skuCode,
+    imageUrl: parent.imageUrl,
+    featuredImage: parent.products[0]?.featuredImage ?? null,
+    productCount: parent._count.products + sumDescendantProductCounts(parent.id),
+    children: (byParent.get(parent.id) ?? []).map((child) => ({
+      id: child.id,
+      slug: child.slug,
+      name: child.name,
+      skuCode: child.skuCode,
+      imageUrl: child.imageUrl,
+      productCount: child._count.products,
+      featuredImage: child.products[0]?.featuredImage ?? null,
+    })),
+  }));
 }
 
 export type CatalogCategoryFilterChild = {
@@ -48,58 +142,23 @@ export type CatalogCategoryContext = {
   subtitle: string;
 };
 
-/**
- * Parent/child category tree for `/san-pham` filter sidebar.
- * Source: CMS categories from `/admin/products/categories`.
- */
+/** Catalog filter sidebar tree — same CMS hierarchy as mega menu. */
 export async function getCategoryTreeForCatalogFilter(): Promise<
   CatalogCategoryFilterNode[]
 > {
-  const categories = await prisma.category.findMany({
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    include: {
-      _count: {
-        select: { products: { where: { status: "ACTIVE" } } },
-      },
-    },
-  });
-
-  const byParent = new Map<string | null, typeof categories>();
-  for (const category of categories) {
-    const key = category.parentId;
-    if (!byParent.has(key)) byParent.set(key, []);
-    byParent.get(key)!.push(category);
-  }
-
-  function sumDescendantProductCounts(categoryId: string): number {
-    let total = 0;
-    for (const child of byParent.get(categoryId) ?? []) {
-      total += child._count.products + sumDescendantProductCounts(child.id);
-    }
-    return total;
-  }
-
-  const roots = byParent.get(null) ?? [];
-
-  return roots.map((parent) => {
-    const children = (byParent.get(parent.id) ?? []).map((child) => ({
+  const tree = await getCmsCategoryTree();
+  return tree.map((parent) => ({
+    id: parent.id,
+    slug: parent.slug,
+    name: parent.name,
+    productCount: parent.productCount,
+    children: parent.children.map((child) => ({
       id: child.id,
       slug: child.slug,
       name: child.name,
-      productCount: child._count.products,
-    }));
-
-    const productCount =
-      parent._count.products + sumDescendantProductCounts(parent.id);
-
-    return {
-      id: parent.id,
-      slug: parent.slug,
-      name: parent.name,
-      productCount,
-      children,
-    };
-  });
+      productCount: child.productCount,
+    })),
+  }));
 }
 
 /** Collect category id + all descendant ids for catalog filtering. */
