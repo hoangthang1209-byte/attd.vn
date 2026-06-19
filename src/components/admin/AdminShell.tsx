@@ -44,6 +44,13 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Báo giá",
+    items: [
+      { href: "/admin/quotes", label: "Danh sách báo giá" },
+      { href: "/admin/quotes/new", label: "Tạo báo giá" },
+    ],
+  },
+  {
     label: "Tính giá",
     items: [
       { href: "/admin/pricing", label: "Tổng quan" },

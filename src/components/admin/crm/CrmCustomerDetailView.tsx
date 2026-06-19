@@ -11,6 +11,7 @@ import CrmProductInterestForm, {
 } from "@/components/admin/crm/CrmProductInterestForm";
 import { CustomerStatusBadge, CustomerTypeBadge } from "@/components/admin/crm/CustomerBadges";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
+import CrmRelatedQuotes from "@/components/admin/crm/CrmRelatedQuotes";
 import {
   CUSTOMER_STATUS_LABELS,
   CUSTOMER_TYPE_LABELS,
@@ -135,10 +136,10 @@ export default function CrmCustomerDetailView({
       )}
 
       <div className="admin-crm-placeholder-grid">
-        <div className="admin-section-card admin-section-card--disabled">
-          <h3>Báo giá</h3>
-          <p className="admin-empty-hint">Sẽ triển khai ở sprint sau</p>
-        </div>
+        <CrmRelatedQuotes
+          customerId={customer.id}
+          createHref={`/admin/quotes/new?customerId=${customer.id}`}
+        />
         <div className="admin-section-card admin-section-card--disabled">
           <h3>Đơn hàng</h3>
           <p className="admin-empty-hint">Sẽ triển khai ở sprint sau</p>

@@ -1,0 +1,54 @@
+import type { QuoteStatus } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
+import { parseCreateQuoteBody } from "@/features/quotes/quote-input";
+import {
+  createQuote,
+  createQuoteFromPricingCalculation,
+  listQuotes,
+  QuoteValidationError,
+} from "@/features/quotes/quote.service";
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const status = searchParams.get("status") as QuoteStatus | null;
+  try {
+    const result = await listQuotes({
+      search: searchParams.get("search") ?? undefined,
+      status: status ?? undefined,
+      leadId: searchParams.get("leadId") ?? undefined,
+      customerId: searchParams.get("customerId") ?? undefined,
+    });
+    return NextResponse.json(result);
+  } catch (err) {
+    console.error("[GET /api/quotes]", err);
+    return NextResponse.json({ message: "Không thể tải danh sách báo giá" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
+  }
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ message: "Request body missing" }, { status: 400 });
+  }
+
+  const raw = body as Record<string, unknown>;
+  try {
+    if (raw.fromPricingCalculationId && typeof raw.fromPricingCalculationId === "string") {
+      const quote = await createQuoteFromPricingCalculation(raw.fromPricingCalculationId, parseCreateQuoteBody(raw));
+      return NextResponse.json({ quote }, { status: 201 });
+    }
+    const quote = await createQuote(parseCreateQuoteBody(raw));
+    return NextResponse.json({ quote }, { status: 201 });
+  } catch (err) {
+    if (err instanceof QuoteValidationError) {
+      return NextResponse.json({ message: err.message }, { status: 400 });
+    }
+    console.error("[POST /api/quotes]", err);
+    return NextResponse.json({ message: "Không thể tạo báo giá" }, { status: 500 });
+  }
+}

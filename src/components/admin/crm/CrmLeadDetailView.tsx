@@ -13,6 +13,7 @@ import CrmLeadTimeline from "@/components/admin/crm/CrmLeadTimeline";
 import CrmProductInterestForm, {
   CrmProductInterestList,
 } from "@/components/admin/crm/CrmProductInterestForm";
+import CrmRelatedQuotes from "@/components/admin/crm/CrmRelatedQuotes";
 import {
   CRM_PRIORITY_LABELS,
   CRM_STATUS_LABELS,
@@ -237,6 +238,11 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
           <CrmProductInterestForm leadId={lead.id} onCreated={() => void refreshLead()} />
         </section>
       </div>
+
+      <CrmRelatedQuotes
+        leadId={lead.id}
+        createHref={`/admin/quotes/new?leadId=${lead.id}`}
+      />
 
       <section className="admin-section-card">
         <h3>Hoạt động chăm sóc</h3>

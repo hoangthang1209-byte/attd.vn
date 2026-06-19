@@ -169,9 +169,12 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
       </fieldset>
 
       <div style={{ marginTop: 24 }}>
-        <button type="button" className="admin-btn admin-btn--secondary" disabled title="Sẽ triển khai ở Sprint 26.2.0">
-          Tạo báo giá (Sprint 26.2.0)
-        </button>
+        <Link
+          href={`/admin/quotes/new?pricingCalculationId=${id}`}
+          className="admin-btn admin-btn--primary"
+        >
+          Tạo báo giá từ bản tính giá
+        </Link>
       </div>
 
       <details className="admin-import-error-detail" style={{ marginTop: 24 }}>
