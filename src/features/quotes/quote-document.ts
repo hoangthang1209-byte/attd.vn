@@ -23,6 +23,7 @@ type QuoteRow = {
   customerPhoneSnapshot: string | null;
   customerEmailSnapshot: string | null;
   salesName: string | null;
+  salesTitleSnapshot: string | null;
   salesPhone: string | null;
   salesEmail: string | null;
   salesAddress: string | null;
@@ -141,6 +142,7 @@ export function formatPublicQuoteDocument(row: QuoteRow): PublicQuoteDocument {
     customerPhone: contactPhone,
     customerEmail: contactEmail,
     salesName: row.salesName,
+    salesTitle: row.salesTitleSnapshot,
     salesPhone: row.salesPhone,
     salesEmail: row.salesEmail,
     salesAddress: row.salesAddress,

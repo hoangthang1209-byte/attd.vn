@@ -4,6 +4,7 @@ import {
   generateQuotePdfWithFallback,
   quotePdfFilename,
 } from "@/features/quotes/pdf/quote-pdf.service";
+import { generateQuoteHtmlPdfByToken } from "@/features/quotes/pdf/quote-html-pdf.service";
 
 type PdfRouteContext = {
   route: string;
@@ -26,18 +27,44 @@ function logPdfError(context: PdfRouteContext, err: unknown, quoteNo?: string) {
 export async function buildQuotePdfResponse(
   pdfData: QuotePdfData,
   context: PdfRouteContext,
+  options?: { publicToken: string },
 ): Promise<NextResponse> {
+  const filename = quotePdfFilename(pdfData.quoteNo);
+
+  if (options?.publicToken) {
+    try {
+      const htmlBuffer = await generateQuoteHtmlPdfByToken(options.publicToken);
+      if (htmlBuffer && htmlBuffer.length > 100) {
+        return new NextResponse(new Uint8Array(htmlBuffer), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${filename}"`,
+            "Cache-Control": "no-store",
+            "X-Quote-Pdf-Renderer": "html",
+          },
+        });
+      }
+    } catch (htmlError) {
+      console.error(`[${context.route}] HTML-to-PDF failed, using PDFKit fallback`, {
+        quoteNo: pdfData.quoteNo,
+        quoteId: context.quoteId,
+        token: context.token,
+        errorMessage: htmlError instanceof Error ? htmlError.message : String(htmlError),
+      });
+    }
+  }
+
   try {
     const { buffer, usedFallback } = await generateQuotePdfWithFallback(pdfData);
     if (usedFallback) {
-      console.warn(`[${context.route}] Returned fallback PDF`, {
+      console.warn(`[${context.route}] Returned PDFKit fallback PDF`, {
         quoteNo: pdfData.quoteNo,
         quoteId: context.quoteId,
         token: context.token,
       });
     }
 
-    const filename = quotePdfFilename(pdfData.quoteNo);
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
@@ -45,6 +72,7 @@ export async function buildQuotePdfResponse(
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "no-store",
         ...(usedFallback ? { "X-Quote-Pdf-Fallback": "1" } : {}),
+        "X-Quote-Pdf-Renderer": "pdfkit",
       },
     });
   } catch (err) {

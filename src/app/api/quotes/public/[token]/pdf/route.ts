@@ -32,7 +32,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
       return quoteNotFoundResponse();
     }
 
-    return buildQuotePdfResponse(pdfData, { route, token });
+    return buildQuotePdfResponse(pdfData, { route, token }, { publicToken: token });
   } catch (err) {
     return quoteRouteErrorResponse({ route, token }, err);
   }

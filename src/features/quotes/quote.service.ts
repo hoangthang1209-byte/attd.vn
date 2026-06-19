@@ -12,7 +12,23 @@ import {
 } from "@/features/quotes/quote-code";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
 import { formatPublicQuoteDocument, formatQuotePdfData } from "@/features/quotes/quote-document";
+import { validateContactBelongsToCustomer } from "@/features/crm/services/crm-contact.service";
+import {
+  getDefaultSalesRepresentative,
+  salesRepToQuoteSnapshots,
+} from "@/features/sales/services/sales-representative.service";
 import type { CreateQuoteInput, QuoteItemInput, QuoteListRecord } from "@/features/quotes/types";
+
+async function validateQuoteCustomerContact(
+  customerId: string | null | undefined,
+  contactId: string | null | undefined,
+) {
+  if (!customerId || !contactId) return;
+  const valid = await validateContactBelongsToCustomer(customerId, contactId);
+  if (!valid) {
+    throw new QuoteValidationError("Người liên hệ không thuộc khách hàng đã chọn.");
+  }
+}
 
 export class QuoteValidationError extends Error {
   constructor(message: string) {
@@ -213,7 +229,9 @@ export async function getQuoteDetail(id: string) {
     customerContactTitleSnapshot: row.customerContactTitleSnapshot,
     customerPhoneSnapshot: row.customerPhoneSnapshot,
     customerEmailSnapshot: row.customerEmailSnapshot,
+    salesRepresentativeId: row.salesRepresentativeId,
     salesName: row.salesName,
+    salesTitleSnapshot: row.salesTitleSnapshot,
     salesPhone: row.salesPhone,
     salesEmail: row.salesEmail,
     salesAddress: row.salesAddress,
@@ -290,6 +308,7 @@ export async function getQuoteDetail(id: string) {
 export async function createQuote(input: CreateQuoteInput) {
   validateQuoteItems(input.items);
   if ((input.vatRate ?? 0) < 0) throw new QuoteValidationError("VAT phải >= 0.");
+  await validateQuoteCustomerContact(input.customerId, input.contactId);
 
   const { items, totals } = computeQuoteFromItems(input.items, {
     discountAmount: input.discountAmount,
@@ -326,7 +345,9 @@ export async function createQuote(input: CreateQuoteInput) {
         customerContactTitleSnapshot: input.customerContactTitleSnapshot ?? null,
         customerPhoneSnapshot: input.customerPhoneSnapshot ?? null,
         customerEmailSnapshot: input.customerEmailSnapshot ?? null,
+        salesRepresentativeId: input.salesRepresentativeId ?? null,
         salesName: input.salesName ?? null,
+        salesTitleSnapshot: input.salesTitleSnapshot ?? null,
         salesPhone: input.salesPhone ?? null,
         salesEmail: input.salesEmail ?? null,
         salesAddress: input.salesAddress ?? null,
@@ -426,6 +447,9 @@ export async function updateQuote(id: string, input: Partial<CreateQuoteInput>) 
   if (!existing) throw new QuoteValidationError("Không tìm thấy báo giá.");
   if (!input.items?.length) throw new QuoteValidationError("Cần ít nhất một dòng sản phẩm/dịch vụ.");
   validateQuoteItems(input.items);
+  const customerId = input.customerId !== undefined ? input.customerId : existing.customerId;
+  const contactId = input.contactId !== undefined ? input.contactId : existing.contactId;
+  await validateQuoteCustomerContact(customerId, contactId);
 
   const { items, totals } = computeQuoteFromItems(input.items, {
     discountAmount: input.discountAmount ?? existing.discountAmount.toNumber(),
@@ -458,7 +482,11 @@ export async function updateQuote(id: string, input: Partial<CreateQuoteInput>) 
         customerContactTitleSnapshot: input.customerContactTitleSnapshot !== undefined ? input.customerContactTitleSnapshot : undefined,
         customerPhoneSnapshot: input.customerPhoneSnapshot !== undefined ? input.customerPhoneSnapshot : undefined,
         customerEmailSnapshot: input.customerEmailSnapshot !== undefined ? input.customerEmailSnapshot : undefined,
+        salesRepresentativeId:
+          input.salesRepresentativeId !== undefined ? input.salesRepresentativeId : undefined,
         salesName: input.salesName !== undefined ? input.salesName : undefined,
+        salesTitleSnapshot:
+          input.salesTitleSnapshot !== undefined ? input.salesTitleSnapshot : undefined,
         salesPhone: input.salesPhone !== undefined ? input.salesPhone : undefined,
         salesEmail: input.salesEmail !== undefined ? input.salesEmail : undefined,
         salesAddress: input.salesAddress !== undefined ? input.salesAddress : undefined,
@@ -585,7 +613,9 @@ export async function duplicateQuote(id: string) {
     customerContactTitleSnapshot: source.customerContactTitleSnapshot,
     customerPhoneSnapshot: source.customerPhoneSnapshot,
     customerEmailSnapshot: source.customerEmailSnapshot,
+    salesRepresentativeId: source.salesRepresentativeId,
     salesName: source.salesName,
+    salesTitleSnapshot: source.salesTitleSnapshot,
     salesPhone: source.salesPhone,
     salesEmail: source.salesEmail,
     salesAddress: source.salesAddress,
@@ -699,11 +729,18 @@ export async function buildQuotePrefill(params: {
   leadId?: string;
   customerId?: string;
 }) {
-  const [companySettings] = await Promise.all([getCompanySettings()]);
+  const [companySettings, defaultSalesRep] = await Promise.all([
+    getCompanySettings(),
+    getDefaultSalesRepresentative(),
+  ]);
+  const salesRepSnapshots = defaultSalesRep ? salesRepToQuoteSnapshots(defaultSalesRep) : null;
   const salesDefaults = {
-    salesPhone: companySettings.hotline.display?.trim() || null,
-    salesEmail: companySettings.email?.trim() || null,
-    salesAddress: companySettings.address?.trim() || null,
+    salesPhone: salesRepSnapshots?.salesPhone ?? (companySettings.hotline.display?.trim() || null),
+    salesEmail: salesRepSnapshots?.salesEmail ?? (companySettings.email?.trim() || null),
+    salesAddress: salesRepSnapshots?.salesAddress ?? (companySettings.address?.trim() || null),
+    salesName: salesRepSnapshots?.salesName ?? null,
+    salesTitleSnapshot: salesRepSnapshots?.salesTitleSnapshot ?? null,
+    salesRepresentativeId: salesRepSnapshots?.salesRepresentativeId ?? null,
   };
 
   const basePrefill = {

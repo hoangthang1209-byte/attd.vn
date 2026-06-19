@@ -52,7 +52,9 @@ export type CreateQuoteInput = {
   customerContactTitleSnapshot?: string | null;
   customerPhoneSnapshot?: string | null;
   customerEmailSnapshot?: string | null;
+  salesRepresentativeId?: string | null;
   salesName?: string | null;
+  salesTitleSnapshot?: string | null;
   salesPhone?: string | null;
   salesEmail?: string | null;
   salesAddress?: string | null;
@@ -148,6 +150,7 @@ export type PublicQuoteDocument = {
   /** @deprecated Use customerContactEmail */
   customerEmail: string | null;
   salesName: string | null;
+  salesTitle: string | null;
   salesPhone: string | null;
   salesEmail: string | null;
   salesAddress: string | null;

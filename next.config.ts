@@ -5,13 +5,15 @@ const BLOB_HOSTNAME =
   "0iitstjrwqim8udr.public.blob.vercel-storage.com";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdfkit"],
+  serverExternalPackages: ["pdfkit", "puppeteer-core", "@sparticuz/chromium"],
   outputFileTracingIncludes: {
     "/api/quotes/[id]/pdf/route": [
       "./node_modules/dejavu-fonts-ttf/ttf/**/*",
+      "./node_modules/@sparticuz/chromium/**/*",
     ],
     "/api/quotes/public/[token]/pdf/route": [
       "./node_modules/dejavu-fonts-ttf/ttf/**/*",
+      "./node_modules/@sparticuz/chromium/**/*",
     ],
     "/api/quotes/pdf-health/route": [
       "./node_modules/dejavu-fonts-ttf/ttf/**/*",

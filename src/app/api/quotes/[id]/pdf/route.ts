@@ -6,6 +6,7 @@ import {
   quoteRouteErrorResponse,
 } from "@/features/quotes/pdf/quote-pdf-route";
 import { getBrandingSettings, getCompanySettings } from "@/features/settings/services/settings.service";
+import { ensureQuotePublicToken } from "@/features/quotes/quote-pdf-token";
 import { resolveQuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
 
 export const runtime = "nodejs";
@@ -32,7 +33,8 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
       return quoteNotFoundResponse();
     }
 
-    return buildQuotePdfResponse(pdfData, { route, quoteId: id });
+    const publicToken = await ensureQuotePublicToken(id);
+    return buildQuotePdfResponse(pdfData, { route, quoteId: id }, { publicToken });
   } catch (err) {
     return quoteRouteErrorResponse({ route, quoteId: id }, err);
   }

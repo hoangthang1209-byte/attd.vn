@@ -35,6 +35,7 @@ type QuotePartyColumnsProps = {
     | "customerContactPhone"
     | "customerContactEmail"
     | "salesName"
+    | "salesTitle"
     | "salesPhone"
     | "salesEmail"
     | "salesAddress"
@@ -74,6 +75,7 @@ export function QuotePartyColumns({ quote, className = "" }: QuotePartyColumnsPr
         <FieldList
           fields={[
             { label: "Tên", value: quote.salesName },
+            { label: "Chức vụ", value: quote.salesTitle },
             { label: "Số điện thoại", value: quote.salesPhone },
             { label: "Email", value: quote.salesEmail },
             { label: "Địa chỉ", value: quote.salesAddress },
@@ -111,33 +113,39 @@ type QuoteCompanyHeaderProps = {
 export function QuoteCompanyHeader({ company, logoUrl }: QuoteCompanyHeaderProps) {
   return (
     <header className="quote-doc__header">
-      {logoUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={logoUrl} alt={company.brandName} className="quote-doc__logo" />
-      )}
-      <div className="quote-doc__header-text">
-        <h1 className="quote-doc__title">BẢNG BÁO GIÁ</h1>
-        <p className="quote-doc__brand">{company.brandName}</p>
-        {company.legalName && company.legalName !== company.brandName && (
-          <p className="quote-doc__legal">{company.legalName}</p>
+      <div className="quote-doc__header-left">
+        {logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt={company.brandName} className="quote-doc__logo" />
         )}
-        <div className="quote-doc__company-lines">
-          {company.taxCode?.trim() && (
-            <p><strong>Mã số thuế:</strong> {company.taxCode}</p>
-          )}
-          {company.address?.trim() && (
-            <p><strong>Địa chỉ:</strong> {company.address}</p>
-          )}
-          {company.phone?.trim() && (
-            <p><strong>Điện thoại:</strong> {company.phone}</p>
-          )}
-          {company.email?.trim() && (
-            <p><strong>Email:</strong> {company.email}</p>
-          )}
-          {company.website?.trim() && (
-            <p><strong>Website:</strong> {company.website}</p>
+        <div className="quote-doc__brand-block">
+          <p className="quote-doc__brand">{company.brandName}</p>
+          {company.legalName && company.legalName !== company.brandName && (
+            <p className="quote-doc__legal">{company.legalName}</p>
           )}
         </div>
+      </div>
+
+      <div className="quote-doc__header-center">
+        <h1 className="quote-doc__title">BẢNG BÁO GIÁ</h1>
+      </div>
+
+      <div className="quote-doc__header-right">
+        {company.address?.trim() && (
+          <p><strong>Địa chỉ:</strong> {company.address}</p>
+        )}
+        {company.phone?.trim() && (
+          <p><strong>Điện thoại:</strong> {company.phone}</p>
+        )}
+        {company.email?.trim() && (
+          <p><strong>Email:</strong> {company.email}</p>
+        )}
+        {company.website?.trim() && (
+          <p><strong>Website:</strong> {company.website}</p>
+        )}
+        {company.taxCode?.trim() && (
+          <p><strong>Mã số thuế:</strong> {company.taxCode}</p>
+        )}
       </div>
     </header>
   );

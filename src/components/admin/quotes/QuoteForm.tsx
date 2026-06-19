@@ -17,6 +17,8 @@ import QuoteItemFormRow, {
   emptyQuoteItem,
   type QuoteItemRow,
 } from "@/components/admin/quotes/QuoteItemFormRow";
+import QuickAddContactModal from "@/components/admin/quotes/QuickAddContactModal";
+import type { SalesRepresentativeRecord } from "@/features/sales/types";
 
 type ProductOption = { id: string; name: string };
 type VariantOption = {
@@ -83,11 +85,30 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
   const [customerContactTitle, setCustomerContactTitle] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  const [salesRepresentativeId, setSalesRepresentativeId] = useState("");
+  const [salesTitle, setSalesTitle] = useState("");
+  const [salesReps, setSalesReps] = useState<SalesRepresentativeRecord[]>([]);
+  const [quickAddContactOpen, setQuickAddContactOpen] = useState(false);
   const [salesName, setSalesName] = useState("");
   const [salesPhone, setSalesPhone] = useState("");
   const [salesEmail, setSalesEmail] = useState("");
   const [salesAddress, setSalesAddress] = useState("");
   const [preparedBy, setPreparedBy] = useState("");
+
+  function applySalesRep(rep: SalesRepresentativeRecord) {
+    setSalesRepresentativeId(rep.id);
+    setSalesName(rep.fullName);
+    setSalesTitle(rep.title ?? "");
+    setSalesPhone(rep.phone ?? "");
+    setSalesEmail(rep.email ?? "");
+    setSalesAddress(rep.address ?? "");
+  }
+
+  async function loadCustomerContacts(id: string) {
+    const res = await fetch(`/api/crm/customers/${id}/contacts`);
+    const data = (await res.json()) as { contacts?: CrmContactRecord[] };
+    setContacts(data.contacts ?? []);
+  }
 
   function applyCustomer(customer: CrmCustomerRecord) {
     const snapshots = customerToQuoteSnapshots(customer);
@@ -101,7 +122,7 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
     setCustomerPhone(snapshots.customerPhoneSnapshot ?? "");
     setCustomerEmail(snapshots.customerEmailSnapshot ?? "");
     setContactId("");
-    setContacts(customer.contacts ?? []);
+    void loadCustomerContacts(customer.id);
   }
 
   function applyContact(contact: CrmContactRecord) {
@@ -121,7 +142,7 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
     const data = (await res.json()) as { customer?: CrmCustomerRecord };
     if (!data.customer) return;
     setSelectedCustomer(data.customer);
-    setContacts(data.customer.contacts ?? []);
+    await loadCustomerContacts(id);
     if (!keepSnapshots) applyCustomer(data.customer);
   }
 
@@ -129,9 +150,11 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
     void Promise.all([
       fetch("/api/admin/products?pageSize=200").then((r) => r.json()),
       fetch("/api/crm/leads").then((r) => r.json()),
-    ]).then(([productsData, leadsData]) => {
+      fetch("/api/admin/sales?active=1").then((r) => r.json()),
+    ]).then(([productsData, leadsData, salesData]) => {
       setProducts((productsData as { products?: ProductOption[] }).products ?? []);
       setLeads((leadsData as { leads?: LeadOption[] }).leads ?? []);
+      setSalesReps((salesData as { salesReps?: SalesRepresentativeRecord[] }).salesReps ?? []);
     });
   }, []);
 
@@ -178,7 +201,9 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
           setCustomerContactTitle(String(q.customerContactTitleSnapshot ?? ""));
           setCustomerPhone(String(q.customerPhoneSnapshot ?? ""));
           setCustomerEmail(String(q.customerEmailSnapshot ?? ""));
+          setSalesRepresentativeId((q.salesRepresentativeId as string) ?? "");
           setSalesName(String(q.salesName ?? ""));
+          setSalesTitle(String(q.salesTitleSnapshot ?? ""));
           setSalesPhone(String(q.salesPhone ?? ""));
           setSalesEmail(String(q.salesEmail ?? ""));
           setSalesAddress(String(q.salesAddress ?? ""));
@@ -276,7 +301,9 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
         setCustomerContactTitle(String(p.customerContactTitleSnapshot ?? ""));
         setCustomerPhone(String(p.customerPhoneSnapshot ?? ""));
         setCustomerEmail(String(p.customerEmailSnapshot ?? ""));
+        setSalesRepresentativeId((p.salesRepresentativeId as string) ?? "");
         setSalesName(String(p.salesName ?? ""));
+        setSalesTitle(String(p.salesTitleSnapshot ?? ""));
         setSalesPhone(String(p.salesPhone ?? ""));
         setSalesEmail(String(p.salesEmail ?? ""));
         setSalesAddress(String(p.salesAddress ?? ""));
@@ -391,7 +418,9 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
       customerContactTitleSnapshot: customerContactTitle || null,
       customerPhoneSnapshot: customerPhone || null,
       customerEmailSnapshot: customerEmail || null,
+      salesRepresentativeId: salesRepresentativeId || null,
       salesName: salesName || null,
+      salesTitleSnapshot: salesTitle || null,
       salesPhone: salesPhone || null,
       salesEmail: salesEmail || null,
       salesAddress: salesAddress || null,
@@ -638,6 +667,13 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
                     Khách hàng này chưa có người liên hệ
                   </p>
                 )}
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--small"
+                  onClick={() => setQuickAddContactOpen(true)}
+                >
+                  Thêm người liên hệ mới
+                </button>
               </div>
             ) : (
               <p className="admin-field-hint">Chọn khách hàng để tải danh sách liên hệ</p>
@@ -682,11 +718,39 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
           <legend>Nhân viên tư vấn</legend>
           <div className="quote-form__party-fields">
             <div className="admin-field">
+              <label className="admin-label">Chọn nhân viên tư vấn</label>
+              <select
+                className="admin-input"
+                value={salesRepresentativeId}
+                onChange={(e) => {
+                  const rep = salesReps.find((r) => r.id === e.target.value);
+                  if (rep) applySalesRep(rep);
+                  else setSalesRepresentativeId("");
+                }}
+              >
+                <option value="">— Chọn nhân viên —</option>
+                {salesReps.map((rep) => (
+                  <option key={rep.id} value={rep.id}>
+                    {rep.fullName}
+                    {rep.isDefault ? " (Mặc định)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-field">
               <label className="admin-label">Tên</label>
               <input
                 className="admin-input"
                 value={salesName}
                 onChange={(e) => setSalesName(e.target.value)}
+              />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Chức vụ</label>
+              <input
+                className="admin-input"
+                value={salesTitle}
+                onChange={(e) => setSalesTitle(e.target.value)}
               />
             </div>
             <div className="admin-field">
@@ -717,6 +781,18 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
           </div>
         </fieldset>
       </div>
+
+      {customerId && (
+        <QuickAddContactModal
+          customerId={customerId}
+          open={quickAddContactOpen}
+          onClose={() => setQuickAddContactOpen(false)}
+          onCreated={(contact) => {
+            setContacts((prev) => [...prev, contact]);
+            applyContact(contact);
+          }}
+        />
+      )}
 
       <div className="quote-form__layout">
         <fieldset className="quote-form__items admin-catalog-fieldset">

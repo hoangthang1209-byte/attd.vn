@@ -32,7 +32,9 @@ type QuoteDetail = {
   customerContactTitleSnapshot: string | null;
   customerPhoneSnapshot: string | null;
   customerEmailSnapshot: string | null;
+  salesRepresentativeId: string | null;
   salesName: string | null;
+  salesTitleSnapshot: string | null;
   salesPhone: string | null;
   salesEmail: string | null;
   salesAddress: string | null;
@@ -231,6 +233,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
             customerContactPhone: quote.customerPhoneSnapshot,
             customerContactEmail: quote.customerEmailSnapshot,
             salesName: quote.salesName,
+            salesTitle: quote.salesTitleSnapshot,
             salesPhone: quote.salesPhone,
             salesEmail: quote.salesEmail,
             salesAddress: quote.salesAddress,
