@@ -14,6 +14,7 @@ type Props = {
   pdfDownloading?: boolean;
 };
 
+/** Public quote document with optional action buttons outside the document root. */
 export default function QuoteDocumentTable({
   quote,
   company,
@@ -28,7 +29,7 @@ export default function QuoteDocumentTable({
       <QuoteDocumentContent quote={quote} company={company} logoUrl={logoUrl} />
 
       {showActions && (
-        <div className="quote-doc__actions no-print">
+        <div className="quote-document-actions quote-doc__actions no-print">
           {onPrint && (
             <button type="button" className="admin-btn admin-btn--secondary" onClick={onPrint}>
               In / Lưu PDF

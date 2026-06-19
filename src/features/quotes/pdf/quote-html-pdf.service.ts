@@ -12,8 +12,35 @@ function resolveSiteBaseUrl(): string {
   return `http://127.0.0.1:${port}`;
 }
 
-export function buildQuoteDocumentUrl(publicToken: string): string {
-  return `${resolveSiteBaseUrl()}/q/${encodeURIComponent(publicToken)}/document`;
+export function buildQuoteDocumentUrl(
+  publicToken: string,
+  options?: { mode?: "pdf" | "print" },
+): string {
+  const base = resolveSiteBaseUrl();
+  const mode = options?.mode ?? "pdf";
+  return `${base}/q/${encodeURIComponent(publicToken)}/document?mode=${mode}`;
+}
+
+async function waitForImagesOnPage(page: import("puppeteer-core").Page): Promise<void> {
+  await page.evaluate(async () => {
+    const images = Array.from(document.images);
+    await Promise.race([
+      Promise.all(
+        images.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) {
+                resolve();
+                return;
+              }
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            }),
+        ),
+      ),
+      new Promise<void>((resolve) => setTimeout(resolve, 8000)),
+    ]);
+  });
 }
 
 export async function generateQuoteHtmlPdf(documentUrl: string): Promise<Buffer> {
@@ -21,28 +48,37 @@ export async function generateQuoteHtmlPdf(documentUrl: string): Promise<Buffer>
 
   const browser = await puppeteer.launch({
     args: chromium.args,
-    defaultViewport: { width: 1280, height: 900 },
+    defaultViewport: {
+      width: 1600,
+      height: 1000,
+      deviceScaleFactor: 1,
+    },
     executablePath,
     headless: true,
   });
 
   try {
     const page = await browser.newPage();
+    await page.emulateMediaType("screen");
+
     await page.goto(documentUrl, {
-      waitUntil: "networkidle0",
-      timeout: 45000,
+      waitUntil: "networkidle2",
+      timeout: 60000,
     });
 
+    await page.waitForSelector(".quote-document-root", { timeout: 30000 });
+
     await page.evaluate(() => document.fonts.ready);
+    await waitForImagesOnPage(page);
 
     const pdf = await page.pdf({
       format: "A4",
       landscape: true,
       printBackground: true,
       margin: {
-        top: "10mm",
+        top: "8mm",
         right: "8mm",
-        bottom: "10mm",
+        bottom: "8mm",
         left: "8mm",
       },
     });
@@ -54,6 +90,6 @@ export async function generateQuoteHtmlPdf(documentUrl: string): Promise<Buffer>
 }
 
 export async function generateQuoteHtmlPdfByToken(publicToken: string): Promise<Buffer> {
-  const url = buildQuoteDocumentUrl(publicToken);
+  const url = buildQuoteDocumentUrl(publicToken, { mode: "pdf" });
   return generateQuoteHtmlPdf(url);
 }

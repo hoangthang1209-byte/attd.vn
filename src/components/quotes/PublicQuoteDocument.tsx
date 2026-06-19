@@ -8,6 +8,7 @@ import {
   downloadQuotePdfFromApi,
   quotePdfDownloadFilename,
 } from "@/features/quotes/pdf/download-quote-pdf.client";
+import { openQuoteDocumentPrint } from "@/features/quotes/pdf/open-quote-document-print.client";
 
 type Props = {
   token: string;
@@ -61,7 +62,7 @@ export default function PublicQuoteDocument({ token, company, logoUrl }: Props) 
       company={company}
       logoUrl={logoUrl}
       showActions
-      onPrint={() => window.print()}
+      onPrint={() => openQuoteDocumentPrint(token)}
       onDownloadPdf={() => void downloadPdf()}
       pdfDownloading={pdfDownloading}
     />

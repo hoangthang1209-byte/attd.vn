@@ -13,6 +13,7 @@ import {
   downloadQuotePdfFromApi,
   quotePdfDownloadFilename,
 } from "@/features/quotes/pdf/download-quote-pdf.client";
+import { openQuoteDocumentPrint } from "@/features/quotes/pdf/open-quote-document-print.client";
 
 type QuoteDetail = {
   id: string;
@@ -276,7 +277,16 @@ export default function QuoteDetailView({ id }: { id: string }) {
             <code>{url}</code>
             <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void copyLink()}>{copied ? "Đã sao chép" : "Sao chép liên kết"}</button>
             <a href={url} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary admin-btn--xs">Mở trang báo giá</a>
-            <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => window.open(url, "_blank")?.print()}>In / Lưu PDF</button>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+              onClick={() => {
+                if (quote.publicToken) openQuoteDocumentPrint(quote.publicToken);
+              }}
+              disabled={!quote.publicToken}
+            >
+              In / Lưu PDF
+            </button>
             <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={pdfDownloading} onClick={() => void downloadPdf()}>
               {pdfDownloading ? "Đang tạo PDF..." : "Tải PDF báo giá"}
             </button>

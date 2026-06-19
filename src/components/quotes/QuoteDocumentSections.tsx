@@ -150,3 +150,8 @@ export function QuoteCompanyHeader({ company, logoUrl }: QuoteCompanyHeaderProps
     </header>
   );
 }
+
+/** Aliases for shared document component tree naming. */
+export { QuoteCompanyHeader as QuoteDocumentHeader };
+export { QuotePartyColumns as QuoteDocumentParties };
+export { QuoteDocMeta as QuoteDocumentMeta };

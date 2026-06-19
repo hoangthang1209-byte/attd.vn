@@ -3,5 +3,9 @@ export default function DocumentLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="quote-document-pdf-root">{children}</div>;
+  return (
+    <div className="quote-document-pdf-root quote-document-print-host">
+      {children}
+    </div>
+  );
 }

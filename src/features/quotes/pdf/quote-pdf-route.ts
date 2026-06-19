@@ -41,7 +41,7 @@ export async function buildQuotePdfResponse(
             "Content-Type": "application/pdf",
             "Content-Disposition": `attachment; filename="${filename}"`,
             "Cache-Control": "no-store",
-            "X-Quote-Pdf-Renderer": "html",
+            "X-Quote-Pdf-Renderer": "chromium",
           },
         });
       }
