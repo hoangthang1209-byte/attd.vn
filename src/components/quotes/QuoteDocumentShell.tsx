@@ -22,6 +22,7 @@ export default function QuoteDocumentShell({
     <div
       className={`quote-document-root quote-doc${variantClass}`}
       data-quote-document="true"
+      data-mode={variant}
     >
       <div className="quote-document-page quote-doc__paper" id="quote-print-area">
         {children}

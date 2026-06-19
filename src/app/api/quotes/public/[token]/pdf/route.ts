@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ token: string }> };
 
-export async function GET(_req: NextRequest, ctx: RouteContext) {
+export async function GET(req: NextRequest, ctx: RouteContext) {
   const { token } = await ctx.params;
   const route = "GET /api/quotes/public/[token]/pdf";
 
@@ -32,7 +32,11 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
       return quoteNotFoundResponse();
     }
 
-    return buildQuotePdfResponse(pdfData, { route, token }, { publicToken: token });
+    return buildQuotePdfResponse(
+      pdfData,
+      { route, token },
+      { publicToken: token, requestHeaders: req.headers },
+    );
   } catch (err) {
     return quoteRouteErrorResponse({ route, token }, err);
   }

@@ -12,6 +12,15 @@ type PdfRouteContext = {
   token?: string;
 };
 
+type BuildQuotePdfOptions = {
+  publicToken: string;
+  requestHeaders?: Headers;
+};
+
+function countDesignImages(data: QuotePdfData): number {
+  return data.items.filter((item) => item.designImageUrl?.trim()).length;
+}
+
 function logPdfError(context: PdfRouteContext, err: unknown, quoteNo?: string) {
   console.error(`[${context.route}] PDF generation failed`, {
     route: context.route,
@@ -27,43 +36,67 @@ function logPdfError(context: PdfRouteContext, err: unknown, quoteNo?: string) {
 export async function buildQuotePdfResponse(
   pdfData: QuotePdfData,
   context: PdfRouteContext,
-  options?: { publicToken: string },
+  options?: BuildQuotePdfOptions,
 ): Promise<NextResponse> {
   const filename = quotePdfFilename(pdfData.quoteNo);
+  const itemCount = pdfData.items.length;
+  const imageCount = countDesignImages(pdfData);
 
   if (options?.publicToken) {
     try {
-      const htmlBuffer = await generateQuoteHtmlPdfByToken(options.publicToken);
-      if (htmlBuffer && htmlBuffer.length > 100) {
-        return new NextResponse(new Uint8Array(htmlBuffer), {
-          status: 200,
-          headers: {
-            "Content-Type": "application/pdf",
-            "Content-Disposition": `attachment; filename="${filename}"`,
-            "Cache-Control": "no-store",
-            "X-Quote-Pdf-Renderer": "chromium",
-          },
-        });
-      }
+      const htmlBuffer = await generateQuoteHtmlPdfByToken({
+        publicToken: options.publicToken,
+        quoteNo: pdfData.quoteNo,
+        itemCount,
+        imageCount,
+        requestHeaders: options.requestHeaders,
+      });
+
+      console.info("[quote-pdf] renderer=chromium", {
+        quoteNo: pdfData.quoteNo,
+        bytes: htmlBuffer.length,
+        itemCount,
+        imageCount,
+      });
+
+      return new NextResponse(new Uint8Array(htmlBuffer), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Cache-Control": "no-store",
+          "X-Quote-Pdf-Renderer": "chromium",
+          "X-Quote-Pdf-Bytes": String(htmlBuffer.length),
+        },
+      });
     } catch (htmlError) {
-      console.error(`[${context.route}] HTML-to-PDF failed, using PDFKit fallback`, {
+      console.error("[quote-pdf] renderer=fallback", {
         quoteNo: pdfData.quoteNo,
         quoteId: context.quoteId,
         token: context.token,
-        errorMessage: htmlError instanceof Error ? htmlError.message : String(htmlError),
+        reason: "chromium_failed",
       });
+      console.error(
+        "[quote-pdf] chromium failed:",
+        htmlError instanceof Error ? htmlError.message : htmlError,
+      );
     }
   }
 
   try {
+    console.warn("[quote-pdf] renderer=pdfkit fallback starting", {
+      quoteNo: pdfData.quoteNo,
+      quoteId: context.quoteId,
+      token: context.token,
+    });
+
     const { buffer, usedFallback } = await generateQuotePdfWithFallback(pdfData);
-    if (usedFallback) {
-      console.warn(`[${context.route}] Returned PDFKit fallback PDF`, {
-        quoteNo: pdfData.quoteNo,
-        quoteId: context.quoteId,
-        token: context.token,
-      });
-    }
+
+    console.warn("[quote-pdf] renderer=pdfkit", {
+      quoteNo: pdfData.quoteNo,
+      usedMinimalFallback: usedFallback,
+      bytes: buffer.length,
+    });
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
@@ -71,8 +104,9 @@ export async function buildQuotePdfResponse(
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "no-store",
-        ...(usedFallback ? { "X-Quote-Pdf-Fallback": "1" } : {}),
         "X-Quote-Pdf-Renderer": "pdfkit",
+        "X-Quote-Pdf-Fallback": "1",
+        "X-Quote-Pdf-Bytes": String(buffer.length),
       },
     });
   } catch (err) {

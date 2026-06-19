@@ -10162,14 +10162,52 @@ body.mp-mega-cat-open { overflow: hidden; }
 .quote-party-col__empty { margin: 0; color: #9ca3af; font-size: 13px; }
 .quote-doc { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .quote-document-root.quote-doc { max-width: 1200px; margin: 0 auto; padding: 16px; }
-.quote-doc--pdf, .quote-document-root.quote-doc--pdf { max-width: none; padding: 0; margin: 0; }
-.quote-doc--print, .quote-document-root.quote-doc--print { max-width: none; padding: 0; margin: 0; }
-.quote-document-pdf-root, .quote-document-print-host { background: #fff; min-height: 100vh; }
-.quote-document-page, .quote-doc__paper { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 28px; }
+.quote-doc--pdf, .quote-document-root.quote-doc--pdf { max-width: none; padding: 0; margin: 0; width: 100%; }
+.quote-doc--print, .quote-document-root.quote-doc--print { max-width: none; padding: 0; margin: 0; width: 100%; }
+.quote-document-pdf-root, .quote-document-print-host {
+  background: #fff;
+  min-height: 100vh;
+  font-family: Arial, "Helvetica Neue", Helvetica, system-ui, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.quote-doc--pdf,
+.quote-doc--print,
+.quote-document-root[data-mode="pdf"],
+.quote-document-root[data-mode="print"] {
+  font-family: Arial, "Helvetica Neue", Helvetica, system-ui, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
 .quote-doc--pdf .quote-document-page,
 .quote-doc--pdf .quote-doc__paper,
 .quote-doc--print .quote-document-page,
-.quote-doc--print .quote-doc__paper { border: none; border-radius: 0; padding: 20px; box-shadow: none; }
+.quote-doc--print .quote-doc__paper {
+  border: none;
+  border-radius: 0;
+  padding: 16px 20px;
+  box-shadow: none;
+  width: 100%;
+  max-width: none;
+  min-height: auto;
+  box-sizing: border-box;
+}
+.quote-doc--pdf .quote-doc__table,
+.quote-document-root[data-mode="pdf"] .quote-document-table {
+  font-size: 9px;
+  width: 100%;
+  table-layout: auto;
+}
+.quote-doc--pdf .quote-doc__title { font-size: 22px; }
+.quote-doc--pdf .quote-doc__header { margin-bottom: 12px; padding-bottom: 14px; }
+.quote-doc--pdf .quote-doc__design-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+.quote-document-page, .quote-doc__paper { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 28px; }
 .quote-doc__header {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(200px, 1.2fr) minmax(220px, 1fr);

@@ -66,22 +66,22 @@ function buildTableColumns(data: QuotePdfData): TableColumn[] {
       value: (_item, idx) => String(idx + 1),
     },
     {
-      header: "Thiet ke",
+      header: "Thiết kế",
       width: 34,
       value: (item) => designCellLabel(item),
     },
     {
-      header: "Mau",
+      header: "Màu",
       width: 44,
       value: (item) => safeDash(item.colorSnapshot),
     },
     {
-      header: "Danh muc",
+      header: "Danh mục",
       width: 52,
       value: (item) => safeDash(item.categorySnapshot),
     },
     {
-      header: "San pham",
+      header: "Sản phẩm",
       width: 110,
       value: (item) => {
         const label = [item.productNameSnapshot, item.variantNameSnapshot]
@@ -97,7 +97,7 @@ function buildTableColumns(data: QuotePdfData): TableColumn[] {
       value: (item) => safeDash(item.skuSnapshot),
     },
     {
-      header: "Mo ta",
+      header: "Mô tả",
       width: 72,
       value: (item) => safeDash(item.description),
     },
@@ -107,22 +107,22 @@ function buildTableColumns(data: QuotePdfData): TableColumn[] {
       value: (item) => String(safeNumber(item.quantity)),
     },
     {
-      header: "DV",
+      header: "ĐV",
       width: 26,
       value: (item) => safeDash(item.unit),
     },
     {
-      header: "Loai gia",
+      header: "Loại giá",
       width: 52,
       value: (_item, _idx, quote) => safePriceType(quote.priceVatType),
     },
     {
-      header: "Don gia",
+      header: "Đơn giá",
       width: 58,
       value: (item, _idx, quote) => safeMoney(item.unitPrice, quote.currency),
     },
     {
-      header: "Tong",
+      header: "Tổng",
       width: 58,
       value: (item, _idx, quote) => safeMoney(item.lineTotal, quote.currency),
     },
@@ -137,14 +137,14 @@ function buildTableColumns(data: QuotePdfData): TableColumn[] {
   }
   if (data.showSampleFee) {
     cols.push({
-      header: "Phi mau",
+      header: "Phí mẫu",
       width: 44,
       value: (item, _idx, quote) => safeMoney(item.sampleFee, quote.currency),
     });
   }
   if (data.showSampleLeadTime) {
     cols.push({
-      header: "TG mau",
+      header: "TG mẫu",
       width: 44,
       value: (item) => safeDash(item.sampleLeadTime),
     });
@@ -193,7 +193,7 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   const pageW = safeDim(doc.page.width - 56, 500);
   const colW = safeDim(pageW / 3, 120);
 
-  doc.font(fonts.boldName, 18).text("BANG BAO GIA", { align: "center" });
+  doc.font(fonts.boldName, 18).text("BẢNG BÁO GIÁ", { align: "center" });
   doc.moveDown(0.3);
   if (safeText(company?.brandName).trim()) {
     doc.font(fonts.boldName, 11).text(safeText(company?.brandName), { align: "center" });
@@ -205,13 +205,13 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   }
   doc.font(fonts.regularName, 8);
   if (safeText(company?.taxCode).trim()) {
-    doc.text(`Ma so thue: ${safeText(company?.taxCode).trim()}`, { align: "center" });
+    doc.text(`Mã số thuế: ${safeText(company?.taxCode).trim()}`, { align: "center" });
   }
   if (safeText(company?.address).trim()) {
-    doc.text(`Dia chi: ${safeText(company?.address).trim()}`, { align: "center" });
+    doc.text(`Địa chỉ: ${safeText(company?.address).trim()}`, { align: "center" });
   }
   const companyContact = [
-    safeText(company?.phone).trim() ? `Dien thoai: ${safeText(company?.phone).trim()}` : "",
+    safeText(company?.phone).trim() ? `Điện thoại: ${safeText(company?.phone).trim()}` : "",
     safeText(company?.email).trim() ? `Email: ${safeText(company?.email).trim()}` : "",
     safeText(company?.website).trim() ? `Website: ${safeText(company?.website).trim()}` : "",
   ]
@@ -222,7 +222,7 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   doc.moveDown(0.6);
   doc.font(fonts.regularName, 8);
   doc.text(
-    `Ma bao gia: ${safeDash(data.quoteNo)}   Ngay: ${safeDate(data.quoteDate)}   Hieu luc: ${safeDate(data.validUntil)}   ${safeDash(data.currency)} · ${safePriceType(data.priceVatType)}`,
+    `Mã báo giá: ${safeDash(data.quoteNo)}   Ngày: ${safeDate(data.quoteDate)}   Hiệu lực: ${safeDate(data.validUntil)}   ${safeDash(data.currency)} · ${safePriceType(data.priceVatType)}`,
     { align: "center" },
   );
   doc.moveDown(0.5);
@@ -231,13 +231,13 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   drawPartyBlock(
     doc,
     fonts,
-    "Khach hang",
+    "Khách hàng",
     [
-      ["Cong ty", data.customerCompany],
-      ["Ma KH", data.customerCode],
+      ["Công ty", data.customerCompany],
+      ["Mã KH", data.customerCode],
       ["MST", data.customerTaxCode],
-      ["Dia chi", data.customerAddress],
-      ["DT", data.customerCompanyPhone],
+      ["Địa chỉ", data.customerAddress],
+      ["ĐT", data.customerCompanyPhone],
       ["Email", data.customerCompanyEmail],
     ],
     28,
@@ -247,11 +247,11 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   drawPartyBlock(
     doc,
     fonts,
-    "Nguoi lien he",
+    "Người liên hệ",
     [
-      ["Ho ten", data.customerContactName],
-      ["Chuc vu", data.customerContactTitle],
-      ["DT", data.customerContactPhone],
+      ["Họ tên", data.customerContactName],
+      ["Chức vụ", data.customerContactTitle],
+      ["ĐT", data.customerContactPhone],
       ["Email", data.customerContactEmail],
     ],
     28 + colW,
@@ -261,12 +261,13 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   drawPartyBlock(
     doc,
     fonts,
-    "Nhan vien tu van",
+    "Nhân viên tư vấn",
     [
-      ["Ten", data.salesName],
-      ["DT", data.salesPhone],
+      ["Tên", data.salesName],
+      ["Chức vụ", data.salesTitle],
+      ["ĐT", data.salesPhone],
       ["Email", data.salesEmail],
-      ["Dia chi", data.salesAddress],
+      ["Địa chỉ", data.salesAddress],
     ],
     28 + colW * 2,
     blockY,
@@ -312,7 +313,7 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
     data.manualOverride && data.manualTotalAmount != null
       ? safeNumber(data.manualTotalAmount)
       : safeNumber(data.totalAmount);
-  doc.text(`Tong cong: ${safeMoney(displayTotal, data.currency)}`, 28, tableY, {
+  doc.text(`Tổng cộng: ${safeMoney(displayTotal, data.currency)}`, 28, tableY, {
     align: "right",
     width: pageW,
   });
@@ -320,23 +321,33 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   const customerNote = safeText(data.customerNote).trim();
   if (customerNote) {
     tableY += 20;
-    doc.font(fonts.boldName, 9).text("Ghi chu gui khach:", 28, tableY);
+    doc.font(fonts.boldName, 9).text("Ghi chú gửi khách:", 28, tableY);
     doc.font(fonts.regularName, 8).text(customerNote, 28, tableY + 12, { width: pageW });
   }
 
   const terms = safeText(data.terms).trim();
   if (terms) {
     tableY += 40;
-    doc.font(fonts.boldName, 9).text("Dieu khoan bao gia:", 28, tableY);
+    doc.font(fonts.boldName, 9).text("Điều khoản báo giá:", 28, tableY);
     doc.font(fonts.regularName, 7).text(terms, 28, tableY + 12, { width: pageW });
   }
 
   const preparedBy = safeText(data.preparedBy).trim();
   if (preparedBy) {
-    doc.font(fonts.regularName, 9).text(`Nguoi lap: ${preparedBy}`, 28, doc.page.height - 60, {
+    doc.font(fonts.regularName, 9).text(`Người lập: ${preparedBy}`, 28, doc.page.height - 60, {
       align: "right",
       width: pageW,
     });
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    doc.font(fonts.regularName, 8).fillColor("#9ca3af").text(
+      "PDF fallback renderer",
+      28,
+      doc.page.height - 40,
+      { align: "center", width: pageW },
+    );
+    doc.fillColor("#000000");
   }
 
   doc.end();

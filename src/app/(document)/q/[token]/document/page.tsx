@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import QuoteDocumentContent from "@/components/quotes/QuoteDocumentContent";
 import QuoteDocumentAutoprint from "@/components/quotes/QuoteDocumentAutoprint";
+import QuoteDocumentPdfReady from "@/components/quotes/QuoteDocumentPdfReady";
 import { getPublicQuoteByToken } from "@/features/quotes/quote.service";
 import { getBrandingSettings, getCompanySettings } from "@/features/settings/services/settings.service";
 import { resolveQuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
@@ -48,6 +49,7 @@ export default async function QuoteDocumentPage({ params, searchParams }: Props)
         variant={variant}
       />
       {shouldAutoprint && <QuoteDocumentAutoprint />}
+      {variant === "pdf" && <QuoteDocumentPdfReady />}
     </>
   );
 }
