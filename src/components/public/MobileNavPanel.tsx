@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { X, ChevronDown, Phone, MessageCircle } from "lucide-react";
-import Image from "next/image";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
 import { NAV_PRIMARY_LINKS } from "@/lib/navConfig";
@@ -15,7 +14,7 @@ import {
 } from "@/lib/companyInfo";
 import { CTA } from "@/lib/ctaConfig";
 import { companyInfo } from "@/lib/companyInfo";
-import { isValidImageSrc } from "@/lib/imagePaths";
+import CategoryMenuImage from "@/components/marketplace/CategoryMenuImage";
 
 type MobileNavPanelProps = {
   open: boolean;
@@ -99,15 +98,40 @@ export default function MobileNavPanel({
                 <ChevronDown size={18} className="mobile-nav-accordion-icon" />
               </summary>
               <div className="mobile-nav-accordion-content">
-                {categoryTree.map((parent) => (
+                {categoryTree.map((parent) => {
+                  const hasChildren = parent.children.length > 0;
+
+                  if (!hasChildren) {
+                    return (
+                      <Link
+                        key={parent.id}
+                        href={parent.viewAllHref}
+                        className="mobile-nav-category-parent-link"
+                        onClick={onClose}
+                      >
+                        {parent.name}
+                        {parent.productCount > 0 && (
+                          <span className="mobile-nav-category-count">
+                            {parent.productCount}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  }
+
+                  return (
                   <details key={parent.id} className="mobile-nav-category-group">
                     <summary className="mobile-nav-category-parent">
                       {parent.name}
-                      {parent.productCount > 0 && (
+                      {parent.childCount > 0 ? (
+                        <span className="mobile-nav-category-count">
+                          {parent.childCount}
+                        </span>
+                      ) : parent.productCount > 0 ? (
                         <span className="mobile-nav-category-count">
                           {parent.productCount}
                         </span>
-                      )}
+                      ) : null}
                       <ChevronDown size={16} className="mobile-nav-accordion-icon" />
                     </summary>
                     <div className="mobile-nav-category-children">
@@ -118,19 +142,11 @@ export default function MobileNavPanel({
                           className="mobile-nav-category-child"
                           onClick={onClose}
                         >
-                          <span className="mobile-nav-category-child-img">
-                            {child.imageUrl && isValidImageSrc(child.imageUrl) ? (
-                              <Image
-                                src={child.imageUrl}
-                                alt=""
-                                fill
-                                className="mobile-nav-category-child-photo"
-                                sizes="48px"
-                              />
-                            ) : (
-                              <span className="mobile-nav-category-child-fallback" />
-                            )}
-                          </span>
+                          <CategoryMenuImage
+                            imageUrl={child.imageUrl}
+                            name={child.name}
+                            size="mobile"
+                          />
                           <span className="mobile-nav-category-child-label">
                             {child.name}
                           </span>
@@ -145,7 +161,8 @@ export default function MobileNavPanel({
                       </Link>
                     </div>
                   </details>
-                ))}
+                  );
+                })}
               </div>
             </details>
           )}

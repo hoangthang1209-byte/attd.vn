@@ -1,12 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { MarketplaceCategoryTreeNode } from "@/features/categories/marketplace-category-tree";
 import MarketplaceCategoryNav from "@/components/marketplace/MarketplaceCategoryNav";
-import { isValidImageSrc } from "@/lib/imagePaths";
+import CategoryMenuImage from "@/components/marketplace/CategoryMenuImage";
 
 type MarketplaceMegaCategoryMenuProps = {
   categories: MarketplaceCategoryTreeNode[];
@@ -85,6 +84,8 @@ export default function MarketplaceMegaCategoryMenu({
 
   if (categories.length === 0) return null;
 
+  const hasChildren = activeParent.children.length > 0;
+
   return (
     <div
       ref={containerRef}
@@ -120,6 +121,8 @@ export default function MarketplaceMegaCategoryMenu({
               <ul className="mp-mega-cat-parent-list">
                 {categories.map((parent) => {
                   const isActive = parent.id === activeParentId;
+                  const badgeCount =
+                    parent.childCount > 0 ? parent.childCount : parent.productCount;
                   return (
                     <li key={parent.id}>
                       <button
@@ -134,13 +137,14 @@ export default function MarketplaceMegaCategoryMenu({
                           selectParent(parent.id);
                         }}
                       >
-                        <span className="mp-mega-cat-parent-label">
-                          {parent.name}
-                        </span>
-                        {parent.productCount > 0 && (
-                          <span className="mp-mega-cat-parent-count">
-                            {parent.productCount}
-                          </span>
+                        <CategoryMenuImage
+                          imageUrl={parent.imageUrl}
+                          name={parent.name}
+                          size="parent"
+                        />
+                        <span className="mp-mega-cat-parent-label">{parent.name}</span>
+                        {badgeCount > 0 && (
+                          <span className="mp-mega-cat-parent-count">{badgeCount}</span>
                         )}
                         <ChevronRight
                           size={16}
@@ -166,36 +170,43 @@ export default function MarketplaceMegaCategoryMenu({
                 </Link>
               </div>
 
-              <div className="mp-mega-cat-grid" key={activeParent.id}>
-                {activeParent.children.map((child) => (
+              {hasChildren ? (
+                <div className="mp-mega-cat-grid" key={activeParent.id}>
+                  {activeParent.children.map((child) => (
+                    <Link
+                      key={`${activeParent.id}-${child.id}`}
+                      href={child.href}
+                      className="mp-mega-cat-chip"
+                      onClick={close}
+                    >
+                      <CategoryMenuImage
+                        imageUrl={child.imageUrl}
+                        name={child.name}
+                        size="child"
+                      />
+                      <span className="mp-mega-cat-chip-label">{child.name}</span>
+                      {child.productCount > 0 && (
+                        <span className="mp-mega-cat-chip-count">
+                          {child.productCount} sp
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="mp-mega-cat-empty" key={activeParent.id}>
+                  <p className="mp-mega-cat-empty__text">
+                    Danh mục này chưa có danh mục con.
+                  </p>
                   <Link
-                    key={`${activeParent.id}-${child.id || child.slug}`}
-                    href={child.href}
-                    className="mp-mega-cat-chip"
+                    href={activeParent.viewAllHref}
+                    className="mp-mega-cat-empty__cta"
                     onClick={close}
                   >
-                    <span className="mp-mega-cat-chip-img">
-                      {child.imageUrl && isValidImageSrc(child.imageUrl) ? (
-                        <Image
-                          src={child.imageUrl}
-                          alt=""
-                          fill
-                          className="mp-mega-cat-chip-photo"
-                          sizes="96px"
-                        />
-                      ) : (
-                        <span className="mp-mega-cat-chip-fallback" aria-hidden="true" />
-                      )}
-                    </span>
-                    <span className="mp-mega-cat-chip-label">{child.name}</span>
-                    {child.productCount > 0 && (
-                      <span className="mp-mega-cat-chip-count">
-                        {child.productCount} sp
-                      </span>
-                    )}
+                    Xem sản phẩm trong danh mục này
                   </Link>
-                ))}
-              </div>
+                </div>
+              )}
             </section>
           </div>
         </>

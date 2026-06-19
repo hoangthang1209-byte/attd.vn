@@ -23,6 +23,7 @@ export type MarketplaceCategoryTreeNode = {
   skuCode: string | null;
   imageUrl: string | null;
   productCount: number;
+  childCount: number;
   viewAllHref: string;
   children: MarketplaceCategoryTreeChild[];
 };
@@ -34,15 +35,28 @@ type DbCategory = {
   skuCode: string | null;
   imageUrl: string | null;
   sortOrder: number;
+  parentId?: string | null;
   _count: { products: number };
   products: { featuredImage: string | null }[];
   children?: DbCategory[];
 };
 
-const PLACEHOLDER_IMAGE = categoryDemoImages["ao-thun-tron"];
+const DEMO_PLACEHOLDER = categoryDemoImages["ao-thun-tron"];
 
+const categoryInclude = {
+  _count: { select: { products: { where: { status: "ACTIVE" as const } } } },
+  products: {
+    where: { status: "ACTIVE" as const },
+    take: 1,
+    select: { featuredImage: true },
+    orderBy: { createdAt: "desc" as const },
+  },
+};
+
+/** Resolve image: category.imageUrl → first product image → demo only in static-empty-DB mode. */
 function resolveCategoryImage(
   category: Pick<DbCategory, "slug" | "imageUrl" | "products">,
+  allowDemoFallback: boolean,
 ): string | null {
   if (category.imageUrl && isValidImageSrc(category.imageUrl)) {
     return category.imageUrl;
@@ -51,41 +65,46 @@ function resolveCategoryImage(
   if (productImage && isValidImageSrc(productImage)) {
     return productImage;
   }
-  const demo = categoryDemoImages[category.slug];
-  if (demo && isValidImageSrc(demo)) {
-    return demo;
+  if (allowDemoFallback) {
+    const demo = categoryDemoImages[category.slug];
+    if (demo && isValidImageSrc(demo)) return demo;
+    return DEMO_PLACEHOLDER;
   }
-  return PLACEHOLDER_IMAGE;
+  return null;
 }
 
 function mapDbChild(
   category: DbCategory,
-  labelOverride?: string,
-  idOverride?: string,
+  allowDemoFallback: boolean,
 ): MarketplaceCategoryTreeChild {
   return {
-    id: idOverride ?? category.id,
-    name: labelOverride ?? category.name,
+    id: category.id,
+    name: category.name,
     slug: category.slug,
-    imageUrl: resolveCategoryImage(category),
+    imageUrl: resolveCategoryImage(category, allowDemoFallback),
     productCount: category._count.products,
     href: catalogCategoryHref(category.slug),
   };
 }
 
-function mapDbParent(category: DbCategory): MarketplaceCategoryTreeNode {
-  const children =
-    category.children && category.children.length > 0
-      ? category.children.map((child) => mapDbChild(child))
-      : [mapDbChild(category)];
+function mapDbParent(
+  category: DbCategory,
+  allowDemoFallback: boolean,
+): MarketplaceCategoryTreeNode {
+  const children = (category.children ?? []).map((child) =>
+    mapDbChild(child, allowDemoFallback),
+  );
+  const childrenProductCount = children.reduce((sum, c) => sum + c.productCount, 0);
+  const productCount = category._count.products + childrenProductCount;
 
   return {
     id: category.id,
     name: category.name,
     slug: category.slug,
     skuCode: category.skuCode,
-    imageUrl: resolveCategoryImage(category),
-    productCount: category._count.products,
+    imageUrl: resolveCategoryImage(category, allowDemoFallback),
+    productCount,
+    childCount: children.length,
     viewAllHref: catalogCategoryHref(category.slug),
     children,
   };
@@ -96,23 +115,15 @@ function buildChildFromStatic(
   bySlug: Map<string, DbCategory>,
   groupId: string,
   childIndex: number,
-): MarketplaceCategoryTreeChild {
-  const uniqueId = `${groupId}-${staticChild.slug}-${childIndex}`;
+): MarketplaceCategoryTreeChild | null {
   const db = bySlug.get(staticChild.slug);
   if (db) {
-    return mapDbChild(db, staticChild.name, uniqueId);
+    return mapDbChild(db, true);
   }
-  const demo = categoryDemoImages[staticChild.slug];
-  return {
-    id: uniqueId,
-    name: staticChild.name,
-    slug: staticChild.slug,
-    imageUrl: demo && isValidImageSrc(demo) ? demo : PLACEHOLDER_IMAGE,
-    productCount: 0,
-    href: catalogCategoryHref(staticChild.slug),
-  };
+  return null;
 }
 
+/** Static marketing groups — only when CMS has zero categories. */
 function buildTreeFromStaticGroups(
   allCategories: DbCategory[],
 ): MarketplaceCategoryTreeNode[] {
@@ -120,12 +131,19 @@ function buildTreeFromStaticGroups(
 
   return MARKETPLACE_PARENT_GROUPS.map((group) => {
     const dbParent = bySlug.get(group.slug);
-    const children = group.children.map((child, childIndex) =>
-      buildChildFromStatic(child, bySlug, group.id, childIndex),
+    const children = group.children
+      .map((child, childIndex) =>
+        buildChildFromStatic(child, bySlug, group.id, childIndex),
+      )
+      .filter((c): c is MarketplaceCategoryTreeChild => c !== null);
+
+    const uniqueChildren = Array.from(
+      new Map(children.map((c) => [c.id, c])).values(),
     );
+
     const productCount =
-      dbParent?._count.products ??
-      children.reduce((sum, c) => sum + c.productCount, 0);
+      (dbParent?._count.products ?? 0) +
+      uniqueChildren.reduce((sum, c) => sum + c.productCount, 0);
 
     return {
       id: group.id,
@@ -133,62 +151,56 @@ function buildTreeFromStaticGroups(
       slug: group.slug,
       skuCode: dbParent?.skuCode ?? null,
       imageUrl: dbParent
-        ? resolveCategoryImage(dbParent)
-        : children[0]?.imageUrl ?? PLACEHOLDER_IMAGE,
+        ? resolveCategoryImage(dbParent, true)
+        : uniqueChildren[0]?.imageUrl ?? null,
       productCount,
+      childCount: uniqueChildren.length,
       viewAllHref: catalogCategoryHref(group.slug),
-      children,
+      children: uniqueChildren,
     };
   });
 }
 
-/** Marketplace category tree for mega menu — DB hierarchy first, static B2B groups as fallback. */
+/**
+ * Marketplace category tree for mega menu.
+ * Source of truth: CMS Category parent/child hierarchy from `/admin/products/categories`.
+ * Static B2B groups are used only when the database has no categories at all.
+ */
 export async function getMarketplaceCategoryTree(): Promise<
   MarketplaceCategoryTreeNode[]
 > {
-  const parentCategories = await prisma.category.findMany({
-    where: { parentId: null },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    include: {
-      children: {
-        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-        include: {
-          _count: { select: { products: { where: { status: "ACTIVE" } } } },
-          products: {
-            where: { status: "ACTIVE" },
-            take: 1,
-            select: { featuredImage: true },
-            orderBy: { createdAt: "desc" },
-          },
-        },
-      },
-      _count: { select: { products: { where: { status: "ACTIVE" } } } },
-      products: {
-        where: { status: "ACTIVE" },
-        take: 1,
-        select: { featuredImage: true },
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  });
-
-  const hasHierarchy = parentCategories.some((c) => c.children.length > 0);
-  if (hasHierarchy) {
-    return parentCategories.map(mapDbParent);
+  const totalCategories = await prisma.category.count();
+  if (totalCategories === 0) {
+    return buildTreeFromStaticGroups([]);
   }
 
-  const allCategories = await prisma.category.findMany({
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    include: {
-      _count: { select: { products: { where: { status: "ACTIVE" } } } },
-      products: {
-        where: { status: "ACTIVE" },
-        take: 1,
-        select: { featuredImage: true },
-        orderBy: { createdAt: "desc" },
+  const hasHierarchy = (await prisma.category.count({
+    where: { parentId: { not: null } },
+  })) > 0;
+
+  if (hasHierarchy) {
+    const parentCategories = await prisma.category.findMany({
+      where: { parentId: null },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      include: {
+        children: {
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          include: categoryInclude,
+        },
+        ...categoryInclude,
       },
-    },
+    });
+
+    return parentCategories.map((parent) => mapDbParent(parent, false));
+  }
+
+  const rootCategories = await prisma.category.findMany({
+    where: { parentId: null },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    include: categoryInclude,
   });
 
-  return buildTreeFromStaticGroups(allCategories);
+  return rootCategories.map((category) =>
+    mapDbParent({ ...category, children: [] }, false),
+  );
 }
