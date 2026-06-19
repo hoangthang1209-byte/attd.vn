@@ -4,13 +4,17 @@ import MobileActionBar from "@/components/public/MobileActionBar";
 import FloatingContactWidget from "@/components/public/FloatingContactWidget";
 import NavigationProgress from "@/components/public/NavigationProgress";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
+import { getMarketplaceCategoryTree } from "@/features/categories/marketplace-category-tree";
 
 export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const branding = await getBrandingSettings();
+  const [branding, categoryTree] = await Promise.all([
+    getBrandingSettings(),
+    getMarketplaceCategoryTree(),
+  ]);
 
   return (
     <>
@@ -18,6 +22,7 @@ export default async function PublicLayout({
       <Header
         headerLogoUrl={branding.headerLogoUrl}
         companyTagline={branding.companyTagline}
+        categoryTree={categoryTree}
       />
 
       <div className="public-main">{children}</div>

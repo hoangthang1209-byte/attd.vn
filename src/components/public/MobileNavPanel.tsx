@@ -3,13 +3,11 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { X, ChevronDown, Phone, MessageCircle } from "lucide-react";
+import Image from "next/image";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
-import {
-  NAV_SAN_PHAM_MENU,
-  NAV_PRIMARY_LINKS,
-  getMegaMenuLinks,
-} from "@/lib/navConfig";
+import { NAV_PRIMARY_LINKS } from "@/lib/navConfig";
+import type { MarketplaceCategoryTreeNode } from "@/features/categories/marketplace-category-tree";
 import {
   getHotlineTel,
   getHotlineDisplay,
@@ -17,12 +15,14 @@ import {
 } from "@/lib/companyInfo";
 import { CTA } from "@/lib/ctaConfig";
 import { companyInfo } from "@/lib/companyInfo";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
 type MobileNavPanelProps = {
   open: boolean;
   onClose: () => void;
   headerLogoUrl?: string | null;
   companyTagline?: string;
+  categoryTree?: MarketplaceCategoryTreeNode[];
 };
 
 export default function MobileNavPanel({
@@ -30,6 +30,7 @@ export default function MobileNavPanel({
   onClose,
   headerLogoUrl,
   companyTagline,
+  categoryTree = [],
 }: MobileNavPanelProps) {
   useEffect(() => {
     if (open) {
@@ -91,24 +92,63 @@ export default function MobileNavPanel({
             Xem danh mục sản phẩm →
           </Link>
 
-          <details className="mobile-nav-accordion" open>
-            <summary className="mobile-nav-accordion-trigger">
-              {NAV_SAN_PHAM_MENU.label}
-              <ChevronDown size={18} className="mobile-nav-accordion-icon" />
-            </summary>
-            <div className="mobile-nav-accordion-content">
-              {getMegaMenuLinks(NAV_SAN_PHAM_MENU).map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="mobile-nav-sublink"
-                  onClick={onClose}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          </details>
+          {categoryTree.length > 0 && (
+            <details className="mobile-nav-accordion mobile-nav-accordion--categories">
+              <summary className="mobile-nav-accordion-trigger">
+                Danh mục nguồn hàng
+                <ChevronDown size={18} className="mobile-nav-accordion-icon" />
+              </summary>
+              <div className="mobile-nav-accordion-content">
+                {categoryTree.map((parent) => (
+                  <details key={parent.id} className="mobile-nav-category-group">
+                    <summary className="mobile-nav-category-parent">
+                      {parent.name}
+                      {parent.productCount > 0 && (
+                        <span className="mobile-nav-category-count">
+                          {parent.productCount}
+                        </span>
+                      )}
+                      <ChevronDown size={16} className="mobile-nav-accordion-icon" />
+                    </summary>
+                    <div className="mobile-nav-category-children">
+                      {parent.children.map((child) => (
+                        <Link
+                          key={child.id}
+                          href={child.href}
+                          className="mobile-nav-category-child"
+                          onClick={onClose}
+                        >
+                          <span className="mobile-nav-category-child-img">
+                            {child.imageUrl && isValidImageSrc(child.imageUrl) ? (
+                              <Image
+                                src={child.imageUrl}
+                                alt=""
+                                fill
+                                className="mobile-nav-category-child-photo"
+                                sizes="48px"
+                              />
+                            ) : (
+                              <span className="mobile-nav-category-child-fallback" />
+                            )}
+                          </span>
+                          <span className="mobile-nav-category-child-label">
+                            {child.name}
+                          </span>
+                        </Link>
+                      ))}
+                      <Link
+                        href={parent.viewAllHref}
+                        className="mobile-nav-category-view-all"
+                        onClick={onClose}
+                      >
+                        Xem tất cả {parent.name} →
+                      </Link>
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </details>
+          )}
 
           {NAV_PRIMARY_LINKS.map((link) => (
             <Link

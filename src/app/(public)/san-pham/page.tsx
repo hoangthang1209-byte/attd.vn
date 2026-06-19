@@ -126,8 +126,16 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
               {products.length === 0 ? (
                 <EmptyState
-                  title="Chưa tìm thấy sản phẩm phù hợp"
-                  description="Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, số lượng tối thiểu và thời gian giao/sản xuất."
+                  title={
+                    activeCategory
+                      ? `Chưa có sản phẩm trong danh mục "${activeCategory.name}"`
+                      : "Chưa tìm thấy sản phẩm phù hợp"
+                  }
+                  description={
+                    activeCategory
+                      ? "Chưa có sản phẩm trong danh mục này. Gửi yêu cầu để ATTD tư vấn nguồn hàng phù hợp."
+                      : "Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, số lượng tối thiểu và thời gian giao/sản xuất."
+                  }
                 />
               ) : (
                 <div className="mp-product-grid">

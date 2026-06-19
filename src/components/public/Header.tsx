@@ -5,21 +5,24 @@ import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
-import NavMegaMenuPanel from "@/components/public/NavMegaMenu";
 import MobileNavPanel from "@/components/public/MobileNavPanel";
 import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
-import MarketplaceCategoryNav from "@/components/marketplace/MarketplaceCategoryNav";
-import { NAV_SAN_PHAM_MENU } from "@/lib/navConfig";
+import MarketplaceMegaCategoryMenu from "@/components/marketplace/MarketplaceMegaCategoryMenu";
+import type { MarketplaceCategoryTreeNode } from "@/features/categories/marketplace-category-tree";
 import { CTA } from "@/lib/ctaConfig";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
 type HeaderProps = {
   headerLogoUrl?: string | null;
   companyTagline?: string;
+  categoryTree?: MarketplaceCategoryTreeNode[];
 };
 
-const MEGA_MENU = { ...NAV_SAN_PHAM_MENU, label: "Tất cả danh mục" };
-
-export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
+export default function Header({
+  headerLogoUrl,
+  companyTagline,
+  categoryTree = [],
+}: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -89,9 +92,8 @@ export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
         </div>
 
         <div className="mp-header-cats mp-header-cats--desktop">
-          <div className="container mp-header-cats-inner">
-            <NavMegaMenuPanel item={MEGA_MENU} />
-            <MarketplaceCategoryNav />
+          <div className="container mp-header-cats-container">
+            <MarketplaceMegaCategoryMenu categories={categoryTree} />
           </div>
         </div>
       </header>
@@ -101,6 +103,7 @@ export default function Header({ headerLogoUrl, companyTagline }: HeaderProps) {
         onClose={() => setMobileOpen(false)}
         headerLogoUrl={headerLogoUrl}
         companyTagline={companyTagline}
+        categoryTree={categoryTree}
       />
     </>
   );
