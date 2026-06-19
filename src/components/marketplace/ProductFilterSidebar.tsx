@@ -1,13 +1,10 @@
 import Link from "next/link";
-
-type CategoryOption = {
-  slug: string;
-  name: string;
-  count?: number;
-};
+import type {
+  CatalogCategoryFilterNode,
+} from "@/features/categories/services/category.service";
 
 type ProductFilterSidebarProps = {
-  categories: CategoryOption[];
+  categoryTree: CatalogCategoryFilterNode[];
   activeCategory?: string;
   searchQuery?: string;
   filters: {
@@ -23,7 +20,7 @@ function buildFilterUrl(
   base: ProductFilterSidebarProps["filters"] & {
     category?: string;
     q?: string;
-  }
+  },
 ) {
   const p = new URLSearchParams();
   if (base.category) p.set("category", base.category);
@@ -38,7 +35,7 @@ function buildFilterUrl(
 }
 
 export default function ProductFilterSidebar({
-  categories,
+  categoryTree,
   activeCategory,
   searchQuery,
   filters,
@@ -55,29 +52,58 @@ export default function ProductFilterSidebar({
   return (
     <aside className="mp-filter-sidebar">
       <div className="mp-filter-block">
-        <h3 className="mp-filter-title">Danh mục</h3>
-        <ul className="mp-filter-list">
+        <h3 className="mp-filter-title">Danh mục sản phẩm</h3>
+        <ul className="mp-filter-category-tree">
           <li>
             <Link
               href={buildFilterUrl({ ...base, category: undefined })}
-              className={`mp-filter-link${!activeCategory ? " mp-filter-link--active" : ""}`}
+              className={`mp-filter-parent${!activeCategory ? " mp-filter-parent--active" : ""}`}
             >
-              Tất cả
+              Tất cả sản phẩm
             </Link>
           </li>
-          {categories.map((cat) => (
-            <li key={cat.slug}>
-              <Link
-                href={buildFilterUrl({ ...base, category: cat.slug })}
-                className={`mp-filter-link${activeCategory === cat.slug ? " mp-filter-link--active" : ""}`}
-              >
-                {cat.name}
-                {cat.count != null && (
-                  <span className="mp-filter-count">{cat.count}</span>
+
+          {categoryTree.map((parent) => {
+            const isParentActive = activeCategory === parent.slug;
+            const isChildActive = parent.children.some(
+              (child) => child.slug === activeCategory,
+            );
+            const isGroupExpanded = isParentActive || isChildActive;
+
+            return (
+              <li key={parent.id} className="mp-filter-category-group">
+                <Link
+                  href={buildFilterUrl({ ...base, category: parent.slug })}
+                  className={`mp-filter-parent${isParentActive ? " mp-filter-parent--active" : ""}`}
+                >
+                  <span className="mp-filter-parent-label">{parent.name}</span>
+                  {parent.productCount > 0 && (
+                    <span className="mp-filter-count">{parent.productCount}</span>
+                  )}
+                </Link>
+
+                {parent.children.length > 0 && (
+                  <ul
+                    className={`mp-filter-children${isGroupExpanded ? " mp-filter-children--expanded" : ""}`}
+                  >
+                    {parent.children.map((child) => (
+                      <li key={child.id}>
+                        <Link
+                          href={buildFilterUrl({ ...base, category: child.slug })}
+                          className={`mp-filter-child${activeCategory === child.slug ? " mp-filter-child--active" : ""}`}
+                        >
+                          <span className="mp-filter-child-label">{child.name}</span>
+                          {child.productCount > 0 && (
+                            <span className="mp-filter-count">{child.productCount}</span>
+                          )}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-              </Link>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </div>
 

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getCategoryFilterIdsBySlug } from "@/features/categories/services/category.service";
 
 export async function getProducts() {
   return prisma.product.findMany({
@@ -96,10 +97,18 @@ export async function getProductsForPublicListing(params: {
     material,
   } = params;
 
+  let categoryIds: string[] | undefined;
+  if (categorySlug) {
+    categoryIds = await getCategoryFilterIdsBySlug(categorySlug);
+    if (categoryIds.length === 0) {
+      return { products: [], total: 0, page, perPage };
+    }
+  }
+
   const where: Prisma.ProductWhereInput = {
     status: "ACTIVE",
     slug: { not: "" },
-    ...(categorySlug && { category: { slug: categorySlug } }),
+    ...(categoryIds && { categoryId: { in: categoryIds } }),
     ...(search && {
       OR: [
         { name: { contains: search, mode: "insensitive" } },

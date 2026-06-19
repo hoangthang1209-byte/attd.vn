@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getProductsForPublicListing } from "@/features/products/services/product.service";
-import { getCategoriesWithCounts } from "@/features/categories/services/category.service";
+import {
+  getCategoryTreeForCatalogFilter,
+  resolveCatalogCategoryContext,
+} from "@/features/categories/services/category.service";
 import ProductCard from "@/components/public/ProductCard";
 import ProductFilterSidebar from "@/components/marketplace/ProductFilterSidebar";
 import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
@@ -54,18 +57,19 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
     material,
   };
 
-  const [{ products, total, perPage }, categories] = await Promise.all([
-    getProductsForPublicListing({
-      categorySlug: category,
-      search: q,
-      page,
-      ...filters,
-    }),
-    getCategoriesWithCounts(),
-  ]);
+  const [{ products, total, perPage }, categoryTree, categoryContext] =
+    await Promise.all([
+      getProductsForPublicListing({
+        categorySlug: category,
+        search: q,
+        page,
+        ...filters,
+      }),
+      getCategoryTreeForCatalogFilter(),
+      category ? resolveCatalogCategoryContext(category) : Promise.resolve(null),
+    ]);
 
   const totalPages = Math.ceil(total / perPage);
-  const activeCategory = categories.find((c) => c.slug === category);
 
   function buildUrl(nextPage?: number) {
     const p = new URLSearchParams();
@@ -81,23 +85,28 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
     return `/san-pham${qs ? `?${qs}` : ""}`;
   }
 
+  const pageTitle = categoryContext?.title ?? "Danh mục sản phẩm";
+  const pageDescription =
+    categoryContext?.subtitle ??
+    "Tìm nguồn hàng đồng phục & quà tặng — lọc theo danh mục, tình trạng hàng và khả năng gia công.";
+
+  const breadcrumbItems = [
+    { name: "Sản phẩm", href: "/san-pham" },
+    ...(categoryContext?.parentName && categoryContext.parentSlug
+      ? [{ name: categoryContext.parentName, href: `/san-pham?category=${categoryContext.parentSlug}` }]
+      : []),
+    ...(categoryContext ? [{ name: categoryContext.name }] : []),
+  ];
+
   return (
     <main className="mp-catalog">
-      <Breadcrumb
-        items={[
-          { name: "Sản phẩm", href: "/san-pham" },
-          ...(activeCategory ? [{ name: activeCategory.name }] : []),
-        ]}
-      />
+      <Breadcrumb items={breadcrumbItems} />
 
       <section className="mp-catalog-hero">
         <div className="container">
           <MarketplaceSectionHeader
-            title={activeCategory ? activeCategory.name : "Kho sản phẩm sỉ B2B"}
-            description={
-              activeCategory?.description ??
-              "Tìm nguồn hàng đồng phục & quà tặng — lọc theo danh mục, tình trạng hàng và khả năng gia công."
-            }
+            title={pageTitle}
+            description={pageDescription}
           />
           <MarketplaceSearchBar defaultValue={q ?? ""} size="large" />
         </div>
@@ -107,11 +116,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
         <div className="container">
           <div className="mp-catalog-layout">
             <ProductFilterSidebar
-              categories={categories.map((c) => ({
-                slug: c.slug,
-                name: c.name,
-                count: c._count.products,
-              }))}
+              categoryTree={categoryTree}
               activeCategory={category}
               searchQuery={q}
               filters={filters}
@@ -120,23 +125,30 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
             <div className="mp-catalog-main">
               <p className="mp-catalog-count">
                 {total > 0
-                  ? `${total} sản phẩm${q ? ` cho "${q}"` : ""}${activeCategory ? ` · ${activeCategory.name}` : ""}`
+                  ? `${total} sản phẩm${q ? ` cho "${q}"` : ""}${categoryContext ? ` · ${categoryContext.name}` : ""}`
                   : "Không tìm thấy sản phẩm"}
               </p>
 
               {products.length === 0 ? (
-                <EmptyState
-                  title={
-                    activeCategory
-                      ? `Chưa có sản phẩm trong danh mục "${activeCategory.name}"`
-                      : "Chưa tìm thấy sản phẩm phù hợp"
-                  }
-                  description={
-                    activeCategory
-                      ? "Chưa có sản phẩm trong danh mục này. Gửi yêu cầu để ATTD tư vấn nguồn hàng phù hợp."
-                      : "Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, số lượng tối thiểu và thời gian giao/sản xuất."
-                  }
-                />
+                <div className="mp-catalog-empty">
+                  <EmptyState
+                    title={
+                      categoryContext
+                        ? `Chưa có sản phẩm trong danh mục "${categoryContext.name}"`
+                        : "Chưa tìm thấy sản phẩm phù hợp"
+                    }
+                    description={
+                      categoryContext
+                        ? "Chưa có sản phẩm trong danh mục này. Gửi yêu cầu để ATTD tư vấn nguồn hàng phù hợp."
+                        : "Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, số lượng tối thiểu và thời gian giao/sản xuất."
+                    }
+                  />
+                  {categoryContext && (
+                    <Link href="/lien-he" className="btn-primary mp-catalog-empty-cta">
+                      Liên hệ báo giá
+                    </Link>
+                  )}
+                </div>
               ) : (
                 <div className="mp-product-grid">
                   {products.map((product) => {

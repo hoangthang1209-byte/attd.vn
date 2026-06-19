@@ -9146,6 +9146,29 @@ body.mp-mega-cat-open { overflow: hidden; }
 .mp-filter-check--active .mp-filter-check-box { background: var(--primary); border-color: var(--primary); }
 .mp-filter-clear { display: inline-block; font-size: 13px; font-weight: 600; color: var(--primary); text-decoration: none; }
 
+/* Category tree filter (parent/child) */
+.mp-filter-category-tree { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.mp-filter-category-group { display: flex; flex-direction: column; gap: 0; }
+.mp-filter-parent { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 8px; font-size: 14px; font-weight: 700; color: #111827; text-decoration: none; min-height: 44px; }
+.mp-filter-parent:hover { background: var(--section-bg); }
+.mp-filter-parent--active { background: #fef2f2; color: var(--primary); }
+.mp-filter-parent-label { flex: 1; min-width: 0; }
+.mp-filter-children { list-style: none; margin: 0; padding: 0 0 4px 0; display: flex; flex-direction: column; gap: 1px; }
+.mp-filter-child { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 8px 24px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #4b5563; text-decoration: none; min-height: 40px; border-left: 2px solid #f3f4f6; margin-left: 12px; }
+.mp-filter-child:hover { background: var(--section-bg); color: #111827; }
+.mp-filter-child--active { background: #fef2f2; color: var(--primary); font-weight: 600; border-left-color: var(--primary); }
+.mp-filter-child-label { flex: 1; min-width: 0; }
+.mp-filter-count { font-size: 11px; font-weight: 600; color: #9ca3af; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 999px; padding: 1px 7px; flex-shrink: 0; }
+.mp-filter-parent--active .mp-filter-count,
+.mp-filter-child--active .mp-filter-count { color: var(--primary); border-color: #fecaca; background: #fff; }
+.mp-catalog-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.mp-catalog-empty-cta { display: inline-flex; align-items: center; padding: 12px 20px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 14px; }
+@media (max-width: 900px) {
+  .mp-filter-category-tree { gap: 4px; }
+  .mp-filter-parent { padding: 12px; }
+  .mp-filter-child { padding: 10px 12px 10px 20px; margin-left: 8px; }
+}
+
 /* Product detail */
 .mp-product-detail { padding: 24px 0 48px; }
 .mp-product-detail-layout { display: grid; grid-template-columns: 1fr; gap: 32px; }
