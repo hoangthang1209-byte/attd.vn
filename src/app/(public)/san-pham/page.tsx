@@ -6,7 +6,7 @@ import {
   resolveCatalogCategoryContext,
 } from "@/features/categories/services/category.service";
 import ProductCard from "@/components/public/ProductCard";
-import ProductFilterSidebar from "@/components/marketplace/ProductFilterSidebar";
+import CatalogFilterToolbar from "@/components/marketplace/CatalogFilterToolbar";
 import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
 import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
 import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
@@ -14,6 +14,7 @@ import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import { SITE_NAME, DEFAULT_DESCRIPTION, canonicalUrl } from "@/lib/seo";
 import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
+import { buildClearFiltersUrl } from "@/lib/catalog-filter-url";
 
 export const revalidate = 3600;
 
@@ -114,15 +115,22 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
       <section className="mp-catalog-body">
         <div className="container">
-          <div className="mp-catalog-layout">
-            <ProductFilterSidebar
-              categoryTree={categoryTree}
-              activeCategory={category}
-              searchQuery={q}
-              filters={filters}
-            />
-
+          <div className="mp-catalog-layout mp-catalog-layout--compact">
             <div className="mp-catalog-main">
+              <CatalogFilterToolbar
+                categoryTree={categoryTree}
+                filters={{
+                  category,
+                  q,
+                  inStock: filters.inStock,
+                  print: filters.print,
+                  embroidery: filters.embroidery,
+                  oem: filters.oem,
+                  material,
+                }}
+                categoryLabel={categoryContext?.name ?? null}
+              />
+
               <p className="mp-catalog-count">
                 {total > 0
                   ? `${total} sản phẩm${q ? ` cho "${q}"` : ""}${categoryContext ? ` · ${categoryContext.name}` : ""}`
@@ -135,14 +143,21 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                     title={
                       categoryContext
                         ? `Chưa có sản phẩm trong danh mục "${categoryContext.name}"`
-                        : "Chưa tìm thấy sản phẩm phù hợp"
+                        : q
+                          ? `Không tìm thấy sản phẩm cho "${q}"`
+                          : "Chưa tìm thấy sản phẩm phù hợp"
                     }
                     description={
                       categoryContext
-                        ? "Chưa có sản phẩm trong danh mục này. Gửi yêu cầu để ATTD tư vấn nguồn hàng phù hợp."
-                        : "Gửi yêu cầu để ATTD gợi ý nguồn hàng theo danh mục, số lượng tối thiểu và thời gian giao/sản xuất."
+                        ? "Thử chọn danh mục khác hoặc xóa bộ lọc để xem thêm sản phẩm."
+                        : "Thử điều chỉnh bộ lọc hoặc gửi yêu cầu để ATTD gợi ý nguồn hàng phù hợp."
                     }
                   />
+                  {(category || filters.inStock || filters.print || filters.embroidery || filters.oem || material) && (
+                    <Link href={buildClearFiltersUrl(q)} className="btn-secondary mp-catalog-empty-cta">
+                      Xóa bộ lọc
+                    </Link>
+                  )}
                   {categoryContext && (
                     <Link href="/lien-he" className="btn-primary mp-catalog-empty-cta">
                       Liên hệ báo giá

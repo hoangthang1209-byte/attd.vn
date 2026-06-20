@@ -15,6 +15,25 @@ import { NAV_PRIMARY_LINKS } from "@/lib/navConfig";
 
 const HEADER_SEARCH_PLACEHOLDER = "Tìm áo thun, áo polo, nón, quà tặng…";
 
+function MobileNavCategorySlugEffect({
+  onCategoryChange,
+}: {
+  onCategoryChange: (slug: string | null) => void;
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (pathname === "/san-pham") {
+      onCategoryChange(searchParams.get("category"));
+    } else {
+      onCategoryChange(null);
+    }
+  }, [pathname, searchParams, onCategoryChange]);
+
+  return null;
+}
+
 function MobileSearchRouteCloseEffect({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -43,6 +62,7 @@ export default function Header({
 }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [activeCategorySlug, setActiveCategorySlug] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +113,10 @@ export default function Header({
     mobileSearchInputRef.current?.blur();
   }, []);
 
+  const handleCategorySlugChange = useCallback((slug: string | null) => {
+    setActiveCategorySlug(slug);
+  }, []);
+
   function openMobileMenu() {
     closeMobileSearch();
     setMobileOpen(true);
@@ -107,6 +131,7 @@ export default function Header({
     <>
       <Suspense fallback={null}>
         <MobileSearchRouteCloseEffect onClose={closeMobileSearch} />
+        <MobileNavCategorySlugEffect onCategoryChange={handleCategorySlugChange} />
       </Suspense>
       <header
         ref={headerRef}
@@ -219,6 +244,7 @@ export default function Header({
         headerLogoUrl={headerLogoUrl}
         companyTagline={companyTagline}
         categoryTree={categoryTree}
+        activeCategorySlug={activeCategorySlug}
       />
     </>
   );

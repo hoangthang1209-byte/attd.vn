@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { X, ChevronDown, Phone, MessageCircle } from "lucide-react";
+import { X, Phone, MessageCircle } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
+import MobileCategoryBrowser from "@/components/public/MobileCategoryBrowser";
 import { NAV_PRIMARY_LINKS } from "@/lib/navConfig";
 import type { MarketplaceCategoryTreeNode } from "@/features/categories/marketplace-category-tree";
 import {
@@ -14,7 +15,6 @@ import {
 } from "@/lib/companyInfo";
 import { CTA } from "@/lib/ctaConfig";
 import { companyInfo } from "@/lib/companyInfo";
-import CategoryMenuImage from "@/components/marketplace/CategoryMenuImage";
 
 type MobileNavPanelProps = {
   open: boolean;
@@ -22,6 +22,7 @@ type MobileNavPanelProps = {
   headerLogoUrl?: string | null;
   companyTagline?: string;
   categoryTree?: MarketplaceCategoryTreeNode[];
+  activeCategorySlug?: string | null;
 };
 
 export default function MobileNavPanel({
@@ -30,6 +31,7 @@ export default function MobileNavPanel({
   headerLogoUrl,
   companyTagline,
   categoryTree = [],
+  activeCategorySlug,
 }: MobileNavPanelProps) {
   useEffect(() => {
     if (open) {
@@ -88,83 +90,15 @@ export default function MobileNavPanel({
             className="mobile-nav-sublink mobile-nav-sublink--primary mobile-nav-sublink--top"
             onClick={onClose}
           >
-            Xem danh mục sản phẩm →
+            Xem danh mục sản phẩm
           </Link>
 
           {categoryTree.length > 0 && (
-            <details className="mobile-nav-accordion mobile-nav-accordion--categories">
-              <summary className="mobile-nav-accordion-trigger">
-                Danh mục nguồn hàng
-                <ChevronDown size={18} className="mobile-nav-accordion-icon" />
-              </summary>
-              <div className="mobile-nav-accordion-content">
-                {categoryTree.map((parent) => {
-                  const hasChildren = parent.children.length > 0;
-
-                  if (!hasChildren) {
-                    return (
-                      <Link
-                        key={parent.id}
-                        href={parent.viewAllHref}
-                        className="mobile-nav-category-parent-link"
-                        onClick={onClose}
-                      >
-                        {parent.name}
-                        {parent.productCount > 0 && (
-                          <span className="mobile-nav-category-count">
-                            {parent.productCount}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  }
-
-                  return (
-                  <details key={parent.id} className="mobile-nav-category-group">
-                    <summary className="mobile-nav-category-parent">
-                      {parent.name}
-                      {parent.childCount > 0 ? (
-                        <span className="mobile-nav-category-count">
-                          {parent.childCount}
-                        </span>
-                      ) : parent.productCount > 0 ? (
-                        <span className="mobile-nav-category-count">
-                          {parent.productCount}
-                        </span>
-                      ) : null}
-                      <ChevronDown size={16} className="mobile-nav-accordion-icon" />
-                    </summary>
-                    <div className="mobile-nav-category-children">
-                      {parent.children.map((child) => (
-                        <Link
-                          key={child.id}
-                          href={child.href}
-                          className="mobile-nav-category-child"
-                          onClick={onClose}
-                        >
-                          <CategoryMenuImage
-                            imageUrl={child.imageUrl}
-                            name={child.name}
-                            size="mobile"
-                          />
-                          <span className="mobile-nav-category-child-label">
-                            {child.name}
-                          </span>
-                        </Link>
-                      ))}
-                      <Link
-                        href={parent.viewAllHref}
-                        className="mobile-nav-category-view-all"
-                        onClick={onClose}
-                      >
-                        Xem tất cả {parent.name} →
-                      </Link>
-                    </div>
-                  </details>
-                  );
-                })}
-              </div>
-            </details>
+            <MobileCategoryBrowser
+              categoryTree={categoryTree}
+              activeCategorySlug={activeCategorySlug}
+              onNavigate={onClose}
+            />
           )}
 
           {NAV_PRIMARY_LINKS.map((link) => (
