@@ -74,25 +74,33 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const customer = await createCustomer({
-    type,
-    name,
-    legalName: typeof raw.legalName === "string" ? raw.legalName : null,
-    taxCode: typeof raw.taxCode === "string" ? raw.taxCode : null,
-    phone: typeof raw.phone === "string" ? raw.phone : null,
-    email: typeof raw.email === "string" ? raw.email : null,
-    website: typeof raw.website === "string" ? raw.website : null,
-    address: typeof raw.address === "string" ? raw.address : null,
-    province: typeof raw.province === "string" ? raw.province : null,
-    district: typeof raw.district === "string" ? raw.district : null,
-    status,
-    note: typeof raw.note === "string" ? raw.note : null,
-    primaryContact,
-  });
+  try {
+    const customer = await createCustomer({
+      type,
+      name,
+      legalName: typeof raw.legalName === "string" ? raw.legalName : null,
+      taxCode: typeof raw.taxCode === "string" ? raw.taxCode : null,
+      phone: typeof raw.phone === "string" ? raw.phone : null,
+      email: typeof raw.email === "string" ? raw.email : null,
+      website: typeof raw.website === "string" ? raw.website : null,
+      address: typeof raw.address === "string" ? raw.address : null,
+      province: typeof raw.province === "string" ? raw.province : null,
+      district: typeof raw.district === "string" ? raw.district : null,
+      status,
+      note: typeof raw.note === "string" ? raw.note : null,
+      primaryContact,
+    });
 
-  if (!customer) {
+    if (!customer) {
+      return NextResponse.json({ message: "Không thể tạo khách hàng" }, { status: 500 });
+    }
+
+    return NextResponse.json({ customer }, { status: 201 });
+  } catch (err) {
+    if (err instanceof Error && err.message) {
+      return NextResponse.json({ message: err.message }, { status: 400 });
+    }
+    console.error("[POST /api/crm/customers]", err);
     return NextResponse.json({ message: "Không thể tạo khách hàng" }, { status: 500 });
   }
-
-  return NextResponse.json({ customer }, { status: 201 });
 }

@@ -27,6 +27,8 @@ import {
   ORDER_STATUS_LABELS,
 } from "@/features/orders/order-labels";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
+import type { EmployeeRecord } from "@/features/employees/employee.service";
+import type { DeliveryMethodRecord } from "@/features/delivery/delivery-method.service";
 import { toDateInputValue } from "@/features/quotes/format";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
@@ -35,7 +37,7 @@ type Props = { id: string };
 
 function syncProductionFields(order: OrderDetailRecord) {
   return {
-    productionOwnerName: order.productionOwnerName ?? "",
+    productionOwnerId: order.productionOwnerId ?? "",
     productionDueDate: order.productionDueDate ? toDateInputValue(order.productionDueDate) : "",
     productionNote: order.productionNote ?? "",
   };
@@ -43,7 +45,8 @@ function syncProductionFields(order: OrderDetailRecord) {
 
 function syncDeliveryFields(order: OrderDetailRecord) {
   return {
-    deliveryMethod: order.deliveryMethod ?? "",
+    deliveryMethodId: order.deliveryMethodId ?? "",
+    deliveryOwnerId: order.deliveryOwnerId ?? "",
     deliveryCarrier: order.deliveryCarrier ?? "",
     deliveryTrackingCode: order.deliveryTrackingCode ?? "",
     deliveryRecipientName: order.deliveryRecipientName ?? order.contactName ?? "",
@@ -52,6 +55,10 @@ function syncDeliveryFields(order: OrderDetailRecord) {
     deliveryExpectedAt: order.deliveryExpectedAt ? toDateInputValue(order.deliveryExpectedAt) : "",
     deliveryNote: order.deliveryNote ?? "",
   };
+}
+
+function deliveryMethodDisplay(order: OrderDetailRecord): string {
+  return order.deliveryMethodName ?? order.deliveryMethod ?? "—";
 }
 
 export default function OrderDetailView({ id }: Props) {
@@ -87,12 +94,13 @@ export default function OrderDetailView({ id }: Props) {
   const [paymentNote, setPaymentNote] = useState("");
   const [paymentEditReason, setPaymentEditReason] = useState("");
   const [productionFields, setProductionFields] = useState({
-    productionOwnerName: "",
+    productionOwnerId: "",
     productionDueDate: "",
     productionNote: "",
   });
   const [deliveryFields, setDeliveryFields] = useState({
-    deliveryMethod: "",
+    deliveryMethodId: "",
+    deliveryOwnerId: "",
     deliveryCarrier: "",
     deliveryTrackingCode: "",
     deliveryRecipientName: "",
@@ -101,6 +109,8 @@ export default function OrderDetailView({ id }: Props) {
     deliveryExpectedAt: "",
     deliveryNote: "",
   });
+  const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
+  const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethodRecord[]>([]);
 
   async function load() {
     setLoading(true);
@@ -119,6 +129,16 @@ export default function OrderDetailView({ id }: Props) {
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    void Promise.all([
+      fetch("/api/employees?active=1&limit=200").then((r) => r.json()),
+      fetch("/api/delivery-methods?active=1").then((r) => r.json()),
+    ]).then(([empData, dmData]) => {
+      setEmployees((empData as { employees?: EmployeeRecord[] }).employees ?? []);
+      setDeliveryMethods((dmData as { deliveryMethods?: DeliveryMethodRecord[] }).deliveryMethods ?? []);
+    });
+  }, []);
 
   useEffect(() => { void load(); }, [id]);
 
@@ -274,7 +294,7 @@ export default function OrderDetailView({ id }: Props) {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            productionOwnerName: productionFields.productionOwnerName || null,
+            productionOwnerId: productionFields.productionOwnerId || null,
             productionDueDate: productionFields.productionDueDate
               ? new Date(productionFields.productionDueDate).toISOString()
               : null,
@@ -302,7 +322,8 @@ export default function OrderDetailView({ id }: Props) {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            deliveryMethod: deliveryFields.deliveryMethod || null,
+            deliveryMethodId: deliveryFields.deliveryMethodId || null,
+            deliveryOwnerId: deliveryFields.deliveryOwnerId || null,
             deliveryCarrier: deliveryFields.deliveryCarrier || null,
             deliveryTrackingCode: deliveryFields.deliveryTrackingCode || null,
             deliveryRecipientName: deliveryFields.deliveryRecipientName || null,
@@ -449,11 +470,25 @@ export default function OrderDetailView({ id }: Props) {
             <div className="admin-catalog-variant-fields">
               <div className="admin-field">
                 <label className="admin-label">Người phụ trách sản xuất</label>
-                <input
+                <select
                   className="admin-input"
-                  value={productionFields.productionOwnerName}
-                  onChange={(e) => setProductionFields((f) => ({ ...f, productionOwnerName: e.target.value }))}
-                />
+                  value={productionFields.productionOwnerId}
+                  onChange={(e) => setProductionFields((f) => ({ ...f, productionOwnerId: e.target.value }))}
+                >
+                  <option value="">— Chọn nhân viên —</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.fullName} ({emp.employeeCode})
+                    </option>
+                  ))}
+                  {order.productionOwnerId &&
+                    !employees.some((e) => e.id === order.productionOwnerId) &&
+                    order.productionOwnerName && (
+                      <option value={order.productionOwnerId}>
+                        {order.productionOwnerName} (lưu trước)
+                      </option>
+                    )}
+                </select>
               </div>
               <div className="admin-field">
                 <label className="admin-label">Hạn hoàn thành dự kiến</label>
@@ -494,7 +529,45 @@ export default function OrderDetailView({ id }: Props) {
             <div className="admin-catalog-variant-fields">
               <div className="admin-field">
                 <label className="admin-label">Hình thức giao hàng</label>
-                <input className="admin-input" value={deliveryFields.deliveryMethod} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryMethod: e.target.value }))} />
+                <select
+                  className="admin-input"
+                  value={deliveryFields.deliveryMethodId}
+                  onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryMethodId: e.target.value }))}
+                >
+                  <option value="">— Chọn hình thức —</option>
+                  {deliveryMethods.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                  {order.deliveryMethodId &&
+                    !deliveryMethods.some((m) => m.id === order.deliveryMethodId) &&
+                    deliveryMethodDisplay(order) !== "—" && (
+                      <option value={order.deliveryMethodId}>
+                        {deliveryMethodDisplay(order)} (lưu trước)
+                      </option>
+                    )}
+                </select>
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Người phụ trách giao hàng</label>
+                <select
+                  className="admin-input"
+                  value={deliveryFields.deliveryOwnerId}
+                  onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryOwnerId: e.target.value }))}
+                >
+                  <option value="">— Chọn nhân viên —</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.fullName} ({emp.employeeCode})
+                    </option>
+                  ))}
+                  {order.deliveryOwnerId &&
+                    !employees.some((e) => e.id === order.deliveryOwnerId) &&
+                    order.deliveryOwnerName && (
+                      <option value={order.deliveryOwnerId}>
+                        {order.deliveryOwnerName} (lưu trước)
+                      </option>
+                    )}
+                </select>
               </div>
               <div className="admin-field">
                 <label className="admin-label">Đơn vị vận chuyển</label>
@@ -531,7 +604,10 @@ export default function OrderDetailView({ id }: Props) {
           </form>
         ) : (
           <>
-            <p className="admin-field-hint">Hình thức: {order.deliveryMethod ?? "—"}</p>
+            <p className="admin-field-hint">Hình thức: {deliveryMethodDisplay(order)}</p>
+            {order.deliveryOwnerName && (
+              <p className="admin-field-hint">Phụ trách giao: {order.deliveryOwnerName}</p>
+            )}
             <p className="admin-field-hint">Đơn vị vận chuyển: {order.deliveryCarrier ?? "—"}</p>
             <p className="admin-field-hint">Mã vận đơn: {order.deliveryTrackingCode ?? "—"}</p>
             <p className="admin-field-hint">Người nhận: {order.deliveryRecipientName ?? "—"}</p>

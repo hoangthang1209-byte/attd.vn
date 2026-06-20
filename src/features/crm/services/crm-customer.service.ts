@@ -65,6 +65,23 @@ export async function createCustomer(input: CreateCustomerInput): Promise<CrmCus
   const name = input.name.trim();
   if (!name) return null;
 
+  const taxCode = input.taxCode?.trim();
+  if (taxCode) {
+    const duplicateTax = await prisma.customer.findFirst({
+      where: { taxCode: { equals: taxCode, mode: "insensitive" } },
+    });
+    if (duplicateTax) {
+      throw new Error("Mã số thuế đã tồn tại trong hệ thống.");
+    }
+  }
+
+  const duplicateName = await prisma.customer.findFirst({
+    where: { name: { equals: name, mode: "insensitive" } },
+  });
+  if (duplicateName) {
+    throw new Error("Tên khách hàng đã tồn tại trong hệ thống.");
+  }
+
   try {
     const code = await generateCustomerCode();
 

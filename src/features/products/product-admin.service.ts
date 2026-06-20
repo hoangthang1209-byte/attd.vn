@@ -15,6 +15,7 @@ import {
   normalizeCode,
 } from "@/features/products/product-sku-utils";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
+import { generateProductSystemCode } from "@/features/products/product-system-code";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -280,12 +281,14 @@ export async function createProductAdmin(input: ProductInput) {
   }
 
   const slug = await ensureUniqueSlug(input.slug ?? toSlug(input.name));
+  const systemCode = await generateProductSystemCode();
 
   const product = await prisma.product.create({
     data: {
       name: input.name,
       slug,
       productCode,
+      systemCode,
       categoryId: input.categoryId,
       shortDescription: input.shortDescription,
       description: input.description,

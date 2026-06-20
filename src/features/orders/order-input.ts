@@ -159,7 +159,7 @@ export function parseUpdateOrderProductionBody(
   raw: Record<string, unknown>,
 ): UpdateOrderProductionInput {
   return {
-    productionOwnerName: parseOptionalString(raw.productionOwnerName),
+    productionOwnerId: parseOptionalString(raw.productionOwnerId),
     productionDueDate: parseOptionalString(raw.productionDueDate),
     productionNote: parseOptionalString(raw.productionNote),
   };
@@ -169,7 +169,8 @@ export function parseUpdateOrderDeliveryBody(
   raw: Record<string, unknown>,
 ): UpdateOrderDeliveryInput {
   return {
-    deliveryMethod: parseOptionalString(raw.deliveryMethod),
+    deliveryMethodId: parseOptionalString(raw.deliveryMethodId),
+    deliveryOwnerId: parseOptionalString(raw.deliveryOwnerId),
     deliveryCarrier: parseOptionalString(raw.deliveryCarrier),
     deliveryTrackingCode: parseOptionalString(raw.deliveryTrackingCode),
     deliveryRecipientName: parseOptionalString(raw.deliveryRecipientName),

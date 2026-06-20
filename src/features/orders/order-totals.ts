@@ -1,9 +1,14 @@
+import type { OrderProductGender } from "@prisma/client";
 import { parseMoneyInput } from "@/features/pricing/parse-money";
+import { isOrderProductGender } from "@/features/orders/order-gender";
 
 export type OrderItemInput = {
   id?: string | null;
   productId?: string | null;
   variantId?: string | null;
+  colorId?: string | null;
+  categoryId?: string | null;
+  gender?: OrderProductGender | null;
   productNameSnapshot?: string | null;
   variantNameSnapshot?: string | null;
   description?: string | null;
@@ -110,6 +115,12 @@ export function parseOrderItemInput(raw: Record<string, unknown>, index: number)
       typeof raw.designMediaAssetId === "string" ? raw.designMediaAssetId : null,
     designImageUrl: typeof raw.designImageUrl === "string" ? raw.designImageUrl : null,
     skuSnapshot: typeof raw.skuSnapshot === "string" ? raw.skuSnapshot : null,
+    colorId: typeof raw.colorId === "string" ? raw.colorId : null,
+    categoryId: typeof raw.categoryId === "string" ? raw.categoryId : null,
+    gender:
+      typeof raw.gender === "string" && isOrderProductGender(raw.gender)
+        ? raw.gender
+        : null,
     colorSnapshot: typeof raw.colorSnapshot === "string" ? raw.colorSnapshot : null,
     categorySnapshot:
       typeof raw.categorySnapshot === "string" ? raw.categorySnapshot : null,

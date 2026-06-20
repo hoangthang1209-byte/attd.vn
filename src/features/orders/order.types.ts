@@ -3,6 +3,7 @@ import type {
   OrderPaymentMethod,
   OrderPaymentStatus,
   OrderPaymentType,
+  OrderProductGender,
   OrderStatus,
   QuotePriceVatType,
 } from "@prisma/client";
@@ -38,6 +39,9 @@ export type OrderItemRecord = {
   description: string | null;
   designImageUrl: string | null;
   skuSnapshot: string | null;
+  colorId: string | null;
+  categoryId: string | null;
+  gender: OrderProductGender | null;
   colorSnapshot: string | null;
   categorySnapshot: string | null;
   genderSnapshot: string | null;
@@ -119,9 +123,14 @@ export type OrderDetailRecord = {
   sourceQuoteDate: string | null;
   sourceQuoteValidUntil: string | null;
   productionDueDate: string | null;
+  productionOwnerId: string | null;
   productionOwnerName: string | null;
   productionNote: string | null;
+  deliveryMethodId: string | null;
+  deliveryMethodName: string | null;
   deliveryMethod: string | null;
+  deliveryOwnerId: string | null;
+  deliveryOwnerName: string | null;
   deliveryRecipientName: string | null;
   deliveryRecipientPhone: string | null;
   deliveryAddress: string | null;
@@ -165,6 +174,9 @@ export type OrderItemInputPayload = {
   designMediaAssetId?: string | null;
   designImageUrl?: string | null;
   skuSnapshot?: string | null;
+  colorId?: string | null;
+  categoryId?: string | null;
+  gender?: OrderProductGender | null;
   colorSnapshot?: string | null;
   categorySnapshot?: string | null;
   genderSnapshot?: string | null;
@@ -222,13 +234,14 @@ export type EditOrderPaymentInput = {
 };
 
 export type UpdateOrderProductionInput = {
-  productionOwnerName?: string | null;
+  productionOwnerId?: string | null;
   productionDueDate?: string | null;
   productionNote?: string | null;
 };
 
 export type UpdateOrderDeliveryInput = {
-  deliveryMethod?: string | null;
+  deliveryMethodId?: string | null;
+  deliveryOwnerId?: string | null;
   deliveryCarrier?: string | null;
   deliveryTrackingCode?: string | null;
   deliveryRecipientName?: string | null;

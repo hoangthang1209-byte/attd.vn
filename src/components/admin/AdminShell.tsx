@@ -53,7 +53,11 @@ const NAV_GROUPS = [
   },
   {
     label: "Đơn hàng",
-    items: [{ href: "/admin/orders", label: "Đơn hàng" }],
+    items: [
+      { href: "/admin/orders", label: "Đơn hàng" },
+      { href: "/admin/employees", label: "Nhân viên" },
+      { href: "/admin/delivery-methods", label: "Giao hàng" },
+    ],
   },
   {
     label: "Tính giá",

@@ -6,6 +6,14 @@ import Link from "next/link";
 import AdminBackLink from "@/components/admin/AdminBackLink";
 import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
 import QuickAddContactModal from "@/components/admin/quotes/QuickAddContactModal";
+import QuickAddCustomerModal from "@/components/admin/orders/QuickAddCustomerModal";
+import QuickAddColorModal from "@/components/admin/orders/QuickAddColorModal";
+import QuickAddCategoryModal, {
+  type CategoryOption,
+} from "@/components/admin/orders/QuickAddCategoryModal";
+import CustomProductModal, {
+  type CustomProductResult,
+} from "@/components/admin/orders/CustomProductModal";
 import OrderItemFormRow, {
   emptyOrderItem,
   type OrderItemRow,
@@ -22,6 +30,7 @@ import type { OrderDetailRecord } from "@/features/orders/order.types";
 import type { CrmContactRecord, CrmCustomerRecord } from "@/features/crm/types";
 import type { SalesRepresentativeRecord } from "@/features/sales/types";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import type { ColorRecord } from "@/features/colors/color.service";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type ProductOption = { id: string; name: string };
@@ -42,11 +51,16 @@ function orderToItemRows(order: OrderDetailRecord): OrderItemRow[] {
   return order.items.map((item) => ({
     key: item.id,
     id: item.id,
+    productId: null,
+    variantId: null,
     productNameSnapshot: item.productNameSnapshot ?? "",
     variantNameSnapshot: item.variantNameSnapshot,
     description: item.description,
     designImageUrl: item.designImageUrl,
     skuSnapshot: item.skuSnapshot,
+    colorId: item.colorId,
+    categoryId: item.categoryId,
+    gender: item.gender,
     colorSnapshot: item.colorSnapshot,
     categorySnapshot: item.categorySnapshot,
     genderSnapshot: item.genderSnapshot,
@@ -72,6 +86,13 @@ export default function OrderForm({ mode, orderId }: Props) {
   const [salesReps, setSalesReps] = useState<SalesRepresentativeRecord[]>([]);
   const skipContactAutofill = useRef(false);
   const [quickAddContactOpen, setQuickAddContactOpen] = useState(false);
+  const [quickAddCustomerOpen, setQuickAddCustomerOpen] = useState(false);
+  const [quickAddColorOpen, setQuickAddColorOpen] = useState(false);
+  const [quickAddCategoryOpen, setQuickAddCategoryOpen] = useState(false);
+  const [customProductOpen, setCustomProductOpen] = useState(false);
+  const [customProductItemIndex, setCustomProductItemIndex] = useState(0);
+  const [colors, setColors] = useState<ColorRecord[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
 
   const [customerId, setCustomerId] = useState("");
   const [contactId, setContactId] = useState("");
@@ -156,9 +177,13 @@ export default function OrderForm({ mode, orderId }: Props) {
     void Promise.all([
       fetch("/api/admin/products?pageSize=200").then((r) => r.json()),
       fetch("/api/admin/sales?active=1").then((r) => r.json()),
-    ]).then(([productsData, salesData]) => {
+      fetch("/api/colors?active=1").then((r) => r.json()),
+      fetch("/api/admin/products/categories").then((r) => r.json()),
+    ]).then(([productsData, salesData, colorsData, categoriesData]) => {
       setProducts((productsData as { products?: ProductOption[] }).products ?? []);
       setSalesReps((salesData as { salesReps?: SalesRepresentativeRecord[] }).salesReps ?? []);
+      setColors((colorsData as { colors?: ColorRecord[] }).colors ?? []);
+      setCategories((categoriesData as CategoryOption[]) ?? []);
     });
   }, []);
 
@@ -356,6 +381,14 @@ export default function OrderForm({ mode, orderId }: Props) {
             }
           }}
         />
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          style={{ marginTop: 8 }}
+          onClick={() => setQuickAddCustomerOpen(true)}
+        >
+          Thêm khách hàng mới
+        </button>
       </div>
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
@@ -489,12 +522,20 @@ export default function OrderForm({ mode, orderId }: Props) {
             currency={currency}
             products={products}
             variants={item.productId ? variantsMap[item.productId] ?? [] : []}
+            colors={colors}
+            categories={categories}
             onChange={(patch) =>
               setItems((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
             }
             onRemove={items.length > 1 ? () => setItems((prev) => prev.filter((_, i) => i !== index)) : undefined}
             onLoadVariants={loadVariants}
             onProductSelect={(productId) => loadProductMeta(productId, index)}
+            onAddColor={() => setQuickAddColorOpen(true)}
+            onAddCategory={() => setQuickAddCategoryOpen(true)}
+            onCustomProduct={() => {
+              setCustomProductItemIndex(index);
+              setCustomProductOpen(true);
+            }}
           />
         ))}
         <button
@@ -546,6 +587,85 @@ export default function OrderForm({ mode, orderId }: Props) {
           }}
         />
       )}
+
+      <QuickAddCustomerModal
+        open={quickAddCustomerOpen}
+        onClose={() => setQuickAddCustomerOpen(false)}
+        onCreated={(customer, contact) => {
+          applyCustomer(customer);
+          if (contact) {
+            skipContactAutofill.current = true;
+            applyContact(contact);
+          }
+          setQuickAddCustomerOpen(false);
+        }}
+      />
+
+      <QuickAddColorModal
+        open={quickAddColorOpen}
+        onClose={() => setQuickAddColorOpen(false)}
+        onCreated={(color) => {
+          setColors((prev) => [...prev, color]);
+          setQuickAddColorOpen(false);
+        }}
+      />
+
+      <QuickAddCategoryModal
+        open={quickAddCategoryOpen}
+        onClose={() => setQuickAddCategoryOpen(false)}
+        onCreated={(category) => {
+          setCategories((prev) => [...prev, category]);
+          setQuickAddCategoryOpen(false);
+        }}
+      />
+
+      <CustomProductModal
+        open={customProductOpen}
+        customerCode={customerCode}
+        colors={colors}
+        categories={categories}
+        onClose={() => setCustomProductOpen(false)}
+        onAddColor={() => {
+          setCustomProductOpen(false);
+          setQuickAddColorOpen(true);
+        }}
+        onAddCategory={() => {
+          setCustomProductOpen(false);
+          setQuickAddCategoryOpen(true);
+        }}
+        onCreated={(result: CustomProductResult) => {
+          setProducts((prev) => {
+            if (prev.some((p) => p.id === result.productId)) return prev;
+            return [...prev, { id: result.productId, name: result.productNameSnapshot }];
+          });
+          setItems((prev) =>
+            prev.map((row, i) =>
+              i === customProductItemIndex
+                ? {
+                    ...row,
+                    productId: result.productId,
+                    variantId: result.variantId,
+                    productNameSnapshot: result.productNameSnapshot,
+                    variantNameSnapshot: result.variantNameSnapshot,
+                    skuSnapshot: result.skuSnapshot,
+                    colorId: result.colorId,
+                    categoryId: result.categoryId,
+                    gender: result.gender,
+                    colorSnapshot: result.colorSnapshot,
+                    categorySnapshot: result.categorySnapshot,
+                    genderSnapshot: result.genderSnapshot,
+                    description: result.description,
+                    designImageUrl: result.designImageUrl,
+                    moqSnapshot: result.moqSnapshot,
+                    productionLeadTime: result.productionLeadTime,
+                    unit: result.unit,
+                  }
+                : row,
+            ),
+          );
+          setCustomProductOpen(false);
+        }}
+      />
     </form>
   );
 }

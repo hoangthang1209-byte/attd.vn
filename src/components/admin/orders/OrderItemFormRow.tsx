@@ -1,9 +1,16 @@
 "use client";
 
+import type { OrderProductGender } from "@prisma/client";
 import MediaPicker from "@/components/admin/media/MediaPicker";
+import type { CategoryOption } from "@/components/admin/orders/QuickAddCategoryModal";
+import type { ColorRecord } from "@/features/colors/color.service";
 import type { OrderItemInput } from "@/features/orders/order-totals";
 import { computeOrderItem } from "@/features/orders/order-totals";
 import { formatOrderCurrency } from "@/features/orders/order-format";
+import {
+  ORDER_PRODUCT_GENDER_OPTIONS,
+  orderProductGenderLabel,
+} from "@/features/orders/order-gender";
 
 type ProductOption = { id: string; name: string };
 type VariantOption = {
@@ -22,10 +29,15 @@ type Props = {
   currency: string;
   products: ProductOption[];
   variants: VariantOption[];
+  colors: ColorRecord[];
+  categories: CategoryOption[];
   onChange: (patch: Partial<OrderItemRow>) => void;
   onRemove?: () => void;
   onLoadVariants: (productId: string) => void;
   onProductSelect: (productId: string) => Promise<void>;
+  onAddColor: () => void;
+  onAddCategory: () => void;
+  onCustomProduct: () => void;
 };
 
 export function emptyOrderItem(): OrderItemRow {
@@ -44,12 +56,19 @@ export default function OrderItemFormRow({
   currency,
   products,
   variants,
+  colors,
+  categories,
   onChange,
   onRemove,
   onLoadVariants,
   onProductSelect,
+  onAddColor,
+  onAddCategory,
+  onCustomProduct,
 }: Props) {
   const lineTotal = computeOrderItem(item).lineTotal;
+  const selectedColor = colors.find((c) => c.id === item.colorId);
+  const selectedCategory = categories.find((c) => c.id === item.categoryId);
 
   return (
     <div className="admin-catalog-variant-row" style={{ marginBottom: 12 }}>
@@ -89,12 +108,16 @@ export default function OrderItemFormRow({
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
+          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onCustomProduct}>
+            Tạo sản phẩm tùy chọn
+          </button>
         </div>
         <div className="admin-field">
           <label className="admin-label">Biến thể</label>
           <select
             className="admin-input"
             value={item.variantId ?? ""}
+            disabled={!item.productId}
             onChange={(e) => {
               const variant = variants.find((v) => v.id === e.target.value);
               onChange({
@@ -103,7 +126,6 @@ export default function OrderItemFormRow({
                   ? [variant.colorName, variant.sizeName].filter(Boolean).join(" · ")
                   : null,
                 skuSnapshot: variant?.sku ?? item.skuSnapshot,
-                colorSnapshot: variant?.colorName ?? item.colorSnapshot,
               });
             }}
           >
@@ -122,36 +144,82 @@ export default function OrderItemFormRow({
           />
         </div>
         <div className="admin-field">
-          <label className="admin-label">SKU</label>
-          <input
-            className="admin-input"
-            value={item.skuSnapshot ?? ""}
-            onChange={(e) => onChange({ skuSnapshot: e.target.value })}
-          />
+          <label className="admin-label">SKU (tham chiếu đơn hàng)</label>
+          <input className="admin-input" value={item.skuSnapshot ?? ""} readOnly placeholder="Tự động khi lưu" />
         </div>
         <div className="admin-field">
-          <label className="admin-label">Màu</label>
-          <input
+          <label className="admin-label">Màu sắc *</label>
+          <select
             className="admin-input"
-            value={item.colorSnapshot ?? ""}
-            onChange={(e) => onChange({ colorSnapshot: e.target.value })}
-          />
+            required
+            value={item.colorId ?? ""}
+            onChange={(e) => {
+              const color = colors.find((c) => c.id === e.target.value);
+              onChange({
+                colorId: e.target.value || null,
+                colorSnapshot: color?.name ?? null,
+              });
+            }}
+          >
+            <option value="">— Chọn màu —</option>
+            {colors.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}{!c.isActive ? " (ngưng)" : ""}
+              </option>
+            ))}
+            {item.colorId && !selectedColor && item.colorSnapshot && (
+              <option value={item.colorId}>{item.colorSnapshot} (lưu trước)</option>
+            )}
+          </select>
+          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onAddColor}>
+            Thêm màu mới
+          </button>
         </div>
         <div className="admin-field">
-          <label className="admin-label">Danh mục</label>
-          <input
+          <label className="admin-label">Danh mục *</label>
+          <select
             className="admin-input"
-            value={item.categorySnapshot ?? ""}
-            onChange={(e) => onChange({ categorySnapshot: e.target.value })}
-          />
+            required
+            value={item.categoryId ?? ""}
+            onChange={(e) => {
+              const category = categories.find((c) => c.id === e.target.value);
+              onChange({
+                categoryId: e.target.value || null,
+                categorySnapshot: category?.name ?? null,
+              });
+            }}
+          >
+            <option value="">— Chọn danh mục —</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+            {item.categoryId && !selectedCategory && item.categorySnapshot && (
+              <option value={item.categoryId}>{item.categorySnapshot} (lưu trước)</option>
+            )}
+          </select>
+          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onAddCategory}>
+            Thêm danh mục mới
+          </button>
         </div>
         <div className="admin-field">
-          <label className="admin-label">Giới tính</label>
-          <input
+          <label className="admin-label">Giới tính *</label>
+          <select
             className="admin-input"
-            value={item.genderSnapshot ?? ""}
-            onChange={(e) => onChange({ genderSnapshot: e.target.value })}
-          />
+            required
+            value={item.gender ?? ""}
+            onChange={(e) => {
+              const gender = e.target.value as OrderProductGender;
+              onChange({
+                gender: gender || null,
+                genderSnapshot: orderProductGenderLabel(gender),
+              });
+            }}
+          >
+            <option value="">— Chọn giới tính —</option>
+            {ORDER_PRODUCT_GENDER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </div>
         <div className="admin-field">
           <label className="admin-label">Mô tả</label>

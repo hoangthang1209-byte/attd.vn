@@ -33,11 +33,13 @@ model Category {
   parent         Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children       Category[] @relation("CategoryTree")
   products       Product[]
+  orderItems     OrderItem[]
 }
 
 model Product {
   id                  String                   @id @default(cuid())
   productCode         String?                  @unique
+  systemCode          String?                  @unique
   name                String
   slug                String                   @unique
   shortDescription    String?
@@ -75,15 +77,23 @@ model Product {
 
   @@index([categoryId])
   @@index([status])
+  @@index([systemCode])
 }
 
 model Color {
   id        String           @id @default(cuid())
   name      String
   slug      String           @unique
+  hex       String?
+  isActive  Boolean          @default(true)
+  sortOrder Int              @default(0)
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
   variants  ProductVariant[]
+  orderItems OrderItem[]
+
+  @@index([isActive])
+  @@index([sortOrder])
 }
 
 model Size {
@@ -1247,6 +1257,14 @@ model QuoteItem {
 
 // ── Sprint 26.3.0 — Order Management Foundation ────────────────────────────────
 
+enum OrderProductGender {
+  MALE
+  FEMALE
+  UNISEX
+  KIDS
+  OTHER
+}
+
 enum OrderStatus {
   NEW
   CONFIRMED
@@ -1332,9 +1350,13 @@ model Order {
   sourceQuoteDate       DateTime?
   sourceQuoteValidUntil DateTime?
   productionDueDate     DateTime?
+  productionOwnerId     String?
   productionOwnerName   String?
   productionNote        String?              @db.Text
+  deliveryMethodId      String?
+  deliveryMethodName    String?
   deliveryMethod        String?
+  deliveryOwnerId       String?
   deliveryRecipientName String?
   deliveryRecipientPhone String?
   deliveryAddress       String?              @db.Text
@@ -1349,6 +1371,9 @@ model Order {
   customer              Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   contact               Contact?             @relation(fields: [contactId], references: [id], onDelete: SetNull)
   salesRepresentative   SalesRepresentative? @relation(fields: [salesRepresentativeId], references: [id], onDelete: SetNull)
+  productionOwner       Employee?            @relation("OrderProductionOwner", fields: [productionOwnerId], references: [id], onDelete: SetNull)
+  deliveryOwner         Employee?            @relation("OrderDeliveryOwner", fields: [deliveryOwnerId], references: [id], onDelete: SetNull)
+  deliveryMethodRef     DeliveryMethod?      @relation(fields: [deliveryMethodId], references: [id], onDelete: SetNull)
   items                 OrderItem[]
   payments              OrderPayment[]
   activities            OrderActivity[]
@@ -1360,6 +1385,41 @@ model Order {
   @@index([createdAt])
   @@index([productionDueDate])
   @@index([deliveryExpectedAt])
+  @@index([productionOwnerId])
+  @@index([deliveryMethodId])
+}
+
+model Employee {
+  id           String   @id @default(cuid())
+  employeeCode String   @unique
+  fullName     String
+  jobTitle     String?
+  department   String?
+  phone        String?
+  email        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  productionOrders Order[] @relation("OrderProductionOwner")
+  deliveryOrders   Order[] @relation("OrderDeliveryOwner")
+
+  @@index([employeeCode])
+  @@index([isActive])
+}
+
+model DeliveryMethod {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?  @db.Text
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orders      Order[]
+
+  @@index([code])
+  @@index([isActive])
 }
 
 model OrderItem {
@@ -1367,6 +1427,9 @@ model OrderItem {
   orderId            String
   productId          String?
   variantId          String?
+  colorId            String?
+  categoryId         String?
+  gender             OrderProductGender?
   productNameSnapshot String?
   variantNameSnapshot String?
   description        String?
@@ -1389,11 +1452,15 @@ model OrderItem {
   order              Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product            Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
   variant            ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  color              Color?        @relation(fields: [colorId], references: [id], onDelete: SetNull)
+  category           Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   designMediaAsset   MediaAsset?   @relation(fields: [designMediaAssetId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([productId])
   @@index([variantId])
+  @@index([colorId])
+  @@index([categoryId])
 }
 
 model OrderPayment {

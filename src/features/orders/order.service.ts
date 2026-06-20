@@ -1,6 +1,7 @@
 import type {
   OrderPaymentMethod,
   OrderPaymentType,
+  OrderProductGender,
   OrderStatus,
 } from "@prisma/client";
 import { Prisma } from "@prisma/client";
@@ -9,6 +10,13 @@ import {
   computeConfirmedNetPaid,
   computeOrderFinancials,
 } from "@/features/orders/order-finance";
+import {
+  isOrderProductGender,
+  orderProductGenderLabel,
+} from "@/features/orders/order-gender";
+import { allocateOrderCustomSku } from "@/features/orders/order-custom-sku";
+import { ensureProductSystemCode } from "@/features/products/product-system-code";
+import { resolveDeliveryMethodSnapshot } from "@/features/delivery/delivery-method.service";
 import {
   canUpdateOrderStatus,
   formatOrderStatusCorrection,
@@ -20,6 +28,7 @@ import {
 import {
   computeOrderItem,
   computeOrderTotals,
+  type OrderItemInput,
 } from "@/features/orders/order-totals";
 import { generateOrderNo } from "@/features/orders/order-code";
 import {
@@ -130,9 +139,14 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
     sourceQuoteDate: row.sourceQuoteDate?.toISOString() ?? null,
     sourceQuoteValidUntil: row.sourceQuoteValidUntil?.toISOString() ?? null,
     productionDueDate: row.productionDueDate?.toISOString() ?? null,
-    productionOwnerName: row.productionOwnerName,
+    productionOwnerId: row.productionOwnerId,
+    productionOwnerName: row.productionOwnerName ?? row.productionOwner?.fullName ?? null,
     productionNote: row.productionNote,
-    deliveryMethod: row.deliveryMethod,
+    deliveryMethodId: row.deliveryMethodId,
+    deliveryMethodName: row.deliveryMethodName ?? row.deliveryMethodRef?.name ?? row.deliveryMethod,
+    deliveryMethod: row.deliveryMethod ?? row.deliveryMethodRef?.name ?? null,
+    deliveryOwnerId: row.deliveryOwnerId,
+    deliveryOwnerName: row.deliveryOwner?.fullName ?? null,
     deliveryRecipientName: row.deliveryRecipientName,
     deliveryRecipientPhone: row.deliveryRecipientPhone,
     deliveryAddress: row.deliveryAddress,
@@ -152,6 +166,9 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
       description: item.description,
       designImageUrl: item.designImageUrl,
       skuSnapshot: item.skuSnapshot,
+      colorId: item.colorId,
+      categoryId: item.categoryId,
+      gender: item.gender,
       colorSnapshot: item.colorSnapshot,
       categorySnapshot: item.categorySnapshot,
       genderSnapshot: item.genderSnapshot,
@@ -185,6 +202,9 @@ async function fetchOrderRow(id: string) {
     include: {
       customer: { select: { id: true, name: true, code: true } },
       quote: { select: { id: true, quoteNo: true } },
+      productionOwner: { select: { id: true, fullName: true, isActive: true } },
+      deliveryOwner: { select: { id: true, fullName: true, isActive: true } },
+      deliveryMethodRef: { select: { id: true, name: true, isActive: true } },
       items: { orderBy: { sortOrder: "asc" } },
       payments: { orderBy: { paidAt: "desc" } },
       activities: { orderBy: { createdAt: "desc" } },
@@ -467,6 +487,9 @@ function buildOrderItemCreates(items: ReturnType<typeof computeOrderItem>[]) {
   return items.map((item, index) => ({
     productId: item.productId ?? null,
     variantId: item.variantId ?? null,
+    colorId: item.colorId ?? null,
+    categoryId: item.categoryId ?? null,
+    gender: item.gender ?? null,
     productNameSnapshot: item.productNameSnapshot?.trim() || null,
     variantNameSnapshot: item.variantNameSnapshot?.trim() || null,
     description: item.description?.trim() || null,
@@ -549,9 +572,90 @@ function validateOrderItemsInput(input: CreateManualOrderInput) {
   }
 }
 
+async function resolveOrderItemSnapshot(
+  item: OrderItemInput,
+  tx?: Prisma.TransactionClient,
+): Promise<OrderItemInput> {
+  const db = tx ?? prisma;
+  let colorSnapshot = item.colorSnapshot ?? null;
+  let categorySnapshot = item.categorySnapshot ?? null;
+  let genderSnapshot = item.genderSnapshot ?? null;
+
+  if (item.colorId) {
+    const color = await db.color.findUnique({ where: { id: item.colorId } });
+    if (!color) throw new OrderValidationError("Màu sắc không hợp lệ.");
+    colorSnapshot = color.name;
+  } else if (item.colorSnapshot?.trim()) {
+    throw new OrderValidationError("Vui lòng chọn màu sắc từ danh sách hệ thống.");
+  }
+
+  if (item.categoryId) {
+    const category = await db.category.findUnique({ where: { id: item.categoryId } });
+    if (!category) throw new OrderValidationError("Danh mục không hợp lệ.");
+    categorySnapshot = category.name;
+  } else if (item.categorySnapshot?.trim()) {
+    throw new OrderValidationError("Vui lòng chọn danh mục từ danh sách hệ thống.");
+  }
+
+  if (item.gender) {
+    if (!isOrderProductGender(item.gender)) {
+      throw new OrderValidationError("Giới tính không hợp lệ.");
+    }
+    genderSnapshot = orderProductGenderLabel(item.gender as OrderProductGender);
+  } else if (item.genderSnapshot?.trim()) {
+    throw new OrderValidationError("Vui lòng chọn giới tính từ danh sách.");
+  }
+
+  return { ...item, colorSnapshot, categorySnapshot, genderSnapshot };
+}
+
+async function prepareOrderItemsForSave(
+  items: OrderItemInput[],
+  customerCode: string | null | undefined,
+  tx?: Prisma.TransactionClient,
+) {
+  const db = tx ?? prisma;
+  const prepared: ReturnType<typeof computeOrderItem>[] = [];
+
+  for (const raw of items) {
+    const resolved = await resolveOrderItemSnapshot(raw, tx);
+    let skuSnapshot = resolved.skuSnapshot?.trim() || null;
+
+    if (!skuSnapshot && customerCode?.trim() && resolved.productId) {
+      const product = await db.product.findUnique({
+        where: { id: resolved.productId },
+        select: { systemCode: true },
+      });
+      const variant = resolved.variantId
+        ? await db.productVariant.findUnique({
+            where: { id: resolved.variantId },
+            select: { colorName: true, sizeName: true },
+          })
+        : null;
+      const systemCode = product?.systemCode
+        ?? (resolved.productId ? await ensureProductSystemCode(resolved.productId) : null);
+      if (systemCode) {
+        skuSnapshot = await allocateOrderCustomSku(
+          {
+            customerCode: customerCode.trim(),
+            systemCode,
+            colorName: variant?.colorName ?? resolved.colorSnapshot,
+            sizeName: variant?.sizeName ?? null,
+          },
+          tx,
+        );
+      }
+    }
+
+    prepared.push(computeOrderItem({ ...resolved, skuSnapshot }));
+  }
+
+  return prepared;
+}
+
 export async function createManualOrder(input: CreateManualOrderInput) {
   validateOrderItemsInput(input);
-  const computedItems = input.items.map(computeOrderItem);
+  const computedItems = await prepareOrderItemsForSave(input.items, input.customerCode);
   const totals = computeOrderTotals(computedItems, {
     discountAmount: input.discountAmount,
     shippingFee: input.shippingFee,
@@ -606,7 +710,7 @@ export async function updateOrderDetails(id: string, input: UpdateOrderInput) {
   }
 
   validateOrderItemsInput(input);
-  const computedItems = input.items.map(computeOrderItem);
+  const computedItems = await prepareOrderItemsForSave(input.items, input.customerCode);
   const totals = computeOrderTotals(computedItems, {
     discountAmount: input.discountAmount,
     shippingFee: input.shippingFee,
@@ -758,9 +862,18 @@ export async function updateOrderProduction(
   }
 
   const productionDueDate = parseProductionDueDate(input.productionDueDate);
+  let productionOwnerId: string | null = null;
+  let productionOwnerName: string | null = null;
+  if (input.productionOwnerId) {
+    const employee = await prisma.employee.findUnique({ where: { id: input.productionOwnerId } });
+    if (!employee) throw new OrderValidationError("Nhân viên phụ trách sản xuất không hợp lệ.");
+    productionOwnerId = employee.id;
+    productionOwnerName = employee.fullName;
+  }
+
   const details: string[] = [];
-  if (input.productionOwnerName?.trim() !== (order.productionOwnerName ?? "")) {
-    details.push(`Phụ trách: ${input.productionOwnerName?.trim() || "—"}`);
+  if (productionOwnerName !== (order.productionOwnerName ?? null)) {
+    details.push(`Phụ trách: ${productionOwnerName ?? "—"}`);
   }
   if (productionDueDate?.toISOString() !== order.productionDueDate?.toISOString()) {
     details.push(
@@ -774,7 +887,8 @@ export async function updateOrderProduction(
     await tx.order.update({
       where: { id },
       data: {
-        productionOwnerName: input.productionOwnerName?.trim() || null,
+        productionOwnerId,
+        productionOwnerName,
         productionDueDate,
         productionNote: input.productionNote?.trim() || null,
       },
@@ -814,19 +928,40 @@ export async function updateOrderDelivery(
   }
 
   const deliveryExpectedAt = parseDeliveryExpectedAt(input.deliveryExpectedAt);
+  const deliveryMethodSnapshot = await resolveDeliveryMethodSnapshot(input.deliveryMethodId, {
+    allowInactiveId: order.deliveryMethodId,
+  });
+  let deliveryOwnerId: string | null = null;
+  let deliveryOwnerName: string | null = null;
+  if (input.deliveryOwnerId) {
+    const employee = await prisma.employee.findUnique({ where: { id: input.deliveryOwnerId } });
+    if (!employee) throw new OrderValidationError("Nhân viên phụ trách giao hàng không hợp lệ.");
+    deliveryOwnerId = employee.id;
+    deliveryOwnerName = employee.fullName;
+  }
+
   const details: string[] = [];
-  if (input.deliveryRecipientName?.trim()) {
-    details.push(`Người nhận: ${input.deliveryRecipientName.trim()}`);
+  if (deliveryMethodSnapshot.deliveryMethodName) {
+    details.push(`Hình thức: ${deliveryMethodSnapshot.deliveryMethodName}`);
+  }
+  if (deliveryOwnerName) {
+    details.push(`Phụ trách giao: ${deliveryOwnerName}`);
   }
   if (input.deliveryTrackingCode?.trim()) {
     details.push(`Mã vận đơn: ${input.deliveryTrackingCode.trim()}`);
+  }
+  if (input.deliveryRecipientName?.trim()) {
+    details.push(`Người nhận: ${input.deliveryRecipientName.trim()}`);
   }
 
   await prisma.$transaction(async (tx) => {
     await tx.order.update({
       where: { id },
       data: {
-        deliveryMethod: input.deliveryMethod?.trim() || null,
+        deliveryMethodId: deliveryMethodSnapshot.deliveryMethodId,
+        deliveryMethodName: deliveryMethodSnapshot.deliveryMethodName,
+        deliveryMethod: deliveryMethodSnapshot.deliveryMethod,
+        deliveryOwnerId,
         deliveryCarrier: input.deliveryCarrier?.trim() || null,
         deliveryTrackingCode: input.deliveryTrackingCode?.trim() || null,
         deliveryRecipientName: input.deliveryRecipientName?.trim() || null,
