@@ -26,7 +26,23 @@ export default function MarketplaceMegaCategoryMenu({
     resolveInitialParentId(categories),
   );
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLElement>(null);
+
+  const syncPanelAnchor = useCallback(() => {
+    const trigger = triggerRef.current;
+    const panel = panelRef.current;
+    if (!trigger || !panel) return;
+
+    const gutter = 20;
+    const triggerRect = trigger.getBoundingClientRect();
+    const panelWidth = panel.getBoundingClientRect().width || panel.offsetWidth;
+    const maxLeft = Math.max(gutter, window.innerWidth - panelWidth - gutter);
+    const left = Math.min(Math.max(triggerRect.left, gutter), maxLeft);
+
+    panel.style.setProperty("--mp-mega-cat-panel-left", `${left}px`);
+  }, []);
 
   const activeParent =
     categories.find((group) => group.id === activeParentId) ?? categories[0];
@@ -53,6 +69,31 @@ export default function MarketplaceMegaCategoryMenu({
         : categories[0].id,
     );
   }, [categories]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const runSync = () => {
+      syncPanelAnchor();
+    };
+
+    runSync();
+    const rafId = window.requestAnimationFrame(runSync);
+
+    const observer = new ResizeObserver(runSync);
+    if (triggerRef.current) observer.observe(triggerRef.current);
+    if (panelRef.current) observer.observe(panelRef.current);
+
+    window.addEventListener("resize", runSync);
+    window.addEventListener("scroll", runSync, { passive: true });
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      observer.disconnect();
+      window.removeEventListener("resize", runSync);
+      window.removeEventListener("scroll", runSync);
+    };
+  }, [open, syncPanelAnchor, activeParentId]);
 
   useEffect(() => {
     if (!open) return;
@@ -104,6 +145,7 @@ export default function MarketplaceMegaCategoryMenu({
     >
       <div className="mp-header-cats-inner">
         <button
+          ref={triggerRef}
           type="button"
           className="mp-mega-cat-trigger"
           aria-expanded={open}
@@ -126,7 +168,12 @@ export default function MarketplaceMegaCategoryMenu({
             aria-hidden="true"
             onClick={close}
           />
-          <div className="mp-mega-cat-panel" role="dialog" aria-label="Danh mục nguồn hàng">
+          <div
+            ref={panelRef}
+            className="mp-mega-cat-panel"
+            role="dialog"
+            aria-label="Danh mục nguồn hàng"
+          >
             <aside className="mp-mega-cat-left">
               <p className="mp-mega-cat-left-title">Danh mục nguồn hàng</p>
               <ul className="mp-mega-cat-parent-list">

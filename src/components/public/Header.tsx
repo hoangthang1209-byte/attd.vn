@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Menu, Search, X } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
@@ -13,6 +14,21 @@ import type { MarketplaceCategoryTreeNode } from "@/features/categories/marketpl
 import { NAV_PRIMARY_LINKS } from "@/lib/navConfig";
 
 const HEADER_SEARCH_PLACEHOLDER = "Tìm áo thun, áo polo, nón, quà tặng…";
+
+function MobileSearchRouteCloseEffect({ onClose }: { onClose: () => void }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const routeKey = `${pathname}?${searchParams.toString()}`;
+  const prevRouteRef = useRef(routeKey);
+
+  useEffect(() => {
+    if (prevRouteRef.current === routeKey) return;
+    prevRouteRef.current = routeKey;
+    onClose();
+  }, [routeKey, onClose]);
+
+  return null;
+}
 
 type HeaderProps = {
   headerLogoUrl?: string | null;
@@ -72,13 +88,26 @@ export default function Header({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [mobileSearchOpen]);
 
-  function openMobileMenu() {
+  const closeMobileSearch = useCallback(() => {
     setMobileSearchOpen(false);
+    mobileSearchInputRef.current?.blur();
+  }, []);
+
+  function openMobileMenu() {
+    closeMobileSearch();
     setMobileOpen(true);
+  }
+
+  function toggleMobileSearch() {
+    setMobileOpen(false);
+    setMobileSearchOpen((open) => !open);
   }
 
   return (
     <>
+      <Suspense fallback={null}>
+        <MobileSearchRouteCloseEffect onClose={closeMobileSearch} />
+      </Suspense>
       <header
         ref={headerRef}
         className={`mp-header mp-header--v271${scrolled ? " mp-header--scrolled" : ""}${mobileSearchOpen ? " mp-header--mobile-search-open" : ""}`}
@@ -135,7 +164,7 @@ export default function Header({
               type="button"
               aria-label="Tìm sản phẩm"
               aria-expanded={mobileSearchOpen}
-              onClick={() => setMobileSearchOpen((open) => !open)}
+              onClick={toggleMobileSearch}
               className="mp-header-search-toggle"
             >
               <Search size={20} aria-hidden />
@@ -162,13 +191,14 @@ export default function Header({
                   placeholder={HEADER_SEARCH_PLACEHOLDER}
                   autoFocus
                   inputRef={mobileSearchInputRef}
+                  onSubmitNavigate={closeMobileSearch}
                 />
               </div>
               <button
                 type="button"
                 className="mp-header-search-close"
                 aria-label="Đóng tìm kiếm"
-                onClick={() => setMobileSearchOpen(false)}
+                onClick={closeMobileSearch}
               >
                 <X size={20} aria-hidden />
               </button>

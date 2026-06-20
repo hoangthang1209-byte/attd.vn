@@ -11314,10 +11314,10 @@ body.mp-mega-cat-open { overflow: hidden; }
 @media (min-width: 900px) {
   .mp-header--v271 .mp-mega-cat-panel {
     position: fixed;
-    left: 50%;
+    left: var(--mp-mega-cat-panel-left, 20px);
     right: auto;
     top: var(--mp-header-stack-height, var(--mp-header-height, 120px));
-    transform: translateX(-50%);
+    transform: none;
     width: min(var(--container, 1200px), calc(100vw - 40px));
     height: auto;
     max-height: min(480px, calc(100vh - var(--mp-header-stack-height, 120px) - 16px));

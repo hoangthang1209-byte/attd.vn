@@ -12,6 +12,8 @@ type MarketplaceSearchBarProps = {
   className?: string;
   autoFocus?: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
+  /** Called after a successful mobile/catalog search submit (before navigation). */
+  onSubmitNavigate?: () => void;
 };
 
 export default function MarketplaceSearchBar({
@@ -22,6 +24,7 @@ export default function MarketplaceSearchBar({
   className = "",
   autoFocus = false,
   inputRef,
+  onSubmitNavigate,
 }: MarketplaceSearchBarProps) {
   const router = useRouter();
   const [query, setQuery] = useState(defaultValue);
@@ -39,6 +42,8 @@ export default function MarketplaceSearchBar({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const q = query.trim();
+    resolvedInputRef.current?.blur();
+    onSubmitNavigate?.();
     router.push(q ? `/san-pham?q=${encodeURIComponent(q)}` : "/san-pham");
   }
 
