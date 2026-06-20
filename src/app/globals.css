@@ -9235,6 +9235,126 @@ body.mp-mega-cat-open { overflow: hidden; }
   color: #94a3b8;
 }
 
+/* Sprint 27.1.2.2 — Mobile homepage category access bar */
+.mobile-home-cat-access {
+  display: block;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.mobile-home-cat-access__btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  max-height: 52px;
+  margin: 6px 0;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fafafa;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.mobile-home-cat-access__btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.mobile-home-cat-access__btn:active {
+  background: #fef2f2;
+  border-color: rgba(220, 38, 38, 0.25);
+}
+
+.mobile-home-cat-access__btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.mobile-home-cat-access__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.mobile-home-cat-access__btn:active .mobile-home-cat-access__icon,
+.mobile-home-cat-access__btn:hover .mobile-home-cat-access__icon {
+  color: var(--primary);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.mobile-home-cat-access__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mobile-home-cat-access__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.mobile-home-cat-access__hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+.mobile-home-cat-access__chevron {
+  flex-shrink: 0;
+  color: #94a3b8;
+}
+
+.mobile-cat-explorer-panel {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100dvh;
+  height: 100vh;
+  background: #fff;
+  z-index: 402;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.mobile-cat-explorer-panel--open {
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+}
+
+@media (min-width: 900px) {
+  .mobile-home-cat-access {
+    display: none !important;
+  }
+
+  .mobile-cat-explorer-panel {
+    display: none !important;
+  }
+}
+
 .mobile-cat-explorer-header {
   display: flex;
   align-items: center;
@@ -11912,9 +12032,15 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 /* Homepage hero — B2B marketplace editorial */
 .home-hero {
-  padding: 20px 0 0;
+  padding: 12px 0 0;
   background: #fff;
   overflow-x: clip;
+}
+
+@media (min-width: 900px) {
+  .home-hero {
+    padding: 20px 0 0;
+  }
 }
 
 .home-hero__grid {

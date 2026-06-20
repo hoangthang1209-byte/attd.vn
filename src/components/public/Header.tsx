@@ -7,6 +7,8 @@ import { Menu, Search, X } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
 import MobileNavPanel from "@/components/public/MobileNavPanel";
+import MobileCategoryExplorerPanel from "@/components/public/MobileCategoryExplorerPanel";
+import MobileHomeCategoryAccessBar from "@/components/public/MobileHomeCategoryAccessBar";
 import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
 import MarketplaceMegaCategoryMenu from "@/components/marketplace/MarketplaceMegaCategoryMenu";
 import MarketplaceCategoryNav from "@/components/marketplace/MarketplaceCategoryNav";
@@ -34,7 +36,7 @@ function MobileNavCategorySlugEffect({
   return null;
 }
 
-function MobileSearchRouteCloseEffect({ onClose }: { onClose: () => void }) {
+function MobileOverlayRouteCloseEffect({ onClose }: { onClose: () => void }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const routeKey = `${pathname}?${searchParams.toString()}`;
@@ -60,12 +62,18 @@ export default function Header({
   companyTagline,
   categoryTree = [],
 }: HeaderProps) {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [mobileCategoryOpen, setMobileCategoryOpen] = useState(false);
   const [activeCategorySlug, setActiveCategorySlug] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  const categoryAccessRef = useRef<HTMLButtonElement>(null);
+
+  const isHomePage = pathname === "/";
+  const showHomeCategoryAccess = isHomePage && categoryTree.length > 0;
 
   useEffect(() => {
     function onScroll() {
@@ -95,7 +103,7 @@ export default function Header({
       observer.disconnect();
       window.removeEventListener("resize", syncHeaderStackHeight);
     };
-  }, [mobileSearchOpen]);
+  }, [mobileSearchOpen, showHomeCategoryAccess]);
 
   useEffect(() => {
     if (!mobileSearchOpen) return;
@@ -113,24 +121,37 @@ export default function Header({
     mobileSearchInputRef.current?.blur();
   }, []);
 
+  const closeMobileCategory = useCallback(() => {
+    setMobileCategoryOpen(false);
+  }, []);
+
   const handleCategorySlugChange = useCallback((slug: string | null) => {
     setActiveCategorySlug(slug);
   }, []);
 
   function openMobileMenu() {
     closeMobileSearch();
+    setMobileCategoryOpen(false);
     setMobileOpen(true);
+  }
+
+  function openMobileCategoryExplorer() {
+    closeMobileSearch();
+    setMobileOpen(false);
+    setMobileCategoryOpen(true);
   }
 
   function toggleMobileSearch() {
     setMobileOpen(false);
+    setMobileCategoryOpen(false);
     setMobileSearchOpen((open) => !open);
   }
 
   return (
     <>
       <Suspense fallback={null}>
-        <MobileSearchRouteCloseEffect onClose={closeMobileSearch} />
+        <MobileOverlayRouteCloseEffect onClose={closeMobileSearch} />
+        <MobileOverlayRouteCloseEffect onClose={closeMobileCategory} />
         <MobileNavCategorySlugEffect onCategoryChange={handleCategorySlugChange} />
       </Suspense>
       <header
@@ -231,6 +252,13 @@ export default function Header({
           </div>
         )}
 
+        {showHomeCategoryAccess && (
+          <MobileHomeCategoryAccessBar
+            ref={categoryAccessRef}
+            onOpen={openMobileCategoryExplorer}
+          />
+        )}
+
         <div className="mp-header-cats mp-header-cats--desktop">
           <div className="container mp-header-cats-scroll-row">
             <MarketplaceCategoryNav />
@@ -243,8 +271,14 @@ export default function Header({
         onClose={() => setMobileOpen(false)}
         headerLogoUrl={headerLogoUrl}
         companyTagline={companyTagline}
+      />
+
+      <MobileCategoryExplorerPanel
+        open={mobileCategoryOpen}
+        onClose={closeMobileCategory}
         categoryTree={categoryTree}
         activeCategorySlug={activeCategorySlug}
+        restoreFocusRef={categoryAccessRef}
       />
     </>
   );
