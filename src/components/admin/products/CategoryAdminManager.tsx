@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type CategoryRow = {
   id: string;
@@ -57,6 +59,7 @@ const emptyForm = (): CategoryForm => ({
 
 export default function CategoryAdminManager() {
   const router = useRouter();
+  const mutate = useAdminMutation();
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -160,34 +163,32 @@ export default function CategoryAdminManager() {
     };
 
     setSaving(true);
-    try {
-      const url = editingId
-        ? `/api/admin/products/categories/${editingId}`
-        : "/api/admin/products/categories";
-      const res = await fetch(url, {
-        method: editingId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json()) as { message?: string };
-      if (!res.ok) {
-        setMessage({ type: "error", text: data.message ?? "Không thể lưu danh mục." });
-        return;
-      }
-      setMessage({
-        type: "success",
-        text: editingId ? "Đã cập nhật danh mục." : "Đã thêm danh mục mới.",
-      });
-      setShowForm(false);
-      setEditingId(null);
-      setForm(emptyForm());
-      await load();
-      router.refresh();
-    } catch {
-      setMessage({ type: "error", text: "Lỗi kết nối máy chủ." });
-    } finally {
-      setSaving(false);
+    const saved = await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: editingId ? "Đã lưu thông tin." : "Đã lưu thông tin.",
+      action: async () => {
+        const url = editingId
+          ? `/api/admin/products/categories/${editingId}`
+          : "/api/admin/products/categories";
+        const res = await fetch(url, {
+          method: editingId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        return parseAdminJsonResponse(res, () => true);
+      },
+      onSuccess: async () => {
+        setShowForm(false);
+        setEditingId(null);
+        setForm(emptyForm());
+        await load();
+        router.refresh();
+      },
+    });
+    if (!saved) {
+      setMessage({ type: "error", text: "Không thể lưu danh mục." });
     }
+    setSaving(false);
   }
 
   async function handleDelete(id: string, name: string, productCount: number) {

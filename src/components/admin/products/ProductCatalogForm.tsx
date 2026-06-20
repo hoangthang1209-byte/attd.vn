@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type Category = { id: string; name: string; slug: string; skuCode: string | null };
 type AttributeOption = { id: string; type: string; name: string; code: string | null; value: string | null };
@@ -71,6 +73,7 @@ const LEAD_TIME_PRESETS = [
 
 export default function ProductCatalogForm({ initialData, categories: propCategories }: Props) {
   const router = useRouter();
+  const mutate = useAdminMutation();
   const [categories, setCategories] = useState<Category[]>(propCategories ?? []);
   const [attributes, setAttributes] = useState<AttrMap>({});
   const [form, setForm] = useState<ProductFormData>({
@@ -345,38 +348,42 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       })),
     };
 
-    try {
-      const url = form.id ? `/api/admin/products/${form.id}` : "/api/admin/products";
-      const method = form.id ? "PATCH" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json() as {
-        id?: string;
-        slug?: string;
-        message?: string;
-        error?: string;
-        detail?: string;
-        fieldErrors?: Record<string, string>;
-      };
+    const url = form.id ? `/api/admin/products/${form.id}` : "/api/admin/products";
+    const method = form.id ? "PATCH" : "POST";
 
-      if (!res.ok) {
-        setError(data.error ?? data.message ?? "Không thể lưu sản phẩm.");
-        setErrorDetail(data.detail ?? null);
-        setFieldErrors(data.fieldErrors ?? {});
-        return;
-      }
+    const saved = await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã lưu thông tin.",
+      action: async () => {
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = (await res.json()) as {
+          message?: string;
+          error?: string;
+          detail?: string;
+          fieldErrors?: Record<string, string>;
+        };
+        if (!res.ok) {
+          setError(body.error ?? body.message ?? "Không thể lưu sản phẩm.");
+          setErrorDetail(body.detail ?? null);
+          setFieldErrors(body.fieldErrors ?? {});
+          return { ok: false as const, message: body.error ?? body.message };
+        }
+        return { ok: true as const, data: true };
+      },
+      onSuccess: () => {
+        router.push("/admin/products");
+        router.refresh();
+      },
+    });
 
-      router.push("/admin/products");
-      router.refresh();
-    } catch (err) {
-      setError("Không thể lưu sản phẩm.");
-      setErrorDetail(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
+    if (!saved) {
+      // field-level errors already set above when response parsed
     }
+    setSaving(false);
   }
 
   const publicSlug = form.slug ?? "";

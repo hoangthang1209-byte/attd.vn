@@ -11,6 +11,8 @@ import {
 } from "@/features/products/product-import-feedback";
 import ImportTemplateSection from "@/components/admin/ImportTemplateSection";
 import ProductImportHistory from "@/components/admin/products/ProductImportHistory";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type ImportRow = Record<string, unknown>;
 type PreviewRow = {
@@ -84,6 +86,7 @@ const FINAL_ACTION_CLS: Record<string, string> = {
 };
 
 export default function ProductBulkImport() {
+  const mutate = useAdminMutation();
   const fileRef = useRef<HTMLInputElement>(null);
   const originalFileRef = useRef<File | null>(null);
   const [tab, setTab] = useState<Tab>("import");
@@ -239,33 +242,38 @@ export default function ProductBulkImport() {
     if (!preview) return;
     setExecuting(true);
     setError(null);
-    try {
-      const res = await fetch("/api/admin/products/import/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rows: preview.rows,
-          fileName,
-          jobId,
-          options: {
-            presetId,
-            columnMapping,
-            defaultDuplicateStrategy: duplicateStrategy,
-            autoCreateCategories: autoCreateCats,
-          },
-        }),
-      });
-      const data = await res.json() as ExecuteResult & { message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Lỗi thực hiện import.");
-      setExecuteResult(data);
-      if (data.jobId) setJobId(data.jobId);
-      setHistoryRefreshKey((k) => k + 1);
-      setStep("done");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi thực hiện import.");
-    } finally {
-      setExecuting(false);
+    const result = await mutate({
+      loadingMessage: "Đang xử lý dữ liệu…",
+      successMessage: "Đã bắt đầu nhập sản phẩm.",
+      action: async () => {
+        const res = await fetch("/api/admin/products/import/execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            rows: preview.rows,
+            fileName,
+            jobId,
+            options: {
+              presetId,
+              columnMapping,
+              defaultDuplicateStrategy: duplicateStrategy,
+              autoCreateCategories: autoCreateCats,
+            },
+          }),
+        });
+        return parseAdminJsonResponse(res, (data) => data as ExecuteResult);
+      },
+      onSuccess: (data) => {
+        setExecuteResult(data);
+        if (data.jobId) setJobId(data.jobId);
+        setHistoryRefreshKey((k) => k + 1);
+        setStep("done");
+      },
+    });
+    if (!result) {
+      setError("Lỗi thực hiện import.");
     }
+    setExecuting(false);
   }
 
   function reset() {

@@ -22,6 +22,9 @@ import {
   displayLeadContactName,
 } from "@/features/crm/labels";
 import { formatCrmCurrency, formatCrmDateTime } from "@/features/crm/format";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { useAdminToast } from "@/hooks/useAdminToast";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import {
   CRM_LEAD_PRIORITIES,
   CRM_LEAD_STATUSES,
@@ -37,6 +40,8 @@ function toDatetimeLocalValue(iso: string | null) {
 
 export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLeadRecord }) {
   const router = useRouter();
+  const mutate = useAdminMutation();
+  const toast = useAdminToast();
   const [lead, setLead] = useState(initialLead);
   const [status, setStatus] = useState<LeadStatus>(initialLead.status);
   const [priority, setPriority] = useState<LeadPriority>(initialLead.priority);
@@ -64,31 +69,29 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
   async function saveUpdates() {
     setSaving(true);
     setMessage(null);
-    try {
-      const res = await fetch(`/api/crm/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status,
-          priority,
-          nextFollowUpAt: nextFollowUpAt ? new Date(nextFollowUpAt).toISOString() : null,
-          note,
-          demand,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage({ type: "error", text: data.message ?? "Cập nhật thất bại" });
-        return;
-      }
-      setLead(data.lead);
-      setMessage({ type: "success", text: "Đã cập nhật lead" });
-      router.refresh();
-    } catch {
-      setMessage({ type: "error", text: "Cập nhật thất bại" });
-    } finally {
-      setSaving(false);
-    }
+    await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã lưu thông tin.",
+      action: async () => {
+        const res = await fetch(`/api/crm/leads/${lead.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status,
+            priority,
+            nextFollowUpAt: nextFollowUpAt ? new Date(nextFollowUpAt).toISOString() : null,
+            note,
+            demand,
+          }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.lead as CrmLeadRecord);
+      },
+      onSuccess: (updatedLead) => {
+        setLead(updatedLead);
+        router.refresh();
+      },
+    });
+    setSaving(false);
   }
 
   return (
@@ -130,7 +133,7 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
             setMessage({ type: "success", text: "Đã cập nhật liên kết khách hàng" });
             router.refresh();
           }}
-          onError={(text) => setMessage({ type: "error", text })}
+          onError={(text) => toast.error(text)}
         />
       )}
 

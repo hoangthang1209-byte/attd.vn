@@ -18,6 +18,9 @@ import {
   CUSTOMER_TYPE_LABELS,
 } from "@/features/crm/labels";
 import { formatCrmDateTime } from "@/features/crm/format";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { useAdminToast } from "@/hooks/useAdminToast";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import {
   CRM_CUSTOMER_STATUSES,
   CRM_CUSTOMER_TYPES,
@@ -30,6 +33,8 @@ export default function CrmCustomerDetailView({
   initialCustomer: CrmCustomerRecord;
 }) {
   const router = useRouter();
+  const mutate = useAdminMutation();
+  const toast = useAdminToast();
   const [customer, setCustomer] = useState(initialCustomer);
   const [type, setType] = useState<CustomerType>(initialCustomer.type);
   const [status, setStatus] = useState<CustomerStatus>(initialCustomer.status);
@@ -55,53 +60,49 @@ export default function CrmCustomerDetailView({
   async function saveCustomer() {
     setSaving(true);
     setMessage(null);
-    try {
-      const res = await fetch(`/api/crm/customers/${customer.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, status, name, phone, email, province, note }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage({ type: "error", text: data.message ?? "Cập nhật thất bại" });
-        return;
-      }
-      setCustomer(data.customer);
-      setMessage({ type: "success", text: "Đã cập nhật khách hàng" });
-    } catch {
-      setMessage({ type: "error", text: "Cập nhật thất bại" });
-    } finally {
-      setSaving(false);
-    }
+    await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã lưu thông tin.",
+      action: async () => {
+        const res = await fetch(`/api/crm/customers/${customer.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type, status, name, phone, email, province, note }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.customer as CrmCustomerRecord);
+      },
+      onSuccess: (updatedCustomer) => {
+        setCustomer(updatedCustomer);
+      },
+    });
+    setSaving(false);
   }
 
   async function addContact() {
     if (!newContactName.trim()) return;
     setSaving(true);
-    try {
-      const res = await fetch("/api/crm/contacts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: customer.id,
-          fullName: newContactName,
-          phone: newContactPhone || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage({ type: "error", text: data.message ?? "Không thể thêm liên hệ" });
-        return;
-      }
-      setCustomer(data.customer);
-      setNewContactName("");
-      setNewContactPhone("");
-      setMessage({ type: "success", text: "Đã thêm liên hệ" });
-    } catch {
-      setMessage({ type: "error", text: "Không thể thêm liên hệ" });
-    } finally {
-      setSaving(false);
-    }
+    await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã thêm liên hệ.",
+      action: async () => {
+        const res = await fetch("/api/crm/contacts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerId: customer.id,
+            fullName: newContactName,
+            phone: newContactPhone || null,
+          }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.customer as CrmCustomerRecord);
+      },
+      onSuccess: (updatedCustomer) => {
+        setCustomer(updatedCustomer);
+        setNewContactName("");
+        setNewContactPhone("");
+      },
+    });
+    setSaving(false);
   }
 
   async function markPrimary(contactId: string) {

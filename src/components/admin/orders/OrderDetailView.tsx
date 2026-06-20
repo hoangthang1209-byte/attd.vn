@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { OrderPaymentMethod, OrderPaymentType, OrderStatus } from "@prisma/client";
+import AdminBackLink from "@/components/admin/AdminBackLink";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
 import {
   formatOrderCurrency,
@@ -21,17 +23,30 @@ import {
   ORDER_PAYMENT_TYPE_LABELS,
 } from "@/features/orders/order-labels";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type Props = { id: string };
 
 export default function OrderDetailView({ id }: Props) {
+  const searchParams = useSearchParams();
+  const mutate = useAdminMutation();
+  const listBackHref = useMemo(() => {
+    if (searchParams.get("from") === "list") {
+      const qs = searchParams.get("qs");
+      return qs ? `/admin/orders?${qs}` : "/admin/orders";
+    }
+    return "/admin/orders";
+  }, [searchParams]);
   const [order, setOrder] = useState<OrderDetailRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidPaymentId, setVoidPaymentId] = useState<string | null>(null);
+  const [voidReason, setVoidReason] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentType, setPaymentType] = useState<OrderPaymentType>("DEPOSIT");
   const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod>("BANK_TRANSFER");
@@ -57,72 +72,88 @@ export default function OrderDetailView({ id }: Props) {
 
   async function updateStatus(status: OrderStatus, reason?: string) {
     setBusy(true);
-    setMessage(null);
-    const res = await fetch(`/api/orders/${id}/status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, cancelReason: reason ?? null }),
+    const data = await mutate({
+      loadingMessage: "Đang cập nhật trạng thái…",
+      successMessage: "Đã cập nhật trạng thái đơn hàng.",
+      action: async () => {
+        const res = await fetch(`/api/orders/${id}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status, cancelReason: reason ?? null }),
+        });
+        return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
+      },
+      onSuccess: (orderData) => {
+        setOrder(orderData);
+        setCancelOpen(false);
+        setCancelReason("");
+      },
     });
-    const data = await res.json() as { order?: OrderDetailRecord; message?: string };
     setBusy(false);
-    if (!res.ok) {
-      setMessage(data.message ?? "Không thể cập nhật trạng thái");
-      return;
-    }
-    setOrder(data.order ?? null);
-    setCancelOpen(false);
-    setCancelReason("");
-    setMessage("Đã cập nhật trạng thái đơn hàng");
+    if (!data) return;
   }
 
   async function submitPayment(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setMessage(null);
-    const res = await fetch(`/api/orders/${id}/payments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: paymentType,
-        method: paymentMethod,
-        amount: Number(paymentAmount),
-        paidAt: new Date(paymentDate).toISOString(),
-        referenceCode: paymentReference || null,
-        note: paymentNote || null,
-      }),
+    await mutate({
+      loadingMessage: "Đang ghi nhận thanh toán…",
+      successMessage: "Đã ghi nhận thanh toán.",
+      action: async () => {
+        const res = await fetch(`/api/orders/${id}/payments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: paymentType,
+            method: paymentMethod,
+            amount: Number(paymentAmount),
+            paidAt: new Date(paymentDate).toISOString(),
+            referenceCode: paymentReference || null,
+            note: paymentNote || null,
+          }),
+        });
+        return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
+      },
+      onSuccess: (orderData) => {
+        setOrder(orderData);
+        setPaymentOpen(false);
+        setPaymentAmount("");
+        setPaymentReference("");
+        setPaymentNote("");
+      },
     });
-    const data = await res.json() as { order?: OrderDetailRecord; message?: string };
     setBusy(false);
-    if (!res.ok) {
-      setMessage(data.message ?? "Không thể ghi nhận thanh toán");
-      return;
-    }
-    setOrder(data.order ?? null);
-    setPaymentOpen(false);
-    setPaymentAmount("");
-    setPaymentReference("");
-    setPaymentNote("");
-    setMessage("Đã ghi nhận thanh toán");
   }
 
-  async function voidPayment(paymentId: string) {
-    const reason = window.prompt("Lý do hủy ghi nhận (tuỳ chọn):");
-    if (reason === null) return;
+  function openVoidPayment(paymentId: string) {
+    setVoidPaymentId(paymentId);
+    setVoidReason("");
+    setVoidOpen(true);
+  }
+
+  async function submitVoidPayment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!voidPaymentId) return;
     setBusy(true);
-    setMessage(null);
-    const res = await fetch(`/api/orders/${id}/payments/${paymentId}/void`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ voidReason: reason || null }),
+    await mutate({
+      loadingMessage: "Đang hủy ghi nhận thanh toán…",
+      successMessage: "Đã hủy ghi nhận thanh toán.",
+      action: async () => {
+        const res = await fetch(`/api/orders/${id}/payments/${voidPaymentId}/void`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voidReason: voidReason || null }),
+        });
+        return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
+      },
+      onSuccess: (orderData) => {
+        setOrder(orderData);
+        setVoidOpen(false);
+        setVoidPaymentId(null);
+        setVoidReason("");
+      },
     });
-    const data = await res.json() as { order?: OrderDetailRecord; message?: string };
     setBusy(false);
-    if (!res.ok) {
-      setMessage(data.message ?? "Không thể hủy ghi nhận");
-      return;
-    }
-    setOrder(data.order ?? null);
-    setMessage("Đã hủy ghi nhận thanh toán");
   }
 
   if (loading) return <p className="admin-loading">Đang tải...</p>;
@@ -140,6 +171,8 @@ export default function OrderDetailView({ id }: Props) {
 
   return (
     <div className="admin-panel">
+      <AdminBackLink href={listBackHref} />
+
       <div className="admin-section-header">
         <div>
           <p className="admin-crm-detail-code">{order.orderNo}</p>
@@ -165,6 +198,7 @@ export default function OrderDetailView({ id }: Props) {
                 type="button"
                 className="admin-btn admin-btn--primary"
                 disabled={busy}
+                aria-busy={busy}
                 onClick={() => void updateStatus(status)}
               >
                 {label}
@@ -178,8 +212,6 @@ export default function OrderDetailView({ id }: Props) {
           )}
         </div>
       </div>
-
-      {message && <p className="admin-field-hint">{message}</p>}
 
       <div className="admin-catalog-kpi-bar">
         <div className="admin-catalog-kpi">
@@ -311,7 +343,7 @@ export default function OrderDetailView({ id }: Props) {
                   <td>{ORDER_PAYMENT_STATUS_LABELS[p.status]}</td>
                   <td>
                     {p.status === "CONFIRMED" && canRecordPayment ? (
-                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" disabled={busy} onClick={() => void voidPayment(p.id)}>
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" disabled={busy} aria-busy={busy} onClick={() => openVoidPayment(p.id)}>
                         Hủy ghi nhận
                       </button>
                     ) : p.status === "VOID" ? (
@@ -360,6 +392,29 @@ export default function OrderDetailView({ id }: Props) {
             <div className="quote-quick-contact-modal__actions">
               <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setCancelOpen(false)}>Đóng</button>
               <button type="submit" className="admin-btn admin-btn--primary" disabled={busy}>Xác nhận hủy</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {voidOpen && (
+        <div className="quote-quick-contact-modal">
+          <div className="quote-quick-contact-modal__backdrop" onClick={() => setVoidOpen(false)} />
+          <form
+            className="quote-quick-contact-modal__panel"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submitVoidPayment(e);
+            }}
+          >
+            <h3 className="quote-quick-contact-modal__title">Hủy ghi nhận thanh toán</h3>
+            <div className="admin-field">
+              <label className="admin-label">Lý do hủy ghi nhận (tuỳ chọn)</label>
+              <textarea className="admin-textarea" rows={3} value={voidReason} onChange={(e) => setVoidReason(e.target.value)} />
+            </div>
+            <div className="quote-quick-contact-modal__actions">
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setVoidOpen(false)}>Đóng</button>
+              <button type="submit" className="admin-btn admin-btn--primary" disabled={busy} aria-busy={busy}>Xác nhận hủy</button>
             </div>
           </form>
         </div>

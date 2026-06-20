@@ -2,10 +2,12 @@
 // always appear without a redeploy.
 export const dynamic = "force-dynamic";
 
+import AdminProviders from "@/components/admin/AdminProviders";
+
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <AdminProviders>{children}</AdminProviders>;
 }

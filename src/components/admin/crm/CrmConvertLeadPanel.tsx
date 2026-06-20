@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { CrmCustomerRecord } from "@/features/crm/types";
 import type { CrmLeadRecord } from "@/features/crm/types";
 import { displayLeadContactName } from "@/features/crm/labels";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type Props = {
   lead: CrmLeadRecord;
@@ -12,6 +14,7 @@ type Props = {
 };
 
 export default function CrmConvertLeadPanel({ lead, onDone, onError }: Props) {
+  const mutate = useAdminMutation();
   const [mode, setMode] = useState<"new" | "link">("new");
   const [search, setSearch] = useState("");
   const [customers, setCustomers] = useState<CrmCustomerRecord[]>([]);
@@ -54,19 +57,16 @@ export default function CrmConvertLeadPanel({ lead, onDone, onError }: Props) {
   async function createNewCustomer() {
     if (!confirm("Tạo khách hàng mới từ thông tin lead này?")) return;
     setSubmitting(true);
-    try {
-      const res = await fetch(`/api/crm/leads/${lead.id}/convert`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        onError(data.message ?? "Không thể tạo khách hàng mới");
-        return;
-      }
-      onDone(data.lead);
-    } catch {
-      onError("Không thể tạo khách hàng mới");
-    } finally {
-      setSubmitting(false);
-    }
+    const updated = await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã liên kết khách hàng.",
+      action: async () => {
+        const res = await fetch(`/api/crm/leads/${lead.id}/convert`, { method: "POST" });
+        return parseAdminJsonResponse(res, (data) => data.lead as CrmLeadRecord);
+      },
+    });
+    setSubmitting(false);
+    if (updated) onDone(updated);
   }
 
   async function linkExistingCustomer() {
@@ -75,26 +75,23 @@ export default function CrmConvertLeadPanel({ lead, onDone, onError }: Props) {
       return;
     }
     setSubmitting(true);
-    try {
-      const res = await fetch(`/api/crm/leads/${lead.id}/link-customer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: selectedCustomerId,
-          createContact: createContact && hasContactData,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        onError(data.message ?? "Không thể gắn khách hàng");
-        return;
-      }
-      onDone(data.lead);
-    } catch {
-      onError("Không thể gắn khách hàng");
-    } finally {
-      setSubmitting(false);
-    }
+    const updated = await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã liên kết khách hàng.",
+      action: async () => {
+        const res = await fetch(`/api/crm/leads/${lead.id}/link-customer`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerId: selectedCustomerId,
+            createContact: createContact && hasContactData,
+          }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.lead as CrmLeadRecord);
+      },
+    });
+    setSubmitting(false);
+    if (updated) onDone(updated);
   }
 
   return (

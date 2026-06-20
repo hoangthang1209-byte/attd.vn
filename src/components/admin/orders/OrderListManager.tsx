@@ -49,6 +49,18 @@ export default function OrderListManager() {
 
   useEffect(() => { void load(); }, [load]);
 
+  function buildDetailHref(orderId: string) {
+    const filter = new URLSearchParams();
+    if (search.trim()) filter.set("search", search.trim());
+    if (status) filter.set("status", status);
+    if (paymentState) filter.set("paymentState", paymentState);
+    const qs = filter.toString();
+    const params = new URLSearchParams();
+    params.set("from", "list");
+    if (qs) params.set("qs", qs);
+    return `/admin/orders/${orderId}?${params.toString()}`;
+  }
+
   return (
     <div className="admin-panel">
       <div className="admin-section-header">
@@ -101,7 +113,7 @@ export default function OrderListManager() {
             </thead>
             <tbody>
               {orders.map((o) => (
-                <tr key={o.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/orders/${o.id}`)}>
+                <tr key={o.id} style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
                   <td><code>{o.orderNo}</code></td>
                   <td>{o.sourceQuoteNo ?? "—"}</td>
                   <td>{o.customerCompanyName ?? o.contactName ?? "—"}</td>

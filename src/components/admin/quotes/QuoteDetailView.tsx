@@ -9,6 +9,9 @@ import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
 import { QuotePartyColumns } from "@/components/quotes/QuoteDocumentSections";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { useAdminToast } from "@/hooks/useAdminToast";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import {
   downloadQuotePdfFromApi,
   quotePdfDownloadFilename,
@@ -81,11 +84,13 @@ type QuoteDetail = {
 
 export default function QuoteDetailView({ id }: { id: string }) {
   const router = useRouter();
+  const mutate = useAdminMutation();
+  const toast = useAdminToast();
   const [quote, setQuote] = useState<QuoteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -103,45 +108,52 @@ export default function QuoteDetailView({ id }: { id: string }) {
   useEffect(() => { void load(); }, [id]);
 
   async function updateStatus(status: QuoteStatus) {
-    setMessage(null);
-    const res = await fetch(`/api/quotes/${id}/status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+    setBusy(true);
+    await mutate({
+      loadingMessage: "Đang cập nhật trạng thái…",
+      successMessage: "Đã cập nhật trạng thái.",
+      action: async () => {
+        const res = await fetch(`/api/quotes/${id}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        return parseAdminJsonResponse(res, () => true);
+      },
+      onSuccess: async () => {
+        await load();
+      },
     });
-    const data = await res.json() as { message?: string };
-    if (!res.ok) {
-      setMessage(data.message ?? "Không thể cập nhật trạng thái");
-      return;
-    }
-    await load();
-    setMessage("Đã cập nhật trạng thái");
+    setBusy(false);
   }
-
-  const [converting, setConverting] = useState(false);
 
   async function convertToOrder() {
     if (!window.confirm("Tạo đơn hàng từ báo giá này?")) return;
-    setConverting(true);
-    setMessage(null);
-    const res = await fetch(`/api/orders/from-quote/${id}`, { method: "POST" });
-    const data = await res.json() as { order?: { id: string }; message?: string };
-    setConverting(false);
-    if (!res.ok) {
-      setMessage(data.message ?? "Không thể tạo đơn hàng");
-      return;
-    }
-    router.push(`/admin/orders/${data.order!.id}`);
+    setBusy(true);
+    const order = await mutate({
+      loadingMessage: "Đang tạo đơn hàng…",
+      successMessage: "Đã tạo đơn hàng.",
+      action: async () => {
+        const res = await fetch(`/api/orders/from-quote/${id}`, { method: "POST" });
+        return parseAdminJsonResponse(res, (body) => body.order as { id: string });
+      },
+    });
+    setBusy(false);
+    if (order) router.push(`/admin/orders/${order.id}`);
   }
 
   async function duplicateQuote() {
-    const res = await fetch(`/api/quotes/${id}/duplicate`, { method: "POST" });
-    const data = await res.json() as { quote?: { id: string }; message?: string };
-    if (!res.ok) {
-      setMessage(data.message ?? "Không thể sao chép");
-      return;
-    }
-    router.push(`/admin/quotes/${data.quote!.id}`);
+    setBusy(true);
+    const duplicated = await mutate({
+      loadingMessage: "Đang sao chép báo giá…",
+      successMessage: "Đã sao chép báo giá.",
+      action: async () => {
+        const res = await fetch(`/api/quotes/${id}/duplicate`, { method: "POST" });
+        return parseAdminJsonResponse(res, (body) => body.quote as { id: string });
+      },
+    });
+    setBusy(false);
+    if (duplicated) router.push(`/admin/quotes/${duplicated.id}`);
   }
 
   function publicUrl() {
@@ -172,7 +184,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
       );
     } catch (err) {
       console.error("[QuoteDetailView] PDF download failed", err);
-      setMessage(
+      toast.error(
         err instanceof Error
           ? err.message
           : "Không thể tạo file PDF giao diện báo giá. Vui lòng thử lại.",
@@ -219,14 +231,12 @@ export default function QuoteDetailView({ id }: { id: string }) {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link href={`/admin/quotes/${id}/edit`} className="admin-btn admin-btn--secondary">Chỉnh sửa</Link>
-          <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void duplicateQuote()}>Sao chép</button>
+          <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} aria-busy={busy} onClick={() => void duplicateQuote()}>Sao chép</button>
           <button type="button" className="admin-btn admin-btn--secondary" disabled={pdfDownloading} onClick={() => void downloadPdf()}>
             {pdfDownloading ? "Đang tạo PDF..." : "Tải PDF báo giá"}
           </button>
         </div>
       </div>
-
-      {message && <p className="admin-field-hint">{message}</p>}
 
       {(quote.status === "ACCEPTED" || quote.status === "REJECTED") && (
         <p className="admin-field-hint" style={{ color: "var(--admin-warning, #b45309)" }}>
@@ -318,10 +328,10 @@ export default function QuoteDetailView({ id }: { id: string }) {
       </fieldset>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
-        <button type="button" className="admin-btn admin-btn--primary" onClick={() => void updateStatus("SENT")}>Gửi báo giá</button>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void updateStatus("ACCEPTED")}>Khách đồng ý</button>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void updateStatus("REJECTED")}>Khách từ chối</button>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void updateStatus("CANCELLED")}>Đã hủy</button>
+        <button type="button" className="admin-btn admin-btn--primary" disabled={busy} aria-busy={busy} onClick={() => void updateStatus("SENT")}>Gửi báo giá</button>
+        <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} aria-busy={busy} onClick={() => void updateStatus("ACCEPTED")}>Khách đồng ý</button>
+        <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} aria-busy={busy} onClick={() => void updateStatus("REJECTED")}>Khách từ chối</button>
+        <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} aria-busy={busy} onClick={() => void updateStatus("CANCELLED")}>Đã hủy</button>
         {quote.order ? (
           <Link href={`/admin/orders/${quote.order.id}`} className="admin-btn admin-btn--secondary">
             Đơn hàng {quote.order.orderNo}
@@ -330,10 +340,11 @@ export default function QuoteDetailView({ id }: { id: string }) {
           <button
             type="button"
             className="admin-btn admin-btn--primary"
-            disabled={converting}
+            disabled={busy}
+            aria-busy={busy}
             onClick={() => void convertToOrder()}
           >
-            {converting ? "Đang tạo đơn..." : "Tạo đơn hàng"}
+            {busy ? "Đang tạo đơn..." : "Tạo đơn hàng"}
           </button>
         ) : null}
       </div>

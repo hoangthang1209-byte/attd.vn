@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import { useState } from "react";
 import type { CustomerStatus, CustomerType } from "@prisma/client";
 import {
@@ -11,6 +13,7 @@ import { CRM_CUSTOMER_STATUSES, CRM_CUSTOMER_TYPES } from "@/features/crm/types"
 
 export default function CrmCustomerForm() {
   const router = useRouter();
+  const mutate = useAdminMutation();
   const [type, setType] = useState<CustomerType>("BUSINESS");
   const [name, setName] = useState("");
   const [legalName, setLegalName] = useState("");
@@ -37,46 +40,49 @@ export default function CrmCustomerForm() {
     setSaving(true);
     setError(null);
 
-    try {
-      const res = await fetch("/api/crm/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type,
-          name,
-          legalName,
-          taxCode,
-          phone,
-          email,
-          website,
-          address,
-          province,
-          district,
-          status,
-          note,
-          primaryContact: contactFullName.trim()
-            ? {
-                fullName: contactFullName,
-                title: contactTitle,
-                phone: contactPhone,
-                email: contactEmail,
-                zalo: contactZalo,
-                note: contactNote,
-              }
-            : null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message ?? "Không thể tạo khách hàng");
-        return;
-      }
-      router.push(`/admin/crm/customers/${data.customer.id}`);
-    } catch {
+    const customer = await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã lưu thông tin.",
+      action: async () => {
+        const res = await fetch("/api/crm/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type,
+            name,
+            legalName,
+            taxCode,
+            phone,
+            email,
+            website,
+            address,
+            province,
+            district,
+            status,
+            note,
+            primaryContact: contactFullName.trim()
+              ? {
+                  fullName: contactFullName,
+                  title: contactTitle,
+                  phone: contactPhone,
+                  email: contactEmail,
+                  zalo: contactZalo,
+                  note: contactNote,
+                }
+              : null,
+          }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.customer as { id: string });
+      },
+      onSuccess: (savedCustomer) => {
+        router.push(`/admin/crm/customers/${savedCustomer.id}`);
+      },
+    });
+
+    if (!customer) {
       setError("Không thể tạo khách hàng");
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   }
 
   return (

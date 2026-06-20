@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import type { LeadPriority, LeadSource, LeadStatus } from "@prisma/client";
 import CrmProductInterestFields, {
   useCrmProducts,
@@ -24,6 +26,7 @@ import {
 
 export default function CrmLeadForm() {
   const router = useRouter();
+  const mutate = useAdminMutation();
   const products = useCrmProducts();
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
@@ -74,39 +77,42 @@ export default function CrmLeadForm() {
         };
       });
 
-    try {
-      const res = await fetch("/api/crm/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          adminMode: true,
-          companyName,
-          contactName,
-          phone,
-          email,
-          zalo,
-          source,
-          sourceDetail,
-          demand,
-          status,
-          priority,
-          estimatedValue: estimatedValue ? Number(estimatedValue.replace(/[^\d]/g, "")) : null,
-          nextFollowUpAt: nextFollowUpAt || null,
-          note,
-          productInterests,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message ?? "Không thể tạo lead");
-        return;
-      }
-      router.push(`/admin/crm/leads/${data.lead.id}`);
-    } catch {
+    const lead = await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã lưu thông tin.",
+      action: async () => {
+        const res = await fetch("/api/crm/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            adminMode: true,
+            companyName,
+            contactName,
+            phone,
+            email,
+            zalo,
+            source,
+            sourceDetail,
+            demand,
+            status,
+            priority,
+            estimatedValue: estimatedValue ? Number(estimatedValue.replace(/[^\d]/g, "")) : null,
+            nextFollowUpAt: nextFollowUpAt || null,
+            note,
+            productInterests,
+          }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.lead as { id: string });
+      },
+      onSuccess: (savedLead) => {
+        router.push(`/admin/crm/leads/${savedLead.id}`);
+      },
+    });
+
+    if (!lead) {
       setError("Không thể tạo lead");
-    } finally {
-      setSaving(false);
     }
+    setSaving(false);
   }
 
   return (

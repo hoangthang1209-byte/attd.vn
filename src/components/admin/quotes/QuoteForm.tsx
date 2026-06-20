@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import Link from "next/link";
 import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
 import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
@@ -47,6 +49,7 @@ type Props = {
 
 export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
   const router = useRouter();
+  const mutate = useAdminMutation();
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -450,28 +453,35 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
   async function handleSave(draft = true) {
     setSaving(true);
     setError(null);
-    try {
-      const payload = buildPayload(draft ? "DRAFT" : status);
-      const url =
-        mode === "edit" && quoteId ? `/api/quotes/${quoteId}` : "/api/quotes";
-      const method = mode === "edit" ? "PATCH" : "POST";
-      const body =
-        mode === "create" && prefillParams?.pricingCalculationId
-          ? { ...payload, fromPricingCalculationId: prefillParams.pricingCalculationId }
-          : payload;
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = (await res.json()) as { quote?: { id: string }; message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Không thể lưu báo giá");
-      router.push(`/admin/quotes/${data.quote!.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi lưu");
-    } finally {
-      setSaving(false);
+    const payload = buildPayload(draft ? "DRAFT" : status);
+    const url =
+      mode === "edit" && quoteId ? `/api/quotes/${quoteId}` : "/api/quotes";
+    const method = mode === "edit" ? "PATCH" : "POST";
+    const body =
+      mode === "create" && prefillParams?.pricingCalculationId
+        ? { ...payload, fromPricingCalculationId: prefillParams.pricingCalculationId }
+        : payload;
+
+    const saved = await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: mode === "edit" ? "Đã lưu thông tin." : "Đã tạo báo giá.",
+      action: async () => {
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        return parseAdminJsonResponse(res, (data) => data.quote as { id: string });
+      },
+      onSuccess: (quote) => {
+        router.push(`/admin/quotes/${quote.id}`);
+      },
+    });
+
+    if (!saved) {
+      setError("Không thể lưu báo giá");
     }
+    setSaving(false);
   }
 
   function updateItem(index: number, patch: Partial<QuoteItemRow>) {
