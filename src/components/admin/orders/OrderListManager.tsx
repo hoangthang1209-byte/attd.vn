@@ -65,6 +65,9 @@ export default function OrderListManager() {
     <div className="admin-panel">
       <div className="admin-section-header">
         <p>Tổng: {total} đơn hàng</p>
+        <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
+          Tạo đơn hàng
+        </Link>
       </div>
 
       <form className="admin-crm-filters" onSubmit={(e) => { e.preventDefault(); void load(); }}>

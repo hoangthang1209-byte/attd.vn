@@ -10,19 +10,32 @@ import {
   computeOrderFinancials,
 } from "@/features/orders/order-finance";
 import {
-  canTransitionOrderStatus,
+  canUpdateOrderStatus,
+  formatOrderStatusCorrection,
   formatOrderStatusTransition,
+  isOrderEditable,
   isOrderPaymentLocked,
+  validateDeliveryForShipped,
 } from "@/features/orders/order-status";
+import {
+  computeOrderItem,
+  computeOrderTotals,
+} from "@/features/orders/order-totals";
+import { generateOrderNo } from "@/features/orders/order-code";
 import {
   ORDER_PAYMENT_METHOD_LABELS,
   ORDER_PAYMENT_TYPE_LABELS,
   type OrderPaymentStateFilter,
 } from "@/features/orders/order-labels";
 import type {
+  CreateManualOrderInput,
+  EditOrderPaymentInput,
   OrderDetailRecord,
   OrderListRecord,
   RecordOrderPaymentInput,
+  UpdateOrderDeliveryInput,
+  UpdateOrderInput,
+  UpdateOrderProductionInput,
   UpdateOrderStatusInput,
 } from "@/features/orders/order.types";
 
@@ -47,6 +60,8 @@ function mapPaymentRow(payment: {
   referenceCode: string | null;
   note: string | null;
   voidReason: string | null;
+  editReason: string | null;
+  editedAt: Date | null;
   createdAt: Date;
 }) {
   return {
@@ -59,6 +74,8 @@ function mapPaymentRow(payment: {
     referenceCode: payment.referenceCode,
     note: payment.note,
     voidReason: payment.voidReason,
+    editReason: payment.editReason,
+    editedAt: payment.editedAt?.toISOString() ?? null,
     createdAt: payment.createdAt.toISOString(),
   };
 }
@@ -74,6 +91,7 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
     quoteId: row.quoteId,
     customerId: row.customerId,
     contactId: row.contactId,
+    salesRepresentativeId: row.salesRepresentativeId,
     status: row.status,
     currency: row.currency,
     priceVatType: row.priceVatType,
@@ -111,6 +129,18 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
     sourceQuoteNo: row.sourceQuoteNo,
     sourceQuoteDate: row.sourceQuoteDate?.toISOString() ?? null,
     sourceQuoteValidUntil: row.sourceQuoteValidUntil?.toISOString() ?? null,
+    productionDueDate: row.productionDueDate?.toISOString() ?? null,
+    productionOwnerName: row.productionOwnerName,
+    productionNote: row.productionNote,
+    deliveryMethod: row.deliveryMethod,
+    deliveryRecipientName: row.deliveryRecipientName,
+    deliveryRecipientPhone: row.deliveryRecipientPhone,
+    deliveryAddress: row.deliveryAddress,
+    deliveryTrackingCode: row.deliveryTrackingCode,
+    deliveryCarrier: row.deliveryCarrier,
+    deliveryNote: row.deliveryNote,
+    deliveryExpectedAt: row.deliveryExpectedAt?.toISOString() ?? null,
+    deliveredAt: row.deliveredAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     customer: row.customer,
@@ -244,12 +274,20 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
   const order = await prisma.order.findUnique({ where: { id } });
   if (!order) throw new OrderValidationError("Không tìm thấy đơn hàng.");
 
-  if (!canTransitionOrderStatus(order.status, input.status)) {
-    throw new OrderValidationError("Không thể chuyển đơn hàng sang trạng thái này.");
+  const transition = canUpdateOrderStatus(order.status, input.status, {
+    correctionReason: input.correctionReason,
+  });
+  if (!transition.allowed) {
+    throw new OrderValidationError(transition.error ?? "Không thể chuyển đơn hàng sang trạng thái này.");
   }
 
   if (input.status === "CANCELLED" && !input.cancelReason?.trim()) {
     throw new OrderValidationError("Vui lòng nhập lý do hủy đơn hàng.");
+  }
+
+  if (input.status === "SHIPPED") {
+    const deliveryError = validateDeliveryForShipped(order);
+    if (deliveryError) throw new OrderValidationError(deliveryError);
   }
 
   const now = new Date();
@@ -264,8 +302,20 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
   if (input.status === "CONFIRMED" && !order.confirmedAt) data.confirmedAt = now;
   if (input.status === "IN_PRODUCTION" && !order.productionStartedAt) data.productionStartedAt = now;
   if (input.status === "READY_TO_SHIP" && !order.readyToShipAt) data.readyToShipAt = now;
-  if (input.status === "SHIPPED" && !order.shippedAt) data.shippedAt = now;
+  if (input.status === "SHIPPED") {
+    if (!order.shippedAt) data.shippedAt = now;
+    if (!order.deliveredAt) data.deliveredAt = now;
+  }
   if (input.status === "COMPLETED" && !order.completedAt) data.completedAt = now;
+
+  const activityTitle = transition.isCorrection
+    ? formatOrderStatusCorrection(order.status, input.status)
+    : formatOrderStatusTransition(order.status, input.status);
+  const activityDetail = input.status === "CANCELLED"
+    ? input.cancelReason?.trim() ?? null
+    : transition.isCorrection
+      ? input.correctionReason?.trim() ?? null
+      : null;
 
   await prisma.$transaction(async (tx) => {
     await tx.order.update({ where: { id }, data });
@@ -273,8 +323,8 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
       data: {
         orderId: id,
         type: "STATUS_CHANGED",
-        title: formatOrderStatusTransition(order.status, input.status),
-        detail: input.status === "CANCELLED" ? input.cancelReason?.trim() ?? null : null,
+        title: activityTitle,
+        detail: activityDetail,
       },
     });
   });
@@ -404,4 +454,399 @@ export async function getOrderIdByQuoteId(quoteId: string): Promise<string | nul
     select: { id: true },
   });
   return row?.id ?? null;
+}
+
+function isOrderNoUniqueError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
+function buildOrderItemCreates(items: ReturnType<typeof computeOrderItem>[]) {
+  return items.map((item, index) => ({
+    productId: item.productId ?? null,
+    variantId: item.variantId ?? null,
+    productNameSnapshot: item.productNameSnapshot?.trim() || null,
+    variantNameSnapshot: item.variantNameSnapshot?.trim() || null,
+    description: item.description?.trim() || null,
+    designMediaAssetId: item.designMediaAssetId ?? null,
+    designImageUrl: item.designImageUrl?.trim() || null,
+    skuSnapshot: item.skuSnapshot?.trim() || null,
+    colorSnapshot: item.colorSnapshot?.trim() || null,
+    categorySnapshot: item.categorySnapshot?.trim() || null,
+    genderSnapshot: item.genderSnapshot?.trim() || null,
+    moqSnapshot: item.moqSnapshot ?? null,
+    itemNote: item.itemNote?.trim() || null,
+    productionLeadTime: item.productionLeadTime?.trim() || null,
+    quantity: item.quantity,
+    unit: item.unit,
+    unitPrice: item.unitPrice,
+    lineTotal: item.lineTotal,
+    sortOrder: item.sortOrder ?? index,
+  }));
+}
+
+function buildOrderDataFromInput(
+  input: CreateManualOrderInput,
+  totals: ReturnType<typeof computeOrderTotals>,
+) {
+  const orderDate = new Date(input.orderDate);
+  if (Number.isNaN(orderDate.getTime())) {
+    throw new OrderValidationError("Ngày đơn hàng không hợp lệ.");
+  }
+
+  return {
+    customerId: input.customerId ?? null,
+    contactId: input.contactId ?? null,
+    salesRepresentativeId: input.salesRepresentativeId ?? null,
+    currency: input.currency?.trim() || "VND",
+    priceVatType: input.priceVatType ?? "EXCLUDING_VAT",
+    subtotal: totals.subtotal,
+    discountAmount: totals.discountAmount,
+    shippingFee: totals.shippingFee,
+    vatAmount: totals.vatAmount,
+    totalAmount: totals.totalAmount,
+    orderDate,
+    customerNote: input.customerNote?.trim() || null,
+    internalNote: input.internalNote?.trim() || null,
+    terms: input.terms?.trim() || null,
+    sampleFee: input.sampleFee ?? null,
+    sampleLeadTime: input.sampleLeadTime?.trim() || null,
+    sampleRefundCondition: input.sampleRefundCondition?.trim() || null,
+    customerCompanyName: input.customerCompanyName?.trim() || null,
+    customerCode: input.customerCode?.trim() || null,
+    customerTaxCode: input.customerTaxCode?.trim() || null,
+    customerAddress: input.customerAddress?.trim() || null,
+    contactName: input.contactName?.trim() || null,
+    contactTitle: input.contactTitle?.trim() || null,
+    contactPhone: input.contactPhone?.trim() || null,
+    contactEmail: input.contactEmail?.trim() || null,
+    salesName: input.salesName?.trim() || null,
+    salesTitle: input.salesTitle?.trim() || null,
+    salesPhone: input.salesPhone?.trim() || null,
+    salesEmail: input.salesEmail?.trim() || null,
+    deliveryRecipientName: input.contactName?.trim() || null,
+    deliveryRecipientPhone: input.contactPhone?.trim() || null,
+    deliveryAddress: input.customerAddress?.trim() || null,
+  };
+}
+
+function validateOrderItemsInput(input: CreateManualOrderInput) {
+  if (!input.items.length) {
+    throw new OrderValidationError("Vui lòng thêm ít nhất một dòng sản phẩm.");
+  }
+  for (const item of input.items) {
+    if (!item.productNameSnapshot?.trim()) {
+      throw new OrderValidationError("Vui lòng nhập tên sản phẩm cho tất cả dòng.");
+    }
+    if (item.quantity < 1) {
+      throw new OrderValidationError("Số lượng phải lớn hơn 0.");
+    }
+    if (item.unitPrice < 0) {
+      throw new OrderValidationError("Đơn giá không hợp lệ.");
+    }
+  }
+}
+
+export async function createManualOrder(input: CreateManualOrderInput) {
+  validateOrderItemsInput(input);
+  const computedItems = input.items.map(computeOrderItem);
+  const totals = computeOrderTotals(computedItems, {
+    discountAmount: input.discountAmount,
+    shippingFee: input.shippingFee,
+    vatRate: input.vatRate,
+    vatAmount: input.vatAmount,
+  });
+  const orderData = buildOrderDataFromInput(input, totals);
+  const itemCreates = buildOrderItemCreates(computedItems);
+
+  const maxAttempts = 5;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const orderNo = await generateOrderNo();
+    try {
+      const orderId = await prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            orderNo,
+            status: "NEW",
+            ...orderData,
+            items: { create: itemCreates },
+          },
+          select: { id: true },
+        });
+        await tx.orderActivity.create({
+          data: {
+            orderId: created.id,
+            type: "CREATED",
+            title: "Tạo đơn hàng thủ công",
+            detail: `${orderNo} · ${input.customerCompanyName?.trim() ?? ""}`.trim(),
+          },
+        });
+        return created.id;
+      });
+
+      const detail = await getOrderDetail(orderId);
+      if (!detail) throw new OrderValidationError("Không tìm thấy đơn hàng.");
+      return detail;
+    } catch (error) {
+      if (isOrderNoUniqueError(error) && attempt < maxAttempts - 1) continue;
+      throw error;
+    }
+  }
+
+  throw new OrderValidationError("Không thể tạo mã đơn hàng.");
+}
+
+export async function updateOrderDetails(id: string, input: UpdateOrderInput) {
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order) throw new OrderValidationError("Không tìm thấy đơn hàng.");
+  if (!isOrderEditable(order.status)) {
+    throw new OrderValidationError("Không thể chỉnh sửa đơn hàng đã hoàn tất hoặc đã hủy.");
+  }
+
+  validateOrderItemsInput(input);
+  const computedItems = input.items.map(computeOrderItem);
+  const totals = computeOrderTotals(computedItems, {
+    discountAmount: input.discountAmount,
+    shippingFee: input.shippingFee,
+    vatRate: input.vatRate,
+    vatAmount: input.vatAmount,
+  });
+  const orderData = buildOrderDataFromInput(input, totals);
+  const itemCreates = buildOrderItemCreates(computedItems);
+
+  const previousItemCount = await prisma.orderItem.count({ where: { orderId: id } });
+  const changes: string[] = [];
+  if (order.totalAmount.toNumber() !== totals.totalAmount) {
+    changes.push(
+      `Tổng: ${order.totalAmount.toNumber().toLocaleString("vi-VN")} → ${totals.totalAmount.toLocaleString("vi-VN")} đ`,
+    );
+  }
+  if (previousItemCount !== computedItems.length) {
+    changes.push(`Số dòng: ${computedItems.length}`);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.orderItem.deleteMany({ where: { orderId: id } });
+    await tx.order.update({
+      where: { id },
+      data: {
+        ...orderData,
+        items: { create: itemCreates },
+      },
+    });
+    await tx.orderActivity.create({
+      data: {
+        orderId: id,
+        type: "ORDER_EDITED",
+        title: "Đã cập nhật thông tin đơn hàng",
+        detail: changes.length ? changes.join(" · ") : "Cập nhật thông tin và sản phẩm",
+      },
+    });
+  });
+
+  const detail = await getOrderDetail(id);
+  if (!detail) throw new OrderValidationError("Không tìm thấy đơn hàng.");
+  return detail;
+}
+
+export async function editOrderPayment(
+  orderId: string,
+  paymentId: string,
+  input: EditOrderPaymentInput,
+) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { payments: true },
+  });
+  if (!order) throw new OrderValidationError("Không tìm thấy đơn hàng.");
+
+  if (isOrderPaymentLocked(order.status)) {
+    throw new OrderValidationError("Đơn hàng đã hoàn tất hoặc đã hủy không thể cập nhật thanh toán.");
+  }
+
+  const payment = order.payments.find((p) => p.id === paymentId);
+  if (!payment) throw new OrderValidationError("Không tìm thấy ghi nhận thanh toán.");
+  if (payment.status !== "CONFIRMED") {
+    throw new OrderValidationError("Chỉ có thể chỉnh sửa ghi nhận đã xác nhận.");
+  }
+
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new OrderValidationError("Số tiền thanh toán phải lớn hơn 0.");
+  }
+
+  const paidAt = new Date(input.paidAt);
+  if (Number.isNaN(paidAt.getTime())) {
+    throw new OrderValidationError("Ngày thanh toán không hợp lệ.");
+  }
+
+  const otherPayments = order.payments
+    .filter((p) => p.id !== paymentId)
+    .map((p) => ({
+      type: p.type,
+      status: p.status,
+      amount: p.amount.toNumber(),
+    }));
+  const totalAmount = order.totalAmount.toNumber();
+  const { outstandingAmount } = computeOrderFinancials(totalAmount, otherPayments);
+  const netPaid = computeConfirmedNetPaid(otherPayments);
+
+  if (input.type === "REFUND") {
+    if (input.amount > netPaid) {
+      throw new OrderValidationError("Số tiền hoàn không được vượt quá tổng đã thanh toán.");
+    }
+  } else if (input.amount > outstandingAmount) {
+    throw new OrderValidationError("Số tiền không được vượt quá số còn phải thu.");
+  }
+
+  const beforeSummary = [
+    ORDER_PAYMENT_TYPE_LABELS[payment.type],
+    `${payment.amount.toNumber().toLocaleString("vi-VN")} đ`,
+  ].join(" · ");
+  const afterSummary = [
+    ORDER_PAYMENT_TYPE_LABELS[input.type],
+    `${input.amount.toLocaleString("vi-VN")} đ`,
+  ].join(" · ");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.orderPayment.update({
+      where: { id: paymentId },
+      data: {
+        type: input.type,
+        method: input.method,
+        amount: input.amount,
+        paidAt,
+        referenceCode: input.referenceCode?.trim() || null,
+        note: input.note?.trim() || null,
+        editReason: input.editReason.trim(),
+        editedAt: new Date(),
+      },
+    });
+    await tx.orderActivity.create({
+      data: {
+        orderId,
+        type: "PAYMENT_EDITED",
+        title: "Đã chỉnh sửa ghi nhận thanh toán",
+        detail: `${beforeSummary} → ${afterSummary} · Lý do: ${input.editReason.trim()}`,
+      },
+    });
+  });
+
+  const detail = await getOrderDetail(orderId);
+  if (!detail) throw new OrderValidationError("Không tìm thấy đơn hàng.");
+  return detail;
+}
+
+function parseProductionDueDate(value: string | null | undefined): Date | null {
+  if (!value?.trim()) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new OrderValidationError("Hạn hoàn thành dự kiến không hợp lệ.");
+  }
+  return date;
+}
+
+export async function updateOrderProduction(
+  id: string,
+  input: UpdateOrderProductionInput,
+) {
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order) throw new OrderValidationError("Không tìm thấy đơn hàng.");
+  if (!isOrderEditable(order.status)) {
+    throw new OrderValidationError("Không thể cập nhật sản xuất cho đơn hàng đã hoàn tất hoặc đã hủy.");
+  }
+
+  const productionDueDate = parseProductionDueDate(input.productionDueDate);
+  const details: string[] = [];
+  if (input.productionOwnerName?.trim() !== (order.productionOwnerName ?? "")) {
+    details.push(`Phụ trách: ${input.productionOwnerName?.trim() || "—"}`);
+  }
+  if (productionDueDate?.toISOString() !== order.productionDueDate?.toISOString()) {
+    details.push(
+      productionDueDate
+        ? `Hạn: ${productionDueDate.toLocaleDateString("vi-VN")}`
+        : "Đã xóa hạn hoàn thành",
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.order.update({
+      where: { id },
+      data: {
+        productionOwnerName: input.productionOwnerName?.trim() || null,
+        productionDueDate,
+        productionNote: input.productionNote?.trim() || null,
+      },
+    });
+    await tx.orderActivity.create({
+      data: {
+        orderId: id,
+        type: "PRODUCTION_UPDATED",
+        title: "Đã cập nhật thông tin sản xuất",
+        detail: details.length ? details.join(" · ") : "Cập nhật ghi chú sản xuất",
+      },
+    });
+  });
+
+  const detail = await getOrderDetail(id);
+  if (!detail) throw new OrderValidationError("Không tìm thấy đơn hàng.");
+  return detail;
+}
+
+function parseDeliveryExpectedAt(value: string | null | undefined): Date | null {
+  if (!value?.trim()) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new OrderValidationError("Ngày dự kiến giao không hợp lệ.");
+  }
+  return date;
+}
+
+export async function updateOrderDelivery(
+  id: string,
+  input: UpdateOrderDeliveryInput,
+) {
+  const order = await prisma.order.findUnique({ where: { id } });
+  if (!order) throw new OrderValidationError("Không tìm thấy đơn hàng.");
+  if (!isOrderEditable(order.status)) {
+    throw new OrderValidationError("Không thể cập nhật giao hàng cho đơn hàng đã hoàn tất hoặc đã hủy.");
+  }
+
+  const deliveryExpectedAt = parseDeliveryExpectedAt(input.deliveryExpectedAt);
+  const details: string[] = [];
+  if (input.deliveryRecipientName?.trim()) {
+    details.push(`Người nhận: ${input.deliveryRecipientName.trim()}`);
+  }
+  if (input.deliveryTrackingCode?.trim()) {
+    details.push(`Mã vận đơn: ${input.deliveryTrackingCode.trim()}`);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.order.update({
+      where: { id },
+      data: {
+        deliveryMethod: input.deliveryMethod?.trim() || null,
+        deliveryCarrier: input.deliveryCarrier?.trim() || null,
+        deliveryTrackingCode: input.deliveryTrackingCode?.trim() || null,
+        deliveryRecipientName: input.deliveryRecipientName?.trim() || null,
+        deliveryRecipientPhone: input.deliveryRecipientPhone?.trim() || null,
+        deliveryAddress: input.deliveryAddress?.trim() || null,
+        deliveryExpectedAt,
+        deliveryNote: input.deliveryNote?.trim() || null,
+      },
+    });
+    await tx.orderActivity.create({
+      data: {
+        orderId: id,
+        type: "DELIVERY_UPDATED",
+        title: "Đã cập nhật thông tin giao hàng",
+        detail: details.length ? details.join(" · ") : "Cập nhật thông tin giao hàng",
+      },
+    });
+  });
+
+  const detail = await getOrderDetail(id);
+  if (!detail) throw new OrderValidationError("Không tìm thấy đơn hàng.");
+  return detail;
 }

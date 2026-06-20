@@ -1280,6 +1280,10 @@ enum OrderActivityType {
   STATUS_CHANGED
   PAYMENT_RECORDED
   PAYMENT_VOIDED
+  PAYMENT_EDITED
+  ORDER_EDITED
+  PRODUCTION_UPDATED
+  DELIVERY_UPDATED
   NOTE_ADDED
 }
 
@@ -1327,6 +1331,18 @@ model Order {
   sourceQuoteNo         String?
   sourceQuoteDate       DateTime?
   sourceQuoteValidUntil DateTime?
+  productionDueDate     DateTime?
+  productionOwnerName   String?
+  productionNote        String?              @db.Text
+  deliveryMethod        String?
+  deliveryRecipientName String?
+  deliveryRecipientPhone String?
+  deliveryAddress       String?              @db.Text
+  deliveryTrackingCode  String?
+  deliveryCarrier       String?
+  deliveryNote          String?              @db.Text
+  deliveryExpectedAt    DateTime?
+  deliveredAt           DateTime?
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   quote                 Quote?               @relation(fields: [quoteId], references: [id], onDelete: SetNull)
@@ -1342,6 +1358,8 @@ model Order {
   @@index([customerId])
   @@index([status])
   @@index([createdAt])
+  @@index([productionDueDate])
+  @@index([deliveryExpectedAt])
 }
 
 model OrderItem {
@@ -1389,12 +1407,15 @@ model OrderPayment {
   referenceCode String?
   note          String?             @db.Text
   voidReason    String?             @db.Text
+  editReason    String?             @db.Text
+  editedAt      DateTime?
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
   order         Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([paidAt])
+  @@index([editedAt])
 }
 
 model OrderActivity {

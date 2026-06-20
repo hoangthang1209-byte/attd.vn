@@ -61,6 +61,8 @@ export type OrderPaymentRecord = {
   referenceCode: string | null;
   note: string | null;
   voidReason: string | null;
+  editReason: string | null;
+  editedAt: string | null;
   createdAt: string;
 };
 
@@ -78,6 +80,7 @@ export type OrderDetailRecord = {
   quoteId: string | null;
   customerId: string | null;
   contactId: string | null;
+  salesRepresentativeId: string | null;
   status: OrderStatus;
   currency: string;
   priceVatType: QuotePriceVatType;
@@ -115,6 +118,18 @@ export type OrderDetailRecord = {
   sourceQuoteNo: string | null;
   sourceQuoteDate: string | null;
   sourceQuoteValidUntil: string | null;
+  productionDueDate: string | null;
+  productionOwnerName: string | null;
+  productionNote: string | null;
+  deliveryMethod: string | null;
+  deliveryRecipientName: string | null;
+  deliveryRecipientPhone: string | null;
+  deliveryAddress: string | null;
+  deliveryTrackingCode: string | null;
+  deliveryCarrier: string | null;
+  deliveryNote: string | null;
+  deliveryExpectedAt: string | null;
+  deliveredAt: string | null;
   createdAt: string;
   updatedAt: string;
   customer: { id: string; name: string; code: string } | null;
@@ -137,4 +152,88 @@ export type RecordOrderPaymentInput = {
 export type UpdateOrderStatusInput = {
   status: OrderStatus;
   cancelReason?: string | null;
+  correctionReason?: string | null;
+};
+
+export type OrderItemInputPayload = {
+  id?: string | null;
+  productId?: string | null;
+  variantId?: string | null;
+  productNameSnapshot?: string | null;
+  variantNameSnapshot?: string | null;
+  description?: string | null;
+  designMediaAssetId?: string | null;
+  designImageUrl?: string | null;
+  skuSnapshot?: string | null;
+  colorSnapshot?: string | null;
+  categorySnapshot?: string | null;
+  genderSnapshot?: string | null;
+  moqSnapshot?: number | null;
+  itemNote?: string | null;
+  productionLeadTime?: string | null;
+  quantity: number;
+  unit?: string | null;
+  unitPrice: number;
+  sortOrder?: number;
+};
+
+export type CreateManualOrderInput = {
+  customerId?: string | null;
+  contactId?: string | null;
+  salesRepresentativeId?: string | null;
+  orderDate: string;
+  currency?: string;
+  priceVatType?: QuotePriceVatType;
+  customerCompanyName?: string | null;
+  customerCode?: string | null;
+  customerTaxCode?: string | null;
+  customerAddress?: string | null;
+  contactName?: string | null;
+  contactTitle?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  salesName?: string | null;
+  salesTitle?: string | null;
+  salesPhone?: string | null;
+  salesEmail?: string | null;
+  terms?: string | null;
+  customerNote?: string | null;
+  internalNote?: string | null;
+  sampleFee?: number | null;
+  sampleLeadTime?: string | null;
+  sampleRefundCondition?: string | null;
+  discountAmount?: number;
+  shippingFee?: number;
+  vatRate?: number;
+  vatAmount?: number;
+  items: OrderItemInputPayload[];
+};
+
+export type UpdateOrderInput = CreateManualOrderInput;
+
+export type EditOrderPaymentInput = {
+  type: OrderPaymentType;
+  method: OrderPaymentMethod;
+  amount: number;
+  paidAt: string;
+  referenceCode?: string | null;
+  note?: string | null;
+  editReason: string;
+};
+
+export type UpdateOrderProductionInput = {
+  productionOwnerName?: string | null;
+  productionDueDate?: string | null;
+  productionNote?: string | null;
+};
+
+export type UpdateOrderDeliveryInput = {
+  deliveryMethod?: string | null;
+  deliveryCarrier?: string | null;
+  deliveryTrackingCode?: string | null;
+  deliveryRecipientName?: string | null;
+  deliveryRecipientPhone?: string | null;
+  deliveryAddress?: string | null;
+  deliveryExpectedAt?: string | null;
+  deliveryNote?: string | null;
 };

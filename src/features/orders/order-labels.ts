@@ -48,5 +48,9 @@ export const ORDER_ACTIVITY_TYPE_LABELS: Record<OrderActivityType, string> = {
   STATUS_CHANGED: "Đổi trạng thái",
   PAYMENT_RECORDED: "Ghi nhận thanh toán",
   PAYMENT_VOIDED: "Hủy ghi nhận thanh toán",
+  PAYMENT_EDITED: "Chỉnh sửa thanh toán",
+  ORDER_EDITED: "Cập nhật đơn hàng",
+  PRODUCTION_UPDATED: "Cập nhật sản xuất",
+  DELIVERY_UPDATED: "Cập nhật giao hàng",
   NOTE_ADDED: "Thêm ghi chú",
 };

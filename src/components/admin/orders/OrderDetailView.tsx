@@ -14,19 +14,45 @@ import {
 } from "@/features/orders/order-format";
 import {
   getAllowedOrderStatusTransitions,
+  getOrderStatusCorrectionTargets,
+  isOrderEditable,
   orderStatusActionLabel,
+  orderStatusCorrectionLabel,
 } from "@/features/orders/order-status";
 import {
   ORDER_PAYMENT_METHOD_LABELS,
   ORDER_PAYMENT_STATE_LABELS,
   ORDER_PAYMENT_STATUS_LABELS,
   ORDER_PAYMENT_TYPE_LABELS,
+  ORDER_STATUS_LABELS,
 } from "@/features/orders/order-labels";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
+import { toDateInputValue } from "@/features/quotes/format";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type Props = { id: string };
+
+function syncProductionFields(order: OrderDetailRecord) {
+  return {
+    productionOwnerName: order.productionOwnerName ?? "",
+    productionDueDate: order.productionDueDate ? toDateInputValue(order.productionDueDate) : "",
+    productionNote: order.productionNote ?? "",
+  };
+}
+
+function syncDeliveryFields(order: OrderDetailRecord) {
+  return {
+    deliveryMethod: order.deliveryMethod ?? "",
+    deliveryCarrier: order.deliveryCarrier ?? "",
+    deliveryTrackingCode: order.deliveryTrackingCode ?? "",
+    deliveryRecipientName: order.deliveryRecipientName ?? order.contactName ?? "",
+    deliveryRecipientPhone: order.deliveryRecipientPhone ?? order.contactPhone ?? "",
+    deliveryAddress: order.deliveryAddress ?? order.customerAddress ?? "",
+    deliveryExpectedAt: order.deliveryExpectedAt ? toDateInputValue(order.deliveryExpectedAt) : "",
+    deliveryNote: order.deliveryNote ?? "",
+  };
+}
 
 export default function OrderDetailView({ id }: Props) {
   const searchParams = useSearchParams();
@@ -44,16 +70,37 @@ export default function OrderDetailView({ id }: Props) {
   const [busy, setBusy] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correctionStatus, setCorrectionStatus] = useState<OrderStatus | null>(null);
+  const [correctionReason, setCorrectionReason] = useState("");
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidPaymentId, setVoidPaymentId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [editPaymentOpen, setEditPaymentOpen] = useState(false);
+  const [editPaymentId, setEditPaymentId] = useState<string | null>(null);
   const [paymentType, setPaymentType] = useState<OrderPaymentType>("DEPOSIT");
   const [paymentMethod, setPaymentMethod] = useState<OrderPaymentMethod>("BANK_TRANSFER");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(toDateTimeLocalValue());
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
+  const [paymentEditReason, setPaymentEditReason] = useState("");
+  const [productionFields, setProductionFields] = useState({
+    productionOwnerName: "",
+    productionDueDate: "",
+    productionNote: "",
+  });
+  const [deliveryFields, setDeliveryFields] = useState({
+    deliveryMethod: "",
+    deliveryCarrier: "",
+    deliveryTrackingCode: "",
+    deliveryRecipientName: "",
+    deliveryRecipientPhone: "",
+    deliveryAddress: "",
+    deliveryExpectedAt: "",
+    deliveryNote: "",
+  });
 
   async function load() {
     setLoading(true);
@@ -63,23 +110,35 @@ export default function OrderDetailView({ id }: Props) {
       setError(data.message ?? "Không tìm thấy đơn hàng");
       setOrder(null);
     } else {
-      setOrder(data.order ?? null);
+      const next = data.order ?? null;
+      setOrder(next);
+      if (next) {
+        setProductionFields(syncProductionFields(next));
+        setDeliveryFields(syncDeliveryFields(next));
+      }
     }
     setLoading(false);
   }
 
   useEffect(() => { void load(); }, [id]);
 
-  async function updateStatus(status: OrderStatus, reason?: string) {
+  async function updateStatus(
+    status: OrderStatus,
+    options?: { cancelReason?: string; correctionReason?: string },
+  ) {
     setBusy(true);
-    const data = await mutate({
+    await mutate({
       loadingMessage: "Đang cập nhật trạng thái…",
       successMessage: "Đã cập nhật trạng thái đơn hàng.",
       action: async () => {
         const res = await fetch(`/api/orders/${id}/status`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status, cancelReason: reason ?? null }),
+          body: JSON.stringify({
+            status,
+            cancelReason: options?.cancelReason ?? null,
+            correctionReason: options?.correctionReason ?? null,
+          }),
         });
         return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
       },
@@ -87,10 +146,12 @@ export default function OrderDetailView({ id }: Props) {
         setOrder(orderData);
         setCancelOpen(false);
         setCancelReason("");
+        setCorrectionOpen(false);
+        setCorrectionStatus(null);
+        setCorrectionReason("");
       },
     });
     setBusy(false);
-    if (!data) return;
   }
 
   async function submitPayment(e: React.FormEvent) {
@@ -120,6 +181,52 @@ export default function OrderDetailView({ id }: Props) {
         setPaymentAmount("");
         setPaymentReference("");
         setPaymentNote("");
+      },
+    });
+    setBusy(false);
+  }
+
+  function openEditPayment(paymentId: string) {
+    const payment = order?.payments.find((p) => p.id === paymentId);
+    if (!payment) return;
+    setEditPaymentId(paymentId);
+    setPaymentType(payment.type);
+    setPaymentMethod(payment.method);
+    setPaymentAmount(String(payment.amount));
+    setPaymentDate(toDateTimeLocalValue(payment.paidAt));
+    setPaymentReference(payment.referenceCode ?? "");
+    setPaymentNote(payment.note ?? "");
+    setPaymentEditReason("");
+    setEditPaymentOpen(true);
+  }
+
+  async function submitEditPayment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editPaymentId) return;
+    setBusy(true);
+    await mutate({
+      loadingMessage: "Đang cập nhật thanh toán…",
+      successMessage: "Đã cập nhật ghi nhận thanh toán.",
+      action: async () => {
+        const res = await fetch(`/api/orders/${id}/payments/${editPaymentId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: paymentType,
+            method: paymentMethod,
+            amount: Number(paymentAmount),
+            paidAt: new Date(paymentDate).toISOString(),
+            referenceCode: paymentReference || null,
+            note: paymentNote || null,
+            editReason: paymentEditReason,
+          }),
+        });
+        return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
+      },
+      onSuccess: (orderData) => {
+        setOrder(orderData);
+        setEditPaymentOpen(false);
+        setEditPaymentId(null);
       },
     });
     setBusy(false);
@@ -156,6 +263,67 @@ export default function OrderDetailView({ id }: Props) {
     setBusy(false);
   }
 
+  async function saveProduction(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã lưu thông tin sản xuất.",
+      action: async () => {
+        const res = await fetch(`/api/orders/${id}/production`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productionOwnerName: productionFields.productionOwnerName || null,
+            productionDueDate: productionFields.productionDueDate
+              ? new Date(productionFields.productionDueDate).toISOString()
+              : null,
+            productionNote: productionFields.productionNote || null,
+          }),
+        });
+        return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
+      },
+      onSuccess: (orderData) => {
+        setOrder(orderData);
+        setProductionFields(syncProductionFields(orderData));
+      },
+    });
+    setBusy(false);
+  }
+
+  async function saveDelivery(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    await mutate({
+      loadingMessage: "Đang lưu thông tin…",
+      successMessage: "Đã lưu thông tin giao hàng.",
+      action: async () => {
+        const res = await fetch(`/api/orders/${id}/delivery`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            deliveryMethod: deliveryFields.deliveryMethod || null,
+            deliveryCarrier: deliveryFields.deliveryCarrier || null,
+            deliveryTrackingCode: deliveryFields.deliveryTrackingCode || null,
+            deliveryRecipientName: deliveryFields.deliveryRecipientName || null,
+            deliveryRecipientPhone: deliveryFields.deliveryRecipientPhone || null,
+            deliveryAddress: deliveryFields.deliveryAddress || null,
+            deliveryExpectedAt: deliveryFields.deliveryExpectedAt
+              ? new Date(deliveryFields.deliveryExpectedAt).toISOString()
+              : null,
+            deliveryNote: deliveryFields.deliveryNote || null,
+          }),
+        });
+        return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
+      },
+      onSuccess: (orderData) => {
+        setOrder(orderData);
+        setDeliveryFields(syncDeliveryFields(orderData));
+      },
+    });
+    setBusy(false);
+  }
+
   if (loading) return <p className="admin-loading">Đang tải...</p>;
   if (error || !order) {
     return (
@@ -167,7 +335,10 @@ export default function OrderDetailView({ id }: Props) {
   }
 
   const transitions = getAllowedOrderStatusTransitions(order.status);
+  const correctionTargets = getOrderStatusCorrectionTargets(order.status);
   const canRecordPayment = order.status !== "COMPLETED" && order.status !== "CANCELLED";
+  const canEditOrder = isOrderEditable(order.status);
+  const showDeliveryForm = order.status !== "SHIPPED" && order.status !== "COMPLETED" && order.status !== "CANCELLED";
 
   return (
     <div className="admin-panel">
@@ -189,6 +360,20 @@ export default function OrderDetailView({ id }: Props) {
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {canEditOrder && (
+            <Link href={`/admin/orders/${id}/edit`} className="admin-btn admin-btn--secondary">
+              Chỉnh sửa đơn hàng
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
+        <legend>Cập nhật trạng thái</legend>
+        <p className="admin-field-hint" style={{ marginBottom: 12 }}>
+          Trạng thái hiện tại: <strong>{ORDER_STATUS_LABELS[order.status]}</strong>
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {transitions.filter((s) => s !== "CANCELLED").map((status) => {
             const label = orderStatusActionLabel(status);
             if (!label) return null;
@@ -198,7 +383,6 @@ export default function OrderDetailView({ id }: Props) {
                 type="button"
                 className="admin-btn admin-btn--primary"
                 disabled={busy}
-                aria-busy={busy}
                 onClick={() => void updateStatus(status)}
               >
                 {label}
@@ -210,8 +394,23 @@ export default function OrderDetailView({ id }: Props) {
               Hủy đơn
             </button>
           )}
+          {correctionTargets.map((status) => (
+            <button
+              key={`correction-${status}`}
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--small"
+              disabled={busy}
+              onClick={() => {
+                setCorrectionStatus(status);
+                setCorrectionReason("");
+                setCorrectionOpen(true);
+              }}
+            >
+              {orderStatusCorrectionLabel(status)}
+            </button>
+          ))}
         </div>
-      </div>
+      </fieldset>
 
       <div className="admin-catalog-kpi-bar">
         <div className="admin-catalog-kpi">
@@ -237,6 +436,113 @@ export default function OrderDetailView({ id }: Props) {
           </div>
         )}
       </div>
+
+      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
+        <legend>TIẾN ĐỘ SẢN XUẤT</legend>
+        <div className="admin-field-hint" style={{ marginBottom: 12 }}>
+          <p>Trạng thái đơn hàng: <strong>{ORDER_STATUS_LABELS[order.status]}</strong></p>
+          {order.productionStartedAt && <p>Ngày bắt đầu sản xuất: {formatOrderDateTime(order.productionStartedAt)}</p>}
+          {order.readyToShipAt && <p>Ngày sẵn sàng giao: {formatOrderDateTime(order.readyToShipAt)}</p>}
+        </div>
+        {canEditOrder ? (
+          <form onSubmit={(e) => void saveProduction(e)}>
+            <div className="admin-catalog-variant-fields">
+              <div className="admin-field">
+                <label className="admin-label">Người phụ trách sản xuất</label>
+                <input
+                  className="admin-input"
+                  value={productionFields.productionOwnerName}
+                  onChange={(e) => setProductionFields((f) => ({ ...f, productionOwnerName: e.target.value }))}
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Hạn hoàn thành dự kiến</label>
+                <input
+                  className="admin-input"
+                  type="date"
+                  value={productionFields.productionDueDate}
+                  onChange={(e) => setProductionFields((f) => ({ ...f, productionDueDate: e.target.value }))}
+                />
+              </div>
+              <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
+                <label className="admin-label">Ghi chú sản xuất</label>
+                <textarea
+                  className="admin-textarea"
+                  rows={3}
+                  value={productionFields.productionNote}
+                  onChange={(e) => setProductionFields((f) => ({ ...f, productionNote: e.target.value }))}
+                />
+              </div>
+            </div>
+            <button type="submit" className="admin-btn admin-btn--primary admin-btn--small" disabled={busy}>
+              Lưu thông tin sản xuất
+            </button>
+          </form>
+        ) : (
+          <>
+            <p className="admin-field-hint">Phụ trách: {order.productionOwnerName ?? "—"}</p>
+            <p className="admin-field-hint">Hạn hoàn thành: {order.productionDueDate ? formatOrderDate(order.productionDueDate) : "—"}</p>
+            {order.productionNote && <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.productionNote}</pre>}
+          </>
+        )}
+      </fieldset>
+
+      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
+        <legend>GIAO HÀNG</legend>
+        {showDeliveryForm && canEditOrder ? (
+          <form onSubmit={(e) => void saveDelivery(e)}>
+            <div className="admin-catalog-variant-fields">
+              <div className="admin-field">
+                <label className="admin-label">Hình thức giao hàng</label>
+                <input className="admin-input" value={deliveryFields.deliveryMethod} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryMethod: e.target.value }))} />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Đơn vị vận chuyển</label>
+                <input className="admin-input" value={deliveryFields.deliveryCarrier} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryCarrier: e.target.value }))} />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Mã vận đơn</label>
+                <input className="admin-input" value={deliveryFields.deliveryTrackingCode} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryTrackingCode: e.target.value }))} />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Người nhận *</label>
+                <input className="admin-input" required value={deliveryFields.deliveryRecipientName} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryRecipientName: e.target.value }))} />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Số điện thoại người nhận *</label>
+                <input className="admin-input" required value={deliveryFields.deliveryRecipientPhone} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryRecipientPhone: e.target.value }))} />
+              </div>
+              <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
+                <label className="admin-label">Địa chỉ giao hàng *</label>
+                <textarea className="admin-textarea" rows={2} required value={deliveryFields.deliveryAddress} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryAddress: e.target.value }))} />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Dự kiến giao</label>
+                <input className="admin-input" type="date" value={deliveryFields.deliveryExpectedAt} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryExpectedAt: e.target.value }))} />
+              </div>
+              <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
+                <label className="admin-label">Ghi chú giao hàng</label>
+                <textarea className="admin-textarea" rows={2} value={deliveryFields.deliveryNote} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryNote: e.target.value }))} />
+              </div>
+            </div>
+            <button type="submit" className="admin-btn admin-btn--primary admin-btn--small" disabled={busy}>
+              Lưu thông tin giao hàng
+            </button>
+          </form>
+        ) : (
+          <>
+            <p className="admin-field-hint">Hình thức: {order.deliveryMethod ?? "—"}</p>
+            <p className="admin-field-hint">Đơn vị vận chuyển: {order.deliveryCarrier ?? "—"}</p>
+            <p className="admin-field-hint">Mã vận đơn: {order.deliveryTrackingCode ?? "—"}</p>
+            <p className="admin-field-hint">Người nhận: {order.deliveryRecipientName ?? "—"}</p>
+            <p className="admin-field-hint">SĐT: {order.deliveryRecipientPhone ?? "—"}</p>
+            <p className="admin-field-hint">Địa chỉ: {order.deliveryAddress ?? "—"}</p>
+            <p className="admin-field-hint">Dự kiến giao: {order.deliveryExpectedAt ? formatOrderDate(order.deliveryExpectedAt) : "—"}</p>
+            <p className="admin-field-hint">Ngày bàn giao vận chuyển: {order.shippedAt ? formatOrderDateTime(order.shippedAt) : "—"}</p>
+            {order.deliveryNote && <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.deliveryNote}</pre>}
+          </>
+        )}
+      </fieldset>
 
       <div className="quote-form__party-grid" style={{ marginTop: 16 }}>
         <fieldset className="quote-form__party-col admin-catalog-fieldset">
@@ -267,7 +573,7 @@ export default function OrderDetailView({ id }: Props) {
 
       {order.terms && (
         <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-          <legend>Điều khoản báo giá</legend>
+          <legend>Điều khoản đơn hàng</legend>
           <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.terms}</pre>
         </fieldset>
       )}
@@ -343,9 +649,14 @@ export default function OrderDetailView({ id }: Props) {
                   <td>{ORDER_PAYMENT_STATUS_LABELS[p.status]}</td>
                   <td>
                     {p.status === "CONFIRMED" && canRecordPayment ? (
-                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" disabled={busy} aria-busy={busy} onClick={() => openVoidPayment(p.id)}>
-                        Hủy ghi nhận
-                      </button>
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" disabled={busy} onClick={() => openEditPayment(p.id)}>
+                          Chỉnh sửa
+                        </button>
+                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" disabled={busy} onClick={() => openVoidPayment(p.id)}>
+                          Hủy ghi nhận
+                        </button>
+                      </div>
                     ) : p.status === "VOID" ? (
                       <span className="admin-field-hint">Đã hủy</span>
                     ) : null}
@@ -381,7 +692,7 @@ export default function OrderDetailView({ id }: Props) {
             className="quote-quick-contact-modal__panel"
             onSubmit={(e) => {
               e.preventDefault();
-              void updateStatus("CANCELLED", cancelReason);
+              void updateStatus("CANCELLED", { cancelReason });
             }}
           >
             <h3 className="quote-quick-contact-modal__title">Hủy đơn hàng</h3>
@@ -397,16 +708,36 @@ export default function OrderDetailView({ id }: Props) {
         </div>
       )}
 
-      {voidOpen && (
+      {correctionOpen && correctionStatus && (
         <div className="quote-quick-contact-modal">
-          <div className="quote-quick-contact-modal__backdrop" onClick={() => setVoidOpen(false)} />
+          <div className="quote-quick-contact-modal__backdrop" onClick={() => setCorrectionOpen(false)} />
           <form
             className="quote-quick-contact-modal__panel"
             onSubmit={(e) => {
               e.preventDefault();
-              void submitVoidPayment(e);
+              void updateStatus(correctionStatus, { correctionReason });
             }}
           >
+            <h3 className="quote-quick-contact-modal__title">Điều chỉnh trạng thái</h3>
+            <p className="admin-field-hint">
+              Chuyển từ {ORDER_STATUS_LABELS[order.status]} sang {ORDER_STATUS_LABELS[correctionStatus]}
+            </p>
+            <div className="admin-field">
+              <label className="admin-label">Lý do điều chỉnh</label>
+              <textarea className="admin-textarea" rows={3} required value={correctionReason} onChange={(e) => setCorrectionReason(e.target.value)} />
+            </div>
+            <div className="quote-quick-contact-modal__actions">
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setCorrectionOpen(false)}>Đóng</button>
+              <button type="submit" className="admin-btn admin-btn--primary" disabled={busy}>Xác nhận</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {voidOpen && (
+        <div className="quote-quick-contact-modal">
+          <div className="quote-quick-contact-modal__backdrop" onClick={() => setVoidOpen(false)} />
+          <form className="quote-quick-contact-modal__panel" onSubmit={(e) => void submitVoidPayment(e)}>
             <h3 className="quote-quick-contact-modal__title">Hủy ghi nhận thanh toán</h3>
             <div className="admin-field">
               <label className="admin-label">Lý do hủy ghi nhận (tuỳ chọn)</label>
@@ -414,7 +745,7 @@ export default function OrderDetailView({ id }: Props) {
             </div>
             <div className="quote-quick-contact-modal__actions">
               <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setVoidOpen(false)}>Đóng</button>
-              <button type="submit" className="admin-btn admin-btn--primary" disabled={busy} aria-busy={busy}>Xác nhận hủy</button>
+              <button type="submit" className="admin-btn admin-btn--primary" disabled={busy}>Xác nhận hủy</button>
             </div>
           </form>
         </div>
@@ -460,6 +791,55 @@ export default function OrderDetailView({ id }: Props) {
             <div className="quote-quick-contact-modal__actions">
               <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setPaymentOpen(false)}>Đóng</button>
               <button type="submit" className="admin-btn admin-btn--primary" disabled={busy}>Ghi nhận</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editPaymentOpen && (
+        <div className="quote-quick-contact-modal">
+          <div className="quote-quick-contact-modal__backdrop" onClick={() => setEditPaymentOpen(false)} />
+          <form className="quote-quick-contact-modal__panel" onSubmit={(e) => void submitEditPayment(e)}>
+            <h3 className="quote-quick-contact-modal__title">Chỉnh sửa ghi nhận thanh toán</h3>
+            <div className="admin-field">
+              <label className="admin-label">Loại thanh toán</label>
+              <select className="admin-input" value={paymentType} onChange={(e) => setPaymentType(e.target.value as OrderPaymentType)}>
+                {(Object.keys(ORDER_PAYMENT_TYPE_LABELS) as OrderPaymentType[]).map((t) => (
+                  <option key={t} value={t}>{ORDER_PAYMENT_TYPE_LABELS[t]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Phương thức</label>
+              <select className="admin-input" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as OrderPaymentMethod)}>
+                {(Object.keys(ORDER_PAYMENT_METHOD_LABELS) as OrderPaymentMethod[]).map((m) => (
+                  <option key={m} value={m}>{ORDER_PAYMENT_METHOD_LABELS[m]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Số tiền</label>
+              <input className="admin-input" type="number" min="1" required value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Ngày thanh toán</label>
+              <input className="admin-input" type="datetime-local" required value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Mã tham chiếu</label>
+              <input className="admin-input" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Ghi chú</label>
+              <textarea className="admin-textarea" rows={2} value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Lý do chỉnh sửa</label>
+              <textarea className="admin-textarea" rows={2} required value={paymentEditReason} onChange={(e) => setPaymentEditReason(e.target.value)} />
+            </div>
+            <div className="quote-quick-contact-modal__actions">
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setEditPaymentOpen(false)}>Đóng</button>
+              <button type="submit" className="admin-btn admin-btn--primary" disabled={busy}>Lưu</button>
             </div>
           </form>
         </div>
