@@ -137,7 +137,10 @@ export default function OrderForm({ mode, orderId }: Props) {
     setContacts(data.contacts ?? []);
   }
 
-  function applyCustomer(customer: CrmCustomerRecord) {
+  function applyCustomer(
+    customer: CrmCustomerRecord,
+    options?: { contacts?: CrmContactRecord[] },
+  ) {
     const snapshots = customerToQuoteSnapshots(customer);
     setSelectedCustomer(customer);
     setCustomerId(customer.id);
@@ -150,13 +153,18 @@ export default function OrderForm({ mode, orderId }: Props) {
     setCustomerPhone(snapshots.customerPhoneSnapshot ?? "");
     setCustomerEmail(snapshots.customerEmailSnapshot ?? "");
     setContactId("");
-    void loadCustomerContacts(customer.id);
+    if (options?.contacts) {
+      setContacts(options.contacts);
+    } else {
+      void loadCustomerContacts(customer.id);
+    }
   }
 
-  function applyContact(contact: CrmContactRecord) {
+  function applyContact(contact: CrmContactRecord, customerOverride?: CrmCustomerRecord) {
+    const customer = customerOverride ?? selectedCustomer;
     const snapshots = contactToQuoteSnapshots(contact, {
-      phone: selectedCustomer?.phone,
-      email: selectedCustomer?.email,
+      phone: customer?.phone,
+      email: customer?.email,
     });
     setContactId(contact.id);
     setCustomerContactName(snapshots.customerContactNameSnapshot ?? "");
@@ -592,10 +600,10 @@ export default function OrderForm({ mode, orderId }: Props) {
         open={quickAddCustomerOpen}
         onClose={() => setQuickAddCustomerOpen(false)}
         onCreated={(customer, contact) => {
-          applyCustomer(customer);
+          applyCustomer(customer, { contacts: customer.contacts ?? [] });
           if (contact) {
             skipContactAutofill.current = true;
-            applyContact(contact);
+            applyContact(contact, customer);
           }
           setQuickAddCustomerOpen(false);
         }}

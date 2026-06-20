@@ -133,6 +133,9 @@ export async function createCustomer(input: CreateCustomerInput): Promise<CrmCus
     return getCustomerById(customer.id);
   } catch (err) {
     console.error("[CRM] createCustomer failed:", err);
+    if (err instanceof Error && err.message) {
+      throw err;
+    }
     return null;
   }
 }

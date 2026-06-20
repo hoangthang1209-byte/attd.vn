@@ -25,6 +25,7 @@ export type RunAdminMutationOptions<T> = {
   errorFallback?: string;
   action: () => Promise<MutationResult<T>>;
   onSuccess?: (data: T) => void | Promise<void>;
+  onError?: (message: string) => void;
 };
 
 /** Shared helper for admin mutations — loading overlay + toast feedback. */
@@ -39,7 +40,10 @@ export async function runAdminMutation<T>(
     ctx.loading.hide();
 
     if (!result.ok) {
-      ctx.toast.error(result.message ?? options.errorFallback ?? ADMIN_TOAST_ERROR_FALLBACK);
+      const message =
+        result.message ?? options.errorFallback ?? ADMIN_TOAST_ERROR_FALLBACK;
+      ctx.toast.error(message);
+      options.onError?.(message);
       return null;
     }
 
@@ -49,9 +53,14 @@ export async function runAdminMutation<T>(
 
     await options.onSuccess?.(result.data);
     return result.data;
-  } catch {
+  } catch (err) {
     ctx.loading.hide();
-    ctx.toast.error(options.errorFallback ?? ADMIN_TOAST_ERROR_FALLBACK);
+    const message = options.errorFallback ?? ADMIN_TOAST_ERROR_FALLBACK;
+    ctx.toast.error(message);
+    options.onError?.(message);
+    if (process.env.NODE_ENV === "development") {
+      console.error("[runAdminMutation]", err);
+    }
     return null;
   }
 }
@@ -61,7 +70,16 @@ export async function parseAdminJsonResponse<T>(
   res: Response,
   pickData: (body: Record<string, unknown>) => T,
 ): Promise<MutationResult<T>> {
-  const body = (await res.json()) as Record<string, unknown>;
+  let body: Record<string, unknown> = {};
+  try {
+    body = (await res.json()) as Record<string, unknown>;
+  } catch {
+    if (!res.ok) {
+      return { ok: false, message: undefined };
+    }
+    return { ok: false, message: "Phản hồi không hợp lệ từ máy chủ." };
+  }
+
   if (!res.ok) {
     const message =
       (typeof body.message === "string" && body.message) ||
