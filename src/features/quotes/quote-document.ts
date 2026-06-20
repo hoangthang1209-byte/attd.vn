@@ -1,6 +1,7 @@
 import type { Prisma, QuotePriceVatType, QuoteStatus } from "@prisma/client";
 import type { QuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
 import type { PublicQuoteDocument, PublicQuoteItem } from "@/features/quotes/types";
+import { DEFAULT_QUOTE_TERMS } from "@/features/quotes/quote-code";
 import { getQuoteDesignImageUrl } from "@/features/quotes/quote-format";
 
 function decimalToNum(value: Prisma.Decimal | null | undefined): number | null {
@@ -38,6 +39,9 @@ type QuoteRow = {
   manualTotalAmount: Prisma.Decimal | null;
   customerNote: string | null;
   terms: string | null;
+  sampleFee: Prisma.Decimal | null;
+  sampleLeadTime: string | null;
+  sampleRefundCondition: string | null;
   customer?: {
     code?: string;
     name: string;
@@ -156,7 +160,10 @@ export function formatPublicQuoteDocument(row: QuoteRow): PublicQuoteDocument {
     manualOverride: row.manualOverride,
     manualTotalAmount: decimalToNum(row.manualTotalAmount),
     customerNote: row.customerNote,
-    terms: row.terms,
+    terms: row.terms?.trim() || DEFAULT_QUOTE_TERMS,
+    sampleFee: decimalToNum(row.sampleFee),
+    sampleLeadTime: row.sampleLeadTime,
+    sampleRefundCondition: row.sampleRefundCondition,
     items,
     showProductionLeadTime,
     showSampleFee,

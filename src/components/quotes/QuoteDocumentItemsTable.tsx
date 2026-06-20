@@ -11,28 +11,22 @@ type Props = {
   mediaBaseUrl?: string;
 };
 
-const OPTIONAL_COL_WIDTH = 4;
+const PRODUCTION_COL_WIDTH = 4;
 
-/** Base column widths (%); optional columns borrow from Mô tả. */
-function buildTableColWidths(quote: PublicQuoteDocument): number[] {
-  let descWidth = 20;
-  const widths = [3, 6, 4, 5, 5, 12, 6, descWidth, 4, 5, 5, 4, 6, 7, 8];
+/** Base column widths (%); production column borrows proportionally from existing columns. */
+function buildTableColWidths(): number[] {
+  const base = [3, 6, 4, 5, 5, 12, 6, 20, 4, 5, 5, 4, 6, 7, 8];
+  const scale = (100 - PRODUCTION_COL_WIDTH) / 100;
+  return [...base.map((w) => Math.round(w * scale * 10) / 10), PRODUCTION_COL_WIDTH];
+}
 
-  if (quote.showProductionLeadTime) {
-    descWidth -= OPTIONAL_COL_WIDTH;
-    widths.push(OPTIONAL_COL_WIDTH);
+function formatProductionLeadTime(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  if (!trimmed) return "—";
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    return `${trimmed} ngày`;
   }
-  if (quote.showSampleFee) {
-    descWidth -= OPTIONAL_COL_WIDTH;
-    widths.push(OPTIONAL_COL_WIDTH);
-  }
-  if (quote.showSampleLeadTime) {
-    descWidth -= OPTIONAL_COL_WIDTH;
-    widths.push(OPTIONAL_COL_WIDTH);
-  }
-
-  widths[7] = Math.max(descWidth, 12);
-  return widths;
+  return trimmed;
 }
 
 export default function QuoteDocumentItemsTable({
@@ -41,7 +35,7 @@ export default function QuoteDocumentItemsTable({
   mediaBaseUrl,
 }: Props) {
   const priceTypeLabel = quotePriceVatTypeLabel(quote.priceVatType);
-  const colWidths = buildTableColWidths(quote);
+  const colWidths = buildTableColWidths();
 
   return (
     <div className="quote-doc__table-wrap">
@@ -68,9 +62,10 @@ export default function QuoteDocumentItemsTable({
             <th>Loại giá</th>
             <th>Đơn giá</th>
             <th>Tổng</th>
-            {quote.showProductionLeadTime && <th>Thời gian sản xuất</th>}
-            {quote.showSampleFee && <th>Phí làm mẫu</th>}
-            {quote.showSampleLeadTime && <th>Thời gian làm mẫu</th>}
+            <th className="quote-doc__cell-center quote-doc__th-production">
+              <span className="quote-doc__th-production-line">Thời gian</span>
+              <span className="quote-doc__th-production-line">sản xuất</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -115,19 +110,9 @@ export default function QuoteDocumentItemsTable({
                 <td className="quote-doc__cell-money">
                   {formatQuoteMoney(item.lineTotal, quote.currency)}
                 </td>
-                {quote.showProductionLeadTime && (
-                  <td>{item.productionLeadTime || "—"}</td>
-                )}
-                {quote.showSampleFee && (
-                  <td>
-                    {item.sampleFee != null
-                      ? formatQuoteMoney(item.sampleFee, quote.currency)
-                      : "—"}
-                  </td>
-                )}
-                {quote.showSampleLeadTime && (
-                  <td>{item.sampleLeadTime || "—"}</td>
-                )}
+                <td className="quote-doc__cell-center quote-doc__cell-production">
+                  {formatProductionLeadTime(item.productionLeadTime)}
+                </td>
               </tr>
             );
           })}

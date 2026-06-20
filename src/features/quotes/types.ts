@@ -67,6 +67,9 @@ export type CreateQuoteInput = {
   customerNote?: string | null;
   internalNote?: string | null;
   terms?: string | null;
+  sampleFee?: number | null;
+  sampleLeadTime?: string | null;
+  sampleRefundCondition?: string | null;
   items: QuoteItemInput[];
 };
 
@@ -165,6 +168,9 @@ export type PublicQuoteDocument = {
   manualTotalAmount: number | null;
   customerNote: string | null;
   terms: string | null;
+  sampleFee: number | null;
+  sampleLeadTime: string | null;
+  sampleRefundCondition: string | null;
   items: PublicQuoteItem[];
   showProductionLeadTime: boolean;
   showSampleFee: boolean;

@@ -76,6 +76,10 @@ export function parseCreateQuoteBody(raw: Record<string, unknown>): CreateQuoteI
     customerNote: typeof raw.customerNote === "string" ? raw.customerNote : null,
     internalNote: typeof raw.internalNote === "string" ? raw.internalNote : null,
     terms: typeof raw.terms === "string" ? raw.terms : null,
+    sampleFee: parseMoneyInput(raw.sampleFee),
+    sampleLeadTime: typeof raw.sampleLeadTime === "string" ? raw.sampleLeadTime : null,
+    sampleRefundCondition:
+      typeof raw.sampleRefundCondition === "string" ? raw.sampleRefundCondition : null,
     items: parseItems(raw.items),
   };
 }

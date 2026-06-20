@@ -72,7 +72,7 @@ export function QuotePartyColumns({ quote, className = "" }: QuotePartyColumnsPr
         <h3 className="quote-party-col__title">Nhân viên tư vấn</h3>
         <FieldList
           fields={[
-            { label: "Tên", value: quote.salesName },
+            { label: "Họ tên", value: quote.salesName },
             { label: "Chức vụ", value: quote.salesTitle },
             { label: "Số điện thoại", value: quote.salesPhone },
             { label: "Email", value: quote.salesEmail },

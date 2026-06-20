@@ -8,7 +8,7 @@ import {
   QuotePartyColumns,
 } from "@/components/quotes/QuoteDocumentSections";
 import QuoteDocumentItemsTable from "@/components/quotes/QuoteDocumentItemsTable";
-import QuoteDocumentTotals from "@/components/quotes/QuoteDocumentTotals";
+import QuoteDocumentSummaryRow from "@/components/quotes/QuoteDocumentSummaryRow";
 import QuoteDocumentNotes from "@/components/quotes/QuoteDocumentNotes";
 
 type Props = {
@@ -46,7 +46,7 @@ export default function QuoteDocumentContent({
         absoluteMedia={absoluteMedia}
         mediaBaseUrl={mediaBaseUrl}
       />
-      <QuoteDocumentTotals quote={quote} />
+      <QuoteDocumentSummaryRow quote={quote} />
       <QuoteDocumentNotes quote={quote} />
     </QuoteDocumentShell>
   );

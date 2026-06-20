@@ -255,6 +255,9 @@ export async function getQuoteDetail(id: string) {
     customerNote: row.customerNote,
     internalNote: row.internalNote,
     terms: row.terms,
+    sampleFee: decimalToNum(row.sampleFee),
+    sampleLeadTime: row.sampleLeadTime,
+    sampleRefundCondition: row.sampleRefundCondition,
     inputSnapshot: row.inputSnapshot,
     resultSnapshot: row.resultSnapshot,
     createdAt: row.createdAt.toISOString(),
@@ -366,6 +369,9 @@ export async function createQuote(input: CreateQuoteInput) {
         customerNote: input.customerNote ?? null,
         internalNote: input.internalNote ?? null,
         terms,
+        sampleFee: input.sampleFee ?? null,
+        sampleLeadTime: input.sampleLeadTime?.trim() || null,
+        sampleRefundCondition: input.sampleRefundCondition?.trim() || null,
         inputSnapshot: input as unknown as Prisma.InputJsonValue,
         resultSnapshot: { items, totals } as unknown as Prisma.InputJsonValue,
       },
@@ -505,6 +511,15 @@ export async function updateQuote(id: string, input: Partial<CreateQuoteInput>) 
         customerNote: input.customerNote !== undefined ? input.customerNote : undefined,
         internalNote: input.internalNote !== undefined ? input.internalNote : undefined,
         terms: input.terms !== undefined ? (input.terms?.trim() || DEFAULT_QUOTE_TERMS) : undefined,
+        sampleFee: input.sampleFee !== undefined ? input.sampleFee : undefined,
+        sampleLeadTime:
+          input.sampleLeadTime !== undefined
+            ? input.sampleLeadTime?.trim() || null
+            : undefined,
+        sampleRefundCondition:
+          input.sampleRefundCondition !== undefined
+            ? input.sampleRefundCondition?.trim() || null
+            : undefined,
         inputSnapshot: input as unknown as Prisma.InputJsonValue,
         resultSnapshot: { items, totals } as unknown as Prisma.InputJsonValue,
       },
@@ -603,6 +618,9 @@ export async function duplicateQuote(id: string) {
     customerNote: source.customerNote,
     internalNote: source.internalNote,
     terms: source.terms,
+    sampleFee: source.sampleFee,
+    sampleLeadTime: source.sampleLeadTime,
+    sampleRefundCondition: source.sampleRefundCondition,
     quoteDate: new Date().toISOString(),
     currency: source.currency,
     priceVatType: source.priceVatType,

@@ -1158,6 +1158,9 @@ model Quote {
   customerNote                 String?              @db.Text
   internalNote                 String?              @db.Text
   terms                        String?              @db.Text
+  sampleFee                    Decimal?             @db.Decimal(12, 2)
+  sampleLeadTime               String?
+  sampleRefundCondition        String?              @db.Text
   inputSnapshot                Json?
   resultSnapshot               Json?
   createdAt                    DateTime             @default(now())

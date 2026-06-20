@@ -73,6 +73,9 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
   const [customerNote, setCustomerNote] = useState("");
   const [internalNote, setInternalNote] = useState("");
   const [terms, setTerms] = useState(DEFAULT_QUOTE_TERMS);
+  const [sampleFee, setSampleFee] = useState("");
+  const [sampleLeadTime, setSampleLeadTime] = useState("");
+  const [sampleRefundCondition, setSampleRefundCondition] = useState("");
   const [items, setItems] = useState<QuoteItemRow[]>([emptyQuoteItem()]);
   const [status, setStatus] = useState<string>("DRAFT");
   const [quoteDate, setQuoteDate] = useState(toDateInputValue(new Date().toISOString()));
@@ -218,6 +221,9 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
           setCustomerNote(String(q.customerNote ?? ""));
           setInternalNote(String(q.internalNote ?? ""));
           setTerms(String(q.terms ?? DEFAULT_QUOTE_TERMS));
+          setSampleFee(q.sampleFee != null ? String(q.sampleFee) : "");
+          setSampleLeadTime(String(q.sampleLeadTime ?? ""));
+          setSampleRefundCondition(String(q.sampleRefundCondition ?? ""));
           setStatus(String(q.status ?? "DRAFT"));
           if (q.status === "ACCEPTED" || q.status === "REJECTED") {
             setWarning(
@@ -433,6 +439,9 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
       customerNote: customerNote || null,
       internalNote: internalNote || null,
       terms,
+      sampleFee: sampleFee.trim() ? Number(sampleFee) : null,
+      sampleLeadTime: sampleLeadTime.trim() || null,
+      sampleRefundCondition: sampleRefundCondition.trim() || null,
       status: statusOverride ?? status,
       items: items.map(({ key: _k, ...item }) => item),
     };
@@ -738,7 +747,7 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
               </select>
             </div>
             <div className="admin-field">
-              <label className="admin-label">Tên</label>
+              <label className="admin-label">Họ tên</label>
               <input
                 className="admin-input"
                 value={salesName}
@@ -884,6 +893,41 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
           </fieldset>
         </div>
       </div>
+
+      <fieldset className="quote-form__card admin-catalog-fieldset">
+        <legend>Thông tin mẫu</legend>
+        <div className="admin-seo-brief-form-grid">
+          <div className="admin-field">
+            <label className="admin-label">Phí mẫu</label>
+            <input
+              className="admin-input"
+              type="number"
+              min="0"
+              value={sampleFee}
+              onChange={(e) => setSampleFee(e.target.value)}
+              placeholder="VND"
+            />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Thời gian làm mẫu</label>
+            <input
+              className="admin-input"
+              value={sampleLeadTime}
+              onChange={(e) => setSampleLeadTime(e.target.value)}
+              placeholder="VD: 5–7 ngày"
+            />
+          </div>
+        </div>
+        <div className="admin-field">
+          <label className="admin-label">Điều kiện hoàn phí</label>
+          <textarea
+            className="admin-textarea"
+            rows={3}
+            value={sampleRefundCondition}
+            onChange={(e) => setSampleRefundCondition(e.target.value)}
+          />
+        </div>
+      </fieldset>
 
       <fieldset className="quote-form__card admin-catalog-fieldset">
         <legend>Ghi chú & điều khoản</legend>
