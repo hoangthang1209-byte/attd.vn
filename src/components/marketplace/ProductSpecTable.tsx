@@ -1,3 +1,5 @@
+import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
+
 type ProductSpecTableProps = {
   material?: string | null;
   form?: string | null;
@@ -31,7 +33,9 @@ export default function ProductSpecTable({
   if (form) rows.push({ label: "Form/kiểu dáng", value: form });
   if (fit) rows.push({ label: "Kiểu form", value: fit });
   if (gsm) rows.push({ label: "GSM", value: `${gsm} gsm` });
-  if (defaultMoq != null) rows.push({ label: "Số lượng tối thiểu", value: `${defaultMoq} cái` });
+  if (isPublicMoq(defaultMoq)) {
+    rows.push({ label: "Số lượng tối thiểu", value: formatPdpMoqValue(defaultMoq) });
+  }
   if (leadTime) rows.push({ label: "Thời gian giao/sản xuất", value: leadTime });
   if (useCases.length) rows.push({ label: "Ứng dụng B2B", value: useCases.join(" · ") });
   if (targetCustomers.length) rows.push({ label: "Đối tượng phù hợp", value: targetCustomers.join(" · ") });

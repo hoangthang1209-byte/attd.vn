@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
-import ImagePlaceholder from "@/components/public/ImagePlaceholder";
+import ProductMediaFrame from "@/components/public/ProductMediaFrame";
 import {
   getProductGalleryImages,
   type ProductImageRecord,
@@ -55,18 +55,30 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
   if (total === 0) {
     return (
       <div className="mp-pdp-gallery mp-pdp-gallery--empty">
-        <ImagePlaceholder variant="product" label={productName} />
+        <ProductMediaFrame
+          alt={productName}
+          placeholderLabel={productName}
+          sizes="(max-width: 1024px) 100vw, 44vw"
+        />
       </div>
     );
   }
 
   const selected = gallery[selectedIndex] ?? gallery[0];
   const selectedSrc = selected?.imageUrl;
+  const mainAlt =
+    total > 1
+      ? `${productName} — ảnh ${selectedIndex + 1}`
+      : productName;
 
   if (!selectedSrc || !isValidImageSrc(selectedSrc)) {
     return (
       <div className="mp-pdp-gallery mp-pdp-gallery--empty">
-        <ImagePlaceholder variant="product" label={productName} />
+        <ProductMediaFrame
+          alt={productName}
+          placeholderLabel={productName}
+          sizes="(max-width: 1024px) 100vw, 44vw"
+        />
       </div>
     );
   }
@@ -112,7 +124,7 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
           >
             <Image
               src={selectedSrc}
-              alt={selected.altText ?? productName}
+              alt={selected.altText ?? mainAlt}
               fill
               className="mp-pdp-gallery-main-img"
               sizes="(max-width: 1024px) 100vw, 44vw"
@@ -217,7 +229,7 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
           <div className="mp-pdp-lightbox-img-wrap">
             <Image
               src={selectedSrc}
-              alt={selected.altText ?? productName}
+              alt={selected.altText ?? mainAlt}
               fill
               className="mp-pdp-lightbox-img"
               sizes="100vw"

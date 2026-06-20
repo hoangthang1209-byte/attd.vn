@@ -1,6 +1,7 @@
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import ProductInquiryMiniForm from "@/components/marketplace/ProductInquiryMiniForm";
+import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
 import { getZaloUrl } from "@/lib/companyInfo";
 import { CTA } from "@/lib/ctaConfig";
 
@@ -69,10 +70,10 @@ export default function ProductInquiryPanel({
               <dd>{productCode}</dd>
             </div>
           )}
-          {defaultMoq != null && (
+          {isPublicMoq(defaultMoq) && (
             <div className="mp-pdp-inquiry-fact">
               <dt>Số lượng tối thiểu</dt>
-              <dd>{defaultMoq} cái</dd>
+              <dd>{formatPdpMoqValue(defaultMoq)}</dd>
             </div>
           )}
           {leadTime && (

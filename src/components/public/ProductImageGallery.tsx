@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import ImagePlaceholder from "@/components/public/ImagePlaceholder";
+import ProductMediaFrame from "@/components/public/ProductMediaFrame";
 import {
   getProductGalleryImages,
   type ProductImageRecord,
@@ -57,7 +57,11 @@ export default function ProductImageGallery({ images, productName }: Props) {
   if (total === 0) {
     return (
       <div className="product-gallery-main product-gallery-main--empty">
-        <ImagePlaceholder variant="product" label={productName} />
+        <ProductMediaFrame
+          alt={productName}
+          placeholderLabel={productName}
+          sizes="(max-width: 1024px) 100vw, 50vw"
+        />
       </div>
     );
   }
@@ -68,10 +72,19 @@ export default function ProductImageGallery({ images, productName }: Props) {
   if (!selectedSrc || !isValidImageSrc(selectedSrc)) {
     return (
       <div className="product-gallery-main product-gallery-main--empty">
-        <ImagePlaceholder variant="product" label={productName} />
+        <ProductMediaFrame
+          alt={productName}
+          placeholderLabel={productName}
+          sizes="(max-width: 1024px) 100vw, 50vw"
+        />
       </div>
     );
   }
+
+  const mainAlt =
+    total > 1
+      ? `${productName} — ảnh ${selectedIndex + 1}`
+      : productName;
 
   return (
     <div>
@@ -81,9 +94,9 @@ export default function ProductImageGallery({ images, productName }: Props) {
       >
         <Image
           src={selectedSrc}
-          alt={selected.altText ?? productName}
+          alt={selected.altText ?? mainAlt}
           fill
-          style={{ objectFit: "cover" }}
+          className="product-gallery-main-img"
           sizes="(max-width: 1024px) 100vw, 50vw"
           priority
         />
@@ -130,7 +143,7 @@ export default function ProductImageGallery({ images, productName }: Props) {
                   alt={image.altText ?? `${productName} — ảnh ${index + 1}`}
                   fill
                   sizes="72px"
-                  style={{ objectFit: "cover" }}
+                  className="product-gallery-thumb-img"
                 />
               </button>
             );

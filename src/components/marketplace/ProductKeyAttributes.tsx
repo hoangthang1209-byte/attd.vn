@@ -1,3 +1,5 @@
+import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
+
 type ProductKeyAttributesProps = {
   className?: string;
   compact?: boolean;
@@ -39,7 +41,9 @@ export default function ProductKeyAttributes({
   if (material) rows.push({ label: "Chất liệu", value: material });
   if (form) rows.push({ label: "Form / kiểu dáng", value: form });
   if (!compact && fit) rows.push({ label: "Kiểu form", value: fit });
-  if (defaultMoq != null) rows.push({ label: "Số lượng tối thiểu", value: `${defaultMoq} cái` });
+  if (isPublicMoq(defaultMoq)) {
+    rows.push({ label: "Số lượng tối thiểu", value: formatPdpMoqValue(defaultMoq) });
+  }
   if (leadTime) rows.push({ label: "Thời gian giao/sản xuất", value: leadTime });
   if (stockLabel) rows.push({ label: "Tình trạng hàng", value: stockLabel, color: stockColor });
   if (!compact && colorSummary) rows.push({ label: "Màu sắc", value: colorSummary });

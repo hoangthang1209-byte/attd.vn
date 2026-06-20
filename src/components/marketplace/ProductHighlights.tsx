@@ -1,3 +1,5 @@
+import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
+
 type ProductHighlightsProps = {
   shortDescription?: string | null;
   description?: string | null;
@@ -24,8 +26,8 @@ function buildBullets(props: ProductHighlightsProps): string[] {
 
   if (props.material) bullets.push(`Chất liệu: ${props.material}`);
   if (props.form) bullets.push(`Form / kiểu dáng: ${props.form}`);
-  if (props.defaultMoq != null) {
-    bullets.push(`Số lượng tối thiểu từ ${props.defaultMoq} cái`);
+  if (isPublicMoq(props.defaultMoq)) {
+    bullets.push(formatPdpMoqText(props.defaultMoq));
   }
   if (props.leadTime) bullets.push(`Thời gian giao/sản xuất: ${props.leadTime}`);
 

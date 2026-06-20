@@ -24,6 +24,10 @@ import {
   getProductGalleryImages,
 } from "@/lib/productImages";
 import { getCatalogProduct } from "@/lib/productCatalog";
+import {
+  formatPdpMoqText,
+  isPublicMoq,
+} from "@/lib/formatMoq";
 import { isValidImageSrc } from "@/lib/imagePaths";
 
 type PageProps = {
@@ -167,8 +171,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
     },
     {
       question: "Số lượng tối thiểu là bao nhiêu?",
-      answer: product.defaultMoq
-        ? `Số lượng tối thiểu là ${product.defaultMoq} cái. Liên hệ để nhận báo giá theo số lượng đặt hàng.`
+      answer: isPublicMoq(product.defaultMoq)
+        ? `${formatPdpMoqText(product.defaultMoq)}. Liên hệ để nhận báo giá theo số lượng đặt hàng.`
         : "Liên hệ ATTD để được tư vấn số lượng tối thiểu theo từng dòng sản phẩm.",
     },
     {

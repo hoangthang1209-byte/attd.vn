@@ -1,8 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight } from "lucide-react";
-import ImagePlaceholder from "@/components/public/ImagePlaceholder";
-import { isValidImageSrc } from "@/lib/imagePaths";
+import ProductMediaFrame from "@/components/public/ProductMediaFrame";
+import { formatProductCardMoq, isPublicMoq } from "@/lib/formatMoq";
 
 type ProductCardProps = {
   id: string;
@@ -41,8 +40,9 @@ export default function ProductCard({
   stockLabel,
   compact = false,
 }: ProductCardProps) {
-  const hasImage = imageUrl && isValidImageSrc(imageUrl);
   const stockColor = stockStatus ? (STOCK_COLORS[stockStatus] ?? "#6b7280") : undefined;
+  const moqLabel = isPublicMoq(moq) ? formatProductCardMoq(moq) : null;
+  const showB2bMeta = moqLabel || leadTime;
 
   return (
     <Link
@@ -50,17 +50,13 @@ export default function ProductCard({
       className={`product-card${compact ? " product-card--compact" : ""}`}
     >
       <div className="product-card-media">
-        {hasImage ? (
-          <Image
-            src={imageUrl}
-            alt={name}
-            fill
-            className="product-card-img"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
-          />
-        ) : (
-          <ImagePlaceholder variant="product" label={productCode ?? undefined} />
-        )}
+        <ProductMediaFrame
+          imageUrl={imageUrl}
+          alt={name}
+          placeholderLabel={productCode ?? undefined}
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
+          placeholderCompact={compact}
+        />
 
         {stockLabel && stockStatus !== "IN_STOCK" && (
           <span className="product-card-stock-badge" style={{ background: stockColor }}>
@@ -73,14 +69,14 @@ export default function ProductCard({
         {category && <p className="product-card-category">{category}</p>}
         <h3 className="product-card-title">{name}</h3>
 
-        <div className="product-card-b2b">
-          {moq != null && (
-            <span className="product-card-meta">Tối thiểu {moq} cái</span>
-          )}
-          {leadTime && (
-            <span className="product-card-meta product-card-leadtime">{leadTime}</span>
-          )}
-        </div>
+        {showB2bMeta && (
+          <div className="product-card-b2b">
+            {moqLabel && <span className="product-card-meta">{moqLabel}</span>}
+            {leadTime && (
+              <span className="product-card-meta product-card-leadtime">{leadTime}</span>
+            )}
+          </div>
+        )}
 
         <div className="product-card-footer">
           <span className="product-card-price">Liên hệ báo giá sỉ</span>
