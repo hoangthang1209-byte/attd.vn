@@ -7,6 +7,8 @@ import { isValidImageSrc } from "@/lib/imagePaths";
 type CategoryCardProps = {
   name: string;
   slug: string;
+  /** Override link target — defaults to /{slug} collection page */
+  href?: string;
   icon?: LucideIcon;
   imageUrl?: string | null;
   count?: number;
@@ -30,6 +32,7 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
 export default function CategoryCard({
   name,
   slug,
+  href,
   icon: Icon = Package,
   imageUrl,
   count,
@@ -40,12 +43,14 @@ export default function CategoryCard({
   const hasImage = imageUrl && isValidImageSrc(imageUrl);
   const gradient = CATEGORY_GRADIENTS[slug] ?? "linear-gradient(135deg, #374151 0%, #111827 100%)";
 
+  const cardHref = href ?? `/${slug}`;
+
   if (variant === "grid" || variant === "marketplace") {
     const countLabel =
       count != null && count > 0 ? `${count}+ lựa chọn` : undefined;
 
     return (
-      <Link href={`/${slug}`} className="market-cat-card market-cat-card--marketplace">
+      <Link href={cardHref} className="market-cat-card market-cat-card--marketplace">
         <div className="market-cat-card-img">
           {hasImage ? (
             <Image

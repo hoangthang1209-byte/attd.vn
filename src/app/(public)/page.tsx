@@ -1,25 +1,18 @@
 import Link from "next/link";
 import Image from "next/image";
-import { getCategoriesWithCounts } from "@/features/categories/services/category.service";
-import { getProductsForPublicListing } from "@/features/products/services/product.service";
-import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
+import { getHomepageData } from "@/features/home/homepage.service";
 import { categoryDemoImages } from "@/features/demo/demo-image-map";
 import MarketplaceHero from "@/components/marketplace/MarketplaceHero";
 import type { MarketplaceHeroTile } from "@/components/marketplace/MarketplaceHero";
 import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
 import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
 import MarketplaceFinalCta from "@/components/marketplace/MarketplaceFinalCta";
-import CategoryCard from "@/components/public/CategoryCard";
-import ProductCard from "@/components/public/ProductCard";
-import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
+import HomeCategoryGridSection from "@/components/home/HomeCategoryGridSection";
+import HomeProductDiscoverySection from "@/components/home/HomeProductDiscoverySection";
+import HomeBlogTeaserSection from "@/components/home/HomeBlogTeaserSection";
 import { isValidImageSrc } from "@/lib/imagePaths";
 
 export const revalidate = 3600;
-
-const STATIC_CATEGORIES = [
-  { slug: "bandana", name: "Khăn bandana" },
-  { slug: "gift-set-doanh-nghiep", name: "Gift set doanh nghiệp" },
-];
 
 const B2B_AUDIENCES = [
   {
@@ -65,127 +58,31 @@ const SOURCING_STEPS = [
   "Giao hàng / sản xuất",
 ];
 
-const HERO_MOSAIC_CONFIG: MarketplaceHeroTile[] = [
-  { slug: "ao-thun-tron", label: "Áo thun trơn", variant: "featured", href: "/ao-thun-tron" },
-  { slug: "ao-polo-tron", label: "Polo", variant: "sm", href: "/ao-polo-tron" },
-  { slug: "tote", label: "Tote", variant: "sm", href: "/tote" },
-  { slug: "non", label: "Nón", variant: "sm", href: "/non" },
-  { slug: "binh-giu-nhiet", label: "Bình giữ nhiệt", variant: "sm", href: "/binh-giu-nhiet" },
-];
+function buildHeroTiles(
+  heroProductImages: Awaited<ReturnType<typeof getHomepageData>>["heroProductImages"],
+): MarketplaceHeroTile[] {
+  return heroProductImages.map((item, index) => ({
+    slug: item.slug,
+    label: item.label,
+    imageUrl: item.imageUrl,
+    href: item.href,
+    variant: index === 0 ? "featured" : "sm",
+  }));
+}
 
 export default async function HomePage() {
-  const [{ products: featuredProducts }, categories, { posts: blogPosts }] =
-    await Promise.all([
-      getProductsForPublicListing({ page: 1, perPage: 12 }),
-      getCategoriesWithCounts(),
-      getPublishedBlogPosts(1, 4),
-    ]);
+  const { categories, latestProducts, heroProductImages, blogPosts } =
+    await getHomepageData();
 
-  const productImageByCategory = new Map<string, string>();
-  for (const p of featuredProducts) {
-    if (!productImageByCategory.has(p.category.slug)) {
-      const img = getPrimaryProductImageFromProduct(p);
-      if (img) productImageByCategory.set(p.category.slug, img);
-    }
-  }
-
-  const heroTiles = HERO_MOSAIC_CONFIG.map((tile) => ({
-    ...tile,
-    imageUrl:
-      productImageByCategory.get(tile.slug) ??
-      categoryDemoImages[tile.slug] ??
-      null,
-  }));
-
-  const categorySlugs = new Set(categories.map((c) => c.slug));
-  const extraCategories = STATIC_CATEGORIES.filter((c) => !categorySlugs.has(c.slug));
-
-  const STOCK_LABELS: Record<string, string> = {
-    IN_STOCK: "Còn hàng",
-    LOW_STOCK: "Sắp hết",
-    OUT_OF_STOCK: "Hết hàng",
-  };
+  const heroTiles = buildHeroTiles(heroProductImages);
 
   return (
     <main className="mp-home mp-home--v251">
       <MarketplaceHero tiles={heroTiles} />
 
-      <section className="mp-section mp-section--alt mp-section--tight">
-        <div className="container">
-          <MarketplaceSectionHeader title="Tìm nguồn hàng theo danh mục" />
-          <div className="mp-category-grid mp-category-grid--marketplace">
-            {categories.map((cat) => (
-              <CategoryCard
-                key={cat.id}
-                name={cat.name}
-                slug={cat.slug}
-                imageUrl={cat.imageUrl ?? categoryDemoImages[cat.slug]}
-                count={cat._count.products}
-                variant="marketplace"
-              />
-            ))}
-            {extraCategories.map((cat) => (
-              <CategoryCard
-                key={cat.slug}
-                name={cat.name}
-                slug={cat.slug}
-                imageUrl={categoryDemoImages[cat.slug]}
-                variant="marketplace"
-              />
-            ))}
-            <Link href="/oem" className="market-cat-card market-cat-card--marketplace">
-              <div className="market-cat-card-img">
-                <div
-                  className="market-cat-card-gradient"
-                  style={{ background: "linear-gradient(145deg, #374151, #111827)" }}
-                />
-              </div>
-              <div className="market-cat-card-body market-cat-card-body--minimal">
-                <h3 className="market-cat-card-name">OEM / Private Label</h3>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HomeCategoryGridSection categories={categories} />
 
-      {featuredProducts.length > 0 && (
-        <section className="mp-section mp-section--tight">
-          <div className="container">
-            <MarketplaceSectionHeader
-              title="Sản phẩm sỉ nổi bật"
-              actionHref="/san-pham"
-              actionLabel="Xem tất cả"
-            />
-            <div className="mp-product-grid mp-product-grid--compact">
-              {featuredProducts.map((product) => {
-                const stockStatuses = product.variants.map((v) => v.stockStatus);
-                const stock = stockStatuses.includes("IN_STOCK")
-                  ? "IN_STOCK"
-                  : stockStatuses.includes("LOW_STOCK")
-                  ? "LOW_STOCK"
-                  : stockStatuses.length > 0
-                  ? "OUT_OF_STOCK"
-                  : undefined;
-                return (
-                  <ProductCard
-                    key={product.id}
-                    id={product.id}
-                    slug={product.slug}
-                    name={product.name}
-                    category={product.category.name}
-                    imageUrl={getPrimaryProductImageFromProduct(product)}
-                    moq={product.defaultMoq}
-                    leadTime={product.leadTime}
-                    stockStatus={stock}
-                    stockLabel={stock ? STOCK_LABELS[stock] : undefined}
-                    compact
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
+      <HomeProductDiscoverySection products={latestProducts} />
 
       <section className="mp-section mp-section--alt mp-section--tight">
         <div className="container">
@@ -237,39 +134,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {blogPosts && blogPosts.length > 0 && (
-        <section className="mp-section mp-section--tight">
-          <div className="container">
-            <MarketplaceSectionHeader
-              title="Kiến thức nguồn hàng B2B"
-              actionHref="/blog"
-              actionLabel="Xem tất cả"
-            />
-            <div className="mp-blog-grid">
-              {blogPosts.slice(0, 4).map((post) => {
-                const imgUrl =
-                  typeof post.featuredImageUrl === "string" && isValidImageSrc(post.featuredImageUrl)
-                    ? post.featuredImageUrl
-                    : null;
-                return (
-                  <Link key={post.id} href={`/blog/${post.slug}`} className="mp-blog-card">
-                    <div className="mp-blog-card-img">
-                      {imgUrl ? (
-                        <Image src={imgUrl} alt={post.title} fill className="mp-blog-card-photo" sizes="400px" />
-                      ) : (
-                        <div className="mp-blog-card-placeholder"><span>ATTD</span></div>
-                      )}
-                    </div>
-                    <div className="mp-blog-card-body mp-blog-card-body--minimal">
-                      <h3 className="mp-blog-card-title">{post.title}</h3>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
+      <HomeBlogTeaserSection posts={blogPosts} />
 
       <MarketplaceFinalCta />
     </main>

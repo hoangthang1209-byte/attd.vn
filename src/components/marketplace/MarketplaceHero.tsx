@@ -36,7 +36,7 @@ const GRADIENT_MAP: Record<string, string> = {
 };
 
 export default function MarketplaceHero({ tiles }: MarketplaceHeroProps) {
-  const items = tiles?.length ? tiles.slice(0, 5) : HERO_MOSAIC;
+  const items = tiles != null ? tiles.slice(0, 5) : HERO_MOSAIC;
 
   return (
     <section className="mp-hero mp-hero--v251">
