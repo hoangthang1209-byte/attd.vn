@@ -18,6 +18,9 @@ const nextConfig: NextConfig = {
     "/api/quotes/pdf-health/route": [
       "./node_modules/dejavu-fonts-ttf/ttf/**/*",
     ],
+    "/api/quotes/pdf-renderer-health/route": [
+      "./node_modules/@sparticuz/chromium/**/*",
+    ],
   },
   images: {
     remotePatterns: [

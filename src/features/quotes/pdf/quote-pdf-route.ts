@@ -5,6 +5,7 @@ import {
   quotePdfFilename,
 } from "@/features/quotes/pdf/quote-pdf.service";
 import { generateQuoteHtmlPdfByToken } from "@/features/quotes/pdf/quote-html-pdf.service";
+import { getQuotePdfTraceId } from "@/features/quotes/pdf/quote-pdf-chromium-error";
 import {
   quotePdfContentDisposition,
   type QuotePdfDisposition,
@@ -62,24 +63,33 @@ function chromiumFailureResponse(
   context: PdfRouteContext,
   quoteNo: string,
 ): NextResponse {
+  const traceId = getQuotePdfTraceId(err);
+
   console.error(`[quote-pdf] quoteNo=${quoteNo}`);
   console.error(
     `[quote-pdf] chromium failed=${err instanceof Error ? err.stack ?? err.message : String(err)}`,
   );
+  if (traceId) {
+    console.error(`[quote-pdf] traceId=${traceId}`);
+  }
   logPdfError(context, err, quoteNo);
 
   const isDev = process.env.NODE_ENV === "development";
+
   return NextResponse.json(
     {
       error: "Không thể tạo file PDF giao diện báo giá. Vui lòng thử lại.",
       ...(isDev
         ? {
+            traceId,
             detail: err instanceof Error ? err.message : String(err),
-            stack: err instanceof Error ? err.stack : undefined,
           }
         : {}),
     },
-    { status: 500 },
+    {
+      status: 500,
+      headers: traceId ? { "X-Quote-Pdf-Trace-Id": traceId } : undefined,
+    },
   );
 }
 
