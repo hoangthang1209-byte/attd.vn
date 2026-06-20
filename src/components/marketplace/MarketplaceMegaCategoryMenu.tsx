@@ -182,7 +182,10 @@ export default function MarketplaceMegaCategoryMenu({
               </div>
 
               {hasChildren ? (
-                <div className="mp-mega-cat-grid" key={activeParent.id}>
+                <div
+                  className={`mp-mega-cat-grid${activeParent.children.length <= 3 ? " mp-mega-cat-grid--compact" : ""}`}
+                  key={activeParent.id}
+                >
                   {activeParent.children.map((child) => (
                     <Link
                       key={`${activeParent.id}-${child.id}`}

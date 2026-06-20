@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Menu, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Menu, Search, X } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
 import MobileNavPanel from "@/components/public/MobileNavPanel";
@@ -28,6 +28,8 @@ export default function Header({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function onScroll() {
@@ -38,6 +40,38 @@ export default function Header({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    const headerEl = headerRef.current;
+    if (!headerEl) return;
+
+    function syncHeaderStackHeight() {
+      const el = headerRef.current;
+      if (!el) return;
+      el.style.setProperty("--mp-header-stack-height", `${el.offsetHeight}px`);
+    }
+
+    syncHeaderStackHeight();
+    const observer = new ResizeObserver(syncHeaderStackHeight);
+    observer.observe(headerEl);
+    window.addEventListener("resize", syncHeaderStackHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", syncHeaderStackHeight);
+    };
+  }, [mobileSearchOpen]);
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return;
+
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileSearchOpen(false);
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [mobileSearchOpen]);
+
   function openMobileMenu() {
     setMobileSearchOpen(false);
     setMobileOpen(true);
@@ -45,7 +79,10 @@ export default function Header({
 
   return (
     <>
-      <header className={`mp-header mp-header--v271${scrolled ? " mp-header--scrolled" : ""}`}>
+      <header
+        ref={headerRef}
+        className={`mp-header mp-header--v271${scrolled ? " mp-header--scrolled" : ""}${mobileSearchOpen ? " mp-header--mobile-search-open" : ""}`}
+      >
         <div className="mp-header-top">
           <div className="container mp-header-top-inner">
             <p className="mp-header-tagline">
@@ -118,7 +155,24 @@ export default function Header({
 
         {mobileSearchOpen && (
           <div className="mp-header-search-mobile container">
-            <MarketplaceSearchBar placeholder={HEADER_SEARCH_PLACEHOLDER} />
+            <div className="mp-header-search-mobile__row">
+              <div className="mp-header-search-mobile__field">
+                <MarketplaceSearchBar
+                  variant="mobile-header"
+                  placeholder={HEADER_SEARCH_PLACEHOLDER}
+                  autoFocus
+                  inputRef={mobileSearchInputRef}
+                />
+              </div>
+              <button
+                type="button"
+                className="mp-header-search-close"
+                aria-label="Đóng tìm kiếm"
+                onClick={() => setMobileSearchOpen(false)}
+              >
+                <X size={20} aria-hidden />
+              </button>
+            </div>
           </div>
         )}
 
