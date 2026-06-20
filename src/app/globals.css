@@ -10317,6 +10317,8 @@ body.mp-mega-cat-open { overflow: hidden; }
   margin-bottom: 12px; padding: 12px 14px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;
 }
 .quote-doc__table-wrap { overflow-x: auto; margin: 16px 0; }
+.quote-table-mobile-hint { display: none; }
+.quote-items-scroll { width: 100%; }
 .quote-doc__table {
   width: 100%;
   border-collapse: collapse;
@@ -10404,6 +10406,83 @@ body.mp-mega-cat-open { overflow: hidden; }
 }
 .quote-doc__th-production-line { display: block; line-height: 1.2; }
 .quote-doc__cell-production { font-size: inherit; }
+@media (max-width: 767px) {
+  .quote-public-page,
+  .quote-document-root[data-mode="screen"] {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .quote-document-root[data-mode="screen"] .quote-doc__paper {
+    max-width: 100%;
+    overflow-x: visible;
+  }
+
+  .quote-document-root[data-mode="screen"] .quote-doc__table-wrap {
+    overflow: visible;
+    max-width: 100%;
+  }
+
+  .quote-document-root[data-mode="screen"] .quote-table-mobile-hint {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #6b7280;
+  }
+
+  .quote-document-root[data-mode="screen"] .quote-items-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    touch-action: pan-x pan-y;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .quote-document-root[data-mode="screen"] .quote-items-scroll .quote-document-table,
+  .quote-document-root[data-mode="screen"] .quote-items-scroll .quote-doc__table {
+    width: 1220px;
+    min-width: 1220px;
+    max-width: none;
+    table-layout: fixed;
+  }
+}
+
+.quote-doc--pdf .quote-table-mobile-hint,
+.quote-doc--print .quote-table-mobile-hint,
+.quote-document-root[data-mode="pdf"] .quote-table-mobile-hint,
+.quote-document-root[data-mode="print"] .quote-table-mobile-hint {
+  display: none !important;
+}
+
+.quote-doc--pdf .quote-items-scroll,
+.quote-doc--print .quote-items-scroll,
+.quote-document-root[data-mode="pdf"] .quote-items-scroll,
+.quote-document-root[data-mode="print"] .quote-items-scroll {
+  overflow: visible;
+  border: none;
+  background: transparent;
+}
+
+.quote-doc--pdf .quote-items-scroll .quote-document-table,
+.quote-doc--pdf .quote-items-scroll .quote-doc__table,
+.quote-doc--print .quote-items-scroll .quote-document-table,
+.quote-doc--print .quote-items-scroll .quote-doc__table,
+.quote-document-root[data-mode="pdf"] .quote-items-scroll .quote-document-table,
+.quote-document-root[data-mode="pdf"] .quote-items-scroll .quote-doc__table,
+.quote-document-root[data-mode="print"] .quote-items-scroll .quote-document-table,
+.quote-document-root[data-mode="print"] .quote-items-scroll .quote-doc__table {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
 @media (max-width: 720px) {
   .quote-doc__summary-row { flex-direction: column; align-items: stretch; }
   .quote-doc__sample-info { max-width: none; }
@@ -10518,6 +10597,10 @@ body.mp-mega-cat-open { overflow: hidden; }
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
 
+  .quote-table-mobile-hint {
+    display: none !important;
+  }
+
   html, body {
     background: #fff !important;
     -webkit-print-color-adjust: exact;
@@ -10620,4 +10703,22 @@ body.mp-mega-cat-open { overflow: hidden; }
     margin: 0 !important;
   }
 }
+
+.order-activity-timeline { list-style: none; margin: 0; padding: 0; }
+.order-activity-timeline li { padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+.order-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f3f4f6;
+  color: #374151;
+}
+.order-status-badge--confirmed,
+.order-status-badge--completed { background: #dcfce7; color: #166534; }
+.order-status-badge--cancelled { background: #fee2e2; color: #991b1b; }
+.order-status-badge--in_production,
+.order-status-badge--ready_to_ship,
+.order-status-badge--shipped { background: #dbeafe; color: #1e40af; }
 

@@ -202,6 +202,7 @@ export async function getQuoteDetail(id: string) {
       contact: { select: { id: true, fullName: true, phone: true, email: true } },
       priceGroup: { select: { id: true, name: true, code: true } },
       pricingCalculation: { select: { id: true, code: true } },
+      order: { select: { id: true, orderNo: true } },
       items: { orderBy: { sortOrder: "asc" }, include: { designMediaAsset: { select: { url: true } } } },
     },
   });
@@ -269,6 +270,7 @@ export async function getQuoteDetail(id: string) {
     contact: row.contact,
     priceGroup: row.priceGroup,
     pricingCalculation: row.pricingCalculation,
+    order: row.order,
     items: row.items.map((item) => ({
       id: item.id,
       pricingCalculationItemId: item.pricingCalculationItemId,

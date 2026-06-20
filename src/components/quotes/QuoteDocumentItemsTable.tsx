@@ -39,7 +39,11 @@ export default function QuoteDocumentItemsTable({
 
   return (
     <div className="quote-doc__table-wrap">
-      <table className="quote-document-table quote-doc__table">
+      <p className="quote-table-mobile-hint" aria-hidden="true">
+        Vuốt ngang để xem đầy đủ bảng →
+      </p>
+      <div className="quote-items-scroll">
+        <table className="quote-document-table quote-doc__table">
         <colgroup>
           {colWidths.map((width, index) => (
             <col key={index} style={{ width: `${width}%` }} />
@@ -118,6 +122,7 @@ export default function QuoteDocumentItemsTable({
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

@@ -23,6 +23,7 @@ const PROTECTED_MUTATION_PREFIXES = [
   "/api/posts/",
   "/api/variants/",
   "/api/dealer-leads/",
+  "/api/orders/",
 ] as const;
 
 const PROTECTED_READ_PREFIXES = [
@@ -38,6 +39,8 @@ const PROTECTED_READ_PREFIXES = [
   "/api/leads",
   "/api/dealer-leads/",
   "/api/variants/",
+  "/api/orders",
+  "/api/orders/",
 ] as const;
 
 function isMediaApiPath(pathname: string): boolean {

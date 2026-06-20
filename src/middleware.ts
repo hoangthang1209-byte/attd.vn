@@ -76,5 +76,7 @@ export const config = {
     "/api/dealer-leads/:path*",
     "/api/dealers/:path*",
     "/api/variants/:path*",
+    "/api/orders",
+    "/api/orders/:path*",
   ],
 };

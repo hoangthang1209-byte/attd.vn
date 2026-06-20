@@ -52,6 +52,10 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Đơn hàng",
+    items: [{ href: "/admin/orders", label: "Đơn hàng" }],
+  },
+  {
     label: "Tính giá",
     items: [
       { href: "/admin/pricing", label: "Tổng quan" },

@@ -63,6 +63,7 @@ type QuoteDetail = {
   customer: { id: string; name: string; code: string; phone: string | null; email: string | null } | null;
   contact: { id: string; fullName: string } | null;
   pricingCalculation: { id: string; code: string } | null;
+  order: { id: string; orderNo: string } | null;
   items: Array<{
     id: string;
     productNameSnapshot: string | null;
@@ -115,6 +116,22 @@ export default function QuoteDetailView({ id }: { id: string }) {
     }
     await load();
     setMessage("Đã cập nhật trạng thái");
+  }
+
+  const [converting, setConverting] = useState(false);
+
+  async function convertToOrder() {
+    if (!window.confirm("Tạo đơn hàng từ báo giá này?")) return;
+    setConverting(true);
+    setMessage(null);
+    const res = await fetch(`/api/orders/from-quote/${id}`, { method: "POST" });
+    const data = await res.json() as { order?: { id: string }; message?: string };
+    setConverting(false);
+    if (!res.ok) {
+      setMessage(data.message ?? "Không thể tạo đơn hàng");
+      return;
+    }
+    router.push(`/admin/orders/${data.order!.id}`);
   }
 
   async function duplicateQuote() {
@@ -305,9 +322,21 @@ export default function QuoteDetailView({ id }: { id: string }) {
         <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void updateStatus("ACCEPTED")}>Khách đồng ý</button>
         <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void updateStatus("REJECTED")}>Khách từ chối</button>
         <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void updateStatus("CANCELLED")}>Đã hủy</button>
-        <button type="button" className="admin-btn admin-btn--secondary" disabled title="Sẽ triển khai ở Sprint 26.3.0">Chuyển thành đơn hàng</button>
+        {quote.order ? (
+          <Link href={`/admin/orders/${quote.order.id}`} className="admin-btn admin-btn--secondary">
+            Đơn hàng {quote.order.orderNo}
+          </Link>
+        ) : quote.status === "ACCEPTED" ? (
+          <button
+            type="button"
+            className="admin-btn admin-btn--primary"
+            disabled={converting}
+            onClick={() => void convertToOrder()}
+          >
+            {converting ? "Đang tạo đơn..." : "Tạo đơn hàng"}
+          </button>
+        ) : null}
       </div>
-      <p className="admin-field-hint">Chuyển thành đơn hàng — Sẽ triển khai ở Sprint 26.3.0</p>
     </div>
   );
 }
