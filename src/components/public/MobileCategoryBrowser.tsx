@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { useRef, useState } from "react";
+import { LayoutGrid } from "lucide-react";
+import CategoryMenuImage from "@/components/marketplace/CategoryMenuImage";
 import type { MarketplaceCategoryTreeNode } from "@/features/categories/marketplace-category-tree";
 
 type Props = {
@@ -11,111 +12,123 @@ type Props = {
   onNavigate: () => void;
 };
 
+function resolveInitialParentId(
+  parents: MarketplaceCategoryTreeNode[],
+  activeCategorySlug?: string | null,
+): string {
+  if (activeCategorySlug) {
+    const match = parents.find(
+      (p) =>
+        p.slug === activeCategorySlug ||
+        p.children.some((c) => c.slug === activeCategorySlug),
+    );
+    if (match) return match.id;
+  }
+  return parents[0]?.id ?? "";
+}
+
 export default function MobileCategoryBrowser({
   categoryTree,
   activeCategorySlug,
   onNavigate,
 }: Props) {
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
-
-  const visibleParents = useMemo(
-    () => categoryTree.filter((p) => p.productCount > 0 || p.children.some((c) => c.productCount > 0)),
-    [categoryTree],
+  const [activeParentId, setActiveParentId] = useState(() =>
+    resolveInitialParentId(categoryTree, activeCategorySlug),
   );
+  const discoveryRef = useRef<HTMLElement>(null);
 
-  function isParentExpanded(parent: MarketplaceCategoryTreeNode) {
-    if (expandedIds.has(parent.id)) return true;
-    if (!activeCategorySlug) return false;
-    return (
-      parent.slug === activeCategorySlug ||
-      parent.children.some((c) => c.slug === activeCategorySlug)
-    );
+  const activeParent =
+    categoryTree.find((p) => p.id === activeParentId) ?? categoryTree[0];
+
+  if (!activeParent || categoryTree.length === 0) return null;
+
+  const visibleChildren = activeParent.children;
+
+  function selectParent(parentId: string) {
+    setActiveParentId(parentId);
+    if (discoveryRef.current) {
+      discoveryRef.current.scrollTop = 0;
+    }
   }
-
-  function toggleExpand(id: string) {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  if (visibleParents.length === 0) return null;
 
   return (
-    <section className="mobile-nav-categories" aria-label="Tất cả danh mục">
-      <h2 className="mobile-nav-categories-heading">Tất cả danh mục</h2>
-      <div className="mobile-nav-categories-scroll">
-        <ul className="mobile-nav-categories-list">
-          {visibleParents.map((parent) => {
-            const hasChildren = parent.children.some((c) => c.productCount > 0);
-            const isExpanded = isParentExpanded(parent);
-
-            if (!hasChildren) {
+    <div className="mobile-cat-explorer" aria-label="Danh mục nguồn hàng">
+      <div className="mobile-cat-explorer__panes">
+        <aside className="mobile-cat-explorer__rail" aria-label="Danh mục cha">
+          <ul className="mobile-cat-explorer__parent-list">
+            {categoryTree.map((parent) => {
+              const isActive = parent.id === activeParentId;
               return (
                 <li key={parent.id}>
-                  <Link
-                    href={parent.viewAllHref}
-                    className="mobile-nav-categories-link"
-                    onClick={onNavigate}
-                  >
-                    {parent.name}
-                  </Link>
-                </li>
-              );
-            }
-
-            return (
-              <li key={parent.id} className="mobile-nav-categories-item">
-                <div className="mobile-nav-categories-parent-row">
                   <button
                     type="button"
-                    className="mobile-nav-categories-expand"
-                    aria-expanded={isExpanded}
-                    aria-label={isExpanded ? `Thu gọn ${parent.name}` : `Mở rộng ${parent.name}`}
-                    onClick={() => toggleExpand(parent.id)}
+                    className={`mobile-cat-explorer__parent-btn${isActive ? " mobile-cat-explorer__parent-btn--active" : ""}`}
+                    aria-current={isActive ? "true" : undefined}
+                    onClick={() => selectParent(parent.id)}
                   >
-                    <ChevronDown
-                      size={18}
-                      className={`mobile-nav-categories-chevron${isExpanded ? " mobile-nav-categories-chevron--open" : ""}`}
-                      aria-hidden
-                    />
+                    <span className="mobile-cat-explorer__parent-label">{parent.name}</span>
                   </button>
-                  <span className="mobile-nav-categories-parent-name">{parent.name}</span>
-                </div>
+                </li>
+              );
+            })}
+          </ul>
+        </aside>
 
-                {isExpanded && (
-                  <div className="mobile-nav-categories-children">
-                    <Link
-                      href={parent.viewAllHref}
-                      className="mobile-nav-categories-view-all"
-                      onClick={onNavigate}
-                    >
-                      Xem tất cả {parent.name}
-                    </Link>
-                    <ul className="mobile-nav-categories-child-list">
-                      {parent.children
-                        .filter((c) => c.productCount > 0)
-                        .map((child) => (
-                          <li key={child.id}>
-                            <Link
-                              href={child.href}
-                              className={`mobile-nav-categories-child-link${activeCategorySlug === child.slug ? " mobile-nav-categories-child-link--active" : ""}`}
-                              onClick={onNavigate}
-                            >
-                              {child.name}
-                            </Link>
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <section
+          ref={discoveryRef}
+          className="mobile-cat-explorer__discovery"
+          aria-label={`Danh mục con: ${activeParent.name}`}
+        >
+          <div className="mobile-cat-explorer__discovery-header">
+            <h2 className="mobile-cat-explorer__discovery-title">{activeParent.name}</h2>
+            <Link
+              href={activeParent.viewAllHref}
+              className="mobile-cat-explorer__view-all"
+              onClick={onNavigate}
+            >
+              Xem tất cả
+            </Link>
+          </div>
+
+          {visibleChildren.length > 0 ? (
+            <div className="mobile-cat-explorer__grid">
+              {visibleChildren.map((child) => (
+                <Link
+                  key={child.id}
+                  href={child.href}
+                  className="mobile-cat-explorer__card"
+                  onClick={onNavigate}
+                >
+                  <CategoryMenuImage
+                    imageUrl={child.imageUrl}
+                    name={child.name}
+                    size="explorer"
+                  />
+                  <span className="mobile-cat-explorer__card-label">{child.name}</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="mobile-cat-explorer__empty">
+              <LayoutGrid
+                size={28}
+                className="mobile-cat-explorer__empty-icon"
+                aria-hidden="true"
+              />
+              <p className="mobile-cat-explorer__empty-text">
+                Khám phá các sản phẩm thuộc danh mục này.
+              </p>
+              <Link
+                href={activeParent.viewAllHref}
+                className="mobile-cat-explorer__empty-cta"
+                onClick={onNavigate}
+              >
+                Xem tất cả sản phẩm
+              </Link>
+            </div>
+          )}
+        </section>
       </div>
-    </section>
+    </div>
   );
 }

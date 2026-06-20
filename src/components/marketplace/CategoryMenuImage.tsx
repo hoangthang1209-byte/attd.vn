@@ -4,7 +4,7 @@ import { isValidImageSrc } from "@/lib/imagePaths";
 type CategoryMenuImageProps = {
   imageUrl: string | null | undefined;
   name: string;
-  size?: "parent" | "child" | "mobile";
+  size?: "parent" | "child" | "mobile" | "explorer";
   className?: string;
 };
 
@@ -19,19 +19,34 @@ export default function CategoryMenuImage({
       ? "mp-mega-cat-parent-thumb"
       : size === "mobile"
         ? "mobile-nav-category-child-img"
-        : "mp-mega-cat-chip-img";
+        : size === "explorer"
+          ? "mobile-cat-explorer-card-img"
+          : "mp-mega-cat-chip-img";
 
   if (imageUrl && isValidImageSrc(imageUrl)) {
+    const photoClass =
+      size === "explorer"
+        ? "mobile-cat-explorer-card-photo"
+        : size === "mobile"
+          ? "mobile-nav-category-child-photo"
+          : "mp-mega-cat-chip-photo";
+
     return (
       <span className={`${sizeClass} ${className}`.trim()}>
         <Image
           src={imageUrl}
           alt=""
           fill
-          className={
-            size === "mobile" ? "mobile-nav-category-child-photo" : "mp-mega-cat-chip-photo"
+          className={photoClass}
+          sizes={
+            size === "parent"
+              ? "40px"
+              : size === "mobile"
+                ? "48px"
+                : size === "explorer"
+                  ? "72px"
+                  : "96px"
           }
-          sizes={size === "parent" ? "40px" : size === "mobile" ? "48px" : "96px"}
         />
       </span>
     );
