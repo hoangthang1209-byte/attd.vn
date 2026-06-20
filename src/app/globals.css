@@ -10167,7 +10167,7 @@ body.mp-mega-cat-open { overflow: hidden; }
 .quote-document-pdf-root,
 .quote-document-print-host {
   background: #fff;
-  font-family: Arial, "Helvetica Neue", Helvetica, system-ui, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -10181,8 +10181,10 @@ body.mp-mega-cat-open { overflow: hidden; }
 .quote-doc--pdf,
 .quote-doc--print,
 .quote-document-root[data-mode="pdf"],
-.quote-document-root[data-mode="print"] {
-  font-family: Arial, "Helvetica Neue", Helvetica, system-ui, sans-serif;
+.quote-document-root[data-mode="print"],
+.quote-document-root,
+.quote-doc {
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -10278,7 +10280,7 @@ body.mp-mega-cat-open { overflow: hidden; }
 .quote-document-page, .quote-doc__paper { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 28px; }
 .quote-doc__header {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(200px, 1.2fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(100px, 140px) minmax(180px, 1fr) minmax(220px, 1.2fr);
   gap: 16px;
   align-items: start;
   border-bottom: 3px solid var(--primary, #e11d2e);
@@ -10286,26 +10288,67 @@ body.mp-mega-cat-open { overflow: hidden; }
   margin-bottom: 16px;
 }
 @media (max-width: 900px) { .quote-doc__header { grid-template-columns: 1fr; } }
-.quote-doc__header-left { display: flex; gap: 12px; align-items: center; }
+.quote-doc__header-left { display: flex; align-items: center; justify-content: flex-start; }
 .quote-doc__header-center { text-align: center; align-self: center; }
-.quote-doc__header-right { font-size: 12px; color: #374151; line-height: 1.5; }
+.quote-doc__header-right {
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.45;
+  text-align: right;
+}
 .quote-doc__header-right p { margin: 0 0 4px; }
+.quote-doc__header-legal {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.4;
+}
 .quote-doc__logo { max-height: 56px; width: auto; flex-shrink: 0; }
-.quote-doc__brand-block { min-width: 0; }
 .quote-doc__title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: .06em; color: #111827; }
-.quote-doc__brand { margin: 0; font-size: 16px; font-weight: 700; color: var(--primary, #e11d2e); }
-.quote-doc__legal { margin: 4px 0 0; font-size: 12px; color: #374151; }
 .quote-doc__meta-bar {
   display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 12px; color: #374151;
   margin-bottom: 12px; padding: 12px 14px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px;
 }
 .quote-doc__table-wrap { overflow-x: auto; margin: 16px 0; }
-.quote-doc__table { width: 100%; border-collapse: collapse; font-size: 11px; }
-.quote-doc__table th, .quote-doc__table td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: middle; }
-.quote-doc__table th { background: #111827; color: #fff; font-weight: 600; white-space: nowrap; }
+.quote-doc__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 9px;
+  line-height: 1.35;
+}
+.quote-doc__table thead { display: table-header-group; }
+.quote-doc__table th,
+.quote-doc__table td {
+  border: 1px solid #d1d5db;
+  padding: 5px 4px;
+  text-align: left;
+  vertical-align: middle;
+}
+.quote-doc__table th {
+  background: #111827;
+  color: #fff;
+  font-weight: 700;
+  font-size: 8.5px;
+  line-height: 1.3;
+  white-space: normal;
+}
 .quote-doc__table tbody tr:nth-child(even) { background: #f9fafb; }
 .quote-doc__row--alt { background: #f9fafb; }
-.quote-doc__cell-design { text-align: center; width: 64px; }
+.quote-doc__cell-center { text-align: center; }
+.quote-doc__cell-design { text-align: center; }
+.quote-doc__cell-product,
+.quote-doc__cell-desc {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.quote-doc__cell-sku {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  font-size: 8.5px;
+}
 .quote-doc__cell-money { white-space: nowrap; text-align: right; }
 .quote-doc__design-thumb { width: 56px; height: 64px; object-fit: contain; border-radius: 6px; border: 1px solid #e5e7eb; background: #fff; }
 .quote-doc__muted { color: #9ca3af; font-size: 11px; }
@@ -10317,8 +10360,13 @@ body.mp-mega-cat-open { overflow: hidden; }
 .quote-doc--pdf .quote-doc__table,
 .quote-document-root[data-mode="pdf"] .quote-document-table {
   font-size: 8.5px;
+  line-height: 1.35;
   width: 100%;
   table-layout: fixed;
+}
+.quote-doc--pdf .quote-doc__table th,
+.quote-document-root[data-mode="pdf"] .quote-doc__table th {
+  font-size: 8px;
 }
 .quote-doc__actions, .quote-document-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 16px; }
 .quote-document-actions__group { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -10380,8 +10428,15 @@ body.mp-mega-cat-open { overflow: hidden; }
 
   .quote-document-table,
   .quote-doc__table {
-    font-size: 11px;
+    font-size: 8.5px;
+    line-height: 1.35;
+    table-layout: fixed;
     page-break-inside: auto;
+  }
+
+  .quote-document-table thead,
+  .quote-doc__table thead {
+    display: table-header-group;
   }
 
   .quote-document-table th,

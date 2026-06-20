@@ -11,16 +11,46 @@ type Props = {
   mediaBaseUrl?: string;
 };
 
+const OPTIONAL_COL_WIDTH = 4;
+
+/** Base column widths (%); optional columns borrow from Mô tả. */
+function buildTableColWidths(quote: PublicQuoteDocument): number[] {
+  let descWidth = 20;
+  const widths = [3, 6, 4, 5, 5, 12, 6, descWidth, 4, 5, 5, 4, 6, 7, 8];
+
+  if (quote.showProductionLeadTime) {
+    descWidth -= OPTIONAL_COL_WIDTH;
+    widths.push(OPTIONAL_COL_WIDTH);
+  }
+  if (quote.showSampleFee) {
+    descWidth -= OPTIONAL_COL_WIDTH;
+    widths.push(OPTIONAL_COL_WIDTH);
+  }
+  if (quote.showSampleLeadTime) {
+    descWidth -= OPTIONAL_COL_WIDTH;
+    widths.push(OPTIONAL_COL_WIDTH);
+  }
+
+  widths[7] = Math.max(descWidth, 12);
+  return widths;
+}
+
 export default function QuoteDocumentItemsTable({
   quote,
   absoluteMedia = false,
   mediaBaseUrl,
 }: Props) {
   const priceTypeLabel = quotePriceVatTypeLabel(quote.priceVatType);
+  const colWidths = buildTableColWidths(quote);
 
   return (
     <div className="quote-doc__table-wrap">
       <table className="quote-document-table quote-doc__table">
+        <colgroup>
+          {colWidths.map((width, index) => (
+            <col key={index} style={{ width: `${width}%` }} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             <th>STT</th>
@@ -51,8 +81,8 @@ export default function QuoteDocumentItemsTable({
 
             return (
               <tr key={i} className={`quote-table-row${i % 2 === 1 ? " quote-doc__row--alt" : ""}`}>
-                <td>{i + 1}</td>
-                <td className="quote-doc__cell-design">
+                <td className="quote-doc__cell-center">{i + 1}</td>
+                <td className="quote-doc__cell-design quote-doc__cell-center">
                   {designUrl ? (
                     <>
                       <QuoteDesignThumb src={designUrl} />
@@ -64,20 +94,20 @@ export default function QuoteDocumentItemsTable({
                     <span className="quote-doc__muted">Chưa có</span>
                   )}
                 </td>
-                <td>{item.colorSnapshot || "—"}</td>
-                <td>{item.categorySnapshot || "—"}</td>
-                <td>{item.genderSnapshot || "—"}</td>
-                <td>
+                <td className="quote-doc__cell-center">{item.colorSnapshot || "—"}</td>
+                <td className="quote-doc__cell-center">{item.categorySnapshot || "—"}</td>
+                <td className="quote-doc__cell-center">{item.genderSnapshot || "—"}</td>
+                <td className="quote-doc__cell-product">
                   {[item.productNameSnapshot, item.variantNameSnapshot]
                     .filter(Boolean)
                     .join(" · ") || "—"}
                 </td>
-                <td>{item.skuSnapshot || "—"}</td>
-                <td>{item.description || "—"}</td>
-                <td>{formatQuoteMoq(item.moqSnapshot)}</td>
+                <td className="quote-doc__cell-sku">{item.skuSnapshot || "—"}</td>
+                <td className="quote-doc__cell-desc">{item.description || "—"}</td>
+                <td className="quote-doc__cell-center">{formatQuoteMoq(item.moqSnapshot)}</td>
                 <td>{item.itemNote || "—"}</td>
-                <td>{item.quantity}</td>
-                <td>{item.unit}</td>
+                <td className="quote-doc__cell-center">{item.quantity}</td>
+                <td className="quote-doc__cell-center">{item.unit}</td>
                 <td>{priceTypeLabel}</td>
                 <td className="quote-doc__cell-money">
                   {formatQuoteMoney(item.unitPrice, quote.currency)}

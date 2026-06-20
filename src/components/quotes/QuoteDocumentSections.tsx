@@ -54,8 +54,6 @@ export function QuotePartyColumns({ quote, className = "" }: QuotePartyColumnsPr
             { label: "Mã khách hàng", value: quote.customerCode },
             { label: "Mã số thuế", value: quote.customerTaxCode },
             { label: "Địa chỉ", value: quote.customerAddress },
-            { label: "Số điện thoại", value: quote.customerCompanyPhone },
-            { label: "Email", value: quote.customerCompanyEmail },
           ]}
         />
       </section>
@@ -78,7 +76,6 @@ export function QuotePartyColumns({ quote, className = "" }: QuotePartyColumnsPr
             { label: "Chức vụ", value: quote.salesTitle },
             { label: "Số điện thoại", value: quote.salesPhone },
             { label: "Email", value: quote.salesEmail },
-            { label: "Địa chỉ", value: quote.salesAddress },
           ]}
         />
       </section>
@@ -111,6 +108,8 @@ type QuoteCompanyHeaderProps = {
 };
 
 export function QuoteCompanyHeader({ company, logoUrl }: QuoteCompanyHeaderProps) {
+  const legalName = company.legalName?.trim();
+
   return (
     <header className="quote-doc__header">
       <div className="quote-doc__header-left">
@@ -118,12 +117,6 @@ export function QuoteCompanyHeader({ company, logoUrl }: QuoteCompanyHeaderProps
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt={company.brandName} className="quote-doc__logo" />
         )}
-        <div className="quote-doc__brand-block">
-          <p className="quote-doc__brand">{company.brandName}</p>
-          {company.legalName && company.legalName !== company.brandName && (
-            <p className="quote-doc__legal">{company.legalName}</p>
-          )}
-        </div>
       </div>
 
       <div className="quote-doc__header-center">
@@ -131,6 +124,9 @@ export function QuoteCompanyHeader({ company, logoUrl }: QuoteCompanyHeaderProps
       </div>
 
       <div className="quote-doc__header-right">
+        {legalName && (
+          <p className="quote-doc__header-legal">{legalName}</p>
+        )}
         {company.address?.trim() && (
           <p><strong>Địa chỉ:</strong> {company.address}</p>
         )}
@@ -139,12 +135,6 @@ export function QuoteCompanyHeader({ company, logoUrl }: QuoteCompanyHeaderProps
         )}
         {company.email?.trim() && (
           <p><strong>Email:</strong> {company.email}</p>
-        )}
-        {company.website?.trim() && (
-          <p><strong>Website:</strong> {company.website}</p>
-        )}
-        {company.taxCode?.trim() && (
-          <p><strong>Mã số thuế:</strong> {company.taxCode}</p>
         )}
       </div>
     </header>
