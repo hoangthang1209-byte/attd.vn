@@ -64,6 +64,7 @@ function parseOrderFormBody(raw: Record<string, unknown>): CreateManualOrderInpu
     customerId: parseOptionalString(raw.customerId),
     contactId: parseOptionalString(raw.contactId),
     salesRepresentativeId: parseOptionalString(raw.salesRepresentativeId),
+    salesEmployeeId: parseOptionalString(raw.salesEmployeeId),
     orderDate,
     currency: typeof raw.currency === "string" ? raw.currency : "VND",
     priceVatType,

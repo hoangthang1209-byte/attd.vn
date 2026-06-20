@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { OrderProductGender } from "@prisma/client";
+import AdminQuickCreateShell from "@/components/admin/AdminQuickCreateShell";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import { ORDER_PRODUCT_GENDER_OPTIONS } from "@/features/orders/order-gender";
 import type { ColorRecord } from "@/features/colors/color.service";
@@ -15,6 +16,7 @@ export type CustomProductResult = {
   productNameSnapshot: string;
   variantNameSnapshot: string | null;
   skuSnapshot: string;
+  systemCode?: string | null;
   colorId: string;
   categoryId: string;
   gender: OrderProductGender;
@@ -37,7 +39,11 @@ type Props = {
   onCreated: (result: CustomProductResult) => void;
   onAddColor: () => void;
   onAddCategory: () => void;
+  selectColorId?: string | null;
+  selectCategoryId?: string | null;
 };
+
+const FORM_ID = "custom-product-form";
 
 export default function CustomProductModal({
   open,
@@ -48,8 +54,12 @@ export default function CustomProductModal({
   onCreated,
   onAddColor,
   onAddCategory,
+  selectColorId,
+  selectCategoryId,
 }: Props) {
   const mutate = useAdminMutation();
+  const submitLock = useRef(false);
+  const [pending, setPending] = useState(false);
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [colorId, setColorId] = useState("");
@@ -60,134 +70,264 @@ export default function CustomProductModal({
   const [designImageUrl, setDesignImageUrl] = useState<string | null>(null);
   const [productionLeadTime, setProductionLeadTime] = useState("");
   const [sizeName, setSizeName] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  if (!open) return null;
+  useEffect(() => {
+    if (selectColorId) {
+      setColorId(selectColorId);
+      if (fieldErrors.colorId) setFieldErrors((p) => ({ ...p, colorId: "" }));
+    }
+  }, [selectColorId]);
+
+  useEffect(() => {
+    if (selectCategoryId) {
+      setCategoryId(selectCategoryId);
+      if (fieldErrors.categoryId) setFieldErrors((p) => ({ ...p, categoryId: "" }));
+    }
+  }, [selectCategoryId]);
+
+  function resetForm() {
+    setName("");
+    setCategoryId("");
+    setColorId("");
+    setGender("UNISEX");
+    setDescription("");
+    setDefaultMoq("");
+    setUnit("cái");
+    setDesignImageUrl(null);
+    setProductionLeadTime("");
+    setSizeName("");
+    setFormError(null);
+    setFieldErrors({});
+    setPending(false);
+    submitLock.current = false;
+  }
+
+  function handleClose() {
+    if (pending) return;
+    resetForm();
+    onClose();
+  }
+
+  function validate(): boolean {
+    const errors: Record<string, string> = {};
+    if (!name.trim()) errors.name = "Vui lòng nhập tên sản phẩm.";
+    if (!categoryId) errors.categoryId = "Vui lòng chọn danh mục.";
+    if (!colorId) errors.colorId = "Vui lòng chọn màu sắc.";
+    if (!customerCode.trim()) {
+      errors.customer = "Vui lòng chọn khách hàng trước khi tạo sản phẩm tùy chọn.";
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    if (!customerCode.trim()) {
-      setError("Vui lòng chọn khách hàng trước khi tạo sản phẩm tùy chọn.");
-      return;
-    }
+    if (pending || submitLock.current) return;
+
+    setFormError(null);
+    setFieldErrors({});
+    if (!validate()) return;
+
+    submitLock.current = true;
+    setPending(true);
 
     await mutate({
       loadingMessage: "Đang tạo sản phẩm…",
       successMessage: "Đã tạo sản phẩm tùy chọn.",
+      errorFallback: "Không thể tạo sản phẩm tùy chọn. Vui lòng kiểm tra lại thông tin.",
+      onError: (message) => setFormError(message),
       action: async () => {
         const res = await fetch("/api/orders/custom-product", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name,
+            name: name.trim(),
             categoryId,
             colorId,
             gender,
-            description: description || null,
+            description: description.trim() || null,
             defaultMoq: defaultMoq.trim() ? Number(defaultMoq) : null,
-            unit: unit || "cái",
+            unit: unit.trim() || "cái",
             designImageUrl,
-            productionLeadTime: productionLeadTime || null,
-            customerCode,
-            sizeName: sizeName || null,
+            productionLeadTime: productionLeadTime.trim() || null,
+            customerCode: customerCode.trim(),
+            sizeName: sizeName.trim() || null,
           }),
         });
-        return parseAdminJsonResponse(res, (data) => data.product as CustomProductResult & { genderSnapshot?: string });
+        const result = await parseAdminJsonResponse(
+          res,
+          (data) => data.product as CustomProductResult & { genderSnapshot?: string },
+        );
+        if (!result.ok) {
+          console.error("[CustomProductModal] POST custom-product", res.status, result.message);
+        }
+        return result;
       },
       onSuccess: (product) => {
         onCreated({
           ...product,
-          genderSnapshot: product.genderSnapshot ?? ORDER_PRODUCT_GENDER_OPTIONS.find((o) => o.value === gender)?.label ?? "",
+          genderSnapshot:
+            product.genderSnapshot ??
+            ORDER_PRODUCT_GENDER_OPTIONS.find((o) => o.value === gender)?.label ??
+            "",
         });
-        setName("");
-        setCategoryId("");
-        setColorId("");
-        setGender("UNISEX");
-        setDescription("");
-        setDefaultMoq("");
-        setUnit("cái");
-        setDesignImageUrl(null);
-        setProductionLeadTime("");
-        setSizeName("");
+        resetForm();
         onClose();
       },
     });
+
+    setPending(false);
+    submitLock.current = false;
   }
 
   return (
-    <div className="quote-quick-contact-modal">
-      <div className="quote-quick-contact-modal__backdrop" onClick={onClose} aria-hidden="true" />
-      <form className="quote-quick-contact-modal__panel quote-quick-contact-modal__panel--wide" onSubmit={(e) => void handleSubmit(e)}>
-        <h3 className="quote-quick-contact-modal__title">Tạo sản phẩm tùy chọn</h3>
-        {error && <p className="admin-error">{error}</p>}
-        <div className="admin-catalog-variant-fields">
-          <div className="admin-field">
-            <label className="admin-label">Tên sản phẩm *</label>
-            <input className="admin-input" required value={name} onChange={(e) => setName(e.target.value)} />
+    <AdminQuickCreateShell
+      open={open}
+      size="wide"
+      title="Tạo sản phẩm tùy chọn"
+      subtitle="Sản phẩm sẽ được lưu vào danh mục và chọn cho dòng đơn hàng hiện tại."
+      onClose={handleClose}
+      pending={pending}
+      footer={
+        <>
+          <button type="button" className="admin-btn admin-btn--secondary" onClick={handleClose} disabled={pending}>
+            Hủy
+          </button>
+          <button type="submit" form={FORM_ID} className="admin-btn admin-btn--primary" disabled={pending}>
+            {pending ? "Đang tạo…" : "Tạo sản phẩm"}
+          </button>
+        </>
+      }
+    >
+      {formError && <p className="admin-error">{formError}</p>}
+      {fieldErrors.customer && <p className="admin-error">{fieldErrors.customer}</p>}
+
+      <form id={FORM_ID} noValidate onSubmit={(e) => void handleSubmit(e)}>
+        <div className="admin-quick-create-grid admin-quick-create-grid--3">
+          <div className="admin-field admin-quick-create-grid__span-2">
+            <label className="admin-label" htmlFor="custom-product-name">
+              Tên sản phẩm *
+            </label>
+            <input
+              id="custom-product-name"
+              className="admin-input"
+              value={name}
+              disabled={pending}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: "" }));
+              }}
+            />
+            {fieldErrors.name && <p className="admin-field-error">{fieldErrors.name}</p>}
           </div>
           <div className="admin-field">
-            <label className="admin-label">Danh mục *</label>
-            <select className="admin-input" required value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              <option value="">— Chọn danh mục —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+            <label className="admin-label" htmlFor="custom-product-gender">
+              Giới tính *
+            </label>
+            <select
+              id="custom-product-gender"
+              className="admin-input"
+              value={gender}
+              disabled={pending}
+              onChange={(e) => setGender(e.target.value as OrderProductGender)}
+            >
+              {ORDER_PRODUCT_GENDER_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
-            <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onAddCategory}>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="custom-product-category">
+              Danh mục *
+            </label>
+            <select
+              id="custom-product-category"
+              className="admin-input"
+              value={categoryId}
+              disabled={pending}
+              onChange={(e) => {
+                setCategoryId(e.target.value);
+                if (fieldErrors.categoryId) setFieldErrors((p) => ({ ...p, categoryId: "" }));
+              }}
+            >
+              <option value="">— Chọn danh mục —</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.categoryId && <p className="admin-field-error">{fieldErrors.categoryId}</p>}
+            <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onAddCategory} disabled={pending}>
               Thêm danh mục mới
             </button>
           </div>
           <div className="admin-field">
-            <label className="admin-label">Màu sắc *</label>
-            <select className="admin-input" required value={colorId} onChange={(e) => setColorId(e.target.value)}>
+            <label className="admin-label" htmlFor="custom-product-color">
+              Màu mặc định *
+            </label>
+            <select
+              id="custom-product-color"
+              className="admin-input"
+              value={colorId}
+              disabled={pending}
+              onChange={(e) => {
+                setColorId(e.target.value);
+                if (fieldErrors.colorId) setFieldErrors((p) => ({ ...p, colorId: "" }));
+              }}
+            >
               <option value="">— Chọn màu —</option>
               {colors.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
-            <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onAddColor}>
+            {fieldErrors.colorId && <p className="admin-field-error">{fieldErrors.colorId}</p>}
+            <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onAddColor} disabled={pending}>
               Thêm màu mới
             </button>
           </div>
           <div className="admin-field">
-            <label className="admin-label">Giới tính *</label>
-            <select className="admin-input" required value={gender} onChange={(e) => setGender(e.target.value as OrderProductGender)}>
-              {ORDER_PRODUCT_GENDER_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <label className="admin-label" htmlFor="custom-product-unit">
+              Đơn vị
+            </label>
+            <input id="custom-product-unit" className="admin-input" value={unit} disabled={pending} onChange={(e) => setUnit(e.target.value)} />
           </div>
           <div className="admin-field">
-            <label className="admin-label">Size (tùy chọn)</label>
-            <input className="admin-input" value={sizeName} onChange={(e) => setSizeName(e.target.value)} placeholder="M, L, XL…" />
+            <label className="admin-label" htmlFor="custom-product-size">
+              Size template (tùy chọn)
+            </label>
+            <input id="custom-product-size" className="admin-input" value={sizeName} disabled={pending} onChange={(e) => setSizeName(e.target.value)} placeholder="M, L, XL…" />
           </div>
           <div className="admin-field">
-            <label className="admin-label">MOQ</label>
-            <input className="admin-input" type="number" min="0" value={defaultMoq} onChange={(e) => setDefaultMoq(e.target.value)} />
+            <label className="admin-label" htmlFor="custom-product-moq">
+              MOQ
+            </label>
+            <input id="custom-product-moq" className="admin-input" type="number" min="0" value={defaultMoq} disabled={pending} onChange={(e) => setDefaultMoq(e.target.value)} />
           </div>
           <div className="admin-field">
-            <label className="admin-label">Đơn vị</label>
-            <input className="admin-input" value={unit} onChange={(e) => setUnit(e.target.value)} />
+            <label className="admin-label" htmlFor="custom-product-lead">
+              Thời gian sản xuất
+            </label>
+            <input id="custom-product-lead" className="admin-input" value={productionLeadTime} disabled={pending} onChange={(e) => setProductionLeadTime(e.target.value)} />
           </div>
-          <div className="admin-field">
-            <label className="admin-label">Thời gian sản xuất</label>
-            <input className="admin-input" value={productionLeadTime} onChange={(e) => setProductionLeadTime(e.target.value)} />
+          <div className="admin-field admin-quick-create-grid__full">
+            <label className="admin-label" htmlFor="custom-product-desc">
+              Mô tả
+            </label>
+            <textarea id="custom-product-desc" className="admin-textarea" rows={2} value={description} disabled={pending} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-            <label className="admin-label">Mô tả</label>
-            <textarea className="admin-textarea" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
+          <div className="admin-field admin-quick-create-grid__full">
             <label className="admin-label">Ảnh thiết kế / sản phẩm</label>
             <MediaPicker folder="general" usageType="auto" value={designImageUrl} onChange={setDesignImageUrl} />
           </div>
         </div>
-        <div className="quote-quick-contact-modal__actions">
-          <button type="button" className="admin-btn admin-btn--secondary" onClick={onClose}>Hủy</button>
-          <button type="submit" className="admin-btn admin-btn--primary">Tạo sản phẩm</button>
-        </div>
       </form>
-    </div>
+    </AdminQuickCreateShell>
   );
 }

@@ -20,7 +20,8 @@ import QuoteItemFormRow, {
   type QuoteItemRow,
 } from "@/components/admin/quotes/QuoteItemFormRow";
 import QuickAddContactModal from "@/components/admin/quotes/QuickAddContactModal";
-import type { SalesRepresentativeRecord } from "@/features/sales/types";
+import type { EmployeeRecord } from "@/features/employees/employee.service";
+import { employeeRoleLabel } from "@/features/employees/employee-role";
 
 type ProductOption = { id: string; name: string };
 type VariantOption = {
@@ -93,7 +94,7 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
   const [customerEmail, setCustomerEmail] = useState("");
   const [salesRepresentativeId, setSalesRepresentativeId] = useState("");
   const [salesTitle, setSalesTitle] = useState("");
-  const [salesReps, setSalesReps] = useState<SalesRepresentativeRecord[]>([]);
+  const [salesEmployees, setSalesEmployees] = useState<EmployeeRecord[]>([]);
   const [quickAddContactOpen, setQuickAddContactOpen] = useState(false);
   const [salesName, setSalesName] = useState("");
   const [salesPhone, setSalesPhone] = useState("");
@@ -101,13 +102,12 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
   const [salesAddress, setSalesAddress] = useState("");
   const [preparedBy, setPreparedBy] = useState("");
 
-  function applySalesRep(rep: SalesRepresentativeRecord) {
-    setSalesRepresentativeId(rep.id);
-    setSalesName(rep.fullName);
-    setSalesTitle(rep.title ?? "");
-    setSalesPhone(rep.phone ?? "");
-    setSalesEmail(rep.email ?? "");
-    setSalesAddress(rep.address ?? "");
+  function applySalesEmployee(employee: EmployeeRecord) {
+    setSalesRepresentativeId("");
+    setSalesName(employee.fullName);
+    setSalesTitle(employee.jobTitle ?? "");
+    setSalesPhone(employee.phone ?? "");
+    setSalesEmail(employee.email ?? "");
   }
 
   async function loadCustomerContacts(id: string) {
@@ -156,11 +156,18 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
     void Promise.all([
       fetch("/api/admin/products?pageSize=200").then((r) => r.json()),
       fetch("/api/crm/leads").then((r) => r.json()),
-      fetch("/api/admin/sales?active=1").then((r) => r.json()),
-    ]).then(([productsData, leadsData, salesData]) => {
+      fetch("/api/employees?active=1&role=SALES&limit=200").then((r) => r.json()),
+      fetch("/api/employees?active=1&role=ADMIN&limit=200").then((r) => r.json()),
+    ]).then(([productsData, leadsData, salesData, adminData]) => {
       setProducts((productsData as { products?: ProductOption[] }).products ?? []);
       setLeads((leadsData as { leads?: LeadOption[] }).leads ?? []);
-      setSalesReps((salesData as { salesReps?: SalesRepresentativeRecord[] }).salesReps ?? []);
+      const sales = (salesData as { employees?: EmployeeRecord[] }).employees ?? [];
+      const admins = (adminData as { employees?: EmployeeRecord[] }).employees ?? [];
+      const merged = [...sales];
+      for (const admin of admins) {
+        if (!merged.some((e) => e.id === admin.id)) merged.push(admin);
+      }
+      setSalesEmployees(merged);
     });
   }, []);
 
@@ -740,18 +747,19 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
               <label className="admin-label">Chọn nhân viên tư vấn</label>
               <select
                 className="admin-input"
-                value={salesRepresentativeId}
+                value={salesName ? salesEmployees.find((e) => e.fullName === salesName)?.id ?? "" : ""}
                 onChange={(e) => {
-                  const rep = salesReps.find((r) => r.id === e.target.value);
-                  if (rep) applySalesRep(rep);
+                  const employee = salesEmployees.find((r) => r.id === e.target.value);
+                  if (employee) applySalesEmployee(employee);
                   else setSalesRepresentativeId("");
                 }}
               >
                 <option value="">— Chọn nhân viên —</option>
-                {salesReps.map((rep) => (
-                  <option key={rep.id} value={rep.id}>
-                    {rep.fullName}
-                    {rep.isDefault ? " (Mặc định)" : ""}
+                {salesEmployees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.fullName}
+                    {employee.jobTitle ? ` · ${employee.jobTitle}` : ""}
+                    {employee.role ? ` · ${employeeRoleLabel(employee.role)}` : ""}
                   </option>
                 ))}
               </select>

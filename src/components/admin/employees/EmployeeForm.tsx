@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import type { EmployeeRole } from "@prisma/client";
+import { EMPLOYEE_ROLES, EMPLOYEE_ROLE_LABELS } from "@/features/employees/employee-role";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
@@ -19,6 +21,7 @@ export default function EmployeeForm({ mode, employeeId }: Props) {
   const [fullName, setFullName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [department, setDepartment] = useState("");
+  const [role, setRole] = useState<EmployeeRole | "">("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [isActive, setIsActive] = useState(true);
@@ -34,6 +37,7 @@ export default function EmployeeForm({ mode, employeeId }: Props) {
             fullName: string;
             jobTitle: string | null;
             department: string | null;
+            role: EmployeeRole | null;
             phone: string | null;
             email: string | null;
             isActive: boolean;
@@ -46,6 +50,7 @@ export default function EmployeeForm({ mode, employeeId }: Props) {
         setFullName(emp.fullName);
         setJobTitle(emp.jobTitle ?? "");
         setDepartment(emp.department ?? "");
+        setRole(emp.role ?? "");
         setPhone(emp.phone ?? "");
         setEmail(emp.email ?? "");
         setIsActive(emp.isActive);
@@ -61,6 +66,7 @@ export default function EmployeeForm({ mode, employeeId }: Props) {
       fullName,
       jobTitle: jobTitle || null,
       department: department || null,
+      role: role || null,
       phone: phone || null,
       email: email || null,
       isActive,
@@ -103,6 +109,15 @@ export default function EmployeeForm({ mode, employeeId }: Props) {
       <div className="admin-field">
         <label className="admin-label">Chức vụ</label>
         <input className="admin-input" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
+      </div>
+      <div className="admin-field">
+        <label className="admin-label">Vai trò</label>
+        <select className="admin-input" value={role} onChange={(e) => setRole(e.target.value as EmployeeRole | "")}>
+          <option value="">— Chọn vai trò —</option>
+          {EMPLOYEE_ROLES.map((value) => (
+            <option key={value} value={value}>{EMPLOYEE_ROLE_LABELS[value]}</option>
+          ))}
+        </select>
       </div>
       <div className="admin-field">
         <label className="admin-label">Phòng ban</label>

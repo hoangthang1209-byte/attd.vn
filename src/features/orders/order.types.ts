@@ -32,6 +32,17 @@ export type OrderListRecord = {
   createdAt: string;
 };
 
+export type OrderItemVariantRecord = {
+  id: string;
+  colorId: string | null;
+  colorNameSnapshot: string | null;
+  sizeValue: string | null;
+  skuSnapshot: string | null;
+  quantity: number;
+  unit: string;
+  sortOrder: number;
+};
+
 export type OrderItemRecord = {
   id: string;
   productNameSnapshot: string | null;
@@ -53,6 +64,7 @@ export type OrderItemRecord = {
   unitPrice: number;
   lineTotal: number;
   sortOrder: number;
+  variants: OrderItemVariantRecord[];
 };
 
 export type OrderPaymentRecord = {
@@ -85,6 +97,7 @@ export type OrderDetailRecord = {
   customerId: string | null;
   contactId: string | null;
   salesRepresentativeId: string | null;
+  salesEmployeeId: string | null;
   status: OrderStatus;
   currency: string;
   priceVatType: QuotePriceVatType;
@@ -164,6 +177,17 @@ export type UpdateOrderStatusInput = {
   correctionReason?: string | null;
 };
 
+export type OrderItemVariantInputPayload = {
+  id?: string | null;
+  colorId?: string | null;
+  colorNameSnapshot?: string | null;
+  sizeValue?: string | null;
+  skuSnapshot?: string | null;
+  quantity: number;
+  unit?: string | null;
+  sortOrder?: number;
+};
+
 export type OrderItemInputPayload = {
   id?: string | null;
   productId?: string | null;
@@ -187,12 +211,14 @@ export type OrderItemInputPayload = {
   unit?: string | null;
   unitPrice: number;
   sortOrder?: number;
+  variants?: OrderItemVariantInputPayload[];
 };
 
 export type CreateManualOrderInput = {
   customerId?: string | null;
   contactId?: string | null;
   salesRepresentativeId?: string | null;
+  salesEmployeeId?: string | null;
   orderDate: string;
   currency?: string;
   priceVatType?: QuotePriceVatType;

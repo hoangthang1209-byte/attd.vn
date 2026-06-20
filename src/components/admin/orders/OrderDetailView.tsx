@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { OrderPaymentMethod, OrderPaymentType, OrderStatus } from "@prisma/client";
@@ -671,19 +671,51 @@ export default function OrderDetailView({ id }: Props) {
             </thead>
             <tbody>
               {order.items.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    {[item.productNameSnapshot, item.variantNameSnapshot].filter(Boolean).join(" · ") || "—"}
-                    {item.description && <div className="admin-field-hint">{item.description}</div>}
-                    {item.itemNote && <div className="admin-field-hint">Ghi chú: {item.itemNote}</div>}
-                  </td>
-                  <td>{item.skuSnapshot ?? "—"}</td>
-                  <td>{item.colorSnapshot ?? "—"}</td>
-                  <td>{item.quantity} {item.unit}</td>
-                  <td>{formatOrderCurrency(item.unitPrice, order.currency)}</td>
-                  <td>{formatOrderCurrency(item.lineTotal, order.currency)}</td>
-                  <td>{item.productionLeadTime ?? "—"}</td>
-                </tr>
+                <Fragment key={item.id}>
+                  <tr>
+                    <td>
+                      {[item.productNameSnapshot, item.variantNameSnapshot].filter(Boolean).join(" · ") || "—"}
+                      {item.description && <div className="admin-field-hint">{item.description}</div>}
+                      {item.itemNote && <div className="admin-field-hint">Ghi chú: {item.itemNote}</div>}
+                    </td>
+                    <td>{item.skuSnapshot ?? "—"}</td>
+                    <td>{item.colorSnapshot ?? "—"}</td>
+                    <td>{item.quantity} {item.unit}</td>
+                    <td>{formatOrderCurrency(item.unitPrice, order.currency)}</td>
+                    <td>{formatOrderCurrency(item.lineTotal, order.currency)}</td>
+                    <td>{item.productionLeadTime ?? "—"}</td>
+                  </tr>
+                  {item.variants.length > 0 && (
+                    <tr key={`${item.id}-variants`}>
+                      <td colSpan={7} style={{ paddingTop: 0 }}>
+                        <div className="admin-table-wrap">
+                          <table className="admin-table admin-table--compact">
+                            <thead>
+                              <tr>
+                                <th>Màu sắc</th>
+                                <th>Size</th>
+                                <th>SKU</th>
+                                <th>Số lượng</th>
+                                <th>Đơn vị</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {item.variants.map((variant) => (
+                                <tr key={variant.id}>
+                                  <td>{variant.colorNameSnapshot ?? "—"}</td>
+                                  <td>{variant.sizeValue ?? "—"}</td>
+                                  <td>{variant.skuSnapshot ?? "—"}</td>
+                                  <td>{variant.quantity}</td>
+                                  <td>{variant.unit}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

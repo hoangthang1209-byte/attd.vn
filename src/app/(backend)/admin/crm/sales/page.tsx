@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
-import SalesRepresentativesList from "@/components/admin/sales/SalesRepresentativesList";
+import { redirect } from "next/navigation";
 
-export default function SalesPage() {
-  return (
-    <AdminShell title="Nhân viên tư vấn">
-      <SalesRepresentativesList />
-    </AdminShell>
-  );
+export default async function SalesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ role?: string }>;
+}) {
+  const params = await searchParams;
+  const role = params.role ?? "SALES";
+  redirect(`/admin/employees?role=${encodeURIComponent(role)}`);
 }

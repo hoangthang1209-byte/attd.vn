@@ -40,6 +40,100 @@ async function logOrderConversionActivity(
   });
 }
 
+function resolveQuoteItemVariantData(item: {
+  variantNameSnapshot: string | null;
+  colorSnapshot: string | null;
+  quantity: number;
+  unit: string;
+}) {
+  const parts = item.variantNameSnapshot?.split(" · ").map((p) => p.trim()) ?? [];
+  const sizeValue = parts.length >= 2 ? parts[parts.length - 1] : null;
+  const hasColorOrSize = Boolean(item.colorSnapshot?.trim() || sizeValue);
+  if (!hasColorOrSize) return null;
+  return {
+    colorNameSnapshot: item.colorSnapshot,
+    sizeValue,
+    quantity: item.quantity,
+    unit: item.unit,
+    sortOrder: 0,
+  };
+}
+
+async function buildQuoteConversionItems(
+  tx: Prisma.TransactionClient,
+  quoteItems: Array<{
+    productId: string | null;
+    variantId: string | null;
+    productNameSnapshot: string | null;
+    variantNameSnapshot: string | null;
+    description: string | null;
+    designMediaAssetId: string | null;
+    designImageUrl: string | null;
+    skuSnapshot: string | null;
+    colorSnapshot: string | null;
+    categorySnapshot: string | null;
+    genderSnapshot: string | null;
+    moqSnapshot: number | null;
+    itemNote: string | null;
+    productionLeadTime: string | null;
+    quantity: number;
+    unit: string;
+    unitPrice: Prisma.Decimal;
+    lineTotal: Prisma.Decimal;
+    sortOrder: number;
+  }>,
+) {
+  const variantIds = quoteItems.map((item) => item.variantId).filter(Boolean) as string[];
+  const productVariants = variantIds.length
+    ? await tx.productVariant.findMany({
+        where: { id: { in: variantIds } },
+        include: { color: true },
+      })
+    : [];
+  const variantById = new Map(productVariants.map((v) => [v.id, v]));
+
+  return quoteItems.map((item, index) => {
+    const linkedVariant = item.variantId ? variantById.get(item.variantId) : null;
+    const variantSeed = resolveQuoteItemVariantData(item);
+    const variantCreates = [];
+
+    if (variantSeed) {
+      variantCreates.push({
+        colorId: linkedVariant?.colorId ?? null,
+        colorNameSnapshot: linkedVariant?.color?.name ?? variantSeed.colorNameSnapshot,
+        sizeValue: linkedVariant?.sizeName ?? variantSeed.sizeValue,
+        skuSnapshot: item.skuSnapshot,
+        quantity: variantSeed.quantity,
+        unit: variantSeed.unit,
+        sortOrder: 0,
+      });
+    }
+
+    return {
+      productId: item.productId,
+      variantId: item.variantId,
+      productNameSnapshot: item.productNameSnapshot,
+      variantNameSnapshot: item.variantNameSnapshot,
+      description: item.description,
+      designMediaAssetId: item.designMediaAssetId,
+      designImageUrl: item.designImageUrl,
+      skuSnapshot: item.skuSnapshot,
+      colorSnapshot: item.colorSnapshot,
+      categorySnapshot: item.categorySnapshot,
+      genderSnapshot: item.genderSnapshot,
+      moqSnapshot: item.moqSnapshot,
+      itemNote: item.itemNote,
+      productionLeadTime: item.productionLeadTime,
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      sortOrder: item.sortOrder ?? index,
+      ...(variantCreates.length ? { variants: { create: variantCreates } } : {}),
+    };
+  });
+}
+
 function resolveCommercialTotal(quote: {
   manualOverride: boolean;
   manualTotalAmount: Prisma.Decimal | null;
@@ -94,6 +188,8 @@ export async function convertQuoteToOrder(quoteId: string) {
         });
         if (duplicate) return duplicate.id;
 
+        const itemCreates = await buildQuoteConversionItems(tx, quote.items);
+
         const created = await tx.order.create({
           data: {
             orderNo,
@@ -131,29 +227,7 @@ export async function convertQuoteToOrder(quoteId: string) {
             sourceQuoteNo: quote.quoteNo,
             sourceQuoteDate: quote.quoteDate,
             sourceQuoteValidUntil: quote.validUntil,
-            items: {
-              create: quote.items.map((item, index) => ({
-                productId: item.productId,
-                variantId: item.variantId,
-                productNameSnapshot: item.productNameSnapshot,
-                variantNameSnapshot: item.variantNameSnapshot,
-                description: item.description,
-                designMediaAssetId: item.designMediaAssetId,
-                designImageUrl: item.designImageUrl,
-                skuSnapshot: item.skuSnapshot,
-                colorSnapshot: item.colorSnapshot,
-                categorySnapshot: item.categorySnapshot,
-                genderSnapshot: item.genderSnapshot,
-                moqSnapshot: item.moqSnapshot,
-                itemNote: item.itemNote,
-                productionLeadTime: item.productionLeadTime,
-                quantity: item.quantity,
-                unit: item.unit,
-                unitPrice: item.unitPrice,
-                lineTotal: item.lineTotal,
-                sortOrder: item.sortOrder ?? index,
-              })),
-            },
+            items: { create: itemCreates },
             activities: {
               create: {
                 type: "CREATED",

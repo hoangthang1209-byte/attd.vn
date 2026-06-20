@@ -15,8 +15,12 @@ import {
   orderProductGenderLabel,
 } from "@/features/orders/order-gender";
 import { allocateOrderCustomSku } from "@/features/orders/order-custom-sku";
+import {
+  buildOrderItemVariantSkuBase,
+} from "@/features/orders/order-item-variant-sku";
 import { ensureProductSystemCode } from "@/features/products/product-system-code";
 import { resolveDeliveryMethodSnapshot } from "@/features/delivery/delivery-method.service";
+import { resolveSalesEmployeeSnapshot } from "@/features/employees/employee.service";
 import {
   canUpdateOrderStatus,
   formatOrderStatusCorrection,
@@ -29,6 +33,7 @@ import {
   computeOrderItem,
   computeOrderTotals,
   type OrderItemInput,
+  type OrderItemVariantInput,
 } from "@/features/orders/order-totals";
 import { generateOrderNo } from "@/features/orders/order-code";
 import {
@@ -101,6 +106,7 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
     customerId: row.customerId,
     contactId: row.contactId,
     salesRepresentativeId: row.salesRepresentativeId,
+    salesEmployeeId: row.salesEmployeeId,
     status: row.status,
     currency: row.currency,
     priceVatType: row.priceVatType,
@@ -180,6 +186,16 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
       unitPrice: item.unitPrice.toNumber(),
       lineTotal: item.lineTotal.toNumber(),
       sortOrder: item.sortOrder,
+      variants: item.variants.map((variant) => ({
+        id: variant.id,
+        colorId: variant.colorId,
+        colorNameSnapshot: variant.colorNameSnapshot,
+        sizeValue: variant.sizeValue,
+        skuSnapshot: variant.skuSnapshot,
+        quantity: variant.quantity,
+        unit: variant.unit,
+        sortOrder: variant.sortOrder,
+      })),
     })),
     payments,
     activities: row.activities.map((activity) => ({
@@ -205,7 +221,10 @@ async function fetchOrderRow(id: string) {
       productionOwner: { select: { id: true, fullName: true, isActive: true } },
       deliveryOwner: { select: { id: true, fullName: true, isActive: true } },
       deliveryMethodRef: { select: { id: true, name: true, isActive: true } },
-      items: { orderBy: { sortOrder: "asc" } },
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: { variants: { orderBy: { sortOrder: "asc" } } },
+      },
       payments: { orderBy: { paidAt: "desc" } },
       activities: { orderBy: { createdAt: "desc" } },
     },
@@ -507,12 +526,28 @@ function buildOrderItemCreates(items: ReturnType<typeof computeOrderItem>[]) {
     unitPrice: item.unitPrice,
     lineTotal: item.lineTotal,
     sortOrder: item.sortOrder ?? index,
+    ...(item.variants?.length
+      ? {
+          variants: {
+            create: item.variants.map((variant, variantIndex) => ({
+              colorId: variant.colorId ?? null,
+              colorNameSnapshot: variant.colorNameSnapshot?.trim() || null,
+              sizeValue: variant.sizeValue?.trim() || null,
+              skuSnapshot: variant.skuSnapshot?.trim() || null,
+              quantity: variant.quantity,
+              unit: variant.unit?.trim() || item.unit,
+              sortOrder: variant.sortOrder ?? variantIndex,
+            })),
+          },
+        }
+      : {}),
   }));
 }
 
 function buildOrderDataFromInput(
   input: CreateManualOrderInput,
   totals: ReturnType<typeof computeOrderTotals>,
+  salesSnapshots?: Awaited<ReturnType<typeof resolveSalesEmployeeSnapshot>>,
 ) {
   const orderDate = new Date(input.orderDate);
   if (Number.isNaN(orderDate.getTime())) {
@@ -522,7 +557,9 @@ function buildOrderDataFromInput(
   return {
     customerId: input.customerId ?? null,
     contactId: input.contactId ?? null,
-    salesRepresentativeId: input.salesRepresentativeId ?? null,
+    salesRepresentativeId:
+      salesSnapshots?.salesRepresentativeId ?? input.salesRepresentativeId ?? null,
+    salesEmployeeId: salesSnapshots?.salesEmployeeId ?? input.salesEmployeeId ?? null,
     currency: input.currency?.trim() || "VND",
     priceVatType: input.priceVatType ?? "EXCLUDING_VAT",
     subtotal: totals.subtotal,
@@ -545,10 +582,10 @@ function buildOrderDataFromInput(
     contactTitle: input.contactTitle?.trim() || null,
     contactPhone: input.contactPhone?.trim() || null,
     contactEmail: input.contactEmail?.trim() || null,
-    salesName: input.salesName?.trim() || null,
-    salesTitle: input.salesTitle?.trim() || null,
-    salesPhone: input.salesPhone?.trim() || null,
-    salesEmail: input.salesEmail?.trim() || null,
+    salesName: salesSnapshots?.salesName ?? (input.salesName?.trim() || null),
+    salesTitle: salesSnapshots?.salesTitle ?? (input.salesTitle?.trim() || null),
+    salesPhone: salesSnapshots?.salesPhone ?? (input.salesPhone?.trim() || null),
+    salesEmail: salesSnapshots?.salesEmail ?? (input.salesEmail?.trim() || null),
     deliveryRecipientName: input.contactName?.trim() || null,
     deliveryRecipientPhone: input.contactPhone?.trim() || null,
     deliveryAddress: input.customerAddress?.trim() || null,
@@ -563,7 +600,19 @@ function validateOrderItemsInput(input: CreateManualOrderInput) {
     if (!item.productNameSnapshot?.trim()) {
       throw new OrderValidationError("Vui lòng nhập tên sản phẩm cho tất cả dòng.");
     }
-    if (item.quantity < 1) {
+    if (item.variants?.length) {
+      const seen = new Set<string>();
+      for (const variant of item.variants) {
+        const key = `${variant.colorId ?? ""}|${(variant.sizeValue ?? "").trim().toUpperCase()}`;
+        if (seen.has(key)) {
+          throw new OrderValidationError("Màu và size này đã tồn tại trong sản phẩm.");
+        }
+        seen.add(key);
+        if (variant.quantity < 1) {
+          throw new OrderValidationError("Số lượng biến thể phải lớn hơn 0.");
+        }
+      }
+    } else if (item.quantity < 1) {
       throw new OrderValidationError("Số lượng phải lớn hơn 0.");
     }
     if (item.unitPrice < 0) {
@@ -609,6 +658,75 @@ async function resolveOrderItemSnapshot(
   return { ...item, colorSnapshot, categorySnapshot, genderSnapshot };
 }
 
+async function prepareOrderItemVariantsForSave(
+  variants: OrderItemVariantInput[] | undefined,
+  item: OrderItemInput,
+  customerCode: string | null | undefined,
+  tx?: Prisma.TransactionClient,
+): Promise<OrderItemVariantInput[] | undefined> {
+  if (!variants?.length) return undefined;
+
+  const db = tx ?? prisma;
+  const product = item.productId
+    ? await db.product.findUnique({
+        where: { id: item.productId },
+        select: { systemCode: true },
+      })
+    : null;
+  const systemCode =
+    product?.systemCode ??
+    (item.productId ? await ensureProductSystemCode(item.productId) : null);
+
+  const usedSkus = new Set<string>();
+  const prepared: OrderItemVariantInput[] = [];
+
+  for (let index = 0; index < variants.length; index += 1) {
+    const variant = variants[index];
+    let colorNameSnapshot = variant.colorNameSnapshot ?? null;
+    let colorSlug: string | undefined;
+
+    if (variant.colorId) {
+      const color = await db.color.findUnique({ where: { id: variant.colorId } });
+      if (!color) throw new OrderValidationError("Màu sắc biến thể không hợp lệ.");
+      colorNameSnapshot = color.name;
+      colorSlug = color.slug;
+    }
+
+    const quantity = Math.max(1, Math.floor(variant.quantity));
+    let skuSnapshot = variant.skuSnapshot?.trim() || null;
+
+    if (!skuSnapshot && customerCode?.trim() && systemCode) {
+      const base = buildOrderItemVariantSkuBase({
+        customerCode: customerCode.trim(),
+        systemCode,
+        colorName: colorNameSnapshot,
+        colorSlug,
+        sizeValue: variant.sizeValue,
+      });
+      skuSnapshot = base;
+      let suffix = 0;
+      while (usedSkus.has(skuSnapshot)) {
+        suffix += 1;
+        skuSnapshot = `${base}-${String(suffix).padStart(2, "0")}`;
+      }
+    }
+
+    if (skuSnapshot) usedSkus.add(skuSnapshot);
+
+    prepared.push({
+      ...variant,
+      colorNameSnapshot,
+      sizeValue: variant.sizeValue?.trim() || null,
+      skuSnapshot,
+      quantity,
+      unit: variant.unit?.trim() || item.unit || "cái",
+      sortOrder: variant.sortOrder ?? index,
+    });
+  }
+
+  return prepared;
+}
+
 async function prepareOrderItemsForSave(
   items: OrderItemInput[],
   customerCode: string | null | undefined,
@@ -618,10 +736,22 @@ async function prepareOrderItemsForSave(
   const prepared: ReturnType<typeof computeOrderItem>[] = [];
 
   for (const raw of items) {
-    const resolved = await resolveOrderItemSnapshot(raw, tx);
+    const preparedVariants = await prepareOrderItemVariantsForSave(
+      raw.variants,
+      raw,
+      customerCode,
+      tx,
+    );
+    const resolved = await resolveOrderItemSnapshot(
+      {
+        ...raw,
+        variants: preparedVariants,
+      },
+      tx,
+    );
     let skuSnapshot = resolved.skuSnapshot?.trim() || null;
 
-    if (!skuSnapshot && customerCode?.trim() && resolved.productId) {
+    if (!skuSnapshot && customerCode?.trim() && resolved.productId && !preparedVariants?.length) {
       const product = await db.product.findUnique({
         where: { id: resolved.productId },
         select: { systemCode: true },
@@ -647,7 +777,13 @@ async function prepareOrderItemsForSave(
       }
     }
 
-    prepared.push(computeOrderItem({ ...resolved, skuSnapshot }));
+    prepared.push(
+      computeOrderItem({
+        ...resolved,
+        skuSnapshot,
+        variants: preparedVariants,
+      }),
+    );
   }
 
   return prepared;
@@ -655,6 +791,9 @@ async function prepareOrderItemsForSave(
 
 export async function createManualOrder(input: CreateManualOrderInput) {
   validateOrderItemsInput(input);
+  const salesSnapshots = input.salesEmployeeId
+    ? await resolveSalesEmployeeSnapshot(input.salesEmployeeId)
+    : undefined;
   const computedItems = await prepareOrderItemsForSave(input.items, input.customerCode);
   const totals = computeOrderTotals(computedItems, {
     discountAmount: input.discountAmount,
@@ -662,7 +801,7 @@ export async function createManualOrder(input: CreateManualOrderInput) {
     vatRate: input.vatRate,
     vatAmount: input.vatAmount,
   });
-  const orderData = buildOrderDataFromInput(input, totals);
+  const orderData = buildOrderDataFromInput(input, totals, salesSnapshots);
   const itemCreates = buildOrderItemCreates(computedItems);
 
   const maxAttempts = 5;
@@ -710,6 +849,9 @@ export async function updateOrderDetails(id: string, input: UpdateOrderInput) {
   }
 
   validateOrderItemsInput(input);
+  const salesSnapshots = input.salesEmployeeId
+    ? await resolveSalesEmployeeSnapshot(input.salesEmployeeId)
+    : undefined;
   const computedItems = await prepareOrderItemsForSave(input.items, input.customerCode);
   const totals = computeOrderTotals(computedItems, {
     discountAmount: input.discountAmount,
@@ -717,7 +859,7 @@ export async function updateOrderDetails(id: string, input: UpdateOrderInput) {
     vatRate: input.vatRate,
     vatAmount: input.vatAmount,
   });
-  const orderData = buildOrderDataFromInput(input, totals);
+  const orderData = buildOrderDataFromInput(input, totals, salesSnapshots);
   const itemCreates = buildOrderItemCreates(computedItems);
 
   const previousItemCount = await prisma.orderItem.count({ where: { orderId: id } });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseUpdateOrderBody } from "@/features/orders/order-input";
+import { EmployeeValidationError } from "@/features/employees/employee.service";
 import {
   getOrderDetail,
   OrderValidationError,
@@ -38,7 +39,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     const order = await updateOrderDetails(id, parseUpdateOrderBody(body as Record<string, unknown>));
     return NextResponse.json({ order });
   } catch (err) {
-    if (err instanceof OrderValidationError) {
+    if (err instanceof OrderValidationError || err instanceof EmployeeValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });
     }
     if (err instanceof Error && err.message) {

@@ -3,14 +3,21 @@ import {
   createEmployee,
   EmployeeValidationError,
   listEmployees,
+  parseEmployeeRoleInput,
 } from "@/features/employees/employee.service";
+import { isEmployeeRole } from "@/features/employees/employee-role";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   try {
+    const roleParam = searchParams.get("role");
     const result = await listEmployees({
       search: searchParams.get("search") ?? undefined,
       activeOnly: searchParams.get("active") === "1",
+      role:
+        roleParam && isEmployeeRole(roleParam)
+          ? roleParam
+          : undefined,
       limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : 100,
     });
     return NextResponse.json(result);
@@ -36,6 +43,7 @@ export async function POST(req: NextRequest) {
       fullName: typeof raw.fullName === "string" ? raw.fullName : "",
       jobTitle: typeof raw.jobTitle === "string" ? raw.jobTitle : null,
       department: typeof raw.department === "string" ? raw.department : null,
+      role: parseEmployeeRoleInput(raw.role) ?? null,
       phone: typeof raw.phone === "string" ? raw.phone : null,
       email: typeof raw.email === "string" ? raw.email : null,
       isActive: raw.isActive !== false,

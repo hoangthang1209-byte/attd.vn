@@ -90,7 +90,8 @@ model Color {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
   variants  ProductVariant[]
-  orderItems OrderItem[]
+  orderItems     OrderItem[]
+  orderItemVariants OrderItemVariant[]
 
   @@index([isActive])
   @@index([sortOrder])
@@ -1117,12 +1118,15 @@ model SalesRepresentative {
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   avatarMediaAsset   MediaAsset? @relation(fields: [avatarMediaAssetId], references: [id], onDelete: SetNull)
+  employeeId         String?     @unique
+  employee           Employee?   @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   quotes             Quote[]
   orders             Order[]
 
   @@index([isActive])
   @@index([isDefault])
   @@index([code])
+  @@index([employeeId])
 }
 
 model Quote {
@@ -1265,6 +1269,14 @@ enum OrderProductGender {
   OTHER
 }
 
+enum EmployeeRole {
+  SALES
+  PRODUCTION
+  DELIVERY
+  ADMIN
+  OTHER
+}
+
 enum OrderStatus {
   NEW
   CONFIRMED
@@ -1312,6 +1324,7 @@ model Order {
   customerId            String?
   contactId             String?
   salesRepresentativeId String?
+  salesEmployeeId       String?
   status                OrderStatus          @default(NEW)
   currency              String               @default("VND")
   priceVatType          QuotePriceVatType    @default(EXCLUDING_VAT)
@@ -1371,6 +1384,7 @@ model Order {
   customer              Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   contact               Contact?             @relation(fields: [contactId], references: [id], onDelete: SetNull)
   salesRepresentative   SalesRepresentative? @relation(fields: [salesRepresentativeId], references: [id], onDelete: SetNull)
+  salesEmployee         Employee?            @relation("OrderSalesEmployee", fields: [salesEmployeeId], references: [id], onDelete: SetNull)
   productionOwner       Employee?            @relation("OrderProductionOwner", fields: [productionOwnerId], references: [id], onDelete: SetNull)
   deliveryOwner         Employee?            @relation("OrderDeliveryOwner", fields: [deliveryOwnerId], references: [id], onDelete: SetNull)
   deliveryMethodRef     DeliveryMethod?      @relation(fields: [deliveryMethodId], references: [id], onDelete: SetNull)
@@ -1387,24 +1401,29 @@ model Order {
   @@index([deliveryExpectedAt])
   @@index([productionOwnerId])
   @@index([deliveryMethodId])
+  @@index([salesEmployeeId])
 }
 
 model Employee {
-  id           String   @id @default(cuid())
-  employeeCode String   @unique
+  id           String        @id @default(cuid())
+  employeeCode String        @unique
   fullName     String
   jobTitle     String?
   department   String?
+  role         EmployeeRole?
   phone        String?
   email        String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  productionOrders Order[] @relation("OrderProductionOwner")
-  deliveryOrders   Order[] @relation("OrderDeliveryOwner")
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  productionOrders Order[]       @relation("OrderProductionOwner")
+  deliveryOrders   Order[]       @relation("OrderDeliveryOwner")
+  salesOrders      Order[]       @relation("OrderSalesEmployee")
+  salesRepresentative SalesRepresentative?
 
   @@index([employeeCode])
   @@index([isActive])
+  @@index([role])
 }
 
 model DeliveryMethod {
@@ -1455,12 +1474,32 @@ model OrderItem {
   color              Color?        @relation(fields: [colorId], references: [id], onDelete: SetNull)
   category           Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   designMediaAsset   MediaAsset?   @relation(fields: [designMediaAssetId], references: [id], onDelete: SetNull)
+  variants           OrderItemVariant[]
 
   @@index([orderId])
   @@index([productId])
   @@index([variantId])
   @@index([colorId])
   @@index([categoryId])
+}
+
+model OrderItemVariant {
+  id                String    @id @default(cuid())
+  orderItemId       String
+  sortOrder         Int       @default(0)
+  colorId           String?
+  colorNameSnapshot String?
+  sizeValue         String?
+  skuSnapshot       String?
+  quantity          Int
+  unit              String    @default("cái")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  orderItem         OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  color             Color?    @relation(fields: [colorId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId])
+  @@index([colorId])
 }
 
 model OrderPayment {

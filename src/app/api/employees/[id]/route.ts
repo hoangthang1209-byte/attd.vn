@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   EmployeeValidationError,
   getEmployeeById,
+  parseEmployeeRoleInput,
   updateEmployee,
 } from "@/features/employees/employee.service";
 
@@ -33,6 +34,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       fullName: typeof raw.fullName === "string" ? raw.fullName : undefined,
       jobTitle: typeof raw.jobTitle === "string" ? raw.jobTitle : raw.jobTitle === null ? null : undefined,
       department: typeof raw.department === "string" ? raw.department : raw.department === null ? null : undefined,
+      role: parseEmployeeRoleInput(raw.role),
       phone: typeof raw.phone === "string" ? raw.phone : raw.phone === null ? null : undefined,
       email: typeof raw.email === "string" ? raw.email : raw.email === null ? null : undefined,
       isActive: typeof raw.isActive === "boolean" ? raw.isActive : undefined,

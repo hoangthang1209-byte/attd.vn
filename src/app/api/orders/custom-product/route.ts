@@ -6,6 +6,7 @@ import {
 } from "@/features/orders/order-custom-product.service";
 import { OrderValidationError } from "@/features/orders/order.service";
 import { orderProductGenderLabel } from "@/features/orders/order-gender";
+import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
       },
     }, { status: 201 });
   } catch (err) {
-    if (err instanceof OrderValidationError) {
+    if (err instanceof OrderValidationError || err instanceof ProductAdminValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });
     }
     if (err instanceof Error && err.message) {

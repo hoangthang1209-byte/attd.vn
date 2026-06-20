@@ -2,18 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { EmployeeRole } from "@prisma/client";
 import { formatCrmDateTime } from "@/features/crm/format";
+import { EMPLOYEE_ROLES, EMPLOYEE_ROLE_LABELS, employeeRoleLabel } from "@/features/employees/employee-role";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 
 export default function EmployeesList() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<EmployeeRole | "">(
+    (searchParams.get("role") as EmployeeRole | null) ?? "",
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -22,6 +28,7 @@ export default function EmployeesList() {
       const params = new URLSearchParams();
       if (search.trim()) params.set("search", search.trim());
       if (activeOnly) params.set("active", "1");
+      if (roleFilter) params.set("role", roleFilter);
       const res = await fetch(`/api/employees?${params}`);
       const data = (await res.json()) as {
         employees?: EmployeeRecord[];
@@ -37,7 +44,7 @@ export default function EmployeesList() {
     } finally {
       setLoading(false);
     }
-  }, [search, activeOnly]);
+  }, [search, activeOnly, roleFilter]);
 
   useEffect(() => {
     void load();
@@ -78,6 +85,16 @@ export default function EmployeesList() {
           <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} />
           Chỉ đang hoạt động
         </label>
+        <select
+          className="admin-input"
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value as EmployeeRole | "")}
+        >
+          <option value="">Tất cả vai trò</option>
+          {EMPLOYEE_ROLES.map((role) => (
+            <option key={role} value={role}>{EMPLOYEE_ROLE_LABELS[role]}</option>
+          ))}
+        </select>
         <button type="submit" className="admin-btn">Tìm kiếm</button>
       </form>
 
@@ -95,6 +112,7 @@ export default function EmployeesList() {
               <tr>
                 <th>Mã NV</th>
                 <th>Họ tên</th>
+                <th>Vai trò</th>
                 <th>Chức vụ</th>
                 <th>Phòng ban</th>
                 <th>Số điện thoại</th>
@@ -109,6 +127,7 @@ export default function EmployeesList() {
                 <tr key={emp.id}>
                   <td>{emp.employeeCode}</td>
                   <td>{emp.fullName}</td>
+                  <td>{employeeRoleLabel(emp.role)}</td>
                   <td>{emp.jobTitle ?? "—"}</td>
                   <td>{emp.department ?? "—"}</td>
                   <td>{emp.phone ?? "—"}</td>

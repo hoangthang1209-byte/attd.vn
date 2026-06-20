@@ -2,6 +2,7 @@
 
 import type { OrderProductGender } from "@prisma/client";
 import MediaPicker from "@/components/admin/media/MediaPicker";
+import OrderItemVariantMatrix from "@/components/admin/orders/OrderItemVariantMatrix";
 import type { CategoryOption } from "@/components/admin/orders/QuickAddCategoryModal";
 import type { ColorRecord } from "@/features/colors/color.service";
 import type { OrderItemInput } from "@/features/orders/order-totals";
@@ -27,6 +28,7 @@ type Props = {
   index: number;
   item: OrderItemRow;
   currency: string;
+  customerCode: string;
   products: ProductOption[];
   variants: VariantOption[];
   colors: ColorRecord[];
@@ -35,7 +37,7 @@ type Props = {
   onRemove?: () => void;
   onLoadVariants: (productId: string) => void;
   onProductSelect: (productId: string) => Promise<void>;
-  onAddColor: () => void;
+  onAddColor: (variantIndex?: number) => void;
   onAddCategory: () => void;
   onCustomProduct: () => void;
 };
@@ -47,6 +49,19 @@ export function emptyOrderItem(): OrderItemRow {
     quantity: 100,
     unit: "cái",
     unitPrice: 0,
+    variants: [],
+  };
+}
+
+function defaultVariantFromItem(item: OrderItemRow) {
+  return {
+    key: crypto.randomUUID(),
+    colorId: item.colorId ?? null,
+    colorNameSnapshot: item.colorSnapshot ?? null,
+    sizeValue: null,
+    skuSnapshot: null,
+    quantity: item.quantity > 0 ? item.quantity : 1,
+    unit: item.unit ?? "cái",
   };
 }
 
@@ -54,6 +69,7 @@ export default function OrderItemFormRow({
   index,
   item,
   currency,
+  customerCode,
   products,
   variants,
   colors,
@@ -69,13 +85,26 @@ export default function OrderItemFormRow({
   const lineTotal = computeOrderItem(item).lineTotal;
   const selectedColor = colors.find((c) => c.id === item.colorId);
   const selectedCategory = categories.find((c) => c.id === item.categoryId);
+  const sizeOptions = [
+    ...new Set(
+      variants.map((v) => v.sizeName?.trim()).filter((v): v is string => Boolean(v)),
+    ),
+  ];
+  const showVariantMatrix = Boolean(item.productId || item.variants?.length);
+  const variantRows = item.variants ?? [];
+
+  function ensureVariantsAfterProductSelect() {
+    if (!item.variants?.length && item.colorId) {
+      onChange({ variants: [defaultVariantFromItem(item)] });
+    }
+  }
 
   return (
     <div className="admin-catalog-variant-row" style={{ marginBottom: 12 }}>
       <div className="admin-catalog-variant-header">
         <strong>Dòng #{index + 1}</strong>
         <span className="admin-field-hint">
-          Thành tiền: {formatOrderCurrency(lineTotal, currency)}
+          Tổng SL: {computeOrderItem(item).quantity} · Thành tiền: {formatOrderCurrency(lineTotal, currency)}
         </span>
         {onRemove && (
           <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={onRemove}>
@@ -96,10 +125,11 @@ export default function OrderItemFormRow({
                 productId: id || null,
                 variantId: null,
                 productNameSnapshot: product?.name ?? item.productNameSnapshot,
+                variants: id ? item.variants ?? [] : [],
               });
               if (id) {
                 onLoadVariants(id);
-                void onProductSelect(id);
+                void onProductSelect(id).then(() => ensureVariantsAfterProductSelect());
               }
             }}
           >
@@ -113,7 +143,7 @@ export default function OrderItemFormRow({
           </button>
         </div>
         <div className="admin-field">
-          <label className="admin-label">Biến thể</label>
+          <label className="admin-label">Biến thể catalog</label>
           <select
             className="admin-input"
             value={item.variantId ?? ""}
@@ -148,10 +178,9 @@ export default function OrderItemFormRow({
           <input className="admin-input" value={item.skuSnapshot ?? ""} readOnly placeholder="Tự động khi lưu" />
         </div>
         <div className="admin-field">
-          <label className="admin-label">Màu sắc *</label>
+          <label className="admin-label">Màu sắc mặc định *</label>
           <select
             className="admin-input"
-            required
             value={item.colorId ?? ""}
             onChange={(e) => {
               const color = colors.find((c) => c.id === e.target.value);
@@ -171,7 +200,7 @@ export default function OrderItemFormRow({
               <option value={item.colorId}>{item.colorSnapshot} (lưu trước)</option>
             )}
           </select>
-          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onAddColor}>
+          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => onAddColor()}>
             Thêm màu mới
           </button>
         </div>
@@ -179,7 +208,6 @@ export default function OrderItemFormRow({
           <label className="admin-label">Danh mục *</label>
           <select
             className="admin-input"
-            required
             value={item.categoryId ?? ""}
             onChange={(e) => {
               const category = categories.find((c) => c.id === e.target.value);
@@ -205,7 +233,6 @@ export default function OrderItemFormRow({
           <label className="admin-label">Giới tính *</label>
           <select
             className="admin-input"
-            required
             value={item.gender ?? ""}
             onChange={(e) => {
               const gender = e.target.value as OrderProductGender;
@@ -243,16 +270,18 @@ export default function OrderItemFormRow({
             }
           />
         </div>
-        <div className="admin-field">
-          <label className="admin-label">Số lượng</label>
-          <input
-            className="admin-input"
-            type="number"
-            min="1"
-            value={item.quantity}
-            onChange={(e) => onChange({ quantity: parseInt(e.target.value, 10) || 1 })}
-          />
-        </div>
+        {!showVariantMatrix && (
+          <div className="admin-field">
+            <label className="admin-label">Số lượng</label>
+            <input
+              className="admin-input"
+              type="number"
+              min="1"
+              value={item.quantity}
+              onChange={(e) => onChange({ quantity: parseInt(e.target.value, 10) || 1 })}
+            />
+          </div>
+        )}
         <div className="admin-field">
           <label className="admin-label">Đơn vị</label>
           <input
@@ -297,6 +326,19 @@ export default function OrderItemFormRow({
           />
         </div>
       </div>
+
+      {showVariantMatrix && (
+        <OrderItemVariantMatrix
+          variants={variantRows}
+          colors={colors}
+          sizeOptions={sizeOptions}
+          defaultUnit={item.unit ?? "cái"}
+          customerCode={customerCode}
+          systemCode={item.systemCode}
+          onChange={(nextVariants) => onChange({ variants: nextVariants })}
+          onAddColor={(variantIndex) => onAddColor(variantIndex)}
+        />
+      )}
     </div>
   );
 }

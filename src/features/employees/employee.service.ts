@@ -1,4 +1,6 @@
+import type { EmployeeRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { isEmployeeRole } from "@/features/employees/employee-role";
 
 export class EmployeeValidationError extends Error {
   constructor(message: string) {
@@ -13,6 +15,7 @@ export type EmployeeRecord = {
   fullName: string;
   jobTitle: string | null;
   department: string | null;
+  role: EmployeeRole | null;
   phone: string | null;
   email: string | null;
   isActive: boolean;
@@ -24,6 +27,7 @@ export type CreateEmployeeInput = {
   fullName: string;
   jobTitle?: string | null;
   department?: string | null;
+  role?: EmployeeRole | null;
   phone?: string | null;
   email?: string | null;
   isActive?: boolean;
@@ -37,6 +41,7 @@ function mapRow(row: {
   fullName: string;
   jobTitle: string | null;
   department: string | null;
+  role: EmployeeRole | null;
   phone: string | null;
   email: string | null;
   isActive: boolean;
@@ -49,6 +54,7 @@ function mapRow(row: {
     fullName: row.fullName,
     jobTitle: row.jobTitle,
     department: row.department,
+    role: row.role,
     phone: row.phone,
     email: row.email,
     isActive: row.isActive,
@@ -71,14 +77,19 @@ export async function listEmployees(params?: {
   search?: string;
   activeOnly?: boolean;
   includeInactive?: boolean;
+  role?: EmployeeRole;
+  roles?: EmployeeRole[];
   limit?: number;
 }) {
   const search = params?.search?.trim();
   const where: {
     isActive?: boolean;
+    role?: EmployeeRole | { in: EmployeeRole[] };
     OR?: Array<Record<string, unknown>>;
   } = {};
   if (params?.activeOnly) where.isActive = true;
+  if (params?.role) where.role = params.role;
+  if (params?.roles?.length) where.role = { in: params.roles };
   if (search) {
     where.OR = [
       { employeeCode: { contains: search, mode: "insensitive" } },
@@ -118,6 +129,7 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<Employ
       fullName,
       jobTitle: input.jobTitle?.trim() || null,
       department: input.department?.trim() || null,
+      role: input.role ?? null,
       phone: input.phone?.trim() || null,
       email: input.email?.trim() || null,
       isActive: input.isActive ?? true,
@@ -136,6 +148,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
       ...(input.fullName !== undefined ? { fullName: input.fullName.trim() } : {}),
       ...(input.jobTitle !== undefined ? { jobTitle: input.jobTitle?.trim() || null } : {}),
       ...(input.department !== undefined ? { department: input.department?.trim() || null } : {}),
+      ...(input.role !== undefined ? { role: input.role ?? null } : {}),
       ...(input.phone !== undefined ? { phone: input.phone?.trim() || null } : {}),
       ...(input.email !== undefined ? { email: input.email?.trim() || null } : {}),
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
@@ -153,4 +166,43 @@ export async function resolveEmployeeSnapshot(employeeId: string | null | undefi
     productionOwnerId: employee.id,
     productionOwnerName: employee.fullName,
   };
+}
+
+export async function resolveSalesEmployeeSnapshot(employeeId: string | null | undefined) {
+  if (!employeeId) {
+    return {
+      salesEmployeeId: null,
+      salesRepresentativeId: null,
+      salesName: null,
+      salesTitle: null,
+      salesPhone: null,
+      salesEmail: null,
+    };
+  }
+
+  const employee = await prisma.employee.findUnique({
+    where: { id: employeeId },
+    include: { salesRepresentative: { select: { id: true } } },
+  });
+  if (!employee) throw new EmployeeValidationError("Nhân viên tư vấn không hợp lệ.");
+  if (!employee.isActive) throw new EmployeeValidationError("Nhân viên đã ngừng hoạt động.");
+  if (employee.role && employee.role !== "SALES" && employee.role !== "ADMIN") {
+    throw new EmployeeValidationError("Nhân viên được chọn không thuộc vai trò kinh doanh.");
+  }
+
+  return {
+    salesEmployeeId: employee.id,
+    salesRepresentativeId: employee.salesRepresentative?.id ?? null,
+    salesName: employee.fullName,
+    salesTitle: employee.jobTitle,
+    salesPhone: employee.phone,
+    salesEmail: employee.email,
+  };
+}
+
+export function parseEmployeeRoleInput(value: unknown): EmployeeRole | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value === "string" && isEmployeeRole(value)) return value;
+  throw new EmployeeValidationError("Vai trò nhân viên không hợp lệ.");
 }

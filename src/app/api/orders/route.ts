@@ -2,6 +2,7 @@ import type { OrderStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import type { OrderPaymentStateFilter } from "@/features/orders/order-labels";
 import { parseCreateManualOrderBody } from "@/features/orders/order-input";
+import { EmployeeValidationError } from "@/features/employees/employee.service";
 import {
   createManualOrder,
   listOrders,
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     const order = await createManualOrder(parseCreateManualOrderBody(body as Record<string, unknown>));
     return NextResponse.json({ order }, { status: 201 });
   } catch (err) {
-    if (err instanceof OrderValidationError) {
+    if (err instanceof OrderValidationError || err instanceof EmployeeValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });
     }
     if (err instanceof Error && err.message) {

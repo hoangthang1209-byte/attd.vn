@@ -28,7 +28,8 @@ import { toDateInputValue } from "@/features/quotes/format";
 import { computeOrderItem, computeOrderTotals } from "@/features/orders/order-totals";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import type { CrmContactRecord, CrmCustomerRecord } from "@/features/crm/types";
-import type { SalesRepresentativeRecord } from "@/features/sales/types";
+import type { EmployeeRecord } from "@/features/employees/employee.service";
+import { employeeRoleLabel } from "@/features/employees/employee-role";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import type { ColorRecord } from "@/features/colors/color.service";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
@@ -46,6 +47,13 @@ type Props = {
   mode: "create" | "edit";
   orderId?: string;
 };
+
+type QuickCreateTarget =
+  | { type: "item-color"; itemIndex: number }
+  | { type: "variant-color"; itemIndex: number; variantIndex: number }
+  | { type: "custom-product-color" }
+  | { type: "custom-product-category" }
+  | { type: "category"; itemIndex: number };
 
 function orderToItemRows(order: OrderDetailRecord): OrderItemRow[] {
   return order.items.map((item) => ({
@@ -71,6 +79,17 @@ function orderToItemRows(order: OrderDetailRecord): OrderItemRow[] {
     unit: item.unit,
     unitPrice: item.unitPrice,
     sortOrder: item.sortOrder,
+    variants: item.variants.map((variant) => ({
+      key: variant.id,
+      id: variant.id,
+      colorId: variant.colorId,
+      colorNameSnapshot: variant.colorNameSnapshot,
+      sizeValue: variant.sizeValue,
+      skuSnapshot: variant.skuSnapshot,
+      quantity: variant.quantity,
+      unit: variant.unit,
+      sortOrder: variant.sortOrder,
+    })),
   }));
 }
 
@@ -83,7 +102,7 @@ export default function OrderForm({ mode, orderId }: Props) {
   const [variantsMap, setVariantsMap] = useState<Record<string, VariantOption[]>>({});
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomerRecord | null>(null);
   const [contacts, setContacts] = useState<CrmContactRecord[]>([]);
-  const [salesReps, setSalesReps] = useState<SalesRepresentativeRecord[]>([]);
+  const [salesEmployees, setSalesEmployees] = useState<EmployeeRecord[]>([]);
   const skipContactAutofill = useRef(false);
   const [quickAddContactOpen, setQuickAddContactOpen] = useState(false);
   const [quickAddCustomerOpen, setQuickAddCustomerOpen] = useState(false);
@@ -91,6 +110,9 @@ export default function OrderForm({ mode, orderId }: Props) {
   const [quickAddCategoryOpen, setQuickAddCategoryOpen] = useState(false);
   const [customProductOpen, setCustomProductOpen] = useState(false);
   const [customProductItemIndex, setCustomProductItemIndex] = useState(0);
+  const [quickCreateTarget, setQuickCreateTarget] = useState<QuickCreateTarget | null>(null);
+  const [injectCustomProductColorId, setInjectCustomProductColorId] = useState<string | null>(null);
+  const [injectCustomProductCategoryId, setInjectCustomProductCategoryId] = useState<string | null>(null);
   const [colors, setColors] = useState<ColorRecord[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
 
@@ -108,6 +130,7 @@ export default function OrderForm({ mode, orderId }: Props) {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [salesRepresentativeId, setSalesRepresentativeId] = useState("");
+  const [salesEmployeeId, setSalesEmployeeId] = useState("");
   const [salesName, setSalesName] = useState("");
   const [salesTitle, setSalesTitle] = useState("");
   const [salesPhone, setSalesPhone] = useState("");
@@ -123,12 +146,67 @@ export default function OrderForm({ mode, orderId }: Props) {
   const [vatRate, setVatRate] = useState("0");
   const [items, setItems] = useState<OrderItemRow[]>([emptyOrderItem()]);
 
-  function applySalesRep(rep: SalesRepresentativeRecord) {
-    setSalesRepresentativeId(rep.id);
-    setSalesName(rep.fullName);
-    setSalesTitle(rep.title ?? "");
-    setSalesPhone(rep.phone ?? "");
-    setSalesEmail(rep.email ?? "");
+  function applySalesEmployee(employee: EmployeeRecord) {
+    setSalesEmployeeId(employee.id);
+    setSalesRepresentativeId("");
+    setSalesName(employee.fullName);
+    setSalesTitle(employee.jobTitle ?? "");
+    setSalesPhone(employee.phone ?? "");
+    setSalesEmail(employee.email ?? "");
+  }
+
+  function handleColorCreated(color: ColorRecord) {
+    setColors((prev) => (prev.some((c) => c.id === color.id) ? prev : [...prev, color]));
+
+    if (quickCreateTarget?.type === "custom-product-color") {
+      setInjectCustomProductColorId(color.id);
+    } else if (quickCreateTarget?.type === "item-color") {
+      setItems((prev) =>
+        prev.map((row, i) =>
+          i === quickCreateTarget.itemIndex
+            ? { ...row, colorId: color.id, colorSnapshot: color.name }
+            : row,
+        ),
+      );
+    } else if (quickCreateTarget?.type === "variant-color") {
+      setItems((prev) =>
+        prev.map((row, i) => {
+          if (i !== quickCreateTarget.itemIndex) return row;
+          const variants = [...(row.variants ?? [])];
+          const variant = variants[quickCreateTarget.variantIndex];
+          if (!variant) return row;
+          variants[quickCreateTarget.variantIndex] = {
+            ...variant,
+            colorId: color.id,
+            colorNameSnapshot: color.name,
+            skuSnapshot: null,
+          };
+          return { ...row, variants };
+        }),
+      );
+    }
+
+    setQuickAddColorOpen(false);
+    setQuickCreateTarget(null);
+  }
+
+  function handleCategoryCreated(category: CategoryOption) {
+    setCategories((prev) => (prev.some((c) => c.id === category.id) ? prev : [...prev, category]));
+
+    if (quickCreateTarget?.type === "custom-product-category") {
+      setInjectCustomProductCategoryId(category.id);
+    } else if (quickCreateTarget?.type === "category") {
+      setItems((prev) =>
+        prev.map((row, i) =>
+          i === quickCreateTarget.itemIndex
+            ? { ...row, categoryId: category.id, categorySnapshot: category.name }
+            : row,
+        ),
+      );
+    }
+
+    setQuickAddCategoryOpen(false);
+    setQuickCreateTarget(null);
   }
 
   async function loadCustomerContacts(id: string) {
@@ -184,12 +262,19 @@ export default function OrderForm({ mode, orderId }: Props) {
   useEffect(() => {
     void Promise.all([
       fetch("/api/admin/products?pageSize=200").then((r) => r.json()),
-      fetch("/api/admin/sales?active=1").then((r) => r.json()),
+      fetch("/api/employees?active=1&role=SALES&limit=200").then((r) => r.json()),
+      fetch("/api/employees?active=1&role=ADMIN&limit=200").then((r) => r.json()),
       fetch("/api/colors?active=1").then((r) => r.json()),
       fetch("/api/admin/products/categories").then((r) => r.json()),
-    ]).then(([productsData, salesData, colorsData, categoriesData]) => {
+    ]).then(([productsData, salesData, adminData, colorsData, categoriesData]) => {
       setProducts((productsData as { products?: ProductOption[] }).products ?? []);
-      setSalesReps((salesData as { salesReps?: SalesRepresentativeRecord[] }).salesReps ?? []);
+      const sales = (salesData as { employees?: EmployeeRecord[] }).employees ?? [];
+      const admins = (adminData as { employees?: EmployeeRecord[] }).employees ?? [];
+      const merged = [...sales];
+      for (const admin of admins) {
+        if (!merged.some((e) => e.id === admin.id)) merged.push(admin);
+      }
+      setSalesEmployees(merged);
       setColors((colorsData as { colors?: ColorRecord[] }).colors ?? []);
       setCategories((categoriesData as CategoryOption[]) ?? []);
     });
@@ -229,6 +314,7 @@ export default function OrderForm({ mode, orderId }: Props) {
         setCustomerPhone(order.contactPhone ?? "");
         setCustomerEmail(order.contactEmail ?? "");
         setSalesRepresentativeId(order.salesRepresentativeId ?? "");
+        setSalesEmployeeId(order.salesEmployeeId ?? "");
         setSalesName(order.salesName ?? "");
         setSalesTitle(order.salesTitle ?? "");
         setSalesPhone(order.salesPhone ?? "");
@@ -259,6 +345,7 @@ export default function OrderForm({ mode, orderId }: Props) {
     const data = (await res.json()) as {
       product?: {
         name?: string;
+        systemCode?: string | null;
         defaultMoq?: number;
         leadTime?: string | null;
         category?: { name?: string };
@@ -277,6 +364,21 @@ export default function OrderForm({ mode, orderId }: Props) {
               categorySnapshot: data.product?.category?.name ?? row.categorySnapshot,
               moqSnapshot: data.product?.defaultMoq ?? row.moqSnapshot,
               productionLeadTime: data.product?.leadTime ?? row.productionLeadTime,
+              systemCode: data.product?.systemCode ?? row.systemCode ?? null,
+              variants:
+                row.variants?.length || !data.product?.systemCode
+                  ? row.variants
+                  : [
+                      {
+                        key: crypto.randomUUID(),
+                        colorId: row.colorId ?? null,
+                        colorNameSnapshot: row.colorSnapshot ?? null,
+                        sizeValue: null,
+                        skuSnapshot: null,
+                        quantity: row.quantity,
+                        unit: row.unit ?? "cái",
+                      },
+                    ],
             }
           : row,
       ),
@@ -308,6 +410,7 @@ export default function OrderForm({ mode, orderId }: Props) {
       customerId: customerId || null,
       contactId: contactId || null,
       salesRepresentativeId: salesRepresentativeId || null,
+      salesEmployeeId: salesEmployeeId || null,
       orderDate: new Date(orderDate).toISOString(),
       currency,
       priceVatType,
@@ -363,6 +466,7 @@ export default function OrderForm({ mode, orderId }: Props) {
   if (loading) return <p className="admin-loading">Đang tải...</p>;
 
   return (
+    <>
     <form className="admin-panel" onSubmit={(e) => void handleSubmit(e)}>
       <AdminBackLink href={mode === "edit" && orderId ? `/admin/orders/${orderId}` : "/admin/orders"} />
       <div className="admin-section-header">
@@ -466,16 +570,23 @@ export default function OrderForm({ mode, orderId }: Props) {
             <label className="admin-label">Nhân viên tư vấn</label>
             <select
               className="admin-input"
-              value={salesRepresentativeId}
+              value={salesEmployeeId}
               onChange={(e) => {
-                const rep = salesReps.find((r) => r.id === e.target.value);
-                if (rep) applySalesRep(rep);
-                else setSalesRepresentativeId("");
+                const employee = salesEmployees.find((r) => r.id === e.target.value);
+                if (employee) applySalesEmployee(employee);
+                else {
+                  setSalesEmployeeId("");
+                  setSalesRepresentativeId("");
+                }
               }}
             >
               <option value="">— Chọn nhân viên —</option>
-              {salesReps.map((rep) => (
-                <option key={rep.id} value={rep.id}>{rep.fullName}</option>
+              {salesEmployees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.fullName}
+                  {employee.jobTitle ? ` · ${employee.jobTitle}` : ""}
+                  {employee.role ? ` · ${employeeRoleLabel(employee.role)}` : ""}
+                </option>
               ))}
             </select>
           </div>
@@ -528,6 +639,7 @@ export default function OrderForm({ mode, orderId }: Props) {
             index={index}
             item={item}
             currency={currency}
+            customerCode={customerCode}
             products={products}
             variants={item.productId ? variantsMap[item.productId] ?? [] : []}
             colors={colors}
@@ -538,8 +650,18 @@ export default function OrderForm({ mode, orderId }: Props) {
             onRemove={items.length > 1 ? () => setItems((prev) => prev.filter((_, i) => i !== index)) : undefined}
             onLoadVariants={loadVariants}
             onProductSelect={(productId) => loadProductMeta(productId, index)}
-            onAddColor={() => setQuickAddColorOpen(true)}
-            onAddCategory={() => setQuickAddCategoryOpen(true)}
+            onAddColor={(variantIndex) => {
+              if (variantIndex != null) {
+                setQuickCreateTarget({ type: "variant-color", itemIndex: index, variantIndex });
+              } else {
+                setQuickCreateTarget({ type: "item-color", itemIndex: index });
+              }
+              setQuickAddColorOpen(true);
+            }}
+            onAddCategory={() => {
+              setQuickCreateTarget({ type: "category", itemIndex: index });
+              setQuickAddCategoryOpen(true);
+            }}
             onCustomProduct={() => {
               setCustomProductItemIndex(index);
               setCustomProductOpen(true);
@@ -582,6 +704,7 @@ export default function OrderForm({ mode, orderId }: Props) {
           Hủy
         </Link>
       </div>
+    </form>
 
       {customerId && (
         <QuickAddContactModal
@@ -611,20 +734,20 @@ export default function OrderForm({ mode, orderId }: Props) {
 
       <QuickAddColorModal
         open={quickAddColorOpen}
-        onClose={() => setQuickAddColorOpen(false)}
-        onCreated={(color) => {
-          setColors((prev) => [...prev, color]);
+        onClose={() => {
           setQuickAddColorOpen(false);
+          setQuickCreateTarget(null);
         }}
+        onCreated={handleColorCreated}
       />
 
       <QuickAddCategoryModal
         open={quickAddCategoryOpen}
-        onClose={() => setQuickAddCategoryOpen(false)}
-        onCreated={(category) => {
-          setCategories((prev) => [...prev, category]);
+        onClose={() => {
           setQuickAddCategoryOpen(false);
+          setQuickCreateTarget(null);
         }}
+        onCreated={handleCategoryCreated}
       />
 
       <CustomProductModal
@@ -632,13 +755,19 @@ export default function OrderForm({ mode, orderId }: Props) {
         customerCode={customerCode}
         colors={colors}
         categories={categories}
-        onClose={() => setCustomProductOpen(false)}
-        onAddColor={() => {
+        selectColorId={injectCustomProductColorId}
+        selectCategoryId={injectCustomProductCategoryId}
+        onClose={() => {
           setCustomProductOpen(false);
+          setInjectCustomProductColorId(null);
+          setInjectCustomProductCategoryId(null);
+        }}
+        onAddColor={() => {
+          setQuickCreateTarget({ type: "custom-product-color" });
           setQuickAddColorOpen(true);
         }}
         onAddCategory={() => {
-          setCustomProductOpen(false);
+          setQuickCreateTarget({ type: "custom-product-category" });
           setQuickAddCategoryOpen(true);
         }}
         onCreated={(result: CustomProductResult) => {
@@ -667,13 +796,27 @@ export default function OrderForm({ mode, orderId }: Props) {
                     moqSnapshot: result.moqSnapshot,
                     productionLeadTime: result.productionLeadTime,
                     unit: result.unit,
+                    systemCode: result.systemCode ?? null,
+                    variants: [
+                      {
+                        key: crypto.randomUUID(),
+                        colorId: result.colorId,
+                        colorNameSnapshot: result.colorSnapshot,
+                        sizeValue: null,
+                        skuSnapshot: result.skuSnapshot,
+                        quantity: row.quantity > 0 ? row.quantity : 1,
+                        unit: result.unit,
+                      },
+                    ],
                   }
                 : row,
             ),
           );
           setCustomProductOpen(false);
+          setInjectCustomProductColorId(null);
+          setInjectCustomProductCategoryId(null);
         }}
       />
-    </form>
+    </>
   );
 }
