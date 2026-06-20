@@ -2,14 +2,20 @@ import type { PublicQuoteDocument } from "@/features/quotes/types";
 import { formatQuoteMoney, formatQuoteMoq } from "@/features/quotes/quote-format";
 import { quotePriceVatTypeLabel } from "@/features/quotes/labels";
 import { resolveAbsoluteMediaUrl } from "@/features/quotes/resolve-absolute-media-url";
+import QuoteDesignThumb from "@/components/quotes/QuoteDesignThumb";
 
 type Props = {
   quote: PublicQuoteDocument;
   /** Resolve relative image URLs for PDF/print rendering */
   absoluteMedia?: boolean;
+  mediaBaseUrl?: string;
 };
 
-export default function QuoteDocumentItemsTable({ quote, absoluteMedia = false }: Props) {
+export default function QuoteDocumentItemsTable({
+  quote,
+  absoluteMedia = false,
+  mediaBaseUrl,
+}: Props) {
   const priceTypeLabel = quotePriceVatTypeLabel(quote.priceVatType);
 
   return (
@@ -40,7 +46,7 @@ export default function QuoteDocumentItemsTable({ quote, absoluteMedia = false }
         <tbody>
           {quote.items.map((item, i) => {
             const designUrl = absoluteMedia
-              ? resolveAbsoluteMediaUrl(item.designImageUrl)
+              ? resolveAbsoluteMediaUrl(item.designImageUrl, mediaBaseUrl)
               : item.designImageUrl;
 
             return (
@@ -48,15 +54,12 @@ export default function QuoteDocumentItemsTable({ quote, absoluteMedia = false }
                 <td>{i + 1}</td>
                 <td className="quote-doc__cell-design">
                   {designUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={designUrl}
-                      alt=""
-                      className="quote-doc__design-thumb"
-                      width={72}
-                      height={72}
-                      loading="eager"
-                    />
+                    <>
+                      <QuoteDesignThumb src={designUrl} />
+                      <span className="quote-doc__muted" hidden>
+                        Chưa có
+                      </span>
+                    </>
                   ) : (
                     <span className="quote-doc__muted">Chưa có</span>
                   )}

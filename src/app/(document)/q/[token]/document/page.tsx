@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import QuoteDocumentContent from "@/components/quotes/QuoteDocumentContent";
 import QuoteDocumentAutoprint from "@/components/quotes/QuoteDocumentAutoprint";
 import QuoteDocumentPdfReady from "@/components/quotes/QuoteDocumentPdfReady";
 import { getPublicQuoteByToken } from "@/features/quotes/quote.service";
 import { getBrandingSettings, getCompanySettings } from "@/features/settings/services/settings.service";
 import { resolveQuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
+import { resolveQuoteDocumentBaseUrl } from "@/features/quotes/pdf/quote-pdf-url";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,8 @@ export default async function QuoteDocumentPage({ params, searchParams }: Props)
   const logoUrl = branding.headerLogoUrl ?? branding.footerLogoUrl;
   const variant = resolveDocumentVariant(mode);
   const shouldAutoprint = autoprint === "1" && variant === "print";
+  const requestHeaders = await headers();
+  const mediaBaseUrl = resolveQuoteDocumentBaseUrl(requestHeaders);
 
   return (
     <>
@@ -47,6 +51,7 @@ export default async function QuoteDocumentPage({ params, searchParams }: Props)
         company={company}
         logoUrl={logoUrl}
         variant={variant}
+        mediaBaseUrl={mediaBaseUrl}
       />
       {shouldAutoprint && <QuoteDocumentAutoprint />}
       {variant === "pdf" && <QuoteDocumentPdfReady />}

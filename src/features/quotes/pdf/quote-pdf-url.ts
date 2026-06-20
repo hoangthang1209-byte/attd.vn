@@ -1,12 +1,12 @@
 /**
  * Resolve absolute base URL for server-side Chromium to fetch the document route.
- * Prefers NEXT_PUBLIC_SITE_URL in production, then forwarded request headers on Vercel.
+ * Priority: NEXT_PUBLIC_SITE_URL → forwarded headers → host → VERCEL_URL → local dev.
  */
 export function resolveQuoteDocumentBaseUrl(
   requestHeaders?: { get(name: string): string | null },
 ): string {
   const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (configured && process.env.NODE_ENV === "production") {
+  if (configured) {
     return configured.replace(/\/$/, "");
   }
 
@@ -19,7 +19,10 @@ export function resolveQuoteDocumentBaseUrl(
 
     if (host) {
       const isLocal = host.startsWith("localhost") || host.startsWith("127.0.0.1");
-      if (!isLocal || process.env.NODE_ENV !== "production") {
+      const isProduction =
+        process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
+
+      if (!isLocal || !isProduction) {
         return `${proto}://${host}`.replace(/\/$/, "");
       }
     }
@@ -29,8 +32,12 @@ export function resolveQuoteDocumentBaseUrl(
     return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`;
   }
 
-  if (configured) {
-    return configured.replace(/\/$/, "");
+  const isProduction =
+    process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
+  if (isProduction) {
+    console.error(
+      "[quote-pdf] Cannot resolve production document base URL — set NEXT_PUBLIC_SITE_URL",
+    );
   }
 
   const port = process.env.PORT ?? "3000";

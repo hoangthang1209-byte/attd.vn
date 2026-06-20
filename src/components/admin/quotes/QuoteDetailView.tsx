@@ -13,7 +13,10 @@ import {
   downloadQuotePdfFromApi,
   quotePdfDownloadFilename,
 } from "@/features/quotes/pdf/download-quote-pdf.client";
-import { openQuoteDocumentPrint } from "@/features/quotes/pdf/open-quote-document-print.client";
+import {
+  openQuotePdfInlineAdmin,
+  quotePdfDownloadUrlAdmin,
+} from "@/features/quotes/pdf/open-quote-pdf.client";
 
 type QuoteDetail = {
   id: string;
@@ -141,7 +144,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
   async function downloadPdf() {
     setPdfDownloading(true);
     try {
-      const apiUrl = `/api/quotes/${encodeURIComponent(id)}/pdf`;
+      const apiUrl = quotePdfDownloadUrlAdmin(id);
       await downloadQuotePdfFromApi(
         apiUrl,
         quotePdfDownloadFilename(quote?.quoteNo ?? id),
@@ -151,7 +154,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
       setMessage(
         err instanceof Error
           ? err.message
-          : "Không thể tạo PDF báo giá. Vui lòng thử lại.",
+          : "Không thể tạo file PDF giao diện báo giá. Vui lòng thử lại.",
       );
     } finally {
       setPdfDownloading(false);
@@ -280,10 +283,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
             <button
               type="button"
               className="admin-btn admin-btn--secondary admin-btn--xs"
-              onClick={() => {
-                if (quote.publicToken) openQuoteDocumentPrint(quote.publicToken);
-              }}
-              disabled={!quote.publicToken}
+              onClick={() => openQuotePdfInlineAdmin(id)}
             >
               In / Lưu PDF
             </button>

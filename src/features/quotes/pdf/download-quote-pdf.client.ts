@@ -1,5 +1,8 @@
 "use client";
 
+const VISUAL_PDF_ERROR =
+  "Không thể tạo file PDF giao diện báo giá. Vui lòng thử lại.";
+
 /** Fetch a quote PDF from an API route and trigger browser download. */
 export async function downloadQuotePdfFromApi(
   apiUrl: string,
@@ -26,7 +29,17 @@ export async function downloadQuotePdfFromApi(
     if (res.status === 404) {
       throw new Error(detail || "Không tìm thấy báo giá.");
     }
-    throw new Error(detail || "Không thể tạo PDF báo giá. Vui lòng thử lại.");
+    throw new Error(detail || VISUAL_PDF_ERROR);
+  }
+
+  const renderer = res.headers.get("X-Quote-Pdf-Renderer");
+  if (renderer !== "chromium") {
+    console.error("[downloadQuotePdfFromApi] Non-visual PDF renderer", {
+      apiUrl,
+      renderer,
+      fallback: res.headers.get("X-Quote-Pdf-Fallback"),
+    });
+    throw new Error(VISUAL_PDF_ERROR);
   }
 
   const contentType = res.headers.get("Content-Type") ?? "";
@@ -35,7 +48,7 @@ export async function downloadQuotePdfFromApi(
       apiUrl,
       contentType,
     });
-    throw new Error("Phản hồi không phải file PDF hợp lệ.");
+    throw new Error(VISUAL_PDF_ERROR);
   }
 
   const blob = await res.blob();

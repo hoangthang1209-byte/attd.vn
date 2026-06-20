@@ -8,7 +8,10 @@ import {
   downloadQuotePdfFromApi,
   quotePdfDownloadFilename,
 } from "@/features/quotes/pdf/download-quote-pdf.client";
-import { openQuoteDocumentPrint } from "@/features/quotes/pdf/open-quote-document-print.client";
+import {
+  openQuotePdfInlinePublic,
+  quotePdfDownloadUrlPublic,
+} from "@/features/quotes/pdf/open-quote-pdf.client";
 
 type Props = {
   token: string;
@@ -36,7 +39,7 @@ export default function PublicQuoteDocument({ token, company, logoUrl }: Props) 
   async function downloadPdf() {
     setPdfDownloading(true);
     try {
-      const apiUrl = `/api/quotes/public/${encodeURIComponent(token)}/pdf`;
+      const apiUrl = quotePdfDownloadUrlPublic(token);
       await downloadQuotePdfFromApi(
         apiUrl,
         quotePdfDownloadFilename(quote?.quoteNo ?? token),
@@ -46,7 +49,7 @@ export default function PublicQuoteDocument({ token, company, logoUrl }: Props) 
       alert(
         err instanceof Error
           ? err.message
-          : "Không thể tạo PDF báo giá. Vui lòng thử lại.",
+          : "Không thể tạo file PDF giao diện báo giá. Vui lòng thử lại.",
       );
     } finally {
       setPdfDownloading(false);
@@ -62,7 +65,7 @@ export default function PublicQuoteDocument({ token, company, logoUrl }: Props) 
       company={company}
       logoUrl={logoUrl}
       showActions
-      onPrint={() => openQuoteDocumentPrint(token)}
+      onPrint={() => openQuotePdfInlinePublic(token)}
       onDownloadPdf={() => void downloadPdf()}
       pdfDownloading={pdfDownloading}
     />

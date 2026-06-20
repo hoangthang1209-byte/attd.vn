@@ -17,8 +17,8 @@ type HtmlPdfOptions = {
 };
 
 const PDF_VIEWPORT = {
-  width: 1400,
-  height: 990,
+  width: 1440,
+  height: 1020,
   deviceScaleFactor: 1,
 } as const;
 
@@ -26,7 +26,8 @@ const PDF_OPTIONS: PDFOptions = {
   format: "A4",
   landscape: true,
   printBackground: true,
-  preferCSSPageSize: true,
+  preferCSSPageSize: false,
+  scale: 1,
   margin: {
     top: "8mm",
     right: "8mm",
@@ -34,6 +35,8 @@ const PDF_OPTIONS: PDFOptions = {
     left: "8mm",
   },
 };
+
+const MIN_PDF_BYTES = 10_000;
 
 function resolveLocalChromePath(): string | null {
   const candidates = [
@@ -100,30 +103,50 @@ async function launchChromiumBrowser(): Promise<{
 async function waitForImagesOnPage(page: import("puppeteer-core").Page): Promise<void> {
   await page.evaluate(async () => {
     const images = Array.from(document.images);
-    await Promise.race([
-      Promise.all(
-        images.map(
-          (img) =>
-            new Promise<void>((resolve) => {
-              if (img.complete) {
-                resolve();
-                return;
-              }
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
-            }),
-        ),
+    await Promise.all(
+      images.map(
+        (image) =>
+          new Promise<void>((resolve) => {
+            if (image.complete) {
+              resolve();
+              return;
+            }
+            image.addEventListener("load", () => resolve(), { once: true });
+            image.addEventListener("error", () => resolve(), { once: true });
+          }),
       ),
-      new Promise<void>((resolve) => setTimeout(resolve, 10000)),
-    ]);
+    );
   });
 }
 
 function isValidPdfBuffer(buffer: Buffer): boolean {
-  return buffer.length > 500 && buffer.subarray(0, 5).toString("ascii") === "%PDF-";
+  return (
+    buffer.length >= MIN_PDF_BYTES &&
+    buffer.subarray(0, 5).toString("ascii") === "%PDF-"
+  );
 }
 
-function logChromiumEnvironment(executablePath: string, launchMode: string): void {
+function assertProductionDocumentUrl(documentUrl: string): void {
+  const isProduction = process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
+  if (!isProduction) return;
+
+  if (
+    documentUrl.includes("localhost") ||
+    documentUrl.includes("127.0.0.1") ||
+    documentUrl.startsWith("http://")
+  ) {
+    throw new Error(
+      `Production quote PDF requires HTTPS document URL, got: ${documentUrl}`,
+    );
+  }
+}
+
+function logChromiumEnvironment(
+  executablePath: string,
+  launchMode: string,
+  quoteNo?: string,
+): void {
+  console.info(`[quote-pdf] quoteNo=${quoteNo ?? "unknown"}`);
   console.info("[quote-pdf] chromium environment", {
     NODE_ENV: process.env.NODE_ENV,
     VERCEL: process.env.VERCEL ?? null,
@@ -136,12 +159,13 @@ export async function generateQuoteHtmlPdf(
   documentUrl: string,
   meta?: Pick<HtmlPdfOptions, "quoteNo" | "itemCount" | "imageCount">,
 ): Promise<Buffer> {
-  console.info("[quote-pdf] document url:", documentUrl);
-  console.info("[quote-pdf] renderer=chromium attempt", {
-    quoteNo: meta?.quoteNo,
-    itemCount: meta?.itemCount,
-    imageCount: meta?.imageCount,
-  });
+  const quoteNo = meta?.quoteNo ?? "unknown";
+
+  console.info(`[quote-pdf] quoteNo=${quoteNo}`);
+  console.info(`[quote-pdf] document-url=${documentUrl}`);
+  console.info("[quote-pdf] renderer=chromium attempt");
+
+  assertProductionDocumentUrl(documentUrl);
 
   let browser: Browser | null = null;
   let executablePath = "";
@@ -152,52 +176,63 @@ export async function generateQuoteHtmlPdf(
     browser = launch.browser;
     executablePath = launch.executablePath;
     launchMode = launch.launchMode;
-    logChromiumEnvironment(executablePath, launchMode);
+    logChromiumEnvironment(executablePath, launchMode, quoteNo);
 
     const page = await browser.newPage();
     await page.setViewport(PDF_VIEWPORT);
     await page.emulateMediaType("screen");
 
-    await page.goto(documentUrl, {
+    const response = await page.goto(documentUrl, {
       waitUntil: "networkidle2",
       timeout: 90000,
     });
+
+    const status = response?.status() ?? 0;
+    if (!response || status !== 200) {
+      throw new Error(
+        `Document URL returned HTTP ${status || "unknown"}: ${documentUrl}`,
+      );
+    }
 
     await page.waitForSelector(".quote-document-root", { timeout: 30000 });
 
     try {
       await page.waitForSelector('[data-quote-pdf-ready="true"]', { timeout: 20000 });
     } catch {
-      console.warn("[quote-pdf] data-quote-pdf-ready timeout — continuing with fonts/images wait");
-      await page.evaluate(() => document.fonts.ready);
-      await waitForImagesOnPage(page);
+      console.warn(
+        "[quote-pdf] data-quote-pdf-ready timeout — continuing with fonts/images wait",
+      );
     }
+
+    await page.evaluate(() => document.fonts.ready);
+    await waitForImagesOnPage(page);
 
     const pdf = await page.pdf(PDF_OPTIONS);
     const buffer = Buffer.from(pdf);
 
     if (!isValidPdfBuffer(buffer)) {
       throw new Error(
-        `Chromium returned invalid PDF buffer (length=${buffer.length}, head=${buffer.subarray(0, 16).toString("ascii")})`,
+        `Chromium returned invalid PDF buffer (length=${buffer.length}, min=${MIN_PDF_BYTES}, head=${buffer.subarray(0, 16).toString("ascii")})`,
       );
     }
 
-    console.info("[quote-pdf] renderer=chromium success", {
-      quoteNo: meta?.quoteNo,
-      bytes: buffer.length,
-    });
+    console.info(`[quote-pdf] renderer=chromium success bytes=${buffer.length}`);
 
     return buffer;
   } catch (err) {
-    console.error("[quote-pdf] chromium failed:", err instanceof Error ? err.message : err);
-    console.error("[quote-pdf] chromium failed stack:", err instanceof Error ? err.stack : undefined);
+    console.error(`[quote-pdf] quoteNo=${quoteNo}`);
+    console.error(
+      `[quote-pdf] chromium failed=${err instanceof Error ? err.stack ?? err.message : String(err)}`,
+    );
     console.error("[quote-pdf] chromium failed context", {
       NODE_ENV: process.env.NODE_ENV,
       VERCEL: process.env.VERCEL ?? null,
       executablePath: executablePath || "(not resolved)",
       launchMode,
       documentUrl,
-      quoteNo: meta?.quoteNo,
+      quoteNo,
+      itemCount: meta?.itemCount,
+      imageCount: meta?.imageCount,
     });
     throw err;
   } finally {

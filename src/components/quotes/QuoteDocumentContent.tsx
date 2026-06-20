@@ -16,6 +16,8 @@ type Props = {
   company: QuoteCompanyProfile;
   logoUrl?: string | null;
   variant?: "screen" | "pdf" | "print";
+  /** Absolute base URL for media in PDF/print mode */
+  mediaBaseUrl?: string;
 };
 
 /**
@@ -27,16 +29,23 @@ export default function QuoteDocumentContent({
   company,
   logoUrl,
   variant = "screen",
+  mediaBaseUrl,
 }: Props) {
   const absoluteMedia = variant === "pdf" || variant === "print";
-  const resolvedLogo = absoluteMedia ? resolveAbsoluteMediaUrl(logoUrl) : logoUrl;
+  const resolvedLogo = absoluteMedia
+    ? resolveAbsoluteMediaUrl(logoUrl, mediaBaseUrl)
+    : logoUrl;
 
   return (
     <QuoteDocumentShell variant={variant}>
       <QuoteCompanyHeader company={company} logoUrl={resolvedLogo} />
       <QuoteDocMeta quote={quote} />
       <QuotePartyColumns quote={quote} />
-      <QuoteDocumentItemsTable quote={quote} absoluteMedia={absoluteMedia} />
+      <QuoteDocumentItemsTable
+        quote={quote}
+        absoluteMedia={absoluteMedia}
+        mediaBaseUrl={mediaBaseUrl}
+      />
       <QuoteDocumentTotals quote={quote} />
       <QuoteDocumentNotes quote={quote} />
     </QuoteDocumentShell>

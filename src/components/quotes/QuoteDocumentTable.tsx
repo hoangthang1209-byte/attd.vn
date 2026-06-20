@@ -30,20 +30,25 @@ export default function QuoteDocumentTable({
 
       {showActions && (
         <div className="quote-document-actions quote-doc__actions no-print">
+          <div className="quote-document-actions__group">
+            {onPrint && (
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={onPrint}>
+                In / Lưu PDF
+              </button>
+            )}
+            {onDownloadPdf && (
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary"
+                onClick={onDownloadPdf}
+                disabled={pdfDownloading}
+              >
+                {pdfDownloading ? "Đang tạo PDF..." : "Tải PDF báo giá"}
+              </button>
+            )}
+          </div>
           {onPrint && (
-            <button type="button" className="admin-btn admin-btn--secondary" onClick={onPrint}>
-              In / Lưu PDF
-            </button>
-          )}
-          {onDownloadPdf && (
-            <button
-              type="button"
-              className="admin-btn admin-btn--primary"
-              onClick={onDownloadPdf}
-              disabled={pdfDownloading}
-            >
-              {pdfDownloading ? "Đang tạo PDF..." : "Tải PDF báo giá"}
-            </button>
+            <p className="quote-document-actions__hint">Mở file PDF để in hoặc lưu</p>
           )}
         </div>
       )}

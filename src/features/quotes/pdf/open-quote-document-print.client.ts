@@ -1,7 +1,4 @@
 "use client";
 
-/** Open document-only quote page and trigger browser print. */
-export function openQuoteDocumentPrint(publicToken: string): void {
-  const url = `/q/${encodeURIComponent(publicToken)}/document?mode=print&autoprint=1`;
-  window.open(url, "_blank", "noopener,noreferrer");
-}
+/** @deprecated Use openQuotePdfInlinePublic from open-quote-pdf.client.ts */
+export { openQuotePdfInlinePublic as openQuoteDocumentPrint } from "@/features/quotes/pdf/open-quote-pdf.client";
