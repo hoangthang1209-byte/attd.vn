@@ -9,6 +9,8 @@ import CategoryMenuImage from "@/components/marketplace/CategoryMenuImage";
 
 type MarketplaceMegaCategoryMenuProps = {
   categories: MarketplaceCategoryTreeNode[];
+  /** When false, renders only the mega-menu trigger (category nav omitted). */
+  showCategoryNav?: boolean;
 };
 
 function resolveInitialParentId(categories: MarketplaceCategoryTreeNode[]): string {
@@ -17,6 +19,7 @@ function resolveInitialParentId(categories: MarketplaceCategoryTreeNode[]): stri
 
 export default function MarketplaceMegaCategoryMenu({
   categories,
+  showCategoryNav = true,
 }: MarketplaceMegaCategoryMenuProps) {
   const [open, setOpen] = useState(false);
   const [activeParentId, setActiveParentId] = useState(() =>
@@ -97,7 +100,7 @@ export default function MarketplaceMegaCategoryMenu({
   return (
     <div
       ref={containerRef}
-      className={`mp-mega-cat-menu${open ? " mp-mega-cat-menu--open" : ""}`}
+      className={`mp-mega-cat-menu${open ? " mp-mega-cat-menu--open" : ""}${!showCategoryNav ? " mp-mega-cat-menu--trigger-only" : ""}`}
     >
       <div className="mp-header-cats-inner">
         <button
@@ -113,7 +116,7 @@ export default function MarketplaceMegaCategoryMenu({
             className={`mp-mega-cat-trigger-icon${open ? " mp-mega-cat-trigger-icon--open" : ""}`}
           />
         </button>
-        <MarketplaceCategoryNav />
+        {showCategoryNav && <MarketplaceCategoryNav />}
       </div>
 
       {open && activeParent && (

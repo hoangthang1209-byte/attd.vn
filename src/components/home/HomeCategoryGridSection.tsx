@@ -9,7 +9,7 @@ type Props = {
 
 export default function HomeCategoryGridSection({ categories }: Props) {
   return (
-    <section className="mp-section mp-section--alt mp-section--tight">
+    <section id="home-categories" className="mp-section mp-section--alt mp-section--tight">
       <div className="container">
         <MarketplaceSectionHeader title="Tìm nguồn hàng theo danh mục" />
         <div className="mp-category-grid mp-category-grid--marketplace">

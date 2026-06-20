@@ -2,8 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getHomepageData } from "@/features/home/homepage.service";
 import { categoryDemoImages } from "@/features/demo/demo-image-map";
-import MarketplaceHero from "@/components/marketplace/MarketplaceHero";
-import type { MarketplaceHeroTile } from "@/components/marketplace/MarketplaceHero";
+import HomeHeroSection from "@/components/home/HomeHeroSection";
 import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
 import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
 import MarketplaceFinalCta from "@/components/marketplace/MarketplaceFinalCta";
@@ -58,27 +57,13 @@ const SOURCING_STEPS = [
   "Giao hàng / sản xuất",
 ];
 
-function buildHeroTiles(
-  heroProductImages: Awaited<ReturnType<typeof getHomepageData>>["heroProductImages"],
-): MarketplaceHeroTile[] {
-  return heroProductImages.map((item, index) => ({
-    slug: item.slug,
-    label: item.label,
-    imageUrl: item.imageUrl,
-    href: item.href,
-    variant: index === 0 ? "featured" : "sm",
-  }));
-}
-
 export default async function HomePage() {
   const { categories, latestProducts, heroProductImages, blogPosts } =
     await getHomepageData();
 
-  const heroTiles = buildHeroTiles(heroProductImages);
-
   return (
-    <main className="mp-home mp-home--v251">
-      <MarketplaceHero tiles={heroTiles} />
+    <main className="mp-home mp-home--v271">
+      <HomeHeroSection heroProductImages={heroProductImages} />
 
       <HomeCategoryGridSection categories={categories} />
 
