@@ -1113,6 +1113,7 @@ model Quote {
   id                           String               @id @default(cuid())
   quoteNo                      String               @unique
   publicToken                  String?              @unique
+  publicShortCode              String?              @unique @db.VarChar(4)
   sourceType                   QuoteSourceType      @default(MANUAL)
   pricingCalculationId         String?
   leadId                       String?

@@ -17,11 +17,13 @@ import {
   openQuotePdfInlineAdmin,
   quotePdfDownloadUrlAdmin,
 } from "@/features/quotes/pdf/open-quote-pdf.client";
+import { getQuotePublicUrl } from "@/features/quotes/quote-public-link.shared";
 
 type QuoteDetail = {
   id: string;
   quoteNo: string;
   publicToken: string | null;
+  publicShortCode: string | null;
   status: QuoteStatus;
   title: string | null;
   validUntil: string | null;
@@ -126,9 +128,11 @@ export default function QuoteDetailView({ id }: { id: string }) {
   }
 
   function publicUrl() {
-    if (!quote?.publicToken) return null;
-    if (typeof window === "undefined") return `/q/${quote.publicToken}`;
-    return `${window.location.origin}/q/${quote.publicToken}`;
+    if (!quote?.quoteNo || !quote.publicShortCode) return null;
+    return getQuotePublicUrl(
+      { quoteNo: quote.quoteNo, publicShortCode: quote.publicShortCode },
+      typeof window === "undefined" ? undefined : window.location.origin,
+    );
   }
 
   async function copyLink() {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { PublicQuoteDocument } from "@/features/quotes/types";
 import type { QuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
 import QuoteDocumentTable from "@/components/quotes/QuoteDocumentTable";
+import QuotePublicLoading from "@/components/quotes/QuotePublicLoading";
 import {
   downloadQuotePdfFromApi,
   quotePdfDownloadFilename,
@@ -17,9 +18,15 @@ type Props = {
   token: string;
   company: QuoteCompanyProfile;
   logoUrl?: string | null;
+  loadingLogoUrl?: string | null;
 };
 
-export default function PublicQuoteDocument({ token, company, logoUrl }: Props) {
+export default function PublicQuoteDocument({
+  token,
+  company,
+  logoUrl,
+  loadingLogoUrl,
+}: Props) {
   const [quote, setQuote] = useState<PublicQuoteDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,8 +63,16 @@ export default function PublicQuoteDocument({ token, company, logoUrl }: Props) 
     }
   }
 
-  if (loading) return <div className="quote-public-page"><p>Đang tải báo giá…</p></div>;
-  if (error || !quote) return <div className="quote-public-page"><p>{error ?? "Không tìm thấy báo giá"}</p></div>;
+  if (loading) {
+    return <QuotePublicLoading logoUrl={loadingLogoUrl ?? logoUrl} />;
+  }
+  if (error || !quote) {
+    return (
+      <div className="quote-public-page">
+        <p>{error ?? "Không tìm thấy báo giá"}</p>
+      </div>
+    );
+  }
 
   return (
     <QuoteDocumentTable

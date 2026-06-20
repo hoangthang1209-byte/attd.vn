@@ -10,6 +10,7 @@ import {
   generatePublicToken,
   generateQuoteNo,
 } from "@/features/quotes/quote-code";
+import { allocateQuotePublicShortCode } from "@/features/quotes/quote-public-link.service";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
 import { formatPublicQuoteDocument, formatQuotePdfData } from "@/features/quotes/quote-document";
 import { validateContactBelongsToCustomer } from "@/features/crm/services/crm-contact.service";
@@ -210,6 +211,7 @@ export async function getQuoteDetail(id: string) {
     id: row.id,
     quoteNo: row.quoteNo,
     publicToken: row.publicToken,
+    publicShortCode: row.publicShortCode,
     sourceType: row.sourceType,
     pricingCalculationId: row.pricingCalculationId,
     leadId: row.leadId,
@@ -322,6 +324,7 @@ export async function createQuote(input: CreateQuoteInput) {
 
   const quoteNo = await generateQuoteNo();
   const publicToken = generatePublicToken();
+  const publicShortCode = await allocateQuotePublicShortCode();
   const terms = input.terms?.trim() || DEFAULT_QUOTE_TERMS;
 
   const quote = await prisma.$transaction(async (tx) => {
@@ -329,6 +332,7 @@ export async function createQuote(input: CreateQuoteInput) {
       data: {
         quoteNo,
         publicToken,
+        publicShortCode,
         sourceType: input.sourceType ?? "MANUAL",
         pricingCalculationId: input.pricingCalculationId ?? null,
         leadId: input.leadId ?? null,

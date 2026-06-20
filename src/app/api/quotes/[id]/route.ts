@@ -6,6 +6,7 @@ import {
   updateQuote,
   QuoteValidationError,
 } from "@/features/quotes/quote.service";
+import { ensureQuotePublicShortCode } from "@/features/quotes/quote-public-link.service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -14,7 +15,8 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   try {
     const quote = await getQuoteDetail(id);
     if (!quote) return NextResponse.json({ message: "Không tìm thấy báo giá" }, { status: 404 });
-    return NextResponse.json({ quote });
+    const publicShortCode = await ensureQuotePublicShortCode(id);
+    return NextResponse.json({ quote: { ...quote, publicShortCode } });
   } catch (err) {
     console.error("[GET /api/quotes/[id]]", err);
     return NextResponse.json({ message: "Không thể tải báo giá" }, { status: 500 });

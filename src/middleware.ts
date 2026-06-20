@@ -6,8 +6,27 @@ import {
   shouldProtectApiRoute,
 } from "@/lib/admin-auth/middleware-utils";
 import { isRequestAdminAuthenticatedEdge } from "@/lib/admin-auth/session-edge";
+import { parseQuotePublicLinkSegment } from "@/features/quotes/quote-public-link.shared";
+
+function tryQuotePublicLinkRewrite(request: NextRequest): NextResponse | null {
+  const { pathname } = request.nextUrl;
+  if (!pathname.startsWith("/") || pathname.includes("/", 1)) return null;
+
+  const segment = pathname.slice(1);
+  if (!segment) return null;
+
+  const parsed = parseQuotePublicLinkSegment(segment);
+  if (!parsed) return null;
+
+  const url = request.nextUrl.clone();
+  url.pathname = `/quote-link/${parsed.quoteNo}-${parsed.publicShortCode}`;
+  return NextResponse.rewrite(url);
+}
 
 export async function middleware(request: NextRequest) {
+  const quoteRewrite = tryQuotePublicLinkRewrite(request);
+  if (quoteRewrite) return quoteRewrite;
+
   const { pathname } = request.nextUrl;
   const authenticated = await isRequestAdminAuthenticatedEdge(request);
 
@@ -37,6 +56,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/:segment",
     "/admin/:path*",
     "/api/admin/:path*",
     "/api/blog/:path*",
