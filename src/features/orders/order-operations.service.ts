@@ -36,6 +36,7 @@ type OrderRowWithItems = Prisma.OrderGetPayload<{
     };
     payments: true;
     deliveryOwner: { select: { fullName: true } };
+    deliveryMethodRef: { select: { requiresCarrier: true } };
   };
 }>;
 
@@ -109,6 +110,10 @@ type DeliveryInfoInput = {
   deliveryMethodId?: string | null;
   deliveryMethodName?: string | null;
   deliveryMethod?: string | null;
+  deliveryMethodRequiresCarrier?: boolean;
+  deliveryCarrierId?: string | null;
+  deliveryCarrierName?: string | null;
+  deliveryCarrier?: string | null;
   deliveryExpectedAt?: Date | null;
   deliveredAt?: Date | null;
 };
@@ -124,6 +129,13 @@ export function getMissingDeliveryFields(order: DeliveryInfoInput): string[] {
     !order.deliveryMethod?.trim()
   ) {
     missing.push("Hình thức giao hàng");
+  }
+  if (order.deliveryMethodRequiresCarrier) {
+    const carrier =
+      order.deliveryCarrierId ||
+      order.deliveryCarrierName?.trim() ||
+      order.deliveryCarrier?.trim();
+    if (!carrier) missing.push("Đơn vị vận chuyển");
   }
   return missing;
 }
@@ -297,7 +309,22 @@ function mapProductionBoardOrder(row: OrderRowWithItems, now: Date): ProductionB
 }
 
 function mapDeliveryBoardOrder(row: OrderRowWithItems, now: Date): DeliveryBoardOrder {
-  const missingDeliveryFields = getMissingDeliveryFields(row);
+  const deliveryInfo = {
+    status: row.status,
+    deliveryRecipientName: row.deliveryRecipientName,
+    deliveryRecipientPhone: row.deliveryRecipientPhone,
+    deliveryAddress: row.deliveryAddress,
+    deliveryMethodId: row.deliveryMethodId,
+    deliveryMethodName: row.deliveryMethodName,
+    deliveryMethod: row.deliveryMethod,
+    deliveryMethodRequiresCarrier: row.deliveryMethodRef?.requiresCarrier ?? false,
+    deliveryCarrierId: row.deliveryCarrierId,
+    deliveryCarrierName: row.deliveryCarrierName,
+    deliveryCarrier: row.deliveryCarrier,
+    deliveryExpectedAt: row.deliveryExpectedAt,
+    deliveredAt: row.deliveredAt,
+  };
+  const missingDeliveryFields = getMissingDeliveryFields(deliveryInfo);
   return {
     id: row.id,
     orderNo: row.orderNo,
@@ -306,7 +333,7 @@ function mapDeliveryBoardOrder(row: OrderRowWithItems, now: Date): DeliveryBoard
     deliveryRecipientPhone: row.deliveryRecipientPhone,
     deliveryAddress: row.deliveryAddress,
     deliveryMethodName: row.deliveryMethodName ?? row.deliveryMethod,
-    deliveryCarrier: row.deliveryCarrier,
+    deliveryCarrier: row.deliveryCarrierName ?? row.deliveryCarrier,
     deliveryTrackingCode: row.deliveryTrackingCode,
     deliveryExpectedAt: row.deliveryExpectedAt?.toISOString() ?? null,
     deliveryOwnerName: row.deliveryOwner?.fullName ?? null,
@@ -314,7 +341,7 @@ function mapDeliveryBoardOrder(row: OrderRowWithItems, now: Date): DeliveryBoard
     shippedAt: row.shippedAt?.toISOString() ?? null,
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
     status: row.status,
-    deliveryReadiness: getDeliveryReadiness(row, now),
+    deliveryReadiness: getDeliveryReadiness(deliveryInfo, now),
     missingDeliveryFields,
   };
 }
@@ -355,6 +382,7 @@ const orderInclude = {
   },
   payments: true,
   deliveryOwner: { select: { fullName: true } },
+  deliveryMethodRef: { select: { requiresCarrier: true } },
 };
 
 function emptyProductionSummary(): ProductionBoardSummary {

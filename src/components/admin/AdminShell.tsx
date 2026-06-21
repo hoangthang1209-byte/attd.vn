@@ -65,6 +65,7 @@ const NAV_GROUPS = [
       { href: "/admin/delivery", label: "Vận hành giao hàng" },
       { href: "/admin/employees", label: "Nhân viên" },
       { href: "/admin/delivery-methods", label: "Hình thức giao hàng" },
+      { href: "/admin/delivery-carriers", label: "Đơn vị vận chuyển" },
     ],
   },
   {

@@ -13,7 +13,7 @@ type Props = {
   footer: ReactNode;
   children: ReactNode;
   ariaLabel?: string;
-  size?: "default" | "wide";
+  size?: "default" | "wide" | "compact";
 };
 
 export default function AdminQuickCreateShell({
@@ -50,7 +50,13 @@ export default function AdminQuickCreateShell({
 
   return createPortal(
     <div
-      className={`admin-quick-create-modal${size === "wide" ? " admin-quick-create-modal--wide" : ""}`}
+      className={`admin-quick-create-modal${
+        size === "wide"
+          ? " admin-quick-create-modal--wide"
+          : size === "compact"
+            ? " admin-quick-create-modal--compact"
+            : ""
+      }`}
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel ?? title}

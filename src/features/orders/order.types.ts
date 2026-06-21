@@ -149,6 +149,8 @@ export type OrderDetailRecord = {
   deliveryAddress: string | null;
   deliveryTrackingCode: string | null;
   deliveryCarrier: string | null;
+  deliveryCarrierId: string | null;
+  deliveryCarrierName: string | null;
   deliveryNote: string | null;
   deliveryExpectedAt: string | null;
   deliveredAt: string | null;
@@ -268,7 +270,7 @@ export type UpdateOrderProductionInput = {
 export type UpdateOrderDeliveryInput = {
   deliveryMethodId?: string | null;
   deliveryOwnerId?: string | null;
-  deliveryCarrier?: string | null;
+  deliveryCarrierId?: string | null;
   deliveryTrackingCode?: string | null;
   deliveryRecipientName?: string | null;
   deliveryRecipientPhone?: string | null;

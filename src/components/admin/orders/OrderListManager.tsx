@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { OrderStatus } from "@prisma/client";
-import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
+import OrderListQuickStatus from "@/components/admin/orders/OrderListQuickStatus";
 import { formatOrderCurrency, formatOrderDate } from "@/features/orders/order-format";
 import {
   ORDER_PAYMENT_STATE_LABELS,
@@ -59,6 +59,18 @@ export default function OrderListManager() {
     params.set("from", "list");
     if (qs) params.set("qs", qs);
     return `/admin/orders/${orderId}?${params.toString()}`;
+  }
+
+  function handleOrderUpdated(orderId: string, updated: OrderListRecord) {
+    setOrders((prev) => {
+      if (status && updated.status !== status) {
+        return prev.filter((o) => o.id !== orderId);
+      }
+      return prev.map((o) => (o.id === orderId ? updated : o));
+    });
+    if (status && updated.status !== status) {
+      setTotal((t) => Math.max(0, t - 1));
+    }
   }
 
   return (
@@ -116,15 +128,35 @@ export default function OrderListManager() {
             </thead>
             <tbody>
               {orders.map((o) => (
-                <tr key={o.id} style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                  <td><code>{o.orderNo}</code></td>
-                  <td>{o.sourceQuoteNo ?? "—"}</td>
-                  <td>{o.customerCompanyName ?? o.contactName ?? "—"}</td>
-                  <td><OrderStatusBadge status={o.status} /></td>
-                  <td>{formatOrderCurrency(o.totalAmount)}</td>
-                  <td>{formatOrderCurrency(o.paidAmount)}</td>
-                  <td>{formatOrderCurrency(o.outstandingAmount)}</td>
-                  <td>{formatOrderDate(o.createdAt)}</td>
+                <tr key={o.id}>
+                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                    <code>{o.orderNo}</code>
+                  </td>
+                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                    {o.sourceQuoteNo ?? "—"}
+                  </td>
+                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                    {o.customerCompanyName ?? o.contactName ?? "—"}
+                  </td>
+                  <td className="order-list-status-col" onClick={(e) => e.stopPropagation()}>
+                    <OrderListQuickStatus
+                      order={o}
+                      detailHref={buildDetailHref(o.id)}
+                      onUpdated={handleOrderUpdated}
+                    />
+                  </td>
+                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                    {formatOrderCurrency(o.totalAmount)}
+                  </td>
+                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                    {formatOrderCurrency(o.paidAmount)}
+                  </td>
+                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                    {formatOrderCurrency(o.outstandingAmount)}
+                  </td>
+                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                    {formatOrderDate(o.createdAt)}
+                  </td>
                 </tr>
               ))}
             </tbody>

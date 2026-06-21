@@ -141,7 +141,18 @@ export type DeliveryInfoLike = {
   deliveryMethodId?: string | null;
   deliveryMethodName?: string | null;
   deliveryMethod?: string | null;
+  deliveryMethodRequiresCarrier?: boolean;
+  deliveryCarrierId?: string | null;
+  deliveryCarrierName?: string | null;
+  deliveryCarrier?: string | null;
 };
+
+export function orderCarrierDisplay(order: {
+  deliveryCarrierName?: string | null;
+  deliveryCarrier?: string | null;
+}): string | null {
+  return order.deliveryCarrierName?.trim() || order.deliveryCarrier?.trim() || null;
+}
 
 export function validateDeliveryForShipped(order: DeliveryInfoLike): string | null {
   const name = order.deliveryRecipientName?.trim();
@@ -156,6 +167,15 @@ export function validateDeliveryForShipped(order: DeliveryInfoLike): string | nu
     order.deliveryMethod?.trim();
   if (!method) {
     return "Vui lòng chọn hình thức giao hàng trước khi chuyển sang Đã giao hàng.";
+  }
+  if (order.deliveryMethodRequiresCarrier) {
+    const carrier =
+      order.deliveryCarrierId ||
+      order.deliveryCarrierName?.trim() ||
+      order.deliveryCarrier?.trim();
+    if (!carrier) {
+      return "Vui lòng chọn đơn vị vận chuyển trước khi chuyển sang Đã giao hàng.";
+    }
   }
   return null;
 }

@@ -20,7 +20,11 @@ import {
 } from "@/features/orders/order-item-variant-sku";
 import { ensureProductSystemCode } from "@/features/products/product-system-code";
 import { resolveDeliveryMethodSnapshot } from "@/features/delivery/delivery-method.service";
-import { resolveSalesEmployeeSnapshot } from "@/features/employees/employee.service";
+import { resolveDeliveryCarrierSnapshot } from "@/features/delivery/delivery-carrier.service";
+import {
+  resolveProductionOwnerSnapshot,
+  resolveSalesEmployeeSnapshot,
+} from "@/features/employees/employee.service";
 import {
   canUpdateOrderStatus,
   formatOrderStatusCorrection,
@@ -158,6 +162,8 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
     deliveryAddress: row.deliveryAddress,
     deliveryTrackingCode: row.deliveryTrackingCode,
     deliveryCarrier: row.deliveryCarrier,
+    deliveryCarrierId: row.deliveryCarrierId,
+    deliveryCarrierName: row.deliveryCarrierName ?? row.deliveryCarrierRef?.name ?? row.deliveryCarrier,
     deliveryNote: row.deliveryNote,
     deliveryExpectedAt: row.deliveryExpectedAt?.toISOString() ?? null,
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
@@ -220,7 +226,8 @@ async function fetchOrderRow(id: string) {
       quote: { select: { id: true, quoteNo: true } },
       productionOwner: { select: { id: true, fullName: true, isActive: true } },
       deliveryOwner: { select: { id: true, fullName: true, isActive: true } },
-      deliveryMethodRef: { select: { id: true, name: true, isActive: true } },
+      deliveryMethodRef: { select: { id: true, name: true, isActive: true, requiresCarrier: true } },
+      deliveryCarrierRef: { select: { id: true, name: true, isActive: true } },
       items: {
         orderBy: { sortOrder: "asc" },
         include: { variants: { orderBy: { sortOrder: "asc" } } },
@@ -325,7 +332,24 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
   }
 
   if (input.status === "SHIPPED") {
-    const deliveryError = validateDeliveryForShipped(order);
+    const methodId = order.deliveryMethodId;
+    let deliveryMethodRequiresCarrier = false;
+    if (methodId) {
+      const method = await prisma.deliveryMethod.findUnique({ where: { id: methodId } });
+      deliveryMethodRequiresCarrier = method?.requiresCarrier ?? false;
+    }
+    const deliveryError = validateDeliveryForShipped({
+      deliveryRecipientName: order.deliveryRecipientName,
+      deliveryRecipientPhone: order.deliveryRecipientPhone,
+      deliveryAddress: order.deliveryAddress,
+      deliveryMethodId: order.deliveryMethodId,
+      deliveryMethodName: order.deliveryMethodName,
+      deliveryMethod: order.deliveryMethod,
+      deliveryMethodRequiresCarrier,
+      deliveryCarrierId: order.deliveryCarrierId,
+      deliveryCarrierName: order.deliveryCarrierName,
+      deliveryCarrier: order.deliveryCarrier,
+    });
     if (deliveryError) throw new OrderValidationError(deliveryError);
   }
 
@@ -1004,14 +1028,10 @@ export async function updateOrderProduction(
   }
 
   const productionDueDate = parseProductionDueDate(input.productionDueDate);
-  let productionOwnerId: string | null = null;
-  let productionOwnerName: string | null = null;
-  if (input.productionOwnerId) {
-    const employee = await prisma.employee.findUnique({ where: { id: input.productionOwnerId } });
-    if (!employee) throw new OrderValidationError("Nhân viên phụ trách sản xuất không hợp lệ.");
-    productionOwnerId = employee.id;
-    productionOwnerName = employee.fullName;
-  }
+  const productionOwnerSnapshot = await resolveProductionOwnerSnapshot(input.productionOwnerId, {
+    allowExistingId: order.productionOwnerId,
+  });
+  const { productionOwnerId, productionOwnerName } = productionOwnerSnapshot;
 
   const details: string[] = [];
   if (productionOwnerName !== (order.productionOwnerName ?? null)) {
@@ -1073,6 +1093,9 @@ export async function updateOrderDelivery(
   const deliveryMethodSnapshot = await resolveDeliveryMethodSnapshot(input.deliveryMethodId, {
     allowInactiveId: order.deliveryMethodId,
   });
+  const deliveryCarrierSnapshot = await resolveDeliveryCarrierSnapshot(input.deliveryCarrierId, {
+    allowInactiveId: order.deliveryCarrierId,
+  });
   let deliveryOwnerId: string | null = null;
   let deliveryOwnerName: string | null = null;
   if (input.deliveryOwnerId) {
@@ -1092,6 +1115,9 @@ export async function updateOrderDelivery(
   if (input.deliveryTrackingCode?.trim()) {
     details.push(`Mã vận đơn: ${input.deliveryTrackingCode.trim()}`);
   }
+  if (deliveryCarrierSnapshot.deliveryCarrierName) {
+    details.push(`ĐVVC: ${deliveryCarrierSnapshot.deliveryCarrierName}`);
+  }
   if (input.deliveryRecipientName?.trim()) {
     details.push(`Người nhận: ${input.deliveryRecipientName.trim()}`);
   }
@@ -1104,7 +1130,8 @@ export async function updateOrderDelivery(
         deliveryMethodName: deliveryMethodSnapshot.deliveryMethodName,
         deliveryMethod: deliveryMethodSnapshot.deliveryMethod,
         deliveryOwnerId,
-        deliveryCarrier: input.deliveryCarrier?.trim() || null,
+        deliveryCarrierId: deliveryCarrierSnapshot.deliveryCarrierId,
+        deliveryCarrierName: deliveryCarrierSnapshot.deliveryCarrierName,
         deliveryTrackingCode: input.deliveryTrackingCode?.trim() || null,
         deliveryRecipientName: input.deliveryRecipientName?.trim() || null,
         deliveryRecipientPhone: input.deliveryRecipientPhone?.trim() || null,

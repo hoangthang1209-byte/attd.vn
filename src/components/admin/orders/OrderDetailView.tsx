@@ -16,9 +16,13 @@ import {
   getAllowedOrderStatusTransitions,
   getOrderStatusCorrectionTargets,
   isOrderEditable,
+  orderCarrierDisplay,
   orderStatusActionLabel,
   orderStatusCorrectionLabel,
 } from "@/features/orders/order-status";
+import type { DeliveryCarrierRecord } from "@/features/delivery/delivery-carrier.service";
+import ProductionOwnerSelect from "@/components/admin/orders/ProductionOwnerSelect";
+import DeliveryCarrierSelect from "@/components/admin/orders/DeliveryCarrierSelect";
 import {
   ORDER_PAYMENT_METHOD_LABELS,
   ORDER_PAYMENT_STATE_LABELS,
@@ -47,7 +51,7 @@ function syncDeliveryFields(order: OrderDetailRecord) {
   return {
     deliveryMethodId: order.deliveryMethodId ?? "",
     deliveryOwnerId: order.deliveryOwnerId ?? "",
-    deliveryCarrier: order.deliveryCarrier ?? "",
+    deliveryCarrierId: order.deliveryCarrierId ?? "",
     deliveryTrackingCode: order.deliveryTrackingCode ?? "",
     deliveryRecipientName: order.deliveryRecipientName ?? order.contactName ?? "",
     deliveryRecipientPhone: order.deliveryRecipientPhone ?? order.contactPhone ?? "",
@@ -101,7 +105,7 @@ export default function OrderDetailView({ id }: Props) {
   const [deliveryFields, setDeliveryFields] = useState({
     deliveryMethodId: "",
     deliveryOwnerId: "",
-    deliveryCarrier: "",
+    deliveryCarrierId: "",
     deliveryTrackingCode: "",
     deliveryRecipientName: "",
     deliveryRecipientPhone: "",
@@ -110,7 +114,9 @@ export default function OrderDetailView({ id }: Props) {
     deliveryNote: "",
   });
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
+  const [productionEmployees, setProductionEmployees] = useState<EmployeeRecord[]>([]);
   const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethodRecord[]>([]);
+  const [carriers, setCarriers] = useState<DeliveryCarrierRecord[]>([]);
 
   async function load() {
     setLoading(true);
@@ -133,14 +139,34 @@ export default function OrderDetailView({ id }: Props) {
   useEffect(() => {
     void Promise.all([
       fetch("/api/employees?active=1&limit=200").then((r) => r.json()),
+      fetch("/api/employees?active=1&role=PRODUCTION&limit=200").then((r) => r.json()),
       fetch("/api/delivery-methods?active=1").then((r) => r.json()),
-    ]).then(([empData, dmData]) => {
+      fetch("/api/delivery-carriers?active=1").then((r) => r.json()),
+    ]).then(([empData, prodEmpData, dmData, carrierData]) => {
       setEmployees((empData as { employees?: EmployeeRecord[] }).employees ?? []);
+      setProductionEmployees((prodEmpData as { employees?: EmployeeRecord[] }).employees ?? []);
       setDeliveryMethods((dmData as { deliveryMethods?: DeliveryMethodRecord[] }).deliveryMethods ?? []);
+      setCarriers((carrierData as { deliveryCarriers?: DeliveryCarrierRecord[] }).deliveryCarriers ?? []);
     });
   }, []);
 
   useEffect(() => { void load(); }, [id]);
+
+  useEffect(() => {
+    const carrierId = order?.deliveryCarrierId;
+    if (!carrierId) return;
+    void fetch(`/api/delivery-carriers/${carrierId}`)
+      .then((r) => r.json())
+      .then((data: { deliveryCarrier?: DeliveryCarrierRecord }) => {
+        if (data.deliveryCarrier) {
+          setCarriers((prev) =>
+            prev.some((c) => c.id === data.deliveryCarrier!.id)
+              ? prev
+              : [...prev, data.deliveryCarrier!],
+          );
+        }
+      });
+  }, [order?.deliveryCarrierId]);
 
   async function updateStatus(
     status: OrderStatus,
@@ -283,8 +309,8 @@ export default function OrderDetailView({ id }: Props) {
     setBusy(false);
   }
 
-  async function saveProduction(e: React.FormEvent) {
-    e.preventDefault();
+  async function saveProductionInternal(override?: Partial<typeof productionFields>) {
+    const payload = { ...productionFields, ...override };
     setBusy(true);
     await mutate({
       loadingMessage: "Đang lưu thông tin…",
@@ -294,11 +320,11 @@ export default function OrderDetailView({ id }: Props) {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            productionOwnerId: productionFields.productionOwnerId || null,
-            productionDueDate: productionFields.productionDueDate
-              ? new Date(productionFields.productionDueDate).toISOString()
+            productionOwnerId: payload.productionOwnerId || null,
+            productionDueDate: payload.productionDueDate
+              ? new Date(payload.productionDueDate).toISOString()
               : null,
-            productionNote: productionFields.productionNote || null,
+            productionNote: payload.productionNote || null,
           }),
         });
         return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
@@ -311,8 +337,13 @@ export default function OrderDetailView({ id }: Props) {
     setBusy(false);
   }
 
-  async function saveDelivery(e: React.FormEvent) {
+  async function saveProduction(e: React.FormEvent) {
     e.preventDefault();
+    await saveProductionInternal();
+  }
+
+  async function saveDeliveryInternal(override?: Partial<typeof deliveryFields>) {
+    const payload = { ...deliveryFields, ...override };
     setBusy(true);
     await mutate({
       loadingMessage: "Đang lưu thông tin…",
@@ -322,17 +353,17 @@ export default function OrderDetailView({ id }: Props) {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            deliveryMethodId: deliveryFields.deliveryMethodId || null,
-            deliveryOwnerId: deliveryFields.deliveryOwnerId || null,
-            deliveryCarrier: deliveryFields.deliveryCarrier || null,
-            deliveryTrackingCode: deliveryFields.deliveryTrackingCode || null,
-            deliveryRecipientName: deliveryFields.deliveryRecipientName || null,
-            deliveryRecipientPhone: deliveryFields.deliveryRecipientPhone || null,
-            deliveryAddress: deliveryFields.deliveryAddress || null,
-            deliveryExpectedAt: deliveryFields.deliveryExpectedAt
-              ? new Date(deliveryFields.deliveryExpectedAt).toISOString()
+            deliveryMethodId: payload.deliveryMethodId || null,
+            deliveryOwnerId: payload.deliveryOwnerId || null,
+            deliveryCarrierId: payload.deliveryCarrierId || null,
+            deliveryTrackingCode: payload.deliveryTrackingCode || null,
+            deliveryRecipientName: payload.deliveryRecipientName || null,
+            deliveryRecipientPhone: payload.deliveryRecipientPhone || null,
+            deliveryAddress: payload.deliveryAddress || null,
+            deliveryExpectedAt: payload.deliveryExpectedAt
+              ? new Date(payload.deliveryExpectedAt).toISOString()
               : null,
-            deliveryNote: deliveryFields.deliveryNote || null,
+            deliveryNote: payload.deliveryNote || null,
           }),
         });
         return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
@@ -343,6 +374,11 @@ export default function OrderDetailView({ id }: Props) {
       },
     });
     setBusy(false);
+  }
+
+  async function saveDelivery(e: React.FormEvent) {
+    e.preventDefault();
+    await saveDeliveryInternal();
   }
 
   if (loading) return <p className="admin-loading">Đang tải...</p>;
@@ -470,25 +506,23 @@ export default function OrderDetailView({ id }: Props) {
             <div className="admin-catalog-variant-fields">
               <div className="admin-field">
                 <label className="admin-label">Người phụ trách sản xuất</label>
-                <select
-                  className="admin-input"
+                <ProductionOwnerSelect
                   value={productionFields.productionOwnerId}
-                  onChange={(e) => setProductionFields((f) => ({ ...f, productionOwnerId: e.target.value }))}
-                >
-                  <option value="">— Chọn nhân viên —</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.fullName} ({emp.employeeCode})
-                    </option>
-                  ))}
-                  {order.productionOwnerId &&
-                    !employees.some((e) => e.id === order.productionOwnerId) &&
-                    order.productionOwnerName && (
-                      <option value={order.productionOwnerId}>
-                        {order.productionOwnerName} (lưu trước)
-                      </option>
-                    )}
-                </select>
+                  onChange={(productionOwnerId) =>
+                    setProductionFields((f) => ({ ...f, productionOwnerId }))
+                  }
+                  employees={productionEmployees}
+                  onEmployeesChange={setProductionEmployees}
+                  legacyOwnerName={
+                    !order.productionOwnerId && order.productionOwnerName
+                      ? order.productionOwnerName
+                      : null
+                  }
+                  disabled={busy}
+                  onEmployeeCreated={(employee) => {
+                    void saveProductionInternal({ productionOwnerId: employee.id });
+                  }}
+                />
               </div>
               <div className="admin-field">
                 <label className="admin-label">Hạn hoàn thành dự kiến</label>
@@ -571,7 +605,21 @@ export default function OrderDetailView({ id }: Props) {
               </div>
               <div className="admin-field">
                 <label className="admin-label">Đơn vị vận chuyển</label>
-                <input className="admin-input" value={deliveryFields.deliveryCarrier} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryCarrier: e.target.value }))} />
+                <DeliveryCarrierSelect
+                  value={deliveryFields.deliveryCarrierId}
+                  onChange={(deliveryCarrierId) =>
+                    setDeliveryFields((f) => ({ ...f, deliveryCarrierId }))
+                  }
+                  carriers={carriers}
+                  onCarriersChange={setCarriers}
+                  legacyCarrierName={
+                    !order.deliveryCarrierId ? orderCarrierDisplay(order) : null
+                  }
+                  disabled={busy}
+                  onCarrierCreated={(carrier) => {
+                    void saveDeliveryInternal({ deliveryCarrierId: carrier.id });
+                  }}
+                />
               </div>
               <div className="admin-field">
                 <label className="admin-label">Mã vận đơn</label>
@@ -608,7 +656,7 @@ export default function OrderDetailView({ id }: Props) {
             {order.deliveryOwnerName && (
               <p className="admin-field-hint">Phụ trách giao: {order.deliveryOwnerName}</p>
             )}
-            <p className="admin-field-hint">Đơn vị vận chuyển: {order.deliveryCarrier ?? "—"}</p>
+            <p className="admin-field-hint">Đơn vị vận chuyển: {orderCarrierDisplay(order) ?? "—"}</p>
             <p className="admin-field-hint">Mã vận đơn: {order.deliveryTrackingCode ?? "—"}</p>
             <p className="admin-field-hint">Người nhận: {order.deliveryRecipientName ?? "—"}</p>
             <p className="admin-field-hint">SĐT: {order.deliveryRecipientPhone ?? "—"}</p>

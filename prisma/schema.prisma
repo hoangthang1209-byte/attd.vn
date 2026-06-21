@@ -1375,6 +1375,8 @@ model Order {
   deliveryAddress       String?              @db.Text
   deliveryTrackingCode  String?
   deliveryCarrier       String?
+  deliveryCarrierId     String?
+  deliveryCarrierName   String?
   deliveryNote          String?              @db.Text
   deliveryExpectedAt    DateTime?
   deliveredAt           DateTime?
@@ -1388,6 +1390,7 @@ model Order {
   productionOwner       Employee?            @relation("OrderProductionOwner", fields: [productionOwnerId], references: [id], onDelete: SetNull)
   deliveryOwner         Employee?            @relation("OrderDeliveryOwner", fields: [deliveryOwnerId], references: [id], onDelete: SetNull)
   deliveryMethodRef     DeliveryMethod?      @relation(fields: [deliveryMethodId], references: [id], onDelete: SetNull)
+  deliveryCarrierRef    DeliveryCarrier?     @relation(fields: [deliveryCarrierId], references: [id], onDelete: SetNull)
   items                 OrderItem[]
   payments              OrderPayment[]
   activities            OrderActivity[]
@@ -1401,6 +1404,7 @@ model Order {
   @@index([deliveryExpectedAt])
   @@index([productionOwnerId])
   @@index([deliveryMethodId])
+  @@index([deliveryCarrierId])
   @@index([salesEmployeeId])
 }
 
@@ -1427,17 +1431,36 @@ model Employee {
 }
 
 model DeliveryMethod {
-  id          String   @id @default(cuid())
-  code        String   @unique
-  name        String
-  description String?  @db.Text
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  orders      Order[]
+  id              String   @id @default(cuid())
+  code            String   @unique
+  name            String
+  description     String?  @db.Text
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  requiresCarrier Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  orders          Order[]
 
   @@index([code])
+  @@index([isActive])
+}
+
+model DeliveryCarrier {
+  id             String   @id @default(cuid())
+  carrierCode    String   @unique
+  name           String
+  shortName      String?
+  description    String?  @db.Text
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  apiProviderKey String?
+  apiEnabled     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  orders         Order[]
+
+  @@index([carrierCode])
   @@index([isActive])
 }
 

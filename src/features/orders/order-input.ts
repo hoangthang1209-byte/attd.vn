@@ -172,7 +172,7 @@ export function parseUpdateOrderDeliveryBody(
   return {
     deliveryMethodId: parseOptionalString(raw.deliveryMethodId),
     deliveryOwnerId: parseOptionalString(raw.deliveryOwnerId),
-    deliveryCarrier: parseOptionalString(raw.deliveryCarrier),
+    deliveryCarrierId: parseOptionalString(raw.deliveryCarrierId),
     deliveryTrackingCode: parseOptionalString(raw.deliveryTrackingCode),
     deliveryRecipientName: parseOptionalString(raw.deliveryRecipientName),
     deliveryRecipientPhone: parseOptionalString(raw.deliveryRecipientPhone),

@@ -157,6 +157,27 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
   return mapRow(row);
 }
 
+export async function resolveProductionOwnerSnapshot(
+  productionOwnerId: string | null | undefined,
+  options?: { allowExistingId?: string | null },
+) {
+  if (!productionOwnerId) {
+    return { productionOwnerId: null, productionOwnerName: null };
+  }
+  const employee = await prisma.employee.findUnique({ where: { id: productionOwnerId } });
+  if (!employee) throw new EmployeeValidationError("Nhân viên phụ trách sản xuất không hợp lệ.");
+  if (employee.id !== options?.allowExistingId) {
+    if (!employee.isActive) throw new EmployeeValidationError("Nhân viên đã ngừng hoạt động.");
+    if (employee.role !== "PRODUCTION") {
+      throw new EmployeeValidationError("Nhân viên được chọn không thuộc vai trò sản xuất.");
+    }
+  }
+  return {
+    productionOwnerId: employee.id,
+    productionOwnerName: employee.fullName,
+  };
+}
+
 export async function resolveEmployeeSnapshot(employeeId: string | null | undefined) {
   if (!employeeId) return { productionOwnerId: null, productionOwnerName: null };
   const employee = await prisma.employee.findUnique({ where: { id: employeeId } });

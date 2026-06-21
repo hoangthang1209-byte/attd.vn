@@ -14,6 +14,7 @@ export type DeliveryMethodRecord = {
   description: string | null;
   isActive: boolean;
   sortOrder: number;
+  requiresCarrier: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -34,6 +35,7 @@ function mapRow(row: {
   description: string | null;
   isActive: boolean;
   sortOrder: number;
+  requiresCarrier: boolean;
   createdAt: Date;
   updatedAt: Date;
 }): DeliveryMethodRecord {
@@ -44,6 +46,7 @@ function mapRow(row: {
     description: row.description,
     isActive: row.isActive,
     sortOrder: row.sortOrder,
+    requiresCarrier: row.requiresCarrier,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -144,10 +147,10 @@ export async function resolveDeliveryMethodSnapshot(
 }
 
 export const DEFAULT_DELIVERY_METHODS = [
-  { name: "Giao nội bộ", sortOrder: 1 },
-  { name: "Giao qua đơn vị vận chuyển", sortOrder: 2 },
-  { name: "Khách tự nhận", sortOrder: 3 },
-  { name: "Giao xe tải / chành xe", sortOrder: 4 },
+  { name: "Giao nội bộ", sortOrder: 1, requiresCarrier: false },
+  { name: "Giao qua đơn vị vận chuyển", sortOrder: 2, requiresCarrier: true },
+  { name: "Khách tự nhận", sortOrder: 3, requiresCarrier: false },
+  { name: "Giao xe tải / chành xe", sortOrder: 4, requiresCarrier: false },
 ] as const;
 
 export async function seedDefaultDeliveryMethodsIfEmpty(): Promise<{ created: number; skipped: boolean }> {
@@ -156,7 +159,16 @@ export async function seedDefaultDeliveryMethodsIfEmpty(): Promise<{ created: nu
 
   let created = 0;
   for (const item of DEFAULT_DELIVERY_METHODS) {
-    await createDeliveryMethod({ name: item.name, sortOrder: item.sortOrder });
+    const code = await generateDeliveryMethodCode();
+    await prisma.deliveryMethod.create({
+      data: {
+        code,
+        name: item.name,
+        sortOrder: item.sortOrder,
+        requiresCarrier: item.requiresCarrier,
+        isActive: true,
+      },
+    });
     created += 1;
   }
   return { created, skipped: false };

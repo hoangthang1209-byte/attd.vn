@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { OrderStatus } from "@prisma/client";
 import AdminOpsSidePanel from "@/components/admin/operations/AdminOpsSidePanel";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
+import ProductionOwnerSelect from "@/components/admin/orders/ProductionOwnerSelect";
 import { formatOrderDateTime } from "@/features/orders/order-format";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import {
@@ -66,8 +67,9 @@ export default function ProductionDetailPanel({ orderId, onClose, onSaved }: Pro
       .finally(() => setLoading(false));
   }, [orderId]);
 
-  async function saveProduction() {
+  async function saveProduction(override?: Partial<typeof fields>) {
     if (!orderId) return;
+    const payload = { ...fields, ...override };
     await mutate({
       loadingMessage: "Đang lưu thông tin sản xuất…",
       successMessage: "Đã cập nhật thông tin sản xuất.",
@@ -76,9 +78,9 @@ export default function ProductionDetailPanel({ orderId, onClose, onSaved }: Pro
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            productionOwnerId: fields.productionOwnerId || null,
-            productionDueDate: fields.productionDueDate || null,
-            productionNote: fields.productionNote || null,
+            productionOwnerId: payload.productionOwnerId || null,
+            productionDueDate: payload.productionDueDate || null,
+            productionNote: payload.productionNote || null,
           }),
         });
         return parseAdminJsonResponse(res, (data) => data.order as OrderDetailRecord);
@@ -178,16 +180,20 @@ export default function ProductionDetailPanel({ orderId, onClose, onSaved }: Pro
 
           <div className="admin-field">
             <label className="admin-label">Người phụ trách sản xuất</label>
-            <select
-              className="admin-input"
+            <ProductionOwnerSelect
               value={fields.productionOwnerId}
-              onChange={(e) => setFields((p) => ({ ...p, productionOwnerId: e.target.value }))}
-            >
-              <option value="">— Chọn nhân viên —</option>
-              {employees.map((e) => (
-                <option key={e.id} value={e.id}>{e.fullName}</option>
-              ))}
-            </select>
+              onChange={(productionOwnerId) => setFields((p) => ({ ...p, productionOwnerId }))}
+              employees={employees}
+              onEmployeesChange={setEmployees}
+              legacyOwnerName={
+                !order.productionOwnerId && order.productionOwnerName
+                  ? order.productionOwnerName
+                  : null
+              }
+              onEmployeeCreated={(employee) => {
+                void saveProduction({ productionOwnerId: employee.id });
+              }}
+            />
           </div>
           <div className="admin-field">
             <label className="admin-label">Hạn hoàn thành</label>

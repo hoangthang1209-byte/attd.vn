@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import type { OrderStatus } from "@prisma/client";
 import AdminOpsSidePanel from "@/components/admin/operations/AdminOpsSidePanel";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
+import DeliveryCarrierSelect from "@/components/admin/orders/DeliveryCarrierSelect";
+import type { DeliveryCarrierRecord } from "@/features/delivery/delivery-carrier.service";
 import type { DeliveryMethodRecord } from "@/features/delivery/delivery-method.service";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import { formatOrderDateTime } from "@/features/orders/order-format";
@@ -14,7 +16,7 @@ import {
   getDeliveryReadiness,
   getMissingDeliveryFields,
 } from "@/features/orders/order-operations.service";
-import { validateDeliveryForShipped } from "@/features/orders/order-status";
+import { validateDeliveryForShipped, orderCarrierDisplay } from "@/features/orders/order-status";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import { toDateInputValue } from "@/features/quotes/format";
 import { useAdminMutation } from "@/hooks/useAdminAction";
@@ -30,7 +32,7 @@ function syncFields(order: OrderDetailRecord) {
   return {
     deliveryMethodId: order.deliveryMethodId ?? "",
     deliveryOwnerId: order.deliveryOwnerId ?? "",
-    deliveryCarrier: order.deliveryCarrier ?? "",
+    deliveryCarrierId: order.deliveryCarrierId ?? "",
     deliveryTrackingCode: order.deliveryTrackingCode ?? "",
     deliveryRecipientName: order.deliveryRecipientName ?? order.contactName ?? "",
     deliveryRecipientPhone: order.deliveryRecipientPhone ?? order.contactPhone ?? "",
@@ -50,10 +52,11 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
   const [order, setOrder] = useState<OrderDetailRecord | null>(null);
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
   const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethodRecord[]>([]);
+  const [carriers, setCarriers] = useState<DeliveryCarrierRecord[]>([]);
   const [fields, setFields] = useState({
     deliveryMethodId: "",
     deliveryOwnerId: "",
-    deliveryCarrier: "",
+    deliveryCarrierId: "",
     deliveryTrackingCode: "",
     deliveryRecipientName: "",
     deliveryRecipientPhone: "",
@@ -68,9 +71,11 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
     void Promise.all([
       fetch("/api/employees?active=1&role=DELIVERY&limit=200").then((r) => r.json()),
       fetch("/api/delivery-methods?active=1").then((r) => r.json()),
-    ]).then(([empData, dmData]) => {
+      fetch("/api/delivery-carriers?active=1").then((r) => r.json()),
+    ]).then(([empData, dmData, carrierData]) => {
       setEmployees((empData as { employees?: EmployeeRecord[] }).employees ?? []);
       setDeliveryMethods((dmData as { deliveryMethods?: DeliveryMethodRecord[] }).deliveryMethods ?? []);
+      setCarriers((carrierData as { deliveryCarriers?: DeliveryCarrierRecord[] }).deliveryCarriers ?? []);
     });
   }, []);
 
@@ -94,8 +99,25 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
       .finally(() => setLoading(false));
   }, [orderId]);
 
-  async function saveDelivery() {
+  useEffect(() => {
+    const carrierId = order?.deliveryCarrierId;
+    if (!carrierId) return;
+    void fetch(`/api/delivery-carriers/${carrierId}`)
+      .then((r) => r.json())
+      .then((data: { deliveryCarrier?: DeliveryCarrierRecord }) => {
+        if (data.deliveryCarrier) {
+          setCarriers((prev) =>
+            prev.some((c) => c.id === data.deliveryCarrier!.id)
+              ? prev
+              : [...prev, data.deliveryCarrier!],
+          );
+        }
+      });
+  }, [order?.deliveryCarrierId]);
+
+  async function saveDelivery(override?: Partial<typeof fields>) {
     if (!orderId) return;
+    const payload = { ...fields, ...override };
     await mutate({
       loadingMessage: "Đang lưu thông tin giao hàng…",
       successMessage: "Đã cập nhật thông tin giao hàng.",
@@ -104,17 +126,17 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            deliveryMethodId: fields.deliveryMethodId || null,
-            deliveryOwnerId: fields.deliveryOwnerId || null,
-            deliveryCarrier: fields.deliveryCarrier || null,
-            deliveryTrackingCode: fields.deliveryTrackingCode || null,
-            deliveryRecipientName: fields.deliveryRecipientName || null,
-            deliveryRecipientPhone: fields.deliveryRecipientPhone || null,
-            deliveryAddress: fields.deliveryAddress || null,
-            deliveryExpectedAt: fields.deliveryExpectedAt
-              ? new Date(fields.deliveryExpectedAt).toISOString()
+            deliveryMethodId: payload.deliveryMethodId || null,
+            deliveryOwnerId: payload.deliveryOwnerId || null,
+            deliveryCarrierId: payload.deliveryCarrierId || null,
+            deliveryTrackingCode: payload.deliveryTrackingCode || null,
+            deliveryRecipientName: payload.deliveryRecipientName || null,
+            deliveryRecipientPhone: payload.deliveryRecipientPhone || null,
+            deliveryAddress: payload.deliveryAddress || null,
+            deliveryExpectedAt: payload.deliveryExpectedAt
+              ? new Date(payload.deliveryExpectedAt).toISOString()
               : null,
-            deliveryNote: fields.deliveryNote || null,
+            deliveryNote: payload.deliveryNote || null,
           }),
         });
         return parseAdminJsonResponse(res, (data) => data.order as OrderDetailRecord);
@@ -122,21 +144,40 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
       onSuccess: (updated) => {
         setOrder(updated);
         setFields(syncFields(updated));
+        if (updated.deliveryCarrierId && !carriers.some((c) => c.id === updated.deliveryCarrierId)) {
+          void fetch(`/api/delivery-carriers/${updated.deliveryCarrierId}`)
+            .then((r) => r.json())
+            .then((data: { deliveryCarrier?: DeliveryCarrierRecord }) => {
+              if (data.deliveryCarrier) {
+                setCarriers((prev) => [...prev, data.deliveryCarrier!]);
+              }
+            });
+        }
         onSaved();
       },
     });
   }
 
+  function selectedMethodRequiresCarrier(methodId: string): boolean {
+    const id = methodId || order?.deliveryMethodId || "";
+    return deliveryMethods.find((m) => m.id === id)?.requiresCarrier ?? false;
+  }
+
   async function quickStatus(status: OrderStatus) {
     if (!orderId || !order) return;
     if (status === "SHIPPED") {
+      const methodId = fields.deliveryMethodId || order.deliveryMethodId || "";
       const validationError = validateDeliveryForShipped({
         deliveryRecipientName: fields.deliveryRecipientName,
         deliveryRecipientPhone: fields.deliveryRecipientPhone,
         deliveryAddress: fields.deliveryAddress,
-        deliveryMethodId: fields.deliveryMethodId || order.deliveryMethodId,
+        deliveryMethodId: methodId,
         deliveryMethodName: order.deliveryMethodName,
         deliveryMethod: order.deliveryMethod,
+        deliveryMethodRequiresCarrier: selectedMethodRequiresCarrier(methodId),
+        deliveryCarrierId: fields.deliveryCarrierId || order.deliveryCarrierId,
+        deliveryCarrierName: order.deliveryCarrierName,
+        deliveryCarrier: order.deliveryCarrier,
       });
       if (validationError) {
         setError(validationError);
@@ -262,10 +303,19 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
           </div>
           <div className="admin-field">
             <label className="admin-label">Đơn vị vận chuyển</label>
-            <input
-              className="admin-input"
-              value={fields.deliveryCarrier}
-              onChange={(e) => setFields((p) => ({ ...p, deliveryCarrier: e.target.value }))}
+            <DeliveryCarrierSelect
+              value={fields.deliveryCarrierId}
+              onChange={(deliveryCarrierId) => setFields((p) => ({ ...p, deliveryCarrierId }))}
+              carriers={carriers}
+              onCarriersChange={setCarriers}
+              legacyCarrierName={
+                !order.deliveryCarrierId
+                  ? orderCarrierDisplay(order)
+                  : null
+              }
+              onCarrierCreated={(carrier) => {
+                void saveDelivery({ deliveryCarrierId: carrier.id });
+              }}
             />
           </div>
           <div className="admin-field">
