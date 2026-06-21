@@ -17,10 +17,10 @@ type RailRenderItem = {
   isDuplicate: boolean;
 };
 
-const AUTO_SCROLL_MOBILE_PX_PER_SEC = 20;
-const AUTO_SCROLL_DESKTOP_PX_PER_SEC = 28;
+const AUTO_SCROLL_MOBILE_PX_PER_SEC = 16;
+const AUTO_SCROLL_DESKTOP_PX_PER_SEC = 20;
 const DESKTOP_BREAKPOINT_PX = 768;
-const RESUME_IDLE_MS = 4000;
+const RESUME_IDLE_MS = 400;
 const DRAG_THRESHOLD_PX = 6;
 const MIN_CATEGORIES_FOR_AUTO = 2;
 const MIN_OVERFLOW_RATIO = 1.25;
@@ -74,6 +74,11 @@ function measurePrimarySegmentWidth(track: HTMLElement, primaryCount: number): n
   return width;
 }
 
+function formatProductCountLabel(productCount: number | null | undefined): string | null {
+  if (productCount == null || productCount < 1) return null;
+  return `${productCount.toLocaleString("vi-VN")}+ lựa chọn`;
+}
+
 function devLog(message: string, data?: Record<string, unknown>) {
   if (process.env.NODE_ENV !== "development") return;
   if (data) console.debug(`[HomeCategoryDiscoveryRail] ${message}`, data);
@@ -88,6 +93,7 @@ function CategoryRailCard({
   isDuplicate: boolean;
 }) {
   const hasImage = category.imageUrl && isValidImageSrc(category.imageUrl);
+  const countLabel = formatProductCountLabel(category.productCount);
 
   return (
     <Link
@@ -101,19 +107,22 @@ function CategoryRailCard({
         {hasImage ? (
           <Image
             src={category.imageUrl!}
-            alt=""
+            alt={category.name}
             fill
             className="home-category-rail__img"
-            sizes="(max-width: 767px) 38vw, 160px"
+            sizes="(max-width: 767px) 76vw, 280px"
             draggable={false}
           />
         ) : (
           <div className="home-category-rail__placeholder" aria-hidden>
-            <Package size={28} strokeWidth={1.5} />
+            <Package size={32} strokeWidth={1.4} />
           </div>
         )}
       </div>
-      <span className="home-category-rail__name">{category.name}</span>
+      <div className="home-category-rail__body">
+        <span className="home-category-rail__name">{category.name}</span>
+        {countLabel ? <span className="home-category-rail__count">{countLabel}</span> : null}
+      </div>
     </Link>
   );
 }
@@ -142,10 +151,12 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
   const dragStartXRef = useRef(0);
   const scrollStartRef = useRef(0);
   const dragMovedRef = useRef(false);
+  const virtualScrollRef = useRef(0);
+  const isProgrammaticScrollRef = useRef(false);
   const runtimeCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startingScrollLeftRef = useRef(0);
   const hasLoggedStartRef = useRef(false);
-  const scrollRemainderRef = useRef(0);
+  const isPointerDraggingRef = useRef(false);
 
   const engineRef = useRef({
     isInteracting: false,
@@ -168,12 +179,20 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     }
   };
 
-  const scheduleResume = () => {
+  const scheduleResumeAfterIdle = () => {
     clearResumeTimer();
     engineRef.current.resumeAt = Date.now() + RESUME_IDLE_MS;
     resumeTimerRef.current = setTimeout(() => {
+      if (isPointerDraggingRef.current) return;
+      engineRef.current.isInteracting = false;
       engineRef.current.resumeAt = 0;
     }, RESUME_IDLE_MS);
+  };
+
+  const syncVirtualScrollFromViewport = () => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    virtualScrollRef.current = viewport.scrollLeft;
   };
 
   const remeasure = () => {
@@ -216,8 +235,28 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
       ? AUTO_SCROLL_DESKTOP_PX_PER_SEC
       : AUTO_SCROLL_MOBILE_PX_PER_SEC;
 
+  const applyVirtualScroll = (viewport: HTMLElement) => {
+    const segmentWidth = segmentWidthRef.current;
+    if (segmentWidth > 0) {
+      while (virtualScrollRef.current >= segmentWidth) {
+        virtualScrollRef.current -= segmentWidth;
+      }
+    }
+
+    const nextScrollLeft = Math.round(virtualScrollRef.current);
+    if (nextScrollLeft === viewport.scrollLeft) return;
+
+    isProgrammaticScrollRef.current = true;
+    viewport.scrollLeft = nextScrollLeft;
+    virtualScrollRef.current = viewport.scrollLeft;
+    requestAnimationFrame(() => {
+      isProgrammaticScrollRef.current = false;
+    });
+  };
+
   useLayoutEffect(() => {
     remeasure();
+    syncVirtualScrollFromViewport();
     const viewport = viewportRef.current;
     const track = trackRef.current;
     if (!viewport) return;
@@ -282,6 +321,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
       engineRef.current.isDocumentVisible = !document.hidden;
       if (document.hidden) return;
       remeasure();
+      syncVirtualScrollFromViewport();
       if (!engineRef.current.isInteracting) {
         engineRef.current.resumeAt = 0;
         clearResumeTimer();
@@ -303,25 +343,10 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
           if (lastFrameRef.current == null) {
             lastFrameRef.current = timestamp;
           } else {
-            const deltaMs = timestamp - lastFrameRef.current;
+            const deltaMs = Math.min(timestamp - lastFrameRef.current, 48);
             lastFrameRef.current = timestamp;
-            const speed = getScrollSpeed();
-            scrollRemainderRef.current += (speed / 1000) * deltaMs;
-            let integerStep = 0;
-            if (scrollRemainderRef.current >= 1) {
-              integerStep = Math.floor(scrollRemainderRef.current);
-              scrollRemainderRef.current -= integerStep;
-            } else if (scrollRemainderRef.current <= -1) {
-              integerStep = Math.ceil(scrollRemainderRef.current);
-              scrollRemainderRef.current -= integerStep;
-            }
-            if (integerStep !== 0) {
-              viewport.scrollLeft += integerStep;
-            }
-            const segmentWidth = segmentWidthRef.current;
-            if (segmentWidth > 0 && viewport.scrollLeft >= segmentWidth) {
-              viewport.scrollLeft -= segmentWidth;
-            }
+            virtualScrollRef.current += (getScrollSpeed() / 1000) * deltaMs;
+            applyVirtualScroll(viewport);
           }
         } else {
           lastFrameRef.current = null;
@@ -365,17 +390,10 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
 
   if (items.length === 0) return null;
 
-  function beginInteraction() {
+  function pauseForUserInput() {
     engineRef.current.isInteracting = true;
     engineRef.current.resumeAt = Number.MAX_SAFE_INTEGER;
     clearResumeTimer();
-    lastFrameRef.current = null;
-    scrollRemainderRef.current = 0;
-  }
-
-  function endInteraction() {
-    engineRef.current.isInteracting = false;
-    scheduleResume();
     lastFrameRef.current = null;
   }
 
@@ -383,41 +401,67 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     if (event.button !== 0) return;
     const viewport = viewportRef.current;
     if (!viewport) return;
-    beginInteraction();
+    isPointerDraggingRef.current = true;
+    pauseForUserInput();
     dragMovedRef.current = false;
     dragStartXRef.current = event.clientX;
     scrollStartRef.current = viewport.scrollLeft;
+    virtualScrollRef.current = viewport.scrollLeft;
     viewport.setPointerCapture(event.pointerId);
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!engineRef.current.isInteracting) return;
+    if (!isPointerDraggingRef.current) return;
     const viewport = viewportRef.current;
     if (!viewport) return;
     const delta = event.clientX - dragStartXRef.current;
     if (Math.abs(delta) > DRAG_THRESHOLD_PX) dragMovedRef.current = true;
     viewport.scrollLeft = scrollStartRef.current - delta;
+    virtualScrollRef.current = viewport.scrollLeft;
   }
 
   function handlePointerUp(event: React.PointerEvent<HTMLDivElement>) {
-    if (!engineRef.current.isInteracting) return;
+    if (!isPointerDraggingRef.current) return;
+    isPointerDraggingRef.current = false;
     viewportRef.current?.releasePointerCapture(event.pointerId);
-    endInteraction();
+    syncVirtualScrollFromViewport();
+    scheduleResumeAfterIdle();
+    lastFrameRef.current = null;
+  }
+
+  function handleTouchStart() {
+    pauseForUserInput();
+  }
+
+  function handleTouchEnd() {
+    syncVirtualScrollFromViewport();
+    scheduleResumeAfterIdle();
+    lastFrameRef.current = null;
   }
 
   function handleWheel() {
-    beginInteraction();
-    scheduleResume();
+    pauseForUserInput();
+    scheduleResumeAfterIdle();
+  }
+
+  function handleScroll() {
+    if (isProgrammaticScrollRef.current || isPointerDraggingRef.current) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    virtualScrollRef.current = viewport.scrollLeft;
+    pauseForUserInput();
+    scheduleResumeAfterIdle();
   }
 
   function handleFocusCapture(event: React.FocusEvent<HTMLDivElement>) {
     if (!event.relatedTarget) return;
-    beginInteraction();
+    pauseForUserInput();
   }
 
   function handleBlurCapture(event: React.FocusEvent<HTMLDivElement>) {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-    endInteraction();
+    scheduleResumeAfterIdle();
+    lastFrameRef.current = null;
   }
 
   function handleClickCapture(event: React.MouseEvent) {
@@ -437,7 +481,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
   function handleMouseLeave() {
     if (!engineRef.current.hasHover || !engineRef.current.isHoverPaused) return;
     engineRef.current.isHoverPaused = false;
-    scheduleResume();
+    scheduleResumeAfterIdle();
   }
 
   return (
@@ -454,10 +498,11 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onTouchStart={beginInteraction}
-        onTouchEnd={endInteraction}
-        onTouchCancel={endInteraction}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         onWheel={handleWheel}
+        onScroll={handleScroll}
         onFocusCapture={handleFocusCapture}
         onBlurCapture={handleBlurCapture}
         onClickCapture={handleClickCapture}
