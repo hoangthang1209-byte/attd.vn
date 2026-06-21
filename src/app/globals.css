@@ -12282,6 +12282,81 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 .order-status-badge--ready_to_ship,
 .order-status-badge--shipped { background: #dbeafe; color: #1e40af; }
 
+/* Sprint 26.3.5 — Production pack */
+.production-pack-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.production-pack-tabs .is-active {
+  background: var(--brand-primary, #111);
+  color: #fff;
+  border-color: transparent;
+}
+.production-pack-file-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+.production-pack-file-row__main {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.production-pack-file-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+.production-pack-file-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: #f3f4f6;
+  font-size: 10px;
+  font-weight: 700;
+}
+.production-pack-status {
+  margin-left: 8px;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+}
+.production-pack-status--archived,
+.production-pack-status--draft {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+.production-pack-file-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+.production-readiness-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.production-readiness-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+.production-readiness-item__label { font-weight: 600; }
+.production-readiness-item--complete .production-readiness-item__status { color: #166534; }
+.production-readiness-item--incomplete .production-readiness-item__status { color: #b45309; }
+.production-readiness-item--not_applicable .production-readiness-item__status { color: #6b7280; }
+
 /* ─── Sprint 27.1.1 — Search-first header & B2B homepage hero ─────────────── */
 
 /* Header v271 — search-first marketplace layout */
@@ -12504,24 +12579,16 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
-  touch-action: pan-x pan-y;
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: auto;
-  scroll-padding-inline: 0;
+  touch-action: pan-y;
   padding: 4px 0 8px;
   cursor: grab;
-  scrollbar-width: none;
 }
 
 .home-category-rail__viewport:active {
   cursor: grabbing;
-}
-
-.home-category-rail__viewport::-webkit-scrollbar {
-  display: none;
 }
 
 .home-category-rail__track {
@@ -12530,6 +12597,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   max-width: none;
   min-width: 0;
   gap: 14px;
+  will-change: transform;
 }
 
 .home-category-rail__card {

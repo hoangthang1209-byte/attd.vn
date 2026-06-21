@@ -178,6 +178,7 @@ export type UpdateOrderStatusInput = {
   status: OrderStatus;
   cancelReason?: string | null;
   correctionReason?: string | null;
+  productionReadinessAcknowledged?: boolean;
 };
 
 export type OrderItemVariantInputPayload = {

@@ -147,6 +147,7 @@ export function parseUpdateOrderStatusBody(raw: Record<string, unknown>): Update
     status: raw.status as OrderStatus,
     cancelReason: parseOptionalString(raw.cancelReason),
     correctionReason: parseOptionalString(raw.correctionReason),
+    productionReadinessAcknowledged: raw.productionReadinessAcknowledged === true,
   };
 }
 

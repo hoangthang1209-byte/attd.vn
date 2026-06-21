@@ -25,6 +25,12 @@ import {
   resolveProductionOwnerSnapshot,
   resolveSalesEmployeeSnapshot,
 } from "@/features/employees/employee.service";
+import { copyProductBomToOrderItems } from "@/features/orders/production-pack.service";
+import {
+  evaluateProductionReadiness,
+  formatReadinessAcknowledgementDetail,
+  isLegacyOrderForReadiness,
+} from "@/features/orders/production-readiness.service";
 import {
   canUpdateOrderStatus,
   formatOrderStatusCorrection,
@@ -378,6 +384,22 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
     if (deliveryError) throw new OrderValidationError(deliveryError);
   }
 
+  if (input.status === "IN_PRODUCTION") {
+    const legacy = isLegacyOrderForReadiness({
+      status: order.status,
+      productionStartedAt: order.productionStartedAt,
+      createdAt: order.createdAt,
+    });
+    if (!legacy) {
+      const readiness = await evaluateProductionReadiness(id);
+      if (!readiness.isReady && !input.productionReadinessAcknowledged) {
+        throw new OrderValidationError(
+          "Hồ sơ sản xuất chưa đầy đủ. Vui lòng xác nhận trước khi bắt đầu sản xuất.",
+        );
+      }
+    }
+  }
+
   const now = new Date();
   const data: Prisma.OrderUpdateInput = {
     status: input.status,
@@ -405,6 +427,14 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
       ? input.correctionReason?.trim() ?? null
       : null;
 
+  let readinessActivityDetail: string | null = null;
+  if (input.status === "IN_PRODUCTION" && input.productionReadinessAcknowledged) {
+    const readiness = await evaluateProductionReadiness(id);
+    if (!readiness.isReady) {
+      readinessActivityDetail = formatReadinessAcknowledgementDetail(readiness.missingMandatory);
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.order.update({ where: { id }, data });
     await tx.orderActivity.create({
@@ -415,6 +445,16 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
         detail: activityDetail,
       },
     });
+    if (readinessActivityDetail) {
+      await tx.orderActivity.create({
+        data: {
+          orderId: id,
+          type: "PRODUCTION_UPDATED",
+          title: "Xác nhận bắt đầu sản xuất khi hồ sơ chưa đầy đủ",
+          detail: readinessActivityDetail,
+        },
+      });
+    }
   });
 
   const detail = await getOrderDetail(id);
@@ -875,6 +915,7 @@ export async function createManualOrder(input: CreateManualOrderInput) {
             detail: `${orderNo} · ${input.customerCompanyName?.trim() ?? ""}`.trim(),
           },
         });
+        await copyProductBomToOrderItems(tx, created.id);
         return created.id;
       });
 
@@ -939,6 +980,7 @@ export async function updateOrderDetails(id: string, input: UpdateOrderInput) {
         detail: changes.length ? changes.join(" · ") : "Cập nhật thông tin và sản phẩm",
       },
     });
+    await copyProductBomToOrderItems(tx, id);
   });
 
   const detail = await getOrderDetail(id);

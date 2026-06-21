@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generateOrderNo } from "@/features/orders/order-code";
+import { copyProductBomToOrderItems } from "@/features/orders/production-pack.service";
 import { getOrderDetail } from "@/features/orders/order.service";
 
 export class OrderConversionError extends Error {
@@ -245,6 +246,8 @@ export async function convertQuoteToOrder(quoteId: string) {
           title: `Đã chuyển báo giá ${quote.quoteNo} thành đơn hàng ${orderNo}`,
           content: orderNo,
         });
+
+        await copyProductBomToOrderItems(tx, created.id);
 
         return created.id;
       });

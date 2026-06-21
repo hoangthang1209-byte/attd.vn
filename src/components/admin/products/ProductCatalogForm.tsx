@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
+import ProductMaterialSection from "@/components/admin/products/ProductMaterialSection";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
@@ -757,6 +758,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           )}
         </div>
       )}
+
+      {form.id && <ProductMaterialSection productId={form.id} />}
 
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>

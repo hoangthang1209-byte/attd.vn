@@ -9,6 +9,9 @@ import {
   validateImageUpload,
   type StorageFolderKey,
 } from "@/lib/storage/types";
+import {
+  validateProductionFileUpload,
+} from "@/lib/productionFileValidation";
 
 export { LARGE_IMAGE_WARNING_SIZE };
 
@@ -113,6 +116,54 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
     if (detail.includes("MediaAsset") || detail.includes("does not exist") || detail.includes("P2021")) {
       throw new Error("CMS tables chưa sẵn sàng — xem bảng chẩn đoán trên trang Media Library");
     }
+    throw err;
+  }
+}
+
+export async function uploadProductionFileAsset(input: {
+  file: File;
+  title?: string;
+  tags?: string[];
+}): Promise<UploadMediaResult> {
+  const { file, title, tags } = input;
+  const validation = validateProductionFileUpload({
+    filename: file.name,
+    mimeType: file.type,
+    sizeBytes: file.size,
+  });
+  if ("error" in validation) {
+    throw new Error(validation.error);
+  }
+
+  const mimeType = validation.mimeType;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const storage = getStorageAdapter();
+  const result = await storage.upload("general", file.name, buffer, mimeType);
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+
+  try {
+    const asset = await prisma.mediaAsset.create({
+      data: {
+        filename: file.name,
+        originalName: file.name,
+        url: result.url,
+        thumbnailUrl: result.thumbnailUrl ?? null,
+        storageKey: result.storageKey,
+        publicId: result.publicId ?? null,
+        mimeType,
+        format: ext || null,
+        sizeBytes: file.size,
+        width: result.width ?? null,
+        height: result.height ?? null,
+        folder: "GENERAL",
+        usageType: "GENERAL",
+        title: title?.trim() || null,
+        tags: tags ?? [],
+      },
+    });
+    return { asset };
+  } catch (err) {
+    await storage.delete(result.url, result.storageKey);
     throw err;
   }
 }

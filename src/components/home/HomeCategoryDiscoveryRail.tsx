@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Package } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import type { HomepageCategoryItem } from "@/features/home/homepage.types";
 import { isValidImageSrc } from "@/lib/imagePaths";
 
@@ -17,8 +17,8 @@ type RailRenderItem = {
   isDuplicate: boolean;
 };
 
-const AUTO_SCROLL_MOBILE_PX_PER_SEC = 16;
-const AUTO_SCROLL_DESKTOP_PX_PER_SEC = 20;
+const AUTO_SCROLL_MOBILE_PX_PER_SEC = 22;
+const AUTO_SCROLL_DESKTOP_PX_PER_SEC = 28;
 const DESKTOP_BREAKPOINT_PX = 768;
 const WHEEL_SETTLE_MS = 100;
 const DRAG_THRESHOLD_PX = 6;
@@ -144,19 +144,24 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const segmentWidthRef = useRef(0);
+  const trackWidthRef = useRef(0);
   const primaryCountRef = useRef(primaryCount);
   const rafRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number | null>(null);
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragStartXRef = useRef(0);
-  const scrollStartRef = useRef(0);
-  const dragMovedRef = useRef(false);
-  const virtualScrollRef = useRef(0);
-  const isProgrammaticScrollRef = useRef(false);
   const runtimeCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startingScrollLeftRef = useRef(0);
+  const startingTransformRef = useRef(0);
   const hasLoggedStartRef = useRef(false);
+
+  /** Sub-pixel transform position — never rounded for animation. */
+  const transformXRef = useRef(0);
+
+  const dragStartXRef = useRef(0);
+  const dragStartYRef = useRef(0);
+  const transformAtDragStartRef = useRef(0);
+  const dragMovedRef = useRef(false);
   const isPointerDraggingRef = useRef(false);
+  const dragAxisCommittedRef = useRef(false);
 
   const engineRef = useRef({
     isInteracting: false,
@@ -171,48 +176,68 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     primaryCountRef.current = primaryCount;
   }, [primaryCount]);
 
-  const clearResumeTimer = () => {
+  const clearResumeTimer = useCallback(() => {
     if (resumeTimerRef.current) {
       clearTimeout(resumeTimerRef.current);
       resumeTimerRef.current = null;
     }
-  };
+  }, []);
 
-  const resumeImmediately = () => {
+  const resumeImmediately = useCallback(() => {
     clearResumeTimer();
     engineRef.current.isInteracting = false;
-  };
+    lastFrameRef.current = null;
+  }, [clearResumeTimer]);
 
-  const scheduleWheelSettleResume = () => {
+  const scheduleWheelSettleResume = useCallback(() => {
     clearResumeTimer();
     resumeTimerRef.current = setTimeout(() => {
       if (isPointerDraggingRef.current) return;
       engineRef.current.isInteracting = false;
+      lastFrameRef.current = null;
     }, WHEEL_SETTLE_MS);
-  };
+  }, [clearResumeTimer]);
 
-  const syncVirtualScrollFromViewport = () => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    virtualScrollRef.current = viewport.scrollLeft;
-  };
+  const wrapTransform = useCallback((allowNegativeWrap: boolean) => {
+    const segmentWidth = segmentWidthRef.current;
+    if (segmentWidth <= 0) return;
+    let x = transformXRef.current;
+    while (x >= segmentWidth) {
+      x -= segmentWidth;
+    }
+    if (allowNegativeWrap) {
+      while (x < 0) {
+        x += segmentWidth;
+      }
+    }
+    transformXRef.current = x;
+  }, []);
 
-  const remeasure = () => {
+  const applyTransform = useCallback((allowNegativeWrap = false) => {
+    const track = trackRef.current;
+    if (!track) return;
+    wrapTransform(allowNegativeWrap);
+    track.style.transform = `translate3d(${-transformXRef.current}px, 0, 0)`;
+  }, [wrapTransform]);
+
+  const remeasure = useCallback(() => {
     const viewport = viewportRef.current;
     const track = trackRef.current;
     if (!viewport || !track || primaryCountRef.current < MIN_CATEGORIES_FOR_AUTO) {
       segmentWidthRef.current = 0;
+      trackWidthRef.current = 0;
       return;
     }
     segmentWidthRef.current = measurePrimarySegmentWidth(track, primaryCountRef.current);
-  };
+    trackWidthRef.current = track.offsetWidth;
+  }, []);
 
-  const isEligible = (viewport: HTMLElement) => {
+  const isEligible = (viewport: HTMLElement, track: HTMLElement) => {
     const engine = engineRef.current;
     const hasCategories = primaryCountRef.current >= MIN_CATEGORIES_FOR_AUTO;
-    const canOverflow = viewport.scrollWidth > viewport.clientWidth + 1;
+    const canOverflow = track.offsetWidth > viewport.clientWidth + 1;
     const overflowRatio =
-      viewport.clientWidth > 0 ? viewport.scrollWidth / viewport.clientWidth : 0;
+      viewport.clientWidth > 0 ? track.offsetWidth / viewport.clientWidth : 0;
     const minRatio =
       primaryCountRef.current === 2
         ? viewport.clientWidth >= DESKTOP_BREAKPOINT_PX
@@ -236,67 +261,69 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
       ? AUTO_SCROLL_DESKTOP_PX_PER_SEC
       : AUTO_SCROLL_MOBILE_PX_PER_SEC;
 
-  const applyVirtualScroll = (viewport: HTMLElement) => {
-    const segmentWidth = segmentWidthRef.current;
-    if (segmentWidth > 0) {
-      while (virtualScrollRef.current >= segmentWidth) {
-        virtualScrollRef.current -= segmentWidth;
-      }
+  const ensureFocusedCardVisible = (target: EventTarget | null) => {
+    const viewport = viewportRef.current;
+    if (!viewport || !(target instanceof HTMLElement)) return;
+    const card = target.closest(".home-category-rail__card") as HTMLElement | null;
+    if (!card || card.getAttribute("aria-hidden") === "true") return;
+
+    const viewportRect = viewport.getBoundingClientRect();
+    const cardRect = card.getBoundingClientRect();
+
+    if (cardRect.left < viewportRect.left) {
+      transformXRef.current -= viewportRect.left - cardRect.left;
+      applyTransform(true);
+    } else if (cardRect.right > viewportRect.right) {
+      transformXRef.current += cardRect.right - viewportRect.right;
+      applyTransform(true);
     }
-
-    const nextScrollLeft = Math.round(virtualScrollRef.current);
-    if (nextScrollLeft === viewport.scrollLeft) return;
-
-    isProgrammaticScrollRef.current = true;
-    viewport.scrollLeft = nextScrollLeft;
-    queueMicrotask(() => {
-      isProgrammaticScrollRef.current = false;
-    });
   };
 
   useLayoutEffect(() => {
     remeasure();
-    syncVirtualScrollFromViewport();
+    applyTransform();
     const viewport = viewportRef.current;
     const track = trackRef.current;
     if (!viewport) return;
 
     const observer = new ResizeObserver(() => {
       remeasure();
+      applyTransform();
     });
     observer.observe(viewport);
     if (track) observer.observe(track);
     return () => observer.disconnect();
-  }, [items, primaryCount]);
+  }, [items, primaryCount, remeasure, applyTransform]);
 
   useEffect(() => {
     const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
     const hoverMedia = window.matchMedia("(hover: hover) and (pointer: fine)");
 
-    const maybeLogRuntimeStart = (viewport: HTMLElement) => {
+    const maybeLogRuntimeStart = (viewport: HTMLElement, track: HTMLElement) => {
       if (process.env.NODE_ENV !== "development" || hasLoggedStartRef.current) return;
+      if (!isEligible(viewport, track)) return;
       hasLoggedStartRef.current = true;
-      startingScrollLeftRef.current = viewport.scrollLeft;
-      devLog("started");
+      startingTransformRef.current = transformXRef.current;
+      devLog("transform engine started", {
+        transformX: transformXRef.current,
+        segmentWidth: segmentWidthRef.current,
+        active: true,
+      });
 
       if (runtimeCheckTimerRef.current) clearTimeout(runtimeCheckTimerRef.current);
       runtimeCheckTimerRef.current = setTimeout(() => {
-        const currentScrollLeft = viewport.scrollLeft;
-        const startingScrollLeft = startingScrollLeftRef.current;
-        const delta = currentScrollLeft - startingScrollLeft;
-
-        devLog("runtime check", {
-          clientWidth: viewport.clientWidth,
-          scrollWidth: viewport.scrollWidth,
-          startingScrollLeft,
-          currentScrollLeft,
+        const delta = transformXRef.current - startingTransformRef.current;
+        devLog("runtime check (2s)", {
+          transformX: transformXRef.current,
+          startingTransformX: startingTransformRef.current,
           delta,
-          isEligible: isEligible(viewport),
-          categoryCount: primaryCountRef.current,
+          segmentWidth: segmentWidthRef.current,
+          active: isEligible(viewport, track),
+          clientWidth: viewport.clientWidth,
+          trackWidth: track.offsetWidth,
         });
-
-        if (isEligible(viewport) && delta < 3) {
-          console.warn("[HomeCategoryDiscoveryRail] auto-scroll did not move");
+        if (isEligible(viewport, track) && delta < 3) {
+          console.warn("[HomeCategoryDiscoveryRail] transform auto-scroll did not move");
         }
       }, 2000);
     };
@@ -320,9 +347,9 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
       engineRef.current.isDocumentVisible = !document.hidden;
       if (document.hidden) return;
       remeasure();
-      syncVirtualScrollFromViewport();
       if (!engineRef.current.isInteracting) {
         clearResumeTimer();
+        lastFrameRef.current = null;
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
@@ -334,17 +361,18 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
 
     const tick = (timestamp: number) => {
       const viewport = viewportRef.current;
-      if (viewport) {
-        const eligible = isEligible(viewport);
+      const track = trackRef.current;
+      if (viewport && track) {
+        const eligible = isEligible(viewport, track);
         if (eligible) {
-          maybeLogRuntimeStart(viewport);
+          maybeLogRuntimeStart(viewport, track);
           if (lastFrameRef.current == null) {
             lastFrameRef.current = timestamp;
           } else {
             const deltaMs = Math.min(timestamp - lastFrameRef.current, 48);
             lastFrameRef.current = timestamp;
-            virtualScrollRef.current += (getScrollSpeed() / 1000) * deltaMs;
-            applyVirtualScroll(viewport);
+            transformXRef.current += (getScrollSpeed() / 1000) * deltaMs;
+            applyTransform(false);
           }
         } else {
           lastFrameRef.current = null;
@@ -355,16 +383,30 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
 
     rafRef.current = requestAnimationFrame(tick);
 
+    const viewport = viewportRef.current;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+      event.preventDefault();
+      engineRef.current.isInteracting = true;
+      clearResumeTimer();
+      lastFrameRef.current = null;
+      transformXRef.current += event.deltaX;
+      applyTransform(true);
+      scheduleWheelSettleResume();
+    };
+    viewport?.addEventListener("wheel", onWheel, { passive: false });
+
     return () => {
       motionMedia.removeEventListener("change", syncMotion);
       hoverMedia.removeEventListener("change", syncHover);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pointermove", onPointerMove);
+      viewport?.removeEventListener("wheel", onWheel);
       clearResumeTimer();
       if (runtimeCheckTimerRef.current) clearTimeout(runtimeCheckTimerRef.current);
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [primaryCount, items.length]);
+  }, [primaryCount, items.length, applyTransform, remeasure, scheduleWheelSettleResume, clearResumeTimer]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== "development") return;
@@ -377,7 +419,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
         documentClientWidth: doc.clientWidth,
         documentScrollWidth: doc.scrollWidth,
         railViewportClientWidth: viewport?.clientWidth ?? null,
-        railViewportScrollWidth: viewport?.scrollWidth ?? null,
+        railTrackWidth: trackRef.current?.offsetWidth ?? null,
       });
     }
 
@@ -396,62 +438,60 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
-    const viewport = viewportRef.current;
-    if (!viewport) return;
     isPointerDraggingRef.current = true;
-    pauseForUserInput();
+    dragAxisCommittedRef.current = false;
     dragMovedRef.current = false;
     dragStartXRef.current = event.clientX;
-    scrollStartRef.current = viewport.scrollLeft;
-    virtualScrollRef.current = viewport.scrollLeft;
-    viewport.setPointerCapture(event.pointerId);
+    dragStartYRef.current = event.clientY;
+    transformAtDragStartRef.current = transformXRef.current;
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!isPointerDraggingRef.current) return;
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const delta = event.clientX - dragStartXRef.current;
-    if (Math.abs(delta) > DRAG_THRESHOLD_PX) dragMovedRef.current = true;
-    viewport.scrollLeft = scrollStartRef.current - delta;
-    virtualScrollRef.current = viewport.scrollLeft;
+
+    const deltaX = event.clientX - dragStartXRef.current;
+    const deltaY = event.clientY - dragStartYRef.current;
+
+    if (!dragAxisCommittedRef.current) {
+      if (
+        Math.abs(deltaX) < DRAG_THRESHOLD_PX &&
+        Math.abs(deltaY) < DRAG_THRESHOLD_PX
+      ) {
+        return;
+      }
+      if (Math.abs(deltaY) > Math.abs(deltaX)) {
+        isPointerDraggingRef.current = false;
+        return;
+      }
+      dragAxisCommittedRef.current = true;
+      pauseForUserInput();
+      viewportRef.current?.setPointerCapture(event.pointerId);
+    }
+
+    if (!dragAxisCommittedRef.current) return;
+
+    if (Math.abs(deltaX) > DRAG_THRESHOLD_PX) dragMovedRef.current = true;
+    transformXRef.current = transformAtDragStartRef.current - deltaX;
+    applyTransform(true);
   }
 
   function handlePointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (!isPointerDraggingRef.current) return;
+    const wasDragging = dragAxisCommittedRef.current;
     isPointerDraggingRef.current = false;
-    viewportRef.current?.releasePointerCapture(event.pointerId);
-    syncVirtualScrollFromViewport();
+    dragAxisCommittedRef.current = false;
+    if (wasDragging) {
+      viewportRef.current?.releasePointerCapture(event.pointerId);
+      wrapTransform(true);
+      applyTransform(true);
+    }
     resumeImmediately();
-  }
-
-  function handleTouchStart() {
-    pauseForUserInput();
-  }
-
-  function handleTouchEnd() {
-    if (isPointerDraggingRef.current) return;
-    syncVirtualScrollFromViewport();
-    resumeImmediately();
-  }
-
-  function handleWheel() {
-    pauseForUserInput();
-    scheduleWheelSettleResume();
-  }
-
-  function handleScroll() {
-    if (isProgrammaticScrollRef.current || isPointerDraggingRef.current) return;
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    virtualScrollRef.current = viewport.scrollLeft;
-    pauseForUserInput();
-    scheduleWheelSettleResume();
   }
 
   function handleFocusCapture(event: React.FocusEvent<HTMLDivElement>) {
     if (!event.relatedTarget) return;
     pauseForUserInput();
+    ensureFocusedCardVisible(event.target);
   }
 
   function handleBlurCapture(event: React.FocusEvent<HTMLDivElement>) {
@@ -493,11 +533,6 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        onWheel={handleWheel}
-        onScroll={handleScroll}
         onFocusCapture={handleFocusCapture}
         onBlurCapture={handleBlurCapture}
         onClickCapture={handleClickCapture}

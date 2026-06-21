@@ -37,6 +37,8 @@ import { toDateInputValue } from "@/features/quotes/format";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import OrderDocumentActions from "@/components/admin/orders/OrderDocumentActions";
+import OrderProductionPackSection from "@/components/admin/orders/OrderProductionPackSection";
+import type { ProductionReadinessResult } from "@/features/orders/production-readiness.service";
 
 type Props = { id: string };
 
@@ -118,6 +120,9 @@ export default function OrderDetailView({ id }: Props) {
   const [productionEmployees, setProductionEmployees] = useState<EmployeeRecord[]>([]);
   const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethodRecord[]>([]);
   const [carriers, setCarriers] = useState<DeliveryCarrierRecord[]>([]);
+  const [readinessOpen, setReadinessOpen] = useState(false);
+  const [readinessData, setReadinessData] = useState<ProductionReadinessResult | null>(null);
+  const [readinessAck, setReadinessAck] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -171,7 +176,11 @@ export default function OrderDetailView({ id }: Props) {
 
   async function updateStatus(
     status: OrderStatus,
-    options?: { cancelReason?: string; correctionReason?: string },
+    options?: {
+      cancelReason?: string;
+      correctionReason?: string;
+      productionReadinessAcknowledged?: boolean;
+    },
   ) {
     setBusy(true);
     await mutate({
@@ -185,6 +194,7 @@ export default function OrderDetailView({ id }: Props) {
             status,
             cancelReason: options?.cancelReason ?? null,
             correctionReason: options?.correctionReason ?? null,
+            productionReadinessAcknowledged: options?.productionReadinessAcknowledged ?? false,
           }),
         });
         return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
@@ -196,9 +206,32 @@ export default function OrderDetailView({ id }: Props) {
         setCorrectionOpen(false);
         setCorrectionStatus(null);
         setCorrectionReason("");
+        setReadinessOpen(false);
+        setReadinessAck(false);
+        setReadinessData(null);
       },
     });
     setBusy(false);
+  }
+
+  async function requestStatusChange(status: OrderStatus) {
+    if (status !== "IN_PRODUCTION") {
+      await updateStatus(status);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/orders/${id}/materials`);
+      const data = await res.json() as { readiness?: ProductionReadinessResult };
+      if (data.readiness?.isReady) {
+        await updateStatus(status);
+        return;
+      }
+      setReadinessData(data.readiness ?? null);
+      setReadinessAck(false);
+      setReadinessOpen(true);
+    } catch {
+      await updateStatus(status);
+    }
   }
 
   async function submitPayment(e: React.FormEvent) {
@@ -443,7 +476,7 @@ export default function OrderDetailView({ id }: Props) {
                 type="button"
                 className="admin-btn admin-btn--primary"
                 disabled={busy}
-                onClick={() => void updateStatus(status)}
+                onClick={() => void requestStatusChange(status)}
               >
                 {label}
               </button>
@@ -558,6 +591,8 @@ export default function OrderDetailView({ id }: Props) {
           </>
         )}
       </fieldset>
+
+      <OrderProductionPackSection orderId={id} order={order} onOrderChange={setOrder} />
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
         <legend>GIAO HÀNG</legend>
@@ -1001,6 +1036,40 @@ export default function OrderDetailView({ id }: Props) {
               <button type="submit" className="admin-btn admin-btn--primary" disabled={busy}>Lưu</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {readinessOpen && (
+        <div className="quote-quick-contact-modal">
+          <div className="quote-quick-contact-modal__backdrop" onClick={() => setReadinessOpen(false)} />
+          <div className="quote-quick-contact-modal__panel">
+            <h3 className="quote-quick-contact-modal__title">Hồ sơ sản xuất chưa đầy đủ</h3>
+            <p className="admin-field-hint">Các mục còn thiếu trước khi bắt đầu sản xuất:</p>
+            <ul className="production-readiness-list">
+              {(readinessData?.missingMandatory ?? []).map((label) => (
+                <li key={label}>{label}</li>
+              ))}
+            </ul>
+            <label className="admin-field" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12 }}>
+              <input
+                type="checkbox"
+                checked={readinessAck}
+                onChange={(e) => setReadinessAck(e.target.checked)}
+              />
+              <span>Tôi xác nhận cho phép bắt đầu sản xuất khi hồ sơ chưa đầy đủ.</span>
+            </label>
+            <div className="quote-quick-contact-modal__actions">
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setReadinessOpen(false)}>Quay lại</button>
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary"
+                disabled={!readinessAck || busy}
+                onClick={() => void updateStatus("IN_PRODUCTION", { productionReadinessAcknowledged: true })}
+              >
+                Bắt đầu sản xuất
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

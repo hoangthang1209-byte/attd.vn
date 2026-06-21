@@ -696,6 +696,13 @@ export default function OrderForm({ mode, orderId }: Props) {
         <OrderTotalsSummary totals={totals} currency={currency} vatRate={Number(vatRate) || 0} />
       </fieldset>
 
+      {mode === "edit" && orderId && (
+        <p className="admin-field-hint" style={{ marginTop: 16 }}>
+          Quản lý hồ sơ sản xuất, BOM và file kỹ thuật tại{" "}
+          <Link href={`/admin/orders/${orderId}#production-pack`}>Bộ hồ sơ sản xuất</Link>.
+        </p>
+      )}
+
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
         <button type="submit" className="admin-btn admin-btn--primary">
           {mode === "create" ? "Tạo đơn hàng" : "Lưu thay đổi"}

@@ -3,6 +3,7 @@ import type { MediaFolder, MediaUsageType } from "@prisma/client";
 import {
   listMediaAssets,
   uploadMediaAsset,
+  uploadProductionFileAsset,
 } from "@/features/media/services/media.service";
 import { STORAGE_FOLDER_TO_MEDIA, type StorageFolderKey } from "@/lib/storage/types";
 
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
 
     const fileEntry = formData.get("file");
     const folder = formData.get("folder") ?? "general";
+    const productionFile = formData.get("productionFile");
     const altText = formData.get("altText");
     const title = formData.get("title");
     const usageParam = formData.get("usageType");
@@ -58,17 +60,26 @@ export async function POST(request: Request) {
       ? folder as StorageFolderKey
       : "general";
 
+    const tags = typeof tagsRaw === "string"
+      ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
+      : [];
+
     if (!fileEntry || typeof fileEntry === "string") {
-      return NextResponse.json({ message: "File ảnh là bắt buộc" }, { status: 400 });
+      return NextResponse.json({ message: "File là bắt buộc" }, { status: 400 });
+    }
+
+    if (productionFile === "true") {
+      const { asset } = await uploadProductionFileAsset({
+        file: fileEntry as File,
+        title: typeof title === "string" ? title : undefined,
+        tags,
+      });
+      return NextResponse.json({ ...asset }, { status: 201 });
     }
 
     const usageType = (typeof usageParam === "string" && VALID_USAGE_TYPES.includes(usageParam as MediaUsageType))
       ? usageParam as MediaUsageType
       : undefined;
-
-    const tags = typeof tagsRaw === "string"
-      ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
-      : [];
 
     const { asset, warning } = await uploadMediaAsset({
       folder: folderKey,
