@@ -12509,7 +12509,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   overscroll-behavior-x: contain;
   touch-action: pan-x pan-y;
   -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
+  scroll-behavior: auto;
   scroll-padding-inline: 0;
   padding: 4px 0 8px;
   cursor: grab;
@@ -12535,7 +12535,6 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 .home-category-rail__card {
   flex: 0 0 auto;
   width: clamp(128px, 38vw, 168px);
-  scroll-snap-align: start;
   text-decoration: none;
   color: inherit;
   border-radius: 12px;
@@ -12593,7 +12592,6 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 .home-category-rail--single .home-category-rail__viewport {
   overflow-x: visible;
-  scroll-snap-type: none;
   cursor: default;
 }
 
@@ -12605,10 +12603,6 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 .home-category-rail--single .home-category-rail__card {
   width: clamp(140px, 48vw, 180px);
-}
-
-.home-category-rail--few .home-category-rail__track {
-  scroll-snap-type: x proximity;
 }
 
 @media (min-width: 768px) {
