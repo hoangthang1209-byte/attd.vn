@@ -1,25 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
+import CategoryQuickEditModal, {
+  type CategoryQuickEditRecord,
+} from "@/components/admin/products/CategoryQuickEditModal";
+import {
+  buildHierarchicalParentOptions,
+  flattenCategoryTree,
+  formatParentHint,
+  getCategoryIndentPx,
+} from "@/features/categories/category-tree-utils";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import { toSlug } from "@/lib/slug";
 
-type CategoryRow = {
-  id: string;
-  name: string;
-  slug: string;
-  skuCode: string | null;
-  description: string | null;
-  seoTitle: string | null;
-  seoDescription: string | null;
-  imageUrl: string | null;
-  sortOrder: number;
-  parentId: string | null;
+type CategoryRow = CategoryQuickEditRecord & {
   parentName: string | null;
-  productCount: number;
 };
 
 type CategoryForm = {
@@ -34,17 +33,6 @@ type CategoryForm = {
   parentId: string;
 };
 
-function toSlug(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-}
-
 const emptyForm = (): CategoryForm => ({
   name: "",
   slug: "",
@@ -57,26 +45,48 @@ const emptyForm = (): CategoryForm => ({
   parentId: "",
 });
 
+async function fetchCategoryRows(): Promise<CategoryRow[]> {
+  const res = await fetch("/api/admin/products/categories");
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
 export default function CategoryAdminManager() {
   const router = useRouter();
   const mutate = useAdminMutation();
+  const tableWrapRef = useRef<HTMLDivElement>(null);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
+    null,
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [quickEditCategory, setQuickEditCategory] = useState<CategoryRow | null>(null);
   const [form, setForm] = useState<CategoryForm>(emptyForm());
   const [slugEdited, setSlugEdited] = useState(false);
   const [skuCodeEdited, setSkuCodeEdited] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  const load = useCallback(async () => {
+  const flattenedCategories = useMemo(
+    () => flattenCategoryTree(categories),
+    [categories],
+  );
+
+  const load = useCallback(async (preserveScroll = false) => {
+    const scrollTop = preserveScroll ? (tableWrapRef.current?.scrollTop ?? 0) : 0;
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/products/categories");
-      const data = await res.json();
-      setCategories(Array.isArray(data) ? data : []);
+      const rows = await fetchCategoryRows();
+      setCategories(rows);
+      if (preserveScroll) {
+        requestAnimationFrame(() => {
+          if (tableWrapRef.current) {
+            tableWrapRef.current.scrollTop = scrollTop;
+          }
+        });
+      }
     } catch {
       setMessage({ type: "error", text: "Không thể tải danh mục." });
     } finally {
@@ -85,33 +95,28 @@ export default function CategoryAdminManager() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    void fetchCategoryRows()
+      .then((rows) => {
+        if (active) setCategories(rows);
+      })
+      .catch(() => {
+        if (active) setMessage({ type: "error", text: "Không thể tải danh mục." });
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function startCreate() {
     setEditingId(null);
     setForm(emptyForm());
     setSlugEdited(false);
     setSkuCodeEdited(false);
-    setShowForm(true);
-    setMessage(null);
-  }
-
-  function startEdit(cat: CategoryRow) {
-    setEditingId(cat.id);
-    setForm({
-      name: cat.name,
-      slug: cat.slug,
-      skuCode: cat.skuCode ?? "",
-      description: cat.description ?? "",
-      seoTitle: cat.seoTitle ?? "",
-      seoDescription: cat.seoDescription ?? "",
-      imageUrl: cat.imageUrl ?? "",
-      sortOrder: String(cat.sortOrder),
-      parentId: cat.parentId ?? "",
-    });
-    setSlugEdited(true);
-    setSkuCodeEdited(true);
     setShowForm(true);
     setMessage(null);
   }
@@ -165,7 +170,7 @@ export default function CategoryAdminManager() {
     setSaving(true);
     const saved = await mutate({
       loadingMessage: "Đang lưu thông tin…",
-      successMessage: editingId ? "Đã lưu thông tin." : "Đã lưu thông tin.",
+      successMessage: "Đã lưu thông tin.",
       action: async () => {
         const url = editingId
           ? `/api/admin/products/categories/${editingId}`
@@ -181,7 +186,7 @@ export default function CategoryAdminManager() {
         setShowForm(false);
         setEditingId(null);
         setForm(emptyForm());
-        await load();
+        await load(true);
         router.refresh();
       },
     });
@@ -211,8 +216,8 @@ export default function CategoryAdminManager() {
         return;
       }
       setMessage({ type: "success", text: "Đã xóa danh mục." });
-      if (editingId === id) cancelForm();
-      await load();
+      if (quickEditCategory?.id === id) setQuickEditCategory(null);
+      await load(true);
       router.refresh();
     } catch {
       setMessage({ type: "error", text: "Lỗi kết nối máy chủ." });
@@ -221,7 +226,12 @@ export default function CategoryAdminManager() {
     }
   }
 
-  const parentOptions = categories.filter((c) => c.id !== editingId);
+  async function handleQuickEditSaved() {
+    await load(true);
+    router.refresh();
+  }
+
+  const parentOptions = buildHierarchicalParentOptions(categories, editingId);
 
   return (
     <div className="admin-category-page">
@@ -302,23 +312,21 @@ export default function CategoryAdminManager() {
                 onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))}
               />
             </div>
-            {parentOptions.length > 0 && (
-              <div>
-                <label className="admin-label">Danh mục cha</label>
-                <select
-                  className="admin-input"
-                  value={form.parentId}
-                  onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))}
-                >
-                  <option value="">— Không có —</option>
-                  {parentOptions.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div>
+              <label className="admin-label">Danh mục cha</label>
+              <select
+                className="admin-input"
+                value={form.parentId}
+                onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value }))}
+              >
+                <option value="">— Không có danh mục cha —</option>
+                {parentOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div style={{ marginTop: 16 }}>
@@ -406,7 +414,7 @@ export default function CategoryAdminManager() {
         ) : categories.length === 0 ? (
           <p className="admin-field-hint">Chưa có danh mục nào.</p>
         ) : (
-          <div className="admin-table-wrap">
+          <div className="admin-table-wrap" ref={tableWrapRef}>
             <table className="admin-table admin-category-table">
               <thead>
                 <tr>
@@ -420,72 +428,120 @@ export default function CategoryAdminManager() {
                 </tr>
               </thead>
               <tbody>
-                {categories.map((cat) => (
-                  <tr key={cat.id}>
-                    <td>
-                      {cat.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={cat.imageUrl}
-                          alt={cat.name}
-                          className="admin-category-list-thumb"
-                        />
-                      ) : (
-                        <span className="admin-field-hint">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <strong>{cat.name}</strong>
-                      {cat.parentName && (
-                        <span className="admin-field-hint" style={{ display: "block" }}>
-                          Thuộc: {cat.parentName}
-                        </span>
-                      )}
-                    </td>
-                    <td><code>{cat.slug}</code></td>
-                    <td>{cat.skuCode ?? "—"}</td>
-                    <td>{cat.productCount}</td>
-                    <td>{cat.sortOrder}</td>
-                    <td>
-                      <div className="admin-table-actions">
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--secondary admin-btn--xs"
-                          onClick={() => startEdit(cat)}
+                {flattenedCategories.map((cat) => {
+                  const parentHint = cat.isRoot
+                    ? null
+                    : formatParentHint(cat.parentPathNames);
+                  const indentPx = getCategoryIndentPx(cat.depth);
+
+                  return (
+                    <tr
+                      key={cat.id}
+                      className={
+                        cat.isRoot
+                          ? "admin-category-table__row--root"
+                          : "admin-category-table__row--child"
+                      }
+                    >
+                      <td className="admin-category-table__image-cell">
+                        {cat.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={cat.imageUrl}
+                            alt={cat.name}
+                            className="admin-category-list-thumb"
+                          />
+                        ) : (
+                          <span className="admin-field-hint">—</span>
+                        )}
+                      </td>
+                      <td className="admin-category-table__name-cell">
+                        <div
+                          className="admin-category-table__name-inner"
+                          style={{ paddingInlineStart: indentPx }}
                         >
-                          Sửa
-                        </button>
-                        <Link
-                          href={`/${cat.slug}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="admin-btn admin-btn--secondary admin-btn--xs"
-                        >
-                          Xem
-                        </Link>
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--secondary admin-btn--xs"
-                          disabled={deleting || cat.productCount > 0}
-                          title={
-                            cat.productCount > 0
-                              ? "Không thể xóa danh mục đang có sản phẩm"
-                              : undefined
-                          }
-                          style={cat.productCount === 0 ? { color: "#dc2626" } : undefined}
-                          onClick={() => void handleDelete(cat.id, cat.name, cat.productCount)}
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {!cat.isRoot && (
+                            <span className="admin-category-table__branch" aria-hidden="true">
+                              ↳
+                            </span>
+                          )}
+                          <div className="admin-category-table__name-text">
+                            <span
+                              className={
+                                cat.isRoot
+                                  ? "admin-category-table__name--root"
+                                  : "admin-category-table__name--child"
+                              }
+                            >
+                              {cat.name}
+                            </span>
+                            {parentHint && (
+                              <span className="admin-category-table__parent-hint">
+                                {parentHint}
+                              </span>
+                            )}
+                            {cat.isOrphan && (
+                              <span className="admin-category-table__orphan-hint">
+                                Danh mục cha không tồn tại
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td><code>{cat.slug}</code></td>
+                      <td>{cat.skuCode ?? "—"}</td>
+                      <td>{cat.productCount}</td>
+                      <td>{cat.sortOrder}</td>
+                      <td>
+                        <div className="admin-table-actions">
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                            onClick={() => setQuickEditCategory(cat)}
+                          >
+                            Sửa nhanh
+                          </button>
+                          <Link
+                            href={`/${cat.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                          >
+                            Xem
+                          </Link>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                            disabled={deleting || cat.productCount > 0}
+                            title={
+                              cat.productCount > 0
+                                ? "Không thể xóa danh mục đang có sản phẩm"
+                                : undefined
+                            }
+                            style={cat.productCount === 0 ? { color: "#dc2626" } : undefined}
+                            onClick={() => void handleDelete(cat.id, cat.name, cat.productCount)}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      <CategoryQuickEditModal
+        key={quickEditCategory?.id ?? "closed"}
+        open={quickEditCategory != null}
+        category={quickEditCategory}
+        allCategories={categories}
+        onClose={() => setQuickEditCategory(null)}
+        onSaved={handleQuickEditSaved}
+      />
     </div>
   );
 }

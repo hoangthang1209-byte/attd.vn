@@ -19,6 +19,51 @@ const PRODUCTION_BOARD_STATUSES: OrderStatus[] = [
   "READY_TO_SHIP",
 ];
 
+export { PRODUCTION_BOARD_STATUSES };
+
+export function getProductionBoardBaseWhere(params?: {
+  status?: OrderStatus;
+  ownerId?: string;
+  customerId?: string;
+  salesEmployeeId?: string;
+  search?: string;
+}): Prisma.OrderWhereInput {
+  return {
+    status: params?.status ? params.status : { in: PRODUCTION_BOARD_STATUSES },
+    ...(params?.ownerId ? { productionOwnerId: params.ownerId } : {}),
+    ...(params?.customerId ? { customerId: params.customerId } : {}),
+    ...(params?.salesEmployeeId ? { salesEmployeeId: params.salesEmployeeId } : {}),
+    ...buildProductionSearchWhere(params?.search ?? ""),
+  };
+}
+
+export function filterProductionBoardOrdersByDue(
+  orders: ProductionBoardOrder[],
+  due: ProductionDueFilter,
+  now: Date,
+): ProductionBoardOrder[] {
+  return orders.filter((order) =>
+    matchesProductionDueFilter(
+      order.productionUrgency,
+      due,
+      order.productionDueDate ? new Date(order.productionDueDate) : null,
+      now,
+    ),
+  );
+}
+
+export function getProductionSummaryCounts(
+  orders: ProductionBoardOrder[],
+): ProductionBoardSummary {
+  return {
+    confirmedCount: orders.filter((o) => o.status === "CONFIRMED").length,
+    inProductionCount: orders.filter((o) => o.status === "IN_PRODUCTION").length,
+    dueSoonCount: orders.filter((o) => o.productionUrgency === "UPCOMING").length,
+    overdueCount: orders.filter((o) => o.productionUrgency === "OVERDUE").length,
+    readyToShipCount: orders.filter((o) => o.status === "READY_TO_SHIP").length,
+  };
+}
+
 const DELIVERY_BOARD_DEFAULT_STATUSES: OrderStatus[] = ["READY_TO_SHIP", "SHIPPED"];
 
 const ACTIVE_STATUSES: OrderStatus[] = [
@@ -204,6 +249,8 @@ function matchesProductionDueFilter(
       return urgency === "OVERDUE";
     case "today":
       return urgency === "TODAY";
+    case "upcoming":
+      return urgency === "UPCOMING";
     case "upcoming3":
       return urgency === "UPCOMING" || urgency === "TODAY";
     case "upcoming7": {
@@ -395,18 +442,6 @@ function emptyProductionSummary(): ProductionBoardSummary {
   };
 }
 
-function computeProductionSummary(orders: ProductionBoardOrder[]): ProductionBoardSummary {
-  return {
-    confirmedCount: orders.filter((o) => o.status === "CONFIRMED").length,
-    inProductionCount: orders.filter((o) => o.status === "IN_PRODUCTION").length,
-    dueSoonCount: orders.filter(
-      (o) => o.productionUrgency === "UPCOMING" || o.productionUrgency === "TODAY",
-    ).length,
-    overdueCount: orders.filter((o) => o.productionUrgency === "OVERDUE").length,
-    readyToShipCount: orders.filter((o) => o.status === "READY_TO_SHIP").length,
-  };
-}
-
 export async function getProductionBoardOrders(params?: {
   status?: OrderStatus;
   ownerId?: string;
@@ -421,27 +456,20 @@ export async function getProductionBoardOrders(params?: {
     return { orders: [] as ProductionBoardOrder[], total: 0, summary: emptyProductionSummary() };
   }
 
-  const where: Prisma.OrderWhereInput = {
-    status: params?.status ? params.status : { in: PRODUCTION_BOARD_STATUSES },
-    ...(params?.ownerId ? { productionOwnerId: params.ownerId } : {}),
-    ...(params?.customerId ? { customerId: params.customerId } : {}),
-    ...(params?.salesEmployeeId ? { salesEmployeeId: params.salesEmployeeId } : {}),
-    ...buildProductionSearchWhere(params?.search ?? ""),
-  };
+  const where = getProductionBoardBaseWhere({
+    status: params?.status,
+    ownerId: params?.ownerId,
+    customerId: params?.customerId,
+    salesEmployeeId: params?.salesEmployeeId,
+    search: params?.search,
+  });
 
   const rows = await prisma.order.findMany({ where, include: orderInclude });
 
   let orders = rows.map((row) => mapProductionBoardOrder(row, now));
 
   if (params?.due) {
-    orders = orders.filter((o) =>
-      matchesProductionDueFilter(
-        o.productionUrgency,
-        params.due!,
-        o.productionDueDate ? new Date(o.productionDueDate) : null,
-        now,
-      ),
-    );
+    orders = filterProductionBoardOrdersByDue(orders, params.due, now);
   }
 
   orders.sort((a, b) => {
@@ -459,7 +487,7 @@ export async function getProductionBoardOrders(params?: {
   });
 
   const allMapped = rows.map((row) => mapProductionBoardOrder(row, now));
-  const summary = computeProductionSummary(allMapped);
+  const summary = getProductionSummaryCounts(allMapped);
 
   return { orders, total: orders.length, summary };
 }
@@ -582,9 +610,7 @@ export async function getOrderOperationalSummary(): Promise<OrderOperationalSumm
     newOrders: rows.filter((r) => r.status === "NEW").length,
     awaitingConfirmation: rows.filter((r) => r.status === "NEW").length,
     inProduction: rows.filter((r) => r.status === "IN_PRODUCTION").length,
-    productionDueSoon: productionMapped.filter(
-      (u) => u === "UPCOMING" || u === "TODAY",
-    ).length,
+    productionDueSoon: productionMapped.filter((u) => u === "UPCOMING").length,
     productionOverdue: productionMapped.filter((u) => u === "OVERDUE").length,
     readyToShip: rows.filter((r) => r.status === "READY_TO_SHIP").length,
     inTransit: rows.filter((r) => r.status === "SHIPPED").length,

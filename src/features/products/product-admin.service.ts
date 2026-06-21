@@ -15,6 +15,10 @@ import {
   normalizeCode,
 } from "@/features/products/product-sku-utils";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
+import {
+  CATEGORY_SLUG_DUPLICATE_ERROR,
+  validateCategoryParentSelection,
+} from "@/features/categories/category-tree-utils";
 import { generateProductSystemCode } from "@/features/products/product-system-code";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -548,7 +552,53 @@ export type CategoryAdminInput = {
   parentId?: string | null;
 };
 
+async function assertUniqueCategorySlug(slug: string, excludeId?: string) {
+  const existing = await prisma.category.findUnique({ where: { slug } });
+  if (existing && existing.id !== excludeId) {
+    throw new ProductAdminValidationError(CATEGORY_SLUG_DUPLICATE_ERROR, {
+      slug: CATEGORY_SLUG_DUPLICATE_ERROR,
+    });
+  }
+}
+
+async function assertValidCategoryParent(
+  categoryId: string | null,
+  parentId: string | null | undefined,
+) {
+  const normalizedParentId = parentId?.trim() ? parentId.trim() : null;
+  if (!normalizedParentId) return null;
+
+  const parent = await prisma.category.findUnique({
+    where: { id: normalizedParentId },
+    select: { id: true },
+  });
+  if (!parent) {
+    throw new ProductAdminValidationError("Danh mục cha không tồn tại.", {
+      parentId: "Danh mục cha không tồn tại.",
+    });
+  }
+
+  if (!categoryId) return normalizedParentId;
+
+  const allCategories = await prisma.category.findMany({
+    select: { id: true, parentId: true },
+  });
+  const parentError = validateCategoryParentSelection(
+    categoryId,
+    normalizedParentId,
+    allCategories,
+  );
+  if (parentError) {
+    throw new ProductAdminValidationError(parentError, { parentId: parentError });
+  }
+
+  return normalizedParentId;
+}
+
 export async function createProductCategory(data: CategoryAdminInput) {
+  await assertUniqueCategorySlug(data.slug);
+  const parentId = await assertValidCategoryParent(null, data.parentId);
+
   let skuCode = data.skuCode?.trim() ? normalizeCode(data.skuCode) : "";
   if (!skuCode) {
     const base = generateCategoryCodeFromName(data.name);
@@ -569,12 +619,15 @@ export async function createProductCategory(data: CategoryAdminInput) {
       seoDescription: data.seoDescription ?? null,
       imageUrl: data.imageUrl ?? null,
       sortOrder: data.sortOrder ?? 0,
-      parentId: data.parentId ?? null,
+      parentId,
     },
   });
 }
 
 export async function updateProductCategory(id: string, data: CategoryAdminInput) {
+  await assertUniqueCategorySlug(data.slug, id);
+  const parentId = await assertValidCategoryParent(id, data.parentId);
+
   let skuCode = data.skuCode?.trim() ? normalizeCode(data.skuCode) : null;
   if (skuCode && (await isCategoryCodeTaken(skuCode, id))) {
     throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_ERROR, {
@@ -593,7 +646,7 @@ export async function updateProductCategory(id: string, data: CategoryAdminInput
       seoDescription: data.seoDescription ?? null,
       imageUrl: data.imageUrl ?? null,
       sortOrder: data.sortOrder ?? 0,
-      parentId: data.parentId ?? null,
+      parentId,
     },
   });
 }

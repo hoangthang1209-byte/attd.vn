@@ -40,7 +40,7 @@ export default function OperationsDashboard() {
     {
       label: "Sắp trễ hạn sản xuất",
       value: summary.productionDueSoon,
-      href: "/admin/production?due=upcoming3",
+      href: "/admin/production?due=upcoming",
       variant: "warning",
     },
     {

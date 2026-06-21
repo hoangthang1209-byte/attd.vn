@@ -15,48 +15,89 @@ type RailRenderItem = {
   category: HomepageCategoryItem;
   key: string;
   isDuplicate: boolean;
+  segmentIndex: number;
 };
 
-const MIN_CATEGORIES_FOR_LOOP = 4;
 const AUTO_SCROLL_CYCLE_MS = 42000;
-const RESUME_IDLE_MS = 4000;
+const RESUME_IDLE_MS = 3500;
 const DESKTOP_MIN_WIDTH = 768;
 const DRAG_THRESHOLD_PX = 6;
+const MIN_CATEGORIES_FOR_AUTO = 2;
 
-function buildRailItems(categories: HomepageCategoryItem[]): {
+function getDuplicateSegmentCount(categoryCount: number): number {
+  if (categoryCount <= 1) return 0;
+  if (categoryCount === 2) return 5;
+  if (categoryCount === 3) return 3;
+  return 2;
+}
+
+function buildRailItems(
+  categories: HomepageCategoryItem[],
+  duplicateSegmentCount: number,
+): {
   items: RailRenderItem[];
-  enableLoop: boolean;
-  enableAutoScroll: boolean;
+  primaryCount: number;
 } {
   const count = categories.length;
   if (count === 0) {
-    return { items: [], enableLoop: false, enableAutoScroll: false };
+    return { items: [], primaryCount: 0 };
   }
 
   const primary = categories.map((category) => ({
     category,
     key: category.id,
     isDuplicate: false,
+    segmentIndex: 0,
   }));
 
   if (count === 1) {
-    return { items: primary, enableLoop: false, enableAutoScroll: false };
+    return { items: primary, primaryCount: 1 };
   }
 
-  if (count >= MIN_CATEGORIES_FOR_LOOP) {
-    const duplicate = categories.map((category) => ({
+  const duplicateSegment = (segmentIndex: number): RailRenderItem[] =>
+    categories.map((category) => ({
       category,
-      key: `${category.id}-loop`,
+      key: `${category.id}-dup-${segmentIndex}`,
       isDuplicate: true,
+      segmentIndex,
     }));
-    return {
-      items: [...primary, ...duplicate],
-      enableLoop: true,
-      enableAutoScroll: true,
-    };
+
+  const duplicates: RailRenderItem[] = [];
+  for (let segmentIndex = 1; segmentIndex <= duplicateSegmentCount; segmentIndex += 1) {
+    duplicates.push(...duplicateSegment(segmentIndex));
   }
 
-  return { items: primary, enableLoop: false, enableAutoScroll: false };
+  return {
+    items: [...primary, ...duplicates],
+    primaryCount: count,
+  };
+}
+
+function measurePrimarySegmentWidth(track: HTMLElement, primaryCount: number): number {
+  const style = getComputedStyle(track);
+  const gap = Number.parseFloat(style.columnGap || style.gap) || 12;
+  const children = track.children;
+  if (children.length < primaryCount) return 0;
+
+  let width = 0;
+  for (let i = 0; i < primaryCount; i += 1) {
+    width += (children[i] as HTMLElement).offsetWidth;
+    if (i < primaryCount - 1) width += gap;
+  }
+  return width;
+}
+
+function isScrollable(track: HTMLElement): boolean {
+  return track.scrollWidth > track.clientWidth + 1;
+}
+
+function devLog(message: string, data?: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== "development") return;
+  if (data) {
+    console.debug(`[HomeCategoryDiscoveryRail] ${message}`, data);
+  } else {
+    console.debug(`[HomeCategoryDiscoveryRail] ${message}`);
+  }
 }
 
 function CategoryRailCard({
@@ -83,7 +124,7 @@ function CategoryRailCard({
             alt=""
             fill
             className="home-category-rail__img"
-            sizes="(max-width: 767px) 42vw, 160px"
+            sizes="(max-width: 767px) 38vw, 160px"
             draggable={false}
           />
         ) : (
@@ -98,8 +139,11 @@ function CategoryRailCard({
 }
 
 export default function HomeCategoryDiscoveryRail({ categories }: Props) {
-  const railConfig = useMemo(() => buildRailItems(categories), [categories]);
-  const { items, enableLoop, enableAutoScroll } = railConfig;
+  const duplicateSegmentCount = getDuplicateSegmentCount(categories.length);
+  const { items, primaryCount } = useMemo(
+    () => buildRailItems(categories, duplicateSegmentCount),
+    [categories, duplicateSegmentCount],
+  );
 
   const layoutClass =
     categories.length === 1
@@ -108,11 +152,14 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
         ? "home-category-rail--few"
         : "";
 
+  const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
-  const loopWidthRef = useRef(0);
+  const segmentWidthRef = useRef(0);
   const pausedRef = useRef(true);
+  const pauseReasonRef = useRef("initial");
   const reducedMotionRef = useRef(false);
   const isDesktopRef = useRef(false);
+  const isScrollableRef = useRef(false);
   const rafRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number | null>(null);
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -120,122 +167,201 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
   const dragMovedRef = useRef(false);
   const dragStartXRef = useRef(0);
   const scrollStartRef = useRef(0);
-  const enableLoopRef = useRef(enableLoop);
-  const enableAutoScrollRef = useRef(enableAutoScroll);
+  const isProgrammaticScrollRef = useRef(false);
+  const primaryCountRef = useRef(primaryCount);
 
   useEffect(() => {
-    enableLoopRef.current = enableLoop;
-    enableAutoScrollRef.current = enableAutoScroll;
-  }, [enableLoop, enableAutoScroll]);
+    primaryCountRef.current = primaryCount;
+  }, [primaryCount]);
 
-  useLayoutEffect(() => {
+  const actionsRef = useRef({
+    pause: (reason: string) => {
+      void reason;
+    },
+    scheduleResume: (reason?: string) => {
+      void reason;
+    },
+    remeasure: () => {},
+    tryStartAutoScroll: () => {},
+    canAutoScroll: (): boolean => false,
+  });
+
+  const clearResumeTimer = () => {
+    if (resumeTimerRef.current) {
+      clearTimeout(resumeTimerRef.current);
+      resumeTimerRef.current = null;
+    }
+  };
+
+  const pause = (reason: string) => {
+    pausedRef.current = true;
+    pauseReasonRef.current = reason;
+    lastFrameRef.current = null;
+    clearResumeTimer();
+    devLog("paused", { reason });
+  };
+
+  const canAutoScroll = () =>
+    primaryCountRef.current >= MIN_CATEGORIES_FOR_AUTO &&
+    isDesktopRef.current &&
+    !reducedMotionRef.current &&
+    isScrollableRef.current &&
+    segmentWidthRef.current > 0 &&
+    !document.hidden;
+
+  const tryStartAutoScroll = () => {
+    if (canAutoScroll()) {
+      pausedRef.current = false;
+      pauseReasonRef.current = "running";
+      lastFrameRef.current = null;
+      devLog("auto-scroll started");
+      return;
+    }
+    pausedRef.current = true;
+    devLog("auto-scroll not eligible", {
+      primaryCount: primaryCountRef.current,
+      isDesktop: isDesktopRef.current,
+      reducedMotion: reducedMotionRef.current,
+      isScrollable: isScrollableRef.current,
+      segmentWidth: segmentWidthRef.current,
+      hidden: document.hidden,
+    });
+  };
+
+  const scheduleResume = (reason = "idle") => {
+    clearResumeTimer();
+    resumeTimerRef.current = setTimeout(() => {
+      if (!isDraggingRef.current) {
+        tryStartAutoScroll();
+        devLog("resume scheduled", { reason, running: !pausedRef.current });
+      }
+    }, RESUME_IDLE_MS);
+  };
+
+  const remeasure = () => {
+    const viewport = viewportRef.current;
     const track = trackRef.current;
-    if (!track || !enableLoopRef.current) {
-      loopWidthRef.current = 0;
+    if (!viewport || !track || primaryCountRef.current < MIN_CATEGORIES_FOR_AUTO) {
+      segmentWidthRef.current = 0;
+      isScrollableRef.current = false;
       return;
     }
 
-    const measure = () => {
-      loopWidthRef.current = track.scrollWidth / 2;
-    };
+    segmentWidthRef.current = measurePrimarySegmentWidth(track, primaryCountRef.current);
+    isScrollableRef.current = isScrollable(viewport);
 
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(track);
+    devLog("measured", {
+      categoryCount: primaryCountRef.current,
+      viewportClientWidth: viewport.clientWidth,
+      viewportScrollWidth: viewport.scrollWidth,
+      segmentWidth: segmentWidthRef.current,
+      isScrollable: isScrollableRef.current,
+      reducedMotion: reducedMotionRef.current,
+      isDesktop: isDesktopRef.current,
+      eligible: canAutoScroll(),
+      pauseReason: pauseReasonRef.current,
+    });
+  };
+
+  useLayoutEffect(() => {
+    actionsRef.current = {
+      pause,
+      scheduleResume,
+      remeasure,
+      tryStartAutoScroll,
+      canAutoScroll,
+    };
+  });
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    actionsRef.current.remeasure();
+
+    const observer = new ResizeObserver(() => {
+      actionsRef.current.remeasure();
+      if (
+        actionsRef.current.canAutoScroll() &&
+        pausedRef.current &&
+        pauseReasonRef.current !== "hover"
+      ) {
+        actionsRef.current.scheduleResume("resize");
+      }
+    });
+    observer.observe(viewport);
     return () => observer.disconnect();
-  }, [items]);
+  }, [items, primaryCount]);
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
     const desktopMedia = window.matchMedia(`(min-width: ${DESKTOP_MIN_WIDTH}px)`);
 
-    const clearResumeTimer = () => {
-      if (resumeTimerRef.current) {
-        clearTimeout(resumeTimerRef.current);
-        resumeTimerRef.current = null;
-      }
-    };
-
-    const pause = () => {
-      pausedRef.current = true;
-      lastFrameRef.current = null;
-      clearResumeTimer();
-    };
-
-    const scheduleResume = () => {
-      clearResumeTimer();
-      resumeTimerRef.current = setTimeout(() => {
-        if (
-          !reducedMotionRef.current &&
-          enableAutoScrollRef.current &&
-          isDesktopRef.current &&
-          !isDraggingRef.current
-        ) {
-          pausedRef.current = false;
-          lastFrameRef.current = null;
-        }
-      }, RESUME_IDLE_MS);
-    };
-
     const syncMotion = () => {
-      reducedMotionRef.current = media.matches;
-      if (media.matches) pause();
+      reducedMotionRef.current = motionMedia.matches;
+      if (motionMedia.matches) {
+        actionsRef.current.pause("reduced-motion");
+      } else {
+        actionsRef.current.scheduleResume("reduced-motion-off");
+      }
     };
 
     const syncDesktop = () => {
       isDesktopRef.current = desktopMedia.matches;
-      if (!desktopMedia.matches) pause();
-      else if (!reducedMotionRef.current && enableAutoScrollRef.current) {
-        scheduleResume();
+      if (!desktopMedia.matches) {
+        actionsRef.current.pause("mobile");
+      } else {
+        actionsRef.current.remeasure();
+        actionsRef.current.scheduleResume("desktop");
       }
     };
 
     syncMotion();
     syncDesktop();
-    media.addEventListener("change", syncMotion);
+    motionMedia.addEventListener("change", syncMotion);
     desktopMedia.addEventListener("change", syncDesktop);
 
     const onVisibility = () => {
-      if (document.hidden) pause();
-      else scheduleResume();
+      if (document.hidden) {
+        actionsRef.current.pause("hidden");
+      } else {
+        actionsRef.current.remeasure();
+        actionsRef.current.scheduleResume("visible");
+      }
     };
     document.addEventListener("visibilitychange", onVisibility);
 
-    if (enableAutoScrollRef.current && !media.matches && desktopMedia.matches) {
-      scheduleResume();
+    actionsRef.current.remeasure();
+    if (actionsRef.current.canAutoScroll()) {
+      actionsRef.current.tryStartAutoScroll();
+    } else {
+      actionsRef.current.pause(
+        isScrollableRef.current ? "waiting" : "not-scrollable",
+      );
+      actionsRef.current.scheduleResume("mount");
     }
 
-    return () => {
-      media.removeEventListener("change", syncMotion);
-      desktopMedia.removeEventListener("change", syncDesktop);
-      document.removeEventListener("visibilitychange", onVisibility);
-      clearResumeTimer();
-    };
-  }, [categories.length, enableAutoScroll]);
-
-  useEffect(() => {
-    if (!enableAutoScroll) return;
-
     const tick = (timestamp: number) => {
-      const track = trackRef.current;
+      const viewport = viewportRef.current;
       if (
-        track &&
+        viewport &&
         !pausedRef.current &&
-        !reducedMotionRef.current &&
-        isDesktopRef.current &&
-        enableLoopRef.current &&
-        loopWidthRef.current > 0
+        actionsRef.current.canAutoScroll()
       ) {
         if (lastFrameRef.current == null) {
           lastFrameRef.current = timestamp;
         } else {
           const delta = timestamp - lastFrameRef.current;
           lastFrameRef.current = timestamp;
-          const speed = loopWidthRef.current / AUTO_SCROLL_CYCLE_MS;
-          track.scrollLeft += speed * delta;
-          if (track.scrollLeft >= loopWidthRef.current) {
-            track.scrollLeft -= loopWidthRef.current;
+          const speed = segmentWidthRef.current / AUTO_SCROLL_CYCLE_MS;
+          isProgrammaticScrollRef.current = true;
+          viewport.scrollLeft += speed * delta;
+          if (viewport.scrollLeft >= segmentWidthRef.current) {
+            viewport.scrollLeft -= segmentWidthRef.current;
           }
+          queueMicrotask(() => {
+            isProgrammaticScrollRef.current = false;
+          });
         }
       } else {
         lastFrameRef.current = null;
@@ -244,87 +370,101 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     };
 
     rafRef.current = requestAnimationFrame(tick);
+
     return () => {
+      motionMedia.removeEventListener("change", syncMotion);
+      desktopMedia.removeEventListener("change", syncDesktop);
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearResumeTimer();
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [enableAutoScroll]);
+  }, [primaryCount, items.length]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+
+    function warnDocumentOverflow() {
+      const doc = document.documentElement;
+      if (doc.scrollWidth <= doc.clientWidth + 1) return;
+
+      const viewport = viewportRef.current;
+      console.debug("[HomeCategoryDiscoveryRail] document horizontal overflow detected", {
+        documentClientWidth: doc.clientWidth,
+        documentScrollWidth: doc.scrollWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+        railViewportClientWidth: viewport?.clientWidth ?? null,
+        railViewportScrollWidth: viewport?.scrollWidth ?? null,
+      });
+    }
+
+    warnDocumentOverflow();
+    window.addEventListener("resize", warnDocumentOverflow);
+
+    const viewport = viewportRef.current;
+    const observer =
+      viewport != null
+        ? new ResizeObserver(() => {
+            warnDocumentOverflow();
+          })
+        : null;
+    if (viewport && observer) observer.observe(viewport);
+
+    return () => {
+      window.removeEventListener("resize", warnDocumentOverflow);
+      observer?.disconnect();
+    };
+  }, [items.length]);
 
   if (items.length === 0) return null;
 
-  function pauseInteraction() {
-    pausedRef.current = true;
-    lastFrameRef.current = null;
-    if (resumeTimerRef.current) {
-      clearTimeout(resumeTimerRef.current);
-      resumeTimerRef.current = null;
-    }
-  }
-
-  function scheduleResumeInteraction() {
-    if (resumeTimerRef.current) {
-      clearTimeout(resumeTimerRef.current);
-    }
-    resumeTimerRef.current = setTimeout(() => {
-      if (
-        !reducedMotionRef.current &&
-        enableAutoScrollRef.current &&
-        isDesktopRef.current &&
-        !isDraggingRef.current
-      ) {
-        pausedRef.current = false;
-        lastFrameRef.current = null;
-      }
-    }, RESUME_IDLE_MS);
-  }
-
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
-    const track = trackRef.current;
-    if (!track) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
     isDraggingRef.current = true;
     dragMovedRef.current = false;
     dragStartXRef.current = event.clientX;
-    scrollStartRef.current = track.scrollLeft;
-    track.setPointerCapture(event.pointerId);
-    pauseInteraction();
+    scrollStartRef.current = viewport.scrollLeft;
+    viewport.setPointerCapture(event.pointerId);
+    actionsRef.current.pause("pointerdown");
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!isDraggingRef.current) return;
-    const track = trackRef.current;
-    if (!track) return;
+    const viewport = viewportRef.current;
+    if (!viewport) return;
     const delta = event.clientX - dragStartXRef.current;
     if (Math.abs(delta) > DRAG_THRESHOLD_PX) {
       dragMovedRef.current = true;
     }
-    track.scrollLeft = scrollStartRef.current - delta;
+    viewport.scrollLeft = scrollStartRef.current - delta;
   }
 
   function handlePointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
-    trackRef.current?.releasePointerCapture(event.pointerId);
-    scheduleResumeInteraction();
+    viewportRef.current?.releasePointerCapture(event.pointerId);
+    actionsRef.current.scheduleResume("pointerup");
   }
 
   function handleWheel() {
-    pauseInteraction();
-    scheduleResumeInteraction();
+    actionsRef.current.pause("wheel");
+    actionsRef.current.scheduleResume("wheel");
   }
 
   function handleScroll() {
-    if (isDraggingRef.current) return;
-    pauseInteraction();
-    scheduleResumeInteraction();
+    if (isProgrammaticScrollRef.current || isDraggingRef.current) return;
+    actionsRef.current.pause("user-scroll");
+    actionsRef.current.scheduleResume("user-scroll");
   }
 
   function handleFocusCapture() {
-    pauseInteraction();
+    actionsRef.current.pause("focus");
   }
 
   function handleBlurCapture(event: React.FocusEvent<HTMLDivElement>) {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-    scheduleResumeInteraction();
+    actionsRef.current.scheduleResume("blur");
   }
 
   function handleClickCapture(event: React.MouseEvent) {
@@ -339,31 +479,33 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     <div
       className={`home-category-rail${layoutClass ? ` ${layoutClass}` : ""}`}
       aria-label="Khám phá danh mục nguồn hàng"
-      onMouseEnter={pauseInteraction}
-      onMouseLeave={scheduleResumeInteraction}
+      onMouseEnter={() => actionsRef.current.pause("hover")}
+      onMouseLeave={() => actionsRef.current.scheduleResume("hover-leave")}
     >
       <div
-        ref={trackRef}
-        className="home-category-rail__track"
+        ref={viewportRef}
+        className="home-category-rail__viewport"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onTouchStart={pauseInteraction}
-        onTouchEnd={scheduleResumeInteraction}
+        onTouchStart={() => actionsRef.current.pause("touch")}
+        onTouchEnd={() => actionsRef.current.scheduleResume("touchend")}
         onWheel={handleWheel}
         onScroll={handleScroll}
         onFocusCapture={handleFocusCapture}
         onBlurCapture={handleBlurCapture}
         onClickCapture={handleClickCapture}
       >
-        {items.map(({ category, key, isDuplicate }) => (
-          <CategoryRailCard
-            key={key}
-            category={category}
-            isDuplicate={isDuplicate}
-          />
-        ))}
+        <div ref={trackRef} className="home-category-rail__track">
+          {items.map(({ category, key, isDuplicate }) => (
+            <CategoryRailCard
+              key={key}
+              category={category}
+              isDuplicate={isDuplicate}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

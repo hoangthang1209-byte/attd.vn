@@ -4,6 +4,7 @@ import {
   createProductCategory,
   type CategoryAdminInput,
 } from "@/features/products/product-admin.service";
+import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-public-category-cache";
 
 export async function GET() {
@@ -54,10 +55,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(cat, { status: 201 });
   } catch (err) {
     console.error("[POST /api/admin/products/categories]", err);
-    if (err instanceof Error && "fieldErrors" in err) {
-      const fe = (err as { fieldErrors?: Record<string, string> }).fieldErrors;
-      const message = fe?.skuCode ?? err.message;
-      return NextResponse.json({ message }, { status: 400 });
+    if (err instanceof ProductAdminValidationError) {
+      const message =
+        err.fieldErrors.slug ??
+        err.fieldErrors.skuCode ??
+        err.fieldErrors.parentId ??
+        err.message;
+      return NextResponse.json({ message, fieldErrors: err.fieldErrors }, { status: 400 });
     }
     return NextResponse.json({ message: "Không thể tạo danh mục." }, { status: 500 });
   }

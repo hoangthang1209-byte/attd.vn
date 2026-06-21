@@ -28,10 +28,38 @@ const PRODUCTION_STATUSES: OrderStatus[] = ["CONFIRMED", "IN_PRODUCTION", "READY
 const DUE_OPTIONS: { value: ProductionDueFilter; label: string }[] = [
   { value: "overdue", label: "Quá hạn" },
   { value: "today", label: "Hôm nay" },
+  { value: "upcoming", label: "Sắp trễ hạn" },
   { value: "upcoming3", label: "3 ngày tới" },
   { value: "upcoming7", label: "7 ngày tới" },
   { value: "none", label: "Chưa có hạn" },
 ];
+
+type ProductionBoardFilters = {
+  status: OrderStatus | "";
+  ownerId: string;
+  due: ProductionDueFilter | "";
+  customerId: string;
+  salesEmployeeId: string;
+  search: string;
+};
+
+const EMPTY_FILTERS: ProductionBoardFilters = {
+  status: "",
+  ownerId: "",
+  due: "",
+  customerId: "",
+  salesEmployeeId: "",
+  search: "",
+};
+
+/** Summary card targets — each replaces the entire board query string. */
+const PRODUCTION_SUMMARY_CARD_PARAMS: Record<string, Partial<ProductionBoardFilters>> = {
+  confirmed: { status: "CONFIRMED" },
+  inProduction: { status: "IN_PRODUCTION" },
+  dueSoon: { due: "upcoming" },
+  overdue: { due: "overdue" },
+  readyToShip: { status: "READY_TO_SHIP" },
+};
 
 function formatQuantity(order: ProductionBoardOrder): string {
   const unit = order.primaryUnit ? ` ${order.primaryUnit}` : "";
@@ -77,15 +105,27 @@ export default function ProductionBoardManager() {
     setSearchInput(filters.search);
   }, [filters.search]);
 
-  const applyFilters = useCallback((next: Partial<typeof filters>) => {
+  const applyFilters = useCallback((next: Partial<ProductionBoardFilters>) => {
     const params = new URLSearchParams(searchParams.toString());
     const merged = { ...filters, ...next };
     for (const [key, value] of Object.entries(merged)) {
       if (value) params.set(key, value);
       else params.delete(key);
     }
-    router.replace(`/admin/production?${params.toString()}`);
+    router.replace(`/admin/production?${params.toString()}`, { scroll: false });
   }, [filters, router, searchParams]);
+
+  const applyCardFilter = useCallback((cardKey: keyof typeof PRODUCTION_SUMMARY_CARD_PARAMS) => {
+    const cardParams = PRODUCTION_SUMMARY_CARD_PARAMS[cardKey];
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries({ ...EMPTY_FILTERS, ...cardParams })) {
+      if (value) params.set(key, value);
+    }
+    router.replace(
+      params.toString() ? `/admin/production?${params.toString()}` : "/admin/production",
+      { scroll: false },
+    );
+  }, [router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -152,11 +192,11 @@ export default function ProductionBoardManager() {
   }
 
   const summaryCards = summary ? [
-    { label: "Đơn cần sản xuất", value: summary.confirmedCount, filter: { status: "CONFIRMED" as const } },
-    { label: "Đang sản xuất", value: summary.inProductionCount, filter: { status: "IN_PRODUCTION" as const } },
-    { label: "Sắp trễ hạn", value: summary.dueSoonCount, filter: { due: "upcoming3" as const, status: "" } },
-    { label: "Quá hạn", value: summary.overdueCount, filter: { due: "overdue" as const, status: "" }, danger: true },
-    { label: "Sẵn sàng giao", value: summary.readyToShipCount, filter: { status: "READY_TO_SHIP" as const } },
+    { key: "confirmed" as const, label: "Đơn cần sản xuất", value: summary.confirmedCount },
+    { key: "inProduction" as const, label: "Đang sản xuất", value: summary.inProductionCount },
+    { key: "dueSoon" as const, label: "Sắp trễ hạn", value: summary.dueSoonCount },
+    { key: "overdue" as const, label: "Quá hạn", value: summary.overdueCount, danger: true },
+    { key: "readyToShip" as const, label: "Sẵn sàng giao", value: summary.readyToShipCount },
   ] : [];
 
   return (
@@ -172,10 +212,10 @@ export default function ProductionBoardManager() {
         <div className="admin-dashboard-grid admin-ops-summary-grid">
           {summaryCards.map((card) => (
             <button
-              key={card.label}
+              key={card.key}
               type="button"
               className={`admin-dashboard-card admin-dashboard-card--link admin-ops-summary-card${card.danger ? " admin-dashboard-card--danger" : ""}`}
-              onClick={() => applyFilters(card.filter)}
+              onClick={() => applyCardFilter(card.key)}
             >
               <p className="admin-dashboard-label">{card.label}</p>
               <p className="admin-dashboard-value">{card.value}</p>
@@ -200,7 +240,11 @@ export default function ProductionBoardManager() {
         <select
           className="admin-input"
           value={filters.status}
-          onChange={(e) => applyFilters({ status: e.target.value })}
+          onChange={(e) =>
+            applyFilters({
+              status: (e.target.value || "") as ProductionBoardFilters["status"],
+            })
+          }
         >
           <option value="">Trạng thái đơn hàng</option>
           {PRODUCTION_STATUSES.map((s) => (
@@ -254,7 +298,7 @@ export default function ProductionBoardManager() {
             className="admin-btn admin-btn--secondary"
             onClick={() => {
               setSearchInput("");
-              router.replace("/admin/production");
+              router.replace("/admin/production", { scroll: false });
             }}
           >
             Xóa bộ lọc

@@ -17,6 +17,7 @@ export type DeliveryReadiness =
 export type ProductionDueFilter =
   | "overdue"
   | "today"
+  | "upcoming"
   | "upcoming3"
   | "upcoming7"
   | "none";

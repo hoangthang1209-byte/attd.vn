@@ -8,6 +8,7 @@ import type { ProductionDueFilter } from "@/features/orders/order-operations.typ
 const DUE_FILTERS = new Set<ProductionDueFilter>([
   "overdue",
   "today",
+  "upcoming",
   "upcoming3",
   "upcoming7",
   "none",
