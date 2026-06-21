@@ -36,6 +36,7 @@ import type { DeliveryMethodRecord } from "@/features/delivery/delivery-method.s
 import { toDateInputValue } from "@/features/quotes/format";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import OrderDocumentActions from "@/components/admin/orders/OrderDocumentActions";
 
 type Props = { id: string };
 
@@ -424,6 +425,8 @@ export default function OrderDetailView({ id }: Props) {
           )}
         </div>
       </div>
+
+      <OrderDocumentActions order={order} />
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
         <legend>Cập nhật trạng thái</legend>

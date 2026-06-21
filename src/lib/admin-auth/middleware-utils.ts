@@ -92,6 +92,17 @@ export function shouldProtectAdminPage(pathname: string): boolean {
   return true;
 }
 
+export function shouldProtectOrderDocumentPage(
+  pathname: string,
+  searchParams: URLSearchParams,
+): boolean {
+  if (!pathname.startsWith("/o/")) return false;
+  if (searchParams.get("mode") === "pdf" && searchParams.get("pdfToken")) {
+    return false;
+  }
+  return true;
+}
+
 export function shouldProtectApiRoute(request: NextRequest): boolean {
   const { pathname } = request.nextUrl;
   const method = request.method;

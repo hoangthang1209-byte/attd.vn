@@ -4,6 +4,7 @@ import { ADMIN_LOGIN_PATH } from "@/lib/admin-auth/constants";
 import {
   shouldProtectAdminPage,
   shouldProtectApiRoute,
+  shouldProtectOrderDocumentPage,
 } from "@/lib/admin-auth/middleware-utils";
 import { isRequestAdminAuthenticatedEdge } from "@/lib/admin-auth/session-edge";
 import { parseQuotePublicLinkSegment } from "@/features/quotes/quote-public-link.shared";
@@ -40,6 +41,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (shouldProtectOrderDocumentPage(pathname, request.nextUrl.searchParams)) {
+    if (!authenticated) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = ADMIN_LOGIN_PATH;
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next();
+  }
+
   if (pathname === ADMIN_LOGIN_PATH && authenticated) {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = "/admin/dashboard";
@@ -57,6 +68,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/:segment",
+    "/o/:path*",
     "/admin/:path*",
     "/api/admin/:path*",
     "/api/blog/:path*",

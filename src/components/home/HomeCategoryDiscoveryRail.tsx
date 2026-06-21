@@ -18,16 +18,17 @@ type RailRenderItem = {
   segmentIndex: number;
 };
 
-const AUTO_SCROLL_CYCLE_MS = 42000;
-const RESUME_IDLE_MS = 3500;
-const DESKTOP_MIN_WIDTH = 768;
+const AUTO_SCROLL_DESKTOP_CYCLE_MS = 45000;
+const AUTO_SCROLL_MOBILE_CYCLE_MS = 62000;
+const RESUME_IDLE_MS = 4000;
+const DESKTOP_BREAKPOINT_PX = 768;
 const DRAG_THRESHOLD_PX = 6;
 const MIN_CATEGORIES_FOR_AUTO = 2;
 
 function getDuplicateSegmentCount(categoryCount: number): number {
   if (categoryCount <= 1) return 0;
-  if (categoryCount === 2) return 5;
-  if (categoryCount === 3) return 3;
+  if (categoryCount === 2) return 6;
+  if (categoryCount === 3) return 4;
   return 2;
 }
 
@@ -87,8 +88,8 @@ function measurePrimarySegmentWidth(track: HTMLElement, primaryCount: number): n
   return width;
 }
 
-function isScrollable(track: HTMLElement): boolean {
-  return track.scrollWidth > track.clientWidth + 1;
+function isScrollable(viewport: HTMLElement): boolean {
+  return viewport.scrollWidth > viewport.clientWidth + 1;
 }
 
 function devLog(message: string, data?: Record<string, unknown>) {
@@ -159,6 +160,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
   const pauseReasonRef = useRef("initial");
   const reducedMotionRef = useRef(false);
   const isDesktopRef = useRef(false);
+  const hasHoverRef = useRef(false);
   const isScrollableRef = useRef(false);
   const rafRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number | null>(null);
@@ -169,6 +171,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
   const scrollStartRef = useRef(0);
   const isProgrammaticScrollRef = useRef(false);
   const primaryCountRef = useRef(primaryCount);
+  const autoScrollActiveRef = useRef(false);
 
   useEffect(() => {
     primaryCountRef.current = primaryCount;
@@ -184,6 +187,10 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     remeasure: () => {},
     tryStartAutoScroll: () => {},
     canAutoScroll: (): boolean => false,
+    getCycleMs: (): number => AUTO_SCROLL_DESKTOP_CYCLE_MS,
+    logEngineState: (context: string) => {
+      void context;
+    },
   });
 
   const clearResumeTimer = () => {
@@ -193,17 +200,41 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     }
   };
 
+  const getCycleMs = () =>
+    isDesktopRef.current ? AUTO_SCROLL_DESKTOP_CYCLE_MS : AUTO_SCROLL_MOBILE_CYCLE_MS;
+
+  const logEngineState = (context: string) => {
+    const viewport = viewportRef.current;
+    const wasActive = autoScrollActiveRef.current;
+    const isActive = !pausedRef.current && canAutoScroll();
+    autoScrollActiveRef.current = isActive;
+
+    devLog(context, {
+      categoryCount: primaryCountRef.current,
+      clientWidth: viewport?.clientWidth ?? null,
+      scrollWidth: viewport?.scrollWidth ?? null,
+      segmentWidth: segmentWidthRef.current,
+      eligible: canAutoScroll(),
+      breakpointMode: isDesktopRef.current ? "desktop" : "mobile",
+      reducedMotion: reducedMotionRef.current,
+      pauseReason: pauseReasonRef.current,
+      rafLoopActive: rafRef.current != null,
+      autoScrollActive: isActive,
+      cycleMs: getCycleMs(),
+      ...(wasActive !== isActive ? { autoScrollTransition: wasActive ? "stopped" : "started" } : {}),
+    });
+  };
+
   const pause = (reason: string) => {
     pausedRef.current = true;
     pauseReasonRef.current = reason;
     lastFrameRef.current = null;
     clearResumeTimer();
-    devLog("paused", { reason });
+    logEngineState("paused");
   };
 
   const canAutoScroll = () =>
     primaryCountRef.current >= MIN_CATEGORIES_FOR_AUTO &&
-    isDesktopRef.current &&
     !reducedMotionRef.current &&
     isScrollableRef.current &&
     segmentWidthRef.current > 0 &&
@@ -214,18 +245,11 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
       pausedRef.current = false;
       pauseReasonRef.current = "running";
       lastFrameRef.current = null;
-      devLog("auto-scroll started");
+      logEngineState("auto-scroll started");
       return;
     }
     pausedRef.current = true;
-    devLog("auto-scroll not eligible", {
-      primaryCount: primaryCountRef.current,
-      isDesktop: isDesktopRef.current,
-      reducedMotion: reducedMotionRef.current,
-      isScrollable: isScrollableRef.current,
-      segmentWidth: segmentWidthRef.current,
-      hidden: document.hidden,
-    });
+    logEngineState("auto-scroll not eligible");
   };
 
   const scheduleResume = (reason = "idle") => {
@@ -249,18 +273,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
 
     segmentWidthRef.current = measurePrimarySegmentWidth(track, primaryCountRef.current);
     isScrollableRef.current = isScrollable(viewport);
-
-    devLog("measured", {
-      categoryCount: primaryCountRef.current,
-      viewportClientWidth: viewport.clientWidth,
-      viewportScrollWidth: viewport.scrollWidth,
-      segmentWidth: segmentWidthRef.current,
-      isScrollable: isScrollableRef.current,
-      reducedMotion: reducedMotionRef.current,
-      isDesktop: isDesktopRef.current,
-      eligible: canAutoScroll(),
-      pauseReason: pauseReasonRef.current,
-    });
+    logEngineState("measured");
   };
 
   useLayoutEffect(() => {
@@ -270,11 +283,14 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
       remeasure,
       tryStartAutoScroll,
       canAutoScroll,
+      getCycleMs,
+      logEngineState,
     };
   });
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
+    const track = trackRef.current;
     if (!viewport) return;
 
     actionsRef.current.remeasure();
@@ -290,36 +306,41 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
       }
     });
     observer.observe(viewport);
+    if (track) observer.observe(track);
     return () => observer.disconnect();
   }, [items, primaryCount]);
 
   useEffect(() => {
     const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const desktopMedia = window.matchMedia(`(min-width: ${DESKTOP_MIN_WIDTH}px)`);
+    const desktopMedia = window.matchMedia(`(min-width: ${DESKTOP_BREAKPOINT_PX}px)`);
+    const hoverMedia = window.matchMedia("(hover: hover) and (pointer: fine)");
 
     const syncMotion = () => {
       reducedMotionRef.current = motionMedia.matches;
       if (motionMedia.matches) {
         actionsRef.current.pause("reduced-motion");
       } else {
+        actionsRef.current.remeasure();
         actionsRef.current.scheduleResume("reduced-motion-off");
       }
     };
 
-    const syncDesktop = () => {
+    const syncBreakpoint = () => {
       isDesktopRef.current = desktopMedia.matches;
-      if (!desktopMedia.matches) {
-        actionsRef.current.pause("mobile");
+      hasHoverRef.current = hoverMedia.matches;
+      actionsRef.current.remeasure();
+      if (actionsRef.current.canAutoScroll()) {
+        actionsRef.current.tryStartAutoScroll();
       } else {
-        actionsRef.current.remeasure();
-        actionsRef.current.scheduleResume("desktop");
+        actionsRef.current.scheduleResume("breakpoint");
       }
     };
 
     syncMotion();
-    syncDesktop();
+    syncBreakpoint();
     motionMedia.addEventListener("change", syncMotion);
-    desktopMedia.addEventListener("change", syncDesktop);
+    desktopMedia.addEventListener("change", syncBreakpoint);
+    hoverMedia.addEventListener("change", syncBreakpoint);
 
     const onVisibility = () => {
       if (document.hidden) {
@@ -331,15 +352,21 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     };
     document.addEventListener("visibilitychange", onVisibility);
 
-    actionsRef.current.remeasure();
-    if (actionsRef.current.canAutoScroll()) {
-      actionsRef.current.tryStartAutoScroll();
-    } else {
-      actionsRef.current.pause(
-        isScrollableRef.current ? "waiting" : "not-scrollable",
-      );
-      actionsRef.current.scheduleResume("mount");
-    }
+    const startAfterLayout = () => {
+      actionsRef.current.remeasure();
+      if (actionsRef.current.canAutoScroll()) {
+        actionsRef.current.tryStartAutoScroll();
+      } else {
+        actionsRef.current.pause(
+          isScrollableRef.current ? "waiting" : "not-scrollable",
+        );
+        actionsRef.current.scheduleResume("mount");
+      }
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(startAfterLayout);
+    });
 
     const tick = (timestamp: number) => {
       const viewport = viewportRef.current;
@@ -353,10 +380,10 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
         } else {
           const delta = timestamp - lastFrameRef.current;
           lastFrameRef.current = timestamp;
-          const speed = segmentWidthRef.current / AUTO_SCROLL_CYCLE_MS;
+          const speed = segmentWidthRef.current / actionsRef.current.getCycleMs();
           isProgrammaticScrollRef.current = true;
           viewport.scrollLeft += speed * delta;
-          if (viewport.scrollLeft >= segmentWidthRef.current) {
+          if (segmentWidthRef.current > 0 && viewport.scrollLeft >= segmentWidthRef.current) {
             viewport.scrollLeft -= segmentWidthRef.current;
           }
           queueMicrotask(() => {
@@ -373,10 +400,12 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
 
     return () => {
       motionMedia.removeEventListener("change", syncMotion);
-      desktopMedia.removeEventListener("change", syncDesktop);
+      desktopMedia.removeEventListener("change", syncBreakpoint);
+      hoverMedia.removeEventListener("change", syncBreakpoint);
       document.removeEventListener("visibilitychange", onVisibility);
       clearResumeTimer();
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      autoScrollActiveRef.current = false;
     };
   }, [primaryCount, items.length]);
 
@@ -475,12 +504,22 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     }
   }
 
+  function handleMouseEnter() {
+    if (!hasHoverRef.current) return;
+    actionsRef.current.pause("hover");
+  }
+
+  function handleMouseLeave() {
+    if (!hasHoverRef.current) return;
+    actionsRef.current.scheduleResume("hover-leave");
+  }
+
   return (
     <div
       className={`home-category-rail${layoutClass ? ` ${layoutClass}` : ""}`}
       aria-label="Khám phá danh mục nguồn hàng"
-      onMouseEnter={() => actionsRef.current.pause("hover")}
-      onMouseLeave={() => actionsRef.current.scheduleResume("hover-leave")}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div
         ref={viewportRef}
@@ -491,6 +530,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
         onPointerCancel={handlePointerUp}
         onTouchStart={() => actionsRef.current.pause("touch")}
         onTouchEnd={() => actionsRef.current.scheduleResume("touchend")}
+        onTouchCancel={() => actionsRef.current.scheduleResume("touchcancel")}
         onWheel={handleWheel}
         onScroll={handleScroll}
         onFocusCapture={handleFocusCapture}

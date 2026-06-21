@@ -12507,6 +12507,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x proximity;
   scroll-padding-inline: 0;
@@ -13410,6 +13411,204 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
   .order-list-status-popover {
     width: min(260px, calc(100vw - 16px));
+  }
+}
+
+/* ─── Sprint 26.3.5 — Order operational documents ─────────────────────────── */
+
+.order-document-print-host {
+  background: #fff;
+}
+
+.order-document-root {
+  color: #111827;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.order-doc__paper {
+  width: 100%;
+  max-width: 297mm;
+  margin: 0 auto;
+  padding: 10mm;
+  box-sizing: border-box;
+}
+
+.order-doc__header {
+  display: grid;
+  grid-template-columns: 120px 1fr 220px;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+.order-doc__logo {
+  max-width: 110px;
+  max-height: 48px;
+  object-fit: contain;
+}
+
+.order-doc__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #dc2626;
+  text-align: center;
+}
+
+.order-doc__company-name {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.order-doc__company-line {
+  margin: 0 0 2px;
+  font-size: 11px;
+  color: #4b5563;
+}
+
+.order-doc__meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+
+.order-doc__meta-row {
+  margin: 0 0 4px;
+}
+
+.order-doc__meta-label {
+  font-weight: 600;
+}
+
+.order-doc__table-wrap {
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.order-doc__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.order-doc__table thead {
+  display: table-header-group;
+}
+
+.order-doc__table th,
+.order-doc__table td {
+  border: 1px solid #d1d5db;
+  padding: 6px 8px;
+  vertical-align: top;
+}
+
+.order-doc__table th {
+  background: #111827;
+  color: #fff;
+  font-weight: 700;
+  text-align: left;
+}
+
+.order-doc__cell-center {
+  text-align: center;
+}
+
+.order-doc__cell-money {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.order-doc__design-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+.order-doc__design-thumb--large {
+  width: 64px;
+  height: 64px;
+}
+
+.order-doc__variant-mini {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.order-doc__variant-mini th,
+.order-doc__variant-mini td {
+  border: 1px solid #e5e7eb;
+  padding: 2px 4px;
+}
+
+.order-doc__summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+
+.order-doc__notes {
+  margin: 10px 0;
+  font-size: 12px;
+}
+
+.order-doc__notes h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+
+.order-doc__prepared-by {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.order-doc__footer-signatures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+  font-size: 12px;
+}
+
+.order-document-actions__groups {
+  display: grid;
+  gap: 14px;
+}
+
+.order-document-actions__title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.order-document-actions__hint {
+  margin: 0 0 8px;
+}
+
+.order-document-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  .order-doc__table tr {
+    break-inside: avoid;
   }
 }
 

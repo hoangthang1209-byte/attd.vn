@@ -167,6 +167,7 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
     deliveryNote: row.deliveryNote,
     deliveryExpectedAt: row.deliveryExpectedAt?.toISOString() ?? null,
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
+    deliveryMethodRequiresCarrier: row.deliveryMethodRef?.requiresCarrier ?? false,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     customer: row.customer,
@@ -240,6 +241,30 @@ async function fetchOrderRow(id: string) {
 
 export async function getOrderDetail(id: string): Promise<OrderDetailRecord | null> {
   const row = await fetchOrderRow(id);
+  if (!row) return null;
+  return mapOrderDetail(row);
+}
+
+export async function getOrderDetailByOrderNo(
+  orderNo: string,
+): Promise<OrderDetailRecord | null> {
+  const row = await prisma.order.findUnique({
+    where: { orderNo },
+    include: {
+      customer: { select: { id: true, name: true, code: true } },
+      quote: { select: { id: true, quoteNo: true } },
+      productionOwner: { select: { id: true, fullName: true, isActive: true } },
+      deliveryOwner: { select: { id: true, fullName: true, isActive: true } },
+      deliveryMethodRef: { select: { id: true, name: true, isActive: true, requiresCarrier: true } },
+      deliveryCarrierRef: { select: { id: true, name: true, isActive: true } },
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: { variants: { orderBy: { sortOrder: "asc" } } },
+      },
+      payments: { orderBy: { paidAt: "desc" } },
+      activities: { orderBy: { createdAt: "desc" } },
+    },
+  });
   if (!row) return null;
   return mapOrderDetail(row);
 }

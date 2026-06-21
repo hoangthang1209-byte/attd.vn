@@ -154,6 +154,7 @@ export type OrderDetailRecord = {
   deliveryNote: string | null;
   deliveryExpectedAt: string | null;
   deliveredAt: string | null;
+  deliveryMethodRequiresCarrier: boolean;
   createdAt: string;
   updatedAt: string;
   customer: { id: string; name: string; code: string } | null;
