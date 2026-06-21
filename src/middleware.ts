@@ -5,6 +5,7 @@ import {
   shouldProtectAdminPage,
   shouldProtectApiRoute,
   shouldProtectOrderDocumentPage,
+  shouldBypassAdminPageForProductionSheetPdf,
 } from "@/lib/admin-auth/middleware-utils";
 import { isRequestAdminAuthenticatedEdge } from "@/lib/admin-auth/session-edge";
 import { parseQuotePublicLinkSegment } from "@/features/quotes/quote-public-link.shared";
@@ -30,6 +31,10 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const authenticated = await isRequestAdminAuthenticatedEdge(request);
+
+  if (shouldBypassAdminPageForProductionSheetPdf(pathname, request.nextUrl.searchParams)) {
+    return NextResponse.next();
+  }
 
   if (shouldProtectAdminPage(pathname)) {
     if (!authenticated) {
@@ -90,5 +95,9 @@ export const config = {
     "/api/variants/:path*",
     "/api/orders",
     "/api/orders/:path*",
+    "/api/materials",
+    "/api/materials/:path*",
+    "/api/purchase-requests",
+    "/api/purchase-requests/:path*",
   ],
 };

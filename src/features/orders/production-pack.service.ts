@@ -359,9 +359,13 @@ function mapOrderMaterial(row: {
   id: string;
   orderItemId: string;
   sourceProductMaterialRequirementId: string | null;
+  materialId: string | null;
   materialType: MaterialType;
   materialName: string;
   materialCode: string | null;
+  materialCodeSnapshot: string | null;
+  materialNameSnapshot: string | null;
+  unitSnapshot: string | null;
   unit: string;
   consumptionPerUnit: Prisma.Decimal;
   wastagePercent: Prisma.Decimal;
@@ -376,9 +380,13 @@ function mapOrderMaterial(row: {
     id: row.id,
     orderItemId: row.orderItemId,
     sourceProductMaterialRequirementId: row.sourceProductMaterialRequirementId,
+    materialId: row.materialId,
     materialType: row.materialType,
     materialName: row.materialName,
     materialCode: row.materialCode,
+    materialCodeSnapshot: row.materialCodeSnapshot,
+    materialNameSnapshot: row.materialNameSnapshot,
+    unitSnapshot: row.unitSnapshot,
     unit: row.unit,
     consumptionPerUnit: row.consumptionPerUnit.toFixed(),
     wastagePercent: row.wastagePercent.toFixed(),
@@ -481,10 +489,14 @@ export async function copyProductBomToOrderItem(
     data: productRows.map((row, index) => ({
       orderItemId: input.orderItemId,
       sourceProductMaterialRequirementId: row.id,
+      materialId: row.materialId,
       materialType: row.materialType,
-      materialName: row.materialName,
-      materialCode: row.materialCode,
-      unit: row.unit,
+      materialName: row.materialNameSnapshot ?? row.materialName,
+      materialCode: row.materialCodeSnapshot ?? row.materialCode,
+      materialCodeSnapshot: row.materialCodeSnapshot ?? row.materialCode,
+      materialNameSnapshot: row.materialNameSnapshot ?? row.materialName,
+      unitSnapshot: row.unitSnapshot ?? row.unit,
+      unit: row.unitSnapshot ?? row.unit,
       consumptionPerUnit: row.consumptionPerUnit,
       wastagePercent: row.wastagePercent,
       requiredQuantity: computeRequiredQuantity(

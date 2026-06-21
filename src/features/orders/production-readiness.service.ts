@@ -2,6 +2,11 @@ import type { OrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DESIGN_FILE_TYPES } from "@/features/orders/production-pack-labels";
 import { resolveOrderItemTotalQuantity } from "@/features/orders/bom-calculations";
+import {
+  evaluateOrderMaterialAvailability,
+  isMaterialAvailabilityReady,
+  materialAvailabilityMissingLabels,
+} from "@/features/materials/material-availability.service";
 
 export type ReadinessItemStatus = "complete" | "incomplete" | "not_applicable";
 
@@ -62,6 +67,11 @@ export async function evaluateProductionReadiness(orderId: string): Promise<Prod
   const hasProductionNote = Boolean(order.productionNote?.trim());
   const noteRequired = false;
 
+  const materialAvailability = await evaluateOrderMaterialAvailability(orderId);
+  const hasBomMaterials = materialAvailability.length > 0;
+  const materialsReady = isMaterialAvailabilityReady(materialAvailability);
+  const missingMaterialNames = materialAvailabilityMissingLabels(materialAvailability);
+
   const items: ProductionReadinessItem[] = [
     {
       key: "production_owner",
@@ -105,6 +115,18 @@ export async function evaluateProductionReadiness(orderId: string): Promise<Prod
           ? "Đã có ghi chú"
           : "Chưa có ghi chú sản xuất"
         : "Không bắt buộc",
+    },
+    {
+      key: "material_availability",
+      label: "Đã xác nhận khả dụng nguyên phụ liệu",
+      status: itemStatus(materialsReady, !hasBomMaterials),
+      detail: !hasBomMaterials
+        ? "Không có định mức nguyên phụ liệu — không áp dụng"
+        : materialsReady
+          ? "Đủ vật tư hoặc đã giữ/cấp"
+          : missingMaterialNames.length
+            ? `Chưa đủ: ${missingMaterialNames.join(", ")}`
+            : "Cần kiểm tra tồn kho",
     },
   ];
 

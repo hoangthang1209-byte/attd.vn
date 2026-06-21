@@ -18,6 +18,8 @@ import {
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import type { OrderItemMaterialRecord, OrderProductionFileRecord } from "@/features/orders/production-pack.types";
 import type { ProductionReadinessResult } from "@/features/orders/production-readiness.service";
+import ProductionSheetActions from "@/components/admin/orders/production-sheet/ProductionSheetActions";
+import OrderMaterialAvailabilityPanel from "@/components/admin/orders/OrderMaterialAvailabilityPanel";
 
 type MaterialItemRow = {
   orderItemId: string;
@@ -46,7 +48,7 @@ type Props = {
   onOrderChange?: (order: OrderDetailRecord) => void;
 };
 
-type Tab = "files" | "materials" | "readiness";
+type Tab = "files" | "materials" | "availability" | "readiness";
 
 type MediaAssetPick = {
   id: string;
@@ -252,15 +254,23 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
     <fieldset className="admin-catalog-fieldset production-pack-section" id="production-pack" style={{ marginTop: 16 }}>
       <legend>BỘ HỒ SƠ SẢN XUẤT</legend>
 
+      <ProductionSheetActions order={order} />
+
       <div className="production-pack-tabs">
-        {(["files", "materials", "readiness"] as Tab[]).map((t) => (
+        {(["files", "materials", "availability", "readiness"] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
             className={`admin-btn admin-btn--secondary admin-btn--small ${tab === t ? "is-active" : ""}`}
             onClick={() => setTab(t)}
           >
-            {t === "files" ? "Tài liệu sản xuất" : t === "materials" ? "Nguyên phụ liệu" : "Kiểm tra sẵn sàng"}
+            {t === "files"
+              ? "Tài liệu sản xuất"
+              : t === "materials"
+                ? "Nguyên phụ liệu"
+                : t === "availability"
+                  ? "Khả dụng nguyên phụ liệu"
+                  : "Kiểm tra sẵn sàng"}
           </button>
         ))}
       </div>
@@ -454,6 +464,8 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
             </>
           )}
         </>
+      ) : tab === "availability" ? (
+        <OrderMaterialAvailabilityPanel orderId={orderId} />
       ) : (
         <>
           {readiness ? (

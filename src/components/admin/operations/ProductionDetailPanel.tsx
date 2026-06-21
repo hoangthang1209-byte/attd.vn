@@ -6,6 +6,7 @@ import type { OrderStatus } from "@prisma/client";
 import AdminOpsSidePanel from "@/components/admin/operations/AdminOpsSidePanel";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
 import ProductionOwnerSelect from "@/components/admin/orders/ProductionOwnerSelect";
+import ProductionSheetActions from "@/components/admin/orders/production-sheet/ProductionSheetActions";
 import { formatOrderDateTime } from "@/features/orders/order-format";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import {
@@ -245,6 +246,7 @@ export default function ProductionDetailPanel({ orderId, onClose, onSaved }: Pro
           )}
 
           <div className="admin-ops-panel-actions">
+            <ProductionSheetActions order={order} />
             {order.status === "CONFIRMED" && (
               <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void quickStatus("IN_PRODUCTION")}>
                 Bắt đầu sản xuất

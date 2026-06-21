@@ -24,6 +24,10 @@ const PROTECTED_MUTATION_PREFIXES = [
   "/api/variants/",
   "/api/dealer-leads/",
   "/api/orders/",
+  "/api/materials",
+  "/api/materials/",
+  "/api/purchase-requests",
+  "/api/purchase-requests/",
 ] as const;
 
 const PROTECTED_READ_PREFIXES = [
@@ -41,6 +45,10 @@ const PROTECTED_READ_PREFIXES = [
   "/api/variants/",
   "/api/orders",
   "/api/orders/",
+  "/api/materials",
+  "/api/materials/",
+  "/api/purchase-requests",
+  "/api/purchase-requests/",
 ] as const;
 
 function isMediaApiPath(pathname: string): boolean {
@@ -101,6 +109,17 @@ export function shouldProtectOrderDocumentPage(
     return false;
   }
   return true;
+}
+
+const PRODUCTION_SHEET_DOCUMENT_PATH =
+  /^\/admin\/orders\/[^/]+\/production-sheet\/document$/;
+
+export function shouldBypassAdminPageForProductionSheetPdf(
+  pathname: string,
+  searchParams: URLSearchParams,
+): boolean {
+  if (!PRODUCTION_SHEET_DOCUMENT_PATH.test(pathname)) return false;
+  return searchParams.get("mode") === "pdf" && Boolean(searchParams.get("pdfToken"));
 }
 
 export function shouldProtectApiRoute(request: NextRequest): boolean {

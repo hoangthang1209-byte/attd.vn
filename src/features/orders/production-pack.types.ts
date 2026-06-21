@@ -31,9 +31,13 @@ export type OrderItemMaterialRecord = {
   id: string;
   orderItemId: string;
   sourceProductMaterialRequirementId: string | null;
+  materialId: string | null;
   materialType: MaterialType;
   materialName: string;
   materialCode: string | null;
+  materialCodeSnapshot: string | null;
+  materialNameSnapshot: string | null;
+  unitSnapshot: string | null;
   unit: string;
   consumptionPerUnit: string;
   wastagePercent: string;

@@ -57,6 +57,14 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: "Nguyên phụ liệu",
+    items: [
+      { href: "/admin/materials", label: "Vật tư" },
+      { href: "/admin/materials/warehouse", label: "Tồn kho vật tư" },
+      { href: "/admin/purchase-requests", label: "Yêu cầu mua hàng" },
+    ],
+  },
+  {
     label: "Đơn hàng",
     items: [
       { href: "/admin/operations", label: "Tổng quan vận hành" },

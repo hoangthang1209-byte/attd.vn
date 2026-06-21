@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { OrderStatus } from "@prisma/client";
 import ProductionDetailPanel from "@/components/admin/operations/ProductionDetailPanel";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
+import ProductionSheetActions from "@/components/admin/orders/production-sheet/ProductionSheetActions";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import { formatOrderDate } from "@/features/orders/order-format";
 import { ORDER_STATUS_LABELS } from "@/features/orders/order-labels";
@@ -359,6 +360,7 @@ export default function ProductionBoardManager() {
                       <Link href={`/admin/orders/${order.id}`} className="admin-btn admin-btn--secondary admin-btn--small">
                         Xem đơn
                       </Link>
+                      <ProductionSheetActions order={order} compact />
                       {order.status === "CONFIRMED" && (
                         <button
                           type="button"
