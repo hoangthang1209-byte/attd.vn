@@ -138,6 +138,9 @@ export type DeliveryInfoLike = {
   deliveryRecipientName?: string | null;
   deliveryRecipientPhone?: string | null;
   deliveryAddress?: string | null;
+  deliveryMethodId?: string | null;
+  deliveryMethodName?: string | null;
+  deliveryMethod?: string | null;
 };
 
 export function validateDeliveryForShipped(order: DeliveryInfoLike): string | null {
@@ -146,6 +149,13 @@ export function validateDeliveryForShipped(order: DeliveryInfoLike): string | nu
   const address = order.deliveryAddress?.trim();
   if (!name || !phone || !address) {
     return "Vui lòng nhập đầy đủ thông tin giao hàng trước khi chuyển sang Đã giao hàng.";
+  }
+  const method =
+    order.deliveryMethodId ||
+    order.deliveryMethodName?.trim() ||
+    order.deliveryMethod?.trim();
+  if (!method) {
+    return "Vui lòng chọn hình thức giao hàng trước khi chuyển sang Đã giao hàng.";
   }
   return null;
 }
