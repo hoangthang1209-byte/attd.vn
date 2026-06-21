@@ -11,7 +11,6 @@ import type {
   HomepageBlogPostItem,
   HomepageCategoryItem,
   HomepageData,
-  HomepageHeroProductImage,
   HomepageProductItem,
 } from "@/features/home/homepage.types";
 
@@ -91,32 +90,6 @@ function mapProduct(product: PublicListingProduct): HomepageProductItem {
   };
 }
 
-function buildHeroProductImages(
-  products: HomepageProductItem[],
-): HomepageHeroProductImage[] {
-  const images: HomepageHeroProductImage[] = [];
-
-  for (const product of products) {
-    if (!product.imageUrl || !isValidImageSrc(product.imageUrl)) {
-      continue;
-    }
-
-    images.push({
-      slug: product.slug,
-      label: product.name,
-      imageUrl: product.imageUrl,
-      imageAlt: product.imageAlt,
-      href: product.href,
-    });
-
-    if (images.length >= 4) {
-      break;
-    }
-  }
-
-  return images;
-}
-
 function mapBlogPost(post: {
   id: string;
   title: string;
@@ -155,13 +128,11 @@ export async function getHomepageData(): Promise<HomepageData> {
     .filter((category): category is HomepageCategoryItem => category != null);
 
   const latestProducts = products.map(mapProduct);
-  const heroProductImages = buildHeroProductImages(latestProducts);
   const blogPosts = blogPostsRaw.map(mapBlogPost);
 
   return {
     categories,
     latestProducts,
-    heroProductImages,
     blogPosts,
   };
 }

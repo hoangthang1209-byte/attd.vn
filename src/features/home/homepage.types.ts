@@ -23,15 +23,6 @@ export type HomepageProductItem = {
   availabilityLabel: string | null;
 };
 
-/** Real product image for hero mosaic — derived from latestProducts. */
-export type HomepageHeroProductImage = {
-  slug: string;
-  label: string;
-  imageUrl: string;
-  imageAlt: string;
-  href: string;
-};
-
 /** Serializable homepage blog teaser row. */
 export type HomepageBlogPostItem = {
   id: string;
@@ -47,6 +38,5 @@ export type HomepageBlogPostItem = {
 export type HomepageData = {
   categories: HomepageCategoryItem[];
   latestProducts: HomepageProductItem[];
-  heroProductImages: HomepageHeroProductImage[];
   blogPosts: HomepageBlogPostItem[];
 };
