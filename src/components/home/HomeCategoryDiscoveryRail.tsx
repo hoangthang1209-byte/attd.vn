@@ -20,7 +20,7 @@ type RailRenderItem = {
 const AUTO_SCROLL_MOBILE_PX_PER_SEC = 16;
 const AUTO_SCROLL_DESKTOP_PX_PER_SEC = 20;
 const DESKTOP_BREAKPOINT_PX = 768;
-const RESUME_IDLE_MS = 400;
+const WHEEL_SETTLE_MS = 100;
 const DRAG_THRESHOLD_PX = 6;
 const MIN_CATEGORIES_FOR_AUTO = 2;
 const MIN_OVERFLOW_RATIO = 1.25;
@@ -163,7 +163,6 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     isHoverPaused: false,
     isReducedMotion: false,
     isDocumentVisible: true,
-    resumeAt: 0,
     hasHover: false,
     pointerHasMoved: false,
   });
@@ -179,14 +178,17 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     }
   };
 
-  const scheduleResumeAfterIdle = () => {
+  const resumeImmediately = () => {
     clearResumeTimer();
-    engineRef.current.resumeAt = Date.now() + RESUME_IDLE_MS;
+    engineRef.current.isInteracting = false;
+  };
+
+  const scheduleWheelSettleResume = () => {
+    clearResumeTimer();
     resumeTimerRef.current = setTimeout(() => {
       if (isPointerDraggingRef.current) return;
       engineRef.current.isInteracting = false;
-      engineRef.current.resumeAt = 0;
-    }, RESUME_IDLE_MS);
+    }, WHEEL_SETTLE_MS);
   };
 
   const syncVirtualScrollFromViewport = () => {
@@ -225,8 +227,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
       !engine.isInteracting &&
       !engine.isHoverPaused &&
       !engine.isReducedMotion &&
-      engine.isDocumentVisible &&
-      Date.now() >= engine.resumeAt
+      engine.isDocumentVisible
     );
   };
 
@@ -248,8 +249,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
 
     isProgrammaticScrollRef.current = true;
     viewport.scrollLeft = nextScrollLeft;
-    virtualScrollRef.current = viewport.scrollLeft;
-    requestAnimationFrame(() => {
+    queueMicrotask(() => {
       isProgrammaticScrollRef.current = false;
     });
   };
@@ -312,7 +312,6 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     syncMotion();
     syncHover();
     engineRef.current.isDocumentVisible = !document.hidden;
-    engineRef.current.resumeAt = 0;
 
     motionMedia.addEventListener("change", syncMotion);
     hoverMedia.addEventListener("change", syncHover);
@@ -323,7 +322,6 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
       remeasure();
       syncVirtualScrollFromViewport();
       if (!engineRef.current.isInteracting) {
-        engineRef.current.resumeAt = 0;
         clearResumeTimer();
       }
     };
@@ -392,7 +390,6 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
 
   function pauseForUserInput() {
     engineRef.current.isInteracting = true;
-    engineRef.current.resumeAt = Number.MAX_SAFE_INTEGER;
     clearResumeTimer();
     lastFrameRef.current = null;
   }
@@ -425,8 +422,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     isPointerDraggingRef.current = false;
     viewportRef.current?.releasePointerCapture(event.pointerId);
     syncVirtualScrollFromViewport();
-    scheduleResumeAfterIdle();
-    lastFrameRef.current = null;
+    resumeImmediately();
   }
 
   function handleTouchStart() {
@@ -434,14 +430,14 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
   }
 
   function handleTouchEnd() {
+    if (isPointerDraggingRef.current) return;
     syncVirtualScrollFromViewport();
-    scheduleResumeAfterIdle();
-    lastFrameRef.current = null;
+    resumeImmediately();
   }
 
   function handleWheel() {
     pauseForUserInput();
-    scheduleResumeAfterIdle();
+    scheduleWheelSettleResume();
   }
 
   function handleScroll() {
@@ -450,7 +446,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
     if (!viewport) return;
     virtualScrollRef.current = viewport.scrollLeft;
     pauseForUserInput();
-    scheduleResumeAfterIdle();
+    scheduleWheelSettleResume();
   }
 
   function handleFocusCapture(event: React.FocusEvent<HTMLDivElement>) {
@@ -460,8 +456,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
 
   function handleBlurCapture(event: React.FocusEvent<HTMLDivElement>) {
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-    scheduleResumeAfterIdle();
-    lastFrameRef.current = null;
+    resumeImmediately();
   }
 
   function handleClickCapture(event: React.MouseEvent) {
@@ -481,7 +476,7 @@ export default function HomeCategoryDiscoveryRail({ categories }: Props) {
   function handleMouseLeave() {
     if (!engineRef.current.hasHover || !engineRef.current.isHoverPaused) return;
     engineRef.current.isHoverPaused = false;
-    scheduleResumeAfterIdle();
+    resumeImmediately();
   }
 
   return (

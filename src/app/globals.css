@@ -12545,6 +12545,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
   border: 1px solid rgba(15, 23, 42, 0.05);
   transition: box-shadow 0.2s ease;
+  isolation: isolate;
 }
 
 .home-category-rail__card:focus-visible {
@@ -12561,11 +12562,17 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   aspect-ratio: 1 / 1.02;
   background: #f3f3f3;
   overflow: hidden;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  margin: -1px -1px 0;
+  width: calc(100% + 2px);
 }
 
 .home-category-rail__img {
   object-fit: contain;
+  object-position: center top;
   padding: 0;
+  border: none;
 }
 
 .home-category-rail__placeholder {
