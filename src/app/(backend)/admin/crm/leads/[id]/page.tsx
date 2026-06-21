@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CrmLeadDetailView from "@/components/admin/crm/CrmLeadDetailView";
 import { displayLeadCompanyName, displayLeadContactName } from "@/features/crm/labels";
 import { getCrmLeadById } from "@/features/crm/services/crm-lead.service";
@@ -23,8 +23,9 @@ export default async function CrmLeadDetailPage({ params }: PageProps) {
     "Chi tiết lead";
 
   return (
-    <AdminShell title={`Lead: ${title}`}>
+    <>
+      <AdminPageTitle title={`Lead: ${title}`} />
       <CrmLeadDetailView initialLead={lead} />
-    </AdminShell>
+    </>
   );
 }

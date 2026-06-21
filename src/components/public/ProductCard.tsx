@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
+import ProductQuoteDialog from "@/components/public/ProductQuoteDialog";
 import { formatProductCardMoq, isPublicMoq } from "@/lib/formatMoq";
 
 type ProductCardProps = {
@@ -29,6 +33,7 @@ const STOCK_COLORS: Record<string, string> = {
 };
 
 export default function ProductCard({
+  id,
   slug,
   name,
   productCode,
@@ -40,54 +45,90 @@ export default function ProductCard({
   stockLabel,
   compact = false,
 }: ProductCardProps) {
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const quoteTriggerRef = useRef<HTMLButtonElement>(null);
+  const productHref = `/san-pham/${slug}`;
+
   const stockColor = stockStatus ? (STOCK_COLORS[stockStatus] ?? "#6b7280") : undefined;
   const moqLabel = isPublicMoq(moq) ? formatProductCardMoq(moq) : null;
   const showB2bMeta = moqLabel || leadTime;
 
+  function openQuote(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setQuoteOpen(true);
+  }
+
+  function closeQuote() {
+    setQuoteOpen(false);
+  }
+
   return (
-    <Link
-      href={`/san-pham/${slug}`}
-      className={`product-card${compact ? " product-card--compact" : ""}`}
-    >
-      <div className="product-card-media">
-        <ProductMediaFrame
-          imageUrl={imageUrl}
-          alt={name}
-          placeholderLabel={productCode ?? undefined}
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
-          placeholderCompact={compact}
-        />
+    <>
+      <article className={`product-card${compact ? " product-card--compact" : ""}`}>
+        <div className="product-card-media">
+          <Link href={productHref} className="product-card-media-link">
+            <ProductMediaFrame
+              imageUrl={imageUrl}
+              alt={name}
+              placeholderLabel={productCode ?? undefined}
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
+              placeholderCompact={compact}
+            />
+          </Link>
 
-        {stockLabel && stockStatus !== "IN_STOCK" && (
-          <span className="product-card-stock-badge" style={{ background: stockColor }}>
-            {stockLabel}
-          </span>
-        )}
-      </div>
-
-      <div className="product-card-body">
-        {category && <p className="product-card-category">{category}</p>}
-        <h3 className="product-card-title">{name}</h3>
-
-        {showB2bMeta && (
-          <div className="product-card-b2b">
-            {moqLabel && <span className="product-card-meta">{moqLabel}</span>}
-            {leadTime && (
-              <span className="product-card-meta product-card-leadtime">{leadTime}</span>
-            )}
-          </div>
-        )}
-
-        <div className="product-card-footer">
-          <span className="product-card-price">Liên hệ báo giá sỉ</span>
-          {!compact && (
-            <span className="product-card-link">
-              Xem chi tiết
-              <ArrowRight size={14} strokeWidth={2} />
+          {stockLabel && stockStatus !== "IN_STOCK" && (
+            <span className="product-card-stock-badge" style={{ background: stockColor }}>
+              {stockLabel}
             </span>
           )}
         </div>
-      </div>
-    </Link>
+
+        <div className="product-card-body">
+          {category && (
+            <Link href={productHref} className="product-card-category">
+              {category}
+            </Link>
+          )}
+          <h3 className="product-card-title">
+            <Link href={productHref} className="product-card-title-link">
+              {name}
+            </Link>
+          </h3>
+
+          {showB2bMeta && (
+            <div className="product-card-b2b">
+              {moqLabel && <span className="product-card-meta">{moqLabel}</span>}
+              {leadTime && (
+                <span className="product-card-meta product-card-leadtime">{leadTime}</span>
+              )}
+            </div>
+          )}
+
+          <div className="product-card-footer">
+            <button
+              ref={quoteTriggerRef}
+              type="button"
+              className="product-card-quote-btn"
+              onClick={openQuote}
+              aria-label={`Liên hệ báo giá sỉ cho ${name}`}
+            >
+              Liên hệ báo giá sỉ
+            </button>
+            <Link href={productHref} className="product-card-link">
+              Xem chi tiết
+              <ArrowRight size={14} strokeWidth={2} aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      </article>
+
+      <ProductQuoteDialog
+        open={quoteOpen}
+        onClose={closeQuote}
+        restoreFocusRef={quoteTriggerRef}
+        product={{ id, slug, name, category, imageUrl, moq }}
+      />
+    </>
   );
 }

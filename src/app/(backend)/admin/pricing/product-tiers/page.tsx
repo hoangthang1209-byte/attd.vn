@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ProductTiersManager from "@/components/admin/pricing/ProductTiersManager";
 
 export default function ProductTiersPage() {
   return (
-    <AdminShell title="Bảng giá sản phẩm">
+    <>
+      <AdminPageTitle title={"Bảng giá sản phẩm"} />
       <ProductTiersManager />
-    </AdminShell>
+    </>
   );
 }

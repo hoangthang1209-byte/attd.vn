@@ -1,4 +1,4 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CompanySettingsForm from "@/components/admin/CompanySettingsForm";
 import { prisma } from "@/lib/prisma";
 import { seedDefaultSettings } from "@/features/settings/services/settings.service";
@@ -25,8 +25,9 @@ export default async function CompanySettingsPage() {
   };
 
   return (
-    <AdminShell title="Thông tin công ty">
+    <>
+      <AdminPageTitle title={"Thông tin công ty"} />
       <CompanySettingsForm initial={initial} />
-    </AdminShell>
+    </>
   );
 }

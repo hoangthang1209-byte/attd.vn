@@ -1,4 +1,4 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import TrustSettingsForm from "@/components/admin/TrustSettingsForm";
 import { prisma } from "@/lib/prisma";
 import { seedDefaultSettings } from "@/features/settings/services/settings.service";
@@ -19,8 +19,9 @@ export default async function TrustSettingsPage() {
   };
 
   return (
-    <AdminShell title="Chỉ số tin cậy">
+    <>
+      <AdminPageTitle title={"Chỉ số tin cậy"} />
       <TrustSettingsForm initial={initial} />
-    </AdminShell>
+    </>
   );
 }

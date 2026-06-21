@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import LandingPageEditForm from "@/components/admin/LandingPageEditForm";
 import {
   ensureLandingPagesSeeded,
@@ -43,13 +43,14 @@ export default async function LandingPageEditPage({ params }: Props) {
   };
 
   return (
-    <AdminShell title={`Sửa landing: ${slug}`}>
+    <>
+      <AdminPageTitle title={`Sửa landing: ${slug}`} />
       {!tableReady && (
         <p className="admin-message admin-message--error" role="alert">
           LandingPageContent table chưa tồn tại. Chạy prisma migrate deploy.
         </p>
       )}
       <LandingPageEditForm slug={slug} initial={initial} readOnly={!tableReady} />
-    </AdminShell>
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import SalesRepresentativeForm from "@/components/admin/sales/SalesRepresentativeForm";
 
 type Props = { params: Promise<{ id: string }> };
@@ -6,8 +6,9 @@ type Props = { params: Promise<{ id: string }> };
 export default async function EditSalesRepPage({ params }: Props) {
   const { id } = await params;
   return (
-    <AdminShell title="Sửa nhân viên tư vấn">
+    <>
+      <AdminPageTitle title={"Sửa nhân viên tư vấn"} />
       <SalesRepresentativeForm mode="edit" salesRepId={id} />
-    </AdminShell>
+    </>
   );
 }

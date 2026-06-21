@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import BlogCategoriesManager from "@/components/admin/BlogCategoriesManager";
 
 export default function BlogCategoriesAdminPage() {
   return (
-    <AdminShell title="Blog — Danh mục">
+    <>
+      <AdminPageTitle title={"Blog — Danh mục"} />
       <BlogCategoriesManager />
-    </AdminShell>
+    </>
   );
 }

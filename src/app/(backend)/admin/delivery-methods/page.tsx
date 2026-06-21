@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import DeliveryMethodsList from "@/components/admin/delivery/DeliveryMethodsList";
 
 export default function AdminDeliveryMethodsPage() {
   return (
-    <AdminShell title="Quản lý hình thức giao hàng">
+    <>
+      <AdminPageTitle title={"Quản lý hình thức giao hàng"} />
       <DeliveryMethodsList />
-    </AdminShell>
+    </>
   );
 }

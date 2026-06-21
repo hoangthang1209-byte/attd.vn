@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CrmLeadsManager from "@/components/admin/CrmLeadsManager";
 
 export default function CrmLeadsPage() {
   return (
-    <AdminShell title="CRM — Quản lý lead">
+    <>
+      <AdminPageTitle title={"CRM — Quản lý lead"} />
       <CrmLeadsManager />
-    </AdminShell>
+    </>
   );
 }

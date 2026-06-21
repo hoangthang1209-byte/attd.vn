@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import FaviconDebugPanel from "@/components/admin/FaviconDebugPanel";
 
 export default function FaviconDebugPage() {
   return (
-    <AdminShell title="Favicon diagnostics">
+    <>
+      <AdminPageTitle title={"Favicon diagnostics"} />
       <FaviconDebugPanel />
-    </AdminShell>
+    </>
   );
 }

@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ClientLogosManager from "@/components/admin/ClientLogosManager";
 
 export default function ClientLogosPage() {
   return (
-    <AdminShell title="Logo khách hàng & đối tác">
+    <>
+      <AdminPageTitle title={"Logo khách hàng & đối tác"} />
       <ClientLogosManager />
-    </AdminShell>
+    </>
   );
 }

@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import OrderForm from "@/components/admin/orders/OrderForm";
 
 export default function NewOrderPage() {
   return (
-    <AdminShell title="Tạo đơn hàng">
+    <>
+      <AdminPageTitle title={"Tạo đơn hàng"} />
       <OrderForm mode="create" />
-    </AdminShell>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CrmCustomerDetailView from "@/components/admin/crm/CrmCustomerDetailView";
 import { getCustomerById } from "@/features/crm/services/crm-customer.service";
 
@@ -16,8 +16,9 @@ export default async function CrmCustomerDetailPage({ params }: PageProps) {
   }
 
   return (
-    <AdminShell title={`Khách hàng: ${customer.name}`}>
+    <>
+      <AdminPageTitle title={`Khách hàng: ${customer.name}`} />
       <CrmCustomerDetailView initialCustomer={customer} />
-    </AdminShell>
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import LandingPagesManager from "@/components/admin/LandingPagesManager";
 import {
   ensureLandingPagesSeeded,
@@ -12,8 +12,9 @@ export default async function LandingPagesAdminPage() {
   }
 
   return (
-    <AdminShell title="Landing pages (SEO)">
+    <>
+      <AdminPageTitle title={"Landing pages (SEO)"} />
       <LandingPagesManager />
-    </AdminShell>
+    </>
   );
 }

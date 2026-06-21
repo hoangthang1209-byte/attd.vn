@@ -1,4 +1,4 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import EmployeeForm from "@/components/admin/employees/EmployeeForm";
 
 type Props = { params: Promise<{ id: string }> };
@@ -6,8 +6,9 @@ type Props = { params: Promise<{ id: string }> };
 export default async function AdminEmployeeEditPage({ params }: Props) {
   const { id } = await params;
   return (
-    <AdminShell title="Sửa nhân viên">
+    <>
+      <AdminPageTitle title={"Sửa nhân viên"} />
       <EmployeeForm mode="edit" employeeId={id} />
-    </AdminShell>
+    </>
   );
 }

@@ -4,7 +4,7 @@ import { countMediaAssets } from "@/features/media/services/media.service";
 import { countClientLogos } from "@/features/client-logos/services/client-logo.service";
 import { countCaseStudies } from "@/features/case-studies/services/case-study.service";
 import { getCmsHealth } from "@/features/admin/services/cms-health.service";
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CmsHealthCard from "@/components/admin/CmsHealthCard";
 
 export default async function DashboardPage() {
@@ -56,7 +56,8 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <AdminShell title="Dashboard">
+    <>
+      <AdminPageTitle title={"Dashboard"} />
       <div className="admin-dashboard-grid">
         <CmsHealthCard health={health} />
         {cmsCards.map((card) => (
@@ -80,6 +81,6 @@ export default async function DashboardPage() {
           <Link href="/admin/crm">CRM leads</Link>
         </div>
       </div>
-    </AdminShell>
+    </>
   );
 }

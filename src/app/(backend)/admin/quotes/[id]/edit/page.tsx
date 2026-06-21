@@ -1,4 +1,4 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import QuoteForm from "@/components/admin/quotes/QuoteForm";
 
 type Props = { params: Promise<{ id: string }> };
@@ -6,8 +6,9 @@ type Props = { params: Promise<{ id: string }> };
 export default async function EditQuotePage({ params }: Props) {
   const { id } = await params;
   return (
-    <AdminShell title="Chỉnh sửa báo giá">
+    <>
+      <AdminPageTitle title={"Chỉnh sửa báo giá"} />
       <QuoteForm mode="edit" quoteId={id} />
-    </AdminShell>
+    </>
   );
 }

@@ -1,4 +1,4 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import KnowledgeBaseEntryEditor from "@/components/admin/knowledge-base/KnowledgeBaseEntryEditor";
 import { getKnowledgeBaseEntryById } from "@/features/knowledge-base/knowledge-base-seed";
 import { notFound } from "next/navigation";
@@ -13,8 +13,9 @@ export default async function EditKnowledgeBaseEntryPage({ params }: Props) {
   if (!entry) notFound();
 
   return (
-    <AdminShell title={`Knowledge Base — ${entry.title}`}>
+    <>
+      <AdminPageTitle title={`Knowledge Base — ${entry.title}`} />
       <KnowledgeBaseEntryEditor mode="edit" entry={entry} />
-    </AdminShell>
+    </>
   );
 }

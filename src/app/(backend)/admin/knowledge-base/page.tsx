@@ -1,4 +1,4 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import KnowledgeBaseDashboard from "@/components/admin/knowledge-base/KnowledgeBaseDashboard";
 import {
   ensureDefaultKnowledgeCategories,
@@ -29,8 +29,9 @@ export default async function KnowledgeBasePage() {
   });
 
   return (
-    <AdminShell title="Knowledge Base — Dữ liệu doanh nghiệp">
+    <>
+      <AdminPageTitle title={"Knowledge Base — Dữ liệu doanh nghiệp"} />
       <KnowledgeBaseDashboard initialEntries={enrichedEntries} initialKpis={kpis} />
-    </AdminShell>
+    </>
   );
 }

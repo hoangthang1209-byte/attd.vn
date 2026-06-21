@@ -1,5 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { Suspense } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
+import AdminScrollRestoration from "@/components/admin/AdminScrollRestoration";
+import { AdminTitleProvider, useAdminTitle } from "@/components/admin/AdminTitleContext";
 
 const NAV_GROUPS = [
   {
@@ -90,47 +96,99 @@ const NAV_GROUPS = [
   },
 ];
 
-export default function AdminShell({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function isNavItemActive(
+  href: string,
+  pathname: string,
+  searchParams: URLSearchParams,
+): boolean {
+  const [path, queryString] = href.split("?");
+  const pathMatches =
+    pathname === path ||
+    (path !== "/admin" && pathname.startsWith(`${path}/`));
+
+  if (!pathMatches) return false;
+
+  if (!queryString) {
+    if (pathname === path) return true;
+    return pathname.startsWith(`${path}/`);
+  }
+
+  if (pathname !== path) return false;
+  const expected = new URLSearchParams(queryString);
+  for (const [key, value] of expected.entries()) {
+    if (searchParams.get(key) !== value) return false;
+  }
+  return true;
+}
+
+function AdminShellNav() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   return (
-    <div className="admin-shell">
-      <aside className="admin-sidebar">
-        <div className="admin-sidebar-top">
-          <Link href="/admin/dashboard" className="admin-brand">
-            ATTD CMS
-          </Link>
-          <AdminLogoutButton />
+    <nav className="admin-nav">
+      {NAV_GROUPS.map((group) => (
+        <div key={group.label ?? "root"} className="admin-nav-group">
+          {group.label && <p className="admin-nav-group-label">{group.label}</p>}
+          {group.items.map((item) => {
+            const active = isNavItemActive(item.href, pathname, searchParams);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                scroll={false}
+                prefetch
+                className={`admin-nav-link${active ? " admin-nav-link--active" : ""}`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
-        <nav className="admin-nav">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label ?? "root"} className="admin-nav-group">
-              {group.label && <p className="admin-nav-group-label">{group.label}</p>}
-              {group.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={
-                    group.label === "Settings"
-                      ? "admin-nav-link admin-nav-link--nested"
-                      : "admin-nav-link"
-                  }
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          ))}
-        </nav>
-      </aside>
-      <main className="admin-main">
-        <h1 className="admin-title">{title}</h1>
-        {children}
-      </main>
-    </div>
+      ))}
+    </nav>
+  );
+}
+
+function AdminShellMain({ children }: { children: React.ReactNode }) {
+  const { title } = useAdminTitle();
+
+  return (
+    <main id="admin-content-scroll" className="admin-main admin-content-scroll">
+      <Suspense fallback={null}>
+        <AdminScrollRestoration />
+      </Suspense>
+      {title ? <h1 className="admin-title">{title}</h1> : null}
+      <div className="admin-main-content">{children}</div>
+    </main>
+  );
+}
+
+/** Persistent admin app shell — mounted once in admin layout. */
+export default function AdminShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isLogin = pathname === "/admin/login";
+
+  if (isLogin) {
+    return children;
+  }
+
+  return (
+    <AdminTitleProvider>
+      <div className="admin-app-shell admin-shell">
+        <aside className="admin-sidebar">
+          <div className="admin-sidebar-top">
+            <Link href="/admin/dashboard" scroll={false} className="admin-brand">
+              ATTD CMS
+            </Link>
+            <AdminLogoutButton />
+          </div>
+          <Suspense fallback={null}>
+            <AdminShellNav />
+          </Suspense>
+        </aside>
+        <AdminShellMain>{children}</AdminShellMain>
+      </div>
+    </AdminTitleProvider>
   );
 }

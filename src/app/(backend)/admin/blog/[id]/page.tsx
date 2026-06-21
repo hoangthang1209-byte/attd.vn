@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import BlogPostEditor from "@/components/admin/BlogPostEditor";
 import { getBlogPostById } from "@/features/blog/services/blog-admin.service";
 
@@ -13,8 +13,9 @@ export default async function EditBlogPostPage({ params }: PageProps) {
   if (!post) notFound();
 
   return (
-    <AdminShell title={`Blog — ${post.title}`}>
+    <>
+      <AdminPageTitle title={`Blog — ${post.title}`} />
       <BlogPostEditor mode="edit" post={post} />
-    </AdminShell>
+    </>
   );
 }

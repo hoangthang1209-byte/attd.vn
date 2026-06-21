@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import KnowledgeBaseBulkImport from "@/components/admin/knowledge-base/KnowledgeBaseBulkImport";
 
 export default function KnowledgeBaseImportPage() {
   return (
-    <AdminShell title="Knowledge Base — Nhập dữ liệu hàng loạt">
+    <>
+      <AdminPageTitle title={"Knowledge Base — Nhập dữ liệu hàng loạt"} />
       <KnowledgeBaseBulkImport />
-    </AdminShell>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ProductCatalogForm from "@/components/admin/products/ProductCatalogForm";
 import { getProductAdminById, listProductCategories } from "@/features/products/product-admin.service";
 
@@ -60,8 +60,9 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   }));
 
   return (
-    <AdminShell title={`Sửa: ${product.name}`}>
+    <>
+      <AdminPageTitle title={`Sửa: ${product.name}`} />
       <ProductCatalogForm initialData={initialData} categories={cats} />
-    </AdminShell>
+    </>
   );
 }

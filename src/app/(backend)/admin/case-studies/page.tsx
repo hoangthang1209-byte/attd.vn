@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CaseStudiesManager from "@/components/admin/CaseStudiesManager";
 
 export default function CaseStudiesPage() {
   return (
-    <AdminShell title="Dự án tiêu biểu">
+    <>
+      <AdminPageTitle title={"Dự án tiêu biểu"} />
       <CaseStudiesManager />
-    </AdminShell>
+    </>
   );
 }

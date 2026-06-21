@@ -1,4 +1,4 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import QuoteForm from "@/components/admin/quotes/QuoteForm";
 
 type Props = {
@@ -12,7 +12,8 @@ type Props = {
 export default async function NewQuotePage({ searchParams }: Props) {
   const params = await searchParams;
   return (
-    <AdminShell title="Tạo báo giá">
+    <>
+      <AdminPageTitle title={"Tạo báo giá"} />
       <QuoteForm
         mode="create"
         prefillParams={{
@@ -21,6 +22,6 @@ export default async function NewQuotePage({ searchParams }: Props) {
           customerId: params.customerId,
         }}
       />
-    </AdminShell>
+    </>
   );
 }

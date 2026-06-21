@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CategoryAdminManager from "@/components/admin/products/CategoryAdminManager";
 
 export default function CategoriesPage() {
   return (
-    <AdminShell title="Danh mục sản phẩm">
+    <>
+      <AdminPageTitle title={"Danh mục sản phẩm"} />
       <CategoryAdminManager />
-    </AdminShell>
+    </>
   );
 }

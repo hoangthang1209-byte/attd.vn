@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import OperationsDashboard from "@/components/admin/operations/OperationsDashboard";
 
 export default function OperationsPage() {
   return (
-    <AdminShell title="Tổng quan vận hành">
+    <>
+      <AdminPageTitle title={"Tổng quan vận hành"} />
       <OperationsDashboard />
-    </AdminShell>
+    </>
   );
 }

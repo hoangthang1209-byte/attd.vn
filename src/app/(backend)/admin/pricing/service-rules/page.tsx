@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ServiceRulesManager from "@/components/admin/pricing/ServiceRulesManager";
 
 export default function ServiceRulesPage() {
   return (
-    <AdminShell title="Phí dịch vụ">
+    <>
+      <AdminPageTitle title={"Phí dịch vụ"} />
       <ServiceRulesManager />
-    </AdminShell>
+    </>
   );
 }

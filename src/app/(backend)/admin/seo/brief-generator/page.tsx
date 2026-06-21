@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import SeoBriefGenerator from "@/components/admin/seo/SeoBriefGenerator";
 
 export default function SeoBriefGeneratorPage() {
   return (
-    <AdminShell title="Trình tạo SEO Brief">
+    <>
+      <AdminPageTitle title={"Trình tạo SEO Brief"} />
       <SeoBriefGenerator />
-    </AdminShell>
+    </>
   );
 }

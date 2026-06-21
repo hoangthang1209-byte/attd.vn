@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import PricingOverviewDashboard from "@/components/admin/pricing/PricingOverviewDashboard";
 
 export default function PricingOverviewPage() {
   return (
-    <AdminShell title="Tính giá — Tổng quan">
+    <>
+      <AdminPageTitle title={"Tính giá — Tổng quan"} />
       <PricingOverviewDashboard />
-    </AdminShell>
+    </>
   );
 }

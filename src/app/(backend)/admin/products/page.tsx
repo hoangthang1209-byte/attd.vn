@@ -1,10 +1,11 @@
-import AdminShell from "@/components/admin/AdminShell";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ProductCatalogDashboard from "@/components/admin/products/ProductCatalogDashboard";
 
 export default function ProductsAdminPage() {
   return (
-    <AdminShell title="Danh mục sản phẩm B2B">
+    <>
+      <AdminPageTitle title={"Danh mục sản phẩm B2B"} />
       <ProductCatalogDashboard />
-    </AdminShell>
+    </>
   );
 }
