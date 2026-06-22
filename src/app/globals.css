@@ -12481,10 +12481,10 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   }
 
   .mp-header-mobile-row {
-    position: relative;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
+    gap: 4px;
     min-height: 44px;
     width: 100%;
     min-width: 0;
@@ -12493,17 +12493,15 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   .mp-header-mobile-row__side {
     display: flex;
     align-items: center;
-    flex: 1 1 0;
     min-width: 0;
-    z-index: 2;
   }
 
   .mp-header-mobile-row__side--left {
-    justify-content: flex-start;
+    justify-self: start;
   }
 
   .mp-header-mobile-row__side--right {
-    justify-content: flex-end;
+    justify-self: end;
     gap: 0;
   }
 
@@ -12545,32 +12543,36 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   }
 
   .mp-header-mobile-logo {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
+    justify-self: center;
     display: inline-flex !important;
+    max-width: min(132px, 38vw);
     pointer-events: auto;
   }
 
   .mp-header-mobile-logo .attd-logo-img {
     height: 32px !important;
     width: auto !important;
+    max-width: 100%;
   }
 
   .mp-header-search-toggle { display: inline-flex; }
 
-  .mp-header--v271 .mp-header-search-mobile {
+  .mp-header-mobile-search-panel {
     display: block;
-    padding: 0 0 8px;
+    width: 100%;
+    border-top: 1px solid var(--border);
+    background: #fff;
+    padding: 8px 0 10px;
+    box-sizing: border-box;
+    overflow-x: clip;
   }
 
   .mp-header--v271 .mp-header-cats--desktop { display: none; }
 }
 
 @media (min-width: 900px) {
-  .mp-header-mobile-row {
+  .mp-header-mobile-row,
+  .mp-header-mobile-search-panel {
     display: none !important;
   }
 }
@@ -13005,13 +13007,11 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 }
 
 @media (max-width: 899px) {
-  .mp-header--v271 .mp-header-search-mobile {
-    display: block;
-    padding: 0 0 10px;
-    overflow-x: clip;
-  }
-
-  .mp-header--v271.mp-header--mobile-search-open .container {
+  .mp-header--v271 .mp-header-mobile-search-panel .mp-header-search-mobile__row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
     min-width: 0;
   }
 }

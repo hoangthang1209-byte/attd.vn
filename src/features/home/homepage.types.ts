@@ -1,3 +1,14 @@
+/** CMS-editable homepage hero copy and CTAs. */
+export type HomepageHeroConfig = {
+  eyebrow: string;
+  heading: string;
+  description: string;
+  primaryCtaLabel: string;
+  primaryCtaUrl: string;
+  secondaryCtaLabel: string;
+  secondaryCtaUrl: string;
+};
+
 /** Serializable homepage category row — parent CMS categories only. */
 export type HomepageCategoryItem = {
   id: string;
@@ -36,6 +47,7 @@ export type HomepageBlogPostItem = {
 
 /** Aggregated CMS-backed homepage payload. */
 export type HomepageData = {
+  hero: HomepageHeroConfig;
   categories: HomepageCategoryItem[];
   latestProducts: HomepageProductItem[];
   blogPosts: HomepageBlogPostItem[];

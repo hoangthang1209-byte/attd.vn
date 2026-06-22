@@ -100,6 +100,7 @@ const NAV_GROUPS = [
       { href: "/admin/settings/company", label: "Thông tin công ty" },
       { href: "/admin/settings/trust", label: "Chỉ số tin cậy" },
       { href: "/admin/settings/branding", label: "Nhận diện thương hiệu" },
+      { href: "/admin/settings/homepage", label: "Nội dung trang chủ" },
       { href: "/admin/demo", label: "🎭 Dữ liệu demo" },
     ],
   },

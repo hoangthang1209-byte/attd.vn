@@ -17,6 +17,34 @@ export class HandoverValidationError extends Error {
   }
 }
 
+export class ShippedValidationError extends Error {
+  missingConditions: string[];
+  requiresExecutionFlow: boolean;
+
+  constructor(
+    missingConditions: string[],
+    options?: { message?: string; requiresExecutionFlow?: boolean },
+  ) {
+    super(
+      options?.message ??
+        "Vui lòng tạo và xác nhận chuyến giao hàng trước khi chuyển đơn sang Đã giao hàng.",
+    );
+    this.name = "ShippedValidationError";
+    this.missingConditions = missingConditions;
+    this.requiresExecutionFlow = options?.requiresExecutionFlow ?? false;
+  }
+}
+
+export class CompletionValidationError extends Error {
+  missingConditions: string[];
+
+  constructor(missingConditions: string[], message?: string) {
+    super(message ?? "Đơn hàng chưa đủ điều kiện hoàn tất.");
+    this.name = "CompletionValidationError";
+    this.missingConditions = missingConditions;
+  }
+}
+
 export function parseQuantityInput(value: unknown, fieldLabel: string): Decimal {
   if (value === null || value === undefined || value === "") {
     return new Decimal(0);

@@ -58,12 +58,12 @@ const SOURCING_STEPS = [
 ];
 
 export default async function HomePage() {
-  const { categories, latestProducts, blogPosts } =
+  const { hero, categories, latestProducts, blogPosts } =
     await getHomepageData();
 
   return (
     <main className="mp-home mp-home--v271">
-      <HomeHeroSection categories={categories} />
+      <HomeHeroSection hero={hero} categories={categories} />
 
       <HomeCategoryGridSection categories={categories} />
 

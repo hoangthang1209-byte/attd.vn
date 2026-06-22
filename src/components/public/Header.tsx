@@ -69,6 +69,7 @@ export default function Header({
   const [scrolled, setScrolled] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchToggleRef = useRef<HTMLButtonElement>(null);
   const categoryAccessRef = useRef<HTMLButtonElement>(null);
 
   const showMobileCategoryTrigger = categoryTree.length > 0;
@@ -117,6 +118,9 @@ export default function Header({
   const closeMobileSearch = useCallback(() => {
     setMobileSearchOpen(false);
     mobileSearchInputRef.current?.blur();
+    window.requestAnimationFrame(() => {
+      mobileSearchToggleRef.current?.focus();
+    });
   }, []);
 
   const closeMobileCategory = useCallback(() => {
@@ -229,8 +233,9 @@ export default function Header({
 
               <div className="mp-header-mobile-row__side mp-header-mobile-row__side--right">
                 <button
+                  ref={mobileSearchToggleRef}
                   type="button"
-                  aria-label="Tìm sản phẩm"
+                  aria-label="Mở tìm kiếm"
                   aria-expanded={mobileSearchOpen}
                   onClick={toggleMobileSearch}
                   className="mp-header-search-toggle"
@@ -252,25 +257,27 @@ export default function Header({
         </div>
 
         {mobileSearchOpen && (
-          <div className="mp-header-search-mobile container">
-            <div className="mp-header-search-mobile__row">
-              <div className="mp-header-search-mobile__field">
-                <MarketplaceSearchBar
-                  variant="mobile-header"
-                  placeholder={HEADER_SEARCH_PLACEHOLDER}
-                  autoFocus
-                  inputRef={mobileSearchInputRef}
-                  onSubmitNavigate={closeMobileSearch}
-                />
+          <div className="mp-header-mobile-search-panel">
+            <div className="container">
+              <div className="mp-header-search-mobile__row">
+                <div className="mp-header-search-mobile__field">
+                  <MarketplaceSearchBar
+                    variant="mobile-header"
+                    placeholder={HEADER_SEARCH_PLACEHOLDER}
+                    autoFocus
+                    inputRef={mobileSearchInputRef}
+                    onSubmitNavigate={closeMobileSearch}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="mp-header-search-close"
+                  aria-label="Đóng tìm kiếm"
+                  onClick={closeMobileSearch}
+                >
+                  <X size={20} aria-hidden />
+                </button>
               </div>
-              <button
-                type="button"
-                className="mp-header-search-close"
-                aria-label="Đóng tìm kiếm"
-                onClick={closeMobileSearch}
-              >
-                <X size={20} aria-hidden />
-              </button>
             </div>
           </div>
         )}

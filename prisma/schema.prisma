@@ -467,6 +467,7 @@ model MediaAsset {
   salesRepresentatives SalesRepresentative[]
   orderProductionFiles OrderProductionFile[]
   orderQcEvidence      OrderQcEvidence[]
+  orderDeliveryProofs  OrderDeliveryProof[]
 
   @@index([folder])
   @@index([filename])
@@ -538,6 +539,18 @@ model BrandingSettings {
   linkedinUrl       String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model HomepageSettings {
+  id                    String   @id @default("default")
+  heroEyebrow           String   @default("Nền tảng nguồn hàng B2B")
+  heroHeading           String   @default("Nguồn hàng đồng phục & quà tặng cho doanh nghiệp")
+  heroDescription       String   @default("Khám phá sản phẩm sẵn kho, đặt OEM theo yêu cầu và kết nối nguồn hàng phù hợp cho đơn vị của bạn.") @db.Text
+  heroPrimaryCtaLabel   String   @default("Khám phá nguồn hàng")
+  heroPrimaryCtaUrl     String   @default("#home-categories")
+  heroSecondaryCtaLabel String   @default("Liên hệ báo giá sỉ")
+  heroSecondaryCtaUrl   String   @default("/lien-he")
+  updatedAt             DateTime @updatedAt
 }
 
 model LandingPageContent {
@@ -1406,6 +1419,7 @@ model Order {
   productionStages      OrderProductionStage[]
   qcInspection          OrderQcInspection?
   qcEvidence            OrderQcEvidence[]
+  deliveryExecutions    OrderDeliveryExecution[]
 
   @@index([orderNo])
   @@index([quoteId])
@@ -1440,6 +1454,8 @@ model Employee {
   purchaseRequests PurchaseRequest[]
   assignedProductionStages OrderProductionStage[] @relation("ProductionStageAssignee")
   qcInspections OrderQcInspection[] @relation("QcInspector")
+  assignedDeliveryExecutions OrderDeliveryExecution[] @relation("DeliveryExecutionAssignee")
+  deliveryAttempts OrderDeliveryAttempt[] @relation("DeliveryAttemptBy")
 
   @@index([employeeCode])
   @@index([isActive])
@@ -1454,9 +1470,11 @@ model DeliveryMethod {
   isActive        Boolean  @default(true)
   sortOrder       Int      @default(0)
   requiresCarrier Boolean  @default(false)
+  requiresProofOfDelivery Boolean @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   orders          Order[]
+  deliveryExecutions OrderDeliveryExecution[]
 
   @@index([code])
   @@index([isActive])
@@ -1475,6 +1493,7 @@ model DeliveryCarrier {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   orders         Order[]
+  deliveryExecutions OrderDeliveryExecution[]
 
   @@index([carrierCode])
   @@index([isActive])
@@ -1516,6 +1535,7 @@ model OrderItem {
   variants           OrderItemVariant[]
   productionFiles    OrderProductionFile[]
   materialRequirements OrderItemMaterialRequirement[]
+  deliveryExecutionItems OrderDeliveryExecutionItem[]
 
   @@index([orderId])
   @@index([productId])
@@ -1538,6 +1558,7 @@ model OrderItemVariant {
   updatedAt         DateTime  @updatedAt
   orderItem         OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   color             Color?    @relation(fields: [colorId], references: [id], onDelete: SetNull)
+  deliveryExecutionItems OrderDeliveryExecutionItem[]
 
   @@index([orderItemId])
   @@index([colorId])
@@ -1948,5 +1969,148 @@ model OrderQcEvidence {
 
   @@index([orderId])
   @@index([qcInspectionId])
+  @@index([mediaAssetId])
+}
+
+enum DeliveryExecutionStatus {
+  DRAFT
+  READY_TO_DISPATCH
+  DISPATCHED
+  IN_TRANSIT
+  PARTIALLY_DELIVERED
+  DELIVERED
+  DELIVERY_FAILED
+  RETURNING
+  RETURNED
+  CANCELLED
+}
+
+enum DeliveryAttemptResult {
+  PENDING
+  DELIVERED
+  PARTIAL
+  FAILED
+  REFUSED
+  NO_RECIPIENT
+  WRONG_ADDRESS
+  DAMAGED
+  RETURNED
+}
+
+enum DeliveryProofType {
+  SIGNED_RECEIPT
+  DELIVERY_PHOTO
+  RECIPIENT_CONFIRMATION
+  DAMAGE_EVIDENCE
+  RETURN_DOCUMENT
+  OTHER
+}
+
+model OrderDeliveryExecution {
+  id                      String                  @id @default(cuid())
+  orderId                 String
+  executionCode           String                  @unique
+  status                  DeliveryExecutionStatus @default(DRAFT)
+  deliveryMethodId        String?
+  deliveryCarrierId       String?
+  carrierNameSnapshot     String?
+  trackingCode            String?
+  assignedEmployeeId      String?
+  recipientNameSnapshot   String?
+  recipientPhoneSnapshot  String?
+  recipientAddressSnapshot String?                @db.Text
+  expectedDeliveryAt      DateTime?
+  dispatchedAt            DateTime?
+  deliveredAt             DateTime?
+  totalDispatchedQuantity Decimal                 @default(0) @db.Decimal(12, 4)
+  totalDeliveredQuantity  Decimal                 @default(0) @db.Decimal(12, 4)
+  totalReturnedQuantity   Decimal                 @default(0) @db.Decimal(12, 4)
+  note                    String?                 @db.Text
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  order                   Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  deliveryMethod          DeliveryMethod?         @relation(fields: [deliveryMethodId], references: [id], onDelete: SetNull)
+  deliveryCarrier         DeliveryCarrier?        @relation(fields: [deliveryCarrierId], references: [id], onDelete: SetNull)
+  assignedEmployee        Employee?               @relation("DeliveryExecutionAssignee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  items                   OrderDeliveryExecutionItem[]
+  attempts                OrderDeliveryAttempt[]
+  proofs                  OrderDeliveryProof[]
+
+  @@index([orderId])
+  @@index([executionCode])
+  @@index([status])
+  @@index([deliveryCarrierId])
+  @@index([assignedEmployeeId])
+}
+
+model OrderDeliveryExecutionItem {
+  id                  String                 @id @default(cuid())
+  deliveryExecutionId String
+  orderItemId         String?
+  orderItemVariantId  String?
+  productNameSnapshot String
+  colorNameSnapshot   String?
+  sizeValueSnapshot   String?
+  skuSnapshot         String?
+  unitSnapshot        String?
+  plannedQuantity     Decimal                @db.Decimal(12, 4)
+  dispatchedQuantity  Decimal                @default(0) @db.Decimal(12, 4)
+  deliveredQuantity   Decimal                @default(0) @db.Decimal(12, 4)
+  returnedQuantity    Decimal                @default(0) @db.Decimal(12, 4)
+  damagedQuantity     Decimal                @default(0) @db.Decimal(12, 4)
+  note                String?                @db.Text
+  sortOrder           Int                    @default(0)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  deliveryExecution   OrderDeliveryExecution @relation(fields: [deliveryExecutionId], references: [id], onDelete: Cascade)
+  orderItem           OrderItem?             @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  orderItemVariant    OrderItemVariant?      @relation(fields: [orderItemVariantId], references: [id], onDelete: SetNull)
+
+  @@index([deliveryExecutionId])
+  @@index([orderItemId])
+  @@index([orderItemVariantId])
+}
+
+model OrderDeliveryAttempt {
+  id                    String                @id @default(cuid())
+  deliveryExecutionId   String
+  attemptNumber         Int
+  attemptedAt           DateTime?
+  attemptedByEmployeeId String?
+  result                DeliveryAttemptResult @default(PENDING)
+  recipientName         String?
+  recipientPhone        String?
+  note                  String?               @db.Text
+  failureReason         String?               @db.Text
+  nextAttemptAt         DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  deliveryExecution     OrderDeliveryExecution @relation(fields: [deliveryExecutionId], references: [id], onDelete: Cascade)
+  attemptedBy           Employee?             @relation("DeliveryAttemptBy", fields: [attemptedByEmployeeId], references: [id], onDelete: SetNull)
+  proofs                OrderDeliveryProof[]
+
+  @@unique([deliveryExecutionId, attemptNumber])
+  @@index([deliveryExecutionId])
+}
+
+model OrderDeliveryProof {
+  id                  String                 @id @default(cuid())
+  orderId             String
+  deliveryExecutionId String
+  deliveryAttemptId   String?
+  mediaAssetId        String
+  proofType           DeliveryProofType      @default(OTHER)
+  title               String?
+  note                String?                @db.Text
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  order               Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  deliveryExecution   OrderDeliveryExecution @relation(fields: [deliveryExecutionId], references: [id], onDelete: Cascade)
+  deliveryAttempt     OrderDeliveryAttempt?  @relation(fields: [deliveryAttemptId], references: [id], onDelete: SetNull)
+  mediaAsset          MediaAsset             @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([deliveryExecutionId])
+  @@index([deliveryAttemptId])
   @@index([mediaAssetId])
 }
