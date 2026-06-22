@@ -36,7 +36,15 @@ import {
   assertReadyToShipTransition,
   isLegacyOrderForHandover,
 } from "@/features/orders/handover-readiness.service";
-import { HandoverValidationError } from "@/features/orders/production-quantity";
+import {
+  assertCompletedTransition,
+  assertShippedTransition,
+} from "@/features/orders/delivery-fulfillment.service";
+import {
+  HandoverValidationError,
+  ShippedValidationError,
+  CompletionValidationError,
+} from "@/features/orders/production-quantity";
 import {
   canUpdateOrderStatus,
   formatOrderStatusCorrection,
@@ -388,6 +396,44 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
       deliveryCarrier: order.deliveryCarrier,
     });
     if (deliveryError) throw new OrderValidationError(deliveryError);
+  }
+
+  if (
+    input.status === "SHIPPED" &&
+    order.status === "READY_TO_SHIP"
+  ) {
+    try {
+      await assertShippedTransition(id, {
+        shippedExecutionAcknowledged: input.shippedExecutionAcknowledged,
+        shippedOverrideReason: input.shippedOverrideReason,
+      });
+    } catch (err) {
+      if (err instanceof ShippedValidationError) throw err;
+      if (err instanceof OrderValidationError) throw err;
+      if (err instanceof Error && err.message) {
+        throw new OrderValidationError(err.message);
+      }
+      throw err;
+    }
+  }
+
+  if (
+    input.status === "COMPLETED" &&
+    order.status === "SHIPPED"
+  ) {
+    try {
+      await assertCompletedTransition(id, {
+        completionReadinessAcknowledged: input.completionReadinessAcknowledged,
+        completionOverrideReason: input.completionOverrideReason,
+      });
+    } catch (err) {
+      if (err instanceof CompletionValidationError) throw err;
+      if (err instanceof OrderValidationError) throw err;
+      if (err instanceof Error && err.message) {
+        throw new OrderValidationError(err.message);
+      }
+      throw err;
+    }
   }
 
   if (input.status === "IN_PRODUCTION") {

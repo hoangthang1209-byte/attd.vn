@@ -41,6 +41,7 @@ export async function listPurchaseRequests(input?: {
     where.OR = [
       { requestCode: { contains: q, mode: "insensitive" } },
       { supplierName: { contains: q, mode: "insensitive" } },
+      { supplierNameSnapshot: { contains: q, mode: "insensitive" } },
     ];
   }
 
@@ -56,6 +57,7 @@ export async function listPurchaseRequests(input?: {
 
   return requests.map((req) => ({
     ...req,
+    supplierName: req.supplierNameSnapshot ?? req.supplierName,
     itemCount: req.items.length,
     totalRequestedQuantity: req.items
       .reduce((sum, item) => sum.add(toDecimal(item.requestedQuantity)), toDecimal(0))
@@ -65,10 +67,21 @@ export async function listPurchaseRequests(input?: {
 }
 
 export async function getPurchaseRequest(id: string) {
-  return prisma.purchaseRequest.findUnique({
+  const request = await prisma.purchaseRequest.findUnique({
     where: { id },
     include: {
       requestedByEmployee: { select: { id: true, fullName: true } },
+      supplier: {
+        select: {
+          id: true,
+          supplierCode: true,
+          name: true,
+          contactName: true,
+          phone: true,
+          email: true,
+          address: true,
+        },
+      },
       items: {
         orderBy: { sortOrder: "asc" },
         include: {
@@ -78,10 +91,29 @@ export async function getPurchaseRequest(id: string) {
       },
     },
   });
+
+  if (!request) return null;
+
+  const materialIds = request.items
+    .map((item) => item.materialId)
+    .filter((mid): mid is string => !!mid);
+  const { getPreferredSupplierLinksForMaterials } = await import(
+    "@/features/materials/material-supplier-link.service"
+  );
+  const preferredMap = await getPreferredSupplierLinksForMaterials(materialIds);
+
+  return {
+    ...request,
+    items: request.items.map((item) => ({
+      ...item,
+      preferredSupplier: item.materialId ? preferredMap.get(item.materialId) ?? null : null,
+    })),
+  };
 }
 
 export async function createPurchaseRequest(input: {
   supplierName?: string | null;
+  supplierId?: string | null;
   requestedByEmployeeId?: string | null;
   expectedArrivalAt?: string | null;
   note?: string | null;
@@ -93,12 +125,27 @@ export async function createPurchaseRequest(input: {
   }
 
   const requestCode = await generatePurchaseRequestCode();
+  let supplierId: string | null = input.supplierId ?? null;
+  let supplierNameSnapshot: string | null = null;
+  let supplierName: string | null = input.supplierName?.trim() || null;
+
+  if (supplierId) {
+    const { resolveMaterialSupplierSnapshot } = await import(
+      "@/features/materials/material-supplier.service"
+    );
+    const snapshot = await resolveMaterialSupplierSnapshot(supplierId);
+    supplierId = snapshot.supplierId;
+    supplierNameSnapshot = snapshot.supplierNameSnapshot;
+    supplierName = supplierNameSnapshot;
+  }
 
   return prisma.purchaseRequest.create({
     data: {
       requestCode,
       status: input.status ?? "DRAFT",
-      supplierName: input.supplierName?.trim() || null,
+      supplierName,
+      supplierId,
+      supplierNameSnapshot,
       requestedByEmployeeId: input.requestedByEmployeeId ?? null,
       expectedArrivalAt: input.expectedArrivalAt ? new Date(input.expectedArrivalAt) : null,
       note: input.note?.trim() || null,
@@ -148,7 +195,15 @@ export async function createPurchaseRequestFromOrderShortages(input: {
     sortOrder: index,
   }));
 
+  const { getPreferredSupplierIdForMaterials } = await import(
+    "@/features/materials/material-supplier.service"
+  );
+  const preferredSupplierId = await getPreferredSupplierIdForMaterials(
+    items.map((i) => i.materialId).filter((id): id is string => !!id),
+  );
+
   return createPurchaseRequest({
+    supplierId: preferredSupplierId,
     requestedByEmployeeId: input.requestedByEmployeeId,
     note: input.note ?? `Tạo từ đơn hàng — thiếu vật tư`,
     items,
@@ -159,6 +214,7 @@ export async function updatePurchaseRequest(
   id: string,
   input: {
     supplierName?: string | null;
+    supplierId?: string | null;
     expectedArrivalAt?: string | null;
     note?: string | null;
     items?: PurchaseRequestItemInput[];
@@ -197,12 +253,37 @@ export async function updatePurchaseRequest(
       });
     }
 
+    let supplierUpdate: {
+      supplierId?: string | null;
+      supplierNameSnapshot?: string | null;
+      supplierName?: string | null;
+    } = {};
+
+    if (input.supplierId !== undefined) {
+      if (input.supplierId) {
+        const { resolveMaterialSupplierSnapshot } = await import(
+          "@/features/materials/material-supplier.service"
+        );
+        const snapshot = await resolveMaterialSupplierSnapshot(input.supplierId);
+        supplierUpdate = {
+          supplierId: snapshot.supplierId,
+          supplierNameSnapshot: snapshot.supplierNameSnapshot,
+          supplierName: snapshot.supplierNameSnapshot,
+        };
+      } else {
+        supplierUpdate = {
+          supplierId: null,
+          supplierNameSnapshot: null,
+        };
+      }
+    } else if (input.supplierName !== undefined) {
+      supplierUpdate = { supplierName: input.supplierName?.trim() || null };
+    }
+
     return tx.purchaseRequest.update({
       where: { id },
       data: {
-        ...(input.supplierName !== undefined
-          ? { supplierName: input.supplierName?.trim() || null }
-          : {}),
+        ...supplierUpdate,
         ...(input.expectedArrivalAt !== undefined
           ? {
               expectedArrivalAt: input.expectedArrivalAt
@@ -221,6 +302,16 @@ export async function updatePurchaseRequest(
           },
         },
         requestedByEmployee: { select: { id: true, fullName: true } },
+        supplier: {
+          select: {
+            id: true,
+            supplierCode: true,
+            name: true,
+            contactName: true,
+            phone: true,
+            email: true,
+          },
+        },
       },
     });
   });

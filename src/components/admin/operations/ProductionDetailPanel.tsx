@@ -9,11 +9,11 @@ import ProductionOwnerSelect from "@/components/admin/orders/ProductionOwnerSele
 import ProductionSheetActions from "@/components/admin/orders/production-sheet/ProductionSheetActions";
 import { formatOrderDateTime } from "@/features/orders/order-format";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
+import { getProductionUrgency } from "@/features/orders/order-operations-helpers";
 import {
-  getProductionUrgency,
   productionUrgencyClass,
   productionUrgencyLabel,
-} from "@/features/orders/order-operations.service";
+} from "@/features/orders/order-operations-labels";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import { toDateInputValue } from "@/features/quotes/format";
 import { useAdminMutation } from "@/hooks/useAdminAction";

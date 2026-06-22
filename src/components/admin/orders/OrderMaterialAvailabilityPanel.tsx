@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { MaterialAvailabilityRow } from "@/features/materials/material-availability.service";
-import { useAdminMutation } from "@/hooks/useAdminAction";
+import { useAdminMutation, useAdminAction } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type MaterialOption = {
@@ -18,6 +19,8 @@ type Props = {
 };
 
 export default function OrderMaterialAvailabilityPanel({ orderId }: Props) {
+  const router = useRouter();
+  const { toast } = useAdminAction();
   const mutate = useAdminMutation();
   const [rows, setRows] = useState<MaterialAvailabilityRow[]>([]);
   const [materials, setMaterials] = useState<MaterialOption[]>([]);
@@ -88,12 +91,16 @@ export default function OrderMaterialAvailabilityPanel({ orderId }: Props) {
       action: async () => {
         const res = await fetch(`/api/orders/${orderId}/purchase-request`, { method: "POST" });
         return parseAdminJsonResponse(res, (body) => ({
-          requestId: (body.request as { id: string } | undefined)?.id ?? null,
+          requestId: (body.request as { id: string; supplierId?: string | null } | undefined)?.id ?? null,
+          supplierId: (body.request as { supplierId?: string | null } | undefined)?.supplierId ?? null,
         }));
       },
       onSuccess: (data) => {
         if (data.requestId) {
-          window.open(`/admin/purchase-requests/${data.requestId}`, "_blank");
+          if (!data.supplierId) {
+            toast.info("Chưa xác định nhà cung cấp chung.");
+          }
+          router.push(`/admin/purchase-requests/${data.requestId}`);
         }
         void load();
       },

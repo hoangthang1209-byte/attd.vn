@@ -1,3 +1,5 @@
+import "server-only";
+
 import PDFDocument from "pdfkit";
 import type { QuotePdfData } from "@/features/quotes/quote-document";
 import { registerQuotePdfFonts } from "@/features/quotes/pdf/quote-pdf-fonts";

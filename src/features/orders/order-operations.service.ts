@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { OrderStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { computeOrderFinancials } from "@/features/orders/order-finance";
@@ -19,6 +21,34 @@ import {
   OVERRIDE_TITLE,
   type ProductionExecutionIndicators,
 } from "@/features/orders/execution-board.service";
+import {
+  batchGetDeliveryExecutionIndicators,
+  matchesDeliveryExecutionFilter,
+  type DeliveryExecutionIndicators,
+} from "@/features/orders/delivery-execution-board.service";
+
+export {
+  deliveryReadinessClass,
+  deliveryReadinessLabel,
+  productionUrgencyClass,
+  productionUrgencyLabel,
+} from "@/features/orders/order-operations-labels";
+export {
+  getDeliveryReadiness,
+  getMissingDeliveryFields,
+  getProductionUrgency,
+  startOfDay,
+  endOfDay,
+  addDays,
+} from "@/features/orders/order-operations-helpers";
+import {
+  addDays,
+  endOfDay,
+  getDeliveryReadiness,
+  getMissingDeliveryFields,
+  getProductionUrgency,
+  startOfDay,
+} from "@/features/orders/order-operations-helpers";
 
 const PRODUCTION_BOARD_STATUSES: OrderStatus[] = [
   "CONFIRMED",
@@ -97,159 +127,6 @@ type OrderRowWithItems = Prisma.OrderGetPayload<{
     deliveryMethodRef: { select: { requiresCarrier: true } };
   };
 }>;
-
-function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function endOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-export function getProductionUrgency(
-  productionDueDate: Date | null | undefined,
-  now = new Date(),
-): ProductionUrgency {
-  if (!productionDueDate) return "NO_DUE_DATE";
-  const due = startOfDay(productionDueDate);
-  const today = startOfDay(now);
-  if (due < today) return "OVERDUE";
-  if (due.getTime() === today.getTime()) return "TODAY";
-  const inThreeDays = endOfDay(addDays(today, 3));
-  if (productionDueDate <= inThreeDays) return "UPCOMING";
-  return "ON_TRACK";
-}
-
-export function productionUrgencyLabel(urgency: ProductionUrgency): string {
-  switch (urgency) {
-    case "OVERDUE":
-      return "Quá hạn";
-    case "TODAY":
-      return "Đến hạn hôm nay";
-    case "UPCOMING":
-      return "Sắp đến hạn";
-    case "NO_DUE_DATE":
-      return "Chưa có hạn";
-    case "ON_TRACK":
-      return "Đúng tiến độ";
-  }
-}
-
-export function productionUrgencyClass(urgency: ProductionUrgency): string {
-  switch (urgency) {
-    case "OVERDUE":
-      return "ops-urgency--overdue";
-    case "TODAY":
-      return "ops-urgency--today";
-    case "UPCOMING":
-      return "ops-urgency--upcoming";
-    case "NO_DUE_DATE":
-      return "ops-urgency--muted";
-    case "ON_TRACK":
-      return "ops-urgency--ok";
-  }
-}
-
-type DeliveryInfoInput = {
-  status: OrderStatus;
-  deliveryRecipientName?: string | null;
-  deliveryRecipientPhone?: string | null;
-  deliveryAddress?: string | null;
-  deliveryMethodId?: string | null;
-  deliveryMethodName?: string | null;
-  deliveryMethod?: string | null;
-  deliveryMethodRequiresCarrier?: boolean;
-  deliveryCarrierId?: string | null;
-  deliveryCarrierName?: string | null;
-  deliveryCarrier?: string | null;
-  deliveryExpectedAt?: Date | null;
-  deliveredAt?: Date | null;
-};
-
-export function getMissingDeliveryFields(order: DeliveryInfoInput): string[] {
-  const missing: string[] = [];
-  if (!order.deliveryRecipientName?.trim()) missing.push("Người nhận");
-  if (!order.deliveryRecipientPhone?.trim()) missing.push("Số điện thoại");
-  if (!order.deliveryAddress?.trim()) missing.push("Địa chỉ giao hàng");
-  if (
-    !order.deliveryMethodId &&
-    !order.deliveryMethodName?.trim() &&
-    !order.deliveryMethod?.trim()
-  ) {
-    missing.push("Hình thức giao hàng");
-  }
-  if (order.deliveryMethodRequiresCarrier) {
-    const carrier =
-      order.deliveryCarrierId ||
-      order.deliveryCarrierName?.trim() ||
-      order.deliveryCarrier?.trim();
-    if (!carrier) missing.push("Đơn vị vận chuyển");
-  }
-  return missing;
-}
-
-export function getDeliveryReadiness(
-  order: DeliveryInfoInput,
-  now = new Date(),
-): DeliveryReadiness {
-  if (order.status === "COMPLETED") return "COMPLETED";
-  const missing = getMissingDeliveryFields(order);
-  if (order.status === "READY_TO_SHIP") {
-    return missing.length > 0 ? "MISSING_INFO" : "READY";
-  }
-  if (order.status === "SHIPPED") {
-    if (order.deliveredAt) return "COMPLETED";
-    if (
-      order.deliveryExpectedAt &&
-      order.deliveryExpectedAt < now &&
-      !order.deliveredAt
-    ) {
-      return "LATE";
-    }
-    return missing.length > 0 ? "MISSING_INFO" : "IN_TRANSIT";
-  }
-  return missing.length > 0 ? "MISSING_INFO" : "READY";
-}
-
-export function deliveryReadinessLabel(readiness: DeliveryReadiness): string {
-  switch (readiness) {
-    case "READY":
-      return "Sẵn sàng giao";
-    case "MISSING_INFO":
-      return "Thiếu thông tin";
-    case "LATE":
-      return "Giao trễ dự kiến";
-    case "IN_TRANSIT":
-      return "Đang giao";
-    case "COMPLETED":
-      return "Đã hoàn tất";
-  }
-}
-
-export function deliveryReadinessClass(readiness: DeliveryReadiness): string {
-  switch (readiness) {
-    case "READY":
-      return "ops-readiness--ready";
-    case "MISSING_INFO":
-      return "ops-readiness--missing";
-    case "LATE":
-      return "ops-readiness--late";
-    case "IN_TRANSIT":
-      return "ops-readiness--transit";
-    case "COMPLETED":
-      return "ops-readiness--completed";
-  }
-}
 
 function matchesProductionDueFilter(
   urgency: ProductionUrgency,
@@ -385,6 +262,7 @@ function mapDeliveryBoardOrder(
   now: Date,
   execution?: ProductionExecutionIndicators,
   executionHandoverOverride = false,
+  deliveryExecution?: DeliveryExecutionIndicators,
 ): DeliveryBoardOrder {
   const deliveryInfo = {
     status: row.status,
@@ -423,6 +301,17 @@ function mapDeliveryBoardOrder(
     executionHandoverLabel: execution?.handoverStateLabel ?? null,
     executionHandoverOverride,
     executionQcStatusLabel: execution?.qcStatusLabel ?? null,
+    deliveryExecutionProgress: deliveryExecution?.progressLabel ?? null,
+    deliveryLatestAttemptLabel: deliveryExecution?.latestAttemptResultLabel ?? null,
+    deliveryProofStatus: deliveryExecution
+      ? deliveryExecution.hasProof
+        ? "Đã có bằng chứng"
+        : deliveryExecution.executionCount > 0
+          ? "Thiếu bằng chứng"
+          : "—"
+      : null,
+    deliveryCompletionLabel: deliveryExecution?.completionStateLabel ?? null,
+    deliveryCanComplete: deliveryExecution?.canComplete ?? false,
   };
 }
 
@@ -577,6 +466,12 @@ function emptyDeliverySummary(): DeliveryBoardSummary {
     lateCount: 0,
     missingInfoCount: 0,
     completedTodayCount: 0,
+    awaitingDispatchCount: 0,
+    inTransitCount: 0,
+    partialDeliveryCount: 0,
+    deliveryFailedCount: 0,
+    fullyDeliveredCount: 0,
+    needsCompletionCount: 0,
   };
 }
 
@@ -596,6 +491,17 @@ function computeDeliverySummary(
       const d = new Date(o.deliveredAt);
       return d >= todayStart && d <= todayEnd;
     }).length,
+    awaitingDispatchCount: orders.filter((o) => o.deliveryCompletionLabel === "Chưa xuất hàng").length,
+    inTransitCount: orders.filter((o) => o.deliveryCompletionLabel === "Đang giao").length,
+    partialDeliveryCount: orders.filter((o) => o.deliveryCompletionLabel === "Giao một phần").length,
+    deliveryFailedCount: orders.filter((o) =>
+      o.deliveryLatestAttemptLabel === "Giao thất bại" ||
+      o.deliveryLatestAttemptLabel === "Khách từ chối nhận" ||
+      o.deliveryLatestAttemptLabel === "Không liên hệ được người nhận" ||
+      o.deliveryLatestAttemptLabel === "Sai / không tìm thấy địa chỉ",
+    ).length,
+    fullyDeliveredCount: orders.filter((o) => o.deliveryCompletionLabel === "Đã giao đủ").length,
+    needsCompletionCount: orders.filter((o) => o.deliveryCanComplete).length,
   };
 }
 
@@ -605,6 +511,8 @@ export async function getDeliveryBoardOrders(params?: {
   includeCompleted?: boolean;
   completedToday?: boolean;
   search?: string;
+  executionFilter?: string;
+  proofFilter?: string;
 }) {
   const now = new Date();
   const defaultStatuses = params?.includeCompleted
@@ -626,9 +534,10 @@ export async function getDeliveryBoardOrders(params?: {
 
   const rows = await prisma.order.findMany({ where, include: orderInclude });
   const orderIds = rows.map((r) => r.id);
-  const [executionMap, overrideMap] = await Promise.all([
+  const [executionMap, overrideMap, deliveryMap] = await Promise.all([
     batchGetProductionExecutionIndicators(rows.map((r) => ({ id: r.id, status: r.status }))),
     loadHandoverOverrideFlags(orderIds),
+    batchGetDeliveryExecutionIndicators(orderIds),
   ]);
 
   let orders = rows.map((row) =>
@@ -637,8 +546,20 @@ export async function getDeliveryBoardOrders(params?: {
       now,
       executionMap.get(row.id),
       overrideMap.get(row.id) ?? false,
+      deliveryMap.get(row.id),
     ),
   );
+
+  if (params?.executionFilter) {
+    orders = orders.filter((o) =>
+      matchesDeliveryExecutionFilter(deliveryMap.get(o.id), params.executionFilter),
+    );
+  }
+  if (params?.proofFilter) {
+    orders = orders.filter((o) =>
+      matchesDeliveryExecutionFilter(deliveryMap.get(o.id), params.proofFilter),
+    );
+  }
 
   if (params?.readiness) {
     orders = orders.filter((o) => o.deliveryReadiness === params.readiness);
@@ -660,7 +581,9 @@ export async function getDeliveryBoardOrders(params?: {
     return deliverySortRank(rowA, now) - deliverySortRank(rowB, now);
   });
 
-  const allMapped = rows.map((row) => mapDeliveryBoardOrder(row, now));
+  const allMapped = rows.map((row) =>
+    mapDeliveryBoardOrder(row, now, executionMap.get(row.id), overrideMap.get(row.id) ?? false, deliveryMap.get(row.id)),
+  );
   const summary = computeDeliverySummary(allMapped, now);
 
   return { orders, total: orders.length, summary };

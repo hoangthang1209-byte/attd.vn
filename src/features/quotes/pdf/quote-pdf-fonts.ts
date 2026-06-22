@@ -1,5 +1,7 @@
-import { existsSync } from "fs";
-import { join } from "path";
+import "server-only";
+
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 export type PdfFontNames = {
   regularName: string;
@@ -7,14 +9,19 @@ export type PdfFontNames = {
   usedDejaVu: boolean;
 };
 
+// Runtime-only font paths — resolved against cwd at execution, not traced at build.
+function fontPath(...segments: string[]): string {
+  return join(process.cwd(), ...segments);
+}
+
 const FONT_CANDIDATES = {
   regular: [
-    join(process.cwd(), "node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf"),
-    join(process.cwd(), "node_modules/dejavu-fonts-ttf/DejaVuSans.ttf"),
+    fontPath("node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf"),
+    fontPath("node_modules/dejavu-fonts-ttf/DejaVuSans.ttf"),
   ],
   bold: [
-    join(process.cwd(), "node_modules/dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf"),
-    join(process.cwd(), "node_modules/dejavu-fonts-ttf/DejaVuSans-Bold.ttf"),
+    fontPath("node_modules/dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf"),
+    fontPath("node_modules/dejavu-fonts-ttf/DejaVuSans-Bold.ttf"),
   ],
 };
 
@@ -35,7 +42,7 @@ function logFontStatus(usedDejaVu: boolean, regularPath: string | null): void {
   } else {
     console.warn(
       "[quote-pdf] DejaVu fonts not found — using Helvetica fallback (Vietnamese diacritics may be missing).",
-      { cwd: process.cwd(), regularPath },
+      { regularPath },
     );
   }
 }

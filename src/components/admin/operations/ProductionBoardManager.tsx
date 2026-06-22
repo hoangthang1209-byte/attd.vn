@@ -13,7 +13,7 @@ import { ORDER_STATUS_LABELS } from "@/features/orders/order-labels";
 import {
   productionUrgencyClass,
   productionUrgencyLabel,
-} from "@/features/orders/order-operations.service";
+} from "@/features/orders/order-operations-labels";
 import type {
   ProductionBoardOrder,
   ProductionBoardSummary,

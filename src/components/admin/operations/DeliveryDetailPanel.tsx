@@ -13,9 +13,11 @@ import { formatOrderDateTime } from "@/features/orders/order-format";
 import {
   deliveryReadinessClass,
   deliveryReadinessLabel,
+} from "@/features/orders/order-operations-labels";
+import {
   getDeliveryReadiness,
   getMissingDeliveryFields,
-} from "@/features/orders/order-operations.service";
+} from "@/features/orders/order-operations-helpers";
 import { validateDeliveryForShipped, orderCarrierDisplay } from "@/features/orders/order-status";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import { toDateInputValue } from "@/features/quotes/format";

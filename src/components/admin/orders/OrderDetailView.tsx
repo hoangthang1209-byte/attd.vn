@@ -39,8 +39,10 @@ import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import OrderDocumentActions from "@/components/admin/orders/OrderDocumentActions";
 import OrderProductionPackSection from "@/components/admin/orders/OrderProductionPackSection";
 import OrderProductionExecutionSection from "@/components/admin/orders/OrderProductionExecutionSection";
+import OrderDeliveryExecutionSection from "@/components/admin/orders/OrderDeliveryExecutionSection";
 import type { ProductionReadinessResult } from "@/features/orders/production-readiness.service";
 import type { HandoverReadinessResult } from "@/features/orders/handover-readiness.service";
+import type { CompletionReadinessResult } from "@/features/orders/delivery-fulfillment.service";
 
 type Props = { id: string };
 
@@ -130,6 +132,16 @@ export default function OrderDetailView({ id }: Props) {
   const [handoverAck, setHandoverAck] = useState(false);
   const [handoverReason, setHandoverReason] = useState("");
   const [partialDeliveryAck, setPartialDeliveryAck] = useState(false);
+  const [shippedOpen, setShippedOpen] = useState(false);
+  const [shippedMissing, setShippedMissing] = useState<string[]>([]);
+  const [shippedRequiresExecution, setShippedRequiresExecution] = useState(false);
+  const [shippedAck, setShippedAck] = useState(false);
+  const [shippedReason, setShippedReason] = useState("");
+  const [completionOpen, setCompletionOpen] = useState(false);
+  const [completionData, setCompletionData] = useState<CompletionReadinessResult | null>(null);
+  const [completionAck, setCompletionAck] = useState(false);
+  const [completionReason, setCompletionReason] = useState("");
+  const [deliveryRefreshKey, setDeliveryRefreshKey] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -190,6 +202,10 @@ export default function OrderDetailView({ id }: Props) {
       handoverReadinessAcknowledged?: boolean;
       handoverOverrideReason?: string;
       partialDeliveryAcknowledged?: boolean;
+      shippedExecutionAcknowledged?: boolean;
+      shippedOverrideReason?: string;
+      completionReadinessAcknowledged?: boolean;
+      completionOverrideReason?: string;
     },
   ) {
     setBusy(true);
@@ -208,6 +224,10 @@ export default function OrderDetailView({ id }: Props) {
             handoverReadinessAcknowledged: options?.handoverReadinessAcknowledged ?? false,
             handoverOverrideReason: options?.handoverOverrideReason ?? null,
             partialDeliveryAcknowledged: options?.partialDeliveryAcknowledged ?? false,
+            shippedExecutionAcknowledged: options?.shippedExecutionAcknowledged ?? false,
+            shippedOverrideReason: options?.shippedOverrideReason ?? null,
+            completionReadinessAcknowledged: options?.completionReadinessAcknowledged ?? false,
+            completionOverrideReason: options?.completionOverrideReason ?? null,
           }),
         });
         if (!res.ok) {
@@ -215,6 +235,7 @@ export default function OrderDetailView({ id }: Props) {
             message?: string;
             code?: string;
             missingConditions?: string[];
+            requiresExecutionFlow?: boolean;
           };
           if (body.code === "HANDOVER_NOT_READY") {
             setHandoverData({
@@ -241,6 +262,23 @@ export default function OrderDetailView({ id }: Props) {
             setHandoverOpen(true);
             return { ok: false as const, message: body.message };
           }
+          if (body.code === "SHIPPED_EXECUTION_REQUIRED") {
+            setShippedMissing(body.missingConditions ?? []);
+            setShippedRequiresExecution(body.requiresExecutionFlow === true);
+            setShippedAck(false);
+            setShippedReason("");
+            setShippedOpen(true);
+            return { ok: false as const, message: body.message };
+          }
+          if (body.code === "COMPLETION_NOT_READY") {
+            const readyRes = await fetch(`/api/orders/${id}/completion-readiness`);
+            const readyData = await readyRes.json() as { readiness?: CompletionReadinessResult };
+            setCompletionData(readyData.readiness ?? null);
+            setCompletionAck(false);
+            setCompletionReason("");
+            setCompletionOpen(true);
+            return { ok: false as const, message: body.message };
+          }
           return { ok: false as const, message: body.message ?? "Không thể cập nhật trạng thái" };
         }
         return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
@@ -260,6 +298,15 @@ export default function OrderDetailView({ id }: Props) {
         setHandoverReason("");
         setHandoverData(null);
         setPartialDeliveryAck(false);
+        setShippedOpen(false);
+        setShippedAck(false);
+        setShippedReason("");
+        setShippedMissing([]);
+        setCompletionOpen(false);
+        setCompletionAck(false);
+        setCompletionReason("");
+        setCompletionData(null);
+        setDeliveryRefreshKey((k) => k + 1);
       },
     });
     setBusy(false);
@@ -295,6 +342,44 @@ export default function OrderDetailView({ id }: Props) {
         setHandoverReason("");
         setPartialDeliveryAck(false);
         setHandoverOpen(true);
+      } catch {
+        await updateStatus(status);
+      }
+      return;
+    }
+    if (status === "SHIPPED") {
+      try {
+        const execRes = await fetch(`/api/orders/${id}/delivery-executions`);
+        const execData = await execRes.json() as { executions?: Array<{ status: string }> };
+        const hasReady = (execData.executions ?? []).some((e) =>
+          e.status === "DISPATCHED" || e.status === "IN_TRANSIT",
+        );
+        if (hasReady) {
+          await updateStatus(status);
+          return;
+        }
+        setShippedMissing(["Chưa có chuyến giao hàng đã xuất hoặc đang giao."]);
+        setShippedRequiresExecution(true);
+        setShippedAck(false);
+        setShippedReason("");
+        setShippedOpen(true);
+      } catch {
+        await updateStatus(status);
+      }
+      return;
+    }
+    if (status === "COMPLETED") {
+      try {
+        const res = await fetch(`/api/orders/${id}/completion-readiness`);
+        const data = await res.json() as { readiness?: CompletionReadinessResult };
+        if (data.readiness?.isReady) {
+          await updateStatus(status);
+          return;
+        }
+        setCompletionData(data.readiness ?? null);
+        setCompletionAck(false);
+        setCompletionReason("");
+        setCompletionOpen(true);
       } catch {
         await updateStatus(status);
       }
@@ -776,6 +861,13 @@ export default function OrderDetailView({ id }: Props) {
         )}
       </fieldset>
 
+      <OrderDeliveryExecutionSection
+        orderId={id}
+        order={order}
+        refreshKey={deliveryRefreshKey}
+        onRequestShip={() => setDeliveryRefreshKey((k) => k + 1)}
+      />
+
       <div className="quote-form__party-grid" style={{ marginTop: 16 }}>
         <fieldset className="quote-form__party-col admin-catalog-fieldset">
           <legend>Thông tin khách hàng</legend>
@@ -1204,6 +1296,91 @@ export default function OrderDetailView({ id }: Props) {
                 onClick={() => void updateStatus("IN_PRODUCTION", { productionReadinessAcknowledged: true })}
               >
                 Bắt đầu sản xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shippedOpen && (
+        <div className="quote-quick-contact-modal">
+          <div className="quote-quick-contact-modal__backdrop" onClick={() => setShippedOpen(false)} />
+          <div className="quote-quick-contact-modal__panel">
+            <h3 className="quote-quick-contact-modal__title">
+              {shippedRequiresExecution
+                ? "Tạo chuyến giao hàng trước khi chuyển sang Đã giao hàng"
+                : "Chưa đủ điều kiện chuyển sang Đã giao hàng"}
+            </h3>
+            <ul className="production-readiness-list">
+              {shippedMissing.map((label) => <li key={label}>{label}</li>)}
+            </ul>
+            {shippedRequiresExecution && (
+              <p className="admin-field-hint">
+                Vui lòng tạo và xác nhận chuyến giao hàng trong mục THỰC HIỆN GIAO HÀNG, hoặc dùng xác nhận ngoại lệ bên dưới.
+              </p>
+            )}
+            <label className="admin-field" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12 }}>
+              <input type="checkbox" checked={shippedAck} onChange={(e) => setShippedAck(e.target.checked)} />
+              <span>Tôi xác nhận chuyển trạng thái khi chưa có chuyến giao hàng.</span>
+            </label>
+            {shippedAck && (
+              <div className="admin-field" style={{ marginTop: 12 }}>
+                <label className="admin-label">Lý do xác nhận</label>
+                <textarea className="admin-textarea" rows={3} required value={shippedReason} onChange={(e) => setShippedReason(e.target.value)} />
+              </div>
+            )}
+            <div className="quote-quick-contact-modal__actions">
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setShippedOpen(false)}>Quay lại</button>
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary"
+                disabled={busy || !(shippedAck && shippedReason.trim())}
+                onClick={() =>
+                  void updateStatus("SHIPPED", {
+                    shippedExecutionAcknowledged: true,
+                    shippedOverrideReason: shippedReason,
+                  })
+                }
+              >
+                Chuyển sang Đã giao hàng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {completionOpen && (
+        <div className="quote-quick-contact-modal">
+          <div className="quote-quick-contact-modal__backdrop" onClick={() => setCompletionOpen(false)} />
+          <div className="quote-quick-contact-modal__panel">
+            <h3 className="quote-quick-contact-modal__title">Đơn hàng chưa đủ điều kiện hoàn tất</h3>
+            <ul className="production-readiness-list">
+              {(completionData?.missingConditions ?? []).map((label) => <li key={label}>{label}</li>)}
+            </ul>
+            <label className="admin-field" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12 }}>
+              <input type="checkbox" checked={completionAck} onChange={(e) => setCompletionAck(e.target.checked)} />
+              <span>Tôi xác nhận hoàn tất đơn khi việc giao hàng chưa được xử lý đầy đủ.</span>
+            </label>
+            {completionAck && (
+              <div className="admin-field" style={{ marginTop: 12 }}>
+                <label className="admin-label">Lý do xác nhận</label>
+                <textarea className="admin-textarea" rows={3} required value={completionReason} onChange={(e) => setCompletionReason(e.target.value)} />
+              </div>
+            )}
+            <div className="quote-quick-contact-modal__actions">
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setCompletionOpen(false)}>Quay lại</button>
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary"
+                disabled={busy || !(completionAck && completionReason.trim())}
+                onClick={() =>
+                  void updateStatus("COMPLETED", {
+                    completionReadinessAcknowledged: true,
+                    completionOverrideReason: completionReason,
+                  })
+                }
+              >
+                Hoàn tất đơn hàng
               </button>
             </div>
           </div>

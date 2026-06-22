@@ -1,5 +1,7 @@
+import "server-only";
+
 import puppeteer, { type Browser, type PDFOptions } from "puppeteer-core";
-import { resolveChromiumExecutablePath } from "@/features/quotes/pdf/quote-html-pdf.service";
+import { resolveChromiumExecutablePath } from "@/features/quotes/pdf/quote-chromium.server";
 import {
   buildOrderDocumentUrl,
   resolveOrderDocumentBaseUrl,

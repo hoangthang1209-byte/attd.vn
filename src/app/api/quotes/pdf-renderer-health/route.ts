@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runChromiumPdfHealthCheck } from "@/features/quotes/pdf/quote-html-pdf.service";
+import { runChromiumPdfHealthCheck } from "@/features/quotes/pdf/quote-chromium-health.server";
 import { getQuotePdfTraceId } from "@/features/quotes/pdf/quote-pdf-chromium-error";
 
 export const runtime = "nodejs";

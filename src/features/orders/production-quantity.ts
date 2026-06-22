@@ -1,5 +1,7 @@
 import { Decimal } from "@prisma/client/runtime/library";
 
+export { formatQuantityDisplay } from "@/features/orders/production-quantity-display";
+
 export class ProductionExecutionValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -62,12 +64,6 @@ export function parseQuantityInput(value: unknown, fieldLabel: string): Decimal 
 export function decimalToNumber(value: Decimal | null | undefined): number {
   if (!value) return 0;
   return value.toNumber();
-}
-
-export function formatQuantityDisplay(value: Decimal | number | null | undefined): string {
-  const n = value instanceof Decimal ? value.toNumber() : Number(value ?? 0);
-  if (!Number.isFinite(n)) return "0";
-  return n.toLocaleString("vi-VN", { maximumFractionDigits: 4 });
 }
 
 export function validateStageQuantities(input: {

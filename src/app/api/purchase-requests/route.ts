@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
   try {
     const request = await createPurchaseRequest({
       supplierName: typeof raw.supplierName === "string" ? raw.supplierName : null,
+      supplierId: typeof raw.supplierId === "string" ? raw.supplierId : null,
       requestedByEmployeeId:
         typeof raw.requestedByEmployeeId === "string" ? raw.requestedByEmployeeId : null,
       expectedArrivalAt: typeof raw.expectedArrivalAt === "string" ? raw.expectedArrivalAt : null,

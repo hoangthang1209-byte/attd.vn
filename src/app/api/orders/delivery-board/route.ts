@@ -34,6 +34,8 @@ export async function GET(req: NextRequest) {
         searchParams.get("completedToday") === "1",
       completedToday: searchParams.get("completedToday") === "1",
       search: searchParams.get("search") ?? undefined,
+      executionFilter: searchParams.get("execution") ?? undefined,
+      proofFilter: searchParams.get("proof") ?? undefined,
     });
     return NextResponse.json(result);
   } catch (err) {

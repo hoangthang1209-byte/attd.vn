@@ -151,6 +151,10 @@ export function parseUpdateOrderStatusBody(raw: Record<string, unknown>): Update
     handoverReadinessAcknowledged: raw.handoverReadinessAcknowledged === true,
     handoverOverrideReason: parseOptionalString(raw.handoverOverrideReason),
     partialDeliveryAcknowledged: raw.partialDeliveryAcknowledged === true,
+    shippedExecutionAcknowledged: raw.shippedExecutionAcknowledged === true,
+    shippedOverrideReason: parseOptionalString(raw.shippedOverrideReason),
+    completionReadinessAcknowledged: raw.completionReadinessAcknowledged === true,
+    completionOverrideReason: parseOptionalString(raw.completionOverrideReason),
   };
 }
 

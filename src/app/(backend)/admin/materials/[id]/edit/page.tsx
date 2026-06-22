@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import MaterialForm from "@/components/admin/materials/MaterialForm";
@@ -13,19 +14,21 @@ export default async function AdminMaterialEditPage({ params }: Props) {
   return (
     <>
       <AdminPageTitle title={`Sửa vật tư · ${material.materialCode}`} />
-      <MaterialForm
-        materialId={material.id}
-        initial={{
-          name: material.name,
-          materialType: material.materialType,
-          unit: material.unit,
-          description: material.description,
-          specification: material.specification,
-          defaultSupplierName: material.defaultSupplierName,
-          reorderPoint: material.reorderPoint?.toFixed() ?? null,
-          isActive: material.isActive,
-        }}
-      />
+      <Suspense fallback={<p className="admin-field-hint">Đang tải…</p>}>
+        <MaterialForm
+          materialId={material.id}
+          initial={{
+            name: material.name,
+            materialType: material.materialType,
+            unit: material.unit,
+            description: material.description,
+            specification: material.specification,
+            defaultSupplierName: material.defaultSupplierName,
+            reorderPoint: material.reorderPoint?.toFixed() ?? null,
+            isActive: material.isActive,
+          }}
+        />
+      </Suspense>
     </>
   );
 }

@@ -8,10 +8,11 @@ import {
 } from "@/features/orders/delivery-execution-labels";
 import { getQcInspection } from "@/features/orders/qc-inspection.service";
 import {
-  decimalToNumber,
   formatQuantityDisplay,
   ProductionExecutionValidationError,
   serializeDecimal,
+  ShippedValidationError,
+  CompletionValidationError,
 } from "@/features/orders/production-quantity";
 
 const ACTIVE_EXECUTION_STATUSES: DeliveryExecutionStatus[] = [
@@ -301,18 +302,18 @@ export async function evaluateCompletionReadiness(orderId: string): Promise<Comp
   const inProgressExecutionCodes: string[] = [];
   const executionsMissingProof: string[] = [];
 
-  const remainingUndelivered = decimalToNumber(fulfillment.remainingUndeliveredQuantity);
+  const remainingUndelivered = Number(fulfillment.remainingUndeliveredQuantity);
   if (remainingUndelivered > 0) {
     missingConditions.push(`Còn ${formatQuantityDisplay(remainingUndelivered)} sản phẩm chưa giao thành công.`);
   }
 
-  const remainingDispatchable = decimalToNumber(fulfillment.remainingDispatchableQuantity);
+  const remainingDispatchable = Number(fulfillment.remainingDispatchableQuantity);
   if (remainingDispatchable > 0) {
     missingConditions.push(`Còn ${formatQuantityDisplay(remainingDispatchable)} sản phẩm chưa xuất hàng.`);
   }
 
-  const returned = decimalToNumber(fulfillment.totalReturnedQuantity);
-  const damaged = decimalToNumber(fulfillment.totalDamagedQuantity);
+  const returned = Number(fulfillment.totalReturnedQuantity);
+  const damaged = Number(fulfillment.totalDamagedQuantity);
   if (returned > 0) {
     missingConditions.push(`Có ${formatQuantityDisplay(returned)} sản phẩm hoàn hàng chưa được xử lý.`);
   }
@@ -348,11 +349,11 @@ export async function evaluateCompletionReadiness(orderId: string): Promise<Comp
   let state: DeliveryCompletionState;
   if (missingConditions.length === 0) {
     state = "CAN_COMPLETE";
-  } else if (decimalToNumber(fulfillment.totalDispatchedQuantity) === 0) {
+  } else if (Number(fulfillment.totalDispatchedQuantity) === 0) {
     state = "NOT_DISPATCHED";
   } else if (inProgressExecutionCodes.length > 0) {
     state = "IN_DELIVERY";
-  } else if (remainingUndelivered > 0 && decimalToNumber(fulfillment.totalDeliveredQuantity) > 0) {
+  } else if (remainingUndelivered > 0 && Number(fulfillment.totalDeliveredQuantity) > 0) {
     state = "PARTIAL";
   } else if (returned > 0 || damaged > 0) {
     state = "HAS_RETURN_OR_DAMAGE";
@@ -404,7 +405,6 @@ export async function assertShippedTransition(
   if (executions.length > 0) return;
 
   if (!input.shippedExecutionAcknowledged) {
-    const { ShippedValidationError } = await import("@/features/orders/production-quantity");
     throw new ShippedValidationError(
       ["Chưa có chuyến giao hàng đã xuất hoặc đang giao."],
       { requiresExecutionFlow: true },
@@ -440,7 +440,6 @@ export async function assertCompletedTransition(
   if (readiness.isReady) return readiness;
 
   if (!input.completionReadinessAcknowledged) {
-    const { CompletionValidationError } = await import("@/features/orders/production-quantity");
     throw new CompletionValidationError(readiness.missingConditions);
   }
 

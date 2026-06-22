@@ -95,6 +95,11 @@ export type DeliveryBoardOrder = {
   executionHandoverLabel: string | null;
   executionHandoverOverride: boolean;
   executionQcStatusLabel: string | null;
+  deliveryExecutionProgress: string | null;
+  deliveryLatestAttemptLabel: string | null;
+  deliveryProofStatus: string | null;
+  deliveryCompletionLabel: string | null;
+  deliveryCanComplete: boolean;
 };
 
 export type DeliveryBoardSummary = {
@@ -103,6 +108,12 @@ export type DeliveryBoardSummary = {
   lateCount: number;
   missingInfoCount: number;
   completedTodayCount: number;
+  awaitingDispatchCount: number;
+  inTransitCount: number;
+  partialDeliveryCount: number;
+  deliveryFailedCount: number;
+  fullyDeliveredCount: number;
+  needsCompletionCount: number;
 };
 
 export type OrderOperationalSummary = {

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { NextResponse } from "next/server";
 import type { QuotePdfData } from "@/features/quotes/quote-document";
 import {

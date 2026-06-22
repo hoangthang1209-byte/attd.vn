@@ -33,6 +33,12 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   try {
     const request = await updatePurchaseRequest(id, {
       supplierName: typeof raw.supplierName === "string" ? raw.supplierName : undefined,
+      supplierId:
+        raw.supplierId === null
+          ? null
+          : typeof raw.supplierId === "string"
+            ? raw.supplierId
+            : undefined,
       expectedArrivalAt:
         typeof raw.expectedArrivalAt === "string" ? raw.expectedArrivalAt : undefined,
       note: typeof raw.note === "string" ? raw.note : undefined,

@@ -15,6 +15,7 @@ export type DeliveryMethodRecord = {
   isActive: boolean;
   sortOrder: number;
   requiresCarrier: boolean;
+  requiresProofOfDelivery: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -36,6 +37,7 @@ function mapRow(row: {
   isActive: boolean;
   sortOrder: number;
   requiresCarrier: boolean;
+  requiresProofOfDelivery: boolean;
   createdAt: Date;
   updatedAt: Date;
 }): DeliveryMethodRecord {
@@ -47,6 +49,7 @@ function mapRow(row: {
     isActive: row.isActive,
     sortOrder: row.sortOrder,
     requiresCarrier: row.requiresCarrier,
+    requiresProofOfDelivery: row.requiresProofOfDelivery,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -147,10 +150,10 @@ export async function resolveDeliveryMethodSnapshot(
 }
 
 export const DEFAULT_DELIVERY_METHODS = [
-  { name: "Giao nội bộ", sortOrder: 1, requiresCarrier: false },
-  { name: "Giao qua đơn vị vận chuyển", sortOrder: 2, requiresCarrier: true },
-  { name: "Khách tự nhận", sortOrder: 3, requiresCarrier: false },
-  { name: "Giao xe tải / chành xe", sortOrder: 4, requiresCarrier: false },
+  { name: "Giao nội bộ", sortOrder: 1, requiresCarrier: false, requiresProofOfDelivery: false },
+  { name: "Giao qua đơn vị vận chuyển", sortOrder: 2, requiresCarrier: true, requiresProofOfDelivery: true },
+  { name: "Khách tự nhận", sortOrder: 3, requiresCarrier: false, requiresProofOfDelivery: false },
+  { name: "Giao xe tải / chành xe", sortOrder: 4, requiresCarrier: false, requiresProofOfDelivery: true },
 ] as const;
 
 export async function seedDefaultDeliveryMethodsIfEmpty(): Promise<{ created: number; skipped: boolean }> {
@@ -166,6 +169,7 @@ export async function seedDefaultDeliveryMethodsIfEmpty(): Promise<{ created: nu
         name: item.name,
         sortOrder: item.sortOrder,
         requiresCarrier: item.requiresCarrier,
+        requiresProofOfDelivery: item.requiresProofOfDelivery,
         isActive: true,
       },
     });

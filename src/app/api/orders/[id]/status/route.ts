@@ -4,7 +4,7 @@ import {
   OrderValidationError,
   updateOrderStatus,
 } from "@/features/orders/order.service";
-import { HandoverValidationError } from "@/features/orders/production-quantity";
+import { HandoverValidationError, ShippedValidationError, CompletionValidationError } from "@/features/orders/production-quantity";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -29,6 +29,27 @@ export async function POST(req: NextRequest, context: RouteContext) {
         {
           message: err.message,
           code: "HANDOVER_NOT_READY",
+          missingConditions: err.missingConditions,
+        },
+        { status: 400 },
+      );
+    }
+    if (err instanceof ShippedValidationError) {
+      return NextResponse.json(
+        {
+          message: err.message,
+          code: "SHIPPED_EXECUTION_REQUIRED",
+          missingConditions: err.missingConditions,
+          requiresExecutionFlow: err.requiresExecutionFlow,
+        },
+        { status: 400 },
+      );
+    }
+    if (err instanceof CompletionValidationError) {
+      return NextResponse.json(
+        {
+          message: err.message,
+          code: "COMPLETION_NOT_READY",
           missingConditions: err.missingConditions,
         },
         { status: 400 },

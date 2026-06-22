@@ -14170,3 +14170,51 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   }
 }
 
+.delivery-note-doc {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  font-size: 14px;
+  color: #111827;
+}
+
+.delivery-note-doc--pdf {
+  padding: 0;
+}
+
+.delivery-note-doc__header h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  text-align: center;
+}
+
+.delivery-note-doc__meta {
+  margin: 16px 0;
+  line-height: 1.5;
+}
+
+.delivery-note-doc__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.delivery-note-doc__table th,
+.delivery-note-doc__table td {
+  border: 1px solid #d1d5db;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.delivery-note-doc__signatures {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 48px;
+}
+
+.delivery-note-doc__sign-line {
+  margin-top: 48px;
+  border-top: 1px solid #9ca3af;
+}
+

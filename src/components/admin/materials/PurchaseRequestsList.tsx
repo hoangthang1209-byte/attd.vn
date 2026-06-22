@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PURCHASE_REQUEST_STATUS_LABELS } from "@/features/materials/material-labels";
 import type { PurchaseRequestStatus } from "@prisma/client";
+import { withFromListParams } from "@/lib/admin/list-return";
 
 type RequestRow = {
   id: string;
@@ -19,6 +21,7 @@ type RequestRow = {
 };
 
 export default function PurchaseRequestsList() {
+  const searchParams = useSearchParams();
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,10 +37,12 @@ export default function PurchaseRequestsList() {
     void load();
   }, [load]);
 
+  const newHref = withFromListParams("/admin/purchase-requests/new", searchParams);
+
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <Link href="/admin/purchase-requests/new" className="admin-btn admin-btn--primary">
+        <Link href={newHref} className="admin-btn admin-btn--primary">
           Tạo yêu cầu mua hàng
         </Link>
       </div>
@@ -71,7 +76,10 @@ export default function PurchaseRequestsList() {
                   <td>{r.requestedAt ? r.requestedAt.slice(0, 10) : "—"}</td>
                   <td>{r.expectedArrivalAt ? r.expectedArrivalAt.slice(0, 10) : "—"}</td>
                   <td>
-                    <Link href={`/admin/purchase-requests/${r.id}`} className="admin-btn admin-btn--secondary admin-btn--xs">
+                    <Link
+                      href={withFromListParams(`/admin/purchase-requests/${r.id}`, searchParams)}
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                    >
                       Xem
                     </Link>
                   </td>

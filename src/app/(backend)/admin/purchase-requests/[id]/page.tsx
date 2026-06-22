@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import PurchaseRequestDetail from "@/components/admin/materials/PurchaseRequestDetail";
 
@@ -8,7 +9,9 @@ export default async function AdminPurchaseRequestDetailPage({ params }: Props) 
   return (
     <>
       <AdminPageTitle title="Chi tiết yêu cầu mua hàng" />
-      <PurchaseRequestDetail requestId={id} />
+      <Suspense fallback={<p className="admin-field-hint">Đang tải…</p>}>
+        <PurchaseRequestDetail requestId={id} />
+      </Suspense>
     </>
   );
 }

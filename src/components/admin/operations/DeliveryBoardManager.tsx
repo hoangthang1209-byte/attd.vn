@@ -11,7 +11,7 @@ import { ORDER_STATUS_LABELS } from "@/features/orders/order-labels";
 import {
   deliveryReadinessClass,
   deliveryReadinessLabel,
-} from "@/features/orders/order-operations.service";
+} from "@/features/orders/order-operations-labels";
 import type {
   DeliveryBoardOrder,
   DeliveryBoardSummary,
@@ -51,6 +51,8 @@ export default function DeliveryBoardManager() {
   const filters = useMemo(() => ({
     status: (searchParams.get("status") as OrderStatus | null) ?? "",
     readiness: (searchParams.get("readiness") as DeliveryReadiness | null) ?? "",
+    execution: searchParams.get("execution") ?? "",
+    proof: searchParams.get("proof") ?? "",
     completedToday: searchParams.get("completedToday") === "1",
     includeCompleted: searchParams.get("includeCompleted") === "1",
     search: searchParams.get("search") ?? "",
@@ -75,6 +77,10 @@ export default function DeliveryBoardManager() {
     else params.delete("completedToday");
     if (merged.includeCompleted) params.set("includeCompleted", "1");
     else params.delete("includeCompleted");
+    if (merged.execution) params.set("execution", merged.execution);
+    else params.delete("execution");
+    if (merged.proof) params.set("proof", merged.proof);
+    else params.delete("proof");
     router.replace(`/admin/delivery?${params.toString()}`);
   }, [filters, router, searchParams]);
 
@@ -90,6 +96,8 @@ export default function DeliveryBoardManager() {
       if (filters.completedToday) params.set("completedToday", "1");
       if (filters.includeCompleted) params.set("includeCompleted", "1");
       if (filters.search.trim()) params.set("search", filters.search.trim());
+      if (filters.execution) params.set("execution", filters.execution);
+      if (filters.proof) params.set("proof", filters.proof);
 
       const res = await fetch(`/api/orders/delivery-board?${params}`);
       const data = await res.json() as {
@@ -129,11 +137,15 @@ export default function DeliveryBoardManager() {
   }
 
   const summaryCards = summary ? [
-    { label: "Sẵn sàng giao", value: summary.readyToShipCount, filter: { status: "READY_TO_SHIP" as const, readiness: "" } },
-    { label: "Đã bàn giao vận chuyển", value: summary.shippedCount, filter: { status: "SHIPPED" as const, readiness: "" } },
-    { label: "Giao trễ dự kiến", value: summary.lateCount, filter: { readiness: "LATE" as const, status: "" }, danger: true },
-    { label: "Thiếu thông tin giao hàng", value: summary.missingInfoCount, filter: { readiness: "MISSING_INFO" as const, status: "" }, warning: true },
-    { label: "Hoàn tất hôm nay", value: summary.completedTodayCount, filter: { completedToday: true, status: "", readiness: "" } },
+    { label: "Sẵn sàng giao", value: summary.readyToShipCount, filter: { status: "READY_TO_SHIP" as const, readiness: "", execution: "", proof: "" } },
+    { label: "Chờ xuất hàng", value: summary.awaitingDispatchCount, filter: { execution: "awaiting_dispatch", status: "", readiness: "", proof: "" } },
+    { label: "Đang giao", value: summary.inTransitCount, filter: { execution: "in_transit", status: "", readiness: "", proof: "" } },
+    { label: "Giao một phần", value: summary.partialDeliveryCount, filter: { execution: "partial", status: "", readiness: "", proof: "" } },
+    { label: "Giao thất bại", value: summary.deliveryFailedCount, filter: { execution: "failed", status: "", readiness: "", proof: "" }, danger: true },
+    { label: "Đã giao đủ", value: summary.fullyDeliveredCount, filter: { execution: "fully_delivered", status: "", readiness: "", proof: "" } },
+    { label: "Cần hoàn tất đơn", value: summary.needsCompletionCount, filter: { execution: "needs_completion", status: "", readiness: "", proof: "" }, warning: true },
+    { label: "Giao trễ dự kiến", value: summary.lateCount, filter: { readiness: "LATE" as const, status: "", execution: "", proof: "" }, danger: true },
+    { label: "Thiếu thông tin giao hàng", value: summary.missingInfoCount, filter: { readiness: "MISSING_INFO" as const, status: "", execution: "", proof: "" }, warning: true },
   ] : [];
 
   return (
@@ -196,6 +208,28 @@ export default function DeliveryBoardManager() {
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
+        <select
+          className="admin-input"
+          value={filters.execution}
+          onChange={(e) => applyFilters({ execution: e.target.value })}
+        >
+          <option value="">Tiến độ chuyến giao</option>
+          <option value="awaiting_dispatch">Chờ xuất hàng</option>
+          <option value="in_transit">Đang giao</option>
+          <option value="partial">Giao một phần</option>
+          <option value="failed">Giao thất bại</option>
+          <option value="fully_delivered">Đã giao đủ</option>
+          <option value="needs_completion">Cần hoàn tất đơn</option>
+        </select>
+        <select
+          className="admin-input"
+          value={filters.proof}
+          onChange={(e) => applyFilters({ proof: e.target.value })}
+        >
+          <option value="">Bằng chứng giao hàng</option>
+          <option value="has_proof">Đã có bằng chứng</option>
+          <option value="missing_proof">Thiếu bằng chứng</option>
+        </select>
         <label className="admin-checkbox-label">
           <input
             type="checkbox"
@@ -205,7 +239,7 @@ export default function DeliveryBoardManager() {
           Bao gồm đơn hoàn tất
         </label>
         <button type="submit" className="admin-btn">Tìm kiếm</button>
-        {(filters.status || filters.readiness || filters.search || filters.includeCompleted || filters.completedToday) && (
+        {(filters.status || filters.readiness || filters.search || filters.includeCompleted || filters.completedToday || filters.execution || filters.proof) && (
           <button
             type="button"
             className="admin-btn admin-btn--secondary"
@@ -239,6 +273,9 @@ export default function DeliveryBoardManager() {
                 <th>Đơn vị vận chuyển</th>
                 <th>Mã vận đơn</th>
                 <th>Dự kiến giao</th>
+                <th>Tiến độ giao</th>
+                <th>Kết quả gần nhất</th>
+                <th>Bằng chứng</th>
                 <th>Trạng thái</th>
                 <th>Thao tác</th>
               </tr>
@@ -262,6 +299,9 @@ export default function DeliveryBoardManager() {
                   <td>
                     {order.deliveryExpectedAt ? formatOrderDate(order.deliveryExpectedAt) : "—"}
                   </td>
+                  <td>{order.deliveryExecutionProgress ?? "—"}</td>
+                  <td>{order.deliveryLatestAttemptLabel ?? "—"}</td>
+                  <td>{order.deliveryProofStatus ?? "—"}</td>
                   <td>
                     <div className="admin-ops-status-cell">
                       <OrderStatusBadge status={order.status} />

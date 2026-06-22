@@ -60,6 +60,7 @@ const NAV_GROUPS = [
     label: "Nguyên phụ liệu",
     items: [
       { href: "/admin/materials", label: "Vật tư" },
+      { href: "/admin/material-suppliers", label: "Nhà cung cấp NPL" },
       { href: "/admin/materials/warehouse", label: "Tồn kho vật tư" },
       { href: "/admin/purchase-requests", label: "Yêu cầu mua hàng" },
     ],

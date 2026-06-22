@@ -82,8 +82,8 @@ export default function MaterialsWarehouseManager() {
       onSuccess: async () => {
         setQuantity("");
         setNote("");
+        setPanelMaterialId(null);
         await load();
-        await openHistory(panelMaterialId);
       },
     });
   }
@@ -106,7 +106,7 @@ export default function MaterialsWarehouseManager() {
                 <th>Tồn thực tế</th>
                 <th>Đã giữ</th>
                 <th>Khả dụng</th>
-                <th>Điểm mua</th>
+                <th>Mức tồn tối thiểu</th>
                 <th>Trạng thái</th>
                 <th />
               </tr>

@@ -182,6 +182,10 @@ export type UpdateOrderStatusInput = {
   handoverReadinessAcknowledged?: boolean;
   handoverOverrideReason?: string | null;
   partialDeliveryAcknowledged?: boolean;
+  shippedExecutionAcknowledged?: boolean;
+  shippedOverrideReason?: string | null;
+  completionReadinessAcknowledged?: boolean;
+  completionOverrideReason?: string | null;
 };
 
 export type OrderItemVariantInputPayload = {

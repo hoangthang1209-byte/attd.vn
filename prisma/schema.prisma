@@ -1420,6 +1420,7 @@ model Order {
   qcInspection          OrderQcInspection?
   qcEvidence            OrderQcEvidence[]
   deliveryExecutions    OrderDeliveryExecution[]
+  deliveryProofs        OrderDeliveryProof[]
 
   @@index([orderNo])
   @@index([quoteId])
@@ -1766,6 +1767,7 @@ model Material {
   orderItemRequirements OrderItemMaterialRequirement[]
   allocations         OrderMaterialAllocation[]
   purchaseRequestItems PurchaseRequestItem[]
+  supplierLinks        MaterialSupplierLink[]
 
   @@index([materialCode])
   @@index([isActive])
@@ -1834,16 +1836,20 @@ model PurchaseRequest {
   status                PurchaseRequestStatus @default(DRAFT)
   requestedByEmployeeId String?
   supplierName          String?
+  supplierId            String?
+  supplierNameSnapshot  String?
   requestedAt           DateTime?
   expectedArrivalAt     DateTime?
   note                  String?               @db.Text
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
   requestedByEmployee   Employee?             @relation(fields: [requestedByEmployeeId], references: [id], onDelete: SetNull)
+  supplier              MaterialSupplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   items                 PurchaseRequestItem[]
 
   @@index([requestCode])
   @@index([status])
+  @@index([supplierId])
 }
 
 model PurchaseRequestItem {
@@ -1868,6 +1874,46 @@ model PurchaseRequestItem {
   @@index([purchaseRequestId])
   @@index([materialId])
   @@index([linkedOrderId])
+}
+
+model MaterialSupplier {
+  id               String                 @id @default(cuid())
+  supplierCode     String                 @unique
+  name             String
+  shortName        String?
+  contactName      String?
+  phone            String?
+  email            String?
+  address          String?                @db.Text
+  taxCode          String?
+  note             String?                @db.Text
+  isActive         Boolean                @default(true)
+  sortOrder        Int                    @default(0)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  materialLinks    MaterialSupplierLink[]
+  purchaseRequests PurchaseRequest[]
+
+  @@index([supplierCode])
+  @@index([isActive])
+}
+
+model MaterialSupplierLink {
+  id                   String           @id @default(cuid())
+  materialId           String
+  supplierId           String
+  supplierMaterialCode String?
+  supplierMaterialName String?
+  isPreferred          Boolean          @default(false)
+  note                 String?          @db.Text
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  material             Material         @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  supplier             MaterialSupplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@unique([materialId, supplierId])
+  @@index([materialId])
+  @@index([supplierId])
 }
 
 enum ProductionStageType {

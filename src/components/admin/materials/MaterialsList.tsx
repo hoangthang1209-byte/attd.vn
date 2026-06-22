@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { MaterialType } from "@prisma/client";
 import { MATERIAL_TYPE_LABELS } from "@/features/materials/material-labels";
 import { WAREHOUSE_STATUS_LABELS } from "@/features/materials/material-labels";
+import { withFromListParams } from "@/lib/admin/list-return";
 
 type MaterialRow = {
   id: string;
@@ -21,6 +23,7 @@ type MaterialRow = {
 };
 
 export default function MaterialsList() {
+  const searchParams = useSearchParams();
   const [materials, setMaterials] = useState<MaterialRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -63,7 +66,7 @@ export default function MaterialsList() {
           <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} />
           Chỉ vật tư đang dùng
         </label>
-        <Link href="/admin/materials/new" className="admin-btn admin-btn--primary">
+        <Link href={withFromListParams("/admin/materials/new", searchParams)} className="admin-btn admin-btn--primary">
           Thêm vật tư
         </Link>
       </div>
@@ -81,7 +84,7 @@ export default function MaterialsList() {
                 <th>ĐVT</th>
                 <th>Tồn kho</th>
                 <th>Khả dụng</th>
-                <th>Điểm mua</th>
+                <th>Mức tồn tối thiểu</th>
                 <th>Trạng thái</th>
                 <th />
               </tr>
@@ -98,7 +101,10 @@ export default function MaterialsList() {
                   <td>{m.reorderPoint ?? "—"}</td>
                   <td>{warehouseLabel(m)}</td>
                   <td>
-                    <Link href={`/admin/materials/${m.id}/edit`} className="admin-btn admin-btn--secondary admin-btn--xs">
+                    <Link
+                      href={withFromListParams(`/admin/materials/${m.id}/edit`, searchParams)}
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                    >
                       Sửa
                     </Link>
                   </td>
