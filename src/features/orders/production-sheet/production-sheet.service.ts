@@ -92,7 +92,8 @@ function mapFileRow(
   file: Awaited<ReturnType<typeof listOrderProductionFiles>>[number],
   productNameByItemId: Map<string, string>,
 ): ProductionSheetFileRow {
-  const previewable = isPreviewableProductionMime(file.mediaAsset.mimeType);
+  const isR2 = file.mediaAsset.storageProvider === "CLOUDFLARE_R2";
+  const previewable = !isR2 && isPreviewableProductionMime(file.mediaAsset.mimeType);
   const previewUrl =
     previewable && (file.mediaAsset.thumbnailUrl || file.mediaAsset.url)
       ? file.mediaAsset.thumbnailUrl ?? file.mediaAsset.url

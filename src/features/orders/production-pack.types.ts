@@ -24,6 +24,7 @@ export type OrderProductionFileRecord = {
     format: string | null;
     sizeBytes: number;
     thumbnailUrl: string | null;
+    storageProvider: string;
   };
 };
 

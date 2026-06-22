@@ -51,6 +51,7 @@ function mapProductionFile(row: {
     format: string | null;
     sizeBytes: number;
     thumbnailUrl: string | null;
+    storageProvider: string;
   };
 }): OrderProductionFileRecord {
   return {
@@ -105,6 +106,7 @@ export async function listOrderProductionFiles(orderId: string): Promise<OrderPr
           format: true,
           sizeBytes: true,
           thumbnailUrl: true,
+          storageProvider: true,
         },
       },
     },
@@ -201,6 +203,7 @@ export async function createOrderProductionFile(
             format: true,
             sizeBytes: true,
             thumbnailUrl: true,
+            storageProvider: true,
           },
         },
       },
@@ -319,6 +322,7 @@ export async function updateOrderProductionFile(
             format: true,
             sizeBytes: true,
             thumbnailUrl: true,
+            storageProvider: true,
           },
         },
       },

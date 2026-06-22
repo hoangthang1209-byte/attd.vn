@@ -13,6 +13,9 @@ import {
 import { formatRequiredQuantityFormula } from "@/features/orders/bom-calculations";
 import {
   ALLOWED_PRODUCTION_FILE_EXTENSIONS,
+  classifyProductionFile,
+  ERROR_R2_NOT_CONFIGURED,
+  getProductionUploadHint,
   isPreviewableProductionMime,
 } from "@/lib/productionFileValidation";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
@@ -56,6 +59,7 @@ type MediaAssetPick = {
   url: string;
   mimeType: string;
   sizeBytes: number;
+  storageProvider?: string;
 };
 
 function formatBytes(bytes: number): string {
@@ -79,6 +83,9 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   const [selectedAsset, setSelectedAsset] = useState<MediaAssetPick | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [mediaAssets, setMediaAssets] = useState<MediaAssetPick[]>([]);
+  const [r2Configured, setR2Configured] = useState<boolean | null>(null);
+  const [uploadHint, setUploadHint] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -101,6 +108,13 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    void fetch("/api/production-files/status")
+      .then((res) => res.json())
+      .then((data: { configured?: boolean }) => setR2Configured(Boolean(data.configured)))
+      .catch(() => setR2Configured(false));
+  }, []);
+
   async function openMediaPicker() {
     setPickerOpen(true);
     const res = await fetch("/api/media?folder=general");
@@ -116,9 +130,75 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   }
 
   async function uploadProductionFile(file: File) {
+    setUploadError(null);
+    const classification = classifyProductionFile({
+      filename: file.name,
+      mimeType: file.type,
+      fileSizeBytes: file.size,
+      productionFileType: fileType,
+    });
+    setUploadHint(getProductionUploadHint(classification));
+
+    if (!classification.allowed) {
+      throw new Error(classification.error ?? "Định dạng file này chưa được hỗ trợ.");
+    }
+
+    if (classification.storageProvider === "CLOUDFLARE_R2") {
+      if (r2Configured === false) {
+        throw new Error(ERROR_R2_NOT_CONFIGURED);
+      }
+
+      const sessionRes = await fetch("/api/production-files/upload-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId,
+          orderItemId: fileScope === "order" ? null : fileScope,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type || classification.mimeType,
+          productionFileType: fileType,
+        }),
+      });
+      const session = await sessionRes.json();
+      if (!sessionRes.ok) {
+        throw new Error(session.message ?? ERROR_R2_NOT_CONFIGURED);
+      }
+
+      const putRes = await fetch(session.uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: session.uploadHeaders ?? { "Content-Type": classification.mimeType ?? file.type },
+      });
+      if (!putRes.ok) {
+        throw new Error("Tải file lên kho lưu trữ thất bại.");
+      }
+
+      const completeRes = await fetch("/api/production-files/upload-complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionToken: session.sessionToken }),
+      });
+      const complete = await completeRes.json();
+      if (!completeRes.ok) {
+        throw new Error(complete.message ?? "Không thể hoàn tất tải lên.");
+      }
+
+      setSelectedAsset({
+        id: String(complete.asset.id),
+        filename: String(complete.asset.filename),
+        url: String(complete.asset.url),
+        mimeType: String(complete.asset.mimeType),
+        sizeBytes: Number(complete.asset.sizeBytes ?? 0),
+        storageProvider: "CLOUDFLARE_R2",
+      });
+      return;
+    }
+
     const fd = new FormData();
     fd.append("file", file);
     fd.append("productionFile", "true");
+    fd.append("productionFileType", fileType);
     const res = await fetch("/api/media", { method: "POST", body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message ?? "Upload thất bại");
@@ -128,6 +208,7 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
       url: String(data.url),
       mimeType: String(data.mimeType),
       sizeBytes: Number(data.sizeBytes ?? 0),
+      storageProvider: "CLOUDINARY",
     });
   }
 
@@ -154,12 +235,18 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
         });
         return parseAdminJsonResponse(res, (body) => body.file as OrderProductionFileRecord);
       },
-      onSuccess: () => {
+      onSuccess: (file) => {
         setFileFormOpen(false);
         setSelectedAsset(null);
         setFileTitle("");
         setFileNote("");
-        void load();
+        setUploadHint(null);
+        setUploadError(null);
+        if (file) {
+          setFiles((prev) => [...prev, file]);
+        } else {
+          void load();
+        }
       },
     });
   }
@@ -205,13 +292,20 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   const readiness = materials?.readiness;
 
   function renderFileRow(file: OrderProductionFileRecord) {
-    const previewable = isPreviewableProductionMime(file.mediaAsset.mimeType);
+    const isR2 = file.mediaAsset.storageProvider === "CLOUDFLARE_R2";
+    const previewable = !isR2 && isPreviewableProductionMime(file.mediaAsset.mimeType);
+    const openUrl = `/api/production-files/${file.id}/open`;
+    const downloadUrl = `/api/production-files/${file.id}/download`;
     return (
       <div key={file.id} className="production-pack-file-row">
         <div className="production-pack-file-row__main">
           {previewable && file.mediaAsset.mimeType.startsWith("image/") ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={file.mediaAsset.url} alt="" className="production-pack-file-thumb" />
+            <img
+              src={file.mediaAsset.thumbnailUrl ?? file.mediaAsset.url}
+              alt=""
+              className="production-pack-file-thumb"
+            />
           ) : (
             <div className="production-pack-file-icon">{file.mediaAsset.format?.toUpperCase() ?? "FILE"}</div>
           )}
@@ -232,8 +326,11 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
           </div>
         </div>
         <div className="production-pack-file-row__actions">
-          <a href={file.mediaAsset.url} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary admin-btn--xs">
-            Mở / Tải
+          <a href={openUrl} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary admin-btn--xs">
+            Mở
+          </a>
+          <a href={downloadUrl} className="admin-btn admin-btn--secondary admin-btn--xs">
+            Tải
           </a>
           {file.status === "ACTIVE" && (
             <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void archiveFile(file.id)}>
@@ -300,7 +397,10 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
               </div>
               <div className="admin-field">
                 <label className="admin-label">Loại file</label>
-                <select className="admin-input" value={fileType} onChange={(e) => setFileType(e.target.value as ProductionFileType)}>
+                <select className="admin-input" value={fileType} onChange={(e) => {
+                  setFileType(e.target.value as ProductionFileType);
+                  setUploadHint(null);
+                }}>
                   {PRODUCTION_FILE_TYPES.map((t) => (
                     <option key={t} value={t}>{PRODUCTION_FILE_TYPE_LABELS[t]}</option>
                   ))}
@@ -309,9 +409,17 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
               <div className="admin-field">
                 <label className="admin-label">File</label>
                 {selectedAsset ? (
-                  <p className="admin-field-hint">{selectedAsset.filename} ({formatBytes(selectedAsset.sizeBytes)})</p>
+                  <p className="admin-field-hint">
+                    {selectedAsset.filename} ({formatBytes(selectedAsset.sizeBytes)})
+                    {selectedAsset.storageProvider === "CLOUDFLARE_R2" && " · File nguồn bảo mật"}
+                  </p>
                 ) : (
                   <p className="admin-field-hint">Chưa chọn file</p>
+                )}
+                {uploadHint && <p className="admin-field-hint">{uploadHint}</p>}
+                {uploadError && <p className="admin-field-hint" style={{ color: "var(--primary, #dc2626)" }}>{uploadError}</p>}
+                {r2Configured === false && (
+                  <p className="admin-field-hint">{ERROR_R2_NOT_CONFIGURED}</p>
                 )}
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void openMediaPicker()}>
@@ -326,7 +434,11 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
                       accept={ALLOWED_PRODUCTION_FILE_EXTENSIONS.join(",")}
                       onChange={(e) => {
                         const f = e.target.files?.[0];
-                        if (f) void uploadProductionFile(f).catch(() => undefined);
+                        if (f) {
+                          void uploadProductionFile(f).catch((err: unknown) => {
+                            setUploadError(err instanceof Error ? err.message : "Upload thất bại");
+                          });
+                        }
                         e.target.value = "";
                       }}
                     />

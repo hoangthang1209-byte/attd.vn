@@ -68,11 +68,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "File là bắt buộc" }, { status: 400 });
     }
 
+    const productionFileType = formData.get("productionFileType");
+
     if (productionFile === "true") {
+      const type =
+        typeof productionFileType === "string" && productionFileType.trim()
+          ? (productionFileType.trim() as import("@prisma/client").ProductionFileType)
+          : undefined;
       const { asset } = await uploadProductionFileAsset({
         file: fileEntry as File,
         title: typeof title === "string" ? title : undefined,
         tags,
+        productionFileType: type,
       });
       return NextResponse.json({ ...asset }, { status: 201 });
     }

@@ -99,5 +99,7 @@ export const config = {
     "/api/materials/:path*",
     "/api/purchase-requests",
     "/api/purchase-requests/:path*",
+    "/api/production-files",
+    "/api/production-files/:path*",
   ],
 };

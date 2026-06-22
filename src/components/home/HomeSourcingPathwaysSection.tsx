@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   Building2,
@@ -10,46 +11,16 @@ import {
   UsersRound,
   Warehouse,
 } from "lucide-react";
+import type { HomepageSourcingPathwayConfig } from "@/features/home/homepage.types";
 
-type PathwayCard = {
-  key: "stock" | "oem" | "dealer";
-  title: string;
-  description: string;
-  cta: string;
-  href: string;
+type Props = {
+  pathways: HomepageSourcingPathwayConfig[];
 };
 
-const PATHWAYS: PathwayCard[] = [
-  {
-    key: "stock",
-    title: "Hàng sẵn kho",
-    description:
-      "Khám phá các nhóm sản phẩm có sẵn để triển khai đơn hàng nhanh và chủ động hơn.",
-    cta: "Xem nguồn hàng",
-    href: "/san-pham",
-  },
-  {
-    key: "oem",
-    title: "Đặt hàng OEM",
-    description:
-      "Phát triển sản phẩm theo chất liệu, màu sắc, nhận diện và yêu cầu riêng của thương hiệu.",
-    cta: "Tìm hiểu OEM",
-    href: "/oem",
-  },
-  {
-    key: "dealer",
-    title: "Nguồn hàng cho đại lý",
-    description:
-      "Tiếp cận danh mục và chính sách phù hợp cho đơn vị kinh doanh, agency và đối tác phân phối.",
-    cta: "Dành cho đại lý",
-    href: "/dai-ly",
-  },
-];
-
-function StockPathwayVisual() {
+function StockPathwayVisual({ microLabel }: { microLabel: string }) {
   return (
     <div className="home-sourcing-pathways__visual home-sourcing-pathways__visual--stock" aria-hidden>
-      <span className="home-sourcing-pathways__visual-label">Sẵn sàng triển khai</span>
+      <span className="home-sourcing-pathways__visual-label">{microLabel}</span>
       <div className="home-sourcing-pathways__stock-scene">
         <div className="home-sourcing-pathways__stock-blocks">
           <span className="home-sourcing-pathways__stock-block home-sourcing-pathways__stock-block--1" />
@@ -69,7 +40,7 @@ function StockPathwayVisual() {
   );
 }
 
-function OemPathwayVisual() {
+function OemPathwayVisual({ microLabel }: { microLabel: string }) {
   const steps = [
     { label: "Chất liệu", Icon: Layers },
     { label: "Màu sắc", Icon: Palette },
@@ -78,7 +49,7 @@ function OemPathwayVisual() {
 
   return (
     <div className="home-sourcing-pathways__visual home-sourcing-pathways__visual--oem" aria-hidden>
-      <span className="home-sourcing-pathways__visual-label">Phát triển theo yêu cầu</span>
+      <span className="home-sourcing-pathways__visual-label">{microLabel}</span>
       <ol className="home-sourcing-pathways__oem-flow">
         {steps.map(({ label, Icon }, index) => (
           <li key={label} className="home-sourcing-pathways__oem-step">
@@ -90,9 +61,7 @@ function OemPathwayVisual() {
               <Icon size={14} strokeWidth={1.75} />
             </span>
             <span className="home-sourcing-pathways__oem-step-label">{label}</span>
-            {index < steps.length - 1 && (
-              <span className="home-sourcing-pathways__oem-connector" />
-            )}
+            {index < steps.length - 1 && <span className="home-sourcing-pathways__oem-connector" />}
           </li>
         ))}
       </ol>
@@ -101,7 +70,7 @@ function OemPathwayVisual() {
   );
 }
 
-function DealerPathwayVisual() {
+function DealerPathwayVisual({ microLabel }: { microLabel: string }) {
   const nodes = [
     { label: "ATTD", Icon: Building2 },
     { label: "Đại lý", Icon: Handshake },
@@ -110,7 +79,7 @@ function DealerPathwayVisual() {
 
   return (
     <div className="home-sourcing-pathways__visual home-sourcing-pathways__visual--dealer" aria-hidden>
-      <span className="home-sourcing-pathways__visual-label">Kết nối nguồn hàng</span>
+      <span className="home-sourcing-pathways__visual-label">{microLabel}</span>
       <ol className="home-sourcing-pathways__dealer-network">
         {nodes.map(({ label, Icon }, index) => (
           <li key={label} className="home-sourcing-pathways__dealer-node-wrap">
@@ -130,18 +99,42 @@ function DealerPathwayVisual() {
   );
 }
 
-const VISUALS = {
+const FALLBACK_VISUALS = {
   stock: StockPathwayVisual,
   oem: OemPathwayVisual,
   dealer: DealerPathwayVisual,
 } as const;
 
-export default function HomeSourcingPathwaysSection() {
+function PathwayVisualPanel({ pathway }: { pathway: HomepageSourcingPathwayConfig }) {
+  if (pathway.imageUrl) {
+    return (
+      <div className="home-sourcing-pathways__visual home-sourcing-pathways__visual--image">
+        <span className="home-sourcing-pathways__visual-label home-sourcing-pathways__visual-label--overlay">
+          {pathway.microLabel}
+        </span>
+        <div className="home-sourcing-pathways__visual-image-wrap">
+          <Image
+            src={pathway.imageUrl}
+            alt={pathway.imageAlt ?? pathway.title}
+            fill
+            className="home-sourcing-pathways__visual-image"
+            sizes="(max-width: 768px) 100vw, 33vw"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const Visual = FALLBACK_VISUALS[pathway.visualFallbackKey];
+  return <Visual microLabel={pathway.microLabel} />;
+}
+
+export default function HomeSourcingPathwaysSection({ pathways }: Props) {
+  const visible = pathways.filter((p) => p.enabled).sort((a, b) => a.sortOrder - b.sortOrder);
+  if (visible.length === 0) return null;
+
   return (
-    <section
-      className="home-sourcing-pathways"
-      aria-labelledby="home-sourcing-pathways-title"
-    >
+    <section className="home-sourcing-pathways" aria-labelledby="home-sourcing-pathways-title">
       <div className="container">
         <header className="home-sourcing-pathways__header">
           <p className="home-sourcing-pathways__eyebrow">Theo nhu cầu triển khai</p>
@@ -155,28 +148,21 @@ export default function HomeSourcingPathwaysSection() {
         </header>
 
         <ul className="home-sourcing-pathways__grid">
-          {PATHWAYS.map(({ key, title, description, cta, href }) => {
-            const Visual = VISUALS[key];
-            return (
-              <li key={key} className="home-sourcing-pathways__grid-item">
-                <Link href={href} className="home-sourcing-pathways__card">
-                  <Visual />
-                  <div className="home-sourcing-pathways__body">
-                    <h3 className="home-sourcing-pathways__card-title">{title}</h3>
-                    <p className="home-sourcing-pathways__card-desc">{description}</p>
-                    <span className="home-sourcing-pathways__cta">
-                      {cta}
-                      <ArrowRight
-                        size={16}
-                        className="home-sourcing-pathways__cta-icon"
-                        aria-hidden
-                      />
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
+          {visible.map((pathway) => (
+            <li key={pathway.slot} className="home-sourcing-pathways__grid-item">
+              <Link href={pathway.ctaUrl} className="home-sourcing-pathways__card">
+                <PathwayVisualPanel pathway={pathway} />
+                <div className="home-sourcing-pathways__body">
+                  <h3 className="home-sourcing-pathways__card-title">{pathway.title}</h3>
+                  <p className="home-sourcing-pathways__card-desc">{pathway.description}</p>
+                  <span className="home-sourcing-pathways__cta">
+                    {pathway.ctaLabel}
+                    <ArrowRight size={16} className="home-sourcing-pathways__cta-icon" aria-hidden />
+                  </span>
+                </div>
+              </Link>
+            </li>
+          ))}
         </ul>
       </div>
     </section>

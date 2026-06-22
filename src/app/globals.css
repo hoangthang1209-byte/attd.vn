@@ -14630,6 +14630,83 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 /* Sprint 27.1.4.1 — end sourcing pathways visual upgrade */
 
+/* Sprint 27.1.5 — CMS pathway & OEM images */
+.home-sourcing-pathways__visual--image {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 148px;
+  padding: 0;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .home-sourcing-pathways__visual--image {
+    min-height: 168px;
+  }
+}
+
+.home-sourcing-pathways__visual-image-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 148px;
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+@media (min-width: 1024px) {
+  .home-sourcing-pathways__visual-image-wrap {
+    min-height: 168px;
+  }
+}
+
+.home-sourcing-pathways__visual-image {
+  object-fit: cover;
+  object-position: center;
+}
+
+.home-sourcing-pathways__visual-label--overlay {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  z-index: 1;
+  margin: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.06);
+}
+
+.home-oem-banner__image-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.home-oem-banner__image {
+  object-fit: contain;
+  object-position: center;
+  background: #f9fafb;
+}
+
+.homepage-media-field__preview {
+  margin-top: 8px;
+}
+
+.homepage-media-field__thumb {
+  display: block;
+  width: 160px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
 .home-oem-banner {
   padding: 48px 0;
   background: #fff;

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import HomeCategoryDiscoveryRail from "@/components/home/HomeCategoryDiscoveryRail";
-import HomeProofStrip from "@/components/home/HomeProofStrip";
 import type { HomepageCategoryItem, HomepageHeroConfig } from "@/features/home/homepage.types";
 
 type Props = {
@@ -54,8 +53,6 @@ export default function HomeHeroSection({ hero, categories }: Props) {
           <HomeCategoryDiscoveryRail categories={categories} />
         </div>
       </section>
-
-      <HomeProofStrip />
     </>
   );
 }
