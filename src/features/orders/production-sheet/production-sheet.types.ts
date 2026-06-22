@@ -71,6 +71,16 @@ export type ProductionSheetAcknowledgement = {
   detail: string | null;
 };
 
+export type ProductionSheetExecutionSummary = {
+  stageProgressLabel: string;
+  qcStatusLabel: string;
+  qcPassedQuantity: string;
+  qcInspectedQuantity: string;
+  packingLabel: string;
+  handoverStateLabel: string;
+  evidenceThumbnails: Array<{ url: string; title: string }>;
+};
+
 export type ProductionSheetViewModel = {
   orderId: string;
   orderNo: string;
@@ -99,6 +109,7 @@ export type ProductionSheetViewModel = {
     isReady: boolean;
   };
   acknowledgement: ProductionSheetAcknowledgement | null;
+  executionSummary: ProductionSheetExecutionSummary | null;
   adminOrderUrl: string;
 };
 

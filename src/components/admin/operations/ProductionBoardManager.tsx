@@ -19,6 +19,8 @@ import type {
   ProductionBoardSummary,
   ProductionDueFilter,
 } from "@/features/orders/order-operations.types";
+import type { ProductionBoardQcFilter } from "@/features/orders/production-execution-labels";
+import { PRODUCTION_BOARD_QC_FILTER_LABELS } from "@/features/orders/production-execution-labels";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
@@ -42,6 +44,7 @@ type ProductionBoardFilters = {
   customerId: string;
   salesEmployeeId: string;
   search: string;
+  qcFilter: ProductionBoardQcFilter | "";
 };
 
 const EMPTY_FILTERS: ProductionBoardFilters = {
@@ -51,6 +54,7 @@ const EMPTY_FILTERS: ProductionBoardFilters = {
   customerId: "",
   salesEmployeeId: "",
   search: "",
+  qcFilter: "",
 };
 
 /** Summary card targets — each replaces the entire board query string. */
@@ -60,6 +64,10 @@ const PRODUCTION_SUMMARY_CARD_PARAMS: Record<string, Partial<ProductionBoardFilt
   dueSoon: { due: "upcoming" },
   overdue: { due: "overdue" },
   readyToShip: { status: "READY_TO_SHIP" },
+  needsQc: { status: "IN_PRODUCTION", qcFilter: "no_qc" },
+  needsRework: { qcFilter: "rework" },
+  awaitingPacking: { status: "IN_PRODUCTION", qcFilter: "not_ready" },
+  handoverReady: { qcFilter: "ready" },
 };
 
 function formatQuantity(order: ProductionBoardOrder): string {
@@ -98,6 +106,7 @@ export default function ProductionBoardManager() {
     customerId: searchParams.get("customerId") ?? "",
     salesEmployeeId: searchParams.get("salesEmployeeId") ?? "",
     search: searchParams.get("search") ?? "",
+    qcFilter: (searchParams.get("qcFilter") as ProductionBoardQcFilter | null) ?? "",
   }), [searchParams]);
 
   const [searchInput, setSearchInput] = useState(filters.search);
@@ -141,6 +150,7 @@ export default function ProductionBoardManager() {
       if (filters.customerId) params.set("customerId", filters.customerId);
       if (filters.salesEmployeeId) params.set("salesEmployeeId", filters.salesEmployeeId);
       if (filters.search.trim()) params.set("search", filters.search.trim());
+      if (filters.qcFilter) params.set("qcFilter", filters.qcFilter);
 
       const res = await fetch(`/api/orders/production-board?${params}`);
       const data = await res.json() as {
@@ -195,6 +205,10 @@ export default function ProductionBoardManager() {
   const summaryCards = summary ? [
     { key: "confirmed" as const, label: "Đơn cần sản xuất", value: summary.confirmedCount },
     { key: "inProduction" as const, label: "Đang sản xuất", value: summary.inProductionCount },
+    { key: "needsQc" as const, label: "Cần QC", value: summary.needsQcCount },
+    { key: "needsRework" as const, label: "Cần làm lại", value: summary.needsReworkCount },
+    { key: "awaitingPacking" as const, label: "Chờ đóng gói", value: summary.awaitingPackingCount },
+    { key: "handoverReady" as const, label: "Đủ bàn giao", value: summary.handoverReadyCount },
     { key: "dueSoon" as const, label: "Sắp trễ hạn", value: summary.dueSoonCount },
     { key: "overdue" as const, label: "Quá hạn", value: summary.overdueCount, danger: true },
     { key: "readyToShip" as const, label: "Sẵn sàng giao", value: summary.readyToShipCount },
@@ -292,8 +306,18 @@ export default function ProductionBoardManager() {
             <option key={e.id} value={e.id}>{e.fullName}</option>
           ))}
         </select>
+        <select
+          className="admin-input"
+          value={filters.qcFilter}
+          onChange={(e) => applyFilters({ qcFilter: e.target.value as ProductionBoardQcFilter | "" })}
+        >
+          <option value="">QC / Bàn giao</option>
+          {(Object.keys(PRODUCTION_BOARD_QC_FILTER_LABELS) as ProductionBoardQcFilter[]).map((k) => (
+            <option key={k} value={k}>{PRODUCTION_BOARD_QC_FILTER_LABELS[k]}</option>
+          ))}
+        </select>
         <button type="submit" className="admin-btn">Tìm kiếm</button>
-        {(filters.status || filters.ownerId || filters.due || filters.customerId || filters.salesEmployeeId || filters.search) && (
+        {(filters.status || filters.ownerId || filters.due || filters.customerId || filters.salesEmployeeId || filters.search || filters.qcFilter) && (
           <button
             type="button"
             className="admin-btn admin-btn--secondary"
@@ -344,7 +368,15 @@ export default function ProductionBoardManager() {
                   </td>
                   <td><OrderStatusBadge status={order.status} /></td>
                   <td>
-                    <span className={`ops-urgency-badge ${productionUrgencyClass(order.productionUrgency)}`}>
+                    <div
+                      className="admin-ops-exec-badges"
+                      title={`Công đoạn: ${order.executionStageProgress} · QC: ${order.executionQcStatusLabel} · Đóng gói: ${order.executionPackingLabel} · Bàn giao: ${order.executionHandoverLabel}`}
+                    >
+                      <span className="ops-exec-badge">{order.executionStageProgress}</span>
+                      <span className="ops-exec-badge">{order.executionQcStatusLabel}</span>
+                      <span className="ops-exec-badge">{order.executionPackingLabel}</span>
+                    </div>
+                    <span className={`ops-urgency-badge ${productionUrgencyClass(order.productionUrgency)}`} style={{ marginTop: 4, display: "inline-block" }}>
                       {productionUrgencyLabel(order.productionUrgency)}
                     </span>
                   </td>

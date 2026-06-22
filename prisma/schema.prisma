@@ -466,6 +466,7 @@ model MediaAsset {
   orderItems           OrderItem[]
   salesRepresentatives SalesRepresentative[]
   orderProductionFiles OrderProductionFile[]
+  orderQcEvidence      OrderQcEvidence[]
 
   @@index([folder])
   @@index([filename])
@@ -1402,6 +1403,9 @@ model Order {
   materialAllocations   OrderMaterialAllocation[]
   materialStockAdjustments MaterialStockAdjustment[] @relation("OrderMaterialStockAdjustments")
   purchaseRequestItems  PurchaseRequestItem[]
+  productionStages      OrderProductionStage[]
+  qcInspection          OrderQcInspection?
+  qcEvidence            OrderQcEvidence[]
 
   @@index([orderNo])
   @@index([quoteId])
@@ -1434,6 +1438,8 @@ model Employee {
   salesRepresentative SalesRepresentative?
   materialStockAdjustments MaterialStockAdjustment[]
   purchaseRequests PurchaseRequest[]
+  assignedProductionStages OrderProductionStage[] @relation("ProductionStageAssignee")
+  qcInspections OrderQcInspection[] @relation("QcInspector")
 
   @@index([employeeCode])
   @@index([isActive])
@@ -1841,4 +1847,106 @@ model PurchaseRequestItem {
   @@index([purchaseRequestId])
   @@index([materialId])
   @@index([linkedOrderId])
+}
+
+enum ProductionStageType {
+  CUTTING
+  SEWING
+  PRINTING
+  EMBROIDERY
+  FINISHING
+  QC
+  PACKING
+  OTHER
+}
+
+enum ProductionStageStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  SKIPPED
+}
+
+enum QcInspectionStatus {
+  DRAFT
+  PASSED
+  PASSED_WITH_NOTE
+  FAILED
+  REWORK_REQUIRED
+}
+
+enum QcEvidenceType {
+  DEFECT
+  PASSED_SAMPLE
+  PACKING
+  FINAL_PRODUCT
+  OTHER
+}
+
+model OrderProductionStage {
+  id                  String                @id @default(cuid())
+  orderId             String
+  stageType           ProductionStageType
+  status              ProductionStageStatus @default(NOT_STARTED)
+  assignedEmployeeId  String?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  plannedQuantity     Decimal?              @db.Decimal(12, 4)
+  completedQuantity   Decimal               @default(0) @db.Decimal(12, 4)
+  passedQuantity      Decimal               @default(0) @db.Decimal(12, 4)
+  defectQuantity      Decimal               @default(0) @db.Decimal(12, 4)
+  reworkQuantity      Decimal               @default(0) @db.Decimal(12, 4)
+  scrapQuantity       Decimal               @default(0) @db.Decimal(12, 4)
+  note                String?               @db.Text
+  sortOrder           Int                   @default(0)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  order               Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  assignedEmployee    Employee?             @relation("ProductionStageAssignee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, stageType])
+  @@index([orderId])
+  @@index([stageType])
+}
+
+model OrderQcInspection {
+  id                    String             @id @default(cuid())
+  orderId               String             @unique
+  inspectedByEmployeeId String?
+  status                QcInspectionStatus @default(DRAFT)
+  inspectedAt           DateTime?
+  inspectedQuantity     Decimal            @default(0) @db.Decimal(12, 4)
+  passedQuantity        Decimal            @default(0) @db.Decimal(12, 4)
+  defectQuantity        Decimal            @default(0) @db.Decimal(12, 4)
+  reworkQuantity        Decimal            @default(0) @db.Decimal(12, 4)
+  scrapQuantity         Decimal            @default(0) @db.Decimal(12, 4)
+  summary               String?            @db.Text
+  correctiveAction      String?            @db.Text
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  order                 Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  inspectedBy           Employee?          @relation("QcInspector", fields: [inspectedByEmployeeId], references: [id], onDelete: SetNull)
+  evidence              OrderQcEvidence[]
+
+  @@index([orderId])
+}
+
+model OrderQcEvidence {
+  id             String         @id @default(cuid())
+  orderId        String
+  qcInspectionId String?
+  mediaAssetId   String
+  title          String?
+  note           String?        @db.Text
+  evidenceType   QcEvidenceType @default(OTHER)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  qcInspection   OrderQcInspection? @relation(fields: [qcInspectionId], references: [id], onDelete: SetNull)
+  mediaAsset     MediaAsset     @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([qcInspectionId])
+  @@index([mediaAssetId])
 }

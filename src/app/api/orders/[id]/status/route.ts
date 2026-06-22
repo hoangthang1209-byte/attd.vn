@@ -4,6 +4,7 @@ import {
   OrderValidationError,
   updateOrderStatus,
 } from "@/features/orders/order.service";
+import { HandoverValidationError } from "@/features/orders/production-quantity";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -23,6 +24,16 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const order = await updateOrderStatus(id, parseUpdateOrderStatusBody(body as Record<string, unknown>));
     return NextResponse.json({ order });
   } catch (err) {
+    if (err instanceof HandoverValidationError) {
+      return NextResponse.json(
+        {
+          message: err.message,
+          code: "HANDOVER_NOT_READY",
+          missingConditions: err.missingConditions,
+        },
+        { status: 400 },
+      );
+    }
     if (err instanceof OrderValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });
     }

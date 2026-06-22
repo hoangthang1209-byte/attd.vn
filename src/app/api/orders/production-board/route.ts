@@ -4,6 +4,7 @@ import {
   getProductionBoardOrders,
 } from "@/features/orders/order-operations.service";
 import type { ProductionDueFilter } from "@/features/orders/order-operations.types";
+import type { ProductionBoardQcFilter } from "@/features/orders/production-execution-labels";
 
 const DUE_FILTERS = new Set<ProductionDueFilter>([
   "overdue",
@@ -20,10 +21,20 @@ const STATUSES = new Set<OrderStatus>([
   "READY_TO_SHIP",
 ]);
 
+const QC_FILTERS = new Set<ProductionBoardQcFilter>([
+  "all",
+  "no_qc",
+  "passed",
+  "rework",
+  "not_ready",
+  "ready",
+]);
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const statusRaw = searchParams.get("status");
   const dueRaw = searchParams.get("due");
+  const qcFilterRaw = searchParams.get("qcFilter");
 
   try {
     const result = await getProductionBoardOrders({
@@ -39,6 +50,10 @@ export async function GET(req: NextRequest) {
       customerId: searchParams.get("customerId") ?? undefined,
       salesEmployeeId: searchParams.get("salesEmployeeId") ?? undefined,
       search: searchParams.get("search") ?? undefined,
+      qcFilter:
+        qcFilterRaw && QC_FILTERS.has(qcFilterRaw as ProductionBoardQcFilter)
+          ? (qcFilterRaw as ProductionBoardQcFilter)
+          : undefined,
     });
     return NextResponse.json(result);
   } catch (err) {

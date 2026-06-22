@@ -66,6 +66,9 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [executionQcLabel, setExecutionQcLabel] = useState<string | null>(null);
+  const [executionHandoverLabel, setExecutionHandoverLabel] = useState<string | null>(null);
+  const [handoverOverride, setHandoverOverride] = useState(false);
 
   useEffect(() => {
     void Promise.all([
@@ -94,6 +97,18 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
         if (!detail) throw new Error("Không tải được đơn hàng");
         setOrder(detail);
         setFields(syncFields(detail));
+        void fetch(`/api/orders/${orderId}/handover-readiness`)
+          .then((r) => r.json())
+          .then((data: { readiness?: { stateLabel: string; qcStatusLabel: string } }) => {
+            if (data.readiness) {
+              setExecutionHandoverLabel(data.readiness.stateLabel);
+              setExecutionQcLabel(data.readiness.qcStatusLabel);
+            }
+          });
+        const override = detail.activities?.some(
+          (a) => a.title === "Xác nhận chuyển sang Sẵn sàng giao khi hồ sơ chưa đầy đủ",
+        );
+        setHandoverOverride(Boolean(override));
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -256,6 +271,23 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
               <div>
                 <dt>Thiếu</dt>
                 <dd className="ops-missing-fields">{missingFields.join(", ")}</dd>
+              </div>
+            )}
+            {executionQcLabel && (
+              <div>
+                <dt>QC sản xuất</dt>
+                <dd>{executionQcLabel}</dd>
+              </div>
+            )}
+            {executionHandoverLabel && (
+              <div>
+                <dt>Bàn giao SX</dt>
+                <dd>{executionHandoverLabel}</dd>
+              </div>
+            )}
+            {handoverOverride && (
+              <div className="admin-field-hint" style={{ color: "#b45309", gridColumn: "1 / -1" }}>
+                Đơn chuyển giao khi hồ sơ hoàn thành chưa đầy đủ.
               </div>
             )}
             <div>

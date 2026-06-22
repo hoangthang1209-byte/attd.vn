@@ -110,7 +110,7 @@ function CategoryRailCard({
             alt={category.name}
             fill
             className="home-category-rail__img"
-            sizes="(max-width: 767px) 255px, 220px"
+            sizes="(max-width: 767px) 175px, 220px"
             draggable={false}
           />
         ) : (

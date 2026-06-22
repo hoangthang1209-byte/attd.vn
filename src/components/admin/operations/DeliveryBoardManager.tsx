@@ -278,6 +278,16 @@ export default function DeliveryBoardManager() {
                           Thiếu thông tin
                         </button>
                       )}
+                      {order.executionQcStatusLabel && (
+                        <span className="ops-exec-badge" title={`QC: ${order.executionQcStatusLabel}`}>
+                          QC: {order.executionQcStatusLabel}
+                        </span>
+                      )}
+                      {order.executionHandoverOverride && (
+                        <span className="ops-warning-badge" title="Đơn chuyển giao khi hồ sơ hoàn thành chưa đầy đủ.">
+                          Cảnh báo bàn giao
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td>

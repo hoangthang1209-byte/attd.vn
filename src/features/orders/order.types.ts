@@ -179,6 +179,9 @@ export type UpdateOrderStatusInput = {
   cancelReason?: string | null;
   correctionReason?: string | null;
   productionReadinessAcknowledged?: boolean;
+  handoverReadinessAcknowledged?: boolean;
+  handoverOverrideReason?: string | null;
+  partialDeliveryAcknowledged?: boolean;
 };
 
 export type OrderItemVariantInputPayload = {

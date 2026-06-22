@@ -31,6 +31,12 @@ import {
   formatReadinessAcknowledgementDetail,
   isLegacyOrderForReadiness,
 } from "@/features/orders/production-readiness.service";
+import { initializeProductionStages } from "@/features/orders/production-stage.service";
+import {
+  assertReadyToShipTransition,
+  isLegacyOrderForHandover,
+} from "@/features/orders/handover-readiness.service";
+import { HandoverValidationError } from "@/features/orders/production-quantity";
 import {
   canUpdateOrderStatus,
   formatOrderStatusCorrection,
@@ -400,6 +406,30 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
     }
   }
 
+  if (input.status === "READY_TO_SHIP" && order.status === "IN_PRODUCTION") {
+    if (!isLegacyOrderForHandover({
+      status: order.status,
+      readyToShipAt: order.readyToShipAt,
+    })) {
+      try {
+        await assertReadyToShipTransition(id, {
+          handoverReadinessAcknowledged: input.handoverReadinessAcknowledged,
+          handoverOverrideReason: input.handoverOverrideReason,
+          partialDeliveryAcknowledged: input.partialDeliveryAcknowledged,
+        });
+      } catch (err) {
+        if (err instanceof HandoverValidationError) {
+          throw err;
+        }
+        if (err instanceof OrderValidationError) throw err;
+        if (err instanceof Error && err.message) {
+          throw new OrderValidationError(err.message);
+        }
+        throw err;
+      }
+    }
+  }
+
   const now = new Date();
   const data: Prisma.OrderUpdateInput = {
     status: input.status,
@@ -456,6 +486,13 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
       });
     }
   });
+
+  if (input.status === "IN_PRODUCTION" && !order.productionStartedAt) {
+    const stageCount = await prisma.orderProductionStage.count({ where: { orderId: id } });
+    if (stageCount === 0) {
+      await initializeProductionStages(id);
+    }
+  }
 
   const detail = await getOrderDetail(id);
   if (!detail) throw new OrderValidationError("Không tìm thấy đơn hàng.");

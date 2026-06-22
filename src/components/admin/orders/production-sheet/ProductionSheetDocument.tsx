@@ -9,6 +9,7 @@ import {
   ProductionSheetMaterialSummaryTable,
 } from "@/components/admin/orders/production-sheet/ProductionSheetBomTable";
 import ProductionSheetReadiness from "@/components/admin/orders/production-sheet/ProductionSheetReadiness";
+import ProductionSheetExecutionSummary from "@/components/admin/orders/production-sheet/ProductionSheetExecutionSummary";
 import type { ProductionSheetPdfData } from "@/features/orders/production-sheet/production-sheet.types";
 
 type Props = {
@@ -35,6 +36,7 @@ export default function ProductionSheetDocument({ data, variant = "screen" }: Pr
       />
       <ProductionSheetBomTable itemBoms={data.itemBoms} />
       <ProductionSheetMaterialSummaryTable rows={data.materialSummary} />
+      <ProductionSheetExecutionSummary data={data} />
       <ProductionSheetReadiness data={data} />
       <ProductionSheetFooter data={data} />
     </div>

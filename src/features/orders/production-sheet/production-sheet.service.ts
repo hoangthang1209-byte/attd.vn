@@ -13,6 +13,10 @@ import { evaluateProductionReadiness } from "@/features/orders/production-readin
 import { evaluateOrderMaterialAvailability } from "@/features/materials/material-availability.service";
 import type { MaterialAvailabilityRow } from "@/features/materials/material-availability.service";
 import { getOrderDetail } from "@/features/orders/order.service";
+import { evaluateHandoverReadiness } from "@/features/orders/handover-readiness.service";
+import { computeStageProgressSummary, listProductionStages } from "@/features/orders/production-stage.service";
+import { getQcInspection } from "@/features/orders/qc-inspection.service";
+import { QC_INSPECTION_STATUS_LABELS } from "@/features/orders/production-execution-labels";
 import { isPreviewableProductionMime } from "@/lib/productionFileValidation";
 import { formatMaterialQuantityDisplay } from "@/features/orders/production-sheet/production-sheet-format";
 import type {
@@ -214,11 +218,14 @@ export async function buildProductionSheetViewModel(
   const order = await getOrderDetail(orderId);
   if (!order) return null;
 
-  const [files, materials, readiness, availability] = await Promise.all([
+  const [files, materials, readiness, availability, stages, qc, handover] = await Promise.all([
     listOrderProductionFiles(orderId),
     listOrderMaterials(orderId),
     evaluateProductionReadiness(orderId),
     evaluateOrderMaterialAvailability(orderId),
+    listProductionStages(orderId),
+    getQcInspection(orderId),
+    evaluateHandoverReadiness(orderId),
   ]);
 
   const activeFiles = files.filter((f) => f.status === "ACTIVE");
@@ -245,6 +252,38 @@ export async function buildProductionSheetViewModel(
       activity.type === "PRODUCTION_UPDATED" &&
       activity.title === "Xác nhận bắt đầu sản xuất khi hồ sơ chưa đầy đủ",
   );
+
+  const handoverOverrideActivity = order.activities.find(
+    (activity) =>
+      activity.type === "PRODUCTION_UPDATED" &&
+      activity.title === "Xác nhận chuyển sang Sẵn sàng giao khi hồ sơ chưa đầy đủ",
+  );
+
+  const stageSummary = computeStageProgressSummary(stages);
+  const evidenceThumbnails = (qc?.evidence ?? [])
+    .filter((ev) => ev.mimeType.startsWith("image/"))
+    .slice(0, 4)
+    .map((ev) => ({
+      url: ev.thumbnailUrl ?? ev.url,
+      title: ev.title ?? ev.filename,
+    }));
+
+  const executionSummary =
+    stages.length > 0 || qc
+      ? {
+          stageProgressLabel: stages.length > 0 ? stageSummary.progressLabel : "—",
+          qcStatusLabel: qc ? QC_INSPECTION_STATUS_LABELS[qc.status] : "Chưa QC",
+          qcPassedQuantity: qc?.passedQuantity ?? "0",
+          qcInspectedQuantity: qc?.inspectedQuantity ?? "0",
+          packingLabel: stageSummary.packingCompleted
+            ? "Đã đóng gói"
+            : stageSummary.packingSkipped
+              ? "Không áp dụng"
+              : "Chưa đóng gói",
+          handoverStateLabel: handover.stateLabel,
+          evidenceThumbnails,
+        }
+      : null;
 
   return {
     orderId: order.id,
@@ -274,8 +313,14 @@ export async function buildProductionSheetViewModel(
           acknowledgedAt: acknowledgementActivity.createdAt,
           detail: acknowledgementActivity.detail,
         }
-      : null,
-    adminOrderUrl: `/admin/orders/${order.id}#production-pack`,
+      : handoverOverrideActivity
+        ? {
+            acknowledgedAt: handoverOverrideActivity.createdAt,
+            detail: handoverOverrideActivity.detail,
+          }
+        : null,
+    executionSummary,
+    adminOrderUrl: `/admin/orders/${order.id}#production-execution`,
   };
 }
 

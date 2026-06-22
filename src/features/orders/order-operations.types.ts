@@ -1,4 +1,5 @@
 import type { OrderStatus } from "@prisma/client";
+import type { ProductionBoardQcFilter } from "@/features/orders/production-execution-labels";
 
 export type ProductionUrgency =
   | "OVERDUE"
@@ -52,6 +53,13 @@ export type ProductionBoardOrder = {
   primaryUnit: string | null;
   productionUrgency: ProductionUrgency;
   itemVariants: ProductionBoardItemVariant[];
+  executionStageProgress: string;
+  executionQcStatusLabel: string;
+  executionPackingLabel: string;
+  executionHandoverLabel: string;
+  executionHandoverReady: boolean;
+  executionQcFilterKey: ProductionBoardQcFilter;
+  executionHandoverOverride: boolean;
 };
 
 export type ProductionBoardSummary = {
@@ -60,6 +68,10 @@ export type ProductionBoardSummary = {
   dueSoonCount: number;
   overdueCount: number;
   readyToShipCount: number;
+  needsQcCount: number;
+  needsReworkCount: number;
+  awaitingPackingCount: number;
+  handoverReadyCount: number;
 };
 
 export type DeliveryBoardOrder = {
@@ -80,6 +92,9 @@ export type DeliveryBoardOrder = {
   status: OrderStatus;
   deliveryReadiness: DeliveryReadiness;
   missingDeliveryFields: string[];
+  executionHandoverLabel: string | null;
+  executionHandoverOverride: boolean;
+  executionQcStatusLabel: string | null;
 };
 
 export type DeliveryBoardSummary = {

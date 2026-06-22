@@ -38,7 +38,9 @@ import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import OrderDocumentActions from "@/components/admin/orders/OrderDocumentActions";
 import OrderProductionPackSection from "@/components/admin/orders/OrderProductionPackSection";
+import OrderProductionExecutionSection from "@/components/admin/orders/OrderProductionExecutionSection";
 import type { ProductionReadinessResult } from "@/features/orders/production-readiness.service";
+import type { HandoverReadinessResult } from "@/features/orders/handover-readiness.service";
 
 type Props = { id: string };
 
@@ -123,6 +125,11 @@ export default function OrderDetailView({ id }: Props) {
   const [readinessOpen, setReadinessOpen] = useState(false);
   const [readinessData, setReadinessData] = useState<ProductionReadinessResult | null>(null);
   const [readinessAck, setReadinessAck] = useState(false);
+  const [handoverOpen, setHandoverOpen] = useState(false);
+  const [handoverData, setHandoverData] = useState<HandoverReadinessResult | null>(null);
+  const [handoverAck, setHandoverAck] = useState(false);
+  const [handoverReason, setHandoverReason] = useState("");
+  const [partialDeliveryAck, setPartialDeliveryAck] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -180,6 +187,9 @@ export default function OrderDetailView({ id }: Props) {
       cancelReason?: string;
       correctionReason?: string;
       productionReadinessAcknowledged?: boolean;
+      handoverReadinessAcknowledged?: boolean;
+      handoverOverrideReason?: string;
+      partialDeliveryAcknowledged?: boolean;
     },
   ) {
     setBusy(true);
@@ -195,8 +205,44 @@ export default function OrderDetailView({ id }: Props) {
             cancelReason: options?.cancelReason ?? null,
             correctionReason: options?.correctionReason ?? null,
             productionReadinessAcknowledged: options?.productionReadinessAcknowledged ?? false,
+            handoverReadinessAcknowledged: options?.handoverReadinessAcknowledged ?? false,
+            handoverOverrideReason: options?.handoverOverrideReason ?? null,
+            partialDeliveryAcknowledged: options?.partialDeliveryAcknowledged ?? false,
           }),
         });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({})) as {
+            message?: string;
+            code?: string;
+            missingConditions?: string[];
+          };
+          if (body.code === "HANDOVER_NOT_READY") {
+            setHandoverData({
+              state: "NOT_READY",
+              stateLabel: "Chưa đủ điều kiện",
+              isReady: false,
+              missingConditions: body.missingConditions ?? [],
+              expectedOrderQuantity: 0,
+              productionCompletedQuantity: 0,
+              qcPassedQuantity: 0,
+              reworkQuantity: 0,
+              defectAndScrapQuantity: 0,
+              packingCompleted: false,
+              packingSkipped: false,
+              stageProgressLabel: "",
+              qcStatusLabel: "",
+              hasBlockedStage: false,
+              partialDeliveryAllowed: false,
+              usedOverride: false,
+              overrideReason: null,
+            });
+            setHandoverAck(false);
+            setHandoverReason("");
+            setHandoverOpen(true);
+            return { ok: false as const, message: body.message };
+          }
+          return { ok: false as const, message: body.message ?? "Không thể cập nhật trạng thái" };
+        }
         return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
       },
       onSuccess: (orderData) => {
@@ -209,29 +255,52 @@ export default function OrderDetailView({ id }: Props) {
         setReadinessOpen(false);
         setReadinessAck(false);
         setReadinessData(null);
+        setHandoverOpen(false);
+        setHandoverAck(false);
+        setHandoverReason("");
+        setHandoverData(null);
+        setPartialDeliveryAck(false);
       },
     });
     setBusy(false);
   }
 
   async function requestStatusChange(status: OrderStatus) {
-    if (status !== "IN_PRODUCTION") {
-      await updateStatus(status);
+    if (status === "IN_PRODUCTION") {
+      try {
+        const res = await fetch(`/api/orders/${id}/materials`);
+        const data = await res.json() as { readiness?: ProductionReadinessResult };
+        if (data.readiness?.isReady) {
+          await updateStatus(status);
+          return;
+        }
+        setReadinessData(data.readiness ?? null);
+        setReadinessAck(false);
+        setReadinessOpen(true);
+      } catch {
+        await updateStatus(status);
+      }
       return;
     }
-    try {
-      const res = await fetch(`/api/orders/${id}/materials`);
-      const data = await res.json() as { readiness?: ProductionReadinessResult };
-      if (data.readiness?.isReady) {
+    if (status === "READY_TO_SHIP") {
+      try {
+        const res = await fetch(`/api/orders/${id}/handover-readiness`);
+        const data = await res.json() as { readiness?: HandoverReadinessResult };
+        if (data.readiness?.isReady) {
+          await updateStatus(status);
+          return;
+        }
+        setHandoverData(data.readiness ?? null);
+        setHandoverAck(false);
+        setHandoverReason("");
+        setPartialDeliveryAck(false);
+        setHandoverOpen(true);
+      } catch {
         await updateStatus(status);
-        return;
       }
-      setReadinessData(data.readiness ?? null);
-      setReadinessAck(false);
-      setReadinessOpen(true);
-    } catch {
-      await updateStatus(status);
+      return;
     }
+    await updateStatus(status);
   }
 
   async function submitPayment(e: React.FormEvent) {
@@ -593,6 +662,7 @@ export default function OrderDetailView({ id }: Props) {
       </fieldset>
 
       <OrderProductionPackSection orderId={id} order={order} onOrderChange={setOrder} />
+      <OrderProductionExecutionSection orderId={id} order={order} />
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
         <legend>GIAO HÀNG</legend>
@@ -1036,6 +1106,73 @@ export default function OrderDetailView({ id }: Props) {
               <button type="submit" className="admin-btn admin-btn--primary" disabled={busy}>Lưu</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {handoverOpen && (
+        <div className="quote-quick-contact-modal">
+          <div className="quote-quick-contact-modal__backdrop" onClick={() => setHandoverOpen(false)} />
+          <div className="quote-quick-contact-modal__panel">
+            <h3 className="quote-quick-contact-modal__title">Đơn hàng chưa đủ điều kiện sẵn sàng giao</h3>
+            <ul className="production-readiness-list">
+              {(handoverData?.missingConditions ?? []).map((label) => (
+                <li key={label}>{label}</li>
+              ))}
+            </ul>
+            {handoverData?.partialDeliveryAllowed && (
+              <label className="admin-field" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={partialDeliveryAck}
+                  onChange={(e) => setPartialDeliveryAck(e.target.checked)}
+                />
+                <span>Xác nhận giao một phần (số lượng QC đạt chưa đủ tổng đơn).</span>
+              </label>
+            )}
+            <label className="admin-field" style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12 }}>
+              <input
+                type="checkbox"
+                checked={handoverAck}
+                onChange={(e) => setHandoverAck(e.target.checked)}
+              />
+              <span>Tôi xác nhận chuyển đơn sang Sẵn sàng giao khi hồ sơ hoàn thành chưa đầy đủ.</span>
+            </label>
+            {handoverAck && (
+              <div className="admin-field" style={{ marginTop: 12 }}>
+                <label className="admin-label">Lý do xác nhận</label>
+                <textarea
+                  className="admin-textarea"
+                  rows={3}
+                  required
+                  value={handoverReason}
+                  onChange={(e) => setHandoverReason(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="quote-quick-contact-modal__actions">
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setHandoverOpen(false)}>Quay lại</button>
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary"
+                disabled={
+                  busy ||
+                  !(
+                    (partialDeliveryAck && handoverData?.partialDeliveryAllowed) ||
+                    (handoverAck && handoverReason.trim())
+                  )
+                }
+                onClick={() =>
+                  void updateStatus("READY_TO_SHIP", {
+                    handoverReadinessAcknowledged: handoverAck || partialDeliveryAck,
+                    handoverOverrideReason: handoverAck ? handoverReason : undefined,
+                    partialDeliveryAcknowledged: partialDeliveryAck,
+                  })
+                }
+              >
+                Chuyển sang Sẵn sàng giao
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,0 +1,19 @@
+import { NextRequest, NextResponse } from "next/server";
+import { initializeProductionStages } from "@/features/orders/production-stage.service";
+import { ProductionExecutionValidationError } from "@/features/orders/production-quantity";
+
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function POST(_req: NextRequest, context: RouteContext) {
+  const { id } = await context.params;
+  try {
+    const stages = await initializeProductionStages(id);
+    return NextResponse.json({ stages }, { status: 201 });
+  } catch (err) {
+    if (err instanceof ProductionExecutionValidationError) {
+      return NextResponse.json({ message: err.message }, { status: 400 });
+    }
+    console.error("[POST /api/orders/[id]/production-stages/initialize]", err);
+    return NextResponse.json({ message: "Không thể khởi tạo công đoạn" }, { status: 500 });
+  }
+}

@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Menu, Search, X } from "lucide-react";
+import { Menu, Search, X, LayoutGrid } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
 import MobileNavPanel from "@/components/public/MobileNavPanel";
 import MobileCategoryExplorerPanel from "@/components/public/MobileCategoryExplorerPanel";
-import MobileHomeCategoryAccessBar from "@/components/public/MobileHomeCategoryAccessBar";
 import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
 import MarketplaceMegaCategoryMenu from "@/components/marketplace/MarketplaceMegaCategoryMenu";
 import MarketplaceCategoryNav from "@/components/marketplace/MarketplaceCategoryNav";
@@ -72,8 +71,7 @@ export default function Header({
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const categoryAccessRef = useRef<HTMLButtonElement>(null);
 
-  const isHomePage = pathname === "/";
-  const showHomeCategoryAccess = isHomePage && categoryTree.length > 0;
+  const showMobileCategoryTrigger = categoryTree.length > 0;
 
   useEffect(() => {
     function onScroll() {
@@ -103,7 +101,7 @@ export default function Header({
       observer.disconnect();
       window.removeEventListener("resize", syncHeaderStackHeight);
     };
-  }, [mobileSearchOpen, showHomeCategoryAccess]);
+  }, [mobileSearchOpen, showMobileCategoryTrigger]);
 
   useEffect(() => {
     if (!mobileSearchOpen) return;
@@ -174,7 +172,6 @@ export default function Header({
         <div className="container">
           <div className="mp-header-main mp-header-main--search-first">
             <AttdLogo variant="desktop" src={headerLogoUrl} className="site-header-logo-desktop" />
-            <AttdLogo variant="mobile" src={headerLogoUrl} className="site-header-logo-mobile" />
 
             <div className="mp-header-mega mp-header-cats-container">
               <MarketplaceMegaCategoryMenu
@@ -206,25 +203,51 @@ export default function Header({
               </TrackedLink>
             </div>
 
-            <button
-              type="button"
-              aria-label="Tìm sản phẩm"
-              aria-expanded={mobileSearchOpen}
-              onClick={toggleMobileSearch}
-              className="mp-header-search-toggle"
-            >
-              <Search size={20} aria-hidden />
-            </button>
+            <div className="mp-header-mobile-row">
+              <div className="mp-header-mobile-row__side mp-header-mobile-row__side--left">
+                {showMobileCategoryTrigger ? (
+                  <button
+                    ref={categoryAccessRef}
+                    type="button"
+                    className="mp-header-mobile-cat-btn"
+                    aria-label="Mở tất cả danh mục"
+                    onClick={openMobileCategoryExplorer}
+                  >
+                    <LayoutGrid size={18} aria-hidden />
+                    <span>Danh mục</span>
+                  </button>
+                ) : (
+                  <span className="mp-header-mobile-row__spacer" aria-hidden="true" />
+                )}
+              </div>
 
-            <button
-              type="button"
-              aria-label="Mở menu"
-              aria-expanded={mobileOpen}
-              onClick={openMobileMenu}
-              className="site-nav-toggle mp-header-menu-btn"
-            >
-              <Menu size={20} />
-            </button>
+              <AttdLogo
+                variant="mobile"
+                src={headerLogoUrl}
+                className="site-header-logo-mobile mp-header-mobile-logo"
+              />
+
+              <div className="mp-header-mobile-row__side mp-header-mobile-row__side--right">
+                <button
+                  type="button"
+                  aria-label="Tìm sản phẩm"
+                  aria-expanded={mobileSearchOpen}
+                  onClick={toggleMobileSearch}
+                  className="mp-header-search-toggle"
+                >
+                  <Search size={20} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Mở menu"
+                  aria-expanded={mobileOpen}
+                  onClick={openMobileMenu}
+                  className="site-nav-toggle mp-header-menu-btn"
+                >
+                  <Menu size={20} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -250,13 +273,6 @@ export default function Header({
               </button>
             </div>
           </div>
-        )}
-
-        {showHomeCategoryAccess && (
-          <MobileHomeCategoryAccessBar
-            ref={categoryAccessRef}
-            onOpen={openMobileCategoryExplorer}
-          />
         )}
 
         <div className="mp-header-cats mp-header-cats--desktop">

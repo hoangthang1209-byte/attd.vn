@@ -12,6 +12,13 @@ import type {
   ProductionDueFilter,
   ProductionUrgency,
 } from "@/features/orders/order-operations.types";
+import type { ProductionBoardQcFilter } from "@/features/orders/production-execution-labels";
+import {
+  batchGetProductionExecutionIndicators,
+  matchesProductionQcFilter,
+  OVERRIDE_TITLE,
+  type ProductionExecutionIndicators,
+} from "@/features/orders/execution-board.service";
 
 const PRODUCTION_BOARD_STATUSES: OrderStatus[] = [
   "CONFIRMED",
@@ -61,6 +68,12 @@ export function getProductionSummaryCounts(
     dueSoonCount: orders.filter((o) => o.productionUrgency === "UPCOMING").length,
     overdueCount: orders.filter((o) => o.productionUrgency === "OVERDUE").length,
     readyToShipCount: orders.filter((o) => o.status === "READY_TO_SHIP").length,
+    needsQcCount: orders.filter((o) => o.executionQcFilterKey === "no_qc" && o.status === "IN_PRODUCTION").length,
+    needsReworkCount: orders.filter((o) => o.executionQcFilterKey === "rework").length,
+    awaitingPackingCount: orders.filter(
+      (o) => o.status === "IN_PRODUCTION" && o.executionPackingLabel === "Chưa đóng gói",
+    ).length,
+    handoverReadyCount: orders.filter((o) => o.executionHandoverReady).length,
   };
 }
 
@@ -325,7 +338,12 @@ function buildItemVariants(row: OrderRowWithItems): ProductionBoardItemVariant[]
   return variants;
 }
 
-function mapProductionBoardOrder(row: OrderRowWithItems, now: Date): ProductionBoardOrder {
+function mapProductionBoardOrder(
+  row: OrderRowWithItems,
+  now: Date,
+  execution?: ProductionExecutionIndicators,
+  executionHandoverOverride = false,
+): ProductionBoardOrder {
   const urgency = getProductionUrgency(row.productionDueDate, now);
   const sortedItems = [...row.items].sort((a, b) => a.sortOrder - b.sortOrder);
   const primary = sortedItems[0];
@@ -352,10 +370,22 @@ function mapProductionBoardOrder(row: OrderRowWithItems, now: Date): ProductionB
     primaryUnit: primary?.unit ?? null,
     productionUrgency: urgency,
     itemVariants: buildItemVariants(row),
+    executionStageProgress: execution?.stageProgressLabel ?? "—",
+    executionQcStatusLabel: execution?.qcStatusLabel ?? "Chưa QC",
+    executionPackingLabel: execution?.packingLabel ?? "Chưa đóng gói",
+    executionHandoverLabel: execution?.handoverStateLabel ?? "—",
+    executionHandoverReady: execution?.handoverReady ?? false,
+    executionQcFilterKey: execution?.qcFilterKey ?? "no_qc",
+    executionHandoverOverride,
   };
 }
 
-function mapDeliveryBoardOrder(row: OrderRowWithItems, now: Date): DeliveryBoardOrder {
+function mapDeliveryBoardOrder(
+  row: OrderRowWithItems,
+  now: Date,
+  execution?: ProductionExecutionIndicators,
+  executionHandoverOverride = false,
+): DeliveryBoardOrder {
   const deliveryInfo = {
     status: row.status,
     deliveryRecipientName: row.deliveryRecipientName,
@@ -390,6 +420,9 @@ function mapDeliveryBoardOrder(row: OrderRowWithItems, now: Date): DeliveryBoard
     status: row.status,
     deliveryReadiness: getDeliveryReadiness(deliveryInfo, now),
     missingDeliveryFields,
+    executionHandoverLabel: execution?.handoverStateLabel ?? null,
+    executionHandoverOverride,
+    executionQcStatusLabel: execution?.qcStatusLabel ?? null,
   };
 }
 
@@ -439,7 +472,24 @@ function emptyProductionSummary(): ProductionBoardSummary {
     dueSoonCount: 0,
     overdueCount: 0,
     readyToShipCount: 0,
+    needsQcCount: 0,
+    needsReworkCount: 0,
+    awaitingPackingCount: 0,
+    handoverReadyCount: 0,
   };
+}
+
+async function loadHandoverOverrideFlags(orderIds: string[]): Promise<Map<string, boolean>> {
+  if (orderIds.length === 0) return new Map();
+  const activities = await prisma.orderActivity.findMany({
+    where: {
+      orderId: { in: orderIds },
+      title: OVERRIDE_TITLE,
+    },
+    select: { orderId: true },
+    distinct: ["orderId"],
+  });
+  return new Map(activities.map((a) => [a.orderId, true]));
 }
 
 export async function getProductionBoardOrders(params?: {
@@ -449,6 +499,7 @@ export async function getProductionBoardOrders(params?: {
   customerId?: string;
   salesEmployeeId?: string;
   search?: string;
+  qcFilter?: ProductionBoardQcFilter;
 }) {
   const now = new Date();
 
@@ -465,11 +516,31 @@ export async function getProductionBoardOrders(params?: {
   });
 
   const rows = await prisma.order.findMany({ where, include: orderInclude });
+  const orderIds = rows.map((r) => r.id);
+  const [executionMap, overrideMap] = await Promise.all([
+    batchGetProductionExecutionIndicators(rows.map((r) => ({ id: r.id, status: r.status }))),
+    loadHandoverOverrideFlags(orderIds),
+  ]);
 
-  let orders = rows.map((row) => mapProductionBoardOrder(row, now));
+  let orders = rows.map((row) =>
+    mapProductionBoardOrder(
+      row,
+      now,
+      executionMap.get(row.id),
+      overrideMap.get(row.id) ?? false,
+    ),
+  );
 
   if (params?.due) {
     orders = filterProductionBoardOrdersByDue(orders, params.due, now);
+  }
+
+  if (params?.qcFilter && params.qcFilter !== "all") {
+    orders = orders.filter((order) => {
+      const indicators = executionMap.get(order.id);
+      if (!indicators) return false;
+      return matchesProductionQcFilter(indicators, params.qcFilter!);
+    });
   }
 
   orders.sort((a, b) => {
@@ -486,7 +557,14 @@ export async function getProductionBoardOrders(params?: {
     return rankA - rankB;
   });
 
-  const allMapped = rows.map((row) => mapProductionBoardOrder(row, now));
+  const allMapped = rows.map((row) =>
+    mapProductionBoardOrder(
+      row,
+      now,
+      executionMap.get(row.id),
+      overrideMap.get(row.id) ?? false,
+    ),
+  );
   const summary = getProductionSummaryCounts(allMapped);
 
   return { orders, total: orders.length, summary };
@@ -547,8 +625,20 @@ export async function getDeliveryBoardOrders(params?: {
   };
 
   const rows = await prisma.order.findMany({ where, include: orderInclude });
+  const orderIds = rows.map((r) => r.id);
+  const [executionMap, overrideMap] = await Promise.all([
+    batchGetProductionExecutionIndicators(rows.map((r) => ({ id: r.id, status: r.status }))),
+    loadHandoverOverrideFlags(orderIds),
+  ]);
 
-  let orders = rows.map((row) => mapDeliveryBoardOrder(row, now));
+  let orders = rows.map((row) =>
+    mapDeliveryBoardOrder(
+      row,
+      now,
+      executionMap.get(row.id),
+      overrideMap.get(row.id) ?? false,
+    ),
+  );
 
   if (params?.readiness) {
     orders = orders.filter((o) => o.deliveryReadiness === params.readiness);

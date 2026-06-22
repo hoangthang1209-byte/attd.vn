@@ -148,6 +148,9 @@ export function parseUpdateOrderStatusBody(raw: Record<string, unknown>): Update
     cancelReason: parseOptionalString(raw.cancelReason),
     correctionReason: parseOptionalString(raw.correctionReason),
     productionReadinessAcknowledged: raw.productionReadinessAcknowledged === true,
+    handoverReadinessAcknowledged: raw.handoverReadinessAcknowledged === true,
+    handoverOverrideReason: parseOptionalString(raw.handoverOverrideReason),
+    partialDeliveryAcknowledged: raw.partialDeliveryAcknowledged === true,
   };
 }
 
