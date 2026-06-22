@@ -7,6 +7,13 @@ import type {
 } from "@/features/products/product-import-types";
 import type { ProductImportPreset } from "@/features/products/product-import-presets";
 import { getSuggestedFix } from "@/features/products/product-import-feedback";
+import { IMPORT_CLEAR_TOKEN } from "@/features/products/product-import-constants";
+import { isValidImageUrl } from "@/features/products/product-admin-input";
+import {
+  buildDisplayLabelFromOptions,
+  hasStructuredAndLegacyConflict,
+  parseStructuredOptionValues,
+} from "@/features/products/product-import-options-parser";
 import {
   generateSku,
   requireCategorySkuCode,
@@ -58,59 +65,142 @@ export function normalizeCategoryName(input: string): string {
   return input.trim().replace(/\s+/g, " ");
 }
 
+export function isClearToken(val: unknown): boolean {
+  return String(val ?? "").trim() === IMPORT_CLEAR_TOKEN;
+}
+
+function readCell(raw: Record<string, unknown>, col?: string): unknown {
+  if (!col) return undefined;
+  return raw[col] ?? raw[col.toLowerCase()] ?? raw[col.toUpperCase()];
+}
+
+function readStringField(
+  raw: Record<string, unknown>,
+  col: string | undefined,
+  present: Record<string, boolean>,
+  key: string,
+): string | undefined {
+  if (!col) return undefined;
+  const val = readCell(raw, col);
+  if (val == null || String(val).trim() === "") return undefined;
+  present[key] = true;
+  if (isClearToken(val)) return IMPORT_CLEAR_TOKEN;
+  return String(val).trim();
+}
+
+function readOptionalNumberField(
+  raw: Record<string, unknown>,
+  col: string | undefined,
+  present: Record<string, boolean>,
+  key: string,
+): number | undefined {
+  if (!col) return undefined;
+  const val = readCell(raw, col);
+  if (val == null || String(val).trim() === "") return undefined;
+  present[key] = true;
+  if (isClearToken(val)) return undefined;
+  return parseNumber(val);
+}
+
 // ─── Map a raw object to ProductImportRow ─────────────────────────────────────
 
 export function mapRawRowToImportRow(
   raw: Record<string, unknown>,
   mapping: ProductImportColumnMapping,
   rowIndex: number,
-  presetDefaults: Record<string, unknown> = {}
+  presetDefaults: Record<string, unknown> = {},
+  entityType: ProductImportRow["entityType"] = "product",
 ): ProductImportRow {
+  const present: Record<string, boolean> = {};
+
   function get(key: keyof ProductImportColumnMapping): unknown {
     const col = mapping[key];
     if (!col) return undefined;
-    return raw[col] ?? raw[col.toLowerCase()] ?? raw[col.toUpperCase()];
+    return readCell(raw, col);
   }
 
   const supportsPrinting = parseBoolean(get("supportsPrinting")) ?? (presetDefaults.supportsPrinting as boolean | undefined);
   const supportsEmbroidery = parseBoolean(get("supportsEmbroidery")) ?? (presetDefaults.supportsEmbroidery as boolean | undefined);
   const supportsOem = parseBoolean(get("supportsOem")) ?? (presetDefaults.supportsOem as boolean | undefined);
 
-  return {
+  const row: ProductImportRow = {
     rowIndex,
+    entityType,
     productName: String(get("productName") ?? "").trim(),
     category: String(get("category") ?? "").trim(),
-    productCode: String(get("productCode") ?? "").trim() || undefined,
-    slug: String(get("slug") ?? "").trim() || undefined,
-    shortDescription: String(get("shortDescription") ?? "").trim() || undefined,
-    description: String(get("description") ?? "").trim() || undefined,
-    material: String(get("material") ?? "").trim() || undefined,
-    form: String(get("form") ?? "").trim() || undefined,
-    fit: String(get("fit") ?? "").trim() || undefined,
-    defaultMoq: parseNumber(get("defaultMoq")),
-    useCases: String(get("useCases") ?? "").trim() || undefined,
-    targetCustomers: String(get("targetCustomers") ?? "").trim() || undefined,
+    productCode: readStringField(raw, mapping.productCode, present, "productCode"),
+    systemCode: readStringField(raw, mapping.systemCode, present, "systemCode"),
+    productId: readStringField(raw, mapping.productId, present, "productId"),
+    slug: readStringField(raw, mapping.slug, present, "slug"),
+    shortDescription: readStringField(raw, mapping.shortDescription, present, "shortDescription"),
+    description: readStringField(raw, mapping.description, present, "description"),
+    material: readStringField(raw, mapping.material, present, "material"),
+    form: readStringField(raw, mapping.form, present, "form"),
+    fit: readStringField(raw, mapping.fit, present, "fit"),
+    gsm: readOptionalNumberField(raw, mapping.gsm, present, "gsm"),
+    defaultMoq: readOptionalNumberField(raw, mapping.defaultMoq, present, "defaultMoq"),
+    leadTime: readStringField(raw, mapping.leadTime, present, "leadTime"),
+    useCases: readStringField(raw, mapping.useCases, present, "useCases"),
+    targetCustomers: readStringField(raw, mapping.targetCustomers, present, "targetCustomers"),
     supportsPrinting: supportsPrinting ?? false,
     supportsEmbroidery: supportsEmbroidery ?? false,
     supportsOem: supportsOem ?? true,
-    tags: String(get("tags") ?? "").trim() || undefined,
-    status: normalizeStatus(String(get("status") ?? presetDefaults.status ?? "DRAFT")),
-    featuredImage: String(get("featuredImage") ?? "").trim() || undefined,
-    sku: String(get("sku") ?? "").trim() || undefined,
-    colorName: String(get("colorName") ?? "").trim() || undefined,
-    colorCode: String(get("colorCode") ?? "").trim() || undefined,
-    sizeName: String(get("sizeName") ?? "").trim() || undefined,
-    dimensions: String(get("dimensions") ?? "").trim() || undefined,
-    capacity: String(get("capacity") ?? "").trim() || undefined,
-    stockQty: parseNumber(get("stockQty")) ?? 0,
-    stockStatus: normalizeStockStatus(String(get("stockStatus") ?? presetDefaults.stockStatus ?? "")),
-    wholesalePrice: parseNumber(get("wholesalePrice")),
-    dealerPrice: parseNumber(get("dealerPrice")),
-    costPrice: parseNumber(get("costPrice")),
-    priceTiers: String(get("priceTiers") ?? "").trim() || undefined,
-    weight: parseNumber(get("weight")),
-    internalNote: String(get("internalNote") ?? "").trim() || undefined,
+    tags: readStringField(raw, mapping.tags, present, "tags"),
+    status: mapping.status
+      ? (readStringField(raw, mapping.status, present, "status") ?? normalizeStatus(String(presetDefaults.status ?? "DRAFT")))
+      : normalizeStatus(String(presetDefaults.status ?? "DRAFT")),
+    featuredImage: readStringField(raw, mapping.featuredImage, present, "featuredImage"),
+    galleryUrls: readStringField(raw, mapping.galleryUrls, present, "galleryUrls"),
+    seoTitle: readStringField(raw, mapping.seoTitle, present, "seoTitle"),
+    seoDescription: readStringField(raw, mapping.seoDescription, present, "seoDescription"),
+    sku: readStringField(raw, mapping.sku, present, "sku"),
+    displayLabel: readStringField(raw, mapping.displayLabel, present, "displayLabel"),
+    optionValues: readStringField(raw, mapping.optionValues, present, "optionValues"),
+    optionGroup: readStringField(raw, mapping.optionGroup, present, "optionGroup"),
+    optionValue: readStringField(raw, mapping.optionValue, present, "optionValue"),
+    colorName: readStringField(raw, mapping.colorName, present, "colorName"),
+    colorCode: readStringField(raw, mapping.colorCode, present, "colorCode"),
+    sizeName: readStringField(raw, mapping.sizeName, present, "sizeName"),
+    dimensions: readStringField(raw, mapping.dimensions, present, "dimensions"),
+    capacity: readStringField(raw, mapping.capacity, present, "capacity"),
+    materialOverride: readStringField(raw, mapping.materialOverride, present, "materialOverride"),
+    stockQty: readOptionalNumberField(raw, mapping.stockQty, present, "stockQty") ?? 0,
+    stockStatus: mapping.stockStatus
+      ? normalizeStockStatus(String(readCell(raw, mapping.stockStatus) ?? presetDefaults.stockStatus ?? ""))
+      : normalizeStockStatus(String(presetDefaults.stockStatus ?? "")),
+    moqOverride: readOptionalNumberField(raw, mapping.moqOverride, present, "moqOverride"),
+    leadTimeOverride: readStringField(raw, mapping.leadTimeOverride, present, "leadTimeOverride"),
+    imageUrl: readStringField(raw, mapping.imageUrl, present, "imageUrl"),
+    variantStatus: readStringField(raw, mapping.variantStatus, present, "variantStatus"),
+    wholesalePrice: readOptionalNumberField(raw, mapping.wholesalePrice, present, "wholesalePrice"),
+    dealerPrice: readOptionalNumberField(raw, mapping.dealerPrice, present, "dealerPrice"),
+    costPrice: readOptionalNumberField(raw, mapping.costPrice, present, "costPrice"),
+    priceTiers: readStringField(raw, mapping.priceTiers, present, "priceTiers"),
+    weight: readOptionalNumberField(raw, mapping.weight, present, "weight"),
+    internalNote: readStringField(raw, mapping.internalNote, present, "internalNote"),
+    specGroup: readStringField(raw, mapping.specGroup, present, "specGroup"),
+    specLabel: readStringField(raw, mapping.specLabel, present, "specLabel"),
+    specValue: readStringField(raw, mapping.specValue, present, "specValue"),
+    specSortOrder: readOptionalNumberField(raw, mapping.specSortOrder, present, "specSortOrder"),
+    capability: readStringField(raw, mapping.capability, present, "capability"),
+    capabilityDescription: readStringField(raw, mapping.capabilityDescription, present, "capabilityDescription"),
+    capabilitySortOrder: readOptionalNumberField(raw, mapping.capabilitySortOrder, present, "capabilitySortOrder"),
+    capabilityEnabled: mapping.capabilityEnabled
+      ? parseBoolean(readCell(raw, mapping.capabilityEnabled))
+      : undefined,
+    _presentFields: present,
   };
+
+  if (entityType === "specification") {
+    row.specLabel = row.specLabel ?? readStringField(raw, mapping.specLabel, present, "specLabel");
+    row.specValue = row.specValue ?? readStringField(raw, mapping.specValue, present, "specValue");
+  }
+
+  if (entityType === "customization") {
+    row.capability = row.capability ?? readStringField(raw, mapping.capability, present, "capability");
+  }
+
+  return row;
 }
 
 function validationError(
@@ -162,13 +252,85 @@ export function validateRawFieldValues(
 
 // ─── Validate a row ───────────────────────────────────────────────────────────
 
-export function validateImportRow(row: ProductImportRow): ProductImportValidationError[] {
+export function validateImportRow(
+  row: ProductImportRow,
+  importMode?: string,
+): ProductImportValidationError[] {
   const errors: ProductImportValidationError[] = [];
+  const entityType = row.entityType ?? "product";
 
-  if (!row.productName) {
+  if (entityType === "product") {
+    if (importMode === "create-product" && !row.productName) {
+      errors.push(validationError("productName", "Tên sản phẩm là bắt buộc."));
+    }
+    if (importMode === "create-product" && !row.category) {
+      errors.push(validationError("category", "Danh mục là bắt buộc."));
+    }
+    if (importMode === "update-product" && !row.productCode && !row.systemCode && !row.slug && !row.productId) {
+      errors.push(validationError("productCode", "Cần productCode, systemCode, slug hoặc ID để cập nhật sản phẩm."));
+    }
+  }
+
+  if (entityType === "variant") {
+    if (!row.productCode && !row.systemCode && !row.slug && !row.productId) {
+      errors.push(validationError("productCode", "Cần productCode, systemCode, slug hoặc ID sản phẩm."));
+    }
+    const optionPairs = row.optionValues ? parseStructuredOptionValues(row.optionValues) : [];
+    if (hasStructuredAndLegacyConflict(optionPairs, row)) {
+      errors.push(
+        validationError(
+          "optionValues",
+          "Không thể dùng đồng thời optionValues có cấu trúc và colorName/sizeName legacy trong cùng một dòng.",
+        ),
+      );
+    }
+    if (
+      importMode !== "update-variants-bulk" &&
+      !row.sku &&
+      !optionPairs.length &&
+      !row.colorName &&
+      !row.sizeName
+    ) {
+      errors.push(
+        validationError("sku", "Cần SKU hoặc tổ hợp thuộc tính (optionValues) hoặc màu/size legacy."),
+      );
+    }
+  }
+
+  if (entityType === "specification") {
+    if (!row.productCode && !row.systemCode) {
+      errors.push(validationError("productCode", "Cần productCode hoặc systemCode."));
+    }
+    if (!row.specLabel) {
+      errors.push(validationError("specLabel", "Nhãn thông số là bắt buộc."));
+    }
+    if (!row.specValue) {
+      errors.push(validationError("specValue", "Giá trị thông số là bắt buộc."));
+    }
+  }
+
+  if (entityType === "customization") {
+    if (!row.productCode && !row.systemCode) {
+      errors.push(validationError("productCode", "Cần productCode hoặc systemCode."));
+    }
+    if (!row.capability) {
+      errors.push(validationError("capability", "Tên khả năng tùy chỉnh là bắt buộc."));
+    }
+  }
+
+  if (!importMode && entityType === "product") {
+    if (!row.productName) {
+      errors.push(validationError("productName", "Tên sản phẩm là bắt buộc."));
+    }
+    if (!row.category) {
+      errors.push(validationError("category", "Danh mục là bắt buộc."));
+    }
+  }
+
+  if (!row.productName && entityType === "product" && importMode === "create-product") {
     errors.push(validationError("productName", "Tên sản phẩm là bắt buộc."));
   }
-  if (!row.category) {
+  if (!row.category && entityType === "product" && importMode === "create-product") {
     errors.push(validationError("category", "Danh mục là bắt buộc."));
   }
   if (row.defaultMoq !== undefined && row.defaultMoq < 1) {
@@ -183,8 +345,19 @@ export function validateImportRow(row: ProductImportRow): ProductImportValidatio
   if (row.dealerPrice !== undefined && row.dealerPrice < 0) {
     errors.push(validationError("dealerPrice", "Giá đại lý không hợp lệ."));
   }
-  if (row.featuredImage && !/^https?:\/\/.+/i.test(row.featuredImage)) {
-    errors.push(validationError("featuredImage", "URL ảnh không hợp lệ."));
+  if (row.featuredImage && row.featuredImage !== IMPORT_CLEAR_TOKEN && !isValidImageUrl(row.featuredImage)) {
+    errors.push(validationError("featuredImage", "URL ảnh đại diện không hợp lệ."));
+  }
+  if (row.galleryUrls && row.galleryUrls !== IMPORT_CLEAR_TOKEN) {
+    for (const url of row.galleryUrls.split("|").map((u) => u.trim()).filter(Boolean)) {
+      if (!isValidImageUrl(url)) {
+        errors.push(validationError("galleryUrls", `URL gallery không hợp lệ: ${url}`));
+        break;
+      }
+    }
+  }
+  if (row.imageUrl && row.imageUrl !== IMPORT_CLEAR_TOKEN && !isValidImageUrl(row.imageUrl)) {
+    errors.push(validationError("imageUrl", "URL ảnh biến thể không hợp lệ."));
   }
   if (row.stockStatus && !["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK", "PREORDER"].includes(row.stockStatus)) {
     errors.push(validationError("stockStatus", "Trạng thái tồn kho không hợp lệ."));
@@ -197,6 +370,15 @@ export function validateImportRow(row: ProductImportRow): ProductImportValidatio
       }
     } catch {
       errors.push(validationError("priceTiers", "priceTiers không phải JSON hợp lệ."));
+    }
+  }
+  if (row.moqOverride !== undefined && row.moqOverride < 1) {
+    errors.push(validationError("moqOverride", "MOQ riêng phải >= 1."));
+  }
+  if (row.variantStatus) {
+    const vs = row.variantStatus.toUpperCase();
+    if (!["ACTIVE", "INACTIVE", "ARCHIVED"].includes(vs)) {
+      errors.push(validationError("variantStatus", "Trạng thái biến thể không hợp lệ."));
     }
   }
 
@@ -307,6 +489,7 @@ export function buildPreviewRows(
 
     return {
       ...row,
+      entityType: row.entityType ?? "product",
       productCode,
       normalizedCategory,
       generatedSku,

@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ProductCatalogForm from "@/components/admin/products/ProductCatalogForm";
+import {
+  mapOptionsToFormRows,
+  mapVariantsToFormRows,
+} from "@/components/admin/products/ProductCatalogVariantsSection";
 import { getProductAdminById, listProductCategories } from "@/features/products/product-admin.service";
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
@@ -34,22 +38,23 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     status: product.status,
     featuredImage: product.featuredImage ?? "",
     gallery: (product.gallery as string[]) ?? [],
-    variants: product.variants.map((v) => ({
-      id: v.id,
-      colorName: v.colorName ?? "",
-      colorCode: v.colorCode ?? "",
-      sizeName: v.sizeName ?? "",
-      dimensions: v.dimensions ?? "",
-      capacity: v.capacity ?? "",
-      wholesalePrice: v.wholesalePrice != null ? String(v.wholesalePrice) : "",
-      dealerPrice: v.dealerPrice != null ? String(v.dealerPrice) : "",
-      stockQty: String(v.stockQty),
-      stockStatus: v.stockStatus,
-      imageUrl: v.imageUrl ?? "",
-      internalNote: v.internalNote ?? "",
-      skuPreview: v.sku,
-      skuTaken: false,
+    specifications: product.specifications.map((row) => ({
+      id: row.id,
+      label: row.label,
+      value: row.value,
+      sortOrder: row.sortOrder,
     })),
+    customizations: product.customizationCapabilities.map((row) => ({
+      id: row.id,
+      label: row.label,
+      description: row.description ?? "",
+      sortOrder: row.sortOrder,
+      enabled: row.enabled,
+    })),
+    options: mapOptionsToFormRows(product.options),
+    variants: mapVariantsToFormRows(product.variants),
+    seoTitle: product.seoTitle ?? "",
+    seoDescription: product.seoDescription ?? "",
   };
 
   const cats = categories.map((c) => ({

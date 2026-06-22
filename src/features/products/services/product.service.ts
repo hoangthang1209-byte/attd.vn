@@ -1,6 +1,53 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCategoryFilterIdsBySlug } from "@/features/categories/services/category.service";
+import {
+  buildDefaultCustomizationsFromFlags,
+  mapProductToPublicDetail,
+} from "@/features/products/product-detail.mapper";
+import type { PublicProductDetail } from "@/features/products/product-detail.types";
+
+const PRODUCT_DETAIL_INCLUDE = {
+  category: { select: { id: true, name: true, slug: true } },
+  images: { orderBy: { sortOrder: "asc" as const } },
+  options: {
+    orderBy: { sortOrder: "asc" as const },
+    include: {
+      values: { orderBy: { sortOrder: "asc" as const } },
+    },
+  },
+  specifications: { orderBy: { sortOrder: "asc" as const } },
+  customizationCapabilities: { orderBy: { sortOrder: "asc" as const } },
+  variants: {
+    where: { variantStatus: "ACTIVE" },
+    include: {
+      color: { select: { name: true } },
+      size: { select: { name: true } },
+      optionValues: {
+        include: {
+          optionValue: {
+            include: { option: { select: { id: true, slug: true, name: true } } },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
+} as const;
+
+export async function getProductDetailBySlug(slug: string): Promise<PublicProductDetail | null> {
+  const product = await prisma.product.findUnique({
+    where: { slug, status: "ACTIVE" },
+    include: PRODUCT_DETAIL_INCLUDE,
+  });
+  if (!product) return null;
+
+  const detail = mapProductToPublicDetail(product);
+  if (detail.customizations.length === 0) {
+    detail.customizations = buildDefaultCustomizationsFromFlags(product);
+  }
+  return detail;
+}
 
 export async function getProducts() {
   return prisma.product.findMany({

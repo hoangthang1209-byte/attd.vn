@@ -20,6 +20,14 @@ import {
   validateCategoryParentSelection,
 } from "@/features/categories/category-tree-utils";
 import { generateProductSystemCode } from "@/features/products/product-system-code";
+import {
+  PRODUCT_CMS_INCLUDE,
+  syncProductCmsData,
+  resolveOptionValueIdsForProduct,
+  type ProductCustomizationInput,
+  type ProductOptionInput,
+  type ProductSpecificationInput,
+} from "@/features/products/product-admin-cms";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +50,11 @@ export type VariantInput = {
   sizeName?: string;
   dimensions?: string;
   capacity?: string;
+  displayLabel?: string;
+  moqOverride?: number | null;
+  leadTimeOverride?: string | null;
+  materialOverride?: string | null;
+  optionValueIds?: string[];
   wholesalePrice?: number | null;
   dealerPrice?: number | null;
   costPrice?: number | null;
@@ -82,6 +95,9 @@ export type ProductInput = {
   status?: ProductStatus;
   metadata?: Record<string, unknown> | null;
   variants?: VariantInput[];
+  options?: ProductOptionInput[];
+  specifications?: ProductSpecificationInput[];
+  customizations?: ProductCustomizationInput[];
 };
 
 const VARIANT_INCLUDE = {
@@ -92,7 +108,14 @@ const VARIANT_INCLUDE = {
 const PRODUCT_INCLUDE = {
   category: { select: { id: true, name: true, slug: true, skuCode: true } },
   images: { select: { id: true, imageUrl: true, altText: true, sortOrder: true }, orderBy: { sortOrder: "asc" as const } },
-  variants: { include: VARIANT_INCLUDE, orderBy: { createdAt: "asc" as const } },
+  variants: {
+    include: {
+      ...VARIANT_INCLUDE,
+      optionValues: { select: { optionValueId: true } },
+    },
+    orderBy: { createdAt: "asc" as const },
+  },
+  ...PRODUCT_CMS_INCLUDE,
 } as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -319,18 +342,31 @@ export async function createProductAdmin(input: ProductInput) {
     include: PRODUCT_INCLUDE,
   });
 
+  if (input.options || input.specifications || input.customizations) {
+    await syncProductCmsData(product.id, {
+      options: input.options,
+      specifications: input.specifications,
+      customizations: input.customizations,
+    });
+  }
+
+  const createdVariantIds: string[] = [];
   if (input.variants?.length) {
     for (const v of input.variants) {
       const sku = await buildVariantSku(v, productCode);
-      await prisma.productVariant.create({
+      const created = await prisma.productVariant.create({
         data: {
           productId: product.id,
-          sku,
+          sku: v.sku?.trim() || sku,
           colorName: v.colorName,
           colorCode: v.colorCode,
           sizeName: v.sizeName,
           dimensions: v.dimensions,
           capacity: v.capacity,
+          displayLabel: v.displayLabel?.trim() || null,
+          moqOverride: v.moqOverride ?? null,
+          leadTimeOverride: v.leadTimeOverride?.trim() || null,
+          materialOverride: v.materialOverride?.trim() || null,
           wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
           dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
           costPrice: v.costPrice != null ? v.costPrice : undefined,
@@ -344,7 +380,22 @@ export async function createProductAdmin(input: ProductInput) {
           ...(v.metadata ? { metadata: v.metadata as Prisma.InputJsonValue } : {}),
         },
       });
+      createdVariantIds.push(created.id);
     }
+  }
+
+  if (input.variants?.some((v) => v.optionValueIds?.length)) {
+    const variantOptionValueIds: Record<string, string[]> = {};
+    for (const [index, v] of (input.variants ?? []).entries()) {
+      const variantId = v.id ?? createdVariantIds[index];
+      if (variantId && v.optionValueIds?.length) {
+        variantOptionValueIds[variantId] = await resolveOptionValueIdsForProduct(
+          product.id,
+          v.optionValueIds,
+        );
+      }
+    }
+    await syncProductCmsData(product.id, { variantOptionValueIds });
   }
 
   return await getProductAdminById(product.id);
@@ -416,12 +467,12 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
 
   await prisma.product.update({ where: { id }, data: updateData });
 
+  const createdVariantIds: string[] = [];
   if (input.variants) {
     const product = await prisma.product.findUnique({
       where: { id },
-      select: { productCode: true, name: true, material: true, categoryId: true },
+      select: { productCode: true, name: true, material: true },
     });
-    const categoryId = input.categoryId ?? product?.categoryId;
     const prodCode = product?.productCode;
     if (!prodCode) {
       throw new ProductAdminValidationError(
@@ -435,11 +486,18 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
         await prisma.productVariant.update({
           where: { id: v.id },
           data: {
+            ...(v.sku?.trim() ? { sku: v.sku.trim() } : {}),
             colorName: v.colorName,
             colorCode: v.colorCode,
             sizeName: v.sizeName,
             dimensions: v.dimensions,
             capacity: v.capacity,
+            displayLabel: v.displayLabel !== undefined ? (v.displayLabel?.trim() || null) : undefined,
+            moqOverride: v.moqOverride !== undefined ? v.moqOverride : undefined,
+            leadTimeOverride:
+              v.leadTimeOverride !== undefined ? (v.leadTimeOverride?.trim() || null) : undefined,
+            materialOverride:
+              v.materialOverride !== undefined ? (v.materialOverride?.trim() || null) : undefined,
             wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
             dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
             costPrice: v.costPrice != null ? v.costPrice : undefined,
@@ -454,15 +512,19 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
         });
       } else {
         const sku = await buildVariantSku(v, prodCode);
-        await prisma.productVariant.create({
+        const created = await prisma.productVariant.create({
           data: {
             productId: id,
-            sku,
+            sku: v.sku?.trim() || sku,
             colorName: v.colorName,
             colorCode: v.colorCode,
             sizeName: v.sizeName,
             dimensions: v.dimensions,
             capacity: v.capacity,
+            displayLabel: v.displayLabel?.trim() || null,
+            moqOverride: v.moqOverride ?? null,
+            leadTimeOverride: v.leadTimeOverride?.trim() || null,
+            materialOverride: v.materialOverride?.trim() || null,
             wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
             dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
             costPrice: v.costPrice != null ? v.costPrice : undefined,
@@ -476,8 +538,36 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
             ...(v.metadata ? { metadata: v.metadata as Prisma.InputJsonValue } : {}),
           },
         });
+        createdVariantIds.push(created.id);
       }
     }
+  }
+
+  if (input.options || input.specifications || input.customizations) {
+    await syncProductCmsData(id, {
+      options: input.options,
+      specifications: input.specifications,
+      customizations: input.customizations,
+    });
+  }
+
+  if (input.variants?.some((v) => v.optionValueIds?.length)) {
+    const variantOptionValueIds: Record<string, string[]> = {};
+    let newVariantIndex = 0;
+    for (const v of input.variants) {
+      if (!v.optionValueIds?.length) {
+        if (!v.id) newVariantIndex += 1;
+        continue;
+      }
+      const variantId = v.id ?? createdVariantIds[newVariantIndex];
+      if (!v.id) newVariantIndex += 1;
+      if (!variantId) continue;
+      variantOptionValueIds[variantId] = await resolveOptionValueIdsForProduct(
+        id,
+        v.optionValueIds,
+      );
+    }
+    await syncProductCmsData(id, { variantOptionValueIds });
   }
 
   return await getProductAdminById(id);

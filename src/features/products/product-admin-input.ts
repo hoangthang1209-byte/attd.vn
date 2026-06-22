@@ -1,5 +1,6 @@
 import type { ProductStatus, StockStatus, VariantStatus } from "@prisma/client";
 import type { ProductInput, VariantInput } from "@/features/products/product-admin.service";
+import { isValidProductImageUrl, PRODUCT_IMAGE_URL_ERROR } from "@/features/products/product-image-url";
 
 export class ProductAdminValidationError extends Error {
   fieldErrors: Record<string, string>;
@@ -18,7 +19,7 @@ const VALID_PRODUCT_STATUSES = new Set<ProductStatus>(["ACTIVE", "DRAFT", "INACT
 const VALID_VARIANT_STATUSES = new Set<VariantStatus>(["ACTIVE", "INACTIVE", "ARCHIVED"]);
 
 export function isValidImageUrl(value: string): boolean {
-  return /^https?:\/\/.+/i.test(value.trim());
+  return isValidProductImageUrl(value);
 }
 
 export function normalizeImageUrl(
@@ -32,7 +33,7 @@ export function normalizeImageUrl(
   const trimmed = String(value).trim();
   if (!trimmed) return optional ? null : undefined;
   if (!isValidImageUrl(trimmed)) {
-    fieldErrors[field] = "URL ảnh không hợp lệ. Vui lòng dùng link ảnh bắt đầu bằng https://.";
+    fieldErrors[field] = PRODUCT_IMAGE_URL_ERROR;
     return optional ? null : undefined;
   }
   return trimmed;
@@ -121,6 +122,7 @@ function parseVariant(raw: unknown, index: number): VariantInput {
   const costPrice = parseOptionalNumber(v.costPrice, `${prefix}.costPrice`, fieldErrors);
   const weight = parseOptionalNumber(v.weight, `${prefix}.weight`, fieldErrors);
   const stockQty = parseOptionalInt(v.stockQty, `${prefix}.stockQty`, fieldErrors);
+  const moqOverride = parseOptionalInt(v.moqOverride, `${prefix}.moqOverride`, fieldErrors);
 
   let stockStatus: StockStatus | undefined;
   if (v.stockStatus !== undefined && v.stockStatus !== null && v.stockStatus !== "") {
@@ -157,6 +159,13 @@ function parseVariant(raw: unknown, index: number): VariantInput {
     sizeName: v.sizeName ? String(v.sizeName).trim() : undefined,
     dimensions: v.dimensions ? String(v.dimensions).trim() : undefined,
     capacity: v.capacity ? String(v.capacity).trim() : undefined,
+    displayLabel: v.displayLabel ? String(v.displayLabel).trim() : undefined,
+    moqOverride: moqOverride ?? undefined,
+    leadTimeOverride: v.leadTimeOverride ? String(v.leadTimeOverride).trim() : undefined,
+    materialOverride: v.materialOverride ? String(v.materialOverride).trim() : undefined,
+    optionValueIds: Array.isArray(v.optionValueIds)
+      ? v.optionValueIds.map((id) => String(id).trim()).filter(Boolean)
+      : undefined,
     wholesalePrice: wholesalePrice ?? undefined,
     dealerPrice: dealerPrice ?? undefined,
     costPrice: costPrice ?? undefined,
@@ -251,6 +260,56 @@ export function parseProductInput(
     input.metadata = raw.metadata as Record<string, unknown>;
   }
   if (variants !== undefined) input.variants = variants;
+
+  if (Array.isArray(raw.options)) {
+    input.options = raw.options.map((opt, index) => {
+      const row = opt as Record<string, unknown>;
+      const values = Array.isArray(row.values)
+        ? row.values.map((val, valIndex) => {
+            const v = val as Record<string, unknown>;
+            return {
+              id: v.id ? String(v.id) : undefined,
+              label: String(v.label ?? "").trim(),
+              valueCode: v.valueCode ? String(v.valueCode).trim() : undefined,
+              imageUrl: v.imageUrl ? String(v.imageUrl).trim() : undefined,
+              sortOrder: typeof v.sortOrder === "number" ? v.sortOrder : valIndex,
+            };
+          }).filter((v) => v.label)
+        : [];
+      return {
+        id: row.id ? String(row.id) : undefined,
+        name: String(row.name ?? "").trim(),
+        slug: row.slug ? String(row.slug).trim() : undefined,
+        sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : index,
+        values,
+      };
+    }).filter((opt) => opt.name);
+  }
+
+  if (Array.isArray(raw.specifications)) {
+    input.specifications = raw.specifications.map((spec, index) => {
+      const row = spec as Record<string, unknown>;
+      return {
+        id: row.id ? String(row.id) : undefined,
+        label: String(row.label ?? "").trim(),
+        value: String(row.value ?? "").trim(),
+        sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : index,
+      };
+    });
+  }
+
+  if (Array.isArray(raw.customizations)) {
+    input.customizations = raw.customizations.map((cap, index) => {
+      const row = cap as Record<string, unknown>;
+      return {
+        id: row.id ? String(row.id) : undefined,
+        label: String(row.label ?? "").trim(),
+        description: row.description ? String(row.description).trim() : undefined,
+        sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : index,
+        enabled: row.enabled !== undefined ? Boolean(row.enabled) : true,
+      };
+    });
+  }
 
   if (mode === "create") {
     if (!name || !categoryId) {

@@ -189,6 +189,7 @@ export async function previewProductImport(
 
     return {
       ...row,
+      entityType: row.entityType ?? "product",
       normalizedCategory,
       generatedSku: "",
       validationErrors: errors,
@@ -256,7 +257,9 @@ export async function executeProductImport(
   const result: ProductImportExecuteResult = {
     createdProducts: 0, updatedProducts: 0,
     createdVariants: 0, updatedVariants: 0,
-    skippedRows: 0, invalidRows: 0, duplicateRows: 0, createdCategories: 0,
+    createdSpecs: 0, updatedSpecs: 0,
+    createdCustomizations: 0, updatedCustomizations: 0,
+    skippedRows: 0, invalidRows: 0, failedRows: 0, duplicateRows: 0, createdCategories: 0,
     errors: [],
   };
 

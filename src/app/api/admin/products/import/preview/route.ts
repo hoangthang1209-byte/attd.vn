@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { previewProductImport } from "@/features/products/product-import-service";
+import {
+  buildPreviewSummaryFromRows,
+  previewProductImportV2,
+} from "@/features/products/product-import-v2.service";
 import type { ProductImportOptions, ProductImportRow } from "@/features/products/product-import-types";
+import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
 import {
   createProductImportJob,
   tryStoreImportOriginalFile,
@@ -10,7 +15,10 @@ import {
 } from "@/features/products/product-import-job-service";
 import { prisma } from "@/lib/prisma";
 
-function buildSummary(rows: Awaited<ReturnType<typeof previewProductImport>>) {
+function buildSummary(rows: Awaited<ReturnType<typeof previewProductImport>>, options?: ProductImportOptions) {
+  if (options?.importMode) {
+    return buildPreviewSummaryFromRows(rows as Parameters<typeof buildPreviewSummaryFromRows>[0]);
+  }
   return {
     total: rows.length,
     valid: rows.filter((r) => r.isValid).length,
@@ -144,8 +152,10 @@ async function parseFormPayload(form: FormData): Promise<ParsedPreviewInput | Ne
 async function runPreview(input: ParsedPreviewInput) {
   const warnings: string[] = [];
 
-  const previewRows = await previewProductImport(input.rows, input.options, input.rawRows);
-  const summary = buildSummary(previewRows);
+  const previewRows = input.options.importMode
+    ? await previewProductImportV2(input.rows, input.options, input.rawRows)
+    : await previewProductImport(input.rows, input.options, input.rawRows);
+  const summary = buildSummary(previewRows, input.options);
 
   let jobId = input.existingJobId;
 
@@ -231,6 +241,9 @@ async function runPreview(input: ParsedPreviewInput) {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdminApiFromCookies();
+  if (authError) return authError;
+
   const contentType = req.headers.get("content-type") ?? "";
 
   try {

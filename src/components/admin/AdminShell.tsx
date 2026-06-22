@@ -17,7 +17,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/products", label: "Danh sách sản phẩm" },
       { href: "/admin/products/new", label: "Thêm sản phẩm" },
-      { href: "/admin/products/import", label: "Nhập Excel/CSV" },
+      { href: "/admin/products/import", label: "Nhập sản phẩm" },
       { href: "/admin/danh-muc", label: "Danh mục sản phẩm" },
       { href: "/admin/products/attributes", label: "Thuộc tính sản phẩm" },
       { href: "/admin/media", label: "Thư viện Media" },

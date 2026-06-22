@@ -1,56 +1,64 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
-import { PRODUCT_IMPORT_PRESETS } from "@/features/products/product-import-presets";
-import { PRODUCT_IMPORT_TEMPLATES } from "@/features/products/product-import-templates";
-import type { ProductImportPresetId } from "@/features/products/product-import-types";
-import { mapRawRowToImportRow } from "@/features/products/product-import-utils";
 import {
-  filterProductImportHeaders,
-  pickProductImportSheetName,
-} from "@/features/products/product-import-feedback";
+  IMPORT_PREVIEW_PAGE_SIZE,
+  IMPORT_PROGRESS_LABELS,
+  PRODUCT_IMPORT_MODE_HINTS,
+  PRODUCT_IMPORT_MODE_LABELS,
+  PRODUCT_IMPORT_MODES,
+  type ImportProgressStage,
+  type ProductImportMode,
+} from "@/features/products/product-import-constants";
+import { PRODUCT_IMPORT_V2_TEMPLATES, CATALOG_BUNDLE_TEMPLATE_ID } from "@/features/products/product-import-v2-templates";
+import type { ProductImportRow } from "@/features/products/product-import-types";
+import { ROUND_TRIP_QA_CHECKLIST } from "@/features/products/product-catalog-qa-fixtures";
+import { mapImportVariantStatusForDisplay } from "@/features/products/product-catalog-qa-regression";
 import ImportTemplateSection from "@/components/admin/ImportTemplateSection";
 import ProductImportHistory from "@/components/admin/products/ProductImportHistory";
+import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
-type ImportRow = Record<string, unknown>;
-type PreviewRow = {
-  rowIndex: number;
-  productName: string;
-  category: string;
-  normalizedCategory: string;
-  productCode?: string;
-  generatedSku: string;
-  colorName?: string;
-  sizeName?: string;
-  status?: string;
-  stockQty?: number;
-  wholesalePrice?: number;
+type PreviewRow = ProductImportRow & {
+  entityType?: string;
+  normalizedCategory?: string;
+  generatedSku?: string;
+  matchedProductId?: string;
+  matchedProductCode?: string;
   finalAction: string;
   isValid: boolean;
-  validationErrors: { field: string; message: string }[];
+  validationErrors: Array<{ field: string; message: string; severity?: string }>;
   duplicateInfo: { type: string } | null;
+  optionValues?: string;
+  affectedFields?: string[];
+};
+
+type PreviewSummary = {
+  total: number;
+  valid: number;
+  invalid: number;
+  warnings?: number;
+  duplicates: number;
+  newProducts: number;
+  newVariants: number;
+  updatedProducts?: number;
+  updatedVariants?: number;
+  duplicateSkuCount?: number;
+  missingCategoryCount?: number;
+  invalidImageUrlCount?: number;
 };
 
 type PreviewResult = {
   ok?: boolean;
   rows: PreviewRow[];
-  summary: {
-    total: number;
-    valid: number;
-    invalid: number;
-    duplicates: number;
-    newProducts: number;
-    newVariants: number;
-  };
+  summary: PreviewSummary;
   jobId?: string;
   warnings?: string[];
   feedbackDownloadUrl?: string;
-  feedbackCsvDownloadUrl?: string;
   error?: string;
   detail?: string;
-  code?: string;
   message?: string;
 };
 
@@ -61,13 +69,16 @@ type ExecuteResult = {
   createdProducts: number;
   updatedProducts: number;
   createdVariants: number;
+  updatedVariants?: number;
   skippedRows: number;
   invalidRows: number;
+  failedRows?: number;
   createdCategories: number;
 };
 
-type Step = "upload" | "map" | "preview" | "execute" | "done";
+type Step = "upload" | "preview" | "done";
 type Tab = "import" | "history";
+type PreviewFilter = "all" | "valid" | "warning" | "error";
 
 const FINAL_ACTION_LABELS: Record<string, string> = {
   create: "Tạo mới",
@@ -75,6 +86,7 @@ const FINAL_ACTION_LABELS: Record<string, string> = {
   skip: "Bỏ qua",
   copy: "Sao chép",
   invalid: "Lỗi",
+  error: "Lỗi",
 };
 
 const FINAL_ACTION_CLS: Record<string, string> = {
@@ -83,6 +95,7 @@ const FINAL_ACTION_CLS: Record<string, string> = {
   skip: "admin-kb-badge--medium",
   copy: "admin-kb-badge--medium",
   invalid: "admin-kb-badge--low",
+  error: "admin-kb-badge--low",
 };
 
 export default function ProductBulkImport() {
@@ -92,13 +105,12 @@ export default function ProductBulkImport() {
   const [tab, setTab] = useState<Tab>("import");
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [step, setStep] = useState<Step>("upload");
-  const [presetId, setPresetId] = useState<ProductImportPresetId>("blank-apparel");
-  const [rawRows, setRawRows] = useState<ImportRow[]>([]);
-  const [headers, setHeaders] = useState<string[]>([]);
+  const [importMode, setImportMode] = useState<ProductImportMode>("create-product");
   const [fileName, setFileName] = useState("");
-  const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [duplicateStrategy, setDuplicateStrategy] = useState<"skip" | "update" | "copy">("skip");
   const [autoCreateCats, setAutoCreateCats] = useState(true);
+  const [allowCreateOptions, setAllowCreateOptions] = useState(false);
+  const [importValidRowsOnly, setImportValidRowsOnly] = useState(false);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
@@ -108,126 +120,104 @@ export default function ProductBulkImport() {
   const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
   const [feedbackDownloadUrl, setFeedbackDownloadUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [progressStage, setProgressStage] = useState<ImportProgressStage>("reading");
+  const [previewFilter, setPreviewFilter] = useState<PreviewFilter>("all");
+  const [previewPage, setPreviewPage] = useState(0);
+  const [exportOpen, setExportOpen] = useState(false);
 
-  const preset = PRODUCT_IMPORT_PRESETS.find((p) => p.id === presetId) ?? PRODUCT_IMPORT_PRESETS[0];
+  const importOptions = {
+    importMode,
+    columnMapping: {},
+    defaultDuplicateStrategy: duplicateStrategy,
+    autoCreateCategories: autoCreateCats,
+    allowCreateOptions,
+    importValidRowsOnly,
+  };
 
   async function handleFile(file: File) {
-    originalFileRef.current = file;
-    setFileName(file.name);
-    const ext = file.name.split(".").pop()?.toLowerCase();
-
-    if (ext === "csv") {
-      const text = await file.text();
-      const lines = text.split(/\r?\n/).filter(Boolean);
-      if (!lines.length) { setError("File CSV trống."); return; }
-      const allHdr = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
-      setHeaders(filterProductImportHeaders(allHdr));
-      const rows = lines.slice(1).map((line) => {
-        const vals = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
-        return Object.fromEntries(allHdr.map((h, i) => [h, vals[i] ?? ""]));
-      });
-      setRawRows(rows);
-      initMapping(allHdr);
-      setStep("map");
-    } else if (ext === "xlsx" || ext === "xls") {
-      try {
-        const xlsx = await import("xlsx");
-        const buffer = await file.arrayBuffer();
-        const wb = xlsx.read(buffer, { type: "array" });
-        const sheetName = pickProductImportSheetName(wb.SheetNames);
-        const ws = wb.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
-        if (!data.length) { setError("File XLSX trống."); return; }
-        const hdr = filterProductImportHeaders(Object.keys(data[0]));
-        setHeaders(hdr);
-        setRawRows(data);
-        initMapping(hdr);
-        setStep("map");
-      } catch {
-        setError("Không đọc được file XLSX. Hãy thử CSV.");
-      }
-    } else {
-      setError("Chỉ hỗ trợ .csv và .xlsx");
-    }
-  }
-
-  function initMapping(hdr: string[]) {
-    const productHeaders = filterProductImportHeaders(hdr);
-    const map: Record<string, string> = {};
-    const targetFields = Object.keys(preset.columnMapping) as (keyof typeof preset.columnMapping)[];
-    for (const field of targetFields) {
-      const expectedCol = preset.columnMapping[field] ?? field;
-      const found = productHeaders.find(
-        (h) => h.toLowerCase() === expectedCol.toLowerCase() || h.toLowerCase() === String(field).toLowerCase(),
-      );
-      map[field] = found ?? "";
-    }
-    setColumnMapping(map);
-  }
-
-  async function handlePreview() {
     setError(null);
     setErrorDetail(null);
-    setPreviewWarnings([]);
-    setFeedbackDownloadUrl(null);
+    originalFileRef.current = file;
+    setFileName(file.name);
+    setProgressStage("reading");
     setPreviewLoading(true);
 
-    const mappedRows = rawRows.map((raw, i) =>
-      mapRawRowToImportRow(raw, columnMapping as Parameters<typeof mapRawRowToImportRow>[1], i, preset.defaults as Record<string, unknown>)
-    );
-    const options = {
-      presetId,
-      columnMapping,
-      defaultDuplicateStrategy: duplicateStrategy,
-      autoCreateCategories: autoCreateCats,
-    };
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("importMode", importMode);
+      const parseRes = await fetch("/api/admin/products/import/parse", { method: "POST", body: form });
+      const parsed = await parseRes.json() as {
+        ok?: boolean;
+        rows?: ProductImportRow[];
+        rawRows?: Record<string, unknown>[];
+        warnings?: string[];
+        message?: string;
+      };
+
+      if (!parseRes.ok || !parsed.ok || !parsed.rows?.length) {
+        setError(parsed.message ?? "Không đọc được tệp.");
+        return;
+      }
+
+      if (parsed.warnings?.length) setPreviewWarnings(parsed.warnings);
+
+      setProgressStage("validating");
+      await runPreview(parsed.rows, parsed.rawRows ?? [], file);
+    } catch (err) {
+      setError("Không đọc được tệp.");
+      setErrorDetail(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  async function runPreview(
+    rows: ProductImportRow[],
+    raw: Record<string, unknown>[],
+    file?: File | null,
+  ) {
+    setPreviewLoading(true);
+    setError(null);
+    setFeedbackDownloadUrl(null);
 
     try {
+      const originalFile = file ?? originalFileRef.current;
       let res: Response;
-      const originalFile = originalFileRef.current;
 
       if (originalFile) {
         const form = new FormData();
         form.append("file", originalFile);
         form.append("fileName", originalFile.name);
-        form.append("rows", JSON.stringify(mappedRows));
-        form.append("rawRows", JSON.stringify(rawRows));
-        form.append("options", JSON.stringify(options));
+        form.append("rows", JSON.stringify(rows));
+        form.append("rawRows", JSON.stringify(raw));
+        form.append("options", JSON.stringify(importOptions));
         if (jobId) form.append("jobId", jobId);
         res = await fetch("/api/admin/products/import/preview", { method: "POST", body: form });
       } else {
         res = await fetch("/api/admin/products/import/preview", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rows: mappedRows, rawRows, options, fileName }),
+          body: JSON.stringify({ rows, rawRows: raw, options: importOptions, fileName }),
         });
       }
 
       const data = await res.json() as PreviewResult;
-
       if (!res.ok || data.ok === false) {
         setError(data.error ?? data.message ?? "Không thể xem trước file import.");
         setErrorDetail(data.detail ?? null);
-        if (data.jobId) setJobId(data.jobId);
-        if (data.code === "IMPORT_JOB_SCHEMA_MISMATCH" || (data.detail ?? "").includes("migration")) {
-          setError("Không thể tạo lịch sử import. Kiểm tra migration production.");
-        }
-        return;
-      }
-
-      if (!Array.isArray(data.rows) || !data.summary) {
-        setError("Không thể xem trước file import.");
-        setErrorDetail("Phản hồi preview không hợp lệ từ server.");
         return;
       }
 
       setPreview(data);
       if (data.jobId) setJobId(data.jobId);
-      if (data.warnings?.length) setPreviewWarnings(data.warnings);
+      if (data.warnings?.length) setPreviewWarnings((prev) => [...prev, ...data.warnings!]);
       if (data.feedbackDownloadUrl) setFeedbackDownloadUrl(data.feedbackDownloadUrl);
-      else if ((data.summary.invalid > 0 || data.summary.duplicates > 0) && data.jobId) {
+      else if ((data.summary.invalid > 0) && data.jobId) {
         setFeedbackDownloadUrl(`/api/admin/products/import/jobs/${data.jobId}/download-feedback`);
       }
+      setPreviewPage(0);
+      setProgressStage("ready");
       setHistoryRefreshKey((k) => k + 1);
       setStep("preview");
     } catch (err) {
@@ -240,11 +230,18 @@ export default function ProductBulkImport() {
 
   async function handleExecute() {
     if (!preview) return;
+    if (preview.summary.invalid > 0 && !importValidRowsOnly) {
+      setError("Còn dòng lỗi. Sửa file hoặc chọn \"Chỉ nhập các dòng hợp lệ\".");
+      return;
+    }
+
     setExecuting(true);
+    setProgressStage("executing");
     setError(null);
+
     const result = await mutate({
-      loadingMessage: "Đang xử lý dữ liệu…",
-      successMessage: "Đã bắt đầu nhập sản phẩm.",
+      loadingMessage: "Đang nhập dữ liệu…",
+      successMessage: "Đã nhập dữ liệu.",
       action: async () => {
         const res = await fetch("/api/admin/products/import/execute", {
           method: "POST",
@@ -253,12 +250,7 @@ export default function ProductBulkImport() {
             rows: preview.rows,
             fileName,
             jobId,
-            options: {
-              presetId,
-              columnMapping,
-              defaultDuplicateStrategy: duplicateStrategy,
-              autoCreateCategories: autoCreateCats,
-            },
+            options: importOptions,
           }),
         });
         return parseAdminJsonResponse(res, (data) => data as ExecuteResult);
@@ -267,19 +259,17 @@ export default function ProductBulkImport() {
         setExecuteResult(data);
         if (data.jobId) setJobId(data.jobId);
         setHistoryRefreshKey((k) => k + 1);
+        setProgressStage("done");
         setStep("done");
       },
     });
-    if (!result) {
-      setError("Lỗi thực hiện import.");
-    }
+
+    if (!result) setError("Lỗi thực hiện import.");
     setExecuting(false);
   }
 
   function reset() {
     setStep("upload");
-    setRawRows([]);
-    setHeaders([]);
     setFileName("");
     setPreview(null);
     setExecuteResult(null);
@@ -288,74 +278,77 @@ export default function ProductBulkImport() {
     setErrorDetail(null);
     setPreviewWarnings([]);
     setFeedbackDownloadUrl(null);
+    setPreviewFilter("all");
+    setPreviewPage(0);
+    setProgressStage("reading");
     originalFileRef.current = null;
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function feedbackLinks(jobId: string | null, feedbackDownloadUrl: string | null) {
-    if (!jobId) return null;
-    const excelUrl = feedbackDownloadUrl ?? `/api/admin/products/import/jobs/${jobId}/download-feedback`;
-    const csvUrl = `${excelUrl}?format=csv`;
+  function feedbackLinks(id: string | null, url: string | null) {
+    if (!id) return null;
+    const excelUrl = url ?? `/api/admin/products/import/jobs/${id}/download-feedback`;
     return (
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
         <a href={excelUrl} className="admin-btn admin-btn--secondary" download>
-          Tải file lỗi Excel
+          Tải báo cáo lỗi Excel
         </a>
-        <a href={csvUrl} className="admin-link-button" download>
+        <a href={`${excelUrl}?format=csv`} className="admin-link-button" download>
           Tải CSV
         </a>
       </div>
     );
   }
 
-  function switchToImportTab() {
-    setTab("import");
-    reset();
-    setStep("upload");
-  }
+  const filteredPreviewRows = (preview?.rows ?? []).filter((row) => {
+    if (previewFilter === "valid") return row.isValid;
+    if (previewFilter === "error") return !row.isValid || row.finalAction === "error" || row.finalAction === "invalid";
+    if (previewFilter === "warning") {
+      return row.validationErrors.some((e) => e.severity === "warning");
+    }
+    return true;
+  });
+
+  const pageStart = previewPage * IMPORT_PREVIEW_PAGE_SIZE;
+  const pageRows = filteredPreviewRows.slice(pageStart, pageStart + IMPORT_PREVIEW_PAGE_SIZE);
+  const pageCount = Math.ceil(filteredPreviewRows.length / IMPORT_PREVIEW_PAGE_SIZE);
+
+  const v2Templates = [
+    { id: CATALOG_BUNDLE_TEMPLATE_ID, label: "Bộ mẫu catalog đầy đủ (workbook)", description: "5 sheet: Hướng dẫn, Sản phẩm, Biến thể, Thông số, Tùy chỉnh" },
+    ...PRODUCT_IMPORT_V2_TEMPLATES.map((t) => ({ id: t.id, label: t.label, description: "" })),
+  ];
 
   return (
     <div className="admin-bulk-import-page">
       <div className="admin-bulk-import-tabs">
-        <button
-          type="button"
-          className={`admin-bulk-import-tab ${tab === "import" ? "is-active" : ""}`}
-          onClick={() => setTab("import")}
-        >
+        <button type="button" className={`admin-bulk-import-tab ${tab === "import" ? "is-active" : ""}`} onClick={() => setTab("import")}>
           Nhập sản phẩm
         </button>
-        <button
-          type="button"
-          className={`admin-bulk-import-tab ${tab === "history" ? "is-active" : ""}`}
-          onClick={() => setTab("history")}
-        >
+        <button type="button" className={`admin-bulk-import-tab ${tab === "history" ? "is-active" : ""}`} onClick={() => setTab("history")}>
           Lịch sử nhập file
+        </button>
+        <button type="button" className="admin-link-button" style={{ marginLeft: "auto" }} onClick={() => setExportOpen(true)}>
+          Xuất dữ liệu hiện có
         </button>
       </div>
 
+      <ProductExportDialog open={exportOpen} onClose={() => setExportOpen(false)} defaultScope="all" />
+
       {tab === "history" && (
-        <ProductImportHistory
-          refreshKey={historyRefreshKey}
-          onRetryUpload={switchToImportTab}
-        />
+        <ProductImportHistory refreshKey={historyRefreshKey} onRetryUpload={() => { setTab("import"); reset(); }} />
       )}
 
       {tab === "import" && (
         <>
-          <p className="admin-field-hint">
-            Nếu file có lỗi, hãy tải file feedback Excel, sửa các ô màu đỏ/vàng rồi upload lại file đã chỉnh sửa.
-          </p>
-          <p className="admin-field-hint">
-            File feedback sẽ tô đỏ các ô lỗi và tô vàng các ô cần kiểm tra. Sửa trực tiếp trong file feedback rồi upload lại.
-            <strong> Ô màu đỏ:</strong> bắt buộc sửa. <strong>Ô màu vàng:</strong> nên kiểm tra.
+          <p className="admin-field-hint" role="status">
+            Giai đoạn: <strong>{IMPORT_PROGRESS_LABELS[progressStage]}</strong>
           </p>
 
-          {/* Step indicator */}
           <div className="admin-bulk-import-steps">
-            {(["upload", "map", "preview", "done"] as Step[]).map((s, i) => {
-              const labels: Record<string, string> = { upload: "1. Tải file", map: "2. Ánh xạ cột", preview: "3. Xem trước", done: "4. Hoàn tất" };
+            {(["upload", "preview", "done"] as Step[]).map((s, i) => {
+              const labels = { upload: "1. Tải file", preview: "2. Xem trước", done: "3. Hoàn tất" };
               return (
-                <div key={s} className={`admin-bulk-import-step ${step === s ? "is-active" : ""} ${["upload","map","preview","execute","done"].indexOf(step) > i ? "is-done" : ""}`}>
+                <div key={s} className={`admin-bulk-import-step ${step === s ? "is-active" : ""} ${["upload", "preview", "done"].indexOf(step) > i ? "is-done" : ""}`}>
                   {labels[s]}
                 </div>
               );
@@ -363,209 +356,239 @@ export default function ProductBulkImport() {
           </div>
 
           {error && (
-            <div className="admin-catalog-fieldset admin-import-error-panel">
+            <div className="admin-catalog-fieldset admin-import-error-panel" role="alert">
               <p className="admin-error">{error}</p>
-              <p className="admin-field-hint">Kiểm tra lại file hoặc ánh xạ cột.</p>
-              {errorDetail && (
-                <details className="admin-import-error-detail">
-                  <summary>Chi tiết lỗi</summary>
-                  <pre>{errorDetail}</pre>
-                </details>
-              )}
+              {errorDetail && <details className="admin-import-error-detail"><summary>Chi tiết</summary><pre>{errorDetail}</pre></details>}
               {jobId && feedbackLinks(jobId, feedbackDownloadUrl)}
             </div>
           )}
 
           {previewWarnings.length > 0 && (
             <ul className="admin-kb-warning-list">
-              {previewWarnings.map((w) => (
-                <li key={w}>{w}</li>
-              ))}
+              {previewWarnings.map((w) => <li key={w}>{w}</li>)}
             </ul>
           )}
 
-          {/* Step 1: Upload */}
           {step === "upload" && (
             <>
-            <ImportTemplateSection
-              heading="File mẫu sản phẩm"
-              apiBase="/api/admin/products/import/templates"
-              templates={PRODUCT_IMPORT_TEMPLATES.slice(0, 3).map((t) => ({ id: t.id, label: t.label, description: "" }))}
-              notes={[
-                "Các cột bắt buộc: category, productName",
-                "Nếu productCode (ID sản phẩm) để trống, hệ thống tự cấp mã theo danh mục (vd. TS0001, TS0002)",
-                "Danh mục phải có mã ID (skuCode) trước khi nhập — nếu thiếu sẽ báo lỗi",
-                "Nếu danh mục chưa có, bật \"Tự tạo danh mục mới\" phía dưới",
-                "priceTiers có thể nhập JSON: [{\"minQty\":50,\"price\":45000}]",
-                "Ảnh nên là URL Cloudinary hoặc URL ảnh hợp lệ",
-                "stockStatus: IN_STOCK | LOW_STOCK | OUT_OF_STOCK | PREORDER",
-                "status: ACTIVE | DRAFT | INACTIVE | ARCHIVED",
-              ]}
-            />
-            <div className="admin-catalog-fieldset">
-              <h3 className="admin-subtitle">Tải file sản phẩm</h3>
-              <div className="admin-field">
-                <label className="admin-label">Preset nhập hàng</label>
-                <select className="admin-input" value={presetId} onChange={(e) => setPresetId(e.target.value as ProductImportPresetId)}>
-                  {PRODUCT_IMPORT_PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                </select>
-                <p className="admin-field-hint">{preset.description}</p>
-                <p className="admin-field-hint">Cột khuyến nghị: {preset.expectedColumns.join(", ")}</p>
+              <ImportTemplateSection
+                heading="Tải mẫu nhập liệu"
+                apiBase="/api/admin/products/import/templates"
+                templates={v2Templates}
+                notes={[
+                  "Workbook XLSX gồm sheet Hướng dẫn, Sản phẩm, Biến thể, Thông số, Tùy chỉnh",
+                  "optionValues: Màu sắc=Đen | Kích thước=M",
+                  "galleryUrls: URL1|URL2",
+                  "Ô trống giữ nguyên giá trị hiện có (chế độ cập nhật)",
+                  "__CLEAR__ để xóa giá trị khi cập nhật",
+                  "Chỉ tạo biến thể có trong file — không sinh Cartesian tự động",
+                ]}
+              />
+
+              <div className="admin-catalog-fieldset">
+                <h3 className="admin-subtitle">Chế độ nhập</h3>
+                <div className="admin-catalog-import-options">
+                  {PRODUCT_IMPORT_MODES.map((mode) => (
+                    <label key={mode} className="admin-catalog-toggle">
+                      <input
+                        type="radio"
+                        name="importMode"
+                        checked={importMode === mode}
+                        onChange={() => setImportMode(mode)}
+                      />
+                      {PRODUCT_IMPORT_MODE_LABELS[mode]}
+                    </label>
+                  ))}
+                </div>
+                <p className="admin-field-hint">{PRODUCT_IMPORT_MODE_HINTS[importMode]}</p>
+                {(importMode === "update-product" || importMode === "update-variants-bulk") && (
+                  <p className="admin-field-hint">
+                    <strong>__CLEAR__</strong> — nhập vào ô cần xóa khi cập nhật (MOQ override, ảnh, mô tả…). Ô trống không đổi dữ liệu hiện có.
+                  </p>
+                )}
+
+                <details className="admin-catalog-fieldset" style={{ marginTop: 12 }}>
+                  <summary className="admin-subtitle">Trước khi nhập lại (round-trip)</summary>
+                  <ol className="admin-field-hint" style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+                    {ROUND_TRIP_QA_CHECKLIST.map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ol>
+                </details>
+
+                <div className="admin-catalog-import-options" style={{ marginTop: 12 }}>
+                  <div className="admin-field">
+                    <label className="admin-label">Xử lý trùng lặp</label>
+                    <select className="admin-input" value={duplicateStrategy} onChange={(e) => setDuplicateStrategy(e.target.value as "skip" | "update" | "copy")}>
+                      <option value="skip">Bỏ qua</option>
+                      <option value="update">Cập nhật</option>
+                      <option value="copy">Sao chép</option>
+                    </select>
+                  </div>
+                  <label className="admin-catalog-toggle">
+                    <input type="checkbox" checked={autoCreateCats} onChange={(e) => setAutoCreateCats(e.target.checked)} />
+                    Tự tạo danh mục nếu chưa có
+                  </label>
+                  <label className="admin-catalog-toggle">
+                    <input type="checkbox" checked={allowCreateOptions} onChange={(e) => setAllowCreateOptions(e.target.checked)} />
+                    Cho phép tạo nhóm thuộc tính/giá trị mới
+                  </label>
+                </div>
+
+                <div className="admin-field" style={{ marginTop: 12 }}>
+                  <label className="admin-label">Tệp (.csv hoặc .xlsx, tối đa 5MB)</label>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    className="admin-input"
+                    disabled={previewLoading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleFile(file);
+                    }}
+                  />
+                  {previewLoading && <p className="admin-field-hint">Đang đọc và kiểm tra tệp…</p>}
+                </div>
               </div>
-              <div className="admin-field">
-                <label className="admin-label">File (.csv hoặc .xlsx)</label>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".csv,.xlsx,.xls"
-                  className="admin-input"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void handleFile(file);
-                  }}
-                />
-              </div>
-            </div>
             </>
           )}
 
-          {/* Step 2: Column mapping */}
-          {step === "map" && (
-            <div className="admin-catalog-fieldset">
-              <h3 className="admin-subtitle">Ánh xạ cột</h3>
-              <p className="admin-field-hint">File: <strong>{fileName}</strong> — {rawRows.length} hàng dữ liệu</p>
-              <div className="admin-catalog-mapping-grid">
-                {(Object.keys(columnMapping) as string[]).map((field) => (
-                  <div key={field} className="admin-field">
-                    <label className="admin-label">{field}</label>
-                    <select className="admin-input" value={columnMapping[field] ?? ""} onChange={(e) => setColumnMapping((prev) => ({ ...prev, [field]: e.target.value }))}>
-                      <option value="">— Bỏ qua —</option>
-                      {headers.map((h) => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
-
-              <div className="admin-catalog-import-options">
-                <div className="admin-field">
-                  <label className="admin-label">Xử lý trùng lặp</label>
-                  <select className="admin-input" value={duplicateStrategy} onChange={(e) => setDuplicateStrategy(e.target.value as "skip" | "update" | "copy")}>
-                    <option value="skip">Bỏ qua (skip)</option>
-                    <option value="update">Cập nhật (update)</option>
-                    <option value="copy">Sao chép (copy)</option>
-                  </select>
-                </div>
-                <label className="admin-catalog-toggle">
-                  <input type="checkbox" checked={autoCreateCats} onChange={(e) => setAutoCreateCats(e.target.checked)} />
-                  Tự tạo danh mục nếu chưa có
-                </label>
-              </div>
-
-              <div style={{ display: "flex", gap: 12 }}>
-                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void handlePreview()} disabled={previewLoading}>
-                  {previewLoading ? "Đang xem trước…" : "Xem trước →"}
-                </button>
-                <button type="button" className="admin-btn admin-btn--secondary" onClick={reset}>Bắt đầu lại</button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Preview */}
           {step === "preview" && preview && (
             <div>
               <div className="admin-catalog-kpi-bar">
-                <div className="admin-catalog-kpi"><strong>{preview.summary.total}</strong><span>Tổng hàng</span></div>
+                <div className="admin-catalog-kpi"><strong>{preview.summary.total}</strong><span>Tổng</span></div>
                 <div className="admin-catalog-kpi admin-catalog-kpi--ok"><strong>{preview.summary.valid}</strong><span>Hợp lệ</span></div>
+                <div className="admin-catalog-kpi admin-catalog-kpi--warn"><strong>{preview.summary.warnings ?? 0}</strong><span>Cảnh báo</span></div>
                 <div className="admin-catalog-kpi admin-catalog-kpi--danger"><strong>{preview.summary.invalid}</strong><span>Lỗi</span></div>
-                <div className="admin-catalog-kpi admin-catalog-kpi--warn"><strong>{preview.summary.duplicates}</strong><span>Trùng lặp</span></div>
-                <div className="admin-catalog-kpi"><strong>{preview.summary.newProducts}</strong><span>Sản phẩm mới</span></div>
+                <div className="admin-catalog-kpi"><strong>{preview.summary.newProducts}</strong><span>SP mới</span></div>
+                <div className="admin-catalog-kpi"><strong>{preview.summary.updatedProducts ?? 0}</strong><span>SP cập nhật</span></div>
+                <div className="admin-catalog-kpi"><strong>{preview.summary.newVariants}</strong><span>BT mới</span></div>
+                <div className="admin-catalog-kpi"><strong>{preview.summary.updatedVariants ?? 0}</strong><span>BT cập nhật</span></div>
+                {(preview.summary.invalidImageUrlCount ?? 0) > 0 && (
+                  <div className="admin-catalog-kpi admin-catalog-kpi--warn">
+                    <strong>{preview.summary.invalidImageUrlCount}</strong>
+                    <span>URL ảnh lỗi</span>
+                  </div>
+                )}
               </div>
 
-              {(preview.summary.invalid > 0 || preview.summary.duplicates > 0) && (feedbackDownloadUrl || jobId) && (
-                <div style={{ marginTop: 12 }}>
-                  <p className="admin-field-hint" style={{ color: "var(--admin-danger, #dc2626)" }}>
-                    Có lỗi cần sửa — tải file feedback Excel, chỉnh sửa các ô màu đỏ/vàng và upload lại.
-                  </p>
-                  {feedbackLinks(jobId, feedbackDownloadUrl)}
-                </div>
+              <p className="admin-field-hint" role="status">
+                Tóm tắt: {preview.summary.valid} hợp lệ · {preview.summary.invalid} lỗi ·{" "}
+                {(preview.summary.warnings ?? 0)} cảnh báo ·{" "}
+                {preview.summary.newProducts} tạo mới SP · {preview.summary.updatedProducts ?? 0} cập nhật SP
+              </p>
+
+              {(preview.summary.invalid > 0) && (
+                <p className="admin-field-hint" style={{ color: "#dc2626" }}>
+                  Các dòng lỗi không được áp dụng. Kiểm tra tệp báo lỗi trước khi nhập lại.
+                </p>
               )}
+
+              <div className="admin-variant-matrix-filters" style={{ marginTop: 12 }}>
+                {(["all", "valid", "warning", "error"] as PreviewFilter[]).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    className={`btn-secondary btn-sm ${previewFilter === f ? "is-active" : ""}`}
+                    onClick={() => { setPreviewFilter(f); setPreviewPage(0); }}
+                  >
+                    {f === "all" ? "Tất cả" : f === "valid" ? "Hợp lệ" : f === "warning" ? "Cảnh báo" : "Lỗi"}
+                  </button>
+                ))}
+              </div>
 
               <div className="admin-catalog-table-wrap" style={{ marginTop: 16 }}>
                 <table className="admin-catalog-table">
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Tên sản phẩm</th>
-                      <th>Danh mục</th>
-                      <th>ID sản phẩm</th>
-                      <th>Màu</th>
-                      <th>Size</th>
-                      <th>SKU lựa chọn</th>
+                      <th>Loại</th>
+                      <th>Định danh</th>
+                      <th>SKU / optionValues</th>
                       <th>Hành động</th>
-                      <th>Lỗi</th>
+                      <th>Thông báo</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.rows.slice(0, 100).map((r) => (
-                      <tr key={r.rowIndex} className={r.finalAction === "invalid" ? "is-invalid" : ""}>
+                    {pageRows.map((r) => (
+                      <tr key={r.rowIndex} className={!r.isValid ? "is-invalid" : ""}>
                         <td>{r.rowIndex + 1}</td>
-                        <td>{r.productName}</td>
-                        <td><span className="admin-field-hint">{r.normalizedCategory}</span></td>
-                        <td><code className="admin-catalog-code">{r.productCode ?? "—"}</code></td>
-                        <td>{r.colorName ?? ""}</td>
-                        <td>{r.sizeName ?? ""}</td>
-                        <td><code className="admin-catalog-code">{r.generatedSku}</code></td>
-                        <td><span className={`admin-kb-badge ${FINAL_ACTION_CLS[r.finalAction] ?? ""}`}>{FINAL_ACTION_LABELS[r.finalAction] ?? r.finalAction}</span></td>
+                        <td>{r.entityType ?? "product"}</td>
                         <td>
-                          {r.validationErrors.length > 0 && (
-                            <span className="admin-kb-badge admin-kb-badge--low">
-                              {r.validationErrors.map((e) => e.message).join(" / ")}
-                            </span>
+                          <div>{r.productName || r.productCode || r.matchedProductCode || "—"}</div>
+                          <span className="admin-field-hint">{r.normalizedCategory}</span>
+                        </td>
+                        <td>
+                          <code className="admin-catalog-code">{r.generatedSku || r.sku || "—"}</code>
+                          {r.optionValues && <div className="admin-field-hint">{r.optionValues}</div>}
+                          {r.entityType === "variant" && r.variantStatus && (
+                            <div className="admin-field-hint">
+                              Trạng thái: {mapImportVariantStatusForDisplay(r.variantStatus)}
+                            </div>
                           )}
-                          {r.duplicateInfo && <span className="admin-kb-badge admin-kb-badge--medium">Trùng {r.duplicateInfo.type}</span>}
+                        </td>
+                        <td>
+                          <span className={`admin-kb-badge ${FINAL_ACTION_CLS[r.finalAction] ?? ""}`}>
+                            {FINAL_ACTION_LABELS[r.finalAction] ?? r.finalAction}
+                          </span>
+                        </td>
+                        <td>
+                          {r.validationErrors.map((e) => (
+                            <span key={`${r.rowIndex}-${e.field}-${e.message}`} className={`admin-kb-badge ${e.severity === "warning" ? "admin-kb-badge--medium" : "admin-kb-badge--low"}`}>
+                              {e.message}
+                            </span>
+                          ))}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {preview.rows.length > 100 && (
-                <p className="admin-field-hint">Hiển thị 100 / {preview.rows.length} hàng.</p>
+
+              {pageCount > 1 && (
+                <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+                  <button type="button" className="btn-secondary btn-sm" disabled={previewPage <= 0} onClick={() => setPreviewPage((p) => p - 1)}>← Trước</button>
+                  <span className="admin-field-hint">Trang {previewPage + 1}/{pageCount} ({filteredPreviewRows.length} dòng)</span>
+                  <button type="button" className="btn-secondary btn-sm" disabled={previewPage >= pageCount - 1} onClick={() => setPreviewPage((p) => p + 1)}>Sau →</button>
+                </div>
               )}
 
-              <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void handleExecute()} disabled={executing}>
-                  {executing ? "Đang nhập…" : "Thực hiện import →"}
+              {feedbackLinks(jobId, feedbackDownloadUrl)}
+
+              <div className="admin-catalog-import-options" style={{ marginTop: 12 }}>
+                <label className="admin-catalog-toggle">
+                  <input type="checkbox" checked={importValidRowsOnly} onChange={(e) => setImportValidRowsOnly(e.target.checked)} />
+                  Chỉ nhập các dòng hợp lệ ({preview.summary.valid} dòng)
+                </label>
+              </div>
+
+              <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
+                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void handleExecute()} disabled={executing || (preview.summary.invalid > 0 && !importValidRowsOnly)}>
+                  {executing ? "Đang nhập…" : "Thực hiện nhập"}
                 </button>
-                <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setStep("map")}>← Quay lại</button>
-                <button type="button" className="admin-btn admin-btn--secondary" onClick={reset}>Bắt đầu lại</button>
+                <button type="button" className="admin-btn admin-btn--secondary" onClick={reset}>Nhập tệp khác</button>
               </div>
             </div>
           )}
 
-          {/* Step 4: Done */}
           {step === "done" && executeResult && (
             <div className="admin-catalog-fieldset">
-              <h3 className="admin-subtitle">Import hoàn tất</h3>
+              <h3 className="admin-subtitle">Hoàn tất nhập dữ liệu</h3>
               <p style={{ color: "var(--admin-success, green)", marginBottom: 12 }}>{executeResult.message}</p>
               <div className="admin-catalog-kpi-bar">
-                <div className="admin-catalog-kpi admin-catalog-kpi--ok"><strong>{executeResult.createdProducts}</strong><span>Sản phẩm tạo</span></div>
-                <div className="admin-catalog-kpi"><strong>{executeResult.updatedProducts}</strong><span>Cập nhật</span></div>
-                <div className="admin-catalog-kpi admin-catalog-kpi--ok"><strong>{executeResult.createdVariants}</strong><span>SKU tạo</span></div>
+                <div className="admin-catalog-kpi admin-catalog-kpi--ok"><strong>{executeResult.createdProducts}</strong><span>Tạo SP</span></div>
+                <div className="admin-catalog-kpi"><strong>{executeResult.updatedProducts}</strong><span>Cập nhật SP</span></div>
+                <div className="admin-catalog-kpi admin-catalog-kpi--ok"><strong>{executeResult.createdVariants}</strong><span>Tạo BT</span></div>
+                <div className="admin-catalog-kpi"><strong>{executeResult.updatedVariants ?? 0}</strong><span>Cập nhật BT</span></div>
                 <div className="admin-catalog-kpi admin-catalog-kpi--warn"><strong>{executeResult.skippedRows}</strong><span>Bỏ qua</span></div>
-                <div className="admin-catalog-kpi admin-catalog-kpi--danger"><strong>{executeResult.invalidRows}</strong><span>Lỗi</span></div>
-                <div className="admin-catalog-kpi"><strong>{executeResult.createdCategories}</strong><span>Danh mục tạo</span></div>
+                <div className="admin-catalog-kpi admin-catalog-kpi--danger"><strong>{(executeResult.invalidRows ?? 0) + (executeResult.failedRows ?? 0)}</strong><span>Lỗi</span></div>
               </div>
-              {executeResult.invalidRows > 0 && jobId && (
-                <div style={{ marginTop: 12 }}>
-                  <p className="admin-field-hint">Tải file feedback để xem chi tiết các dòng lỗi.</p>
-                  {feedbackLinks(jobId, feedbackDownloadUrl)}
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-                <a href="/admin/products" className="admin-btn admin-btn--primary">Xem danh sách sản phẩm</a>
-                <button type="button" className="admin-btn admin-btn--secondary" onClick={reset}>Import thêm</button>
-                <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setTab("history")}>Xem lịch sử</button>
+              <p className="admin-field-hint">Các dòng lỗi không được áp dụng. Kiểm tra tệp báo lỗi trước khi nhập lại.</p>
+              {(executeResult.invalidRows > 0 || (executeResult.failedRows ?? 0) > 0) && feedbackLinks(jobId, feedbackDownloadUrl)}
+              <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
+                <Link href="/admin/products" className="admin-btn admin-btn--primary">Quay lại danh sách sản phẩm</Link>
+                <button type="button" className="admin-btn admin-btn--secondary" onClick={reset}>Nhập tệp khác</button>
               </div>
             </div>
           )}

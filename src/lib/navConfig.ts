@@ -131,5 +131,6 @@ export const CONTACT_EMAIL = getEmail();
 export function shouldShowMobileActionBar(pathname: string): boolean {
   if (pathname.startsWith("/blog")) return false;
   if (pathname.startsWith("/admin") || pathname.startsWith("/quan-tri")) return false;
+  if (/^\/san-pham\/[^/]+$/.test(pathname)) return false;
   return true;
 }

@@ -4,7 +4,7 @@ import ProductBulkImport from "@/components/admin/products/ProductBulkImport";
 export default function ProductImportPage() {
   return (
     <>
-      <AdminPageTitle title={"Nhập hàng loạt sản phẩm"} />
+      <AdminPageTitle title="Nhập dữ liệu sản phẩm" />
       <ProductBulkImport />
     </>
   );

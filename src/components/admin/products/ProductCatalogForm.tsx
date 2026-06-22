@@ -1,31 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import ProductMaterialSection from "@/components/admin/products/ProductMaterialSection";
+import ProductCatalogSpecificationsSection, {
+  type ProductSpecificationFormRow,
+} from "@/components/admin/products/ProductCatalogSpecificationsSection";
+import ProductCatalogContentSection, {
+  type ProductCustomizationFormRow,
+} from "@/components/admin/products/ProductCatalogContentSection";
+import ProductCatalogVariantsSection, {
+  type MatrixVariantFormRow,
+  mapOptionsToFormRows,
+  mapVariantsToFormRows,
+} from "@/components/admin/products/ProductCatalogVariantsSection";
+import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
+import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
+import {
+  combinationSignature,
+  resolveOptionValueRefFromGroups,
+} from "@/features/products/product-variant-matrix.utils";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import { isValidImageUrl } from "@/features/products/product-admin-input";
+import { PRODUCT_IMAGE_URL_ERROR } from "@/features/products/product-image-url";
 
 type Category = { id: string; name: string; slug: string; skuCode: string | null };
 type AttributeOption = { id: string; type: string; name: string; code: string | null; value: string | null };
-
-type VariantFormRow = {
-  id?: string;
-  colorName: string;
-  colorCode: string;
-  sizeName: string;
-  dimensions: string;
-  capacity: string;
-  wholesalePrice: string;
-  dealerPrice: string;
-  stockQty: string;
-  stockStatus: string;
-  internalNote: string;
-  imageUrl: string;
-  skuPreview: string;
-  skuTaken: boolean;
-};
+type AttrMap = Record<string, AttributeOption[]>;
 
 type ProductFormData = {
   id?: string;
@@ -35,6 +38,8 @@ type ProductFormData = {
   categoryId: string;
   shortDescription: string;
   description: string;
+  seoTitle: string;
+  seoDescription: string;
   material: string;
   form: string;
   fit: string;
@@ -49,21 +54,26 @@ type ProductFormData = {
   status: string;
   featuredImage: string;
   gallery: string[];
-  variants: VariantFormRow[];
+  specifications: ProductSpecificationFormRow[];
+  customizations: ProductCustomizationFormRow[];
+  options: OptionGroupFormRow[];
+  variants: MatrixVariantFormRow[];
 };
 
-const defaultVariant = (): VariantFormRow => ({
-  colorName: "", colorCode: "", sizeName: "", dimensions: "", capacity: "",
-  wholesalePrice: "", dealerPrice: "", stockQty: "0", stockStatus: "IN_STOCK",
-  internalNote: "", imageUrl: "", skuPreview: "", skuTaken: false,
-});
+const FORM_TABS = [
+  { id: "basic", label: "Thông tin cơ bản" },
+  { id: "media", label: "Hình ảnh & media" },
+  { id: "variants", label: "Biến thể" },
+  { id: "content", label: "Mô tả & thông số" },
+  { id: "seo", label: "SEO & hiển thị" },
+] as const;
+
+type FormTabId = (typeof FORM_TABS)[number]["id"];
 
 type Props = {
   initialData?: Partial<ProductFormData> & { id?: string; slug?: string };
   categories?: Category[];
 };
-
-type AttrMap = Record<string, AttributeOption[]>;
 
 const LEAD_TIME_PRESETS = [
   "Có sẵn: 1–3 ngày",
@@ -77,6 +87,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   const mutate = useAdminMutation();
   const [categories, setCategories] = useState<Category[]>(propCategories ?? []);
   const [attributes, setAttributes] = useState<AttrMap>({});
+  const [activeTab, setActiveTab] = useState<FormTabId>("basic");
   const [form, setForm] = useState<ProductFormData>({
     id: initialData?.id,
     slug: initialData?.slug,
@@ -85,6 +96,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     categoryId: initialData?.categoryId ?? "",
     shortDescription: initialData?.shortDescription ?? "",
     description: initialData?.description ?? "",
+    seoTitle: initialData?.seoTitle ?? "",
+    seoDescription: initialData?.seoDescription ?? "",
     material: initialData?.material ?? "",
     form: initialData?.form ?? "",
     fit: initialData?.fit ?? "",
@@ -99,9 +112,14 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     status: initialData?.status ?? "DRAFT",
     featuredImage: initialData?.featuredImage ?? "",
     gallery: initialData?.gallery ?? [],
-    variants: initialData?.variants ?? [defaultVariant()],
+    specifications: initialData?.specifications ?? [],
+    customizations: initialData?.customizations ?? [],
+    options: initialData?.options ?? [],
+    variants: initialData?.variants ?? [],
   });
   const [saving, setSaving] = useState(false);
+  const [bulkOpInProgress, setBulkOpInProgress] = useState(false);
+  const [exportDialog, setExportDialog] = useState<"export" | "clone" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -110,6 +128,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   );
   const [categorySkuCode, setCategorySkuCode] = useState<string | null>(null);
   const [productCodePreviewError, setProductCodePreviewError] = useState<string | null>(null);
+  const deletedVariantIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!propCategories) {
@@ -171,62 +190,33 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     };
   }, [form.categoryId, form.id]);
 
-  async function previewSku(index: number) {
-    const v = form.variants[index];
-    if (!form.categoryId && !form.productCode && !form.id) return;
-    try {
-      const res = await fetch("/api/admin/products/sku-preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          categoryId: form.categoryId,
-          productCode: form.id ? (form.productCode || undefined) : undefined,
-          colorName: v.colorName || undefined,
-          colorCode: v.colorCode || undefined,
-          sizeName: v.sizeName || undefined,
-          dimensions: v.dimensions || undefined,
-          capacity: v.capacity || undefined,
-          excludeVariantId: v.id,
-          excludeProductId: form.id,
-        }),
-      });
-      const data = await res.json() as {
-        sku?: string;
-        variantSkuPreview?: string | null;
-        productCodePreview?: string | null;
-        isTaken?: boolean;
-        message?: string;
-      };
-      if (!res.ok) {
-        updateVariant(index, { skuPreview: data.message ?? "Lỗi xem trước", skuTaken: false });
-        return;
-      }
-      const variantSku = data.variantSkuPreview ?? data.sku ?? "";
-      updateVariant(index, { skuPreview: variantSku, skuTaken: data.isTaken ?? false });
-      if (!form.id && data.productCodePreview) {
-        setProductCodePreview(data.productCodePreview);
-      }
-    } catch { /* ignore */ }
-  }
-
   function setField<K extends keyof ProductFormData>(key: K, value: ProductFormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function updateVariant(index: number, patch: Partial<VariantFormRow>) {
-    setForm((prev) => {
-      const variants = [...prev.variants];
-      variants[index] = { ...variants[index], ...patch };
-      return { ...prev, variants };
-    });
+  async function reloadProductFromServer() {
+    if (!form.id) return;
+    try {
+      const res = await fetch(`/api/admin/products/${form.id}`);
+      if (!res.ok) return;
+      const product = (await res.json()) as {
+        options: Parameters<typeof mapOptionsToFormRows>[0];
+        variants: Parameters<typeof mapVariantsToFormRows>[0];
+      };
+      setForm((prev) => ({
+        ...prev,
+        options: mapOptionsToFormRows(product.options ?? []),
+        variants: mapVariantsToFormRows(product.variants ?? []).filter(
+          (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
+        ),
+      }));
+    } catch {
+      /* ignore */
+    }
   }
 
-  function addVariant() {
-    setForm((prev) => ({ ...prev, variants: [...prev.variants, defaultVariant()] }));
-  }
-
-  function removeVariant(index: number) {
-    setForm((prev) => ({ ...prev, variants: prev.variants.filter((_, i) => i !== index) }));
+  function handleVariantDeleted(variantId: string) {
+    deletedVariantIdsRef.current.add(variantId);
   }
 
   function moveGallery(idx: number, dir: -1 | 1) {
@@ -235,10 +225,6 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     if (newIdx < 0 || newIdx >= arr.length) return;
     [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
     setField("gallery", arr);
-  }
-
-  function isValidImageUrl(value: string): boolean {
-    return /^https?:\/\/.+/i.test(value.trim());
   }
 
   function parseNumberField(value: string): number | undefined {
@@ -254,12 +240,12 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     if (!form.categoryId) errors.categoryId = "Vui lòng chọn danh mục.";
 
     if (form.featuredImage.trim() && !isValidImageUrl(form.featuredImage)) {
-      errors.featuredImage = "URL ảnh không hợp lệ. Vui lòng dùng link ảnh bắt đầu bằng https://.";
+      errors.featuredImage = PRODUCT_IMAGE_URL_ERROR;
     }
 
     form.gallery.forEach((url, index) => {
       if (url.trim() && !isValidImageUrl(url)) {
-        errors[`gallery.${index}`] = "URL ảnh gallery không hợp lệ.";
+        errors[`gallery.${index}`] = PRODUCT_IMAGE_URL_ERROR;
       }
     });
 
@@ -279,11 +265,43 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         errors[`${prefix}.stockQty`] = "Tồn kho phải là số.";
       }
       if (v.imageUrl.trim() && !isValidImageUrl(v.imageUrl)) {
-        errors[`${prefix}.imageUrl`] = "Ảnh biến thể không hợp lệ.";
+        errors[`${prefix}.imageUrl`] = PRODUCT_IMAGE_URL_ERROR;
+      }
+      if (v.variantKind === "structured" && v.optionValueIds.length === 0) {
+        errors[`${prefix}.optionValueIds`] = "Chọn ít nhất một giá trị thuộc tính cho biến thể.";
       }
     });
 
+    const structuredCombos = new Set<string>();
+    for (const variant of form.variants) {
+      if (variant.variantKind !== "structured" || !variant.optionValueIds.length) continue;
+      const refs = variant.optionValueIds.map((id) =>
+        resolveOptionValueRefFromGroups(form.options, id),
+      );
+      const signature = combinationSignature(refs);
+      if (structuredCombos.has(signature)) {
+        errors.variants = "Tồn tại biến thể trùng tổ hợp thuộc tính.";
+        break;
+      }
+      structuredCombos.add(signature);
+    }
+
     return errors;
+  }
+
+  function resolveTabForField(field: string): FormTabId {
+    if (field.startsWith("variants") || field === "variants") return "variants";
+    if (field.startsWith("gallery") || field === "featuredImage") return "media";
+    if (
+      field === "shortDescription" ||
+      field === "description" ||
+      field.startsWith("specifications") ||
+      field.startsWith("customizations")
+    ) {
+      return "content";
+    }
+    if (field.startsWith("seo")) return "seo";
+    return "basic";
   }
 
   function fieldLabel(field: string): string {
@@ -307,6 +325,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     const localErrors = validateFormLocally();
     if (Object.keys(localErrors).length > 0) {
       setFieldErrors(localErrors);
+      const firstField = Object.keys(localErrors)[0];
+      if (firstField) setActiveTab(resolveTabForField(firstField));
       setError("Không thể tạo sản phẩm. Vui lòng kiểm tra các trường được đánh dấu.");
       return;
     }
@@ -319,6 +339,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       categoryId: form.categoryId,
       shortDescription: form.shortDescription.trim() || undefined,
       description: form.description.trim() || undefined,
+      seoTitle: form.seoTitle.trim() || undefined,
+      seoDescription: form.seoDescription.trim() || undefined,
       material: form.material.trim() || undefined,
       form: form.form.trim() || undefined,
       fit: form.fit.trim() || undefined,
@@ -333,17 +355,61 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       status: form.status,
       featuredImage: form.featuredImage.trim() || undefined,
       gallery: form.gallery.map((url) => url.trim()).filter(Boolean),
+      specifications: form.specifications
+        .filter((row) => row.label.trim() && row.value.trim())
+        .map((row, index) => ({
+          id: row.id,
+          label: row.label.trim(),
+          value: row.value.trim(),
+          sortOrder: row.sortOrder ?? index,
+        })),
+      customizations: form.customizations
+        .filter((row) => row.label.trim())
+        .map((row, index) => ({
+          id: row.id,
+          label: row.label.trim(),
+          description: row.description?.trim() || undefined,
+          sortOrder: row.sortOrder ?? index,
+          enabled: row.enabled !== false,
+        })),
+      options: form.options
+        .filter((group) => group.name.trim())
+        .map((group, index) => ({
+          id: group.id,
+          name: group.name.trim(),
+          slug: group.slug.trim() || undefined,
+          sortOrder: group.sortOrder ?? index,
+          values: group.values
+            .filter((value) => value.label.trim())
+            .map((value, valueIndex) => ({
+              id: value.id,
+              label: value.label.trim(),
+              valueCode: value.valueCode.trim() || undefined,
+              imageUrl: value.imageUrl.trim() || undefined,
+              sortOrder: value.sortOrder ?? valueIndex,
+            })),
+        })),
       variants: form.variants.map((v) => ({
         id: v.id,
-        colorName: v.colorName.trim() || undefined,
+        sku: v.sku.trim() || undefined,
+        colorName: v.variantKind === "legacy" ? v.colorName.trim() || undefined : v.colorName.trim() || undefined,
         colorCode: v.colorCode.trim() || undefined,
         sizeName: v.sizeName.trim() || undefined,
         dimensions: v.dimensions.trim() || undefined,
         capacity: v.capacity.trim() || undefined,
+        displayLabel: v.displayLabel.trim() || undefined,
+        moqOverride: v.moqOverride.trim() ? parseNumberField(v.moqOverride) : undefined,
+        leadTimeOverride: v.leadTimeOverride.trim() || undefined,
+        materialOverride: v.materialOverride.trim() || undefined,
+        optionValueIds:
+          v.variantKind === "structured" && v.optionValueIds.length
+            ? v.optionValueIds.map((id) => resolveOptionValueRefFromGroups(form.options, id))
+            : undefined,
         wholesalePrice: v.wholesalePrice.trim() ? parseNumberField(v.wholesalePrice) : undefined,
         dealerPrice: v.dealerPrice.trim() ? parseNumberField(v.dealerPrice) : undefined,
         stockQty: v.stockQty.trim() ? parseInt(v.stockQty, 10) : 0,
         stockStatus: v.stockStatus,
+        variantStatus: v.variantStatus,
         internalNote: v.internalNote.trim() || undefined,
         imageUrl: v.imageUrl.trim() || undefined,
       })),
@@ -391,19 +457,58 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   const publicUrl = publicSlug ? `/san-pham/${publicSlug}` : null;
 
   return (
-    <form className="admin-catalog-form" onSubmit={(e) => void handleSubmit(e)}>
+    <form
+      className={`admin-catalog-form${activeTab === "variants" ? " admin-catalog-form--variants" : ""}`}
+      onSubmit={(e) => void handleSubmit(e)}
+    >
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
         <h2 className="admin-subtitle" style={{ margin: 0 }}>{form.id ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}</h2>
-        {publicUrl && (
-          <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary admin-btn--xs">
-            🔗 Xem trên website
-          </a>
-        )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {form.id && (
+            <>
+              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setExportDialog("export")}>
+                Xuất sản phẩm này
+              </button>
+              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setExportDialog("clone")}>
+                Xuất mẫu để nhân bản
+              </button>
+            </>
+          )}
+          {publicUrl && (
+            <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary admin-btn--xs">
+              🔗 Xem trên website
+            </a>
+          )}
+        </div>
       </div>
 
-      {/* ── 1. Thông tin cơ bản ─────────────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset">
+      {form.id && exportDialog && (
+        <ProductExportDialog
+          open
+          onClose={() => setExportDialog(null)}
+          defaultScope="single"
+          productIds={[form.id]}
+          cloneTemplate={exportDialog === "clone"}
+        />
+      )}
+
+      <div className="admin-catalog-tabs" role="tablist" aria-label="Các phần biểu mẫu sản phẩm">
+        {FORM_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={`admin-catalog-tab${activeTab === tab.id ? " is-active" : ""}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "basic"}>
         <legend>1. Thông tin cơ bản</legend>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field">
@@ -467,7 +572,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       </fieldset>
 
       {/* ── 2. Thông tin B2B ─────────────────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset">
+      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "basic"}>
         <legend>2. Thông tin B2B & Sản xuất</legend>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field">
@@ -546,7 +651,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       </fieldset>
 
       {/* ── 3. Hình ảnh ──────────────────────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset">
+      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "media"}>
         <legend>3. Hình ảnh sản phẩm</legend>
         <p className="admin-field-hint">Ảnh nên tối ưu 200–300KB trước khi upload để website tải nhanh.</p>
 
@@ -614,130 +719,63 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         </div>
       </fieldset>
 
-      {/* ── 4. Biến thể / SKU lựa chọn ───────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset">
+      {/* ── 4. Biến thể ───────────────────────────────────────────────────── */}
+      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "variants"}>
         <legend>4. Biến thể / SKU lựa chọn</legend>
-        <p className="admin-field-hint">Nhấn &quot;Xem ID dự kiến&quot; để xem SKU lựa chọn trước khi lưu. Mã màu nên theo chuẩn BLK, WHT, NVY…</p>
+        <ProductCatalogVariantsSection
+          productId={form.id}
+          productCode={form.productCode || productCodePreview || ""}
+          defaultMoq={form.defaultMoq}
+          defaultLeadTime={form.leadTime}
+          optionGroups={form.options}
+          variants={form.variants}
+          onOptionGroupsChange={(options) => setField("options", options)}
+          onVariantsChange={(variants) => setField("variants", variants)}
+          onReloadProduct={reloadProductFromServer}
+          onVariantDeleted={handleVariantDeleted}
+          onBulkOperationChange={setBulkOpInProgress}
+        />
+        {fieldErrors.variants && (
+          <p className="admin-field-error" role="alert">{fieldErrors.variants}</p>
+        )}
+      </fieldset>
 
-        {form.variants.map((v, i) => (
-          <div key={i} className="admin-catalog-variant-row">
-            <div className="admin-catalog-variant-header">
-              <strong>Biến thể #{i + 1}</strong>
-              {v.skuPreview && (
-                <code className={`admin-catalog-code ${v.skuTaken ? "is-taken" : "is-ok"}`}>
-                  {v.skuPreview} {v.skuTaken ? "⚠ Đã tồn tại" : "✓"}
-                </code>
-              )}
-              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void previewSku(i)}>Xem ID dự kiến</button>
-              {form.variants.length > 1 && (
-                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => removeVariant(i)}>Xóa</button>
-              )}
-            </div>
-            <div className="admin-catalog-variant-fields">
-              <div className="admin-field">
-                <label className="admin-label">Màu sắc</label>
-                {(attributes.COLOR?.length ?? 0) > 0 && (
-                  <select className="admin-input" value={v.colorName} onChange={(e) => {
-                    const opt = attributes.COLOR?.find((o) => o.name === e.target.value);
-                    updateVariant(i, { colorName: e.target.value, colorCode: opt?.code ?? v.colorCode });
-                  }}>
-                    <option value="">— Chọn —</option>
-                    {(attributes.COLOR ?? []).map((o) => <option key={o.id} value={o.name}>{o.name} ({o.code})</option>)}
-                  </select>
-                )}
-                <input className="admin-input" value={v.colorName} onChange={(e) => updateVariant(i, { colorName: e.target.value })} placeholder="Đen, Trắng… (nhập thủ công)" style={{ marginTop: 4 }} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Mã màu</label>
-                <input className="admin-input" value={v.colorCode} onChange={(e) => updateVariant(i, { colorCode: e.target.value })} placeholder="BLK, WHT, NVY…" />
-                <p className="admin-field-hint">Dùng trong SKU lựa chọn</p>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Size</label>
-                {(attributes.SIZE?.length ?? 0) > 0 && (
-                  <select className="admin-input" value={v.sizeName} onChange={(e) => updateVariant(i, { sizeName: e.target.value })}>
-                    <option value="">— Chọn —</option>
-                    {(attributes.SIZE ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
-                  </select>
-                )}
-                <input className="admin-input" value={v.sizeName} onChange={(e) => updateVariant(i, { sizeName: e.target.value })} placeholder="S, M, L, XL…" style={{ marginTop: 4 }} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Kích thước</label>
-                {(attributes.DIMENSION?.length ?? 0) > 0 && (
-                  <select className="admin-input" value={v.dimensions} onChange={(e) => updateVariant(i, { dimensions: e.target.value })}>
-                    <option value="">— Chọn —</option>
-                    {(attributes.DIMENSION ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
-                  </select>
-                )}
-                <input className="admin-input" value={v.dimensions} onChange={(e) => updateVariant(i, { dimensions: e.target.value })} placeholder="35x40cm" style={{ marginTop: 4 }} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Dung tích</label>
-                {(attributes.CAPACITY?.length ?? 0) > 0 && (
-                  <select className="admin-input" value={v.capacity} onChange={(e) => updateVariant(i, { capacity: e.target.value })}>
-                    <option value="">— Chọn —</option>
-                    {(attributes.CAPACITY ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
-                  </select>
-                )}
-                <input className="admin-input" value={v.capacity} onChange={(e) => updateVariant(i, { capacity: e.target.value })} placeholder="500ml" style={{ marginTop: 4 }} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Giá sỉ nội bộ (VND)</label>
-                <input className="admin-input" type="number" value={v.wholesalePrice} onChange={(e) => updateVariant(i, { wholesalePrice: e.target.value })} placeholder="0 = liên hệ" />
-                <p className="admin-field-hint">Không hiển thị công khai · Hiển thị "Liên hệ" ngoài website</p>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Giá đại lý (VND)</label>
-                <input className="admin-input" type="number" value={v.dealerPrice} onChange={(e) => updateVariant(i, { dealerPrice: e.target.value })} placeholder="0 = liên hệ" />
-                <p className="admin-field-hint">Không hiển thị công khai</p>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Tồn kho</label>
-                <input className="admin-input" type="number" min="0" value={v.stockQty} onChange={(e) => updateVariant(i, { stockQty: e.target.value })} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Trạng thái tồn kho</label>
-                <select className="admin-input" value={v.stockStatus} onChange={(e) => updateVariant(i, { stockStatus: e.target.value })}>
-                  <option value="IN_STOCK">Còn hàng</option>
-                  <option value="LOW_STOCK">Sắp hết</option>
-                  <option value="OUT_OF_STOCK">Hết hàng</option>
-                  <option value="PREORDER">Đặt trước</option>
-                </select>
-              </div>
+      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "content"}>
+        <legend>Mô tả & thông số</legend>
+        <div className="admin-field">
+          <label className="admin-label">Tóm tắt ngắn (hiển thị gần tiêu đề PDP)</label>
+          <textarea className="admin-textarea" rows={2} value={form.shortDescription} onChange={(e) => setField("shortDescription", e.target.value)} />
+        </div>
+        <div className="admin-field">
+          <label className="admin-label">Mô tả sản phẩm đầy đủ</label>
+          <textarea className="admin-textarea" rows={8} value={form.description} onChange={(e) => setField("description", e.target.value)} />
+          <p className="admin-field-hint">Nội dung văn bản an toàn — không dán HTML thô từ nguồn không tin cậy.</p>
+        </div>
+        <ProductCatalogSpecificationsSection
+          rows={form.specifications}
+          onChange={(specifications) => setField("specifications", specifications)}
+        />
+        <ProductCatalogContentSection
+          rows={form.customizations}
+          onChange={(customizations) => setField("customizations", customizations)}
+        />
+      </fieldset>
 
-              {/* Variant image */}
-              <div className="admin-field">
-                <label className="admin-label">Ảnh biến thể</label>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  {v.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={v.imageUrl} alt="variant" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, border: "1px solid #e5e7eb", flexShrink: 0 }} />
-                  )}
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-                    <MediaPicker
-                      value={v.imageUrl}
-                      onChange={(url) => updateVariant(i, { imageUrl: url })}
-                      label="Ảnh biến thể"
-                      folder="products"
-                    />
-                    <input className="admin-input" value={v.imageUrl} onChange={(e) => updateVariant(i, { imageUrl: e.target.value })} placeholder="URL ảnh biến thể (để trống = dùng ảnh sản phẩm)" />
-                  </div>
-                </div>
-                <p className="admin-field-hint">Dùng ảnh sản phẩm nếu để trống</p>
-              </div>
-
-              <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-                <label className="admin-label">Ghi chú nội bộ</label>
-                <input className="admin-input" value={v.internalNote} onChange={(e) => updateVariant(i, { internalNote: e.target.value })} placeholder="Chỉ dành cho nội bộ ATTD" />
-              </div>
-            </div>
-          </div>
-        ))}
-
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={addVariant}>
-          + Thêm biến thể
-        </button>
+      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "seo"}>
+        <legend>SEO & hiển thị</legend>
+        <div className="admin-field">
+          <label className="admin-label">SEO title</label>
+          <input className="admin-input" value={form.seoTitle} onChange={(e) => setField("seoTitle", e.target.value)} />
+        </div>
+        <div className="admin-field">
+          <label className="admin-label">SEO description</label>
+          <textarea className="admin-textarea" rows={3} value={form.seoDescription} onChange={(e) => setField("seoDescription", e.target.value)} />
+        </div>
+        {publicUrl && (
+          <p className="admin-field-hint">
+            Xem trước công khai: <a href={publicUrl} target="_blank" rel="noopener noreferrer">{publicUrl}</a>
+          </p>
+        )}
       </fieldset>
 
       {error && (
@@ -762,8 +800,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       {form.id && <ProductMaterialSection productId={form.id} />}
 
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-          {saving ? "Đang lưu…" : form.id ? "Lưu thay đổi" : "Tạo sản phẩm"}
+        <button type="submit" className="admin-btn admin-btn--primary" disabled={saving || bulkOpInProgress}>
+          {saving ? "Đang lưu…" : bulkOpInProgress ? "Đang cập nhật biến thể…" : form.id ? "Lưu thay đổi" : "Tạo sản phẩm"}
         </button>
         <button type="button" className="admin-btn admin-btn--secondary" onClick={() => router.push("/admin/products")}>
           Hủy

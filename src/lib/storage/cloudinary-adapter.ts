@@ -1,17 +1,11 @@
 import "server-only";
+import {
+  getCloudinaryConfig,
+  isCloudinaryConfigured,
+} from "@/lib/storage/cloudinary-config";
 import type { StorageAdapter, StorageFolderKey, UploadResult } from "./types";
 
-function getCloudinaryConfig() {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
-  if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error(
-      "Cloudinary chưa được cấu hình. Cần CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET."
-    );
-  }
-  return { cloudName, apiKey, apiSecret };
-}
+export { isCloudinaryConfigured } from "@/lib/storage/cloudinary-config";
 
 function cloudinaryFolder(folder: StorageFolderKey): string {
   const map: Record<StorageFolderKey, string> = {
@@ -103,12 +97,4 @@ export class CloudinaryStorageAdapter implements StorageAdapter {
       console.warn("[cloudinary] destroy failed:", err);
     });
   }
-}
-
-export function isCloudinaryConfigured(): boolean {
-  return !!(
-    process.env.CLOUDINARY_CLOUD_NAME &&
-    process.env.CLOUDINARY_API_KEY &&
-    process.env.CLOUDINARY_API_SECRET
-  );
 }

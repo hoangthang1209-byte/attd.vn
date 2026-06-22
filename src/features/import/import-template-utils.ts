@@ -24,8 +24,9 @@ export type ImportTemplateDefinition = {
 // ─── CSV utilities ────────────────────────────────────────────────────────────
 
 export function escapeCsvValue(value: string): string {
-  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  if (/[",\n\r]/.test(safe)) return `"${safe.replace(/"/g, '""')}"`;
+  return safe;
 }
 
 export function createCsvTemplate(headers: string[], rows: Record<string, string>[]): string {
@@ -60,6 +61,31 @@ export async function downloadXlsxResponse(
   const sheet = XLSX.utils.json_to_sheet(data, { header: headers });
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "Template");
+  const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+  return new Response(buffer, {
+    headers: {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${fileName}.xlsx"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
+export async function downloadMultiSheetXlsxResponse(
+  fileName: string,
+  sheets: Array<{ sheetName: string; headers: string[]; rows: Record<string, string>[] }>,
+): Promise<Response> {
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.utils.book_new();
+  for (const sheetDef of sheets) {
+    const data = sheetDef.rows.map((row) => {
+      const item: Record<string, string> = {};
+      for (const h of sheetDef.headers) item[h] = row[h] ?? "";
+      return item;
+    });
+    const sheet = XLSX.utils.json_to_sheet(data, { header: sheetDef.headers });
+    XLSX.utils.book_append_sheet(workbook, sheet, sheetDef.sheetName.slice(0, 31));
+  }
   const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
   return new Response(buffer, {
     headers: {

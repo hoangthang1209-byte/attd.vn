@@ -230,6 +230,64 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
 
     const identity = resolveLeadIdentity(input);
     const code = await generateLeadCode();
+    const interests = [
+      ...(input.productInterests ?? []),
+      ...(input.productInterest ? [input.productInterest] : []),
+    ];
+
+    if (interests.length > 0) {
+      const lead = await prisma.$transaction(async (tx) => {
+        const row = await tx.lead.create({
+          data: {
+            ...(input.id ? { id: input.id } : {}),
+            code,
+            fullName: identity.fullName,
+            contactName: identity.contactName,
+            companyName: identity.companyName,
+            phone: identity.phone,
+            email: identity.email,
+            zalo: input.zalo?.trim() || null,
+            company: identity.companyName,
+            source: input.source ?? "WEBSITE",
+            sourceDetail: input.sourceDetail?.trim() || null,
+            demand: input.demand?.trim() || input.message?.trim() || null,
+            message: input.message?.trim() || null,
+            note: input.note?.trim() || null,
+            status: input.status ?? "NEW",
+            priority: input.priority ?? "NORMAL",
+            followUpAt: input.followUpAt ?? input.nextFollowUpAt ?? null,
+            nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
+            estimatedValue: input.estimatedValue ?? null,
+            assignedTo: input.assignedTo?.trim() || null,
+            landingPage: input.landingPage?.trim() || null,
+            utmSource: input.utmSource?.trim() || null,
+            utmMedium: input.utmMedium?.trim() || null,
+            utmCampaign: input.utmCampaign?.trim() || null,
+            referrer: input.referrer?.trim() || null,
+          },
+        });
+
+        for (const interest of interests) {
+          const productNameSnapshot = await resolveProductInterestSnapshot(interest);
+          await tx.cRMProductInterest.create({
+            data: {
+              leadId: row.id,
+              productId: interest.productId ?? null,
+              variantId: interest.variantId ?? null,
+              productNameSnapshot,
+              quantity: interest.quantity ?? null,
+              unit: interest.unit?.trim() || "cái",
+              requirementNote: interest.requirementNote?.trim() || null,
+              serviceNeeds: interest.serviceNeeds ?? undefined,
+            },
+          });
+        }
+
+        return row;
+      });
+
+      return mapLeadRow(lead);
+    }
 
     const row = await prisma.lead.create({
       data: {

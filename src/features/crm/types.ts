@@ -247,6 +247,7 @@ export const CRM_LEAD_SOURCES: LeadSource[] = [
   "OEM",
   "SOURCING",
   "LANDING_PAGE",
+  "PRODUCT_INQUIRY",
 ];
 
 export const CRM_CUSTOMER_TYPES: CustomerType[] = [

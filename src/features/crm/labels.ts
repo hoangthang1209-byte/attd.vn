@@ -45,6 +45,7 @@ export const CRM_SOURCE_LABELS: Record<LeadSource, string> = {
   REFERRAL: "Giới thiệu",
   OLD_CUSTOMER: "Khách cũ",
   DIRECT: "Trực tiếp",
+  PRODUCT_INQUIRY: "Yêu cầu báo giá sản phẩm",
   OTHER: "Khác",
 };
 

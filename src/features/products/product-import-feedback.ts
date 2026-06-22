@@ -292,6 +292,9 @@ export function expandCompactPreviewRows(rows: CompactPreviewRow[]): ProductImpo
 
 /** Prefer the editable data sheet when re-uploading feedback workbooks. */
 export function pickProductImportSheetName(sheetNames: string[]): string {
-  if (sheetNames.includes("Dữ liệu cần sửa")) return "Dữ liệu cần sửa";
-  return sheetNames[0] ?? "";
+  const preferred = ["Sản phẩm", "Biến thể", "Dữ liệu cần sửa"];
+  for (const name of preferred) {
+    if (sheetNames.includes(name)) return name;
+  }
+  return sheetNames.find((n) => n !== "Hướng dẫn") ?? sheetNames[0] ?? "";
 }

@@ -37,44 +37,47 @@ model Category {
 }
 
 model Product {
-  id                   String                       @id @default(cuid())
-  productCode          String?                      @unique
-  systemCode           String?                      @unique
-  name                 String
-  slug                 String                       @unique
-  shortDescription     String?
-  description          String?
-  seoTitle             String?
-  seoDescription       String?
-  aiSummary            String?
-  gsm                  Int?
-  material             String?
-  form                 String?
-  fit                  String?
-  defaultMoq           Int?
-  useCases             String[]
-  targetCustomers      String[]
-  supportsPrinting     Boolean                      @default(false)
-  supportsEmbroidery   Boolean                      @default(false)
-  supportsOem          Boolean                      @default(false)
-  tags                 String[]
-  featuredImage        String?
-  gallery              String[]                     @default([])
-  leadTime             String?
-  metadata             Json?
-  categoryId           String
-  status               ProductStatus                @default(ACTIVE)
-  createdAt            DateTime                     @default(now())
-  updatedAt            DateTime                     @updatedAt
-  category             Category                     @relation(fields: [categoryId], references: [id])
-  images               ProductImage[]
-  variants             ProductVariant[]
-  crmProductInterests  CRMProductInterest[]
-  productPriceTiers    ProductPriceTier[]
-  pricingCalcItems     PricingCalculationItem[]
-  quoteItems           QuoteItem[]
-  orderItems           OrderItem[]
-  materialRequirements ProductMaterialRequirement[]
+  id                        String                           @id @default(cuid())
+  productCode               String?                          @unique
+  systemCode                String?                          @unique
+  name                      String
+  slug                      String                           @unique
+  shortDescription          String?
+  description               String?
+  seoTitle                  String?
+  seoDescription            String?
+  aiSummary                 String?
+  gsm                       Int?
+  material                  String?
+  form                      String?
+  fit                       String?
+  defaultMoq                Int?
+  useCases                  String[]
+  targetCustomers           String[]
+  supportsPrinting          Boolean                          @default(false)
+  supportsEmbroidery        Boolean                          @default(false)
+  supportsOem               Boolean                          @default(false)
+  tags                      String[]
+  featuredImage             String?
+  gallery                   String[]                         @default([])
+  leadTime                  String?
+  metadata                  Json?
+  categoryId                String
+  status                    ProductStatus                    @default(ACTIVE)
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
+  category                  Category                         @relation(fields: [categoryId], references: [id])
+  images                    ProductImage[]
+  variants                  ProductVariant[]
+  crmProductInterests       CRMProductInterest[]
+  productPriceTiers         ProductPriceTier[]
+  pricingCalcItems          PricingCalculationItem[]
+  quoteItems                QuoteItem[]
+  orderItems                OrderItem[]
+  materialRequirements      ProductMaterialRequirement[]
+  options                   ProductOption[]
+  specifications            ProductSpecification[]
+  customizationCapabilities ProductCustomizationCapability[]
 
   @@index([categoryId])
   @@index([status])
@@ -127,6 +130,10 @@ model ProductVariant {
   stockQty             Int                          @default(0)
   stockStatus          StockStatus                  @default(IN_STOCK)
   imageUrl             String?
+  displayLabel         String?
+  moqOverride          Int?
+  leadTimeOverride     String?
+  materialOverride     String?
   weight               Decimal?                     @db.Decimal(8, 3)
   internalNote         String?
   variantStatus        VariantStatus                @default(ACTIVE)
@@ -142,6 +149,7 @@ model ProductVariant {
   quoteItems           QuoteItem[]
   orderItems           OrderItem[]
   materialRequirements ProductMaterialRequirement[]
+  optionValues         ProductVariantOptionValue[]
 
   @@index([productId])
   @@index([stockStatus])
@@ -156,6 +164,73 @@ model ProductImage {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   product   Product  @relation(fields: [productId], references: [id])
+}
+
+model ProductOption {
+  id        String               @id @default(cuid())
+  productId String
+  name      String
+  slug      String
+  sortOrder Int                  @default(0)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  product   Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values    ProductOptionValue[]
+
+  @@unique([productId, slug])
+  @@index([productId, sortOrder])
+}
+
+model ProductOptionValue {
+  id        String                      @id @default(cuid())
+  optionId  String
+  label     String
+  valueCode String?
+  imageUrl  String?
+  sortOrder Int                         @default(0)
+  createdAt DateTime                    @default(now())
+  updatedAt DateTime                    @updatedAt
+  option    ProductOption               @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  variants  ProductVariantOptionValue[]
+
+  @@index([optionId, sortOrder])
+}
+
+model ProductVariantOptionValue {
+  variantId     String
+  optionValueId String
+  variant       ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  optionValue   ProductOptionValue @relation(fields: [optionValueId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, optionValueId])
+  @@index([optionValueId])
+}
+
+model ProductSpecification {
+  id        String   @id @default(cuid())
+  productId String
+  label     String
+  value     String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+model ProductCustomizationCapability {
+  id          String   @id @default(cuid())
+  productId   String
+  label       String
+  description String?
+  sortOrder   Int      @default(0)
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
 }
 
 model Lead {
@@ -696,6 +771,7 @@ enum LeadSource {
   REFERRAL
   OLD_CUSTOMER
   DIRECT
+  PRODUCT_INQUIRY
   OTHER
 }
 

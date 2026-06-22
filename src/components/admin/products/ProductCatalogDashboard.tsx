@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
 
 type ProductVariantRow = {
   id: string;
@@ -76,6 +77,8 @@ export default function ProductCatalogDashboard() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [exportOpen, setExportOpen] = useState(false);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -117,8 +120,45 @@ export default function ProductCatalogDashboard() {
   async function deleteProduct(id: string, name: string) {
     if (!confirm(`Xóa sản phẩm "${name}"?`)) return;
     await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
     void fetchProducts();
   }
+
+  function toggleSelect(id: string, checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllVisible(checked: boolean) {
+    const ids = (data?.products ?? []).map((p) => p.id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  const activeFilters = {
+    search: search || undefined,
+    categoryId: categoryId || undefined,
+    status: status || undefined,
+    stockStatus: stockStatus || undefined,
+  };
+
+  const allVisibleSelected =
+    (data?.products?.length ?? 0) > 0 &&
+    (data?.products ?? []).every((p) => selectedIds.has(p.id));
 
   const kpis = data?.kpis;
 
@@ -140,7 +180,10 @@ export default function ProductCatalogDashboard() {
       <div className="admin-catalog-toolbar">
         <div className="admin-catalog-toolbar-left">
           <Link href="/admin/products/new" className="admin-btn admin-btn--primary">+ Thêm sản phẩm</Link>
-          <Link href="/admin/products/import" className="admin-btn admin-btn--secondary">Nhập Excel/CSV</Link>
+          <Link href="/admin/products/import" className="admin-btn admin-btn--secondary">Nhập sản phẩm</Link>
+          <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setExportOpen(true)}>
+            Xuất dữ liệu
+          </button>
           <button
             type="button"
             className="admin-btn admin-btn--secondary"
@@ -151,9 +194,21 @@ export default function ProductCatalogDashboard() {
           </button>
         </div>
         <div className="admin-catalog-toolbar-right">
+          {selectedIds.size > 0 && (
+            <span className="admin-field-hint">Đã chọn {selectedIds.size} sản phẩm</span>
+          )}
           <span className="admin-field-hint">{data?.total ?? 0} sản phẩm</span>
         </div>
       </div>
+
+      <ProductExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        defaultScope={selectedIds.size > 0 ? "selected" : "filtered"}
+        productIds={[...selectedIds]}
+        filters={activeFilters}
+        selectedCount={selectedIds.size}
+      />
 
       {seedMsg && <p className="admin-kb-warning admin-kb-badge--verified" style={{ marginBottom: 12 }}>{seedMsg}</p>}
 
@@ -197,6 +252,14 @@ export default function ProductCatalogDashboard() {
           <table className="admin-catalog-table">
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={(e) => toggleSelectAllVisible(e.target.checked)}
+                    aria-label="Chọn tất cả sản phẩm đang hiển thị"
+                  />
+                </th>
                 <th>Tên sản phẩm</th>
                 <th>Danh mục</th>
                 <th>Mã hàng</th>
@@ -224,6 +287,14 @@ export default function ProductCatalogDashboard() {
 
                 return (
                   <tr key={p.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(p.id)}
+                        onChange={(e) => toggleSelect(p.id, e.target.checked)}
+                        aria-label={`Chọn sản phẩm ${p.name}`}
+                      />
+                    </td>
                     <td>
                       <div className="admin-catalog-product-name">
                         {(p.featuredImage ?? p.images[0]?.imageUrl ?? (p.gallery ?? [])[0]) && (

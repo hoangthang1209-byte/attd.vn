@@ -18,26 +18,30 @@ type Props = {
   restoreFocusRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
-function buildProductMessage(
-  product: ProductQuoteContext,
-  productUrl: string,
-  expectedQty: string,
-  note: string,
-): string {
+function buildProductMessage(payload: {
+  product: ProductQuoteContext;
+  productUrl: string;
+  expectedQty: string;
+  note: string;
+}): string {
+  const { product, productUrl, expectedQty, note } = payload;
   const lines = [
     "[Yêu cầu báo giá sản phẩm]",
     `Sản phẩm: ${product.name}`,
     `URL: ${productUrl}`,
   ];
-  if (product.category?.trim()) {
-    lines.push(`Danh mục: ${product.category.trim()}`);
+  if (product.category?.trim()) lines.push(`Danh mục: ${product.category.trim()}`);
+  if (product.variantLabel?.trim()) lines.push(`Biến thể: ${product.variantLabel.trim()}`);
+  if (product.variantSku?.trim()) lines.push(`SKU: ${product.variantSku.trim()}`);
+  if (product.optionSelections) {
+    const options = Object.entries(product.optionSelections)
+      .filter(([, value]) => value)
+      .map(([key, value]) => `${key}: ${value}`);
+    if (options.length) lines.push(`Tùy chọn: ${options.join(", ")}`);
   }
-  if (isPublicMoq(product.moq)) {
-    lines.push(`MOQ: ${formatPdpMoqText(product.moq)}`);
-  }
-  if (expectedQty.trim()) {
-    lines.push(`Số lượng dự kiến: ${expectedQty.trim()}`);
-  }
+  if (isPublicMoq(product.moq)) lines.push(`MOQ: ${formatPdpMoqText(product.moq)}`);
+  if (product.leadTime?.trim()) lines.push(`Thời gian sản xuất: ${product.leadTime.trim()}`);
+  if (expectedQty.trim()) lines.push(`Số lượng dự kiến: ${expectedQty.trim()}`);
   if (note.trim()) {
     lines.push("---");
     lines.push(note.trim());
@@ -150,7 +154,19 @@ export default function ProductQuoteDialog({
           name: name.trim(),
           phone: phone.trim(),
           company: company.trim() || null,
-          message: buildProductMessage(product, productUrl, expectedQty, note),
+          message: buildProductMessage({ product, productUrl, expectedQty, note }),
+          productInquiry: {
+            productId: product.id,
+            productName: product.name,
+            productUrl,
+            variantId: product.variantId ?? null,
+            variantLabel: product.variantLabel ?? null,
+            optionSelections: product.optionSelections ?? null,
+            moq: product.moq ?? null,
+            leadTime: product.leadTime ?? null,
+            quantity: expectedQty.trim() || null,
+            note: note.trim() || null,
+          },
         }),
       });
 

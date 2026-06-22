@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeProductImport } from "@/features/products/product-import-service";
+import { executeProductImportV2 } from "@/features/products/product-import-v2.service";
 import type { ProductImportOptions, ProductImportPreviewRow } from "@/features/products/product-import-types";
 import { prisma } from "@/lib/prisma";
+import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
 import {
   createProductImportJob,
   markImportJobFailed,
 } from "@/features/products/product-import-job-service";
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdminApiFromCookies();
+  if (authError) return authError;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -45,11 +50,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await executeProductImport(rows, options, jobId);
+    const result = options.importMode
+      ? await executeProductImportV2(rows, options, jobId)
+      : await executeProductImport(rows, options, jobId);
     return NextResponse.json({
       ok: true,
       jobId,
-      message: `Tạo ${result.createdProducts} sản phẩm, ${result.createdVariants} SKU — bỏ qua ${result.skippedRows}, lỗi ${result.invalidRows}.`,
+      message: `Tạo ${result.createdProducts} sản phẩm, cập nhật ${result.updatedProducts}, ${result.createdVariants} biến thể mới — bỏ qua ${result.skippedRows}, lỗi ${result.invalidRows + (result.failedRows ?? 0)}.`,
       ...result,
     });
   } catch (err) {

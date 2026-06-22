@@ -7666,6 +7666,115 @@ body:has(.mobile-action-bar) .site-footer {
 .admin-catalog-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #374151; cursor: pointer; }
 
 /* Variants */
+.admin-catalog-form--variants { max-width: min(1200px, 100%); }
+.admin-variant-matrix-section { display: flex; flex-direction: column; gap: 20px; }
+.admin-product-section { display: flex; flex-direction: column; gap: 12px; }
+.admin-section-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+.admin-variant-matrix-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-variant-matrix-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-variant-matrix-scroll {
+  overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch;
+  border: 1px solid #e5e7eb; border-radius: 8px;
+}
+.admin-variant-matrix-table {
+  width: 100%; min-width: 960px; border-collapse: collapse; font-size: 13px;
+}
+.admin-variant-matrix-table th,
+.admin-variant-matrix-table td {
+  padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top;
+}
+.admin-variant-matrix-table th { background: #f9fafb; font-weight: 600; white-space: nowrap; }
+.admin-variant-thumb { border-radius: 4px; object-fit: cover; border: 1px solid #e5e7eb; }
+.admin-variant-option-list { display: flex; flex-direction: column; gap: 4px; }
+.admin-variant-option-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  background: #eef2ff; color: #3730a3; font-size: 11px; white-space: nowrap;
+}
+.admin-variant-edit-panel {
+  margin-top: 12px; padding: 16px; border: 1px solid #e5e7eb;
+  border-radius: 8px; background: #fafafa; display: flex; flex-direction: column; gap: 10px;
+}
+.admin-option-groups { display: flex; flex-direction: column; gap: 12px; }
+.admin-option-group-card {
+  border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; background: #fff;
+}
+.admin-option-group-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.admin-option-value-list { display: flex; flex-direction: column; gap: 8px; }
+.admin-option-values { display: flex; flex-direction: column; gap: 8px; }
+.admin-option-value-row {
+  display: grid; grid-template-columns: 1fr 120px 1fr auto; gap: 8px; align-items: start;
+}
+.admin-option-value-media { display: flex; flex-direction: column; gap: 4px; }
+.admin-option-value-meta { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+@media (max-width: 768px) {
+  .admin-option-value-row { grid-template-columns: 1fr; }
+  .admin-variant-matrix-filters { width: 100%; }
+  .admin-variant-matrix-filters .form-input { width: 100%; }
+}
+.admin-variant-bulk-toolbar {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px;
+  border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;
+}
+.admin-variant-sku-preview ul {
+  margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: #374151;
+}
+@media (max-width: 768px) {
+  .admin-variant-bulk-toolbar {
+    position: sticky; bottom: 8px; z-index: 5;
+  }
+}
+.admin-variant-row-actions {
+  display: flex; flex-wrap: wrap; gap: 6px; min-width: 120px;
+}
+.admin-variant-lifecycle-actions {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end;
+}
+.admin-variant-lifecycle-summary { display: flex; flex-direction: column; gap: 8px; }
+.admin-variant-status-badge {
+  display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px;
+  background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 600;
+}
+.admin-variant-status-badge--inactive {
+  background: #fef3c7; color: #92400e;
+}
+.admin-variant-status-badge--archived {
+  background: #f3f4f6; color: #4b5563;
+}
+.admin-variant-matrix-row.is-inactive td {
+  background: #fffbeb;
+}
+.admin-variant-matrix-row.is-archived td {
+  background: #f9fafb; color: #6b7280;
+}
+.admin-variant-cell-truncate {
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.admin-field-inherited {
+  border-color: #d1d5db; background: #fafafa;
+}
+.admin-field-overridden {
+  border-color: #6366f1; background: #fff;
+}
+.admin-field-inherit-hint {
+  display: block; font-size: 10px; color: #6b7280; margin-top: 2px;
+}
+.admin-stock-status-hint {
+  display: block; font-size: 10px; color: #374151; margin-top: 2px;
+}
+.admin-variant-row-actions .btn-secondary,
+.admin-variant-row-actions .btn-tertiary {
+  min-height: 32px; padding: 4px 8px;
+}
+.mp-pdp-no-variants-hint {
+  margin: 12px 0 0; padding: 10px 12px; border-radius: 8px;
+  background: #f3f4f6; color: #374151; font-size: 14px;
+}
+.admin-legacy-variant-list { display: flex; flex-direction: column; gap: 12px; }
+.admin-empty-hint { color: #6b7280; font-size: 13px; margin: 0; }
 .admin-catalog-variant-row {
   border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px;
   display: flex; flex-direction: column; gap: 12px;
@@ -10989,6 +11098,196 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 .mp-pdp-related-more { margin-top: 24px; }
 .mp-pdp .mp-product-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+
+/* Sprint 27.2.0 — B2B product detail */
+.mp-pdp--b2b .mp-product-detail-summary {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+.mp-pdp-core-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.mp-pdp-core-fact {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+}
+.mp-pdp-core-fact-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.mp-pdp-core-fact-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+.mp-pdp-capability-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mp-pdp-capability-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--section-bg);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+.mp-pdp-spec-grid {
+  display: grid;
+  gap: 10px 20px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .mp-pdp-spec-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.mp-pdp-spec-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) 1fr;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.mp-pdp-spec-row dt {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+}
+.mp-pdp-spec-row dd {
+  margin: 0;
+  font-size: 14px;
+  color: #111827;
+  line-height: 1.5;
+}
+.mp-pdp-spec-preview-title {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 800;
+}
+.mp-pdp-spec-more {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+.mp-pdp-custom-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+.mp-pdp-custom-list li {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.mp-pdp-custom-list strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.mp-pdp-custom-list span {
+  font-size: 13px;
+  color: #6b7280;
+}
+.mp-pdp-custom-cta { margin-top: 16px; }
+.pdp-mobile-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: none;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
+}
+.pdp-mobile-action-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+.pdp-mobile-action-bar__btn--quote {
+  margin-right: 6px;
+  background: var(--primary);
+  color: #fff;
+}
+.pdp-mobile-action-bar__btn--dealer {
+  margin-left: 6px;
+  background: #fff;
+  color: #111827;
+  border-color: var(--border);
+}
+@media (max-width: 899px) {
+  .pdp-mobile-action-bar { display: grid; }
+  .mp-pdp--b2b { padding-bottom: 84px; }
+  .product-detail-right { display: none; }
+}
+.admin-catalog-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.admin-catalog-tab {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #374151;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.admin-catalog-tab.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.admin-spec-list { display: grid; gap: 10px; }
+.admin-spec-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: start;
+}
+@media (max-width: 768px) {
+  .admin-spec-row { grid-template-columns: 1fr; }
+}
+.admin-spec-row-actions { display: flex; gap: 6px; }
+.admin-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.admin-empty-hint {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
+}
 
 /* CRM Sprint 26 */
 .admin-section-card {
