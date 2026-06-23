@@ -1,5 +1,6 @@
 import { isValidImageSrc } from "@/lib/imagePaths";
 import type { ProductImageRecord } from "@/lib/productImages";
+import { buildProductImageUrlSet, isProductScopedImageUrl, acceptProductScopedImageUrl } from "@/lib/productImageScope";
 
 export type PublicVariantRow = {
   id: string;
@@ -173,17 +174,19 @@ export function getInitialSelection(variants: PublicVariantRow[]): {
 /** Put selected variant image first without duplicating URLs. */
 export function mergeGalleryWithVariantImage(
   baseImages: ProductImageRecord[],
-  variantImageUrl?: string | null
+  variantImageUrl?: string | null,
 ): ProductImageRecord[] {
-  if (!variantImageUrl || !isValidImageSrc(variantImageUrl)) {
+  const allowed = buildProductImageUrlSet(baseImages);
+  const scopedUrl = acceptProductScopedImageUrl(variantImageUrl, allowed);
+  if (!scopedUrl) {
     return baseImages;
   }
 
-  const rest = baseImages.filter((img) => img.imageUrl !== variantImageUrl);
+  const rest = baseImages.filter((img) => img.imageUrl !== scopedUrl);
   return [
     {
       id: "variant-selected",
-      imageUrl: variantImageUrl,
+      imageUrl: scopedUrl,
       altText: null,
       sortOrder: -1,
     },
@@ -191,16 +194,21 @@ export function mergeGalleryWithVariantImage(
   ];
 }
 
-/** Append unique variant images not already in product gallery. */
+/** Append unique variant images already present in the product gallery. */
 export function appendVariantImagesToGallery(
   baseImages: ProductImageRecord[],
-  variants: PublicVariantRow[]
+  variants: PublicVariantRow[],
 ): ProductImageRecord[] {
+  const allowed = buildProductImageUrlSet(baseImages);
   const seen = new Set(baseImages.map((img) => img.imageUrl));
   const extra: ProductImageRecord[] = [];
 
   for (const v of variants) {
-    if (v.imageUrl && isValidImageSrc(v.imageUrl) && !seen.has(v.imageUrl)) {
+    if (
+      v.imageUrl &&
+      isProductScopedImageUrl(v.imageUrl, allowed) &&
+      !seen.has(v.imageUrl)
+    ) {
       seen.add(v.imageUrl);
       extra.push({
         id: `variant-${v.id}`,

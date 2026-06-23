@@ -189,6 +189,7 @@ export default function ProductQuoteDialog({
 
   const moqText = isPublicMoq(product.moq) ? formatPdpMoqText(product.moq) : null;
   const hasImage = Boolean(product.imageUrl && isValidImageSrc(product.imageUrl));
+  const variantLabel = product.variantLabel?.trim() || null;
 
   return createPortal(
     <div className="product-quote-dialog" role="presentation">
@@ -231,129 +232,158 @@ export default function ProductQuoteDialog({
           </div>
         ) : (
           <>
-            <div className="product-quote-dialog__product">
-              <div className="product-quote-dialog__product-media">
-                {hasImage ? (
-                  <Image
-                    src={product.imageUrl!}
-                    alt=""
-                    width={72}
-                    height={72}
-                    className="product-quote-dialog__product-img"
-                  />
-                ) : (
-                  <ProductMediaFrame
-                    imageUrl={null}
-                    alt={product.name}
-                    sizes="72px"
-                    placeholderCompact
-                  />
-                )}
+            <div className="product-quote-dialog__body">
+              <div className="product-quote-dialog__product">
+                <div className="product-quote-dialog__product-media">
+                  {hasImage ? (
+                    <Image
+                      src={product.imageUrl!}
+                      alt=""
+                      width={56}
+                      height={56}
+                      className="product-quote-dialog__product-img"
+                    />
+                  ) : (
+                    <ProductMediaFrame
+                      imageUrl={null}
+                      alt={product.name}
+                      sizes="56px"
+                      placeholderCompact
+                    />
+                  )}
+                </div>
+                <div className="product-quote-dialog__product-meta">
+                  <p className="product-quote-dialog__product-name">{product.name}</p>
+                  {variantLabel && (
+                    <p className="product-quote-dialog__product-variant">{variantLabel}</p>
+                  )}
+                  {moqText && (
+                    <p className="product-quote-dialog__product-moq">{moqText}</p>
+                  )}
+                </div>
               </div>
-              <div className="product-quote-dialog__product-meta">
-                <p className="product-quote-dialog__product-name">{product.name}</p>
-                {moqText && (
-                  <p className="product-quote-dialog__product-moq">{moqText}</p>
+
+              <form
+                id={`${titleId}-form`}
+                className="product-quote-dialog__form"
+                onSubmit={(e) => void handleSubmit(e)}
+                noValidate
+              >
+                <div className="form-group">
+                  <label htmlFor={`${titleId}-name`} className="form-label">
+                    Họ và tên <span className="form-required">*</span>
+                  </label>
+                  <input
+                    id={`${titleId}-name`}
+                    type="text"
+                    className="form-input"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    autoComplete="name"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor={`${titleId}-phone`} className="form-label">
+                    Số điện thoại <span className="form-required">*</span>
+                  </label>
+                  <input
+                    id={`${titleId}-phone`}
+                    type="tel"
+                    className="form-input"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    autoComplete="tel"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor={`${titleId}-company`} className="form-label">
+                    Tên công ty
+                  </label>
+                  <input
+                    id={`${titleId}-company`}
+                    type="text"
+                    className="form-input"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    autoComplete="organization"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor={`${titleId}-qty`} className="form-label">
+                    Số lượng dự kiến
+                  </label>
+                  <input
+                    id={`${titleId}-qty`}
+                    type="text"
+                    className="form-input"
+                    value={expectedQty}
+                    onChange={(e) => setExpectedQty(e.target.value)}
+                    placeholder="VD: 100, 500..."
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor={`${titleId}-note`} className="form-label">
+                    Nội dung cần tư vấn
+                  </label>
+                  <textarea
+                    id={`${titleId}-note`}
+                    className="form-input form-textarea"
+                    rows={3}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                  />
+                </div>
+
+                {formStatus === "error" && errorMessage && (
+                  <div
+                    className="form-error product-quote-dialog__form-error"
+                    role="alert"
+                  >
+                    {errorMessage}
+                  </div>
                 )}
-              </div>
+
+                <div className="product-quote-dialog__actions product-quote-dialog__actions--inline">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleClose}
+                    disabled={formStatus === "loading"}
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={formStatus === "loading"}
+                  >
+                    {formStatus === "loading" ? "Đang gửi…" : "Gửi yêu cầu báo giá"}
+                  </button>
+                </div>
+              </form>
             </div>
 
-            <form className="product-quote-dialog__form" onSubmit={(e) => void handleSubmit(e)} noValidate>
-              <div className="form-group">
-                <label htmlFor={`${titleId}-name`} className="form-label">
-                  Họ và tên <span className="form-required">*</span>
-                </label>
-                <input
-                  id={`${titleId}-name`}
-                  type="text"
-                  className="form-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoComplete="name"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor={`${titleId}-phone`} className="form-label">
-                  Số điện thoại <span className="form-required">*</span>
-                </label>
-                <input
-                  id={`${titleId}-phone`}
-                  type="tel"
-                  className="form-input"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  autoComplete="tel"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor={`${titleId}-company`} className="form-label">
-                  Tên công ty
-                </label>
-                <input
-                  id={`${titleId}-company`}
-                  type="text"
-                  className="form-input"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  autoComplete="organization"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor={`${titleId}-qty`} className="form-label">
-                  Số lượng dự kiến
-                </label>
-                <input
-                  id={`${titleId}-qty`}
-                  type="text"
-                  className="form-input"
-                  value={expectedQty}
-                  onChange={(e) => setExpectedQty(e.target.value)}
-                  placeholder="VD: 100, 500..."
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor={`${titleId}-note`} className="form-label">
-                  Nội dung cần tư vấn
-                </label>
-                <textarea
-                  id={`${titleId}-note`}
-                  className="form-input form-textarea"
-                  rows={3}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </div>
-
+            <div className="product-quote-dialog__sticky-footer" aria-hidden={false}>
               {formStatus === "error" && errorMessage && (
                 <div className="form-error" role="alert">
                   {errorMessage}
                 </div>
               )}
-
-              <div className="product-quote-dialog__actions">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={handleClose}
-                  disabled={formStatus === "loading"}
-                >
-                  Đóng
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={formStatus === "loading"}
-                >
-                  {formStatus === "loading" ? "Đang gửi…" : "Gửi yêu cầu báo giá"}
-                </button>
-              </div>
-            </form>
+              <button
+                type="submit"
+                form={`${titleId}-form`}
+                className="btn-primary product-quote-dialog__sticky-submit"
+                disabled={formStatus === "loading"}
+              >
+                {formStatus === "loading" ? "Đang gửi…" : "Gửi yêu cầu báo giá"}
+              </button>
+            </div>
           </>
         )}
       </div>

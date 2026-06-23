@@ -1,12 +1,12 @@
 /**
- * One-off: gallery images + color-representative variant imageUrl for demo polo.
+ * Cleans demo polo gallery + variant color images.
+ * Only uses images already in this product's gallery — never unrelated product URLs.
  * Run: npx tsx scripts/seed-demo-polo-color-images.ts
  */
 import { prisma } from "../src/lib/prisma";
 
 const DEMO_SLUG = "ao-polo-the-thao-pique-pro-demo";
 
-/** Existing valid URLs already used in ATTD product/media storage. */
 const GALLERY_IMAGES = [
   {
     imageUrl:
@@ -20,18 +20,11 @@ const GALLERY_IMAGES = [
     altText: "Áo polo — Navy",
     sortOrder: 1,
   },
-  {
-    imageUrl:
-      "https://0iitstjrwqim8udr.public.blob.vercel-storage.com/products/-o-thun-regular-tr-n-mau-32-GnOVv7bBYEghC9YYRfaFk30r3Ls6Qk.jpg",
-    altText: "Áo polo — Đen",
-    sortOrder: 2,
-  },
 ];
 
 const COLOR_IMAGE_MAP: Record<string, string> = {
   Trắng: GALLERY_IMAGES[0].imageUrl,
   Navy: GALLERY_IMAGES[1].imageUrl,
-  Đen: GALLERY_IMAGES[2].imageUrl,
 };
 
 async function main() {
@@ -52,19 +45,41 @@ async function main() {
     process.exit(1);
   }
 
-  if (product.images.length === 0) {
-    await prisma.productImage.createMany({
-      data: GALLERY_IMAGES.map((img) => ({
-        productId: product.id,
-        imageUrl: img.imageUrl,
-        altText: img.altText,
-        sortOrder: img.sortOrder,
-      })),
-    });
-    console.log(`Created ${GALLERY_IMAGES.length} gallery image(s).`);
+  const allowedUrls = new Set(GALLERY_IMAGES.map((img) => img.imageUrl));
+
+  for (const img of product.images) {
+    if (!allowedUrls.has(img.imageUrl)) {
+      await prisma.productImage.delete({ where: { id: img.id } });
+      console.log(`Removed unrelated gallery image: ${img.imageUrl}`);
+    }
   }
 
+  const existingUrls = new Set(
+    (
+      await prisma.productImage.findMany({
+        where: { productId: product.id },
+        select: { imageUrl: true },
+      })
+    ).map((row) => row.imageUrl),
+  );
+
+  for (const img of GALLERY_IMAGES) {
+    if (!existingUrls.has(img.imageUrl)) {
+      await prisma.productImage.create({
+        data: {
+          productId: product.id,
+          imageUrl: img.imageUrl,
+          altText: img.altText,
+          sortOrder: img.sortOrder,
+        },
+      });
+      console.log(`Added gallery image: ${img.altText}`);
+    }
+  }
+
+  let cleared = 0;
   let updated = 0;
+
   for (const variant of product.variants) {
     const colorLabel =
       variant.colorName ??
@@ -75,19 +90,23 @@ async function main() {
         return slug.includes("mau") || slug.includes("color") || name.includes("màu");
       })?.optionValue.label;
 
-    if (!colorLabel) continue;
+    const mappedUrl = colorLabel ? COLOR_IMAGE_MAP[colorLabel] : undefined;
+    const nextUrl = mappedUrl && allowedUrls.has(mappedUrl) ? mappedUrl : null;
 
-    const imageUrl = COLOR_IMAGE_MAP[colorLabel];
-    if (!imageUrl || variant.imageUrl === imageUrl) continue;
-
-    await prisma.productVariant.update({
-      where: { id: variant.id },
-      data: { imageUrl },
-    });
-    updated += 1;
+    if (variant.imageUrl !== nextUrl) {
+      if (variant.imageUrl && !allowedUrls.has(variant.imageUrl)) {
+        cleared += 1;
+      } else if (nextUrl) {
+        updated += 1;
+      }
+      await prisma.productVariant.update({
+        where: { id: variant.id },
+        data: { imageUrl: nextUrl },
+      });
+    }
   }
 
-  console.log(`Updated ${updated} variant imageUrl(s) for ${DEMO_SLUG}`);
+  console.log(`Cleared ${cleared} unrelated variant image(s); set ${updated} polo color image(s).`);
 }
 
 main()

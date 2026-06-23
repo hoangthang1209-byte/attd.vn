@@ -3,6 +3,7 @@ import type {
   PublicProductVariantDetail,
 } from "@/features/products/product-detail.types";
 import { isValidImageSrc } from "@/lib/imagePaths";
+import { acceptProductScopedImageUrl } from "@/lib/productImageScope";
 
 export type OptionSelectionState = Record<string, string | null>;
 
@@ -99,18 +100,25 @@ export function resolvePdpGalleryImageUrl(
   variants: PublicProductVariantDetail[],
   optionGroups: ProductOptionGroup[],
   selection: OptionSelectionState,
+  productImageUrls?: ReadonlySet<string>,
 ): string | null {
   if (!variants.length) return null;
 
+  const accept = (url: string | null | undefined) =>
+    productImageUrls
+      ? acceptProductScopedImageUrl(url, productImageUrls)
+      : url && isValidImageSrc(url)
+        ? url
+        : null;
+
   const selectedVariant = findVariantBySelection(variants, optionGroups, selection);
-  if (selectedVariant?.imageUrl && isValidImageSrc(selectedVariant.imageUrl)) {
-    return selectedVariant.imageUrl;
-  }
+  const fromSelected = accept(selectedVariant?.imageUrl);
+  if (fromSelected) return fromSelected;
 
   const colorSlug = findColorGroupSlug(optionGroups);
   const selectedColor = colorSlug ? selection[colorSlug] : null;
   if (!selectedColor || !colorSlug) {
-    return selectedVariant?.imageUrl ?? null;
+    return null;
   }
 
   const colorVariants = variants.filter(
@@ -118,7 +126,7 @@ export function resolvePdpGalleryImageUrl(
   );
 
   const partialMatch = colorVariants.find((variant) => {
-    if (!variant.imageUrl || !isValidImageSrc(variant.imageUrl)) return false;
+    if (!accept(variant.imageUrl)) return false;
     return optionGroups.every((group) => {
       if (group.slug === colorSlug) return true;
       const selected = selection[group.slug];
@@ -126,20 +134,16 @@ export function resolvePdpGalleryImageUrl(
       return variant.optionSelections[group.slug] === selected;
     });
   });
-  if (partialMatch?.imageUrl) return partialMatch.imageUrl;
+  const fromPartial = accept(partialMatch?.imageUrl);
+  if (fromPartial) return fromPartial;
 
-  const anyColorVariant = colorVariants.find(
-    (variant) => variant.imageUrl && isValidImageSrc(variant.imageUrl),
-  );
-  if (anyColorVariant?.imageUrl) return anyColorVariant.imageUrl;
+  const anyColorVariant = colorVariants.find((variant) => accept(variant.imageUrl));
+  const fromColor = accept(anyColorVariant?.imageUrl);
+  if (fromColor) return fromColor;
 
   const colorGroup = optionGroups.find((group) => group.slug === colorSlug);
   const optionValue = colorGroup?.values.find((value) => value.label === selectedColor);
-  if (optionValue?.imageUrl && isValidImageSrc(optionValue.imageUrl)) {
-    return optionValue.imageUrl;
-  }
-
-  return null;
+  return accept(optionValue?.imageUrl);
 }
 
 export function selectionSignature(selection: OptionSelectionState): string {

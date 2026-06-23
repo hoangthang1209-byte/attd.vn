@@ -24,6 +24,7 @@ import {
   buildInteractiveGalleryImages,
   mergeGalleryWithVariantImage,
 } from "@/lib/productVariants";
+import { buildProductImageUrlSet } from "@/lib/productImageScope";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
 
 const STOCK_LABELS: Record<string, string> = {
@@ -106,9 +107,11 @@ export default function ProductDetailInteractive({
   const hasActiveVariants = variants.length > 0;
   const showVariantSelector = optionGroups.length > 0 && hasActiveVariants;
 
+  const productImageUrls = useMemo(() => buildProductImageUrlSet(images), [images]);
+
   const displayImageUrl = useMemo(
-    () => resolvePdpGalleryImageUrl(variants, optionGroups, selection),
-    [variants, optionGroups, selection],
+    () => resolvePdpGalleryImageUrl(variants, optionGroups, selection, productImageUrls),
+    [variants, optionGroups, selection, productImageUrls],
   );
 
   const galleryImages = useMemo(() => {
@@ -174,7 +177,7 @@ export default function ProductDetailInteractive({
     slug: product.slug,
     name: displayName,
     category: product.category?.name ?? "",
-    imageUrl: galleryImages[0]?.imageUrl ?? null,
+    imageUrl: displayImageUrl ?? galleryImages[0]?.imageUrl ?? null,
     moq: effectiveMoq,
     leadTime: effectiveLeadTime,
     variantId: quoteVariantId,
@@ -200,133 +203,138 @@ export default function ProductDetailInteractive({
     <>
       <div className="mp-pdp-shell">
         <div className="container">
-          <div className="mp-pdp-shell-grid">
-            <div className="product-detail-left" id="mp-pdp-overview">
-              <ProductGallery
-                images={galleryImages}
-                productName={displayName}
-                selectedImageUrl={displayImageUrl}
-              />
-              {specifications.length > 0 && (
-                <div className="mp-pdp-spec-below-gallery">
-                  <ProductSpecificationsSection rows={specifications} preview />
-                </div>
-              )}
-            </div>
-
-            <div className="product-detail-center">
-              <header className="product-detail-head">
-                <div className="mp-pdp-overview-meta">
-                  <Link href={`/${product.category?.slug ?? ""}`} className="mp-pdp-overview-cat">
-                    {product.category?.name ?? "Sản phẩm"}
-                  </Link>
-                  {displayedCode && (
-                    <span className="mp-pdp-overview-code">Mã: {displayedCode}</span>
+          <div className="mp-pdp-sticky-layout">
+            <div className="mp-pdp-sticky-layout__cluster">
+              <div className="mp-pdp-shell-hero">
+                <div className="product-detail-left" id="mp-pdp-overview">
+                  <ProductGallery
+                    images={galleryImages}
+                    productName={displayName}
+                    selectedImageUrl={displayImageUrl}
+                  />
+                  {specifications.length > 0 && (
+                    <div className="mp-pdp-spec-below-gallery">
+                      <ProductSpecificationsSection rows={specifications} preview />
+                    </div>
                   )}
                 </div>
-                <h1 className="mp-pdp-overview-title">{displayName}</h1>
-                {displayShortDescription && (
-                  <p className="mp-pdp-overview-summary">{displayShortDescription}</p>
-                )}
-              </header>
 
-              <div className="mp-pdp-core-facts">
-                {isPublicMoq(effectiveMoq) && (
-                  <div className="mp-pdp-core-fact">
-                    <span className="mp-pdp-core-fact-label">MOQ</span>
-                    <span className="mp-pdp-core-fact-value">{formatPdpMoqText(effectiveMoq)}</span>
-                  </div>
-                )}
-                {effectiveLeadTime && (
-                  <div className="mp-pdp-core-fact">
-                    <span className="mp-pdp-core-fact-label">Thời gian sản xuất</span>
-                    <span className="mp-pdp-core-fact-value">{effectiveLeadTime}</span>
-                  </div>
-                )}
-                {stockLabel && (
-                  <div className="mp-pdp-core-fact">
-                    <span className="mp-pdp-core-fact-label">Tình trạng</span>
-                    <span className="mp-pdp-core-fact-value" style={{ color: stockColor }}>
-                      {stockLabel}
-                    </span>
-                  </div>
-                )}
-                {product.supportsOem && (
-                  <div className="mp-pdp-core-fact">
-                    <span className="mp-pdp-core-fact-label">OEM</span>
-                    <span className="mp-pdp-core-fact-value">Hỗ trợ private label</span>
-                  </div>
-                )}
-              </div>
-
-              {customizations.length > 0 && (
-                <div className="mp-pdp-capability-chips" aria-label="Khả năng tùy chỉnh">
-                  {customizations.map((item) => (
-                    <span key={item.id} className="mp-pdp-capability-chip">
-                      {item.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {showVariantSelector && (
-                <div className="mp-pdp-options-card product-detail-options">
-                  <ProductDynamicOptionSelector
-                    optionGroups={optionGroups}
-                    variants={variants}
-                    selection={selection}
-                    onSelect={handleOptionSelect}
-                  />
-                </div>
-              )}
-
-              {optionGroups.length > 0 && !hasActiveVariants && (
-                <p className="mp-pdp-no-variants-hint" role="status">
-                  Hiện không có phân loại đang bán. Vui lòng liên hệ để được tư vấn và báo giá.
-                </p>
-              )}
-
-              {specifications.length > 0 && (
-                <div className="mp-pdp-spec-below-options">
-                  <ProductSpecificationsSection rows={specifications} preview />
-                </div>
-              )}
-            </div>
-
-            <div className="mp-pdp-shell-aside-slot">{conversionPanel}</div>
-
-            <div className="mp-pdp-shell-content">
-              <ProductDetailTabs tabs={anchorTabs} />
-
-              {specifications.length > 0 && (
-                <ProductSpecificationsSection rows={specifications} />
-              )}
-
-              {(displayContent || displayShortDescription) && (
-                <section className="mp-section mp-pdp-section" id="mp-pdp-desc">
-                  <div className="mp-pdp-desc">
-                    <header className="mp-pdp-section-head">
-                      <h2 className="mp-pdp-section-title">Mô tả sản phẩm</h2>
-                      <p className="mp-pdp-section-subtitle">
-                        Thông tin chi tiết về chất liệu, ứng dụng và khả năng cung ứng B2B.
-                      </p>
-                    </header>
-                    <div className="mp-pdp-desc-content">
-                      {displayShortDescription && !displayContent && (
-                        <p className="mp-pdp-desc-lead">{displayShortDescription}</p>
-                      )}
-                      {displayContent && (
-                        <div className="mp-pdp-desc-body">
-                          {formatPdpDescriptionContent(displayContent)}
-                        </div>
+                <div className="product-detail-center">
+                  <header className="product-detail-head">
+                    <div className="mp-pdp-overview-meta">
+                      <Link href={`/${product.category?.slug ?? ""}`} className="mp-pdp-overview-cat">
+                        {product.category?.name ?? "Sản phẩm"}
+                      </Link>
+                      {displayedCode && (
+                        <span className="mp-pdp-overview-code">Mã: {displayedCode}</span>
                       )}
                     </div>
-                  </div>
-                </section>
-              )}
+                    <h1 className="mp-pdp-overview-title">{displayName}</h1>
+                    {displayShortDescription && (
+                      <p className="mp-pdp-overview-summary">{displayShortDescription}</p>
+                    )}
+                  </header>
 
-              <ProductCustomizationsSection items={customizations} onRequestQuote={openQuote} />
+                  <div className="mp-pdp-core-facts">
+                    {isPublicMoq(effectiveMoq) && (
+                      <div className="mp-pdp-core-fact">
+                        <span className="mp-pdp-core-fact-label">MOQ</span>
+                        <span className="mp-pdp-core-fact-value">{formatPdpMoqText(effectiveMoq)}</span>
+                      </div>
+                    )}
+                    {effectiveLeadTime && (
+                      <div className="mp-pdp-core-fact">
+                        <span className="mp-pdp-core-fact-label">Thời gian sản xuất</span>
+                        <span className="mp-pdp-core-fact-value">{effectiveLeadTime}</span>
+                      </div>
+                    )}
+                    {stockLabel && (
+                      <div className="mp-pdp-core-fact">
+                        <span className="mp-pdp-core-fact-label">Tình trạng</span>
+                        <span className="mp-pdp-core-fact-value" style={{ color: stockColor }}>
+                          {stockLabel}
+                        </span>
+                      </div>
+                    )}
+                    {product.supportsOem && (
+                      <div className="mp-pdp-core-fact">
+                        <span className="mp-pdp-core-fact-label">OEM</span>
+                        <span className="mp-pdp-core-fact-value">Hỗ trợ private label</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {customizations.length > 0 && (
+                    <div className="mp-pdp-capability-chips" aria-label="Khả năng tùy chỉnh">
+                      {customizations.map((item) => (
+                        <span key={item.id} className="mp-pdp-capability-chip">
+                          {item.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {showVariantSelector && (
+                    <div className="mp-pdp-options-card product-detail-options">
+                      <ProductDynamicOptionSelector
+                        optionGroups={optionGroups}
+                        variants={variants}
+                        selection={selection}
+                        onSelect={handleOptionSelect}
+                        allowedImageUrls={productImageUrls}
+                      />
+                    </div>
+                  )}
+
+                  {optionGroups.length > 0 && !hasActiveVariants && (
+                    <p className="mp-pdp-no-variants-hint" role="status">
+                      Hiện không có phân loại đang bán. Vui lòng liên hệ để được tư vấn và báo giá.
+                    </p>
+                  )}
+
+                  {specifications.length > 0 && (
+                    <div className="mp-pdp-spec-below-options">
+                      <ProductSpecificationsSection rows={specifications} preview />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mp-pdp-shell-content">
+                <ProductDetailTabs tabs={anchorTabs} />
+
+                {specifications.length > 0 && (
+                  <ProductSpecificationsSection rows={specifications} />
+                )}
+
+                {(displayContent || displayShortDescription) && (
+                  <section className="mp-section mp-pdp-section" id="mp-pdp-desc">
+                    <div className="mp-pdp-desc">
+                      <header className="mp-pdp-section-head">
+                        <h2 className="mp-pdp-section-title">Mô tả sản phẩm</h2>
+                        <p className="mp-pdp-section-subtitle">
+                          Thông tin chi tiết về chất liệu, ứng dụng và khả năng cung ứng B2B.
+                        </p>
+                      </header>
+                      <div className="mp-pdp-desc-content">
+                        {displayShortDescription && !displayContent && (
+                          <p className="mp-pdp-desc-lead">{displayShortDescription}</p>
+                        )}
+                        {displayContent && (
+                          <div className="mp-pdp-desc-body">
+                            {formatPdpDescriptionContent(displayContent)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                <ProductCustomizationsSection items={customizations} onRequestQuote={openQuote} />
+              </div>
             </div>
+
+            <div className="mp-pdp-sticky-layout__aside">{conversionPanel}</div>
           </div>
         </div>
       </div>

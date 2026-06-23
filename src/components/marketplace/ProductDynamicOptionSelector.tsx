@@ -9,12 +9,14 @@ import {
 import type { PublicProductVariantDetail } from "@/features/products/product-detail.types";
 import Image from "next/image";
 import { isValidImageSrc } from "@/lib/imagePaths";
+import { isProductScopedImageUrl } from "@/lib/productImageScope";
 
 type Props = {
   optionGroups: ProductOptionGroup[];
   variants: PublicProductVariantDetail[];
   selection: OptionSelectionState;
   onSelect: (groupSlug: string, valueLabel: string) => void;
+  allowedImageUrls?: ReadonlySet<string>;
 };
 
 function isColorGroup(group: ProductOptionGroup): boolean {
@@ -28,6 +30,7 @@ export default function ProductDynamicOptionSelector({
   variants,
   selection,
   onSelect,
+  allowedImageUrls,
 }: Props) {
   if (!optionGroups.length) return null;
 
@@ -58,7 +61,11 @@ export default function ProductDynamicOptionSelector({
                 );
                 const isActive = selection[group.slug] === value.label;
                 const swatchUrl =
-                  value.imageUrl && isValidImageSrc(value.imageUrl) ? value.imageUrl : null;
+                  value.imageUrl &&
+                  isValidImageSrc(value.imageUrl) &&
+                  (!allowedImageUrls || isProductScopedImageUrl(value.imageUrl, allowedImageUrls))
+                    ? value.imageUrl
+                    : null;
 
                 return (
                   <button
