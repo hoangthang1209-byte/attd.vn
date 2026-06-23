@@ -2214,14 +2214,15 @@ body:has(.mobile-action-bar) .site-footer {
   padding: 0;
   justify-content: center;
   border-radius: 50%;
-  background: #ffffff;
-  color: #111827;
-  border-color: var(--border);
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.85);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transform: translateY(8px);
-  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .floating-contact-btn--top.is-visible {
@@ -2232,8 +2233,9 @@ body:has(.mobile-action-bar) .site-footer {
 }
 
 .floating-contact-btn--top:hover {
-  background: #f8fafc;
-  color: #0f172a;
+  background: #1e293b;
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.34);
 }
 
 .floating-contact-btn--top:focus-visible {
@@ -16224,6 +16226,268 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 @media (max-width: 639px) {
   .mp-pdp--b2b .mp-pdp-core-facts {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Sprint 27.2.9 — PDP sticky fix, gallery specs, color images, polish ───── */
+
+.mp-pdp-shell-aside-slot {
+  grid-area: aside;
+  grid-row: 1 / -1;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 0;
+}
+
+.mp-pdp--b2b .mp-pdp-shell .mp-pdp-shell-aside-slot .mp-pdp-conversion-aside {
+  position: sticky;
+  top: calc(var(--mp-header-stack-height, var(--header-height, 112px)) + 20px);
+  align-self: start;
+  width: 100%;
+  height: fit-content;
+  max-height: none;
+  overflow: visible;
+  z-index: 4;
+}
+
+.mp-pdp-spec-below-gallery {
+  display: block;
+}
+
+.mp-pdp-spec-below-options {
+  display: none;
+}
+
+.mp-pdp-spec-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.mp-pdp-spec-preview-grid-item {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #eef2f6;
+}
+
+.mp-pdp-spec-preview-grid-item dt {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.mp-pdp-spec-preview-grid-item dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.mp-pdp--b2b .mp-pdp-gallery-main,
+.mp-pdp--b2b .mp-pdp-gallery--empty {
+  aspect-ratio: 4 / 5;
+  max-height: min(620px, 50vw);
+}
+
+.mp-pdp-desc-subheading {
+  margin: 28px 0 10px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.mp-pdp-desc-subheading:first-child {
+  margin-top: 0;
+}
+
+.mp-pdp-desc-content {
+  border: 1px solid #eef2f6;
+  box-shadow: none;
+  background: #fafbfc;
+}
+
+.mp-pdp-desc-body p {
+  max-width: 68ch;
+}
+
+.mp-pdp--b2b .mp-pdp-tabs--in-shell {
+  margin-bottom: 4px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.mp-pdp--b2b .mp-pdp-tabs-inner {
+  padding: 0;
+  background: transparent;
+  border-bottom: 1px solid #e5e7eb;
+  border-radius: 0;
+}
+
+.mp-pdp--b2b .mp-pdp-tabs-scroll {
+  gap: 4px;
+  padding: 0 0 10px;
+}
+
+.mp-pdp--b2b .mp-pdp-tab {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 13px;
+}
+
+.mp-pdp--b2b .mp-pdp-tab--active {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+.mp-pdp--b2b .mp-pdp-spec-row {
+  border-bottom: 1px solid #eef2f6;
+  background: transparent;
+}
+
+.mp-pdp--b2b .mp-pdp-spec-row:nth-child(even) {
+  background: transparent;
+}
+
+.mp-pdp--b2b .mp-pdp-spec-row dt {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.mp-pdp--b2b .mp-pdp-spec-row dd {
+  color: #0f172a;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.mp-pdp-custom-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+@media (min-width: 900px) {
+  .mp-pdp-custom-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mp-pdp-custom-grid > li:nth-child(4) {
+    grid-column: 1;
+  }
+
+  .mp-pdp-custom-grid > li:nth-child(5) {
+    grid-column: 2;
+  }
+}
+
+.mp-pdp-custom-card {
+  padding: 16px 16px 14px;
+  border-color: #e8edf2;
+  box-shadow: none;
+}
+
+.mp-pdp-custom-cta {
+  font-weight: 700;
+  padding: 12px 22px;
+}
+
+.mp-pdp-section--alt.mp-pdp-section {
+  padding-top: 48px;
+  padding-bottom: 56px;
+}
+
+.mp-pdp-faq .faq-item summary {
+  padding: 14px 18px;
+  font-size: 14px;
+}
+
+.mp-pdp-faq .faq-item .faq-answer {
+  padding: 0 18px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.mp-pdp-shell-content .mp-pdp-section {
+  padding-top: 36px;
+}
+
+@media (min-width: 1200px) {
+  .mp-pdp-shell-grid {
+    grid-template-columns: minmax(400px, 1.42fr) minmax(300px, 1fr) minmax(280px, 0.84fr);
+    gap: 24px 28px;
+  }
+
+  .mp-pdp--b2b .mp-pdp-shell .mp-pdp-shell-aside-slot .mp-pdp-conversion-aside,
+  .mp-pdp--b2b .mp-pdp-shell .product-detail-right.mp-pdp-conversion-aside {
+    position: sticky;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 1199px) {
+  .mp-pdp-shell-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "gallery gallery"
+      "summary summary"
+      "aside aside"
+      "content content";
+    gap: 20px;
+  }
+
+  .mp-pdp-shell-aside-slot {
+    grid-row: auto;
+    align-self: start;
+  }
+
+  .mp-pdp--b2b .mp-pdp-shell .mp-pdp-shell-aside-slot .mp-pdp-conversion-aside {
+    position: static;
+    max-width: 560px;
+  }
+
+  .mp-pdp-spec-below-gallery {
+    display: none;
+  }
+
+  .mp-pdp-spec-below-options {
+    display: block;
+  }
+
+  .mp-pdp--b2b .mp-pdp-gallery-main,
+  .mp-pdp--b2b .mp-pdp-gallery--empty {
+    aspect-ratio: auto;
+    max-height: min(520px, 68vw);
+  }
+}
+
+@media (max-width: 899px) {
+  .mp-pdp--b2b .mp-pdp-shell .mp-pdp-shell-aside-slot {
+    display: none;
+  }
+
+  .mp-pdp-spec-preview-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 639px) {
+  .mp-pdp-spec-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mp-pdp-custom-grid {
     grid-template-columns: 1fr;
   }
 }

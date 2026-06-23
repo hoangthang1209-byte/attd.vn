@@ -14,10 +14,16 @@ import type { PublicProductDetail } from "@/features/products/product-detail.typ
 import {
   findVariantBySelection,
   getInitialSelection,
+  resolvePdpGalleryImageUrl,
   type OptionSelectionState,
 } from "@/lib/productOptionSelection";
+import { formatPdpDescriptionContent } from "@/lib/formatPdpDescription";
 import { resolveQuoteVariantId } from "@/features/products/product-pdp.utils";
-import { buildInteractiveGalleryImages } from "@/lib/productVariants";
+import {
+  appendVariantImagesToGallery,
+  buildInteractiveGalleryImages,
+  mergeGalleryWithVariantImage,
+} from "@/lib/productVariants";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
 
 const STOCK_LABELS: Record<string, string> = {
@@ -75,7 +81,7 @@ export default function ProductDetailInteractive({
   );
 
   const anchorTabs = useMemo(() => {
-    const tabs = [{ id: "mp-pdp-overview", label: "Tổng quan" }];
+    const tabs: { id: string; label: string }[] = [];
     if (specifications.length > 0) {
       tabs.push({ id: "mp-pdp-specs", label: "Thông số" });
     }
@@ -100,7 +106,31 @@ export default function ProductDetailInteractive({
   const hasActiveVariants = variants.length > 0;
   const showVariantSelector = optionGroups.length > 0 && hasActiveVariants;
 
+  const displayImageUrl = useMemo(
+    () => resolvePdpGalleryImageUrl(variants, optionGroups, selection),
+    [variants, optionGroups, selection],
+  );
+
   const galleryImages = useMemo(() => {
+    const legacyVariants = variants.map((v) => ({
+      id: v.id,
+      sku: v.sku,
+      colorName: v.colorName,
+      colorCode: v.colorCode,
+      sizeName: v.sizeName,
+      dimensions: v.dimensions,
+      capacity: v.capacity,
+      stockStatus: v.stockStatus,
+      imageUrl: v.imageUrl,
+      stockQty: v.stockQty,
+    }));
+
+    const withVariants = appendVariantImagesToGallery(images, legacyVariants);
+
+    if (displayImageUrl) {
+      return mergeGalleryWithVariantImage(withVariants, displayImageUrl);
+    }
+
     const legacyVariant = selectedVariant
       ? {
           id: selectedVariant.id,
@@ -116,9 +146,9 @@ export default function ProductDetailInteractive({
         }
       : null;
 
-    if (!legacyVariant) return images;
-    return buildInteractiveGalleryImages(images, [legacyVariant], legacyVariant, true);
-  }, [images, selectedVariant]);
+    if (!legacyVariant) return withVariants;
+    return buildInteractiveGalleryImages(images, legacyVariants, legacyVariant, true);
+  }, [images, variants, selectedVariant, displayImageUrl]);
 
   const effectiveMoq = selectedVariant?.moq ?? product.defaultMoq;
   const effectiveLeadTime = selectedVariant?.leadTime ?? product.leadTime;
@@ -175,8 +205,13 @@ export default function ProductDetailInteractive({
               <ProductGallery
                 images={galleryImages}
                 productName={displayName}
-                selectedImageUrl={selectedVariant?.imageUrl ?? null}
+                selectedImageUrl={displayImageUrl}
               />
+              {specifications.length > 0 && (
+                <div className="mp-pdp-spec-below-gallery">
+                  <ProductSpecificationsSection rows={specifications} preview />
+                </div>
+              )}
             </div>
 
             <div className="product-detail-center">
@@ -252,13 +287,13 @@ export default function ProductDetailInteractive({
               )}
 
               {specifications.length > 0 && (
-                <div className="mp-pdp-spec-preview-wrap">
+                <div className="mp-pdp-spec-below-options">
                   <ProductSpecificationsSection rows={specifications} preview />
                 </div>
               )}
             </div>
 
-            {conversionPanel}
+            <div className="mp-pdp-shell-aside-slot">{conversionPanel}</div>
 
             <div className="mp-pdp-shell-content">
               <ProductDetailTabs tabs={anchorTabs} />
@@ -282,9 +317,7 @@ export default function ProductDetailInteractive({
                       )}
                       {displayContent && (
                         <div className="mp-pdp-desc-body">
-                          {displayContent.split("\n\n").map((paragraph) => (
-                            <p key={paragraph.slice(0, 48)}>{paragraph}</p>
-                          ))}
+                          {formatPdpDescriptionContent(displayContent)}
                         </div>
                       )}
                     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
@@ -27,6 +27,14 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
 
   const galleryKey = gallery.map((img) => img.imageUrl).join("|");
   const total = gallery.length;
+
+  const prevSelectedUrl = useRef(selectedImageUrl);
+  useEffect(() => {
+    if (selectedImageUrl !== prevSelectedUrl.current) {
+      setManualPick(null);
+      prevSelectedUrl.current = selectedImageUrl;
+    }
+  }, [selectedImageUrl]);
 
   const clampIndex = useCallback(
     (index: number) => {

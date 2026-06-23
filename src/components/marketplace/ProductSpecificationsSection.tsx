@@ -30,9 +30,9 @@ export default function ProductSpecificationsSection({ rows, preview = false }: 
         </header>
 
         {preview ? (
-          <dl className="mp-pdp-spec-preview-list">
+          <dl className="mp-pdp-spec-preview-grid">
             {list.map((row) => (
-              <div key={row.id} className="mp-pdp-spec-preview-item">
+              <div key={row.id} className="mp-pdp-spec-preview-grid-item">
                 <dt>{row.label}</dt>
                 <dd>{row.value}</dd>
               </div>
@@ -51,7 +51,7 @@ export default function ProductSpecificationsSection({ rows, preview = false }: 
           </div>
         )}
 
-        {preview && visible.length > list.length && (
+        {preview && (
           <p className="mp-pdp-spec-more">
             <a href="#mp-pdp-specs">Xem đầy đủ thông số</a>
           </p>
