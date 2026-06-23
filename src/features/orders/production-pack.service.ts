@@ -5,6 +5,8 @@ import {
   ProductionFileType,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { deleteR2Object } from "@/features/storage/r2/r2-production-file.service";
+import { deleteStoredMediaObject } from "@/lib/storage";
 import {
   computeRequiredQuantity,
   resolveOrderItemTotalQuantity,
@@ -14,6 +16,7 @@ import {
   PRODUCTION_FILE_TYPES,
 } from "@/features/orders/production-pack-labels";
 import type {
+  DeleteOrderProductionFileResult,
   OrderItemMaterialRecord,
   OrderProductionFileRecord,
 } from "@/features/orders/production-pack.types";
@@ -26,6 +29,18 @@ export class ProductionPackValidationError extends Error {
 }
 
 type Tx = Prisma.TransactionClient;
+
+const PRODUCTION_FILE_MEDIA_SELECT = {
+  id: true,
+  filename: true,
+  originalName: true,
+  url: true,
+  mimeType: true,
+  format: true,
+  sizeBytes: true,
+  thumbnailUrl: true,
+  storageProvider: true,
+} as const;
 
 function mapProductionFile(row: {
   id: string;
@@ -46,6 +61,7 @@ function mapProductionFile(row: {
   mediaAsset: {
     id: string;
     filename: string;
+    originalName: string | null;
     url: string;
     mimeType: string;
     format: string | null;
@@ -97,18 +113,7 @@ export async function listOrderProductionFiles(orderId: string): Promise<OrderPr
       OR: [{ orderId }, { orderItemId: { in: itemIds } }],
     },
     include: {
-      mediaAsset: {
-        select: {
-          id: true,
-          filename: true,
-          url: true,
-          mimeType: true,
-          format: true,
-          sizeBytes: true,
-          thumbnailUrl: true,
-          storageProvider: true,
-        },
-      },
+      mediaAsset: { select: PRODUCTION_FILE_MEDIA_SELECT },
     },
     orderBy: [{ sortOrder: "asc" }, { version: "desc" }, { createdAt: "desc" }],
   });
@@ -194,18 +199,7 @@ export async function createOrderProductionFile(
         sortOrder: input.sortOrder ?? 0,
       },
       include: {
-        mediaAsset: {
-          select: {
-            id: true,
-            filename: true,
-            url: true,
-            mimeType: true,
-            format: true,
-            sizeBytes: true,
-            thumbnailUrl: true,
-            storageProvider: true,
-          },
-        },
+        mediaAsset: { select: PRODUCTION_FILE_MEDIA_SELECT },
       },
     });
   });
@@ -262,7 +256,7 @@ export async function updateOrderProductionFile(
   const belongsToOrder =
     existing.orderId === orderId ||
     (existing.orderItemId && existing.orderItem?.orderId === orderId);
-  if (!belongsToOrder) throw new ProductionPackValidationError("File không thuộc đơn hàng này.");
+  if (!belongsToOrder) throw new ProductionPackValidationError("Tài liệu không thuộc đơn hàng này.");
 
   if (input.type && !PRODUCTION_FILE_TYPES.includes(input.type)) {
     throw new ProductionPackValidationError("Loại file không hợp lệ.");
@@ -313,23 +307,80 @@ export async function updateOrderProductionFile(
         ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
       },
       include: {
-        mediaAsset: {
-          select: {
-            id: true,
-            filename: true,
-            url: true,
-            mimeType: true,
-            format: true,
-            sizeBytes: true,
-            thumbnailUrl: true,
-            storageProvider: true,
-          },
-        },
+        mediaAsset: { select: PRODUCTION_FILE_MEDIA_SELECT },
       },
     });
   });
 
   return mapProductionFile(updated);
+}
+
+function assertProductionFileBelongsToOrder(
+  orderId: string,
+  existing: {
+    orderId: string | null;
+    orderItemId: string | null;
+    orderItem: { orderId: string } | null;
+  },
+): void {
+  const belongsToOrder =
+    existing.orderId === orderId ||
+    (existing.orderItemId && existing.orderItem?.orderId === orderId);
+  if (!belongsToOrder) {
+    throw new ProductionPackValidationError("Tài liệu không thuộc đơn hàng này.");
+  }
+}
+
+async function countMediaAssetBusinessReferences(tx: Tx, mediaAssetId: string): Promise<number> {
+  const [
+    productionFiles,
+    qcEvidence,
+    deliveryProofs,
+    quoteItems,
+    orderItems,
+    salesReps,
+    pathways,
+    homepageOem,
+  ] = await Promise.all([
+    tx.orderProductionFile.count({ where: { mediaAssetId } }),
+    tx.orderQcEvidence.count({ where: { mediaAssetId } }),
+    tx.orderDeliveryProof.count({ where: { mediaAssetId } }),
+    tx.quoteItem.count({ where: { designMediaAssetId: mediaAssetId } }),
+    tx.orderItem.count({ where: { designMediaAssetId: mediaAssetId } }),
+    tx.salesRepresentative.count({ where: { avatarMediaAssetId: mediaAssetId } }),
+    tx.homepageSourcingPathway.count({ where: { mediaAssetId } }),
+    tx.homepageSettings.count({ where: { oemMediaAssetId: mediaAssetId } }),
+  ]);
+
+  return (
+    productionFiles +
+    qcEvidence +
+    deliveryProofs +
+    quoteItems +
+    orderItems +
+    salesReps +
+    pathways +
+    homepageOem
+  );
+}
+
+async function deleteMediaAssetStorageObject(asset: {
+  storageProvider: string;
+  storageKey: string;
+  url: string;
+}): Promise<void> {
+  try {
+    if (asset.storageProvider === "CLOUDFLARE_R2") {
+      await deleteR2Object(asset.storageKey);
+      return;
+    }
+    await deleteStoredMediaObject(asset.url, asset.storageKey, asset.storageProvider);
+  } catch (err) {
+    console.warn(
+      "[deleteOrderProductionFile] Storage object cleanup failed after relation removal:",
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 export async function archiveOrderProductionFile(
@@ -339,22 +390,40 @@ export async function archiveOrderProductionFile(
   return updateOrderProductionFile(orderId, fileId, { status: "ARCHIVED" });
 }
 
-export async function deleteOrderProductionFile(orderId: string, fileId: string): Promise<void> {
+export async function deleteOrderProductionFile(
+  orderId: string,
+  fileId: string,
+): Promise<DeleteOrderProductionFileResult> {
   const existing = await prisma.orderProductionFile.findUnique({
     where: { id: fileId },
-    include: { orderItem: { select: { orderId: true } } },
+    include: {
+      orderItem: { select: { orderId: true } },
+      mediaAsset: true,
+    },
   });
   if (!existing) throw new ProductionPackValidationError("Không tìm thấy file sản xuất.");
-  const belongsToOrder =
-    existing.orderId === orderId ||
-    (existing.orderItemId && existing.orderItem?.orderId === orderId);
-  if (!belongsToOrder) throw new ProductionPackValidationError("File không thuộc đơn hàng này.");
+  assertProductionFileBelongsToOrder(orderId, existing);
 
-  if (existing.status === "ACTIVE") {
-    throw new ProductionPackValidationError("Không thể xóa file đang sử dụng. Vui lòng lưu trữ trước.");
+  const mediaAssetId = existing.mediaAssetId;
+  const assetSnapshot = existing.mediaAsset;
+
+  const removedRelationOnly = await prisma.$transaction(async (tx) => {
+    await tx.orderProductionFile.delete({ where: { id: fileId } });
+
+    const remainingRefs = await countMediaAssetBusinessReferences(tx, mediaAssetId);
+    if (remainingRefs > 0) {
+      return true;
+    }
+
+    await tx.mediaAsset.delete({ where: { id: mediaAssetId } });
+    return false;
+  });
+
+  if (!removedRelationOnly) {
+    await deleteMediaAssetStorageObject(assetSnapshot);
   }
 
-  await prisma.orderProductionFile.delete({ where: { id: fileId } });
+  return { fileId, removedRelationOnly };
 }
 
 // --- BOM ---

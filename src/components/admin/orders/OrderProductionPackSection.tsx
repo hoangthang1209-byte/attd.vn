@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProductionFileType } from "@prisma/client";
-import { useAdminMutation } from "@/hooks/useAdminAction";
+import { useAdminMutation, useAdminAction } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import {
   MATERIAL_TYPE_LABELS,
-  PRODUCTION_FILE_STATUS_LABELS,
   PRODUCTION_FILE_TYPE_LABELS,
   PRODUCTION_FILE_TYPES,
 } from "@/features/orders/production-pack-labels";
@@ -16,13 +15,13 @@ import {
   classifyProductionFile,
   ERROR_R2_NOT_CONFIGURED,
   getProductionUploadHint,
-  isPreviewableProductionMime,
 } from "@/lib/productionFileValidation";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import type { OrderItemMaterialRecord, OrderProductionFileRecord } from "@/features/orders/production-pack.types";
 import type { ProductionReadinessResult } from "@/features/orders/production-readiness.service";
 import ProductionSheetActions from "@/components/admin/orders/production-sheet/ProductionSheetActions";
 import OrderMaterialAvailabilityPanel from "@/components/admin/orders/OrderMaterialAvailabilityPanel";
+import ProductionPackFileRow from "@/components/admin/orders/ProductionPackFileRow";
 
 type MaterialItemRow = {
   orderItemId: string;
@@ -62,13 +61,47 @@ type MediaAssetPick = {
   storageProvider?: string;
 };
 
+type EditFileState = {
+  id: string;
+  type: ProductionFileType;
+  title: string;
+  version: number;
+  note: string;
+  appliesToColorName: string;
+  appliesToSize: string;
+};
+
+const LINK_FAILURE_MESSAGE =
+  "File đã tải lên nhưng chưa được gắn vào đơn hàng. Vui lòng thử lại hoặc liên hệ quản trị viên.";
+
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   return `${(bytes / 1024).toFixed(0)} KB`;
 }
 
+function itemLabel(item: OrderDetailRecord["items"][number]): string {
+  return [item.productNameSnapshot, item.variantNameSnapshot].filter(Boolean).join(" · ") || "Sản phẩm";
+}
+
+function mergeFileRecord(
+  prev: OrderProductionFileRecord[],
+  file: OrderProductionFileRecord,
+): OrderProductionFileRecord[] {
+  const withoutDup = prev.filter(
+    (existing) =>
+      existing.id !== file.id &&
+      !(
+        existing.mediaAssetId === file.mediaAssetId &&
+        existing.orderItemId === file.orderItemId &&
+        existing.orderId === file.orderId
+      ),
+  );
+  return [...withoutDup, file];
+}
+
 export default function OrderProductionPackSection({ orderId, order }: Props) {
   const mutate = useAdminMutation();
+  const { toast } = useAdminAction();
   const [tab, setTab] = useState<Tab>("files");
   const [files, setFiles] = useState<OrderProductionFileRecord[]>([]);
   const [materials, setMaterials] = useState<MaterialsPayload | null>(null);
@@ -80,12 +113,16 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   const [fileTitle, setFileTitle] = useState("");
   const [fileVersion, setFileVersion] = useState(1);
   const [fileNote, setFileNote] = useState("");
+  const [appliesToColorName, setAppliesToColorName] = useState("");
+  const [appliesToSize, setAppliesToSize] = useState("");
   const [selectedAsset, setSelectedAsset] = useState<MediaAssetPick | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [mediaAssets, setMediaAssets] = useState<MediaAssetPick[]>([]);
   const [r2Configured, setR2Configured] = useState<boolean | null>(null);
   const [uploadHint, setUploadHint] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<OrderProductionFileRecord | null>(null);
+  const [editTarget, setEditTarget] = useState<EditFileState | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -104,6 +141,17 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
     }
   }, [orderId]);
 
+  const refreshFilesAndReadiness = useCallback(async () => {
+    const [filesRes, materialsRes] = await Promise.all([
+      fetch(`/api/orders/${orderId}/production-files`),
+      fetch(`/api/orders/${orderId}/materials`),
+    ]);
+    const filesData = await filesRes.json();
+    const materialsData = await materialsRes.json();
+    setFiles(Array.isArray(filesData.files) ? filesData.files : []);
+    setMaterials(materialsData as MaterialsPayload);
+  }, [orderId]);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -115,6 +163,33 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
       .catch(() => setR2Configured(false));
   }, []);
 
+  function openAddFileForm(scope: "order" | string) {
+    setFileScope(scope);
+    setFileFormOpen(true);
+    setSelectedAsset(null);
+    setFileTitle("");
+    setFileNote("");
+    setFileVersion(1);
+    setAppliesToColorName("");
+    setAppliesToSize("");
+    setUploadHint(null);
+    setUploadError(null);
+  }
+
+  function openNewVersionForm(file: OrderProductionFileRecord) {
+    setFileScope(file.orderItemId ?? "order");
+    setFileType(file.type);
+    setFileTitle(file.title ?? file.mediaAsset.filename);
+    setFileVersion(file.version + 1);
+    setFileNote(file.note ?? "");
+    setAppliesToColorName(file.appliesToColorName ?? "");
+    setAppliesToSize(file.appliesToSize ?? "");
+    setSelectedAsset(null);
+    setUploadHint(null);
+    setUploadError(null);
+    setFileFormOpen(true);
+  }
+
   async function openMediaPicker() {
     setPickerOpen(true);
     const res = await fetch("/api/media?folder=general");
@@ -125,11 +200,36 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
       url: String(a.url),
       mimeType: String(a.mimeType ?? ""),
       sizeBytes: Number(a.sizeBytes ?? 0),
+      storageProvider: typeof a.storageProvider === "string" ? a.storageProvider : undefined,
     }));
     setMediaAssets(list);
   }
 
-  async function uploadProductionFile(file: File) {
+  async function linkProductionAsset(asset: MediaAssetPick): Promise<OrderProductionFileRecord> {
+    const res = await fetch(`/api/orders/${orderId}/production-files`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId: fileScope === "order" ? orderId : null,
+        orderItemId: fileScope === "order" ? null : fileScope,
+        mediaAssetId: asset.id,
+        type: fileType,
+        title: fileTitle || asset.filename,
+        version: fileVersion,
+        note: fileNote || null,
+        appliesToColorName: appliesToColorName.trim() || null,
+        appliesToSize: appliesToSize.trim() || null,
+        setAsActive: true,
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(typeof body.message === "string" ? body.message : LINK_FAILURE_MESSAGE);
+    }
+    return body.file as OrderProductionFileRecord;
+  }
+
+  async function uploadProductionAsset(file: File): Promise<MediaAssetPick> {
     setUploadError(null);
     const classification = classifyProductionFile({
       filename: file.name,
@@ -184,15 +284,14 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
         throw new Error(complete.message ?? "Không thể hoàn tất tải lên.");
       }
 
-      setSelectedAsset({
+      return {
         id: String(complete.asset.id),
         filename: String(complete.asset.filename),
         url: String(complete.asset.url),
         mimeType: String(complete.asset.mimeType),
         sizeBytes: Number(complete.asset.sizeBytes ?? 0),
         storageProvider: "CLOUDFLARE_R2",
-      });
-      return;
+      };
     }
 
     const fd = new FormData();
@@ -202,22 +301,60 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
     const res = await fetch("/api/media", { method: "POST", body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message ?? "Upload thất bại");
-    setSelectedAsset({
+    return {
       id: String(data.id),
       filename: String(data.filename),
       url: String(data.url),
       mimeType: String(data.mimeType),
       sizeBytes: Number(data.sizeBytes ?? 0),
       storageProvider: "CLOUDINARY",
-    });
+    };
+  }
+
+  async function finishFileLink(
+    asset: MediaAssetPick,
+    successToast: string,
+  ): Promise<void> {
+    try {
+      const linked = await linkProductionAsset(asset);
+      setFiles((prev) => mergeFileRecord(prev, linked));
+      setFileFormOpen(false);
+      setSelectedAsset(null);
+      setFileTitle("");
+      setFileNote("");
+      setUploadHint(null);
+      setUploadError(null);
+      await refreshFilesAndReadiness();
+      toast.success(successToast);
+    } catch (err) {
+      setSelectedAsset(asset);
+      setUploadError(err instanceof Error ? err.message : LINK_FAILURE_MESSAGE);
+    }
+  }
+
+  async function handleUploadFile(file: File) {
+    try {
+      const asset = await uploadProductionAsset(file);
+      const successToast =
+        fileScope === "order"
+          ? "Đã thêm tài liệu chung cho đơn hàng."
+          : "Đã thêm tài liệu cho sản phẩm.";
+      await finishFileLink(asset, successToast);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload thất bại");
+    }
   }
 
   async function submitFile(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedAsset) return;
+    const successToast =
+      fileScope === "order"
+        ? "Đã thêm tài liệu chung cho đơn hàng."
+        : "Đã thêm tài liệu cho sản phẩm.";
     await mutate({
       loadingMessage: "Đang thêm file…",
-      successMessage: "Đã thêm file sản xuất.",
+      successMessage: successToast,
       action: async () => {
         const res = await fetch(`/api/orders/${orderId}/production-files`, {
           method: "POST",
@@ -230,12 +367,14 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
             title: fileTitle || selectedAsset.filename,
             version: fileVersion,
             note: fileNote || null,
+            appliesToColorName: appliesToColorName.trim() || null,
+            appliesToSize: appliesToSize.trim() || null,
             setAsActive: true,
           }),
         });
         return parseAdminJsonResponse(res, (body) => body.file as OrderProductionFileRecord);
       },
-      onSuccess: (file) => {
+      onSuccess: async (file) => {
         setFileFormOpen(false);
         setSelectedAsset(null);
         setFileTitle("");
@@ -243,10 +382,9 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
         setUploadHint(null);
         setUploadError(null);
         if (file) {
-          setFiles((prev) => [...prev, file]);
-        } else {
-          void load();
+          setFiles((prev) => mergeFileRecord(prev, file));
         }
+        await refreshFilesAndReadiness();
       },
     });
   }
@@ -261,9 +399,14 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ setAsActive: true }),
         });
-        return parseAdminJsonResponse(res, () => true);
+        return parseAdminJsonResponse(res, (body) => body.file as OrderProductionFileRecord);
       },
-      onSuccess: () => void load(),
+      onSuccess: async (file) => {
+        if (file) {
+          setFiles((prev) => prev.map((f) => (f.id === file.id ? file : f)));
+        }
+        await refreshFilesAndReadiness();
+      },
     });
   }
 
@@ -275,15 +418,77 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
         const res = await fetch(`/api/orders/${orderId}/production-files/${fileId}/archive`, {
           method: "POST",
         });
-        return parseAdminJsonResponse(res, () => true);
+        return parseAdminJsonResponse(res, (body) => body.file as OrderProductionFileRecord);
       },
-      onSuccess: () => void load(),
+      onSuccess: async (file) => {
+        if (file) {
+          setFiles((prev) => prev.map((f) => (f.id === file.id ? file : f)));
+        }
+        await refreshFilesAndReadiness();
+      },
+    });
+  }
+
+  async function confirmDeleteFile() {
+    if (!deleteTarget) return;
+    const targetId = deleteTarget.id;
+    await mutate({
+      loadingMessage: "Đang xóa file…",
+      action: async () => {
+        const res = await fetch(`/api/orders/${orderId}/production-files/${targetId}`, {
+          method: "DELETE",
+        });
+        return parseAdminJsonResponse(res, (body) => ({
+          removedRelationOnly: Boolean(body.removedRelationOnly),
+        }));
+      },
+      onSuccess: async (result) => {
+        setDeleteTarget(null);
+        setFiles((prev) => prev.filter((f) => f.id !== targetId));
+        await refreshFilesAndReadiness();
+        if (result?.removedRelationOnly) {
+          toast.success("Đã gỡ file khỏi bộ hồ sơ sản xuất.");
+        } else {
+          toast.success("Đã xóa file khỏi bộ hồ sơ sản xuất.");
+        }
+      },
+    });
+  }
+
+  async function saveFileEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTarget) return;
+    await mutate({
+      loadingMessage: "Đang lưu…",
+      successMessage: "Đã cập nhật thông tin file.",
+      action: async () => {
+        const res = await fetch(`/api/orders/${orderId}/production-files/${editTarget.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: editTarget.type,
+            title: editTarget.title || null,
+            version: editTarget.version,
+            note: editTarget.note || null,
+            appliesToColorName: editTarget.appliesToColorName.trim() || null,
+            appliesToSize: editTarget.appliesToSize.trim() || null,
+          }),
+        });
+        return parseAdminJsonResponse(res, (body) => body.file as OrderProductionFileRecord);
+      },
+      onSuccess: async (file) => {
+        setEditTarget(null);
+        if (file) {
+          setFiles((prev) => prev.map((f) => (f.id === file.id ? file : f)));
+        }
+        await refreshFilesAndReadiness();
+      },
     });
   }
 
   const activeFiles = files.filter((f) => f.status === "ACTIVE");
   const archivedFiles = files.filter((f) => f.status !== "ACTIVE");
-  const orderLevelFiles = activeFiles.filter((f) => f.orderId);
+  const orderLevelFiles = activeFiles.filter((f) => !f.orderItemId);
   const itemFilesByItem = order.items.map((item) => ({
     item,
     files: activeFiles.filter((f) => f.orderItemId === item.id),
@@ -291,61 +496,155 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
 
   const readiness = materials?.readiness;
 
-  function renderFileRow(file: OrderProductionFileRecord) {
-    const isR2 = file.mediaAsset.storageProvider === "CLOUDFLARE_R2";
-    const previewable = !isR2 && isPreviewableProductionMime(file.mediaAsset.mimeType);
-    const openUrl = `/api/production-files/${file.id}/open`;
-    const downloadUrl = `/api/production-files/${file.id}/download`;
-    return (
-      <div key={file.id} className="production-pack-file-row">
-        <div className="production-pack-file-row__main">
-          {previewable && file.mediaAsset.mimeType.startsWith("image/") ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={file.mediaAsset.thumbnailUrl ?? file.mediaAsset.url}
-              alt=""
-              className="production-pack-file-thumb"
+  function renderFileList(list: OrderProductionFileRecord[]) {
+    return list.map((file) => (
+      <ProductionPackFileRow
+        key={file.id}
+        file={file}
+        onSetActive={(id) => void setFileActive(id)}
+        onArchive={(id) => void archiveFile(id)}
+        onDelete={setDeleteTarget}
+        onEdit={(f) =>
+          setEditTarget({
+            id: f.id,
+            type: f.type,
+            title: f.title ?? f.mediaAsset.filename,
+            version: f.version,
+            note: f.note ?? "",
+            appliesToColorName: f.appliesToColorName ?? "",
+            appliesToSize: f.appliesToSize ?? "",
+          })
+        }
+        onNewVersion={openNewVersionForm}
+      />
+    ));
+  }
+
+  const fileForm = fileFormOpen ? (
+    <form className="production-pack-file-form" onSubmit={(e) => void submitFile(e)}>
+      <div className="admin-field">
+        <label className="admin-label">Phạm vi</label>
+        <select className="admin-input" value={fileScope} onChange={(e) => setFileScope(e.target.value)}>
+          <option value="order">Toàn đơn hàng</option>
+          {order.items.map((item) => (
+            <option key={item.id} value={item.id}>
+              {itemLabel(item)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="admin-field">
+        <label className="admin-label">Loại file</label>
+        <select
+          className="admin-input"
+          value={fileType}
+          onChange={(e) => {
+            setFileType(e.target.value as ProductionFileType);
+            setUploadHint(null);
+          }}
+        >
+          {PRODUCTION_FILE_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {PRODUCTION_FILE_TYPE_LABELS[t]}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="admin-field">
+        <label className="admin-label">File</label>
+        {selectedAsset ? (
+          <p className="admin-field-hint">
+            {selectedAsset.filename} ({formatBytes(selectedAsset.sizeBytes)})
+          </p>
+        ) : (
+          <p className="admin-field-hint">Chưa chọn file</p>
+        )}
+        {uploadHint && <p className="admin-field-hint">{uploadHint}</p>}
+        {uploadError && (
+          <p className="admin-field-hint" style={{ color: "var(--primary, #dc2626)" }}>
+            {uploadError}
+          </p>
+        )}
+        {r2Configured === false && <p className="admin-field-hint">{ERROR_R2_NOT_CONFIGURED}</p>}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void openMediaPicker()}>
+            Chọn từ thư viện
+          </button>
+          <label className="admin-btn admin-btn--secondary admin-btn--xs">
+            Tải file mới
+            <input
+              ref={uploadRef}
+              type="file"
+              hidden
+              accept={ALLOWED_PRODUCTION_FILE_EXTENSIONS.join(",")}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleUploadFile(f);
+                e.target.value = "";
+              }}
             />
-          ) : (
-            <div className="production-pack-file-icon">{file.mediaAsset.format?.toUpperCase() ?? "FILE"}</div>
-          )}
-          <div>
-            <strong>{file.title ?? file.mediaAsset.filename}</strong>
-            <span className={`production-pack-status production-pack-status--${file.status.toLowerCase()}`}>
-              {PRODUCTION_FILE_STATUS_LABELS[file.status]}
-            </span>
-            <p className="admin-field-hint">
-              {PRODUCTION_FILE_TYPE_LABELS[file.type]} · v{file.version} · {formatBytes(file.mediaAsset.sizeBytes)}
-            </p>
-            {(file.appliesToColorName || file.appliesToSize) && (
-              <p className="admin-field-hint">
-                Áp dụng: {[file.appliesToColorName, file.appliesToSize].filter(Boolean).join(" · ")}
-              </p>
-            )}
-            {file.note && <p className="admin-field-hint">{file.note}</p>}
-          </div>
-        </div>
-        <div className="production-pack-file-row__actions">
-          <a href={openUrl} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary admin-btn--xs">
-            Mở
-          </a>
-          <a href={downloadUrl} className="admin-btn admin-btn--secondary admin-btn--xs">
-            Tải
-          </a>
-          {file.status === "ACTIVE" && (
-            <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void archiveFile(file.id)}>
-              Lưu trữ
-            </button>
-          )}
-          {file.status !== "ACTIVE" && (
-            <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" onClick={() => void setFileActive(file.id)}>
-              Đặt làm bản đang sử dụng
-            </button>
-          )}
+          </label>
         </div>
       </div>
-    );
-  }
+      <div className="admin-field">
+        <label className="admin-label">Tiêu đề</label>
+        <input
+          className="admin-input"
+          value={fileTitle}
+          onChange={(e) => setFileTitle(e.target.value)}
+          placeholder="Tự điền từ tên file nếu để trống"
+        />
+      </div>
+      <div className="admin-field">
+        <label className="admin-label">Phiên bản</label>
+        <input
+          className="admin-input"
+          type="number"
+          min={1}
+          value={fileVersion}
+          onChange={(e) => setFileVersion(Number(e.target.value))}
+        />
+      </div>
+      <div className="admin-field">
+        <label className="admin-label">Màu áp dụng (tuỳ chọn)</label>
+        <input
+          className="admin-input"
+          value={appliesToColorName}
+          onChange={(e) => setAppliesToColorName(e.target.value)}
+          placeholder="VD: Đen"
+        />
+      </div>
+      <div className="admin-field">
+        <label className="admin-label">Size áp dụng (tuỳ chọn)</label>
+        <input
+          className="admin-input"
+          value={appliesToSize}
+          onChange={(e) => setAppliesToSize(e.target.value)}
+          placeholder="VD: XL"
+        />
+      </div>
+      <div className="admin-field">
+        <label className="admin-label">Ghi chú</label>
+        <textarea className="admin-textarea" rows={2} value={fileNote} onChange={(e) => setFileNote(e.target.value)} />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="submit" className="admin-btn admin-btn--primary admin-btn--small" disabled={!selectedAsset}>
+          Lưu file
+        </button>
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          onClick={() => {
+            setFileFormOpen(false);
+            setUploadError(null);
+            setSelectedAsset(null);
+          }}
+        >
+          Hủy
+        </button>
+      </div>
+    </form>
+  ) : null;
 
   return (
     <fieldset className="admin-catalog-fieldset production-pack-section" id="production-pack" style={{ marginTop: 16 }}>
@@ -376,114 +675,60 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
         <p className="admin-field-hint">Đang tải…</p>
       ) : tab === "files" ? (
         <>
-          <div style={{ marginBottom: 12 }}>
-            <button type="button" className="admin-btn admin-btn--primary admin-btn--small" onClick={() => setFileFormOpen(true)}>
-              Thêm file
-            </button>
-          </div>
+          {fileForm}
 
-          {fileFormOpen && (
-            <form className="production-pack-file-form" onSubmit={(e) => void submitFile(e)}>
-              <div className="admin-field">
-                <label className="admin-label">Phạm vi</label>
-                <select className="admin-input" value={fileScope} onChange={(e) => setFileScope(e.target.value)}>
-                  <option value="order">Toàn đơn hàng</option>
-                  {order.items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {[item.productNameSnapshot, item.variantNameSnapshot].filter(Boolean).join(" · ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Loại file</label>
-                <select className="admin-input" value={fileType} onChange={(e) => {
-                  setFileType(e.target.value as ProductionFileType);
-                  setUploadHint(null);
-                }}>
-                  {PRODUCTION_FILE_TYPES.map((t) => (
-                    <option key={t} value={t}>{PRODUCTION_FILE_TYPE_LABELS[t]}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">File</label>
-                {selectedAsset ? (
-                  <p className="admin-field-hint">
-                    {selectedAsset.filename} ({formatBytes(selectedAsset.sizeBytes)})
-                    {selectedAsset.storageProvider === "CLOUDFLARE_R2" && " · File nguồn bảo mật"}
-                  </p>
-                ) : (
-                  <p className="admin-field-hint">Chưa chọn file</p>
-                )}
-                {uploadHint && <p className="admin-field-hint">{uploadHint}</p>}
-                {uploadError && <p className="admin-field-hint" style={{ color: "var(--primary, #dc2626)" }}>{uploadError}</p>}
-                {r2Configured === false && (
-                  <p className="admin-field-hint">{ERROR_R2_NOT_CONFIGURED}</p>
-                )}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void openMediaPicker()}>
-                    Chọn từ thư viện
-                  </button>
-                  <label className="admin-btn admin-btn--secondary admin-btn--xs">
-                    Tải file mới
-                    <input
-                      ref={uploadRef}
-                      type="file"
-                      hidden
-                      accept={ALLOWED_PRODUCTION_FILE_EXTENSIONS.join(",")}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) {
-                          void uploadProductionFile(f).catch((err: unknown) => {
-                            setUploadError(err instanceof Error ? err.message : "Upload thất bại");
-                          });
-                        }
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Tiêu đề</label>
-                <input className="admin-input" value={fileTitle} onChange={(e) => setFileTitle(e.target.value)} placeholder="Tự điền từ tên file nếu để trống" />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Phiên bản</label>
-                <input className="admin-input" type="number" min={1} value={fileVersion} onChange={(e) => setFileVersion(Number(e.target.value))} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Ghi chú</label>
-                <textarea className="admin-textarea" rows={2} value={fileNote} onChange={(e) => setFileNote(e.target.value)} />
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="submit" className="admin-btn admin-btn--primary admin-btn--small" disabled={!selectedAsset}>
-                  Lưu file
-                </button>
-                <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setFileFormOpen(false)}>
-                  Hủy
-                </button>
-              </div>
-            </form>
-          )}
-
-          <h4 className="admin-subtitle">File cấp đơn hàng</h4>
-          {orderLevelFiles.length ? orderLevelFiles.map(renderFileRow) : <p className="admin-field-hint">Chưa có file.</p>}
-
-          {itemFilesByItem.map(({ item, files: itemFiles }) => (
-            <div key={item.id} style={{ marginTop: 16 }}>
-              <h4 className="admin-subtitle">
-                {[item.productNameSnapshot, item.variantNameSnapshot].filter(Boolean).join(" · ") || "Sản phẩm"}
-              </h4>
-              {itemFiles.length ? itemFiles.map(renderFileRow) : <p className="admin-field-hint">Chưa có file cho dòng này.</p>}
+          <section className="production-pack-section-block">
+            <div className="production-pack-section-block__header">
+              <h4 className="admin-subtitle">Tài liệu chung của đơn hàng</h4>
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary admin-btn--small"
+                onClick={() => openAddFileForm("order")}
+              >
+                Thêm tài liệu chung
+              </button>
             </div>
-          ))}
+            {orderLevelFiles.length > 0 ? (
+              renderFileList(orderLevelFiles)
+            ) : (
+              <p className="admin-field-hint">Chưa có tài liệu chung cho đơn hàng.</p>
+            )}
+          </section>
+
+          <section className="production-pack-section-block">
+            <h4 className="admin-subtitle">Tài liệu theo sản phẩm</h4>
+            {itemFilesByItem.map(({ item, files: itemFiles }) => (
+              <div key={item.id} className="production-pack-product-card">
+                <div className="production-pack-product-card__header">
+                  <h5 className="admin-subtitle" style={{ margin: 0 }}>
+                    {itemLabel(item)}
+                  </h5>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="production-pack-product-card__count">
+                      {itemFiles.length} file đang sử dụng
+                    </span>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--small"
+                      onClick={() => openAddFileForm(item.id)}
+                    >
+                      Thêm tài liệu cho sản phẩm
+                    </button>
+                  </div>
+                </div>
+                {itemFiles.length > 0 ? (
+                  renderFileList(itemFiles)
+                ) : (
+                  <p className="admin-field-hint">Chưa có tài liệu sản xuất cho sản phẩm này.</p>
+                )}
+              </div>
+            ))}
+          </section>
 
           {archivedFiles.length > 0 && (
             <details style={{ marginTop: 16 }} open={showArchived} onToggle={(e) => setShowArchived(e.currentTarget.open)}>
               <summary>Lịch sử / file đã lưu trữ ({archivedFiles.length})</summary>
-              {archivedFiles.map(renderFileRow)}
+              {renderFileList(archivedFiles)}
             </details>
           )}
         </>
@@ -608,7 +853,9 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
           <div className="admin-modal admin-modal--wide" onClick={(e) => e.stopPropagation()}>
             <div className="admin-modal-header">
               <h3 className="admin-subtitle">Chọn file từ thư viện</h3>
-              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setPickerOpen(false)}>Đóng</button>
+              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setPickerOpen(false)}>
+                Đóng
+              </button>
             </div>
             <div className="admin-media-grid admin-media-grid--picker">
               {mediaAssets.map((asset) => (
@@ -626,6 +873,124 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="admin-modal-overlay" role="presentation">
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h3 className="admin-subtitle">Xóa tài liệu sản xuất?</h3>
+            </div>
+            <p className="admin-field-hint">
+              File sẽ bị gỡ khỏi bộ hồ sơ sản xuất. Hành động này không thể hoàn tác.
+            </p>
+            <div className="admin-modal-actions" style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setDeleteTarget(null)}>
+                Hủy
+              </button>
+              <button type="button" className="admin-btn admin-btn--danger admin-btn--small" onClick={() => void confirmDeleteFile()}>
+                Xóa file
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="admin-modal-overlay" role="presentation">
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <form onSubmit={(e) => void saveFileEdit(e)}>
+              <div className="admin-modal-header">
+                <h3 className="admin-subtitle">Chỉnh sửa thông tin file</h3>
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Loại file</label>
+                <select
+                  className="admin-input"
+                  value={editTarget.type}
+                  onChange={(e) =>
+                    setEditTarget((prev) =>
+                      prev ? { ...prev, type: e.target.value as ProductionFileType } : prev,
+                    )
+                  }
+                >
+                  {PRODUCTION_FILE_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {PRODUCTION_FILE_TYPE_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Tiêu đề</label>
+                <input
+                  className="admin-input"
+                  value={editTarget.title}
+                  onChange={(e) =>
+                    setEditTarget((prev) => (prev ? { ...prev, title: e.target.value } : prev))
+                  }
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Phiên bản</label>
+                <input
+                  className="admin-input"
+                  type="number"
+                  min={1}
+                  value={editTarget.version}
+                  onChange={(e) =>
+                    setEditTarget((prev) =>
+                      prev ? { ...prev, version: Number(e.target.value) } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Màu áp dụng</label>
+                <input
+                  className="admin-input"
+                  value={editTarget.appliesToColorName}
+                  onChange={(e) =>
+                    setEditTarget((prev) =>
+                      prev ? { ...prev, appliesToColorName: e.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Size áp dụng</label>
+                <input
+                  className="admin-input"
+                  value={editTarget.appliesToSize}
+                  onChange={(e) =>
+                    setEditTarget((prev) =>
+                      prev ? { ...prev, appliesToSize: e.target.value } : prev,
+                    )
+                  }
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Ghi chú</label>
+                <textarea
+                  className="admin-textarea"
+                  rows={2}
+                  value={editTarget.note}
+                  onChange={(e) =>
+                    setEditTarget((prev) => (prev ? { ...prev, note: e.target.value } : prev))
+                  }
+                />
+              </div>
+              <div className="admin-modal-actions" style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setEditTarget(null)}>
+                  Hủy
+                </button>
+                <button type="submit" className="admin-btn admin-btn--primary admin-btn--small">
+                  Lưu
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

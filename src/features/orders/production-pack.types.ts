@@ -19,6 +19,7 @@ export type OrderProductionFileRecord = {
   mediaAsset: {
     id: string;
     filename: string;
+    originalName: string | null;
     url: string;
     mimeType: string;
     format: string | null;
@@ -26,6 +27,11 @@ export type OrderProductionFileRecord = {
     thumbnailUrl: string | null;
     storageProvider: string;
   };
+};
+
+export type DeleteOrderProductionFileResult = {
+  fileId: string;
+  removedRelationOnly: boolean;
 };
 
 export type OrderItemMaterialRecord = {

@@ -59,8 +59,8 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
   const { id, fileId } = await context.params;
   try {
     const { deleteOrderProductionFile } = await import("@/features/orders/production-pack.service");
-    await deleteOrderProductionFile(id, fileId);
-    return NextResponse.json({ ok: true });
+    const result = await deleteOrderProductionFile(id, fileId);
+    return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     if (err instanceof ProductionPackValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });
