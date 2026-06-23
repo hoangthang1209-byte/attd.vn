@@ -13,6 +13,7 @@ export const PRODUCT_IMPORT_HEADERS = [
   "form",
   "fit",
   "gsm",
+  "productAttributes",
   "defaultMoq",
   "leadTime",
   "supportsPrinting",
@@ -68,6 +69,10 @@ const GUIDE_ROWS = [
     noiDung: "Định dạng: Màu sắc=Đen | Kích thước=M | Chất liệu=Cotton 250gsm",
   },
   {
+    muc: "productAttributes",
+    noiDung: "Định dạng: Chất liệu=Thể thao Pique | Form dáng=Regular fit | Kiểu cổ=Cổ polo",
+  },
+  {
     muc: "galleryUrls",
     noiDung: "Nhiều URL cách nhau bằng dấu |. Ví dụ: https://example.com/a.jpg|https://example.com/b.jpg",
   },
@@ -106,6 +111,7 @@ export const PRODUCT_IMPORT_V2_TEMPLATES: ImportTemplateDefinition[] = [
         form: "Regular fit",
         fit: "Unisex",
         gsm: "180",
+        productAttributes: "Chất liệu=Cotton CVC | Form dáng=Regular fit",
         defaultMoq: "50",
         leadTime: "7-10 ngày",
         supportsPrinting: "true",

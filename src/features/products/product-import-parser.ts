@@ -140,6 +140,7 @@ function defaultMappingForEntity(
     map.form = pick("form");
     map.fit = pick("fit");
     map.gsm = pick("gsm");
+    map.productAttributes = pick("productAttributes");
     map.defaultMoq = pick("defaultMoq", "moq");
     map.leadTime = pick("leadTime");
     map.supportsPrinting = pick("supportsPrinting");

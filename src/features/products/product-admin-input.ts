@@ -320,6 +320,25 @@ export function parseProductInput(
     });
   }
 
+  if (Array.isArray(raw.attributeAssignments)) {
+    input.attributeAssignments = raw.attributeAssignments.map((item, index) => {
+      const row = item as Record<string, unknown>;
+      const attributeId = String(row.attributeId ?? "").trim();
+      const attributeValueId = row.attributeValueId ? String(row.attributeValueId).trim() : undefined;
+      const customValue = row.customValue ? String(row.customValue).trim() : undefined;
+      if (!attributeId) {
+        fieldErrors[`attributeAssignments.${index}.attributeId`] = "Thiếu thuộc tính được gán.";
+      }
+      return {
+        id: row.id ? String(row.id) : undefined,
+        attributeId,
+        attributeValueId: attributeValueId || null,
+        customValue: customValue || null,
+        sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : index,
+      };
+    });
+  }
+
   if (mode === "create") {
     if (!name || !categoryId) {
       throw new ProductAdminValidationError(

@@ -63,6 +63,8 @@ export type PublicProductDetail = {
   form?: string | null;
   fit?: string | null;
   gsm?: number | null;
+  highlightMaterial?: string | null;
+  highlightForm?: string | null;
   defaultMoq?: number | null;
   leadTime?: string | null;
   supportsPrinting: boolean;

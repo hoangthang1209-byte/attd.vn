@@ -33,6 +33,13 @@ const EXPORT_PRODUCT_INCLUDE = {
     include: { values: { orderBy: { sortOrder: "asc" as const } } },
   },
   specifications: { orderBy: { sortOrder: "asc" as const } },
+  attributeAssignments: {
+    orderBy: { sortOrder: "asc" as const },
+    include: {
+      attribute: { select: { name: true, code: true } },
+      attributeValue: { select: { name: true } },
+    },
+  },
   customizationCapabilities: { orderBy: { sortOrder: "asc" as const } },
   variants: {
     orderBy: { createdAt: "asc" as const },

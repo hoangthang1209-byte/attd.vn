@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ProductCatalogForm from "@/components/admin/products/ProductCatalogForm";
 import { buildProductAdminEditInitialData } from "@/features/products/product-catalog-form-mappers";
@@ -25,7 +26,9 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   return (
     <>
       <AdminPageTitle title={`Sửa: ${product.name}`} />
-      <ProductCatalogForm initialData={initialData} categories={cats} />
+      <Suspense fallback={<p className="admin-field-hint">Đang tải form sản phẩm…</p>}>
+        <ProductCatalogForm initialData={initialData} categories={cats} />
+      </Suspense>
     </>
   );
 }

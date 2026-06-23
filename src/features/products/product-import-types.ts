@@ -23,6 +23,7 @@ export type ProductImportRow = {
   form?: string;
   fit?: string;
   gsm?: number;
+  productAttributes?: string;
   defaultMoq?: number;
   leadTime?: string;
   useCases?: string;
@@ -185,6 +186,7 @@ export type ProductImportColumnMapping = {
   featuredImage?: string;
   galleryUrls?: string;
   gsm?: string;
+  productAttributes?: string;
   leadTime?: string;
   seoTitle?: string;
   seoDescription?: string;

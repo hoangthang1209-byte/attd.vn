@@ -12,6 +12,7 @@ import {
   countVariantsUsingOption,
   countVariantsUsingOptionValue,
 } from "@/features/products/product-variant-matrix.service";
+import type { ProductAttributeAssignmentInput } from "@/features/products/product-attribute-assignment.utils";
 
 export type ProductOptionValueInput = {
   id?: string;
@@ -134,10 +135,11 @@ export async function resolveOptionValueIdsForProduct(
 export async function syncProductCmsData(
   productId: string,
   data: {
-    options?: ProductOptionInput[];
-    specifications?: ProductSpecificationInput[];
-    customizations?: ProductCustomizationInput[];
-    variantOptionValueIds?: Record<string, string[]>;
+  options?: ProductOptionInput[];
+  specifications?: ProductSpecificationInput[];
+  customizations?: ProductCustomizationInput[];
+  attributeAssignments?: ProductAttributeAssignmentInput[];
+  variantOptionValueIds?: Record<string, string[]>;
   },
 ) {
   if (data.options) {
@@ -376,4 +378,11 @@ export const PRODUCT_CMS_INCLUDE = {
   },
   specifications: { orderBy: { sortOrder: "asc" as const } },
   customizationCapabilities: { orderBy: { sortOrder: "asc" as const } },
+  attributeAssignments: {
+    orderBy: { sortOrder: "asc" as const },
+    include: {
+      attribute: { select: { id: true, name: true, code: true, isSpecificationAttribute: true, isVariantAttribute: true } },
+      attributeValue: { select: { id: true, name: true, status: true } },
+    },
+  },
 } satisfies Prisma.ProductInclude;

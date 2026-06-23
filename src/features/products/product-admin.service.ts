@@ -29,6 +29,10 @@ import {
   type ProductOptionInput,
   type ProductSpecificationInput,
 } from "@/features/products/product-admin-cms";
+import {
+  applyLegacyMirrorToProduct,
+  syncProductAttributeAssignments,
+} from "@/features/products/product-attribute-assignment.service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,6 +104,7 @@ export type ProductInput = {
   options?: ProductOptionInput[];
   specifications?: ProductSpecificationInput[];
   customizations?: ProductCustomizationInput[];
+  attributeAssignments?: import("@/features/products/product-attribute-assignment.utils").ProductAttributeAssignmentInput[];
 };
 
 const VARIANT_INCLUDE = {
@@ -365,6 +370,11 @@ export async function createProductAdmin(input: ProductInput) {
     });
   }
 
+  if (input.attributeAssignments !== undefined) {
+    const mirror = await syncProductAttributeAssignments(product.id, input.attributeAssignments);
+    await applyLegacyMirrorToProduct(product.id, mirror);
+  }
+
   const createdVariantIds: string[] = [];
   if (input.variants?.length) {
     for (const v of input.variants) {
@@ -585,6 +595,11 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
       specifications: input.specifications,
       customizations: input.customizations,
     });
+  }
+
+  if (input.attributeAssignments !== undefined) {
+    const mirror = await syncProductAttributeAssignments(id, input.attributeAssignments);
+    await applyLegacyMirrorToProduct(id, mirror);
   }
 
   if (input.variants?.some((v) => v.optionValueIds?.length)) {

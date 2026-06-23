@@ -8,7 +8,7 @@ export function isPartialCatalogSchemaError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
     /does not exist in the current database/i.test(message) &&
-    /ProductOption|ProductSpecification|ProductCustomizationCapability|ProductVariantOptionValue|ProductOptionValue|ProductVariant\.(displayLabel|moqOverride|leadTimeOverride|materialOverride)/i.test(
+    /ProductOption|ProductSpecification|ProductCustomizationCapability|ProductAttributeAssignment|ProductVariantOptionValue|ProductOptionValue|ProductVariant\.(displayLabel|moqOverride|leadTimeOverride|materialOverride)/i.test(
       message,
     )
   );
@@ -68,6 +68,7 @@ export function normalizeLegacyProductRow(row: LegacyProductDetailRow) {
     ...row,
     options: [] as [],
     specifications: [] as [],
+    attributeAssignments: [] as [],
     customizationCapabilities: [] as [],
     variants: row.variants.map((variant) => ({
       ...variant,

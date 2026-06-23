@@ -14,6 +14,7 @@ import {
   hasStructuredAndLegacyConflict,
   parseStructuredOptionValues,
 } from "@/features/products/product-import-options-parser";
+import { parseProductAttributesField } from "@/features/products/product-attribute-assignment.utils";
 import {
   generateSku,
   requireCategorySkuCode,
@@ -138,6 +139,7 @@ export function mapRawRowToImportRow(
     form: readStringField(raw, mapping.form, present, "form"),
     fit: readStringField(raw, mapping.fit, present, "fit"),
     gsm: readOptionalNumberField(raw, mapping.gsm, present, "gsm"),
+    productAttributes: readStringField(raw, mapping.productAttributes, present, "productAttributes"),
     defaultMoq: readOptionalNumberField(raw, mapping.defaultMoq, present, "defaultMoq"),
     leadTime: readStringField(raw, mapping.leadTime, present, "leadTime"),
     useCases: readStringField(raw, mapping.useCases, present, "useCases"),
@@ -268,6 +270,18 @@ export function validateImportRow(
     }
     if (importMode === "update-product" && !row.productCode && !row.systemCode && !row.slug && !row.productId) {
       errors.push(validationError("productCode", "Cần productCode, systemCode, slug hoặc ID để cập nhật sản phẩm."));
+    }
+    if (row.productAttributes?.trim()) {
+      try {
+        parseProductAttributesField(row.productAttributes);
+      } catch (error) {
+        errors.push(
+          validationError(
+            "productAttributes",
+            error instanceof Error ? error.message : "Cú pháp productAttributes không hợp lệ.",
+          ),
+        );
+      }
     }
   }
 

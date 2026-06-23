@@ -4,6 +4,12 @@ import {
   filterProductGalleryImages,
   acceptProductScopedImageUrl,
 } from "@/lib/productImageScope";
+import {
+  buildPdpHighlightFields,
+  buildPdpSpecificationRows,
+  resolveAssignmentDisplayValue,
+  type AssignmentDisplayRow,
+} from "@/features/products/product-attribute-assignment.utils";
 import type {
   ProductCustomizationRow,
   ProductOptionGroup,
@@ -54,6 +60,14 @@ type DbVariant = {
   optionValues: DbVariantOptionLink[];
 };
 
+type DbAttributeAssignment = {
+  id: string;
+  sortOrder: number;
+  customValue: string | null;
+  attribute: { id: string; name: string; code: string };
+  attributeValue: { id: string; name: string; status: string } | null;
+};
+
 type DbProduct = {
   id: string;
   slug: string;
@@ -80,6 +94,7 @@ type DbProduct = {
   gallery: string[];
   options: DbOption[];
   specifications: { id: string; label: string; value: string; sortOrder: number }[];
+  attributeAssignments?: DbAttributeAssignment[];
   customizationCapabilities: {
     id: string;
     label: string;
@@ -250,7 +265,18 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     ? mapStructuredOptionGroups(product.options ?? [])
     : buildLegacyOptionGroups(product.variants ?? []);
 
-  const specifications: ProductSpecificationRow[] = (product.specifications ?? [])
+  const assignmentRows: AssignmentDisplayRow[] = (product.attributeAssignments ?? [])
+    .filter((row) => row.attributeValue?.status !== "INACTIVE")
+    .map((row) => ({
+      attributeId: row.attribute.id,
+      attributeCode: row.attribute.code,
+      attributeName: row.attribute.name,
+      displayValue: resolveAssignmentDisplayValue(row.attributeValue?.name, row.customValue),
+      sortOrder: row.sortOrder,
+    }))
+    .filter((row) => row.displayValue.trim());
+
+  const freeformSpecs: ProductSpecificationRow[] = (product.specifications ?? [])
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((row) => ({
@@ -259,6 +285,25 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
       value: row.value,
       sortOrder: row.sortOrder,
     }));
+
+  const specifications = buildPdpSpecificationRows({
+    assignments: assignmentRows,
+    legacy: {
+      material: product.material,
+      form: product.form,
+      fit: product.fit,
+      gsm: product.gsm,
+    },
+    freeformSpecs,
+  });
+
+  const highlights = buildPdpHighlightFields({
+    assignments: assignmentRows,
+    legacy: {
+      material: product.material,
+      form: product.form,
+    },
+  });
 
   const customizations: ProductCustomizationRow[] = (product.customizationCapabilities ?? [])
     .filter((c) => c.enabled)
@@ -325,6 +370,8 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     form: product.form,
     fit: product.fit,
     gsm: product.gsm,
+    highlightMaterial: highlights.material ?? null,
+    highlightForm: highlights.form ?? null,
     defaultMoq: product.defaultMoq,
     leadTime: product.leadTime,
     supportsPrinting: product.supportsPrinting,

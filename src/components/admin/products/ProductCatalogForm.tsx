@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import ProductMaterialSection from "@/components/admin/products/ProductMaterialSection";
 import ProductCatalogSpecificationsSection, {
@@ -11,11 +11,13 @@ import ProductCatalogContentSection, {
   type ProductCustomizationFormRow,
 } from "@/components/admin/products/ProductCatalogContentSection";
 import ProductCatalogVariantsSection from "@/components/admin/products/ProductCatalogVariantsSection";
+import ProductInformationAttributesSection from "@/components/admin/products/ProductInformationAttributesSection";
 import type { SharedAttributePickerOption } from "@/components/admin/products/ProductOptionGroupBuilder";
 import {
   mapOptionsToFormRows,
   mapVariantsToFormRows,
   type MatrixVariantFormRow,
+  type ProductAttributeAssignmentFormRow,
 } from "@/features/products/product-catalog-form-mappers";
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
@@ -59,6 +61,7 @@ type ProductFormData = {
   featuredImage: string;
   gallery: string[];
   specifications: ProductSpecificationFormRow[];
+  attributeAssignments: ProductAttributeAssignmentFormRow[];
   customizations: ProductCustomizationFormRow[];
   options: OptionGroupFormRow[];
   variants: MatrixVariantFormRow[];
@@ -77,6 +80,8 @@ type FormTabId = (typeof FORM_TABS)[number]["id"];
 type Props = {
   initialData?: Partial<ProductFormData> & { id?: string; slug?: string };
   categories?: Category[];
+  preselectAttributeId?: string;
+  preselectUsage?: string;
 };
 
 const LEAD_TIME_PRESETS = [
@@ -86,8 +91,14 @@ const LEAD_TIME_PRESETS = [
   "Thỏa thuận theo đơn hàng",
 ];
 
-export default function ProductCatalogForm({ initialData, categories: propCategories }: Props) {
+export default function ProductCatalogForm({
+  initialData,
+  categories: propCategories,
+  preselectAttributeId,
+  preselectUsage,
+}: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const mutate = useAdminMutation();
   const [categories, setCategories] = useState<Category[]>(propCategories ?? []);
   const [attributes, setAttributes] = useState<AttrMap>({});
@@ -120,6 +131,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     featuredImage: initialData?.featuredImage ?? "",
     gallery: initialData?.gallery ?? [],
     specifications: initialData?.specifications ?? [],
+    attributeAssignments: initialData?.attributeAssignments ?? [],
     customizations: initialData?.customizations ?? [],
     options: initialData?.options ?? [],
     variants: initialData?.variants ?? [],
@@ -137,6 +149,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   const [productCodePreviewError, setProductCodePreviewError] = useState<string | null>(null);
   const [allowManualProductCode, setAllowManualProductCode] = useState(false);
   const deletedVariantIdsRef = useRef<Set<string>>(new Set());
+  const attributeSectionRef = useRef<HTMLElement | null>(null);
+  const preselectHandledRef = useRef(false);
 
   const loadSharedAttributes = useCallback(async () => {
     setSharedAttributesLoading(true);
@@ -173,6 +187,50 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     }, 0);
     return () => window.clearTimeout(timer);
   }, [propCategories, loadSharedAttributes]);
+
+  useEffect(() => {
+    if (preselectHandledRef.current) return;
+    const attributeId =
+      preselectAttributeId ?? searchParams.get("attributeId") ?? undefined;
+    const usage = preselectUsage ?? searchParams.get("usage") ?? undefined;
+    if (!attributeId || usage !== "specification") return;
+    if (sharedAttributesLoading) return;
+
+    const attribute = sharedAttributes.find((item) => item.id === attributeId);
+    if (!attribute?.isSpecificationAttribute) return;
+
+    preselectHandledRef.current = true;
+    const timer = window.setTimeout(() => {
+      setActiveTab("content");
+      setForm((prev) => {
+        if (prev.attributeAssignments.some((row) => row.attributeId === attributeId)) {
+          return prev;
+        }
+        return {
+          ...prev,
+          attributeAssignments: [
+            ...prev.attributeAssignments,
+            {
+              clientKey: `assign-preselect-${attributeId}`,
+              attributeId,
+              useCustomValue: false,
+              sortOrder: prev.attributeAssignments.length,
+            },
+          ],
+        };
+      });
+      requestAnimationFrame(() => {
+        attributeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [
+    preselectAttributeId,
+    preselectUsage,
+    searchParams,
+    sharedAttributes,
+    sharedAttributesLoading,
+  ]);
 
   useEffect(() => {
     if (form.id || !form.categoryId) {
@@ -316,6 +374,13 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           sortOrder: row.sortOrder ?? index,
           enabled: row.enabled !== false,
         })),
+      attributeAssignments: form.attributeAssignments.map((row, index) => ({
+        id: row.id,
+        attributeId: row.attributeId,
+        attributeValueId: row.useCustomValue ? null : row.attributeValueId || null,
+        customValue: row.useCustomValue ? row.customValue?.trim() || null : null,
+        sortOrder: row.sortOrder ?? index,
+      })),
       options: form.options
         .filter((group) => group.name.trim())
         .map((group, index) => ({
@@ -868,6 +933,16 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           <textarea className="admin-textarea" rows={8} value={form.description} onChange={(e) => setField("description", e.target.value)} />
           <p className="admin-field-hint">Nội dung văn bản an toàn — không dán HTML thô từ nguồn không tin cậy.</p>
         </div>
+        <ProductInformationAttributesSection
+          rows={form.attributeAssignments}
+          sharedAttributes={sharedAttributes}
+          sharedAttributesLoading={sharedAttributesLoading}
+          sharedAttributesError={sharedAttributesError}
+          fieldErrors={fieldErrors}
+          onChange={(attributeAssignments) => setField("attributeAssignments", attributeAssignments)}
+          onRefreshSharedAttributes={loadSharedAttributes}
+          sectionRef={attributeSectionRef}
+        />
         <ProductCatalogSpecificationsSection
           rows={form.specifications}
           fieldErrors={fieldErrors}

@@ -78,6 +78,7 @@ model Product {
   options                   ProductOption[]
   specifications            ProductSpecification[]
   customizationCapabilities ProductCustomizationCapability[]
+  attributeAssignments      ProductAttributeAssignment[]
 
   @@index([categoryId])
   @@index([status])
@@ -942,9 +943,28 @@ model ProductAttribute {
   updatedAt                DateTime                      @updatedAt
   values                   ProductAttributeValue[]
   productOptions           ProductOption[]
+  productAssignments       ProductAttributeAssignment[]
 
   @@index([status])
   @@index([sortOrder])
+}
+
+model ProductAttributeAssignment {
+  id               String                @id @default(cuid())
+  productId        String
+  attributeId      String
+  attributeValueId String?
+  customValue      String?
+  sortOrder        Int                   @default(0)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  product          Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute        ProductAttribute      @relation(fields: [attributeId], references: [id], onDelete: Restrict)
+  attributeValue   ProductAttributeValue? @relation(fields: [attributeValueId], references: [id], onDelete: SetNull)
+
+  @@unique([productId, attributeId])
+  @@index([productId, sortOrder])
+  @@index([attributeId])
 }
 
 model ProductAttributeValue {
@@ -959,8 +979,9 @@ model ProductAttributeValue {
   sortOrder      Int                          @default(0)
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
-  attribute      ProductAttribute             @relation(fields: [attributeId], references: [id], onDelete: Cascade)
-  productValues  ProductOptionValue[]
+  attribute          ProductAttribute             @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  productValues      ProductOptionValue[]
+  productAssignments ProductAttributeAssignment[]
 
   @@unique([attributeId, code])
   @@unique([attributeId, slug])

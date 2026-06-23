@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import AttributePresetDialog from "@/components/admin/products/AttributePresetDialog";
 
 type DisplayType = "TEXT" | "COLOR_SWATCH" | "SIZE" | "SELECT" | "IMAGE_SWATCH";
@@ -294,6 +295,9 @@ export default function ProductAttributesClient() {
       <p className="admin-field-hint">
         Thuộc tính đang hoạt động sẽ xuất hiện trong phần &quot;Thuộc tính &amp; biến thể&quot; khi tạo hoặc sửa sản phẩm.
       </p>
+      <p className="admin-field-hint">
+        Thuộc tính có trạng thái hoạt động và được đánh dấu &quot;Dùng làm thông số&quot; sẽ xuất hiện trong phần &quot;Thông tin thuộc tính sản phẩm&quot; khi tạo hoặc sửa sản phẩm.
+      </p>
 
       {message && <p className="admin-success">{message}</p>}
       {error && <p className="admin-error" role="alert">{error}</p>}
@@ -445,6 +449,14 @@ export default function ProductAttributesClient() {
                     </p>
                   </div>
                   <div className="admin-catalog-actions-cell">
+                    {attribute.status === "ACTIVE" && attribute.isSpecificationAttribute && (
+                      <Link
+                        href={`/admin/products/new?attributeId=${attribute.id}&usage=specification`}
+                        className="admin-btn admin-btn--secondary admin-btn--xs"
+                      >
+                        Dùng cho sản phẩm mới
+                      </Link>
+                    )}
                     <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setAttributeForm({
                       id: attribute.id,
                       name: attribute.name,

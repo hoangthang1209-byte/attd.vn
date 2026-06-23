@@ -78,6 +78,16 @@ type AdminProductCustomization = {
   enabled: boolean;
 };
 
+export type ProductAttributeAssignmentFormRow = {
+  id?: string;
+  clientKey: string;
+  attributeId: string;
+  attributeValueId?: string;
+  customValue?: string;
+  useCustomValue: boolean;
+  sortOrder: number;
+};
+
 export type ProductAdminEditInitialData = {
   id: string;
   slug?: string;
@@ -106,6 +116,7 @@ export type ProductAdminEditInitialData = {
     value: string;
     sortOrder: number;
   }>;
+  attributeAssignments: ProductAttributeAssignmentFormRow[];
   customizations: Array<{
     id: string;
     label: string;
@@ -210,6 +221,14 @@ export function applyBulkResultToVariants(
   });
 }
 
+type AdminProductAttributeAssignment = {
+  id: string;
+  attributeId: string;
+  attributeValueId: string | null;
+  customValue: string | null;
+  sortOrder: number;
+};
+
 type BuildProductAdminEditInitialDataInput = {
   id: string;
   slug: string | null;
@@ -233,12 +252,27 @@ type BuildProductAdminEditInitialDataInput = {
   featuredImage: string | null;
   gallery: unknown;
   specifications: AdminProductSpecification[];
+  attributeAssignments?: AdminProductAttributeAssignment[];
   customizationCapabilities: AdminProductCustomization[];
   options: AdminProductOption[];
   variants: AdminProductVariant[];
   seoTitle: string | null;
   seoDescription: string | null;
 };
+
+export function mapAttributeAssignmentsToFormRows(
+  assignments: AdminProductAttributeAssignment[] | undefined,
+): ProductAttributeAssignmentFormRow[] {
+  return (assignments ?? []).map((row) => ({
+    id: row.id,
+    clientKey: row.id,
+    attributeId: row.attributeId,
+    attributeValueId: row.attributeValueId ?? undefined,
+    customValue: row.customValue ?? undefined,
+    useCustomValue: Boolean(row.customValue?.trim()),
+    sortOrder: row.sortOrder,
+  }));
+}
 
 /** Maps a loaded admin product record into client-serializable edit form state. */
 export function buildProductAdminEditInitialData(
@@ -272,6 +306,7 @@ export function buildProductAdminEditInitialData(
       value: row.value,
       sortOrder: row.sortOrder,
     })),
+    attributeAssignments: mapAttributeAssignmentsToFormRows(product.attributeAssignments),
     customizations: (product.customizationCapabilities ?? []).map((row) => ({
       id: row.id,
       label: row.label,

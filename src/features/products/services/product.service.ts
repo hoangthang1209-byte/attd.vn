@@ -22,6 +22,13 @@ const PRODUCT_DETAIL_INCLUDE = {
     },
   },
   specifications: { orderBy: { sortOrder: "asc" as const } },
+  attributeAssignments: {
+    orderBy: { sortOrder: "asc" as const },
+    include: {
+      attribute: { select: { id: true, name: true, code: true } },
+      attributeValue: { select: { id: true, name: true, status: true } },
+    },
+  },
   customizationCapabilities: { orderBy: { sortOrder: "asc" as const } },
   variants: {
     where: { variantStatus: "ACTIVE" },

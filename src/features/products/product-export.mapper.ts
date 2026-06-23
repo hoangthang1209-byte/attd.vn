@@ -9,12 +9,22 @@ import { IMPORT_SHEET_NAMES } from "@/features/products/product-import-constants
 import type { ProductExportOptions } from "@/features/products/product-export.types";
 import { VARIANT_STATUS_LABELS } from "@/features/products/product-variant-labels";
 import { escapeCsvValue } from "@/features/import/import-template-utils";
+import {
+  resolveAssignmentDisplayValue,
+  serializeProductAttributesField,
+} from "@/features/products/product-attribute-assignment.utils";
 
 export type ExportProductRecord = Prisma.ProductGetPayload<{
   include: {
     category: { select: { slug: true, skuCode: true } },
     options: { include: { values: true } },
     specifications: true,
+    attributeAssignments: {
+      include: {
+        attribute: { select: { name: true, code: true } },
+        attributeValue: { select: { name: true } },
+      },
+    },
     customizationCapabilities: true,
     variants: { include: { optionValues: { select: { optionValueId: true } } } },
   },
@@ -105,6 +115,19 @@ export function mapProductToExportRow(product: ExportProductRecord): Record<stri
         break;
       case "gsm":
         row[header] = sanitizeExportCell(product.gsm);
+        break;
+      case "productAttributes":
+        row[header] = sanitizeExportCell(
+          serializeProductAttributesField(
+            (product.attributeAssignments ?? []).map((assignment) => ({
+              attributeName: assignment.attribute.name,
+              displayValue: resolveAssignmentDisplayValue(
+                assignment.attributeValue?.name,
+                assignment.customValue,
+              ),
+            })),
+          ),
+        );
         break;
       case "defaultMoq":
         row[header] = sanitizeExportCell(product.defaultMoq);

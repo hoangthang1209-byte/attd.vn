@@ -24,6 +24,7 @@ import {
   updateProductAdmin,
   type ProductInput,
 } from "@/features/products/product-admin.service";
+import { resolveImportedProductAttributes } from "@/features/products/product-attribute-assignment-import";
 import { syncProductCmsData } from "@/features/products/product-admin-cms";
 import { generateProductSystemCode } from "@/features/products/product-system-code";
 import {
@@ -538,6 +539,13 @@ async function executeProductRow(
   options: ProductImportOptions,
   result: ProductImportExecuteResult,
 ): Promise<void> {
+  let resolvedAssignments: ProductInput["attributeAssignments"] | undefined;
+  if (row.productAttributes?.trim()) {
+    resolvedAssignments = await resolveImportedProductAttributes(row.productAttributes, {
+      allowCreateCatalogValues: options.allowCreateOptions,
+    });
+  }
+
   if (row.finalAction === "update" && row.matchedProductId) {
     const update: Partial<ProductInput> = {};
     const present = row._presentFields ?? {};
@@ -549,6 +557,7 @@ async function executeProductRow(
     if (present.form) update.form = applyClearableString(undefined, row.form) ?? undefined;
     if (present.fit) update.fit = applyClearableString(undefined, row.fit) ?? undefined;
     if (present.gsm) update.gsm = row.gsm ?? null;
+    if (present.productAttributes) update.attributeAssignments = resolvedAssignments ?? [];
     if (present.defaultMoq) update.defaultMoq = row.defaultMoq ?? null;
     if (present.leadTime) update.leadTime = applyClearableString(undefined, row.leadTime) ?? null;
     if (present.supportsPrinting) update.supportsPrinting = row.supportsPrinting;
@@ -600,6 +609,7 @@ async function executeProductRow(
     seoTitle: row.seoTitle,
     seoDescription: row.seoDescription,
     status: (row.status ?? "DRAFT") as ProductStatus,
+    attributeAssignments: resolvedAssignments,
   };
 
   await createProductAdmin(input);

@@ -29,6 +29,12 @@ export type ProductCatalogFormShape = {
   variants: MatrixVariantFormRow[];
   specifications?: Array<{ label: string; value: string }>;
   customizations?: Array<{ label: string; description?: string }>;
+  attributeAssignments?: Array<{
+    attributeId: string;
+    attributeValueId?: string;
+    customValue?: string;
+    useCustomValue?: boolean;
+  }>;
 };
 
 function parseNumberField(value: string): number | undefined {
@@ -51,7 +57,8 @@ export function resolveTabForField(field: string): "basic" | "media" | "variants
     field === "shortDescription" ||
     field === "description" ||
     field.startsWith("specifications") ||
-    field.startsWith("customizations")
+    field.startsWith("customizations") ||
+    field.startsWith("attributeAssignments")
   ) {
     return "content";
   }
@@ -188,6 +195,32 @@ export function validateProductCatalogFormLocal(form: ProductCatalogFormShape): 
   form.customizations?.forEach((cap, index) => {
     if (!cap.label.trim() && cap.description?.trim()) {
       errors[`customizations.${index}.label`] = "Tên khả năng tùy chỉnh là bắt buộc.";
+    }
+  });
+
+  const seenAssignmentAttributes = new Set<string>();
+  form.attributeAssignments?.forEach((row, index) => {
+    if (!row.attributeId) {
+      errors[`attributeAssignments.${index}.attributeId`] = "Thiếu thuộc tính được gán.";
+      return;
+    }
+    if (seenAssignmentAttributes.has(row.attributeId)) {
+      errors[`attributeAssignments.${index}.attributeId`] = "Thuộc tính đã được gán trùng.";
+      return;
+    }
+    seenAssignmentAttributes.add(row.attributeId);
+
+    const customValue = row.useCustomValue ? row.customValue?.trim() : "";
+    const sharedValueId = row.useCustomValue ? "" : row.attributeValueId?.trim();
+    if (!customValue && !sharedValueId) {
+      errors[`attributeAssignments.${index}.attributeValueId`] = "Vui lòng chọn giá trị hoặc nhập giá trị riêng.";
+    }
+    if (customValue && sharedValueId) {
+      errors[`attributeAssignments.${index}.customValue`] =
+        "Chỉ chọn một: giá trị dùng chung hoặc giá trị riêng cho sản phẩm.";
+    }
+    if (row.useCustomValue && customValue && customValue.length > 200) {
+      errors[`attributeAssignments.${index}.customValue`] = "Giá trị riêng quá dài (tối đa 200 ký tự).";
     }
   });
 
