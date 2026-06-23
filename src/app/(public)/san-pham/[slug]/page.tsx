@@ -77,7 +77,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const displayShortDescription = catalog?.shortDescription ?? product.shortDescription;
   const displayContent = catalog?.content ?? product.description;
 
-  const relatedProducts = await getRelatedProducts(product.category.id, product.id, 4);
+  const relatedProducts = product.category?.id
+    ? await getRelatedProducts(product.category.id, product.id, 4)
+    : [];
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -92,12 +94,12 @@ export default async function ProductDetailPage({ params }: PageProps) {
       product.description ??
       DEFAULT_DESCRIPTION,
     brand: { "@type": "Brand", name: SITE_NAME },
-    category: product.category.name,
+    ...(product.category?.name ? { category: product.category.name } : {}),
     ...((catalog?.sku ?? product.productCode) && {
       sku: catalog?.sku ?? product.productCode,
     }),
     ...(product.images.length > 0 && {
-      image: product.images.map((img) => img.imageUrl),
+      image: product.images.map((img) => img.imageUrl).filter(Boolean),
     }),
     url: canonicalUrl(`/san-pham/${slug}`),
   };
@@ -146,7 +148,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
         <Breadcrumb
           items={[
             { name: "Sản phẩm", href: "/san-pham" },
-            { name: product.category.name, href: `/${product.category.slug}` },
+            { name: product.category?.name ?? "Danh mục", href: `/${product.category?.slug ?? "san-pham"}` },
             { name: displayName, href: `/san-pham/${slug}` },
           ]}
         />
@@ -179,7 +181,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     id={related.id}
                     slug={related.slug}
                     name={related.name}
-                    category={product.category.name}
+                    category={product.category?.name ?? ""}
                     imageUrl={getPrimaryProductImageFromProduct(related)}
                     moq={related.defaultMoq}
                     leadTime={related.leadTime}
@@ -188,8 +190,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 ))}
               </div>
               <div className="mp-pdp-related-more">
-                <Link href={`/${product.category.slug}`} className="link-chip">
-                  Xem tất cả {product.category.name}
+                <Link href={`/${product.category?.slug ?? "san-pham"}`} className="link-chip">
+                  Xem tất cả {product.category?.name ?? "danh mục"}
                   <span aria-hidden style={{ color: "#9ca3af" }}>
                     →
                   </span>

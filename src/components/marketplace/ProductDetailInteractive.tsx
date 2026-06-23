@@ -16,7 +16,7 @@ import {
   getInitialSelection,
   type OptionSelectionState,
 } from "@/lib/productOptionSelection";
-import { resolveQuoteVariantId } from "@/features/products/product-catalog-qa-regression";
+import { resolveQuoteVariantId } from "@/features/products/product-pdp.utils";
 import { buildInteractiveGalleryImages } from "@/lib/productVariants";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
 
@@ -49,50 +49,56 @@ export default function ProductDetailInteractive({
   showFaqTab = true,
   showRelatedTab = false,
 }: Props) {
+  const optionGroups = product.optionGroups ?? [];
+  const variants = product.variants ?? [];
+  const specifications = product.specifications ?? [];
+  const customizations = product.customizations ?? [];
+  const images = product.images ?? [];
+
   const [selection, setSelection] = useState<OptionSelectionState>(() =>
-    getInitialSelection(product.optionGroups),
+    getInitialSelection(optionGroups),
   );
   const [quoteOpen, setQuoteOpen] = useState(false);
 
   const selectedVariant = useMemo(
-    () => findVariantBySelection(product.variants, product.optionGroups, selection),
-    [product.variants, product.optionGroups, selection],
+    () => findVariantBySelection(variants, optionGroups, selection),
+    [variants, optionGroups, selection],
   );
 
   const quoteVariantId = useMemo(
     () =>
       resolveQuoteVariantId(
-        product.variants.map((v) => ({ id: v.id, variantStatus: "ACTIVE" })),
+        variants.map((v) => ({ id: v.id, variantStatus: "ACTIVE" })),
         selectedVariant?.id ?? null,
       ),
-    [product.variants, selectedVariant?.id],
+    [variants, selectedVariant?.id],
   );
 
   const anchorTabs = useMemo(() => {
     const tabs = [{ id: "mp-pdp-overview", label: "Tổng quan" }];
-    if (product.specifications.length > 0) {
+    if (specifications.length > 0) {
       tabs.push({ id: "mp-pdp-specs", label: "Thông số" });
     }
     if (displayContent || displayShortDescription) {
       tabs.push({ id: "mp-pdp-desc", label: "Mô tả" });
     }
-    if (product.customizations.length > 0) {
+    if (customizations.length > 0) {
       tabs.push({ id: "mp-pdp-custom", label: "Tùy chỉnh" });
     }
     if (showFaqTab) tabs.push({ id: "mp-pdp-faq", label: "FAQ" });
     if (showRelatedTab) tabs.push({ id: "mp-pdp-related", label: "Liên quan" });
     return tabs;
   }, [
-    product.specifications.length,
-    product.customizations.length,
+    specifications.length,
+    customizations.length,
     displayContent,
     displayShortDescription,
     showFaqTab,
     showRelatedTab,
   ]);
 
-  const hasActiveVariants = product.variants.length > 0;
-  const showVariantSelector = product.optionGroups.length > 0 && hasActiveVariants;
+  const hasActiveVariants = variants.length > 0;
+  const showVariantSelector = optionGroups.length > 0 && hasActiveVariants;
 
   const galleryImages = useMemo(() => {
     const legacyVariant = selectedVariant
@@ -110,16 +116,16 @@ export default function ProductDetailInteractive({
         }
       : null;
 
-    if (!legacyVariant) return product.images;
-    return buildInteractiveGalleryImages(product.images, [legacyVariant], legacyVariant, true);
-  }, [product.images, selectedVariant]);
+    if (!legacyVariant) return images;
+    return buildInteractiveGalleryImages(images, [legacyVariant], legacyVariant, true);
+  }, [images, selectedVariant]);
 
   const effectiveMoq = selectedVariant?.moq ?? product.defaultMoq;
   const effectiveLeadTime = selectedVariant?.leadTime ?? product.leadTime;
   const displayedCode = selectedVariant?.sku ?? product.productCode ?? null;
   const stockLabel = selectedVariant
     ? STOCK_LABELS[selectedVariant.stockStatus]
-    : product.variants.length
+    : variants.length
       ? null
       : null;
   const stockColor = selectedVariant
@@ -137,7 +143,7 @@ export default function ProductDetailInteractive({
     id: product.id,
     slug: product.slug,
     name: displayName,
-    category: product.category.name,
+    category: product.category?.name ?? "",
     imageUrl: galleryImages[0]?.imageUrl ?? null,
     moq: effectiveMoq,
     leadTime: effectiveLeadTime,
@@ -163,8 +169,8 @@ export default function ProductDetailInteractive({
             <div className="product-detail-center">
               <header className="product-detail-head">
                 <div className="mp-product-detail-meta">
-                  <Link href={`/${product.category.slug}`} className="mp-product-detail-cat">
-                    {product.category.name}
+                  <Link href={`/${product.category?.slug ?? ""}`} className="mp-product-detail-cat">
+                    {product.category?.name ?? "Sản phẩm"}
                   </Link>
                   {displayedCode && (
                     <span className="mp-product-detail-code">Mã: {displayedCode}</span>
@@ -199,9 +205,9 @@ export default function ProductDetailInteractive({
                 )}
               </div>
 
-              {product.customizations.length > 0 && (
+              {customizations.length > 0 && (
                 <div className="mp-pdp-capability-chips">
-                  {product.customizations.map((item) => (
+                  {customizations.map((item) => (
                     <span key={item.id} className="mp-pdp-capability-chip">
                       {item.label}
                     </span>
@@ -212,23 +218,23 @@ export default function ProductDetailInteractive({
               {showVariantSelector && (
                 <div className="product-detail-options">
                   <ProductDynamicOptionSelector
-                    optionGroups={product.optionGroups}
-                    variants={product.variants}
+                    optionGroups={optionGroups}
+                    variants={variants}
                     selection={selection}
                     onSelect={handleOptionSelect}
                   />
                 </div>
               )}
 
-              {product.optionGroups.length > 0 && !hasActiveVariants && (
+              {optionGroups.length > 0 && !hasActiveVariants && (
                 <p className="mp-pdp-no-variants-hint" role="status">
                   Hiện không có phân loại đang bán. Vui lòng liên hệ để được tư vấn và báo giá.
                 </p>
               )}
 
-              {product.specifications.length > 0 && (
+              {specifications.length > 0 && (
                 <div className="mp-pdp-spec-preview-wrap">
-                  <ProductSpecificationsSection rows={product.specifications} preview />
+                  <ProductSpecificationsSection rows={specifications} preview />
                 </div>
               )}
             </div>
@@ -249,8 +255,8 @@ export default function ProductDetailInteractive({
         </div>
       </section>
 
-      {product.specifications.length > 0 && (
-        <ProductSpecificationsSection rows={product.specifications} />
+      {specifications.length > 0 && (
+        <ProductSpecificationsSection rows={specifications} />
       )}
 
       {(displayContent || displayShortDescription) && (
@@ -267,7 +273,7 @@ export default function ProductDetailInteractive({
         </section>
       )}
 
-      <ProductCustomizationsSection items={product.customizations} onRequestQuote={openQuote} />
+      <ProductCustomizationsSection items={customizations} onRequestQuote={openQuote} />
 
       <ProductPdpMobileBar onRequestQuote={openQuote} />
 

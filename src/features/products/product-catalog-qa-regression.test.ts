@@ -4,9 +4,9 @@ import {
   filterActivePublicVariants,
   mergeVariantStatusOnSave,
   resolveEffectiveMoq,
-  resolveQuoteVariantId,
   runProductCatalogQaRegressionSelfTest,
 } from "./product-catalog-qa-regression";
+import { resolveQuoteVariantId } from "./product-pdp.utils";
 import { variantStatusLabel } from "./product-variant-labels";
 import { isValidProductImageUrl } from "./product-image-url";
 

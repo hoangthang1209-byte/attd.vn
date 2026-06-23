@@ -6,6 +6,11 @@ import {
   mapProductToPublicDetail,
 } from "@/features/products/product-detail.mapper";
 import type { PublicProductDetail } from "@/features/products/product-detail.types";
+import {
+  isPartialCatalogSchemaError,
+  normalizeLegacyProductRow,
+  PRODUCT_DETAIL_LEGACY_SELECT,
+} from "@/features/products/product-detail-compat";
 
 const PRODUCT_DETAIL_INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
@@ -35,18 +40,34 @@ const PRODUCT_DETAIL_INCLUDE = {
   },
 } as const;
 
-export async function getProductDetailBySlug(slug: string): Promise<PublicProductDetail | null> {
-  const product = await prisma.product.findUnique({
-    where: { slug, status: "ACTIVE" },
-    include: PRODUCT_DETAIL_INCLUDE,
-  });
-  if (!product) return null;
-
+function mapFetchedProductToPublicDetail(
+  product: Parameters<typeof mapProductToPublicDetail>[0],
+): PublicProductDetail {
   const detail = mapProductToPublicDetail(product);
   if (detail.customizations.length === 0) {
     detail.customizations = buildDefaultCustomizationsFromFlags(product);
   }
   return detail;
+}
+
+export async function getProductDetailBySlug(slug: string): Promise<PublicProductDetail | null> {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { slug, status: "ACTIVE" },
+      include: PRODUCT_DETAIL_INCLUDE,
+    });
+    if (!product) return null;
+    return mapFetchedProductToPublicDetail(product);
+  } catch (error) {
+    if (!isPartialCatalogSchemaError(error)) throw error;
+
+    const legacy = await prisma.product.findUnique({
+      where: { slug, status: "ACTIVE" },
+      select: PRODUCT_DETAIL_LEGACY_SELECT,
+    });
+    if (!legacy) return null;
+    return mapFetchedProductToPublicDetail(normalizeLegacyProductRow(legacy));
+  }
 }
 
 export async function getProducts() {

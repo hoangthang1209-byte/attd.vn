@@ -1,5 +1,6 @@
 import { variantStatusLabel } from "@/features/products/product-variant-labels";
 import { isValidProductImageUrl } from "@/features/products/product-image-url";
+import { resolveQuoteVariantId } from "@/features/products/product-pdp.utils";
 
 export type VariantLike = {
   id: string;
@@ -48,20 +49,6 @@ export function isImageOverridden(value: string | null | undefined): boolean {
   return Boolean(value?.trim());
 }
 
-/** Quote payloads must reference an active variant when variants exist. */
-export function resolveQuoteVariantId(
-  variants: VariantLike[],
-  selectedVariantId: string | null,
-): string | null {
-  const active = filterActivePublicVariants(variants);
-  if (!active.length) return null;
-  if (selectedVariantId && active.some((v) => v.id === selectedVariantId)) {
-    return selectedVariantId;
-  }
-  return null;
-}
-
-/** Saving basics must not change variant status unless explicitly provided. */
 export function mergeVariantStatusOnSave(
   currentStatus: string,
   incomingStatus: string | undefined,

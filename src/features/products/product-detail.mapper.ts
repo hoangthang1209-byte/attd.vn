@@ -204,9 +204,12 @@ function mapVariant(
   const optionValueIds: string[] = [];
 
   if (hasStructuredOptions) {
-    for (const link of v.optionValues) {
-      optionValueIds.push(link.optionValue.id);
-      optionSelections[link.optionValue.option.slug] = link.optionValue.label;
+    for (const link of v.optionValues ?? []) {
+      const optionValue = link?.optionValue;
+      const option = optionValue?.option;
+      if (!optionValue?.id || !option?.slug) continue;
+      optionValueIds.push(optionValue.id);
+      optionSelections[option.slug] = optionValue.label;
     }
   } else {
     const color = v.colorName ?? v.color?.name;
@@ -237,12 +240,12 @@ function mapVariant(
 }
 
 export function mapProductToPublicDetail(product: DbProduct): PublicProductDetail {
-  const hasStructuredOptions = product.options.length > 0;
+  const hasStructuredOptions = (product.options?.length ?? 0) > 0;
   const optionGroups = hasStructuredOptions
-    ? mapStructuredOptionGroups(product.options)
-    : buildLegacyOptionGroups(product.variants);
+    ? mapStructuredOptionGroups(product.options ?? [])
+    : buildLegacyOptionGroups(product.variants ?? []);
 
-  const specifications: ProductSpecificationRow[] = product.specifications
+  const specifications: ProductSpecificationRow[] = (product.specifications ?? [])
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((row) => ({
@@ -252,7 +255,7 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
       sortOrder: row.sortOrder,
     }));
 
-  const customizations: ProductCustomizationRow[] = product.customizationCapabilities
+  const customizations: ProductCustomizationRow[] = (product.customizationCapabilities ?? [])
     .filter((c) => c.enabled)
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -263,7 +266,7 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
       sortOrder: row.sortOrder,
     }));
 
-  const variants = product.variants.map((v) =>
+  const variants = (product.variants ?? []).map((v) =>
     mapVariant(v, product.material, product.defaultMoq, product.leadTime, hasStructuredOptions),
   );
 
