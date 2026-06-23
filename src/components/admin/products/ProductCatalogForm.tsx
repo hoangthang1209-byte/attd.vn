@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import ProductMaterialSection from "@/components/admin/products/ProductMaterialSection";
@@ -67,7 +67,7 @@ type ProductFormData = {
 const FORM_TABS = [
   { id: "basic", label: "Thông tin cơ bản" },
   { id: "media", label: "Hình ảnh & media" },
-  { id: "variants", label: "Biến thể" },
+  { id: "variants", label: "Thuộc tính & biến thể" },
   { id: "content", label: "Mô tả & thông số" },
   { id: "seo", label: "SEO & hiển thị" },
 ] as const;
@@ -92,6 +92,8 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   const [categories, setCategories] = useState<Category[]>(propCategories ?? []);
   const [attributes, setAttributes] = useState<AttrMap>({});
   const [sharedAttributes, setSharedAttributes] = useState<SharedAttributePickerOption[]>([]);
+  const [sharedAttributesLoading, setSharedAttributesLoading] = useState(false);
+  const [sharedAttributesError, setSharedAttributesError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<FormTabId>("basic");
   const [form, setForm] = useState<ProductFormData>({
     id: initialData?.id,
@@ -136,6 +138,20 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   const [allowManualProductCode, setAllowManualProductCode] = useState(false);
   const deletedVariantIdsRef = useRef<Set<string>>(new Set());
 
+  const loadSharedAttributes = useCallback(async () => {
+    setSharedAttributesLoading(true);
+    setSharedAttributesError(null);
+    try {
+      const res = await fetch("/api/admin/attributes?activeOnly=1");
+      const items = await res.json() as SharedAttributePickerOption[];
+      setSharedAttributes(Array.isArray(items) ? items : []);
+    } catch {
+      setSharedAttributes([]);
+      setSharedAttributesError("Không thể tải thuộc tính dùng chung.");
+    }
+    setSharedAttributesLoading(false);
+  }, []);
+
   useEffect(() => {
     if (!propCategories) {
       void fetch("/api/admin/products/categories")
@@ -152,13 +168,11 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         }
         setAttributes(map);
       });
-    void fetch("/api/admin/attributes?activeOnly=1&variantOnly=1")
-      .then((r) => r.json())
-      .then((items: SharedAttributePickerOption[]) => {
-        setSharedAttributes(Array.isArray(items) ? items : []);
-      })
-      .catch(() => setSharedAttributes([]));
-  }, [propCategories]);
+    const timer = window.setTimeout(() => {
+      void loadSharedAttributes();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [propCategories, loadSharedAttributes]);
 
   useEffect(() => {
     if (form.id || !form.categoryId) {
@@ -323,6 +337,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         })),
       variants: form.variants.map((v) => ({
         id: v.id,
+        clientKey: v.clientKey,
         sku: v.sku.trim() || undefined,
         colorName: v.colorName.trim() || undefined,
         colorCode: v.colorCode.trim() || undefined,
@@ -396,8 +411,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     return true;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function saveProduct(stayOnVariants = false): Promise<boolean> {
     setError(null);
     setErrorDetail(null);
     setFieldErrors({});
@@ -410,18 +424,17 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           ? "Không thể lưu sản phẩm. Vui lòng kiểm tra các trường được đánh dấu."
           : "Không thể tạo sản phẩm. Vui lòng kiểm tra các trường được đánh dấu.",
       );
-      return;
+      return false;
     }
 
     setSaving(true);
-
     const payload = buildPayload();
     const url = form.id ? `/api/admin/products/${form.id}` : "/api/admin/products";
     const method = form.id ? "PATCH" : "POST";
 
     const saved = await mutate({
       loadingMessage: "Đang lưu thông tin…",
-      successMessage: "Đã lưu thông tin.",
+      successMessage: stayOnVariants ? "Đã lưu sản phẩm. Tiếp tục thiết lập biến thể." : "Đã lưu thông tin.",
       action: async () => {
         const res = await fetch(url, {
           method,
@@ -429,10 +442,15 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           body: JSON.stringify(payload),
         });
         const body = (await res.json()) as {
+          id?: string;
+          productCode?: string;
+          slug?: string;
           message?: string;
           error?: string;
           detail?: string;
           fieldErrors?: Record<string, string>;
+          options?: Parameters<typeof mapOptionsToFormRows>[0];
+          variants?: Parameters<typeof mapVariantsToFormRows>[0];
         };
         if (!res.ok) {
           setErrorDetail(body.detail ?? null);
@@ -446,18 +464,45 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           }
           return { ok: false as const, message: body.error ?? body.message };
         }
-        return { ok: true as const, data: true };
+        return { ok: true as const, data: body };
       },
-      onSuccess: () => {
+      onSuccess: (product) => {
+        if (stayOnVariants && product?.id) {
+          setForm((prev) => ({
+            ...prev,
+            id: product.id,
+            productCode: product.productCode ?? prev.productCode,
+            slug: product.slug ?? prev.slug,
+            options: product.options ? mapOptionsToFormRows(product.options) : prev.options,
+            variants: product.variants
+              ? mapVariantsToFormRows(product.variants).filter(
+                  (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
+                )
+              : prev.variants,
+          }));
+          setActiveTab("variants");
+          if (!form.id) {
+            router.replace(`/admin/products/${product.id}/edit`);
+          }
+          router.refresh();
+          return;
+        }
         router.push("/admin/products");
         router.refresh();
       },
     });
 
-    if (!saved) {
-      // field-level errors already set above when response parsed
-    }
     setSaving(false);
+    return Boolean(saved);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await saveProduct(false);
+  }
+
+  async function saveAndContinueForMatrix(): Promise<boolean> {
+    return saveProduct(true);
   }
 
   const publicSlug = form.slug ?? "";
@@ -786,7 +831,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
 
       {/* ── 4. Biến thể ───────────────────────────────────────────────────── */}
       <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "variants"}>
-        <legend>4. Biến thể / SKU lựa chọn</legend>
+        <legend>Thuộc tính &amp; biến thể</legend>
         <ProductCatalogVariantsSection
           productId={form.id}
           productCode={form.productCode || productCodePreview || ""}
@@ -795,11 +840,15 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           optionGroups={form.options}
           variants={form.variants}
           sharedAttributes={sharedAttributes}
+          sharedAttributesLoading={sharedAttributesLoading}
+          sharedAttributesError={sharedAttributesError}
+          onRefreshSharedAttributes={() => void loadSharedAttributes()}
           fieldErrors={fieldErrors}
           onOptionGroupsChange={(options) => setField("options", options)}
           onVariantsChange={(variants) => setField("variants", variants)}
           onReloadProduct={reloadProductFromServer}
           onBeforeMatrixGenerate={ensureOptionsSavedForMatrix}
+          onSaveAndContinue={saveAndContinueForMatrix}
           onVariantDeleted={handleVariantDeleted}
           onBulkOperationChange={setBulkOpInProgress}
         />

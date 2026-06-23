@@ -455,20 +455,27 @@ export function buildVariantSkuExplanation(input: {
 
 // ─── Uniqueness enforcement ───────────────────────────────────────────────────
 
-export async function ensureUniqueSku(baseSku: string): Promise<string> {
-  const existing = await prisma.productVariant.findUnique({ where: { sku: baseSku } });
+export async function ensureUniqueSku(
+  baseSku: string,
+  db: Pick<typeof prisma, "productVariant"> = prisma,
+): Promise<string> {
+  const existing = await db.productVariant.findUnique({ where: { sku: baseSku } });
   if (!existing) return baseSku;
 
   for (let i = 2; i <= 99; i++) {
     const candidate = `${baseSku}-${i}`;
-    const dup = await prisma.productVariant.findUnique({ where: { sku: candidate } });
+    const dup = await db.productVariant.findUnique({ where: { sku: candidate } });
     if (!dup) return candidate;
   }
   return `${baseSku}-${Date.now()}`;
 }
 
-export async function isSkuTaken(sku: string, excludeId?: string): Promise<boolean> {
-  const existing = await prisma.productVariant.findUnique({ where: { sku } });
+export async function isSkuTaken(
+  sku: string,
+  excludeId?: string,
+  db: Pick<typeof prisma, "productVariant"> = prisma,
+): Promise<boolean> {
+  const existing = await db.productVariant.findUnique({ where: { sku } });
   if (!existing) return false;
   if (excludeId && existing.id === excludeId) return false;
   return true;

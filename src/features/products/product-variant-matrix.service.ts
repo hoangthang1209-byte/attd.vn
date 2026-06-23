@@ -205,7 +205,7 @@ export async function generateVariantMatrix(
 
       let sku: string;
       try {
-        sku = await ensureUniqueSku(baseSku);
+        sku = await ensureUniqueSku(baseSku, tx);
       } catch {
         throw new ProductAdminValidationError(
           `Không thể tạo SKU duy nhất cho tổ hợp "${combo.displayLabel}".`,

@@ -1,4 +1,5 @@
 import type { Prisma, ProductStatus, StockStatus, VariantStatus } from "@prisma/client";
+import { Prisma as PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   generateSku,
@@ -44,6 +45,7 @@ export type ProductListParams = {
 
 export type VariantInput = {
   id?: string;
+  clientKey?: string;
   sku?: string;
   colorName?: string;
   colorCode?: string;
@@ -167,6 +169,19 @@ async function buildVariantSku(
     capacity: variantInput.capacity,
   });
   return await ensureUniqueSku(base);
+}
+
+function variantSkuFieldKey(v: VariantInput): string {
+  if (v.id) return `variants.byId.${v.id}.sku`;
+  if (v.clientKey) return `variants.byClientKey.${v.clientKey}.sku`;
+  return "variants.sku";
+}
+
+function throwVariantSkuConflict(v: VariantInput, sku: string): never {
+  throw new ProductAdminValidationError(
+    `SKU "${sku}" đã tồn tại.`,
+    { [variantSkuFieldKey(v)]: "SKU đã tồn tại." },
+  );
 }
 
 // ─── List & search ────────────────────────────────────────────────────────────
@@ -354,10 +369,11 @@ export async function createProductAdmin(input: ProductInput) {
   if (input.variants?.length) {
     for (const v of input.variants) {
       const sku = await buildVariantSku(v, productCode);
-      const created = await prisma.productVariant.create({
-        data: {
-          productId: product.id,
-          sku: v.sku?.trim() || sku,
+      try {
+        const created = await prisma.productVariant.create({
+          data: {
+            productId: product.id,
+            sku: v.sku?.trim() || sku,
           colorName: v.colorName,
           colorCode: v.colorCode,
           sizeName: v.sizeName,
@@ -381,6 +397,12 @@ export async function createProductAdmin(input: ProductInput) {
         },
       });
       createdVariantIds.push(created.id);
+      } catch (error) {
+        if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
+          throwVariantSkuConflict(v, v.sku?.trim() || sku);
+        }
+        throw error;
+      }
     }
   }
 
@@ -483,10 +505,11 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
 
     for (const v of input.variants) {
       if (v.id) {
-        await prisma.productVariant.update({
-          where: { id: v.id },
-          data: {
-            ...(v.sku?.trim() ? { sku: v.sku.trim() } : {}),
+        try {
+          await prisma.productVariant.update({
+            where: { id: v.id },
+            data: {
+              ...(v.sku?.trim() ? { sku: v.sku.trim() } : {}),
             colorName: v.colorName,
             colorCode: v.colorCode,
             sizeName: v.sizeName,
@@ -510,9 +533,16 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
             variantStatus: v.variantStatus,
           },
         });
+        } catch (error) {
+          if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
+            throwVariantSkuConflict(v, v.sku?.trim() ?? "");
+          }
+          throw error;
+        }
       } else {
         const sku = await buildVariantSku(v, prodCode);
-        const created = await prisma.productVariant.create({
+        try {
+          const created = await prisma.productVariant.create({
           data: {
             productId: id,
             sku: v.sku?.trim() || sku,
@@ -539,6 +569,12 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
           },
         });
         createdVariantIds.push(created.id);
+        } catch (error) {
+          if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
+            throwVariantSkuConflict(v, v.sku?.trim() || sku);
+          }
+          throw error;
+        }
       }
     }
   }
@@ -718,7 +754,7 @@ export async function updateProductCategory(id: string, data: CategoryAdminInput
   await assertUniqueCategorySlug(data.slug, id);
   const parentId = await assertValidCategoryParent(id, data.parentId);
 
-  let skuCode = data.skuCode?.trim() ? normalizeCode(data.skuCode) : null;
+  const skuCode = data.skuCode?.trim() ? normalizeCode(data.skuCode) : null;
   if (skuCode && (await isCategoryCodeTaken(skuCode, id))) {
     throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_ERROR, {
       skuCode: CATEGORY_CODE_DUPLICATE_ERROR,

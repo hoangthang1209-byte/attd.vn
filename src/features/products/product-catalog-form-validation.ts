@@ -10,6 +10,12 @@ import {
 import { validateOptionValueCodesInGroup } from "@/features/products/product-option-code.utils";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
 import type { MatrixVariantFormRow } from "@/features/products/product-catalog-form-mappers";
+import {
+  focusVariantField,
+  variantFieldKey,
+  variantRefFromRow,
+  variantRowHasError as rowHasStableError,
+} from "@/features/products/variant-field-errors";
 
 export type ProductCatalogFormShape = {
   name: string;
@@ -53,10 +59,14 @@ export function resolveTabForField(field: string): "basic" | "media" | "variants
   return "basic";
 }
 
-/** Scroll to and focus the first invalid field in the catalog form. */
 export function scrollToFirstFieldError(fieldErrors: Record<string, string>): void {
   const firstField = Object.keys(fieldErrors)[0];
   if (!firstField) return;
+
+  if (firstField.startsWith("variants.")) {
+    focusVariantField(firstField);
+    return;
+  }
 
   const el =
     document.querySelector<HTMLElement>(`[data-field="${firstField}"]`) ??
@@ -137,8 +147,9 @@ export function validateProductCatalogFormLocal(form: ProductCatalogFormShape): 
     });
   });
 
-  form.variants.forEach((v, index) => {
-    const prefix = `variants.${index}`;
+  form.variants.forEach((v) => {
+    const ref = variantRefFromRow(v);
+    const prefix = variantFieldKey(ref, "").slice(0, -1);
     if (v.wholesalePrice.trim() && parseNumberField(v.wholesalePrice) === undefined) {
       errors[`${prefix}.wholesalePrice`] = "Giá sỉ phải là số.";
     }
@@ -151,8 +162,14 @@ export function validateProductCatalogFormLocal(form: ProductCatalogFormShape): 
     if (v.moqOverride.trim() && parseNumberField(v.moqOverride) === undefined) {
       errors[`${prefix}.moqOverride`] = "MOQ ghi đè phải là số.";
     }
+    if (v.leadTimeOverride.trim() && v.leadTimeOverride.length > 120) {
+      errors[`${prefix}.leadTimeOverride`] = "Lead-time quá dài.";
+    }
     if (v.imageUrl.trim() && !isValidImageUrl(v.imageUrl)) {
       errors[`${prefix}.imageUrl`] = PRODUCT_IMAGE_URL_ERROR;
+    }
+    if (v.sku.trim() && v.sku.length > 64) {
+      errors[`${prefix}.sku`] = "SKU quá dài.";
     }
     if (v.variantKind === "structured" && v.optionValueIds.length === 0) {
       errors[`${prefix}.optionValueIds`] = "Chọn ít nhất một giá trị thuộc tính cho biến thể.";
@@ -191,7 +208,19 @@ export function validateProductCatalogFormLocal(form: ProductCatalogFormShape): 
   return errors;
 }
 
-export function variantRowHasError(fieldErrors: Record<string, string>, index: number): boolean {
-  const prefix = `variants.${index}.`;
-  return Object.keys(fieldErrors).some((key) => key.startsWith(prefix));
+export function variantRowHasError(
+  fieldErrors: Record<string, string>,
+  variantOrIndex: MatrixVariantFormRow | number,
+  variants?: MatrixVariantFormRow[],
+): boolean {
+  if (typeof variantOrIndex === "number") {
+    const index = variantOrIndex;
+    if (variants?.[index]) {
+      return rowHasStableError(fieldErrors, variantRefFromRow(variants[index]), index);
+    }
+    return Object.keys(fieldErrors).some((key) => key.startsWith(`variants.${index}.`));
+  }
+  const variant = variantOrIndex;
+  const index = variants?.findIndex((row) => row.clientKey === variant.clientKey) ?? -1;
+  return rowHasStableError(fieldErrors, variantRefFromRow(variant), index >= 0 ? index : undefined);
 }

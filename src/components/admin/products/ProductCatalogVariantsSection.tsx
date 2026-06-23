@@ -1,8 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
-import MediaPicker from "@/components/admin/media/MediaPicker";
 import ProductOptionGroupBuilder, {
   type OptionGroupFormRow,
   type SharedAttributePickerOption,
@@ -16,9 +14,7 @@ import VariantBulkDialogs, {
 import type { BulkVariantResult } from "@/features/products/product-variant-bulk.service";
 import type { VariantDependencySummary } from "@/features/products/product-variant-lifecycle.service";
 import {
-  STOCK_STATUS_LABELS,
   VARIANT_STATUS_OPTIONS,
-  variantMatrixRowClass,
   variantStatusBadgeClass,
   variantStatusLabel,
 } from "@/features/products/product-variant-labels";
@@ -33,8 +29,13 @@ import {
   applyBulkResultToVariants,
   type MatrixVariantFormRow,
 } from "@/features/products/product-catalog-form-mappers";
-import { variantRowHasError } from "@/features/products/product-catalog-form-validation";
 import VariantMatrixConfirmDialog from "@/components/admin/products/VariantMatrixConfirmDialog";
+import VariantMatrixView from "@/components/admin/products/VariantMatrixView";
+import {
+  buildVariantRowErrors,
+  focusVariantField,
+  variantFieldLabel,
+} from "@/features/products/variant-field-errors";
 import {
   computeFormMatrixPreview,
 } from "@/features/products/product-variant-matrix-form-preview";
@@ -55,11 +56,15 @@ type Props = {
   optionGroups: OptionGroupFormRow[];
   variants: MatrixVariantFormRow[];
   sharedAttributes?: SharedAttributePickerOption[];
+  sharedAttributesLoading?: boolean;
+  sharedAttributesError?: string | null;
+  onRefreshSharedAttributes?: () => void;
   fieldErrors?: Record<string, string>;
   onOptionGroupsChange: (groups: OptionGroupFormRow[]) => void;
   onVariantsChange: (variants: MatrixVariantFormRow[]) => void;
   onReloadProduct?: () => Promise<void>;
   onBeforeMatrixGenerate?: () => Promise<boolean>;
+  onSaveAndContinue?: () => Promise<boolean>;
   onVariantDeleted?: (variantId: string) => void;
   onBulkOperationChange?: (inProgress: boolean) => void;
 };
@@ -120,11 +125,15 @@ export default function ProductCatalogVariantsSection({
   optionGroups,
   variants,
   sharedAttributes = [],
+  sharedAttributesLoading = false,
+  sharedAttributesError = null,
+  onRefreshSharedAttributes,
   fieldErrors = {},
   onOptionGroupsChange,
   onVariantsChange,
   onReloadProduct,
   onBeforeMatrixGenerate,
+  onSaveAndContinue,
   onVariantDeleted,
   onBulkOperationChange,
 }: Props) {
@@ -135,7 +144,6 @@ export default function ProductCatalogVariantsSection({
   const [matrixConfirmOpen, setMatrixConfirmOpen] = useState(false);
   const [matrixConfirmLarge, setMatrixConfirmLarge] = useState(false);
   const [manualSkuKeys, setManualSkuKeys] = useState<Set<string>>(new Set());
-  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [bulkDialog, setBulkDialog] = useState<BulkDialogKind | null>(null);
@@ -429,7 +437,6 @@ export default function ProductCatalogVariantsSection({
     if (!variant.id || !productId) {
       if (mode === "delete") {
         onVariantsChange(variants.filter((item) => item.clientKey !== variant.clientKey));
-        if (editingKey === variant.clientKey) setEditingKey(null);
         setMatrixMessage("Đã xóa biến thể khỏi danh sách.");
       }
       closeLifecycleDialog();
@@ -470,7 +477,6 @@ export default function ProductCatalogVariantsSection({
 
       if (data.removed) {
         onVariantsChange(variants.filter((item) => item.clientKey !== variant.clientKey));
-        if (editingKey === variant.clientKey) setEditingKey(null);
         onVariantDeleted?.(variant.id);
       } else if (data.variant) {
         updateVariant(variant.clientKey, {
@@ -491,31 +497,22 @@ export default function ProductCatalogVariantsSection({
     }
   }
 
-  function renderVariantActions(variant: MatrixVariantFormRow) {
+  function renderLegacyVariantActions(variant: MatrixVariantFormRow) {
     const isLoading = actionLoadingKey === variant.clientKey;
-
     return (
-      <div className="admin-variant-row-actions">
-        <button
-          type="button"
-          className="btn-tertiary btn-sm"
-          disabled={isLoading}
-          onClick={() =>
-            setEditingKey(editingKey === variant.clientKey ? null : variant.clientKey)
-          }
-        >
-          Sửa
-        </button>
-        <button
-          type="button"
-          className="btn-tertiary btn-sm"
-          disabled={isLoading}
-          onClick={() => void openLifecycleDialog(variant.clientKey)}
-        >
-          {isLoading ? "…" : variant.id ? "Quản lý" : "Xóa khỏi danh sách"}
-        </button>
-      </div>
+      <button
+        type="button"
+        className="btn-tertiary btn-sm"
+        disabled={isLoading}
+        onClick={() => void openLifecycleDialog(variant.clientKey)}
+      >
+        {isLoading ? "…" : variant.id ? "Quản lý" : "Xóa khỏi danh sách"}
+      </button>
     );
+  }
+
+  function addManualStructuredVariant() {
+    onVariantsChange([...variants, defaultStructuredVariant()]);
   }
 
   function openMatrixConfirm() {
@@ -628,28 +625,33 @@ export default function ProductCatalogVariantsSection({
     await generateFromServer(matrixConfirmLarge || matrixPreview.requiresConfirmation);
   }
 
-  function addManualStructuredVariant() {
-    onVariantsChange([...variants, defaultStructuredVariant()]);
-    setEditingKey(variants[variants.length - 1]?.clientKey ?? null);
-  }
-
   function addLegacyVariant() {
     onVariantsChange([...variants, defaultLegacyVariant()]);
   }
+
+  const variantRowErrors = buildVariantRowErrors(fieldErrors, variants);
 
   return (
     <div className="admin-variant-matrix-section">
       <ProductOptionGroupBuilder
         groups={optionGroups}
         sharedAttributes={sharedAttributes}
+        sharedAttributesLoading={sharedAttributesLoading}
+        sharedAttributesError={sharedAttributesError}
+        onRefreshSharedAttributes={onRefreshSharedAttributes}
         variantUsageByValueId={variantUsageByValueId}
         fieldErrors={fieldErrors}
         onChange={onOptionGroupsChange}
       />
 
-      <section className="admin-product-section">
-        <h3>Tổ hợp biến thể</h3>
+      <section className="admin-product-section admin-product-section--step-3">
+        <h3>3. Tạo tổ hợp biến thể</h3>
         <p className="admin-field-hint">{previewText}</p>
+        {!productId && (
+          <p className="admin-kb-warning-list" role="status">
+            Hãy lưu sản phẩm trước để tạo tổ hợp biến thể và SKU tự động.
+          </p>
+        )}
         <dl className="admin-matrix-preview-stats admin-matrix-preview-stats--inline">
           <div>
             <dt>Tổ hợp lý thuyết</dt>
@@ -670,14 +672,25 @@ export default function ProductCatalogVariantsSection({
           </p>
         )}
         <div className="admin-variant-matrix-actions">
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={generating || !matrixPreview.canGenerate}
-            onClick={openMatrixConfirm}
-          >
-            {generating ? "Đang tạo…" : "Tạo tổ hợp biến thể"}
-          </button>
+          {productId ? (
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={generating || !matrixPreview.canGenerate}
+              onClick={openMatrixConfirm}
+            >
+              {generating ? "Đang tạo…" : "Tạo tổ hợp biến thể"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!onSaveAndContinue || !matrixPreview.canGenerate}
+              onClick={() => void onSaveAndContinue?.()}
+            >
+              Lưu sản phẩm và tiếp tục
+            </button>
+          )}
           <button type="button" className="btn-secondary" onClick={addManualStructuredVariant}>
             Thêm biến thể thủ công
           </button>
@@ -734,36 +747,21 @@ export default function ProductCatalogVariantsSection({
           </p>
         )}
 
-        {Object.keys(fieldErrors).some((key) => key.startsWith("variants.")) && (
+        {variantRowErrors.length > 0 && (
           <div className="admin-variant-error-summary" role="alert">
             <p className="admin-variant-error-summary__title">Lỗi biến thể cần sửa:</p>
             <ul className="admin-variant-error-summary__list">
-              {Object.entries(fieldErrors)
-                .filter(([key]) => key.startsWith("variants."))
-                .map(([key, message]) => {
-                  const match = /^variants\.(\d+)\.(.+)$/.exec(key);
-                  const variantIndex = match ? Number(match[1]) : -1;
-                  const field = match?.[2] ?? key;
-                  const variant = variants[variantIndex];
-                  const label = variant?.displayLabel || variant?.sku || `Hàng ${variantIndex + 1}`;
-                  return (
-                    <li key={key}>
-                      <button
-                        type="button"
-                        className="admin-variant-error-summary__item"
-                        onClick={() => {
-                          const row = document.querySelector<HTMLElement>(
-                            `[data-variant-row="${variantIndex}"]`,
-                          );
-                          row?.scrollIntoView({ behavior: "smooth", block: "center" });
-                          row?.querySelector<HTMLElement>("input,select,textarea")?.focus();
-                        }}
-                      >
-                        <strong>{label}</strong> — {field}: {message}
-                      </button>
-                    </li>
-                  );
-                })}
+              {variantRowErrors.map((rowError) => (
+                <li key={rowError.fieldKey}>
+                  <button
+                    type="button"
+                    className="admin-variant-error-summary__item"
+                    onClick={() => focusVariantField(rowError.fieldKey)}
+                  >
+                    <strong>{rowError.variantLabel}</strong> — {variantFieldLabel(rowError.field)}: {rowError.message}
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
         )}
@@ -804,254 +802,30 @@ export default function ProductCatalogVariantsSection({
               : "Không có biến thể phù hợp bộ lọc hiện tại."}
           </p>
         ) : (
-          <div className="admin-variant-matrix-scroll">
-            <table className="admin-variant-matrix-table">
-              <thead>
-                <tr>
-                  <th>
-                    <input
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={(e) => toggleSelectAllVisible(e.target.checked)}
-                      aria-label="Chọn tất cả biến thể đang hiển thị"
-                    />
-                  </th>
-                  <th>Ảnh</th>
-                  <th>Biến thể</th>
-                  <th>Thuộc tính</th>
-                  <th>SKU</th>
-                  <th>Trạng thái</th>
-                  <th>Tồn kho</th>
-                  <th>MOQ</th>
-                  <th>Lead time</th>
-                  <th>Giá nội bộ</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStructuredVariants.map((variant) => {
-                  const variantIndex = variants.findIndex((row) => row.clientKey === variant.clientKey);
-                  const hasRowError = variantIndex >= 0 && variantRowHasError(fieldErrors, variantIndex);
-                  return (
-                  <tr
-                    key={variant.clientKey}
-                    className={`${variantMatrixRowClass(variant.variantStatus)}${hasRowError ? " admin-variant-row--error" : ""}`}
-                    data-variant-row={variantIndex >= 0 ? variantIndex : undefined}
-                    data-field-prefix={variantIndex >= 0 ? `variants.${variantIndex}` : undefined}
-                  >
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedKeys.has(variant.clientKey)}
-                        onChange={(e) => toggleSelect(variant.clientKey, e.target.checked)}
-                        aria-label={`Chọn biến thể ${variant.displayLabel || variant.sku}`}
-                      />
-                    </td>
-                    <td>
-                      {variant.imageUrl ? (
-                        <Image src={variant.imageUrl} alt="" width={40} height={40} className="admin-variant-thumb" />
-                      ) : (
-                        <span className="admin-field-hint">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="admin-variant-cell-wrap" title={variant.displayLabel || undefined}>
-                        {variant.displayLabel || "—"}
-                      </div>
-                      {variant.variantStatus !== "ACTIVE" && (
-                        <span className={variantStatusBadgeClass(variant.variantStatus)}>
-                          {variantStatusLabel(variant.variantStatus)}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="admin-variant-option-list">
-                        {variant.optionValueIds.map((valueId) => (
-                          <span key={valueId} className="admin-variant-option-chip">
-                            {getOptionValueLabel(valueId)}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>
-                      {manualSkuKeys.has(variant.clientKey) || variant.sku.trim() ? (
-                        <>
-                          <input
-                            className={`form-input admin-variant-cell-truncate${fieldErrors[`variants.${variantIndex}.sku`] ? " admin-input--error" : ""}`}
-                            value={variant.sku}
-                            title={variant.sku}
-                            data-field={variantIndex >= 0 ? `variants.${variantIndex}.sku` : undefined}
-                            onChange={(e) => updateVariant(variant.clientKey, { sku: e.target.value })}
-                            placeholder={productCode ? "SKU thủ công" : ""}
-                          />
-                          {fieldErrors[`variants.${variantIndex}.sku`] && (
-                            <p className="admin-field-error" role="alert">
-                              {fieldErrors[`variants.${variantIndex}.sku`]}
-                            </p>
-                          )}
-                        </>
-                      ) : (
-                        <div className="admin-variant-sku-auto">
-                          <span className="admin-field-hint">Tự sinh khi lưu</span>
-                          <button
-                            type="button"
-                            className="btn-tertiary btn-sm"
-                            onClick={() =>
-                              setManualSkuKeys((prev) => new Set(prev).add(variant.clientKey))
-                            }
-                          >
-                            Chỉnh mã thủ công
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <select
-                        className="form-input"
-                        value={variant.variantStatus}
-                        onChange={(e) => updateVariant(variant.clientKey, { variantStatus: e.target.value })}
-                      >
-                        {renderVariantStatusOptions()}
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        className="form-input"
-                        type="number"
-                        min="0"
-                        value={variant.stockQty}
-                        onChange={(e) => updateVariant(variant.clientKey, { stockQty: e.target.value })}
-                      />
-                      <span className="admin-stock-status-hint">
-                        {STOCK_STATUS_LABELS[variant.stockStatus] ?? variant.stockStatus}
-                        {variant.stockQty.trim() === "" || variant.stockQty === "0"
-                          ? " · SL: 0"
-                          : ` · SL: ${variant.stockQty}`}
-                      </span>
-                      <select
-                        className="form-input"
-                        value={variant.stockStatus}
-                        onChange={(e) => updateVariant(variant.clientKey, { stockStatus: e.target.value })}
-                        aria-label="Trạng thái tồn kho"
-                      >
-                        <option value="IN_STOCK">Còn hàng</option>
-                        <option value="LOW_STOCK">Sắp hết</option>
-                        <option value="OUT_OF_STOCK">Hết hàng</option>
-                        <option value="PREORDER">Đặt trước</option>
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        className={`form-input${variant.moqOverride.trim() ? " admin-field-overridden" : " admin-field-inherited"}`}
-                        type="number"
-                        value={variant.moqOverride}
-                        onChange={(e) => updateVariant(variant.clientKey, { moqOverride: e.target.value })}
-                        placeholder={defaultMoq ? `Kế thừa (${defaultMoq})` : "Kế thừa MOQ SP"}
-                      />
-                      {!variant.moqOverride.trim() && (
-                        <span className="admin-field-inherit-hint">Kế thừa</span>
-                      )}
-                    </td>
-                    <td>
-                      <input
-                        className={`form-input${variant.leadTimeOverride.trim() ? " admin-field-overridden" : " admin-field-inherited"}`}
-                        value={variant.leadTimeOverride}
-                        onChange={(e) => updateVariant(variant.clientKey, { leadTimeOverride: e.target.value })}
-                        placeholder={defaultLeadTime ? `Kế thừa (${defaultLeadTime})` : "Kế thừa lead time SP"}
-                      />
-                      {!variant.leadTimeOverride.trim() && (
-                        <span className="admin-field-inherit-hint">Kế thừa</span>
-                      )}
-                    </td>
-                    <td>
-                      <input
-                        className="form-input"
-                        type="number"
-                        value={variant.wholesalePrice}
-                        onChange={(e) => updateVariant(variant.clientKey, { wholesalePrice: e.target.value })}
-                        placeholder="Giá sỉ"
-                      />
-                    </td>
-                    <td>{renderVariantActions(variant)}</td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {editingKey && (
-          <div className="admin-variant-edit-panel">
-            {(() => {
-              const variant = variants.find((item) => item.clientKey === editingKey);
-              if (!variant || variant.variantKind !== "structured") return null;
-              return (
-                <>
-                  <h4>Chỉnh sửa biến thể</h4>
-                  <div className="admin-spec-row">
-                    <label className="admin-label">Chọn giá trị từng nhóm</label>
-                    {optionGroups.map((group) => (
-                      <select
-                        key={group.clientKey}
-                        className="form-input"
-                        value={
-                          variant.optionValueIds.find((valueId) =>
-                            group.values.some(
-                              (value) => value.id === valueId || value.clientKey === valueId,
-                            ),
-                          ) ?? ""
-                        }
-                        onChange={(e) => {
-                          const nextIds = variant.optionValueIds.filter(
-                            (valueId) =>
-                              !group.values.some(
-                                (value) => value.id === valueId || value.clientKey === valueId,
-                              ),
-                          );
-                          if (e.target.value) nextIds.push(e.target.value);
-                          const labels = nextIds.map((valueId) => {
-                            for (const g of optionGroups) {
-                              const val = g.values.find(
-                                (item) => item.id === valueId || item.clientKey === valueId,
-                              );
-                              if (val) return val.label;
-                            }
-                            return "";
-                          });
-                          updateVariant(variant.clientKey, {
-                            optionValueIds: nextIds,
-                            displayLabel: labels.filter(Boolean).join(" / "),
-                          });
-                        }}
-                      >
-                        <option value="">{group.name}</option>
-                        {group.values.map((value) => (
-                          <option key={value.clientKey} value={value.id ?? value.clientKey}>
-                            {value.label}
-                          </option>
-                        ))}
-                      </select>
-                    ))}
-                  </div>
-                  <MediaPicker
-                    value={variant.imageUrl}
-                    onChange={(url) => updateVariant(variant.clientKey, { imageUrl: url })}
-                    label="Ảnh biến thể"
-                    folder="products"
-                  />
-                  <input
-                    className="form-input"
-                    value={variant.materialOverride}
-                    onChange={(e) => updateVariant(variant.clientKey, { materialOverride: e.target.value })}
-                    placeholder="Chất liệu riêng (tuỳ chọn)"
-                  />
-                </>
-              );
-            })()}
-          </div>
+          <VariantMatrixView
+            variants={variants}
+            filteredVariants={filteredStructuredVariants}
+            optionGroups={optionGroups}
+            fieldErrors={fieldErrors}
+            productCode={productCode}
+            defaultMoq={defaultMoq}
+            defaultLeadTime={defaultLeadTime}
+            selectedKeys={selectedKeys}
+            manualSkuKeys={manualSkuKeys}
+            allVisibleSelected={allVisibleSelected}
+            actionLoadingKey={actionLoadingKey}
+            onToggleSelect={toggleSelect}
+            onToggleSelectAll={toggleSelectAllVisible}
+            onUpdateVariant={updateVariant}
+            onEnableManualSku={(clientKey) =>
+              setManualSkuKeys((prev) => new Set(prev).add(clientKey))
+            }
+            onOpenLifecycle={(clientKey) => void openLifecycleDialog(clientKey)}
+            getOptionValueLabel={getOptionValueLabel}
+          />
         )}
       </section>
+
 
       <section className="admin-product-section">
         <div className="admin-section-head">
@@ -1088,7 +862,7 @@ export default function ProductCatalogVariantsSection({
                       {variantStatusLabel(variant.variantStatus)}
                     </span>
                   )}
-                  {renderVariantActions(variant)}
+                  {renderLegacyVariantActions(variant)}
                 </div>
                 <div className="admin-catalog-variant-fields">
                   <input className="form-input" value={variant.colorName} placeholder="Màu sắc" onChange={(e) => updateVariant(variant.clientKey, { colorName: e.target.value })} />

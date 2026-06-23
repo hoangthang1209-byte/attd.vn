@@ -109,7 +109,13 @@ function parseVariant(raw: unknown, index: number): VariantInput {
 
   const v = raw as Record<string, unknown>;
   const fieldErrors: Record<string, string> = {};
-  const prefix = `variants.${index}`;
+  const id = v.id ? String(v.id) : undefined;
+  const clientKey = v.clientKey ? String(v.clientKey) : undefined;
+  const prefix = id
+    ? `variants.byId.${id}`
+    : clientKey
+      ? `variants.byClientKey.${clientKey}`
+      : `variants.${index}`;
 
   const imageUrl = normalizeImageUrl(
     v.imageUrl ?? v.featuredImage,
@@ -152,7 +158,8 @@ function parseVariant(raw: unknown, index: number): VariantInput {
   }
 
   return {
-    id: v.id ? String(v.id) : undefined,
+    id,
+    clientKey,
     sku: v.sku ? String(v.sku).trim() : undefined,
     colorName: v.colorName ? String(v.colorName).trim() : undefined,
     colorCode: v.colorCode ? String(v.colorCode).trim() : undefined,

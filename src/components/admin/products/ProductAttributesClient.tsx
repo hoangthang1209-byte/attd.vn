@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import AttributePresetDialog from "@/components/admin/products/AttributePresetDialog";
 
 type DisplayType = "TEXT" | "COLOR_SWATCH" | "SIZE" | "SELECT" | "IMAGE_SWATCH";
 type Status = "ACTIVE" | "INACTIVE";
@@ -102,6 +103,8 @@ export default function ProductAttributesClient() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [presetDialogOpen, setPresetDialogOpen] = useState(false);
+  const attributeSectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -123,12 +126,16 @@ export default function ProductAttributesClient() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  async function seedDefaults() {
-    setMessage(null);
-    const res = await fetch("/api/admin/attributes/seed", { method: "POST" });
-    const data = await res.json() as { message?: string };
-    setMessage(data.message ?? "Đã tạo thuộc tính mặc định.");
-    void load();
+  function focusAttribute(attributeId: string) {
+    const section = attributeSectionRefs.current[attributeId];
+    section?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function handlePresetSuccess(attributeId: string, successMessage: string) {
+    setMessage(successMessage);
+    setError(null);
+    await load();
+    window.setTimeout(() => focusAttribute(attributeId), 100);
   }
 
   async function handleAttributeSubmit(e: React.FormEvent) {
@@ -274,8 +281,8 @@ export default function ProductAttributesClient() {
     <div className="admin-catalog-page">
       <div className="admin-catalog-toolbar">
         <div className="admin-catalog-toolbar-left">
-          <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void seedDefaults()}>
-            Tạo bộ mặc định COLOR / SIZE / FIT
+          <button type="button" className="admin-btn admin-btn--primary" onClick={() => setPresetDialogOpen(true)}>
+            Tạo từ bộ mặc định
           </button>
         </div>
         <label className="admin-catalog-toggle">
@@ -283,6 +290,10 @@ export default function ProductAttributesClient() {
           Hiện thuộc tính ngừng sử dụng
         </label>
       </div>
+
+      <p className="admin-field-hint">
+        Thuộc tính đang hoạt động sẽ xuất hiện trong phần &quot;Thuộc tính &amp; biến thể&quot; khi tạo hoặc sửa sản phẩm.
+      </p>
 
       {message && <p className="admin-success">{message}</p>}
       {error && <p className="admin-error" role="alert">{error}</p>}
@@ -421,7 +432,11 @@ export default function ProductAttributesClient() {
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {attributes.map((attribute) => {
             return (
-              <section key={attribute.id} className="admin-product-section">
+              <section
+                key={attribute.id}
+                ref={(node) => { attributeSectionRefs.current[attribute.id] = node; }}
+                className="admin-product-section"
+              >
                 <div className="admin-section-head">
                   <div>
                     <h3 className="admin-subtitle" style={{ marginBottom: 4 }}>{attribute.name}</h3>
@@ -512,6 +527,15 @@ export default function ProductAttributesClient() {
           })}
         </div>
       )}
+
+      <AttributePresetDialog
+        open={presetDialogOpen}
+        onClose={() => setPresetDialogOpen(false)}
+        onSuccess={(attributeId, successMessage) => void handlePresetSuccess(attributeId, successMessage)}
+        onOpenExisting={(attributeId) => {
+          void load().then(() => focusAttribute(attributeId));
+        }}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import {
   generateOptionGroupSlug,
@@ -38,6 +39,8 @@ export type SharedAttributePickerOption = {
   code: string;
   slug: string;
   displayType: string;
+  isVariantAttribute?: boolean;
+  isSpecificationAttribute?: boolean;
   values: Array<{
     id: string;
     name: string;
@@ -53,6 +56,9 @@ export type SharedAttributePickerOption = {
 type Props = {
   groups: OptionGroupFormRow[];
   sharedAttributes?: SharedAttributePickerOption[];
+  sharedAttributesLoading?: boolean;
+  sharedAttributesError?: string | null;
+  onRefreshSharedAttributes?: () => void;
   variantUsageByValueId: Record<string, number>;
   fieldErrors?: Record<string, string>;
   onChange: (groups: OptionGroupFormRow[]) => void;
@@ -61,12 +67,29 @@ type Props = {
 export default function ProductOptionGroupBuilder({
   groups,
   sharedAttributes = [],
+  sharedAttributesLoading = false,
+  sharedAttributesError = null,
+  onRefreshSharedAttributes,
   variantUsageByValueId,
   fieldErrors = {},
   onChange,
 }: Props) {
   const [selectedAttributeId, setSelectedAttributeId] = useState("");
   const [selectedSharedValueIds, setSelectedSharedValueIds] = useState<Set<string>>(new Set());
+  const [valueSearch, setValueSearch] = useState("");
+
+  const selectedAttribute = useMemo(
+    () => sharedAttributes.find((item) => item.id === selectedAttributeId) ?? null,
+    [sharedAttributes, selectedAttributeId],
+  );
+
+  const activeValues = useMemo(() => {
+    if (!selectedAttribute) return [];
+    const q = valueSearch.trim().toLowerCase();
+    return selectedAttribute.values
+      .filter((value) => value.status === "ACTIVE")
+      .filter((value) => !q || value.name.toLowerCase().includes(q) || value.code.toLowerCase().includes(q));
+  }, [selectedAttribute, valueSearch]);
 
   function updateGroup(index: number, patch: Partial<OptionGroupFormRow>) {
     const next = [...groups];
@@ -90,6 +113,7 @@ export default function ProductOptionGroupBuilder({
   function addSharedGroup() {
     const attribute = sharedAttributes.find((item) => item.id === selectedAttributeId);
     if (!attribute) return;
+    if (!attribute.isVariantAttribute) return;
     const selectedValues = attribute.values.filter((value) => selectedSharedValueIds.has(value.id));
     if (!selectedValues.length) return;
     const existingGroup = groups.find((group) => group.attributeId === attribute.id);
@@ -238,84 +262,151 @@ export default function ProductOptionGroupBuilder({
     });
   }
 
+  const usedAttributeIds = new Set(groups.map((group) => group.attributeId).filter(Boolean));
+
   return (
-    <section className="admin-product-section">
+    <section className="admin-product-section admin-product-attr-guided">
       <div className="admin-section-head">
-        <h3>Nhóm biến thể sản phẩm</h3>
-        <button type="button" className="btn-secondary btn-sm" onClick={addGroup}>
-          Tạo thuộc tính riêng cho sản phẩm
-        </button>
+        <h3>Thuộc tính &amp; biến thể</h3>
       </div>
 
-      {sharedAttributes.length > 0 && (
-        <div className="admin-shared-attribute-picker">
-          <div className="admin-field">
-            <label className="admin-label">Thêm từ thuộc tính chung</label>
-            <select
-              className="admin-input"
-              value={selectedAttributeId}
-              onChange={(e) => {
-                setSelectedAttributeId(e.target.value);
-                setSelectedSharedValueIds(new Set());
-              }}
-            >
-              <option value="">— Chọn thuộc tính —</option>
-              {sharedAttributes.map((attribute) => (
-                <option key={attribute.id} value={attribute.id}>
-                  {attribute.name} ({attribute.code})
-                </option>
-              ))}
-            </select>
-          </div>
-          {selectedAttributeId && (
-            <div className="admin-shared-attribute-values">
-              {sharedAttributes
-                .find((attribute) => attribute.id === selectedAttributeId)
-                ?.values.filter((value) => value.status === "ACTIVE")
-                .map((value) => {
-                  const checked = selectedSharedValueIds.has(value.id);
-                  return (
-                    <label key={value.id} className="admin-shared-attribute-value">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          setSelectedSharedValueIds((prev) => {
-                            const next = new Set(prev);
-                            if (e.target.checked) next.add(value.id);
-                            else next.delete(value.id);
-                            return next;
-                          });
-                        }}
-                      />
-                      {value.hexCode && (
-                        <span
-                          className="admin-shared-attribute-swatch"
-                          style={{ background: value.hexCode }}
-                          aria-hidden="true"
-                        />
-                      )}
-                      <span>{value.name}</span>
-                      <code>{value.code}</code>
-                    </label>
-                  );
-                })}
-              <button
-                type="button"
-                className="btn-secondary btn-sm"
-                onClick={addSharedGroup}
-                disabled={selectedSharedValueIds.size === 0}
-              >
-                Thêm giá trị đã chọn
-              </button>
-            </div>
+      <div className="admin-product-attr-step">
+        <h4 className="admin-subtitle">1. Chọn thuộc tính dùng chung</h4>
+        <div className="admin-product-attr-step-actions">
+          <button
+            type="button"
+            className="btn-primary btn-sm"
+            disabled={sharedAttributesLoading || sharedAttributes.length === 0}
+            onClick={() => {
+              const first = sharedAttributes.find((item) => item.isVariantAttribute && !usedAttributeIds.has(item.id));
+              if (first) setSelectedAttributeId(first.id);
+            }}
+          >
+            Thêm thuộc tính dùng chung
+          </button>
+          <button type="button" className="btn-secondary btn-sm" onClick={addGroup}>
+            Tạo thuộc tính riêng cho sản phẩm
+          </button>
+          {onRefreshSharedAttributes && (
+            <button type="button" className="btn-tertiary btn-sm" onClick={onRefreshSharedAttributes}>
+              Làm mới danh sách thuộc tính
+            </button>
           )}
+        </div>
+        <p className="admin-field-hint">
+          Thuộc tính riêng chỉ dùng cho sản phẩm này và không xuất hiện trong danh mục thuộc tính chung.
+        </p>
+
+        {sharedAttributesLoading && <p className="admin-field-hint">Đang tải thuộc tính dùng chung…</p>}
+        {sharedAttributesError && <p className="admin-error" role="alert">{sharedAttributesError}</p>}
+
+        {!sharedAttributesLoading && sharedAttributes.length === 0 && (
+          <div className="admin-shared-attribute-empty">
+            <p>Chưa có thuộc tính dùng chung.</p>
+            <Link href="/admin/attributes" className="btn-secondary btn-sm">
+              Quản lý thuộc tính sản phẩm
+            </Link>
+          </div>
+        )}
+
+        {sharedAttributes.length > 0 && (
+          <div className="admin-shared-attribute-card-grid">
+            {sharedAttributes.map((attribute) => {
+              const activeCount = attribute.values.filter((value) => value.status === "ACTIVE").length;
+              const isSelected = selectedAttributeId === attribute.id;
+              const isUsed = usedAttributeIds.has(attribute.id);
+              return (
+                <button
+                  key={attribute.id}
+                  type="button"
+                  className={`admin-shared-attribute-card${isSelected ? " admin-shared-attribute-card--selected" : ""}${isUsed ? " admin-shared-attribute-card--used" : ""}`}
+                  onClick={() => {
+                    setSelectedAttributeId(attribute.id);
+                    setSelectedSharedValueIds(new Set());
+                    setValueSearch("");
+                  }}
+                >
+                  <strong>{attribute.name}</strong>
+                  <code className="admin-catalog-code">{attribute.code}</code>
+                  <span className="admin-field-hint">{activeCount} giá trị đang hoạt động</span>
+                  <div className="admin-attribute-preset-badges">
+                    {attribute.isVariantAttribute && (
+                      <span className="admin-kb-badge admin-kb-badge--verified">Dùng tạo biến thể</span>
+                    )}
+                    {attribute.isSpecificationAttribute && (
+                      <span className="admin-kb-badge">Dùng làm thông số</span>
+                    )}
+                  </div>
+                  {isUsed && <span className="admin-field-hint">Đã thêm vào sản phẩm</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {selectedAttribute && (
+        <div className="admin-product-attr-step">
+          <h4 className="admin-subtitle">2. Chọn giá trị áp dụng — {selectedAttribute.name}</h4>
+          <span className="admin-kb-badge admin-kb-badge--verified">Thuộc tính dùng chung</span>
+          {!selectedAttribute.isVariantAttribute && (
+            <p className="admin-field-hint admin-shared-attribute-conflict-hint">
+              Thuộc tính này dùng làm thông số sản phẩm, không dùng để tạo tổ hợp biến thể.
+            </p>
+          )}
+          <input
+            className="form-input"
+            value={valueSearch}
+            onChange={(e) => setValueSearch(e.target.value)}
+            placeholder="Tìm giá trị…"
+          />
+          <div className="admin-shared-attribute-values admin-shared-attribute-values--guided">
+            {activeValues.map((value) => {
+              const checked = selectedSharedValueIds.has(value.id);
+              const isColor = selectedAttribute.displayType === "COLOR_SWATCH";
+              const isSize = selectedAttribute.displayType === "SIZE";
+              return (
+                <label
+                  key={value.id}
+                  className={`admin-shared-attribute-value${isSize ? " admin-shared-attribute-value--size" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!selectedAttribute.isVariantAttribute}
+                    onChange={(e) => {
+                      setSelectedSharedValueIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(value.id);
+                        else next.delete(value.id);
+                        return next;
+                      });
+                    }}
+                  />
+                  {isColor && value.hexCode && (
+                    <span className="admin-shared-attribute-swatch" style={{ background: value.hexCode }} aria-hidden />
+                  )}
+                  <span>{value.name}</span>
+                  <code>{value.code}</code>
+                </label>
+              );
+            })}
+          </div>
+          <p className="admin-field-hint">Đã chọn {selectedSharedValueIds.size} giá trị</p>
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={addSharedGroup}
+            disabled={!selectedAttribute.isVariantAttribute || selectedSharedValueIds.size === 0}
+          >
+            Thêm giá trị đã chọn
+          </button>
         </div>
       )}
 
       {groups.length === 0 ? (
         <p className="admin-empty-hint">
-          Chưa có nhóm biến thể. Thêm Màu sắc, Kích thước hoặc thuộc tính riêng cho sản phẩm này.
+          Chưa có nhóm biến thể. Thêm Màu sắc, Kích thước từ thuộc tính dùng chung hoặc tạo thuộc tính riêng.
         </p>
       ) : (
         <div className="admin-option-groups">
@@ -333,7 +424,7 @@ export default function ProductOptionGroupBuilder({
                   <strong>Nhóm #{groupIndex + 1}</strong>
                   {group.attributeId && (
                     <span className="admin-kb-badge admin-kb-badge--verified">
-                      Thuộc tính chung
+                      Thuộc tính dùng chung
                     </span>
                   )}
                   <div className="admin-spec-row-actions">
@@ -434,9 +525,11 @@ export default function ProductOptionGroupBuilder({
                   })}
                 </div>
 
-                <button type="button" className="btn-secondary btn-sm" onClick={() => addValue(groupIndex)}>
-                  Thêm giá trị
-                </button>
+                {!group.attributeId && (
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => addValue(groupIndex)}>
+                    Thêm giá trị
+                  </button>
+                )}
               </div>
             );
           })}
