@@ -19,12 +19,11 @@ import {
 } from "@/lib/productOptionSelection";
 import { formatPdpDescriptionContent } from "@/lib/formatPdpDescription";
 import { resolveQuoteVariantId } from "@/features/products/product-pdp.utils";
+import { mergeGalleryWithVariantImage } from "@/lib/productVariants";
 import {
-  appendVariantImagesToGallery,
-  buildInteractiveGalleryImages,
-  mergeGalleryWithVariantImage,
-} from "@/lib/productVariants";
-import { buildProductImageUrlSet } from "@/lib/productImageScope";
+  buildPdpImageAllowlist,
+  filterProductGalleryImages,
+} from "@/lib/productImageScope";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
 
 const STOCK_LABELS: Record<string, string> = {
@@ -107,7 +106,7 @@ export default function ProductDetailInteractive({
   const hasActiveVariants = variants.length > 0;
   const showVariantSelector = optionGroups.length > 0 && hasActiveVariants;
 
-  const productImageUrls = useMemo(() => buildProductImageUrlSet(images), [images]);
+  const productImageUrls = useMemo(() => buildPdpImageAllowlist({ images }), [images]);
 
   const displayImageUrl = useMemo(
     () => resolvePdpGalleryImageUrl(variants, optionGroups, selection, productImageUrls),
@@ -115,43 +114,12 @@ export default function ProductDetailInteractive({
   );
 
   const galleryImages = useMemo(() => {
-    const legacyVariants = variants.map((v) => ({
-      id: v.id,
-      sku: v.sku,
-      colorName: v.colorName,
-      colorCode: v.colorCode,
-      sizeName: v.sizeName,
-      dimensions: v.dimensions,
-      capacity: v.capacity,
-      stockStatus: v.stockStatus,
-      imageUrl: v.imageUrl,
-      stockQty: v.stockQty,
-    }));
-
-    const withVariants = appendVariantImagesToGallery(images, legacyVariants);
-
+    const base = filterProductGalleryImages(images, productImageUrls);
     if (displayImageUrl) {
-      return mergeGalleryWithVariantImage(withVariants, displayImageUrl);
+      return mergeGalleryWithVariantImage(base, displayImageUrl);
     }
-
-    const legacyVariant = selectedVariant
-      ? {
-          id: selectedVariant.id,
-          sku: selectedVariant.sku,
-          colorName: selectedVariant.colorName,
-          colorCode: selectedVariant.colorCode,
-          sizeName: selectedVariant.sizeName,
-          dimensions: selectedVariant.dimensions,
-          capacity: selectedVariant.capacity,
-          stockStatus: selectedVariant.stockStatus,
-          imageUrl: selectedVariant.imageUrl,
-          stockQty: selectedVariant.stockQty,
-        }
-      : null;
-
-    if (!legacyVariant) return withVariants;
-    return buildInteractiveGalleryImages(images, legacyVariants, legacyVariant, true);
-  }, [images, variants, selectedVariant, displayImageUrl]);
+    return base;
+  }, [images, displayImageUrl, productImageUrls]);
 
   const effectiveMoq = selectedVariant?.moq ?? product.defaultMoq;
   const effectiveLeadTime = selectedVariant?.leadTime ?? product.leadTime;

@@ -1,4 +1,9 @@
 import { buildProductImages } from "@/lib/productImages";
+import {
+  buildPdpImageAllowlist,
+  filterProductGalleryImages,
+  acceptProductScopedImageUrl,
+} from "@/lib/productImageScope";
 import type {
   ProductCustomizationRow,
   ProductOptionGroup,
@@ -270,6 +275,42 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     mapVariant(v, product.material, product.defaultMoq, product.leadTime, hasStructuredOptions),
   );
 
+  const canonicalAllowlist = buildPdpImageAllowlist({
+    images: [],
+    featuredImage: product.featuredImage,
+    gallery: product.gallery,
+  });
+
+  const rawImages = buildProductImages(product);
+  const filteredImages = filterProductGalleryImages(rawImages, canonicalAllowlist);
+  const images =
+    filteredImages.length > 0
+      ? filteredImages
+      : buildProductImages({
+          images: [],
+          featuredImage: product.featuredImage,
+          gallery: product.gallery,
+        });
+
+  const allowlist = buildPdpImageAllowlist({
+    images,
+    featuredImage: product.featuredImage,
+    gallery: product.gallery,
+  });
+
+  const scopedVariants = variants.map((v) => ({
+    ...v,
+    imageUrl: acceptProductScopedImageUrl(v.imageUrl, allowlist),
+  }));
+
+  const scopedOptionGroups = optionGroups.map((group) => ({
+    ...group,
+    values: group.values.map((val) => ({
+      ...val,
+      imageUrl: acceptProductScopedImageUrl(val.imageUrl, allowlist),
+    })),
+  }));
+
   return {
     id: product.id,
     slug: product.slug,
@@ -291,9 +332,9 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     supportsOem: product.supportsOem,
     useCases: product.useCases ?? [],
     targetCustomers: product.targetCustomers ?? [],
-    images: buildProductImages(product),
-    optionGroups,
-    variants,
+    images,
+    optionGroups: scopedOptionGroups,
+    variants: scopedVariants,
     specifications,
     customizations,
     hasStructuredOptions,
