@@ -5,6 +5,7 @@ import {
   uploadMediaAsset,
   uploadProductionFileAsset,
 } from "@/features/media/services/media.service";
+import { CLOUDINARY_CONFIG_ERROR } from "@/lib/storage";
 import { STORAGE_FOLDER_TO_MEDIA, type StorageFolderKey } from "@/lib/storage/types";
 
 const VALID_FOLDERS = Object.keys(STORAGE_FOLDER_TO_MEDIA) as StorageFolderKey[];
@@ -101,7 +102,12 @@ export async function POST(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload thất bại";
     console.error("[api/media] POST failed:", err);
-    const status = message.includes("configured") || message.includes("TOKEN") ? 500 : 400;
+    const status =
+      message === CLOUDINARY_CONFIG_ERROR ||
+      message.includes("configured") ||
+      message.includes("TOKEN")
+        ? 500
+        : 400;
     return NextResponse.json({ message }, { status });
   }
 }

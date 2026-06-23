@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
@@ -17,48 +17,73 @@ type Props = {
 };
 
 export default function ProductGallery({ images, productName, selectedImageUrl }: Props) {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [manualPick, setManualPick] = useState<{ key: string; index: number } | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const thumbRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const gallery = getProductGalleryImages(images);
-  const total = gallery.length;
+  const gallery = useMemo(() => {
+    return getProductGalleryImages(images).filter((img) => isValidImageSrc(img.imageUrl));
+  }, [images]);
+
   const galleryKey = gallery.map((img) => img.imageUrl).join("|");
+  const total = gallery.length;
 
-  useEffect(() => {
-    if (selectedIndex >= total && total > 0) setSelectedIndex(0);
-  }, [selectedIndex, total]);
+  const clampIndex = useCallback(
+    (index: number) => {
+      if (total === 0) return 0;
+      return Math.max(0, Math.min(index, total - 1));
+    },
+    [total],
+  );
 
-  useEffect(() => {
-    if (total === 0) return;
+  const selectedIndex = useMemo(() => {
+    if (manualPick && manualPick.key === galleryKey) {
+      return clampIndex(manualPick.index);
+    }
 
     if (selectedImageUrl && isValidImageSrc(selectedImageUrl)) {
       const idx = gallery.findIndex((img) => img.imageUrl === selectedImageUrl);
-      setSelectedIndex(idx >= 0 ? idx : 0);
-      return;
+      if (idx >= 0) return idx;
     }
 
-    setSelectedIndex(0);
-  }, [selectedImageUrl, galleryKey, total, gallery]);
+    return 0;
+  }, [manualPick, galleryKey, gallery, selectedImageUrl, clampIndex]);
 
-  function goTo(index: number) {
-    if (total === 0) return;
-    const next = (index + total) % total;
-    setSelectedIndex(next);
-    thumbRefs.current[next]?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
-    });
-  }
+  const goTo = useCallback(
+    (index: number) => {
+      if (total === 0) return;
+      const next = (index + total) % total;
+      setManualPick({ key: galleryKey, index: next });
+      thumbRefs.current[next]?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    },
+    [galleryKey, total],
+  );
+
+  const handleMainKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (total <= 1) return;
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        goTo(selectedIndex - 1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        goTo(selectedIndex + 1);
+      }
+    },
+    [goTo, selectedIndex, total],
+  );
 
   if (total === 0) {
     return (
-      <div className="mp-pdp-gallery mp-pdp-gallery--empty">
+      <div className="mp-pdp-gallery mp-pdp-gallery--empty" aria-label="Ảnh sản phẩm">
         <ProductMediaFrame
           alt={productName}
           placeholderLabel={productName}
-          sizes="(max-width: 1024px) 100vw, 44vw"
+          sizes="(max-width: 1024px) 100vw, 42vw"
         />
       </div>
     );
@@ -67,17 +92,15 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
   const selected = gallery[selectedIndex] ?? gallery[0];
   const selectedSrc = selected?.imageUrl;
   const mainAlt =
-    total > 1
-      ? `${productName} — ảnh ${selectedIndex + 1}`
-      : productName;
+    total > 1 ? `${productName} — ảnh ${selectedIndex + 1}` : productName;
 
-  if (!selectedSrc || !isValidImageSrc(selectedSrc)) {
+  if (!selectedSrc) {
     return (
-      <div className="mp-pdp-gallery mp-pdp-gallery--empty">
+      <div className="mp-pdp-gallery mp-pdp-gallery--empty" aria-label="Ảnh sản phẩm">
         <ProductMediaFrame
           alt={productName}
           placeholderLabel={productName}
-          sizes="(max-width: 1024px) 100vw, 44vw"
+          sizes="(max-width: 1024px) 100vw, 42vw"
         />
       </div>
     );
@@ -85,20 +108,27 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
 
   return (
     <>
-      <div className="mp-pdp-gallery">
+      <div className="mp-pdp-gallery" aria-label="Thư viện ảnh sản phẩm">
         {total > 1 && (
-          <div className="mp-pdp-gallery-thumbs mp-pdp-gallery-thumbs--vertical" role="list">
+          <div
+            className="mp-pdp-gallery-thumbs"
+            role="tablist"
+            aria-label="Ảnh thu nhỏ"
+          >
             {gallery.map((image, index) => {
-              if (!isValidImageSrc(image.imageUrl)) return null;
               const isSelected = index === selectedIndex;
               return (
                 <button
-                  key={image.id ?? index}
-                  ref={(el) => { thumbRefs.current[index] = el; }}
+                  key={image.id ?? `thumb-${index}`}
+                  ref={(el) => {
+                    thumbRefs.current[index] = el;
+                  }}
                   type="button"
-                  role="listitem"
+                  role="tab"
+                  id={`pdp-gallery-thumb-${index}`}
                   aria-label={`Xem ảnh ${index + 1}`}
-                  aria-pressed={isSelected}
+                  aria-selected={isSelected}
+                  tabIndex={isSelected ? 0 : -1}
                   className={`mp-pdp-gallery-thumb${isSelected ? " mp-pdp-gallery-thumb--active" : ""}`}
                   onClick={() => goTo(index)}
                 >
@@ -115,80 +145,57 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
           </div>
         )}
 
-        <div className="mp-pdp-gallery-main-wrap">
-          <button
-            type="button"
-            className="mp-pdp-gallery-main"
-            onClick={() => setLightboxOpen(true)}
-            aria-label="Phóng to ảnh sản phẩm"
-          >
-            <Image
-              src={selectedSrc}
-              alt={selected.altText ?? mainAlt}
-              fill
-              className="mp-pdp-gallery-main-img"
-              sizes="(max-width: 1024px) 100vw, 44vw"
-              priority
-            />
-            <span className="mp-pdp-gallery-zoom-hint" aria-hidden>
-              <ZoomIn size={18} />
-            </span>
-            {total > 1 && (
-              <span className="mp-pdp-gallery-counter" aria-hidden>
-                {selectedIndex + 1} / {total}
+        <div className="mp-pdp-gallery-stage">
+          <div className="mp-pdp-gallery-main-wrap">
+            <button
+              type="button"
+              className="mp-pdp-gallery-main"
+              onClick={() => setLightboxOpen(true)}
+              onKeyDown={handleMainKeyDown}
+              aria-label="Phóng to ảnh sản phẩm"
+              aria-describedby={total > 1 ? `pdp-gallery-thumb-${selectedIndex}` : undefined}
+            >
+              <Image
+                key={selectedSrc}
+                src={selectedSrc}
+                alt={selected.altText ?? mainAlt}
+                fill
+                className="mp-pdp-gallery-main-img"
+                sizes="(max-width: 1024px) 100vw, 42vw"
+                priority={selectedIndex === 0}
+              />
+              <span className="mp-pdp-gallery-zoom-hint" aria-hidden>
+                <ZoomIn size={18} />
               </span>
-            )}
-          </button>
+              {total > 1 && (
+                <span className="mp-pdp-gallery-counter" aria-hidden>
+                  {selectedIndex + 1} / {total}
+                </span>
+              )}
+            </button>
 
-          {total > 1 && (
-            <>
-              <button
-                type="button"
-                className="mp-pdp-gallery-nav mp-pdp-gallery-nav--prev"
-                aria-label="Ảnh trước"
-                onClick={() => goTo(selectedIndex - 1)}
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                type="button"
-                className="mp-pdp-gallery-nav mp-pdp-gallery-nav--next"
-                aria-label="Ảnh tiếp"
-                onClick={() => goTo(selectedIndex + 1)}
-              >
-                <ChevronRight size={20} />
-              </button>
-            </>
-          )}
-        </div>
-
-        {total > 1 && (
-          <div className="mp-pdp-gallery-thumbs mp-pdp-gallery-thumbs--horizontal" role="list">
-            {gallery.map((image, index) => {
-              if (!isValidImageSrc(image.imageUrl)) return null;
-              const isSelected = index === selectedIndex;
-              return (
+            {total > 1 && (
+              <>
                 <button
-                  key={`m-${image.id ?? index}`}
                   type="button"
-                  role="listitem"
-                  aria-label={`Xem ảnh ${index + 1}`}
-                  aria-pressed={isSelected}
-                  className={`mp-pdp-gallery-thumb${isSelected ? " mp-pdp-gallery-thumb--active" : ""}`}
-                  onClick={() => goTo(index)}
+                  className="mp-pdp-gallery-nav mp-pdp-gallery-nav--prev"
+                  aria-label="Ảnh trước"
+                  onClick={() => goTo(selectedIndex - 1)}
                 >
-                  <Image
-                    src={image.imageUrl}
-                    alt=""
-                    fill
-                    sizes="64px"
-                    className="mp-pdp-gallery-thumb-img"
-                  />
+                  <ChevronLeft size={20} />
                 </button>
-              );
-            })}
+                <button
+                  type="button"
+                  className="mp-pdp-gallery-nav mp-pdp-gallery-nav--next"
+                  aria-label="Ảnh tiếp"
+                  onClick={() => goTo(selectedIndex + 1)}
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {lightboxOpen && (
@@ -228,6 +235,7 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
           )}
           <div className="mp-pdp-lightbox-img-wrap">
             <Image
+              key={`lb-${selectedSrc}`}
               src={selectedSrc}
               alt={selected.altText ?? mainAlt}
               fill

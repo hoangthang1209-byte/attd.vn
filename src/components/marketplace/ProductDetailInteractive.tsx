@@ -168,17 +168,17 @@ export default function ProductDetailInteractive({
 
             <div className="product-detail-center">
               <header className="product-detail-head">
-                <div className="mp-product-detail-meta">
-                  <Link href={`/${product.category?.slug ?? ""}`} className="mp-product-detail-cat">
+                <div className="mp-pdp-overview-meta">
+                  <Link href={`/${product.category?.slug ?? ""}`} className="mp-pdp-overview-cat">
                     {product.category?.name ?? "Sản phẩm"}
                   </Link>
                   {displayedCode && (
-                    <span className="mp-product-detail-code">Mã: {displayedCode}</span>
+                    <span className="mp-pdp-overview-code">Mã: {displayedCode}</span>
                   )}
                 </div>
-                <h1 className="mp-product-detail-title">{displayName}</h1>
+                <h1 className="mp-pdp-overview-title">{displayName}</h1>
                 {displayShortDescription && (
-                  <p className="mp-product-detail-summary">{displayShortDescription}</p>
+                  <p className="mp-pdp-overview-summary">{displayShortDescription}</p>
                 )}
               </header>
 
@@ -203,10 +203,16 @@ export default function ProductDetailInteractive({
                     </span>
                   </div>
                 )}
+                {product.supportsOem && (
+                  <div className="mp-pdp-core-fact">
+                    <span className="mp-pdp-core-fact-label">OEM</span>
+                    <span className="mp-pdp-core-fact-value">Hỗ trợ private label</span>
+                  </div>
+                )}
               </div>
 
               {customizations.length > 0 && (
-                <div className="mp-pdp-capability-chips">
+                <div className="mp-pdp-capability-chips" aria-label="Khả năng tùy chỉnh">
                   {customizations.map((item) => (
                     <span key={item.id} className="mp-pdp-capability-chip">
                       {item.label}
@@ -216,7 +222,7 @@ export default function ProductDetailInteractive({
               )}
 
               {showVariantSelector && (
-                <div className="product-detail-options">
+                <div className="mp-pdp-options-card product-detail-options">
                   <ProductDynamicOptionSelector
                     optionGroups={optionGroups}
                     variants={variants}
@@ -237,6 +243,31 @@ export default function ProductDetailInteractive({
                   <ProductSpecificationsSection rows={specifications} preview />
                 </div>
               )}
+
+              {(displayContent || specifications.length > 0 || customizations.length > 0) && (
+                <nav className="mp-pdp-overview-anchors" aria-label="Đi tới mục chi tiết">
+                  {specifications.length > 0 && (
+                    <a href="#mp-pdp-specs" className="mp-pdp-overview-anchor">
+                      Thông số
+                    </a>
+                  )}
+                  {displayContent && (
+                    <a href="#mp-pdp-desc" className="mp-pdp-overview-anchor">
+                      Mô tả
+                    </a>
+                  )}
+                  {customizations.length > 0 && (
+                    <a href="#mp-pdp-custom" className="mp-pdp-overview-anchor">
+                      Tùy chỉnh
+                    </a>
+                  )}
+                  {showFaqTab && (
+                    <a href="#mp-pdp-faq" className="mp-pdp-overview-anchor">
+                      FAQ
+                    </a>
+                  )}
+                </nav>
+              )}
             </div>
 
             <ProductPdpConversionPanel
@@ -250,9 +281,9 @@ export default function ProductDetailInteractive({
               onRequestQuote={openQuote}
             />
           </div>
-
-          <ProductDetailTabs tabs={anchorTabs} />
         </div>
+
+        <ProductDetailTabs tabs={anchorTabs} />
       </section>
 
       {specifications.length > 0 && (
@@ -260,14 +291,25 @@ export default function ProductDetailInteractive({
       )}
 
       {(displayContent || displayShortDescription) && (
-        <section className="mp-section mp-section--compact" id="mp-pdp-desc">
+        <section className="mp-section mp-pdp-section" id="mp-pdp-desc">
           <div className="container mp-pdp-desc">
-            <h2 className="mp-section-title">Mô tả sản phẩm</h2>
+            <header className="mp-pdp-section-head">
+              <h2 className="mp-pdp-section-title">Mô tả sản phẩm</h2>
+              <p className="mp-pdp-section-subtitle">
+                Thông tin chi tiết về chất liệu, ứng dụng và khả năng cung ứng B2B.
+              </p>
+            </header>
             <div className="mp-pdp-desc-content">
-              {displayShortDescription && (
-                <p className="product-desc-lead">{displayShortDescription}</p>
+              {displayShortDescription && !displayContent && (
+                <p className="mp-pdp-desc-lead">{displayShortDescription}</p>
               )}
-              {displayContent && <div className="product-desc-body">{displayContent}</div>}
+              {displayContent && (
+                <div className="mp-pdp-desc-body">
+                  {displayContent.split("\n\n").map((paragraph) => (
+                    <p key={paragraph.slice(0, 48)}>{paragraph}</p>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>

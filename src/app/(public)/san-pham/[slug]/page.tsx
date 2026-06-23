@@ -162,18 +162,25 @@ export default async function ProductDetailPage({ params }: PageProps) {
         showRelatedTab={relatedProducts.length > 0}
       />
 
-      <section className="mp-section mp-section--alt mp-section--compact" id="mp-pdp-faq">
-        <div className="container mp-product-faq">
-          <h2 className="mp-section-title">Hỏi đáp thường gặp</h2>
+      <section className="mp-section mp-pdp-section mp-pdp-section--alt" id="mp-pdp-faq">
+        <div className="container mp-pdp-faq">
+          <header className="mp-pdp-section-head">
+            <h2 className="mp-pdp-section-title">Hỏi đáp thường gặp</h2>
+            <p className="mp-pdp-section-subtitle">
+              Câu hỏi phổ biến từ đối tác B2B và đại lý đồng phục.
+            </p>
+          </header>
           <ProductFaqList items={faqItems} />
         </div>
       </section>
 
       <div id="mp-pdp-related">
         {relatedProducts.length > 0 && (
-          <section className="mp-section mp-section--compact">
+          <section className="mp-section mp-pdp-section">
             <div className="container">
-              <h2 className="mp-section-title">Sản phẩm liên quan</h2>
+              <header className="mp-pdp-section-head">
+                <h2 className="mp-pdp-section-title">Sản phẩm liên quan</h2>
+              </header>
               <div className="mp-product-grid mp-product-grid--compact">
                 {relatedProducts.map((related) => (
                   <ProductCard

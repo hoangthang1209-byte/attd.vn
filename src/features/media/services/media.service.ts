@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import type { MediaFolder, MediaUsageType } from "@prisma/client";
-import { getStorageAdapter } from "@/lib/storage";
+import {
+  deleteStoredMediaObject,
+  requireCloudinaryStorageAdapter,
+} from "@/lib/storage";
+import { classifyProductionFile } from "@/features/storage/file-classification";
 import {
   MAX_IMAGE_SIZE,
   LARGE_IMAGE_WARNING_SIZE,
@@ -66,8 +70,21 @@ export type UploadMediaResult = {
   warning?: string;
 };
 
+function assertNotR2SourceFile(filename: string, mimeType: string, sizeBytes: number): void {
+  const classification = classifyProductionFile({
+    filename,
+    mimeType,
+    fileSizeBytes: sizeBytes,
+  });
+  if (classification.storageProvider === "CLOUDFLARE_R2") {
+    throw new Error(ERROR_REQUIRES_PRODUCTION_UPLOAD);
+  }
+}
+
 export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadMediaResult> {
   const { folder, file, altText, title, tags, usageType } = input;
+
+  assertNotR2SourceFile(file.name, file.type, file.size);
 
   const validation = validateImageUpload({
     filename: file.name,
@@ -86,7 +103,7 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
     : undefined;
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const storage = getStorageAdapter();
+  const storage = requireCloudinaryStorageAdapter();
   const result = await storage.upload(folder, file.name, buffer, mimeType);
 
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
@@ -146,7 +163,7 @@ export async function uploadProductionFileAsset(input: {
 
   const mimeType = validation.mimeType;
   const buffer = Buffer.from(await file.arrayBuffer());
-  const storage = getStorageAdapter();
+  const storage = requireCloudinaryStorageAdapter();
   const result = await storage.upload("general", file.name, buffer, mimeType);
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
 
@@ -200,8 +217,7 @@ export async function deleteMediaAsset(id: string) {
   if (asset.storageProvider === "CLOUDFLARE_R2") {
     await deleteR2Object(asset.storageKey);
   } else {
-    const storage = getStorageAdapter();
-    await storage.delete(asset.url, asset.storageKey);
+    await deleteStoredMediaObject(asset.url, asset.storageKey, asset.storageProvider);
   }
 
   await prisma.mediaAsset.delete({ where: { id } });
