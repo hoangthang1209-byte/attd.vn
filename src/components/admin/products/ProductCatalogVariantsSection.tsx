@@ -31,6 +31,10 @@ import {
   VARIANT_MATRIX_CONFIRM_THRESHOLD,
   VARIANT_MATRIX_WARN_THRESHOLD,
 } from "@/features/products/product-variant-matrix.utils";
+import {
+  applyBulkResultToVariants,
+  type MatrixVariantFormRow,
+} from "@/features/products/product-catalog-form-mappers";
 
 function renderVariantStatusOptions() {
   return VARIANT_STATUS_OPTIONS.map((opt) => (
@@ -38,114 +42,6 @@ function renderVariantStatusOptions() {
       {opt.label}
     </option>
   ));
-}
-
-export type MatrixVariantFormRow = {
-  id?: string;
-  clientKey: string;
-  variantKind: "structured" | "legacy";
-  displayLabel: string;
-  optionValueIds: string[];
-  colorName: string;
-  colorCode: string;
-  sizeName: string;
-  dimensions: string;
-  capacity: string;
-  sku: string;
-  variantStatus: string;
-  stockQty: string;
-  stockStatus: string;
-  moqOverride: string;
-  leadTimeOverride: string;
-  materialOverride: string;
-  wholesalePrice: string;
-  dealerPrice: string;
-  imageUrl: string;
-  internalNote: string;
-};
-
-type AdminProductOption = {
-  id: string;
-  name: string;
-  slug: string;
-  sortOrder: number;
-  values: Array<{
-    id: string;
-    label: string;
-    valueCode: string | null;
-    imageUrl: string | null;
-    sortOrder: number;
-  }>;
-};
-
-type AdminProductVariant = {
-  id: string;
-  colorName: string | null;
-  colorCode: string | null;
-  sizeName: string | null;
-  dimensions: string | null;
-  capacity: string | null;
-  displayLabel: string | null;
-  moqOverride: number | null;
-  leadTimeOverride: string | null;
-  materialOverride: string | null;
-  wholesalePrice: number | null;
-  dealerPrice: number | null;
-  stockQty: number;
-  stockStatus: string;
-  variantStatus: string;
-  imageUrl: string | null;
-  internalNote: string | null;
-  sku: string;
-  optionValues?: Array<{ optionValueId: string }>;
-};
-
-export function mapOptionsToFormRows(options: AdminProductOption[]): OptionGroupFormRow[] {
-  return options.map((option) => ({
-    id: option.id,
-    clientKey: option.id,
-    name: option.name,
-    slug: option.slug,
-    sortOrder: option.sortOrder,
-    values: option.values.map((value) => ({
-      id: value.id,
-      clientKey: value.id,
-      label: value.label,
-      valueCode: value.valueCode ?? "",
-      imageUrl: value.imageUrl ?? "",
-      sortOrder: value.sortOrder,
-    })),
-  }));
-}
-
-export function mapVariantsToFormRows(variants: AdminProductVariant[]): MatrixVariantFormRow[] {
-  return variants.map((variant) => {
-    const optionValueIds = variant.optionValues?.map((link) => link.optionValueId) ?? [];
-    const isStructured = optionValueIds.length > 0;
-    return {
-      id: variant.id,
-      clientKey: variant.id,
-      variantKind: isStructured ? "structured" : "legacy",
-      displayLabel: variant.displayLabel ?? "",
-      optionValueIds,
-      colorName: variant.colorName ?? "",
-      colorCode: variant.colorCode ?? "",
-      sizeName: variant.sizeName ?? "",
-      dimensions: variant.dimensions ?? "",
-      capacity: variant.capacity ?? "",
-      sku: variant.sku,
-      variantStatus: variant.variantStatus,
-      stockQty: String(variant.stockQty),
-      stockStatus: variant.stockStatus,
-      moqOverride: variant.moqOverride != null ? String(variant.moqOverride) : "",
-      leadTimeOverride: variant.leadTimeOverride ?? "",
-      materialOverride: variant.materialOverride ?? "",
-      wholesalePrice: variant.wholesalePrice != null ? String(variant.wholesalePrice) : "",
-      dealerPrice: variant.dealerPrice != null ? String(variant.dealerPrice) : "",
-      imageUrl: variant.imageUrl ?? "",
-      internalNote: variant.internalNote ?? "",
-    };
-  });
 }
 
 type Props = {
@@ -161,43 +57,6 @@ type Props = {
   onVariantDeleted?: (variantId: string) => void;
   onBulkOperationChange?: (inProgress: boolean) => void;
 };
-
-export function applyBulkResultToVariants(
-  variants: MatrixVariantFormRow[],
-  result: BulkVariantResult,
-): MatrixVariantFormRow[] {
-  let next = variants;
-  if (result.deletedIds.length) {
-    const deleted = new Set(result.deletedIds);
-    next = next.filter((row) => !row.id || !deleted.has(row.id));
-  }
-  const updatedById = new Map(result.variants.map((variant) => [variant.id, variant]));
-  return next.map((row) => {
-    if (!row.id) return row;
-    const updated = updatedById.get(row.id);
-    if (!updated) return row;
-    const optionValueIds =
-      updated.optionValueIds.length > 0 ? updated.optionValueIds : row.optionValueIds;
-    return {
-      ...row,
-      variantKind: optionValueIds.length > 0 ? "structured" : row.variantKind,
-      displayLabel: updated.displayLabel ?? row.displayLabel,
-      sku: updated.sku,
-      variantStatus: updated.variantStatus,
-      stockQty: String(updated.stockQty),
-      stockStatus: updated.stockStatus,
-      moqOverride: updated.moqOverride != null ? String(updated.moqOverride) : "",
-      leadTimeOverride: updated.leadTimeOverride ?? "",
-      imageUrl: updated.imageUrl ?? "",
-      colorName: updated.colorName ?? row.colorName,
-      colorCode: updated.colorCode ?? row.colorCode,
-      sizeName: updated.sizeName ?? row.sizeName,
-      dimensions: updated.dimensions ?? row.dimensions,
-      capacity: updated.capacity ?? row.capacity,
-      optionValueIds,
-    };
-  });
-}
 
 function defaultStructuredVariant(): MatrixVariantFormRow {
   return {

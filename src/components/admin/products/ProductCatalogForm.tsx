@@ -10,11 +10,12 @@ import ProductCatalogSpecificationsSection, {
 import ProductCatalogContentSection, {
   type ProductCustomizationFormRow,
 } from "@/components/admin/products/ProductCatalogContentSection";
-import ProductCatalogVariantsSection, {
-  type MatrixVariantFormRow,
+import ProductCatalogVariantsSection from "@/components/admin/products/ProductCatalogVariantsSection";
+import {
   mapOptionsToFormRows,
   mapVariantsToFormRows,
-} from "@/components/admin/products/ProductCatalogVariantsSection";
+  type MatrixVariantFormRow,
+} from "@/features/products/product-catalog-form-mappers";
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
 import {
