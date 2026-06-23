@@ -11,6 +11,7 @@ import ProductCatalogContentSection, {
   type ProductCustomizationFormRow,
 } from "@/components/admin/products/ProductCatalogContentSection";
 import ProductCatalogVariantsSection from "@/components/admin/products/ProductCatalogVariantsSection";
+import type { SharedAttributePickerOption } from "@/components/admin/products/ProductOptionGroupBuilder";
 import {
   mapOptionsToFormRows,
   mapVariantsToFormRows,
@@ -19,13 +20,15 @@ import {
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
 import {
-  combinationSignature,
   resolveOptionValueRefFromGroups,
 } from "@/features/products/product-variant-matrix.utils";
+import {
+  fieldErrorInputClass,
+  resolveTabForField,
+  scrollToFirstFieldError,
+  validateProductCatalogFormLocal,
+} from "@/features/products/product-catalog-form-validation";
 import { useAdminMutation } from "@/hooks/useAdminAction";
-import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
-import { isValidImageUrl } from "@/features/products/product-admin-input";
-import { PRODUCT_IMAGE_URL_ERROR } from "@/features/products/product-image-url";
 
 type Category = { id: string; name: string; slug: string; skuCode: string | null };
 type AttributeOption = { id: string; type: string; name: string; code: string | null; value: string | null };
@@ -88,6 +91,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   const mutate = useAdminMutation();
   const [categories, setCategories] = useState<Category[]>(propCategories ?? []);
   const [attributes, setAttributes] = useState<AttrMap>({});
+  const [sharedAttributes, setSharedAttributes] = useState<SharedAttributePickerOption[]>([]);
   const [activeTab, setActiveTab] = useState<FormTabId>("basic");
   const [form, setForm] = useState<ProductFormData>({
     id: initialData?.id,
@@ -129,6 +133,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
   );
   const [categorySkuCode, setCategorySkuCode] = useState<string | null>(null);
   const [productCodePreviewError, setProductCodePreviewError] = useState<string | null>(null);
+  const [allowManualProductCode, setAllowManualProductCode] = useState(false);
   const deletedVariantIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -147,14 +152,23 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         }
         setAttributes(map);
       });
+    void fetch("/api/admin/attributes?activeOnly=1&variantOnly=1")
+      .then((r) => r.json())
+      .then((items: SharedAttributePickerOption[]) => {
+        setSharedAttributes(Array.isArray(items) ? items : []);
+      })
+      .catch(() => setSharedAttributes([]));
   }, [propCategories]);
 
   useEffect(() => {
     if (form.id || !form.categoryId) {
       if (!form.id) {
-        setProductCodePreview(null);
-        setCategorySkuCode(null);
-        setProductCodePreviewError(null);
+        const timer = window.setTimeout(() => {
+          setProductCodePreview(null);
+          setCategorySkuCode(null);
+          setProductCodePreviewError(null);
+        }, 0);
+        return () => window.clearTimeout(timer);
       }
       return;
     }
@@ -228,6 +242,14 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     setField("gallery", arr);
   }
 
+  function applyValidationErrors(errors: Record<string, string>, summaryMessage: string) {
+    setFieldErrors(errors);
+    const firstField = Object.keys(errors)[0];
+    if (firstField) setActiveTab(resolveTabForField(firstField));
+    setError(summaryMessage);
+    requestAnimationFrame(() => scrollToFirstFieldError(errors));
+  }
+
   function parseNumberField(value: string): number | undefined {
     const trimmed = value.trim();
     if (!trimmed) return undefined;
@@ -235,108 +257,15 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
     return Number.isFinite(n) ? n : undefined;
   }
 
-  function validateFormLocally(): Record<string, string> {
-    const errors: Record<string, string> = {};
-    if (!form.name.trim()) errors.name = "Tên sản phẩm là bắt buộc.";
-    if (!form.categoryId) errors.categoryId = "Vui lòng chọn danh mục.";
-
-    if (form.featuredImage.trim() && !isValidImageUrl(form.featuredImage)) {
-      errors.featuredImage = PRODUCT_IMAGE_URL_ERROR;
-    }
-
-    form.gallery.forEach((url, index) => {
-      if (url.trim() && !isValidImageUrl(url)) {
-        errors[`gallery.${index}`] = PRODUCT_IMAGE_URL_ERROR;
-      }
-    });
-
-    if (form.defaultMoq.trim() && parseNumberField(form.defaultMoq) === undefined) {
-      errors.defaultMoq = "MOQ phải là số.";
-    }
-
-    form.variants.forEach((v, index) => {
-      const prefix = `variants.${index}`;
-      if (v.wholesalePrice.trim() && parseNumberField(v.wholesalePrice) === undefined) {
-        errors[`${prefix}.wholesalePrice`] = "Giá sỉ phải là số.";
-      }
-      if (v.dealerPrice.trim() && parseNumberField(v.dealerPrice) === undefined) {
-        errors[`${prefix}.dealerPrice`] = "Giá đại lý phải là số.";
-      }
-      if (v.stockQty.trim() && !Number.isInteger(Number(v.stockQty))) {
-        errors[`${prefix}.stockQty`] = "Tồn kho phải là số.";
-      }
-      if (v.imageUrl.trim() && !isValidImageUrl(v.imageUrl)) {
-        errors[`${prefix}.imageUrl`] = PRODUCT_IMAGE_URL_ERROR;
-      }
-      if (v.variantKind === "structured" && v.optionValueIds.length === 0) {
-        errors[`${prefix}.optionValueIds`] = "Chọn ít nhất một giá trị thuộc tính cho biến thể.";
-      }
-    });
-
-    const structuredCombos = new Set<string>();
-    for (const variant of form.variants) {
-      if (variant.variantKind !== "structured" || !variant.optionValueIds.length) continue;
-      const refs = variant.optionValueIds.map((id) =>
-        resolveOptionValueRefFromGroups(form.options, id),
-      );
-      const signature = combinationSignature(refs);
-      if (structuredCombos.has(signature)) {
-        errors.variants = "Tồn tại biến thể trùng tổ hợp thuộc tính.";
-        break;
-      }
-      structuredCombos.add(signature);
-    }
-
-    return errors;
-  }
-
-  function resolveTabForField(field: string): FormTabId {
-    if (field.startsWith("variants") || field === "variants") return "variants";
-    if (field.startsWith("gallery") || field === "featuredImage") return "media";
-    if (
-      field === "shortDescription" ||
-      field === "description" ||
-      field.startsWith("specifications") ||
-      field.startsWith("customizations")
-    ) {
-      return "content";
-    }
-    if (field.startsWith("seo")) return "seo";
-    return "basic";
-  }
-
-  function fieldLabel(field: string): string {
-    if (field.startsWith("variants.") && field.endsWith(".imageUrl")) return "Ảnh biến thể";
-    if (field.endsWith(".dealerPrice")) return "Giá đại lý";
-    if (field.endsWith(".wholesalePrice")) return "Giá sỉ";
-    if (field.endsWith(".stockQty")) return "Tồn kho";
-    if (field === "featuredImage") return "Ảnh đại diện";
-    if (field === "productCode") return "ID sản phẩm";
-    if (field === "categoryId") return "Danh mục";
-    if (field === "name") return "Tên sản phẩm";
-    return field;
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setErrorDetail(null);
-    setFieldErrors({});
-
-    const localErrors = validateFormLocally();
-    if (Object.keys(localErrors).length > 0) {
-      setFieldErrors(localErrors);
-      const firstField = Object.keys(localErrors)[0];
-      if (firstField) setActiveTab(resolveTabForField(firstField));
-      setError("Không thể tạo sản phẩm. Vui lòng kiểm tra các trường được đánh dấu.");
-      return;
-    }
-
-    setSaving(true);
-
-    const payload = {
+  function buildPayload() {
+    return {
       name: form.name.trim(),
-      ...(form.id ? { productCode: form.productCode.trim() || undefined } : {}),
+      ...(form.slug !== undefined ? { slug: form.slug.trim() || undefined } : {}),
+      ...(form.id && allowManualProductCode
+        ? { productCode: form.productCode.trim() || undefined }
+        : form.id
+          ? {}
+          : {}),
       categoryId: form.categoryId,
       shortDescription: form.shortDescription.trim() || undefined,
       description: form.description.trim() || undefined,
@@ -377,6 +306,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         .filter((group) => group.name.trim())
         .map((group, index) => ({
           id: group.id,
+          attributeId: group.attributeId,
           name: group.name.trim(),
           slug: group.slug.trim() || undefined,
           sortOrder: group.sortOrder ?? index,
@@ -384,6 +314,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
             .filter((value) => value.label.trim())
             .map((value, valueIndex) => ({
               id: value.id,
+              attributeValueId: value.attributeValueId,
               label: value.label.trim(),
               valueCode: value.valueCode.trim() || undefined,
               imageUrl: value.imageUrl.trim() || undefined,
@@ -393,7 +324,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       variants: form.variants.map((v) => ({
         id: v.id,
         sku: v.sku.trim() || undefined,
-        colorName: v.variantKind === "legacy" ? v.colorName.trim() || undefined : v.colorName.trim() || undefined,
+        colorName: v.colorName.trim() || undefined,
         colorCode: v.colorCode.trim() || undefined,
         sizeName: v.sizeName.trim() || undefined,
         dimensions: v.dimensions.trim() || undefined,
@@ -415,7 +346,76 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         imageUrl: v.imageUrl.trim() || undefined,
       })),
     };
+  }
 
+  function fieldLabel(field: string): string {
+    if (field.startsWith("variants.") && field.endsWith(".imageUrl")) return "Ảnh biến thể";
+    if (field.endsWith(".dealerPrice")) return "Giá đại lý";
+    if (field.endsWith(".wholesalePrice")) return "Giá sỉ";
+    if (field.endsWith(".stockQty")) return "Tồn kho";
+    if (field === "featuredImage") return "Ảnh đại diện";
+    if (field === "productCode") return "ID sản phẩm";
+    if (field === "categoryId") return "Danh mục";
+    if (field === "name") return "Tên sản phẩm";
+    if (field.startsWith("options")) return "Nhóm biến thể";
+    return field;
+  }
+
+  async function ensureOptionsSavedForMatrix(): Promise<boolean> {
+    if (!form.id) return true;
+    const localErrors = validateProductCatalogFormLocal(form);
+    const optionErrors = Object.fromEntries(
+      Object.entries(localErrors).filter(([key]) => key.startsWith("options")),
+    );
+    if (Object.keys(optionErrors).length > 0) {
+      applyValidationErrors(
+        optionErrors,
+        "Lưu nhóm biến thể trước khi tạo tổ hợp. Vui lòng sửa các trường được đánh dấu.",
+      );
+      return false;
+    }
+
+    const res = await fetch(`/api/admin/products/${form.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ options: buildPayload().options }),
+    });
+    const body = (await res.json()) as {
+      message?: string;
+      error?: string;
+      fieldErrors?: Record<string, string>;
+    };
+    if (!res.ok) {
+      applyValidationErrors(
+        body.fieldErrors ?? { options: body.error ?? body.message ?? "Không thể lưu nhóm biến thể." },
+        body.error ?? body.message ?? "Không thể lưu nhóm biến thể.",
+      );
+      return false;
+    }
+    await reloadProductFromServer();
+    return true;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setErrorDetail(null);
+    setFieldErrors({});
+
+    const localErrors = validateProductCatalogFormLocal(form);
+    if (Object.keys(localErrors).length > 0) {
+      applyValidationErrors(
+        localErrors,
+        form.id
+          ? "Không thể lưu sản phẩm. Vui lòng kiểm tra các trường được đánh dấu."
+          : "Không thể tạo sản phẩm. Vui lòng kiểm tra các trường được đánh dấu.",
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = buildPayload();
     const url = form.id ? `/api/admin/products/${form.id}` : "/api/admin/products";
     const method = form.id ? "PATCH" : "POST";
 
@@ -435,9 +435,15 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           fieldErrors?: Record<string, string>;
         };
         if (!res.ok) {
-          setError(body.error ?? body.message ?? "Không thể lưu sản phẩm.");
           setErrorDetail(body.detail ?? null);
-          setFieldErrors(body.fieldErrors ?? {});
+          if (body.fieldErrors && Object.keys(body.fieldErrors).length > 0) {
+            applyValidationErrors(
+              body.fieldErrors,
+              body.error ?? body.message ?? "Không thể lưu sản phẩm.",
+            );
+          } else {
+            setError(body.error ?? body.message ?? "Không thể lưu sản phẩm.");
+          }
           return { ok: false as const, message: body.error ?? body.message };
         }
         return { ok: true as const, data: true };
@@ -512,26 +518,41 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
       <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "basic"}>
         <legend>1. Thông tin cơ bản</legend>
         <div className="admin-seo-brief-form-grid">
-          <div className="admin-field">
+          <div className="admin-field" data-field="name">
             <label className="admin-label">Tên sản phẩm <span className="admin-required">*</span></label>
-            <input className="admin-input" value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Áo thun CVC basic" />
+            <input
+              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.name))}`}
+              value={form.name}
+              data-field="name"
+              onChange={(e) => setField("name", e.target.value)}
+              placeholder="Áo thun CVC basic"
+            />
+            {fieldErrors.name && <p className="admin-field-error" role="alert">{fieldErrors.name}</p>}
           </div>
-          <div className="admin-field">
+          <div className="admin-field" data-field="categoryId">
             <label className="admin-label">Danh mục <span className="admin-required">*</span></label>
-            <select className="admin-input" value={form.categoryId} onChange={(e) => setField("categoryId", e.target.value)}>
+            <select
+              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.categoryId))}`}
+              value={form.categoryId}
+              data-field="categoryId"
+              onChange={(e) => setField("categoryId", e.target.value)}
+            >
               <option value="">— Chọn danh mục —</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name} {c.skuCode ? `(${c.skuCode})` : ""}</option>)}
             </select>
+            {fieldErrors.categoryId && <p className="admin-field-error" role="alert">{fieldErrors.categoryId}</p>}
           </div>
-          <div className="admin-field">
+          <div className="admin-field" data-field="productCode">
             <label className="admin-label">
               {form.id ? "ID sản phẩm" : "ID sản phẩm tự động"}
             </label>
             <input
-              className="admin-input"
+              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.productCode))}`}
               value={form.id ? form.productCode : (productCodePreview ?? "")}
-              readOnly
+              readOnly={!form.id || !allowManualProductCode}
+              data-field="productCode"
               placeholder={form.categoryId ? "Đang tải ID dự kiến…" : "Chọn danh mục để xem ID dự kiến"}
+              onChange={(e) => setField("productCode", e.target.value)}
             />
             {!form.id && form.categoryId && categorySkuCode && (
               <p className="admin-field-hint">
@@ -547,6 +568,28 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
             {!form.id && (
               <p className="admin-field-hint">ID sản phẩm được tạo tự động khi lưu theo thứ tự danh mục (vd. TS0001, TS0002).</p>
             )}
+            {form.id && !allowManualProductCode && (
+              <button
+                type="button"
+                className="btn-tertiary btn-sm"
+                style={{ marginTop: 6 }}
+                onClick={() => setAllowManualProductCode(true)}
+              >
+                Chỉnh mã thủ công
+              </button>
+            )}
+            {fieldErrors.productCode && <p className="admin-field-error" role="alert">{fieldErrors.productCode}</p>}
+          </div>
+          <div className="admin-field" data-field="slug">
+            <label className="admin-label">Slug</label>
+            <input
+              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.slug))}`}
+              value={form.slug ?? ""}
+              data-field="slug"
+              onChange={(e) => setField("slug", e.target.value)}
+              placeholder="tu-sinh-neu-bo-trong"
+            />
+            {fieldErrors.slug && <p className="admin-field-error" role="alert">{fieldErrors.slug}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Trạng thái</label>
@@ -600,19 +643,30 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
             <label className="admin-label">Fit</label>
             <input className="admin-input" value={form.fit} onChange={(e) => setField("fit", e.target.value)} placeholder="Unisex, Regular, Slim…" />
           </div>
-          <div className="admin-field">
+          <div className="admin-field" data-field="defaultMoq">
             <label className="admin-label">MOQ tối thiểu (cái)</label>
-            <input className="admin-input" type="number" min="1" value={form.defaultMoq} onChange={(e) => setField("defaultMoq", e.target.value)} placeholder="50" />
+            <input
+              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.defaultMoq))}`}
+              type="number"
+              min="1"
+              data-field="defaultMoq"
+              value={form.defaultMoq}
+              onChange={(e) => setField("defaultMoq", e.target.value)}
+              placeholder="50"
+            />
+            {fieldErrors.defaultMoq && <p className="admin-field-error" role="alert">{fieldErrors.defaultMoq}</p>}
             <p className="admin-field-hint">Số lượng tối thiểu cho một đơn sỉ</p>
           </div>
-          <div className="admin-field">
+          <div className="admin-field" data-field="leadTime">
             <label className="admin-label">Lead-time (thời gian giao/sản xuất)</label>
             <input
-              className="admin-input"
+              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.leadTime))}`}
               value={form.leadTime}
+              data-field="leadTime"
               onChange={(e) => setField("leadTime", e.target.value)}
               placeholder="Có sẵn: 1–3 ngày"
             />
+            {fieldErrors.leadTime && <p className="admin-field-error" role="alert">{fieldErrors.leadTime}</p>}
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
               {LEAD_TIME_PRESETS.map((preset) => (
                 <button key={preset} type="button" className="admin-btn admin-btn--secondary admin-btn--xs"
@@ -657,7 +711,7 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         <p className="admin-field-hint">Ảnh nên tối ưu 200–300KB trước khi upload để website tải nhanh.</p>
 
         {/* Featured image */}
-        <div className="admin-field">
+        <div className="admin-field" data-field="featuredImage">
           <label className="admin-label">Ảnh đại diện</label>
           <MediaPicker
             label="Ảnh đại diện"
@@ -667,11 +721,15 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           />
           <p className="admin-field-hint" style={{ marginTop: 6 }}>Hoặc nhập URL ảnh trực tiếp:</p>
           <input
-            className="admin-input"
+            className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.featuredImage))}`}
             value={form.featuredImage}
+            data-field="featuredImage"
             onChange={(e) => setField("featuredImage", e.target.value)}
             placeholder="https://… hoặc chọn từ thư viện ảnh phía trên"
           />
+          {fieldErrors.featuredImage && (
+            <p className="admin-field-error" role="alert">{fieldErrors.featuredImage}</p>
+          )}
         </div>
 
         {/* Gallery */}
@@ -701,8 +759,9 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
                   <img src={url} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 4, border: "1px solid #e5e7eb", flexShrink: 0 }} />
                 )}
                 <input
-                  className="admin-input"
+                  className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors[`gallery.${idx}`]))}`}
                   value={url}
+                  data-field={`gallery.${idx}`}
                   onChange={(e) => {
                     const next = [...form.gallery];
                     next[idx] = e.target.value;
@@ -713,6 +772,11 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
                 <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" title="Di chuyển lên" disabled={idx === 0} onClick={() => moveGallery(idx, -1)}>↑</button>
                 <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" title="Di chuyển xuống" disabled={idx === form.gallery.length - 1} onClick={() => moveGallery(idx, 1)}>↓</button>
                 <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" title="Xóa ảnh" onClick={() => setField("gallery", form.gallery.filter((_, i) => i !== idx))}>✕</button>
+                {fieldErrors[`gallery.${idx}`] && (
+                  <p className="admin-field-error" role="alert" style={{ flex: "1 1 100%" }}>
+                    {fieldErrors[`gallery.${idx}`]}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -730,14 +794,17 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
           defaultLeadTime={form.leadTime}
           optionGroups={form.options}
           variants={form.variants}
+          sharedAttributes={sharedAttributes}
+          fieldErrors={fieldErrors}
           onOptionGroupsChange={(options) => setField("options", options)}
           onVariantsChange={(variants) => setField("variants", variants)}
           onReloadProduct={reloadProductFromServer}
+          onBeforeMatrixGenerate={ensureOptionsSavedForMatrix}
           onVariantDeleted={handleVariantDeleted}
           onBulkOperationChange={setBulkOpInProgress}
         />
-        {fieldErrors.variants && (
-          <p className="admin-field-error" role="alert">{fieldErrors.variants}</p>
+        {fieldErrors.options && (
+          <p className="admin-field-error" role="alert">{fieldErrors.options}</p>
         )}
       </fieldset>
 
@@ -754,10 +821,12 @@ export default function ProductCatalogForm({ initialData, categories: propCatego
         </div>
         <ProductCatalogSpecificationsSection
           rows={form.specifications}
+          fieldErrors={fieldErrors}
           onChange={(specifications) => setField("specifications", specifications)}
         />
         <ProductCatalogContentSection
           rows={form.customizations}
+          fieldErrors={fieldErrors}
           onChange={(customizations) => setField("customizations", customizations)}
         />
       </fieldset>

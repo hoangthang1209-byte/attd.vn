@@ -15,6 +15,7 @@ import {
 
 export type ProductOptionValueInput = {
   id?: string;
+  attributeValueId?: string | null;
   label: string;
   valueCode?: string | null;
   imageUrl?: string | null;
@@ -23,6 +24,7 @@ export type ProductOptionValueInput = {
 
 export type ProductOptionInput = {
   id?: string;
+  attributeId?: string | null;
   name: string;
   slug?: string;
   sortOrder?: number;
@@ -186,6 +188,7 @@ export async function syncProductCmsData(
             where: { id: option.id },
             data: {
               name: option.name.trim(),
+              attributeId: option.attributeId ?? null,
               slug,
               sortOrder: option.sortOrder ?? optIndex,
             },
@@ -193,6 +196,7 @@ export async function syncProductCmsData(
         : await prisma.productOption.create({
             data: {
               productId,
+              attributeId: option.attributeId ?? null,
               name: option.name.trim(),
               slug,
               sortOrder: option.sortOrder ?? optIndex,
@@ -229,6 +233,7 @@ export async function syncProductCmsData(
             where: { id: value.id },
             data: {
               label: value.label.trim(),
+              attributeValueId: value.attributeValueId ?? null,
               valueCode: value.valueCode?.trim() || null,
               imageUrl: value.imageUrl?.trim() || null,
               sortOrder: value.sortOrder ?? valIndex,
@@ -238,6 +243,7 @@ export async function syncProductCmsData(
           await prisma.productOptionValue.create({
             data: {
               optionId: savedOption.id,
+              attributeValueId: value.attributeValueId ?? null,
               label: value.label.trim(),
               valueCode: value.valueCode?.trim() || null,
               imageUrl: value.imageUrl?.trim() || null,
@@ -335,11 +341,13 @@ export async function syncProductCmsData(
         });
         optionsForValidation = dbOptions.map((option) => ({
           id: option.id,
+          attributeId: option.attributeId,
           name: option.name,
           slug: option.slug,
           sortOrder: option.sortOrder,
           values: option.values.map((value) => ({
             id: value.id,
+            attributeValueId: value.attributeValueId,
             label: value.label,
             valueCode: value.valueCode,
             imageUrl: value.imageUrl,

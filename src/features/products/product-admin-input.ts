@@ -269,6 +269,7 @@ export function parseProductInput(
             const v = val as Record<string, unknown>;
             return {
               id: v.id ? String(v.id) : undefined,
+              attributeValueId: v.attributeValueId ? String(v.attributeValueId) : undefined,
               label: String(v.label ?? "").trim(),
               valueCode: v.valueCode ? String(v.valueCode).trim() : undefined,
               imageUrl: v.imageUrl ? String(v.imageUrl).trim() : undefined,
@@ -278,6 +279,7 @@ export function parseProductInput(
         : [];
       return {
         id: row.id ? String(row.id) : undefined,
+        attributeId: row.attributeId ? String(row.attributeId) : undefined,
         name: String(row.name ?? "").trim(),
         slug: row.slug ? String(row.slug).trim() : undefined,
         sortOrder: typeof row.sortOrder === "number" ? row.sortOrder : index,

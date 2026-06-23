@@ -27,11 +27,13 @@ export type MatrixVariantFormRow = {
 
 type AdminProductOption = {
   id: string;
+  attributeId?: string | null;
   name: string;
   slug: string;
   sortOrder: number;
   values?: Array<{
     id: string;
+    attributeValueId?: string | null;
     label: string;
     valueCode: string | null;
     imageUrl: string | null;
@@ -124,12 +126,14 @@ function joinStringArray(value: unknown): string {
 export function mapOptionsToFormRows(options: AdminProductOption[]): OptionGroupFormRow[] {
   return (options ?? []).map((option) => ({
     id: option.id,
+    attributeId: option.attributeId ?? undefined,
     clientKey: option.id,
     name: option.name,
     slug: option.slug,
     sortOrder: option.sortOrder,
     values: (option.values ?? []).map((value) => ({
       id: value.id,
+      attributeValueId: value.attributeValueId ?? undefined,
       clientKey: value.id,
       label: value.label,
       valueCode: value.valueCode ?? "",

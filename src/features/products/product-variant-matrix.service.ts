@@ -195,36 +195,63 @@ export async function generateVariantMatrix(
         dimensions: legacy.dimensions,
         capacity: legacy.capacity,
       });
-      const sku = await ensureUniqueSku(baseSku);
 
-      const variant = await tx.productVariant.create({
-        data: {
-          productId,
-          sku,
-          displayLabel: combo.displayLabel,
-          colorName: legacy.colorName ?? null,
-          colorCode: legacy.colorCode ?? null,
-          sizeName: legacy.sizeName ?? null,
-          dimensions: legacy.dimensions ?? null,
-          capacity: legacy.capacity ?? null,
-          stockQty: 0,
-          stockStatus: "IN_STOCK",
-          variantStatus: "ACTIVE" satisfies VariantStatus,
-        },
-      });
+      if (!baseSku.trim()) {
+        throw new ProductAdminValidationError(
+          `Không thể tạo SKU cho tổ hợp "${combo.displayLabel}". Kiểm tra mã giá trị thuộc tính.`,
+          { variants: `Tổ hợp "${combo.displayLabel}": thiếu dữ liệu mã SKU.` },
+        );
+      }
 
-      await tx.productVariantOptionValue.createMany({
-        data: combo.valueIds.map((optionValueId) => ({
-          variantId: variant.id,
-          optionValueId,
-        })),
-      });
+      let sku: string;
+      try {
+        sku = await ensureUniqueSku(baseSku);
+      } catch {
+        throw new ProductAdminValidationError(
+          `Không thể tạo SKU duy nhất cho tổ hợp "${combo.displayLabel}".`,
+          { variants: `Tổ hợp "${combo.displayLabel}": xung đột mã SKU.` },
+        );
+      }
 
-      createdVariants.push({
-        id: variant.id,
-        sku: variant.sku,
-        displayLabel: variant.displayLabel,
-      });
+      try {
+        const variant = await tx.productVariant.create({
+          data: {
+            productId,
+            sku,
+            displayLabel: combo.displayLabel,
+            colorName: legacy.colorName ?? null,
+            colorCode: legacy.colorCode ?? null,
+            sizeName: legacy.sizeName ?? null,
+            dimensions: legacy.dimensions ?? null,
+            capacity: legacy.capacity ?? null,
+            stockQty: 0,
+            stockStatus: "IN_STOCK",
+            variantStatus: "ACTIVE" satisfies VariantStatus,
+          },
+        });
+
+        await tx.productVariantOptionValue.createMany({
+          data: combo.valueIds.map((optionValueId) => ({
+            variantId: variant.id,
+            optionValueId,
+          })),
+        });
+
+        createdVariants.push({
+          id: variant.id,
+          sku: variant.sku,
+          displayLabel: variant.displayLabel,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message.includes("Unique constraint")
+            ? `SKU "${sku}" đã tồn tại.`
+            : "Dữ liệu tổ hợp không hợp lệ.";
+        throw new ProductAdminValidationError(
+          `Không thể tạo tổ hợp "${combo.displayLabel}": ${message}`,
+          { variants: `Tổ hợp "${combo.displayLabel}": ${message}` },
+        );
+      }
     }
   });
 

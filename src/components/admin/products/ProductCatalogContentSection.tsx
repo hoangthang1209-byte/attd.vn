@@ -1,7 +1,5 @@
 "use client";
 
-import type { ProductCustomizationRow } from "@/features/products/product-detail.types";
-
 type Row = {
   id?: string;
   label: string;
@@ -12,10 +10,11 @@ type Row = {
 
 type Props = {
   rows: Row[];
+  fieldErrors?: Record<string, string>;
   onChange: (rows: Row[]) => void;
 };
 
-export default function ProductCatalogContentSection({ rows, onChange }: Props) {
+export default function ProductCatalogContentSection({ rows, fieldErrors = {}, onChange }: Props) {
   function updateRow(index: number, patch: Partial<Row>) {
     const next = [...rows];
     next[index] = { ...next[index], ...patch };
@@ -51,14 +50,20 @@ export default function ProductCatalogContentSection({ rows, onChange }: Props) 
       ) : (
         <div className="admin-spec-list">
           {rows.map((row, index) => (
-            <div key={row.id ?? `custom-${index}`} className="admin-spec-row">
-              <input
-                type="text"
-                className="form-input"
-                placeholder="VD: In logo / in hình"
-                value={row.label}
-                onChange={(e) => updateRow(index, { label: e.target.value })}
-              />
+            <div key={row.id ?? `custom-${index}`} className="admin-spec-row" data-field-prefix={`customizations.${index}`}>
+              <div className="admin-field">
+                <input
+                  type="text"
+                  className={`form-input${fieldErrors[`customizations.${index}.label`] ? " admin-input--error" : ""}`}
+                  placeholder="VD: In logo / in hình"
+                  value={row.label}
+                  data-field={`customizations.${index}.label`}
+                  onChange={(e) => updateRow(index, { label: e.target.value })}
+                />
+                {fieldErrors[`customizations.${index}.label`] && (
+                  <p className="admin-field-error" role="alert">{fieldErrors[`customizations.${index}.label`]}</p>
+                )}
+              </div>
               <input
                 type="text"
                 className="form-input"

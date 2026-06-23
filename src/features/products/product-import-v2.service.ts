@@ -29,11 +29,13 @@ import { generateProductSystemCode } from "@/features/products/product-system-co
 import {
   ensureUniqueSku,
   generateSku,
+  normalizeSkuPart,
   requireCategorySkuCode,
   validateProductCodeForCategory,
   CATEGORY_SKU_CODE_MISSING_ERROR,
 } from "@/features/products/product-sku-utils";
 import { previewProductImport, executeProductImport } from "@/features/products/product-import-service";
+import { normalizeOptionName } from "@/features/products/product-variant-matrix.utils";
 
 function buildPreviewSummary(rows: ProductImportPreviewRow[]): ProductImportPreviewSummary {
   const warnings = rows.reduce((sum, r) => sum + (r.warningCount ?? 0), 0);
@@ -345,16 +347,58 @@ async function ensureOptionsForVariant(
     let option = options.find(
       (o) => o.name.toLowerCase() === pair.group.toLowerCase() || o.slug.toLowerCase() === pair.group.toLowerCase(),
     );
+    const sharedAttribute = await prisma.productAttribute.findFirst({
+      where: {
+        status: "ACTIVE",
+        OR: [
+          { name: { equals: pair.group, mode: "insensitive" } },
+          { slug: { equals: toSlug(pair.group), mode: "insensitive" } },
+          { code: { equals: normalizeSkuPart(pair.group), mode: "insensitive" } },
+        ],
+      },
+      include: { values: { where: { status: "ACTIVE" }, orderBy: { sortOrder: "asc" } } },
+    });
+    let sharedValue = sharedAttribute?.values.find(
+      (value) =>
+        normalizeOptionName(value.name) === normalizeOptionName(pair.value) ||
+        value.code.toUpperCase() === normalizeSkuPart(pair.value),
+    );
+    if (sharedAttribute && !sharedValue && !allowCreate) {
+      throw new Error(`Giá trị "${pair.value}" chưa tồn tại hoặc đã ngừng sử dụng trong thuộc tính chung "${sharedAttribute.name}".`);
+    }
+    if (sharedAttribute && !sharedValue && allowCreate) {
+      const code = normalizeSkuPart(pair.value) || `VAL${sharedAttribute.values.length + 1}`;
+      sharedValue = await prisma.productAttributeValue.create({
+        data: {
+          attributeId: sharedAttribute.id,
+          name: pair.value,
+          code,
+          slug: toSlug(pair.value) || code.toLowerCase(),
+          sortOrder: sharedAttribute.values.length,
+        },
+      });
+      sharedAttribute.values.push(sharedValue);
+    }
+
     if (!option && allowCreate) {
-      const slug = toSlug(pair.group) || `option-${options.length + 1}`;
+      const slug = sharedAttribute?.slug ?? toSlug(pair.group) ?? `option-${options.length + 1}`;
       option = await prisma.productOption.create({
         data: {
           productId,
-          name: pair.group,
+          attributeId: sharedAttribute?.id,
+          name: sharedAttribute?.name ?? pair.group,
           slug,
           sortOrder: options.length,
           values: {
-            create: [{ label: pair.value, sortOrder: 0 }],
+            create: sharedValue
+              ? [{
+                  attributeValueId: sharedValue.id,
+                  label: sharedValue.name,
+                  valueCode: sharedValue.code,
+                  imageUrl: sharedValue.imageUrl,
+                  sortOrder: 0,
+                }]
+              : [{ label: pair.value, sortOrder: 0 }],
           },
         },
         include: { values: true },
@@ -365,12 +409,18 @@ async function ensureOptionsForVariant(
       throw new Error(`Nhóm thuộc tính "${pair.group}" chưa tồn tại. Bật tạo nhóm thuộc tính mới hoặc tạo trước trong admin.`);
     }
 
-    let value = option.values.find((v) => v.label.toLowerCase() === pair.value.toLowerCase());
+    let value = option.values.find((v) =>
+      v.attributeValueId === sharedValue?.id ||
+      normalizeOptionName(v.label) === normalizeOptionName(pair.value),
+    );
     if (!value && allowCreate) {
       value = await prisma.productOptionValue.create({
         data: {
           optionId: option.id,
-          label: pair.value,
+          attributeValueId: sharedValue?.id,
+          label: sharedValue?.name ?? pair.value,
+          valueCode: sharedValue?.code,
+          imageUrl: sharedValue?.imageUrl,
           sortOrder: option.values.length,
         },
       });

@@ -1,5 +1,463 @@
-import type { ProductAttributeType, ProductAttributeStatus, Prisma } from "@prisma/client";
+import type {
+  ProductAttributeDisplayType,
+  ProductAttributeType,
+  ProductAttributeStatus,
+  Prisma,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { generateOptionGroupSlug, generateOptionValueCode } from "@/features/products/product-option-code.utils";
+import { normalizeSkuPart } from "@/features/products/product-sku-utils";
+import { normalizeOptionName } from "@/features/products/product-variant-matrix.utils";
+
+export class ProductAttributeValidationError extends Error {
+  fieldErrors: Record<string, string>;
+  status: number;
+
+  constructor(
+    message: string,
+    fieldErrors: Record<string, string> = {},
+    status = 400,
+  ) {
+    super(message);
+    this.name = "ProductAttributeValidationError";
+    this.fieldErrors = fieldErrors;
+    this.status = status;
+  }
+}
+
+export const ATTRIBUTE_DISPLAY_TYPE_LABELS: Record<ProductAttributeDisplayType, string> = {
+  TEXT: "text",
+  COLOR_SWATCH: "color swatch",
+  SIZE: "size",
+  SELECT: "select",
+  IMAGE_SWATCH: "image swatch",
+};
+
+const VALID_DISPLAY_TYPES = new Set<ProductAttributeDisplayType>([
+  "TEXT",
+  "COLOR_SWATCH",
+  "SIZE",
+  "SELECT",
+  "IMAGE_SWATCH",
+]);
+
+const HEX_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+function normalizeSlug(raw: string): string {
+  return generateOptionGroupSlug(raw)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "attribute";
+}
+
+function normalizeValueSlug(raw: string): string {
+  return raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "value";
+}
+
+async function ensureUniqueAttributeSlug(base: string, excludeId?: string): Promise<string> {
+  const normalized = normalizeSlug(base);
+  for (let i = 1; i <= 99; i++) {
+    const candidate = i === 1 ? normalized : `${normalized}-${i}`;
+    const existing = await prisma.productAttribute.findUnique({ where: { slug: candidate } });
+    if (!existing || existing.id === excludeId) return candidate;
+  }
+  return `${normalized}-${Date.now().toString(36)}`;
+}
+
+async function ensureUniqueAttributeCode(base: string, excludeId?: string): Promise<string> {
+  const normalized = normalizeSkuPart(base).slice(0, 16) || "ATTR";
+  for (let i = 1; i <= 99; i++) {
+    const candidate = i === 1 ? normalized : `${normalized}${i}`;
+    const existing = await prisma.productAttribute.findUnique({ where: { code: candidate } });
+    if (!existing || existing.id === excludeId) return candidate;
+  }
+  return `${normalized}${Date.now().toString(36).toUpperCase()}`;
+}
+
+async function ensureUniqueValueSlug(attributeId: string, base: string, excludeId?: string): Promise<string> {
+  const normalized = normalizeValueSlug(base);
+  for (let i = 1; i <= 99; i++) {
+    const candidate = i === 1 ? normalized : `${normalized}-${i}`;
+    const existing = await prisma.productAttributeValue.findUnique({
+      where: { attributeId_slug: { attributeId, slug: candidate } },
+    });
+    if (!existing || existing.id === excludeId) return candidate;
+  }
+  return `${normalized}-${Date.now().toString(36)}`;
+}
+
+async function ensureUniqueValueCode(
+  attribute: { id: string; name: string; slug: string },
+  name: string,
+  requested?: string,
+  excludeId?: string,
+): Promise<string> {
+  const existingValues = await prisma.productAttributeValue.findMany({
+    where: { attributeId: attribute.id, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { code: true },
+  });
+  const existingCodes = existingValues.map((value) => value.code);
+  const base = requested?.trim()
+    ? normalizeSkuPart(requested).slice(0, 16)
+    : generateOptionValueCode(attribute, name, existingCodes);
+
+  for (let i = 1; i <= 99; i++) {
+    const candidate = i === 1 ? base : `${base}${i}`;
+    const existing = await prisma.productAttributeValue.findUnique({
+      where: { attributeId_code: { attributeId: attribute.id, code: candidate } },
+    });
+    if (!existing || existing.id === excludeId) return candidate;
+  }
+  return `${base}${Date.now().toString(36).toUpperCase()}`;
+}
+
+async function assertUniqueAttributeName(name: string, excludeId?: string) {
+  const attributes = await prisma.productAttribute.findMany({
+    where: excludeId ? { id: { not: excludeId } } : undefined,
+    select: { name: true },
+  });
+  if (attributes.some((attribute) => normalizeOptionName(attribute.name) === normalizeOptionName(name))) {
+    throw new ProductAttributeValidationError(
+      "Tên thuộc tính bị trùng.",
+      { name: "Tên thuộc tính đã tồn tại." },
+      409,
+    );
+  }
+}
+
+async function assertUniqueValueName(attributeId: string, name: string, excludeId?: string) {
+  const values = await prisma.productAttributeValue.findMany({
+    where: { attributeId, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { name: true },
+  });
+  if (values.some((value) => normalizeOptionName(value.name) === normalizeOptionName(name))) {
+    throw new ProductAttributeValidationError(
+      "Tên giá trị thuộc tính bị trùng.",
+      { name: "Tên giá trị đã tồn tại trong thuộc tính này." },
+      409,
+    );
+  }
+}
+
+function parseSortOrder(value: unknown, field = "sortOrder"): number {
+  if (value === undefined || value === null || value === "") return 0;
+  const n = Number(value);
+  if (!Number.isInteger(n)) {
+    throw new ProductAttributeValidationError("Thứ tự hiển thị không hợp lệ.", {
+      [field]: "Thứ tự hiển thị phải là số nguyên.",
+    });
+  }
+  return n;
+}
+
+export async function listSharedAttributes(options?: {
+  activeOnly?: boolean;
+  variantOnly?: boolean;
+  includeInactiveValues?: boolean;
+}) {
+  const attributes = await prisma.productAttribute.findMany({
+    where: {
+      ...(options?.activeOnly ? { status: "ACTIVE" as const } : {}),
+      ...(options?.variantOnly ? { isVariantAttribute: true } : {}),
+    },
+    include: {
+      values: {
+        where: options?.includeInactiveValues ? undefined : { status: "ACTIVE" },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      },
+      _count: { select: { productOptions: true } },
+    },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+  });
+
+  const valueUsage = await prisma.productOptionValue.groupBy({
+    by: ["attributeValueId"],
+    where: { attributeValueId: { not: null } },
+    _count: { _all: true },
+  });
+  const usageByValueId = new Map(
+    valueUsage
+      .filter((row) => row.attributeValueId)
+      .map((row) => [row.attributeValueId!, row._count._all]),
+  );
+
+  return attributes.map((attribute) => ({
+    ...attribute,
+    usageCount: attribute._count.productOptions,
+    values: attribute.values.map((value) => ({
+      ...value,
+      usageCount: usageByValueId.get(value.id) ?? 0,
+    })),
+  }));
+}
+
+export async function createSharedAttribute(raw: Record<string, unknown>) {
+  const name = String(raw.name ?? "").trim();
+  const fieldErrors: Record<string, string> = {};
+  if (!name) fieldErrors.name = "Tên thuộc tính là bắt buộc.";
+  const displayType = String(raw.displayType ?? "TEXT").toUpperCase() as ProductAttributeDisplayType;
+  if (!VALID_DISPLAY_TYPES.has(displayType)) {
+    fieldErrors.displayType = "Kiểu hiển thị không hợp lệ.";
+  }
+  if (Object.keys(fieldErrors).length) {
+    throw new ProductAttributeValidationError("Dữ liệu thuộc tính chưa hợp lệ.", fieldErrors);
+  }
+
+  await assertUniqueAttributeName(name);
+  const code = await ensureUniqueAttributeCode(String(raw.code ?? name));
+  const slug = await ensureUniqueAttributeSlug(String(raw.slug ?? name));
+
+  return prisma.productAttribute.create({
+    data: {
+      name,
+      code,
+      slug,
+      displayType,
+      isVariantAttribute: raw.isVariantAttribute !== undefined ? Boolean(raw.isVariantAttribute) : true,
+      isSpecificationAttribute: Boolean(raw.isSpecificationAttribute),
+      status: raw.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+      sortOrder: parseSortOrder(raw.sortOrder),
+      note: raw.note ? String(raw.note).trim() : null,
+    },
+  });
+}
+
+export async function updateSharedAttribute(id: string, raw: Record<string, unknown>) {
+  const existing = await prisma.productAttribute.findUnique({ where: { id } });
+  if (!existing) {
+    throw new ProductAttributeValidationError("Không tìm thấy thuộc tính.", {}, 404);
+  }
+
+  const data: Prisma.ProductAttributeUpdateInput = {};
+  if (raw.name !== undefined) {
+    const name = String(raw.name).trim();
+    if (!name) throw new ProductAttributeValidationError("Dữ liệu thuộc tính chưa hợp lệ.", { name: "Tên thuộc tính là bắt buộc." });
+    await assertUniqueAttributeName(name, id);
+    data.name = name;
+    if (raw.slug === undefined) data.slug = await ensureUniqueAttributeSlug(name, id);
+    if (raw.code === undefined) data.code = await ensureUniqueAttributeCode(name, id);
+  }
+  if (raw.code !== undefined) data.code = await ensureUniqueAttributeCode(String(raw.code), id);
+  if (raw.slug !== undefined) data.slug = await ensureUniqueAttributeSlug(String(raw.slug), id);
+  if (raw.displayType !== undefined) {
+    const displayType = String(raw.displayType).toUpperCase() as ProductAttributeDisplayType;
+    if (!VALID_DISPLAY_TYPES.has(displayType)) {
+      throw new ProductAttributeValidationError("Dữ liệu thuộc tính chưa hợp lệ.", { displayType: "Kiểu hiển thị không hợp lệ." });
+    }
+    data.displayType = displayType;
+  }
+  if (raw.isVariantAttribute !== undefined) data.isVariantAttribute = Boolean(raw.isVariantAttribute);
+  if (raw.isSpecificationAttribute !== undefined) data.isSpecificationAttribute = Boolean(raw.isSpecificationAttribute);
+  if (raw.status !== undefined) data.status = raw.status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
+  if (raw.sortOrder !== undefined) data.sortOrder = parseSortOrder(raw.sortOrder);
+  if (raw.note !== undefined) data.note = raw.note ? String(raw.note).trim() : null;
+
+  return prisma.productAttribute.update({ where: { id }, data });
+}
+
+export async function createSharedAttributeValue(attributeId: string, raw: Record<string, unknown>) {
+  const attribute = await prisma.productAttribute.findUnique({ where: { id: attributeId } });
+  if (!attribute) {
+    throw new ProductAttributeValidationError("Không tìm thấy thuộc tính cha.", { attributeId: "Thuộc tính cha không tồn tại." }, 404);
+  }
+
+  const name = String(raw.name ?? "").trim();
+  const fieldErrors: Record<string, string> = {};
+  if (!name) fieldErrors.name = "Tên hiển thị là bắt buộc.";
+  const hexCode = raw.hexCode ? String(raw.hexCode).trim() : null;
+  if (hexCode && !HEX_RE.test(hexCode)) fieldErrors.hexCode = "Mã màu HEX không hợp lệ.";
+  if (Object.keys(fieldErrors).length) {
+    throw new ProductAttributeValidationError("Dữ liệu giá trị thuộc tính chưa hợp lệ.", fieldErrors);
+  }
+
+  await assertUniqueValueName(attributeId, name);
+  const code = await ensureUniqueValueCode(attribute, name, raw.code ? String(raw.code) : undefined);
+  const slug = await ensureUniqueValueSlug(attributeId, String(raw.slug ?? name));
+
+  return prisma.productAttributeValue.create({
+    data: {
+      attributeId,
+      name,
+      code,
+      slug,
+      hexCode,
+      imageUrl: raw.imageUrl ? String(raw.imageUrl).trim() : null,
+      status: raw.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+      sortOrder: parseSortOrder(raw.sortOrder),
+    },
+  });
+}
+
+export async function updateSharedAttributeValue(id: string, raw: Record<string, unknown>) {
+  const existing = await prisma.productAttributeValue.findUnique({
+    where: { id },
+    include: { attribute: true },
+  });
+  if (!existing) {
+    throw new ProductAttributeValidationError("Không tìm thấy giá trị thuộc tính.", {}, 404);
+  }
+
+  const data: Prisma.ProductAttributeValueUpdateInput = {};
+  if (raw.name !== undefined) {
+    const name = String(raw.name).trim();
+    if (!name) throw new ProductAttributeValidationError("Dữ liệu giá trị thuộc tính chưa hợp lệ.", { name: "Tên hiển thị là bắt buộc." });
+    await assertUniqueValueName(existing.attributeId, name, id);
+    data.name = name;
+    if (raw.slug === undefined) data.slug = await ensureUniqueValueSlug(existing.attributeId, name, id);
+    if (raw.code === undefined) data.code = await ensureUniqueValueCode(existing.attribute, name, undefined, id);
+  }
+  if (raw.code !== undefined) {
+    data.code = await ensureUniqueValueCode(existing.attribute, existing.name, String(raw.code), id);
+  }
+  if (raw.slug !== undefined) data.slug = await ensureUniqueValueSlug(existing.attributeId, String(raw.slug), id);
+  if (raw.hexCode !== undefined) {
+    const hexCode = raw.hexCode ? String(raw.hexCode).trim() : null;
+    if (hexCode && !HEX_RE.test(hexCode)) {
+      throw new ProductAttributeValidationError("Dữ liệu giá trị thuộc tính chưa hợp lệ.", { hexCode: "Mã màu HEX không hợp lệ." });
+    }
+    data.hexCode = hexCode;
+  }
+  if (raw.imageUrl !== undefined) data.imageUrl = raw.imageUrl ? String(raw.imageUrl).trim() : null;
+  if (raw.status !== undefined) data.status = raw.status === "INACTIVE" ? "INACTIVE" : "ACTIVE";
+  if (raw.sortOrder !== undefined) data.sortOrder = parseSortOrder(raw.sortOrder);
+
+  return prisma.productAttributeValue.update({ where: { id }, data });
+}
+
+export async function getAttributeDependencyCounts(attributeId: string) {
+  const [productOptions, productValues, variantLinks] = await Promise.all([
+    prisma.productOption.count({ where: { attributeId } }),
+    prisma.productOptionValue.count({ where: { attributeValue: { attributeId } } }),
+    prisma.productVariantOptionValue.count({
+      where: { optionValue: { attributeValue: { attributeId } } },
+    }),
+  ]);
+  return { productOptions, productValues, variantLinks, total: productOptions + productValues + variantLinks };
+}
+
+export async function getAttributeValueDependencyCounts(valueId: string) {
+  const [productValues, variantLinks] = await Promise.all([
+    prisma.productOptionValue.count({ where: { attributeValueId: valueId } }),
+    prisma.productVariantOptionValue.count({ where: { optionValue: { attributeValueId: valueId } } }),
+  ]);
+  return { productValues, variantLinks, total: productValues + variantLinks };
+}
+
+export async function deleteSharedAttribute(id: string) {
+  const deps = await getAttributeDependencyCounts(id);
+  if (deps.total > 0) {
+    throw new ProductAttributeValidationError(
+      `Không thể xóa thuộc tính vì đang được sử dụng (${deps.productOptions} nhóm sản phẩm, ${deps.productValues} giá trị sản phẩm, ${deps.variantLinks} liên kết biến thể).`,
+      { delete: "Thuộc tính đang được sử dụng. Hãy ngừng sử dụng thay vì xóa." },
+      409,
+    );
+  }
+  return prisma.productAttribute.delete({ where: { id } });
+}
+
+export async function deleteSharedAttributeValue(id: string) {
+  const deps = await getAttributeValueDependencyCounts(id);
+  if (deps.total > 0) {
+    throw new ProductAttributeValidationError(
+      `Không thể xóa giá trị vì đang được sử dụng (${deps.productValues} giá trị sản phẩm, ${deps.variantLinks} liên kết biến thể).`,
+      { delete: "Giá trị đang được sử dụng. Hãy ngừng sử dụng thay vì xóa." },
+      409,
+    );
+  }
+  return prisma.productAttributeValue.delete({ where: { id } });
+}
+
+export async function seedSharedAttributes(): Promise<{ createdAttributes: number; createdValues: number; skippedValues: number }> {
+  const seed = [
+    {
+      name: "Màu sắc",
+      code: "COLOR",
+      slug: "color",
+      displayType: "COLOR_SWATCH" as const,
+      sortOrder: 1,
+      values: [
+        ["Đen", "BLK", "#000000"],
+        ["Trắng", "WHT", "#FFFFFF"],
+        ["Navy", "NVY", "#1E3A5F"],
+      ],
+    },
+    {
+      name: "Kích thước",
+      code: "SIZE",
+      slug: "size",
+      displayType: "SIZE" as const,
+      sortOrder: 2,
+      values: [
+        ["S", "S", null],
+        ["M", "M", null],
+        ["L", "L", null],
+        ["XL", "XL", null],
+      ],
+    },
+    {
+      name: "Form dáng",
+      code: "FIT",
+      slug: "fit",
+      displayType: "SELECT" as const,
+      sortOrder: 3,
+      values: [
+        ["Regular fit", "REGULAR", null],
+        ["Oversize", "OVERSIZE", null],
+      ],
+    },
+  ];
+
+  let createdAttributes = 0;
+  let createdValues = 0;
+  let skippedValues = 0;
+
+  for (const item of seed) {
+    let attribute = await prisma.productAttribute.findUnique({ where: { code: item.code } });
+    if (!attribute) {
+      attribute = await prisma.productAttribute.create({
+        data: {
+          name: item.name,
+          code: item.code,
+          slug: item.slug,
+          displayType: item.displayType,
+          isVariantAttribute: true,
+          isSpecificationAttribute: item.code !== "COLOR" && item.code !== "SIZE",
+          sortOrder: item.sortOrder,
+        },
+      });
+      createdAttributes++;
+    }
+
+    for (const [name, code, hexCode] of item.values) {
+      const existing = await prisma.productAttributeValue.findUnique({
+        where: { attributeId_code: { attributeId: attribute.id, code: String(code) } },
+      });
+      if (existing) {
+        skippedValues++;
+        continue;
+      }
+      await prisma.productAttributeValue.create({
+        data: {
+          attributeId: attribute.id,
+          name: String(name),
+          code: String(code),
+          slug: normalizeValueSlug(String(name)),
+          hexCode: hexCode ? String(hexCode) : null,
+          sortOrder: createdValues + 1,
+        },
+      });
+      createdValues++;
+    }
+  }
+
+  return { createdAttributes, createdValues, skippedValues };
+}
 
 export async function listAttributeOptions(options?: {
   type?: ProductAttributeType;

@@ -167,32 +167,38 @@ model ProductImage {
 }
 
 model ProductOption {
-  id        String               @id @default(cuid())
-  productId String
-  name      String
-  slug      String
-  sortOrder Int                  @default(0)
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-  product   Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
-  values    ProductOptionValue[]
+  id          String               @id @default(cuid())
+  productId   String
+  attributeId String?
+  name        String
+  slug        String
+  sortOrder   Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  product     Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute   ProductAttribute?    @relation(fields: [attributeId], references: [id], onDelete: SetNull)
+  values      ProductOptionValue[]
 
   @@unique([productId, slug])
+  @@index([attributeId])
   @@index([productId, sortOrder])
 }
 
 model ProductOptionValue {
-  id        String                      @id @default(cuid())
-  optionId  String
-  label     String
-  valueCode String?
-  imageUrl  String?
-  sortOrder Int                         @default(0)
-  createdAt DateTime                    @default(now())
-  updatedAt DateTime                    @updatedAt
-  option    ProductOption               @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  variants  ProductVariantOptionValue[]
+  id               String                      @id @default(cuid())
+  optionId         String
+  attributeValueId String?
+  label            String
+  valueCode        String?
+  imageUrl         String?
+  sortOrder        Int                         @default(0)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  option           ProductOption               @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  attributeValue   ProductAttributeValue?      @relation(fields: [attributeValueId], references: [id], onDelete: SetNull)
+  variants         ProductVariantOptionValue[]
 
+  @@index([attributeValueId])
   @@index([optionId, sortOrder])
 }
 
@@ -906,6 +912,60 @@ enum ProductAttributeType {
 enum ProductAttributeStatus {
   ACTIVE
   INACTIVE
+}
+
+enum ProductAttributeDisplayType {
+  TEXT
+  COLOR_SWATCH
+  SIZE
+  SELECT
+  IMAGE_SWATCH
+}
+
+enum SharedProductAttributeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model ProductAttribute {
+  id                       String                        @id @default(cuid())
+  name                     String
+  code                     String                        @unique
+  slug                     String                        @unique
+  displayType              ProductAttributeDisplayType   @default(TEXT)
+  isVariantAttribute       Boolean                       @default(true)
+  isSpecificationAttribute Boolean                       @default(false)
+  status                   SharedProductAttributeStatus  @default(ACTIVE)
+  sortOrder                Int                           @default(0)
+  note                     String?
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  values                   ProductAttributeValue[]
+  productOptions           ProductOption[]
+
+  @@index([status])
+  @@index([sortOrder])
+}
+
+model ProductAttributeValue {
+  id             String                       @id @default(cuid())
+  attributeId    String
+  name           String
+  code           String
+  slug           String
+  hexCode        String?
+  imageUrl       String?
+  status         SharedProductAttributeStatus @default(ACTIVE)
+  sortOrder      Int                          @default(0)
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  attribute      ProductAttribute             @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  productValues  ProductOptionValue[]
+
+  @@unique([attributeId, code])
+  @@unique([attributeId, slug])
+  @@index([attributeId, status])
+  @@index([sortOrder])
 }
 
 model ProductAttributeOption {

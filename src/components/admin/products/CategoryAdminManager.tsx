@@ -14,7 +14,6 @@ import {
   getCategoryIndentPx,
 } from "@/features/categories/category-tree-utils";
 import { useAdminMutation } from "@/hooks/useAdminAction";
-import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import { toSlug } from "@/lib/slug";
 
 type CategoryRow = CategoryQuickEditRecord & {
@@ -68,6 +67,7 @@ export default function CategoryAdminManager() {
   const [slugEdited, setSlugEdited] = useState(false);
   const [skuCodeEdited, setSkuCodeEdited] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const flattenedCategories = useMemo(
     () => flattenCategoryTree(categories),
@@ -119,12 +119,14 @@ export default function CategoryAdminManager() {
     setSkuCodeEdited(false);
     setShowForm(true);
     setMessage(null);
+    setFieldErrors({});
   }
 
   function cancelForm() {
     setShowForm(false);
     setEditingId(null);
     setForm(emptyForm());
+    setFieldErrors({});
   }
 
   useEffect(() => {
@@ -149,8 +151,13 @@ export default function CategoryAdminManager() {
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setMessage(null);
+    setFieldErrors({});
 
     if (!form.name.trim() || !form.slug.trim()) {
+      setFieldErrors({
+        ...(!form.name.trim() ? { name: "Tên danh mục là bắt buộc." } : {}),
+        ...(!form.slug.trim() ? { slug: "Slug là bắt buộc." } : {}),
+      });
       setMessage({ type: "error", text: "Tên danh mục và slug là bắt buộc." });
       return;
     }
@@ -180,7 +187,15 @@ export default function CategoryAdminManager() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        return parseAdminJsonResponse(res, () => true);
+        const data = await res.json() as { message?: string; fieldErrors?: Record<string, string> };
+        if (!res.ok) {
+          setFieldErrors(data.fieldErrors ?? {});
+          return {
+            ok: false as const,
+            message: data.message ?? "Không thể lưu danh mục.",
+          };
+        }
+        return { ok: true as const, data: true };
       },
       onSuccess: async () => {
         setShowForm(false);
@@ -260,8 +275,9 @@ export default function CategoryAdminManager() {
             <div>
               <label className="admin-label">Tên danh mục *</label>
               <input
-                className="admin-input"
+                className={`admin-input${fieldErrors.name ? " admin-input--error" : ""}`}
                 value={form.name}
+                data-field="name"
                 onChange={(e) => {
                   const v = e.target.value;
                   setForm((f) => ({
@@ -272,31 +288,36 @@ export default function CategoryAdminManager() {
                 }}
                 required
               />
+              {fieldErrors.name && <p className="admin-field-error" role="alert">{fieldErrors.name}</p>}
             </div>
             <div>
               <label className="admin-label">Slug *</label>
               <input
-                className="admin-input"
+                className={`admin-input${fieldErrors.slug ? " admin-input--error" : ""}`}
                 value={form.slug}
+                data-field="slug"
                 onChange={(e) => {
                   setSlugEdited(true);
                   setForm((f) => ({ ...f, slug: e.target.value }));
                 }}
                 required
               />
+              {fieldErrors.slug && <p className="admin-field-error" role="alert">{fieldErrors.slug}</p>}
               <p className="admin-field-hint">attd.vn/{form.slug || "danh-muc"}</p>
             </div>
             <div>
               <label className="admin-label">Mã danh mục</label>
               <input
-                className="admin-input"
+                className={`admin-input${fieldErrors.skuCode ? " admin-input--error" : ""}`}
                 value={form.skuCode}
+                data-field="skuCode"
                 onChange={(e) => {
                   setSkuCodeEdited(true);
                   setForm((f) => ({ ...f, skuCode: e.target.value.toUpperCase() }));
                 }}
                 placeholder="Tự động từ tên (vd. TS, POLO, TOTE)"
               />
+              {fieldErrors.skuCode && <p className="admin-field-error" role="alert">{fieldErrors.skuCode}</p>}
               {!skuCodeEdited && form.name.trim() && (
                 <p className="admin-field-hint">
                   Mã dự kiến sẽ được tạo tự động khi lưu. Có thể chỉnh tay nếu cần.

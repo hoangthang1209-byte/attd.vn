@@ -2,247 +2,512 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-type AttributeType = "COLOR" | "SIZE" | "MATERIAL" | "FORM" | "FIT" | "DIMENSION" | "CAPACITY" | "UNIT";
+type DisplayType = "TEXT" | "COLOR_SWATCH" | "SIZE" | "SELECT" | "IMAGE_SWATCH";
+type Status = "ACTIVE" | "INACTIVE";
 
-const TYPE_LABELS: Record<AttributeType, string> = {
-  COLOR: "Màu sắc",
-  SIZE: "Size",
-  MATERIAL: "Chất liệu",
-  FORM: "Form / Kiểu dáng",
-  FIT: "Fit",
-  DIMENSION: "Kích thước",
-  CAPACITY: "Dung tích",
-  UNIT: "Đơn vị",
+const DISPLAY_TYPE_LABELS: Record<DisplayType, string> = {
+  TEXT: "text",
+  COLOR_SWATCH: "color swatch",
+  SIZE: "size",
+  SELECT: "select",
+  IMAGE_SWATCH: "image swatch",
 };
 
-const ALL_TYPES: AttributeType[] = ["COLOR", "SIZE", "MATERIAL", "FORM", "FIT", "DIMENSION", "CAPACITY", "UNIT"];
-
-type Option = {
+type AttributeValue = {
   id: string;
-  type: AttributeType;
-  name: string;
-  code: string | null;
-  value: string | null;
-  sortOrder: number;
-  status: string;
-  createdAt: string;
-};
-
-type FormState = {
-  type: AttributeType;
   name: string;
   code: string;
-  value: string;
+  slug: string;
+  hexCode: string | null;
+  imageUrl: string | null;
+  status: Status;
+  sortOrder: number;
+  usageCount: number;
+};
+
+type Attribute = {
+  id: string;
+  name: string;
+  code: string;
+  slug: string;
+  displayType: DisplayType;
+  isVariantAttribute: boolean;
+  isSpecificationAttribute: boolean;
+  status: Status;
+  sortOrder: number;
+  note: string | null;
+  usageCount: number;
+  values: AttributeValue[];
+};
+
+type AttributeForm = {
+  id?: string;
+  name: string;
+  code: string;
+  slug: string;
+  displayType: DisplayType;
+  isVariantAttribute: boolean;
+  isSpecificationAttribute: boolean;
+  status: Status;
+  sortOrder: string;
+  note: string;
+};
+
+type ValueForm = {
+  id?: string;
+  attributeId: string;
+  name: string;
+  code: string;
+  slug: string;
+  hexCode: string;
+  imageUrl: string;
+  status: Status;
   sortOrder: string;
 };
 
-const defaultForm = (): FormState => ({ type: "COLOR", name: "", code: "", value: "", sortOrder: "0" });
+const defaultAttributeForm = (): AttributeForm => ({
+  name: "",
+  code: "",
+  slug: "",
+  displayType: "TEXT",
+  isVariantAttribute: true,
+  isSpecificationAttribute: false,
+  status: "ACTIVE",
+  sortOrder: "0",
+  note: "",
+});
+
+const defaultValueForm = (attributeId = ""): ValueForm => ({
+  attributeId,
+  name: "",
+  code: "",
+  slug: "",
+  hexCode: "",
+  imageUrl: "",
+  status: "ACTIVE",
+  sortOrder: "0",
+});
+
+function errorClass(fieldErrors: Record<string, string>, field: string) {
+  return fieldErrors[field] ? " admin-input--error" : "";
+}
 
 export default function ProductAttributesClient() {
-  const [options, setOptions] = useState<Option[]>([]);
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState<AttributeType | "">("");
-  const [form, setForm] = useState<FormState>(defaultForm());
-  const [editId, setEditId] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState(true);
+  const [attributeForm, setAttributeForm] = useState<AttributeForm>(defaultAttributeForm());
+  const [valueForm, setValueForm] = useState<ValueForm>(defaultValueForm());
   const [saving, setSaving] = useState(false);
-  const [seedMsg, setSeedMsg] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (filterType) params.set("type", filterType);
     try {
-      const res = await fetch(`/api/admin/products/attributes?${params.toString()}`);
-      const data = await res.json() as Option[];
-      setOptions(Array.isArray(data) ? data : []);
-    } catch { setOptions([]); }
+      const params = new URLSearchParams();
+      params.set("includeInactiveValues", "1");
+      if (!showInactive) params.set("activeOnly", "1");
+      const res = await fetch(`/api/admin/attributes?${params.toString()}`);
+      const data = await res.json() as Attribute[];
+      setAttributes(Array.isArray(data) ? data : []);
+    } catch {
+      setAttributes([]);
+    }
     setLoading(false);
-  }, [filterType]);
+  }, [showInactive]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   async function seedDefaults() {
-    setSeedMsg(null);
-    const res = await fetch("/api/admin/products/attributes/seed", { method: "POST" });
+    setMessage(null);
+    const res = await fetch("/api/admin/attributes/seed", { method: "POST" });
     const data = await res.json() as { message?: string };
-    setSeedMsg(data.message ?? "Đã tạo thuộc tính mặc định.");
+    setMessage(data.message ?? "Đã tạo thuộc tính mặc định.");
     void load();
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleAttributeSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError("Tên thuộc tính là bắt buộc."); return; }
+    setFieldErrors({});
     setError(null);
+    if (!attributeForm.name.trim()) {
+      setFieldErrors({ name: "Tên thuộc tính là bắt buộc." });
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
-        type: form.type,
-        name: form.name.trim(),
-        code: form.code.trim() || undefined,
-        value: form.value.trim() || undefined,
-        sortOrder: Number(form.sortOrder) || 0,
+        name: attributeForm.name.trim(),
+        code: attributeForm.code.trim() || undefined,
+        slug: attributeForm.slug.trim() || undefined,
+        displayType: attributeForm.displayType,
+        isVariantAttribute: attributeForm.isVariantAttribute,
+        isSpecificationAttribute: attributeForm.isSpecificationAttribute,
+        status: attributeForm.status,
+        sortOrder: attributeForm.sortOrder,
+        note: attributeForm.note.trim() || undefined,
       };
 
-      if (editId) {
-        await fetch(`/api/admin/products/attributes/${editId}`, {
+      const res = attributeForm.id
+        ? await fetch(`/api/admin/attributes/${attributeForm.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        });
-        setEditId(null);
-      } else {
-        await fetch("/api/admin/products/attributes", {
+        })
+        : await fetch("/api/admin/attributes", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+      const data = await res.json() as { message?: string; fieldErrors?: Record<string, string> };
+      if (!res.ok) {
+        setFieldErrors(data.fieldErrors ?? {});
+        setError(data.message ?? "Không thể lưu thuộc tính.");
+        return;
       }
-      setForm(defaultForm());
+      setAttributeForm(defaultAttributeForm());
+      setMessage(attributeForm.id ? "Đã cập nhật thuộc tính." : "Đã tạo thuộc tính.");
       void load();
-    } catch { setError("Lỗi lưu thuộc tính."); }
+    } catch {
+      setError("Lỗi lưu thuộc tính.");
+    }
     setSaving(false);
   }
 
-  async function toggleStatus(id: string, currentStatus: string) {
-    const newStatus = currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
-    await fetch(`/api/admin/products/attributes/${id}`, {
+  async function handleValueSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFieldErrors({});
+    setError(null);
+    if (!valueForm.attributeId) {
+      setFieldErrors({ attributeId: "Vui lòng chọn thuộc tính cha." });
+      return;
+    }
+    if (!valueForm.name.trim()) {
+      setFieldErrors({ name: "Tên hiển thị là bắt buộc." });
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        name: valueForm.name.trim(),
+        code: valueForm.code.trim() || undefined,
+        slug: valueForm.slug.trim() || undefined,
+        hexCode: valueForm.hexCode.trim() || undefined,
+        imageUrl: valueForm.imageUrl.trim() || undefined,
+        status: valueForm.status,
+        sortOrder: valueForm.sortOrder,
+      };
+      const res = valueForm.id
+        ? await fetch(`/api/admin/attributes/${valueForm.attributeId}/values/${valueForm.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+        : await fetch(`/api/admin/attributes/${valueForm.attributeId}/values`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      const data = await res.json() as { message?: string; fieldErrors?: Record<string, string> };
+      if (!res.ok) {
+        setFieldErrors(data.fieldErrors ?? {});
+        setError(data.message ?? "Không thể lưu giá trị thuộc tính.");
+        return;
+      }
+      setValueForm(defaultValueForm(valueForm.attributeId));
+      setMessage(valueForm.id ? "Đã cập nhật giá trị." : "Đã tạo giá trị.");
+      void load();
+    } catch {
+      setError("Lỗi lưu giá trị thuộc tính.");
+    }
+    setSaving(false);
+  }
+
+  async function patchAttribute(attribute: Attribute, patch: Partial<AttributeForm>) {
+    await fetch(`/api/admin/attributes/${attribute.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
+      body: JSON.stringify(patch),
     });
     void load();
   }
 
-  function startEdit(opt: Option) {
-    setEditId(opt.id);
-    setForm({ type: opt.type, name: opt.name, code: opt.code ?? "", value: opt.value ?? "", sortOrder: String(opt.sortOrder) });
+  async function patchValue(attribute: Attribute, value: AttributeValue, patch: Partial<ValueForm>) {
+    await fetch(`/api/admin/attributes/${attribute.id}/values/${value.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    void load();
   }
 
-  const grouped = ALL_TYPES.reduce<Record<string, Option[]>>((acc, t) => {
-    acc[t] = options.filter((o) => o.type === t);
-    return acc;
-  }, {});
+  async function deleteAttribute(attribute: Attribute) {
+    if (!window.confirm(`Xóa thuộc tính "${attribute.name}"? Chỉ xóa được khi chưa sử dụng.`)) return;
+    const res = await fetch(`/api/admin/attributes/${attribute.id}`, { method: "DELETE" });
+    const data = await res.json() as { message?: string };
+    if (!res.ok) {
+      setError(data.message ?? "Không thể xóa thuộc tính. Hãy ngừng sử dụng thay vì xóa.");
+      return;
+    }
+    setMessage("Đã xóa thuộc tính.");
+    void load();
+  }
+
+  async function deleteValue(attribute: Attribute, value: AttributeValue) {
+    if (!window.confirm(`Xóa giá trị "${value.name}"? Chỉ xóa được khi chưa sử dụng.`)) return;
+    const res = await fetch(`/api/admin/attributes/${attribute.id}/values/${value.id}`, { method: "DELETE" });
+    const data = await res.json() as { message?: string };
+    if (!res.ok) {
+      setError(data.message ?? "Không thể xóa giá trị. Hãy ngừng sử dụng thay vì xóa.");
+      return;
+    }
+    setMessage("Đã xóa giá trị.");
+    void load();
+  }
 
   return (
     <div className="admin-catalog-page">
-      {/* Seed button */}
       <div className="admin-catalog-toolbar">
         <div className="admin-catalog-toolbar-left">
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void seedDefaults()}>
-            Tạo thuộc tính mặc định
+            Tạo bộ mặc định COLOR / SIZE / FIT
           </button>
         </div>
-        <div>
-          <select className="admin-input" value={filterType} onChange={(e) => setFilterType(e.target.value as AttributeType | "")}>
-            <option value="">Tất cả loại</option>
-            {ALL_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-          </select>
-        </div>
+        <label className="admin-catalog-toggle">
+          <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
+          Hiện thuộc tính ngừng sử dụng
+        </label>
       </div>
 
-      {seedMsg && <p style={{ color: "#059669", fontSize: 13 }}>{seedMsg}</p>}
+      {message && <p className="admin-success">{message}</p>}
+      {error && <p className="admin-error" role="alert">{error}</p>}
 
-      {/* Add / Edit form */}
-      <form className="admin-catalog-fieldset" onSubmit={(e) => void handleSubmit(e)}>
-        <legend style={{ fontWeight: 600, fontSize: 14 }}>{editId ? "Cập nhật thuộc tính" : "Thêm thuộc tính mới"}</legend>
+      <form className="admin-catalog-fieldset" onSubmit={(e) => void handleAttributeSubmit(e)}>
+        <legend style={{ fontWeight: 600, fontSize: 14 }}>
+          {attributeForm.id ? "Cập nhật thuộc tính" : "Thêm thuộc tính mới"}
+        </legend>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field">
-            <label className="admin-label">Loại thuộc tính</label>
-            <select className="admin-input" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as AttributeType }))}>
-              {ALL_TYPES.map((t) => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-            </select>
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Tên thuộc tính</label>
-            <input className="admin-input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Đen, M, Cotton 100%…" />
+            <label className="admin-label">Tên thuộc tính <span className="admin-required">*</span></label>
+            <input className={`admin-input${errorClass(fieldErrors, "name")}`} data-field="name" value={attributeForm.name} onChange={(e) => setAttributeForm((f) => ({ ...f, name: e.target.value }))} placeholder="Màu sắc, Kích thước, Form dáng…" />
+            {fieldErrors.name && <p className="admin-field-error" role="alert">{fieldErrors.name}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Mã thuộc tính</label>
-            <input className="admin-input" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} placeholder="BLK, M, CT…" />
+            <input className={`admin-input${errorClass(fieldErrors, "code")}`} value={attributeForm.code} onChange={(e) => setAttributeForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="COLOR, SIZE, FIT…" />
+            {fieldErrors.code && <p className="admin-field-error" role="alert">{fieldErrors.code}</p>}
           </div>
           <div className="admin-field">
-            <label className="admin-label">Giá trị (tùy chọn)</label>
-            <input className="admin-input" value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} placeholder="#000000 cho màu, 500ml cho dung tích…" />
+            <label className="admin-label">Slug</label>
+            <input className={`admin-input${errorClass(fieldErrors, "slug")}`} value={attributeForm.slug} onChange={(e) => setAttributeForm((f) => ({ ...f, slug: e.target.value }))} placeholder="Tự sinh nếu bỏ trống" />
+            {fieldErrors.slug && <p className="admin-field-error" role="alert">{fieldErrors.slug}</p>}
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Kiểu hiển thị</label>
+            <select className={`admin-input${errorClass(fieldErrors, "displayType")}`} value={attributeForm.displayType} onChange={(e) => setAttributeForm((f) => ({ ...f, displayType: e.target.value as DisplayType }))}>
+              {Object.entries(DISPLAY_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            {fieldErrors.displayType && <p className="admin-field-error" role="alert">{fieldErrors.displayType}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Thứ tự sắp xếp</label>
-            <input className="admin-input" type="number" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
+            <input className={`admin-input${errorClass(fieldErrors, "sortOrder")}`} type="number" value={attributeForm.sortOrder} onChange={(e) => setAttributeForm((f) => ({ ...f, sortOrder: e.target.value }))} />
+            {fieldErrors.sortOrder && <p className="admin-field-error" role="alert">{fieldErrors.sortOrder}</p>}
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Trạng thái</label>
+            <select className="admin-input" value={attributeForm.status} onChange={(e) => setAttributeForm((f) => ({ ...f, status: e.target.value as Status }))}>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="INACTIVE">Ngừng sử dụng</option>
+            </select>
           </div>
         </div>
-        {error && <p className="admin-error">{error}</p>}
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="admin-catalog-toggle-grid">
+          <label className="admin-catalog-toggle">
+            <input type="checkbox" checked={attributeForm.isVariantAttribute} onChange={(e) => setAttributeForm((f) => ({ ...f, isVariantAttribute: e.target.checked }))} />
+            Dùng để tạo biến thể
+          </label>
+          <label className="admin-catalog-toggle">
+            <input type="checkbox" checked={attributeForm.isSpecificationAttribute} onChange={(e) => setAttributeForm((f) => ({ ...f, isSpecificationAttribute: e.target.checked }))} />
+            Dùng làm thông số sản phẩm
+          </label>
+        </div>
+        <div className="admin-field">
+          <label className="admin-label">Ghi chú nội bộ</label>
+          <textarea className="admin-textarea" value={attributeForm.note} onChange={(e) => setAttributeForm((f) => ({ ...f, note: e.target.value }))} />
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-            {saving ? "Đang lưu…" : editId ? "Cập nhật" : "Thêm thuộc tính"}
+            {saving ? "Đang lưu…" : attributeForm.id ? "Cập nhật thuộc tính" : "Thêm thuộc tính"}
           </button>
-          {editId && (
-            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => { setEditId(null); setForm(defaultForm()); }}>
+          {attributeForm.id && (
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setAttributeForm(defaultAttributeForm())}>
               Hủy
             </button>
           )}
         </div>
       </form>
 
-      {/* Options list grouped by type */}
+      <form className="admin-catalog-fieldset" onSubmit={(e) => void handleValueSubmit(e)}>
+        <legend style={{ fontWeight: 600, fontSize: 14 }}>
+          {valueForm.id ? "Cập nhật giá trị thuộc tính" : "Thêm giá trị thuộc tính"}
+        </legend>
+        <div className="admin-seo-brief-form-grid">
+          <div className="admin-field">
+            <label className="admin-label">Thuộc tính cha <span className="admin-required">*</span></label>
+            <select className={`admin-input${errorClass(fieldErrors, "attributeId")}`} value={valueForm.attributeId} onChange={(e) => setValueForm((f) => ({ ...f, attributeId: e.target.value }))}>
+              <option value="">— Chọn thuộc tính —</option>
+              {attributes.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name} ({attribute.code})</option>)}
+            </select>
+            {fieldErrors.attributeId && <p className="admin-field-error" role="alert">{fieldErrors.attributeId}</p>}
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Tên hiển thị <span className="admin-required">*</span></label>
+            <input className={`admin-input${errorClass(fieldErrors, "name")}`} value={valueForm.name} onChange={(e) => setValueForm((f) => ({ ...f, name: e.target.value }))} placeholder="Đen, Trắng, S, Regular fit…" />
+            {fieldErrors.name && <p className="admin-field-error" role="alert">{fieldErrors.name}</p>}
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Mã giá trị</label>
+            <input className={`admin-input${errorClass(fieldErrors, "code")}`} value={valueForm.code} onChange={(e) => setValueForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="BLK, WHT, S…" />
+            {fieldErrors.code && <p className="admin-field-error" role="alert">{fieldErrors.code}</p>}
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Slug</label>
+            <input className={`admin-input${errorClass(fieldErrors, "slug")}`} value={valueForm.slug} onChange={(e) => setValueForm((f) => ({ ...f, slug: e.target.value }))} placeholder="Tự sinh nếu bỏ trống" />
+            {fieldErrors.slug && <p className="admin-field-error" role="alert">{fieldErrors.slug}</p>}
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">HEX màu</label>
+            <input className={`admin-input${errorClass(fieldErrors, "hexCode")}`} value={valueForm.hexCode} onChange={(e) => setValueForm((f) => ({ ...f, hexCode: e.target.value }))} placeholder="#000000" />
+            {fieldErrors.hexCode && <p className="admin-field-error" role="alert">{fieldErrors.hexCode}</p>}
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Ảnh giá trị</label>
+            <input className="admin-input" value={valueForm.imageUrl} onChange={(e) => setValueForm((f) => ({ ...f, imageUrl: e.target.value }))} placeholder="URL ảnh nếu dùng image swatch" />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Thứ tự</label>
+            <input className={`admin-input${errorClass(fieldErrors, "sortOrder")}`} type="number" value={valueForm.sortOrder} onChange={(e) => setValueForm((f) => ({ ...f, sortOrder: e.target.value }))} />
+            {fieldErrors.sortOrder && <p className="admin-field-error" role="alert">{fieldErrors.sortOrder}</p>}
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Trạng thái</label>
+            <select className="admin-input" value={valueForm.status} onChange={(e) => setValueForm((f) => ({ ...f, status: e.target.value as Status }))}>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="INACTIVE">Ngừng sử dụng</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
+            {saving ? "Đang lưu…" : valueForm.id ? "Cập nhật giá trị" : "Thêm giá trị"}
+          </button>
+          {valueForm.id && (
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setValueForm(defaultValueForm(valueForm.attributeId))}>
+              Hủy
+            </button>
+          )}
+        </div>
+      </form>
+
       {loading ? (
         <p className="admin-field-hint">Đang tải…</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {ALL_TYPES.filter((t) => !filterType || t === filterType).map((type) => {
-            const items = grouped[type] ?? [];
+          {attributes.map((attribute) => {
             return (
-              <div key={type}>
-                <h3 className="admin-subtitle" style={{ marginBottom: 8 }}>
-                  {TYPE_LABELS[type]}
-                  <span className="admin-field-hint" style={{ marginLeft: 8 }}>({items.length})</span>
-                </h3>
-                {items.length === 0 ? (
-                  <p className="admin-field-hint">Chưa có. Nhấn "Tạo thuộc tính mặc định" hoặc thêm thủ công.</p>
-                ) : (
-                  <div className="admin-catalog-table-wrap">
-                    <table className="admin-catalog-table">
-                      <thead>
-                        <tr>
-                          <th>Tên</th>
-                          <th>Mã</th>
-                          <th>Giá trị</th>
-                          <th>Thứ tự</th>
-                          <th>Trạng thái</th>
-                          <th>Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((opt) => (
-                          <tr key={opt.id}>
-                            <td>
-                              {opt.type === "COLOR" && opt.value && (
-                                <span style={{ display: "inline-block", width: 14, height: 14, background: opt.value, borderRadius: 2, border: "1px solid #ccc", marginRight: 6, verticalAlign: "middle" }} />
-                              )}
-                              {opt.name}
-                            </td>
-                            <td><code className="admin-catalog-code">{opt.code ?? "—"}</code></td>
-                            <td><span className="admin-field-hint">{opt.value ?? "—"}</span></td>
-                            <td>{opt.sortOrder}</td>
-                            <td>
-                              <span className={`admin-kb-badge ${opt.status === "ACTIVE" ? "admin-kb-badge--verified" : "admin-kb-badge--low"}`}>
-                                {opt.status === "ACTIVE" ? "Đang dùng" : "Ngưng"}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="admin-catalog-actions-cell">
-                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => startEdit(opt)}>Sửa</button>
-                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void toggleStatus(opt.id, opt.status)}>
-                                  {opt.status === "ACTIVE" ? "Ngưng" : "Kích hoạt"}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              <section key={attribute.id} className="admin-product-section">
+                <div className="admin-section-head">
+                  <div>
+                    <h3 className="admin-subtitle" style={{ marginBottom: 4 }}>{attribute.name}</h3>
+                    <p className="admin-field-hint">
+                      <code className="admin-catalog-code">{attribute.code}</code> · {attribute.slug} · {DISPLAY_TYPE_LABELS[attribute.displayType]} · {attribute.usageCount} nhóm sản phẩm đang dùng
+                    </p>
                   </div>
-                )}
-              </div>
+                  <div className="admin-catalog-actions-cell">
+                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setAttributeForm({
+                      id: attribute.id,
+                      name: attribute.name,
+                      code: attribute.code,
+                      slug: attribute.slug,
+                      displayType: attribute.displayType,
+                      isVariantAttribute: attribute.isVariantAttribute,
+                      isSpecificationAttribute: attribute.isSpecificationAttribute,
+                      status: attribute.status,
+                      sortOrder: String(attribute.sortOrder),
+                      note: attribute.note ?? "",
+                    })}>Sửa</button>
+                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchAttribute(attribute, { status: attribute.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}>
+                      {attribute.status === "ACTIVE" ? "Ngừng sử dụng" : "Kích hoạt"}
+                    </button>
+                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void deleteAttribute(attribute)}>Xóa</button>
+                  </div>
+                </div>
+                <div className="admin-catalog-table-wrap">
+                  <table className="admin-catalog-table">
+                    <thead>
+                      <tr>
+                        <th>Tên hiển thị</th>
+                        <th>Mã</th>
+                        <th>Slug</th>
+                        <th>Màu/ảnh</th>
+                        <th>Thứ tự</th>
+                        <th>Trạng thái</th>
+                        <th>Sử dụng</th>
+                        <th>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attribute.values.map((value) => (
+                        <tr key={value.id}>
+                          <td>{value.name}</td>
+                          <td><code className="admin-catalog-code">{value.code}</code></td>
+                          <td>{value.slug}</td>
+                          <td>
+                            {value.hexCode ? <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 4, background: value.hexCode, border: "1px solid #d1d5db" }} title={value.hexCode} /> : value.imageUrl ? "Có ảnh" : "—"}
+                          </td>
+                          <td>{value.sortOrder}</td>
+                          <td>
+                            <span className={`admin-kb-badge ${value.status === "ACTIVE" ? "admin-kb-badge--verified" : "admin-kb-badge--low"}`}>
+                              {value.status === "ACTIVE" ? "Đang hoạt động" : "Ngừng sử dụng"}
+                            </span>
+                          </td>
+                          <td>{value.usageCount}</td>
+                          <td>
+                            <div className="admin-catalog-actions-cell">
+                              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setValueForm({
+                                id: value.id,
+                                attributeId: attribute.id,
+                                name: value.name,
+                                code: value.code,
+                                slug: value.slug,
+                                hexCode: value.hexCode ?? "",
+                                imageUrl: value.imageUrl ?? "",
+                                status: value.status,
+                                sortOrder: String(value.sortOrder),
+                              })}>Sửa</button>
+                              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchValue(attribute, value, { status: value.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}>
+                                {value.status === "ACTIVE" ? "Ngừng" : "Kích hoạt"}
+                              </button>
+                              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void deleteValue(attribute, value)}>Xóa</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {attribute.values.length === 0 && (
+                        <tr>
+                          <td colSpan={8}>Chưa có giá trị. Thêm giá trị ở biểu mẫu phía trên.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             );
           })}
         </div>

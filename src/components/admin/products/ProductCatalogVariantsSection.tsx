@@ -5,6 +5,7 @@ import Image from "next/image";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import ProductOptionGroupBuilder, {
   type OptionGroupFormRow,
+  type SharedAttributePickerOption,
 } from "@/components/admin/products/ProductOptionGroupBuilder";
 import VariantLifecycleDialog, {
   type VariantLifecycleDialogState,
@@ -25,16 +26,18 @@ import {
   buildCartesianCombinations,
   buildCombinationPreviewText,
   combinationSignature,
-  computeTheoreticalCombinationCount,
   createClientKey,
   mapCombinationToLegacyFields,
-  VARIANT_MATRIX_CONFIRM_THRESHOLD,
-  VARIANT_MATRIX_WARN_THRESHOLD,
 } from "@/features/products/product-variant-matrix.utils";
 import {
   applyBulkResultToVariants,
   type MatrixVariantFormRow,
 } from "@/features/products/product-catalog-form-mappers";
+import { variantRowHasError } from "@/features/products/product-catalog-form-validation";
+import VariantMatrixConfirmDialog from "@/components/admin/products/VariantMatrixConfirmDialog";
+import {
+  computeFormMatrixPreview,
+} from "@/features/products/product-variant-matrix-form-preview";
 
 function renderVariantStatusOptions() {
   return VARIANT_STATUS_OPTIONS.map((opt) => (
@@ -51,9 +54,12 @@ type Props = {
   defaultLeadTime: string;
   optionGroups: OptionGroupFormRow[];
   variants: MatrixVariantFormRow[];
+  sharedAttributes?: SharedAttributePickerOption[];
+  fieldErrors?: Record<string, string>;
   onOptionGroupsChange: (groups: OptionGroupFormRow[]) => void;
   onVariantsChange: (variants: MatrixVariantFormRow[]) => void;
   onReloadProduct?: () => Promise<void>;
+  onBeforeMatrixGenerate?: () => Promise<boolean>;
   onVariantDeleted?: (variantId: string) => void;
   onBulkOperationChange?: (inProgress: boolean) => void;
 };
@@ -113,9 +119,12 @@ export default function ProductCatalogVariantsSection({
   defaultLeadTime,
   optionGroups,
   variants,
+  sharedAttributes = [],
+  fieldErrors = {},
   onOptionGroupsChange,
   onVariantsChange,
   onReloadProduct,
+  onBeforeMatrixGenerate,
   onVariantDeleted,
   onBulkOperationChange,
 }: Props) {
@@ -123,6 +132,9 @@ export default function ProductCatalogVariantsSection({
   const [statusFilter, setStatusFilter] = useState("");
   const [generating, setGenerating] = useState(false);
   const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
+  const [matrixConfirmOpen, setMatrixConfirmOpen] = useState(false);
+  const [matrixConfirmLarge, setMatrixConfirmLarge] = useState(false);
+  const [manualSkuKeys, setManualSkuKeys] = useState<Set<string>>(new Set());
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -162,9 +174,11 @@ export default function ProductCatalogVariantsSection({
     [matrixGroups],
   );
 
-  const theoreticalCount = useMemo(
-    () => computeTheoreticalCombinationCount(matrixGroups),
-    [matrixGroups],
+  const structuredVariants = variants.filter((variant) => variant.variantKind === "structured");
+
+  const matrixPreview = useMemo(
+    () => computeFormMatrixPreview(matrixGroups, structuredVariants),
+    [matrixGroups, structuredVariants],
   );
 
   const variantUsageByValueId = useMemo(() => {
@@ -178,7 +192,6 @@ export default function ProductCatalogVariantsSection({
     return usage;
   }, [variants]);
 
-  const structuredVariants = variants.filter((variant) => variant.variantKind === "structured");
   const legacyVariants = variants.filter((variant) => variant.variantKind === "legacy");
 
   const filteredStructuredVariants = structuredVariants.filter((variant) => {
@@ -505,7 +518,17 @@ export default function ProductCatalogVariantsSection({
     );
   }
 
-  function generateClientSideCombinations(confirmLarge = false) {
+  function openMatrixConfirm() {
+    setMatrixMessage(null);
+    if (!matrixPreview.canGenerate) {
+      setMatrixMessage(matrixPreview.message ?? "Không có tổ hợp mới để tạo.");
+      return;
+    }
+    setMatrixConfirmLarge(false);
+    setMatrixConfirmOpen(true);
+  }
+
+  function generateClientSideCombinations() {
     if (!matrixGroups.length || matrixGroups.some((group) => group.values.length === 0)) {
       setMatrixMessage("Thêm nhóm biến thể và ít nhất một giá trị cho mỗi nhóm trước khi tạo tổ hợp.");
       return;
@@ -522,23 +545,6 @@ export default function ProductCatalogVariantsSection({
       return;
     }
 
-    if (theoreticalCount >= VARIANT_MATRIX_WARN_THRESHOLD) {
-      setMatrixMessage(`Cảnh báo: ma trận có ${theoreticalCount} tổ hợp lý thuyết.`);
-    }
-
-    if (missing.length >= VARIANT_MATRIX_CONFIRM_THRESHOLD && !confirmLarge) {
-      const ok = window.confirm(
-        `Sẽ tạo ${missing.length} biến thể mới. Bạn có chắc muốn tiếp tục?`,
-      );
-      if (!ok) return;
-    } else if (
-      !window.confirm(
-        `Tạo ${missing.length} biến thể mới và giữ nguyên ${existing.size} biến thể hiện có?`,
-      )
-    ) {
-      return;
-    }
-
     const created = missing.map((combo) => {
       const legacy = mapCombinationToLegacyFields(matrixGroups, combo.valueIds);
       return {
@@ -551,6 +557,8 @@ export default function ProductCatalogVariantsSection({
         sizeName: legacy.sizeName ?? "",
         dimensions: legacy.dimensions ?? "",
         capacity: legacy.capacity ?? "",
+        moqOverride: defaultMoq.trim() || "",
+        leadTimeOverride: defaultLeadTime.trim() || "",
       };
     });
 
@@ -560,8 +568,16 @@ export default function ProductCatalogVariantsSection({
 
   async function generateFromServer(confirmLarge = false) {
     if (!productId) {
-      generateClientSideCombinations(confirmLarge);
+      generateClientSideCombinations();
       return;
+    }
+
+    if (onBeforeMatrixGenerate) {
+      const ready = await onBeforeMatrixGenerate();
+      if (!ready) {
+        setMatrixMessage("Lưu nhóm biến thể trước khi tạo tổ hợp.");
+        return;
+      }
     }
 
     setGenerating(true);
@@ -575,20 +591,19 @@ export default function ProductCatalogVariantsSection({
       const data = (await response.json()) as {
         message?: string;
         created?: number;
-        skipped?: number;
         preserved?: number;
         error?: string;
+        fieldErrors?: Record<string, string>;
       };
 
       if (!response.ok) {
         if (data.message?.includes("xác nhận") && !confirmLarge) {
-          const ok = window.confirm(`${data.message}\n\nBạn có muốn tiếp tục?`);
-          if (ok) {
-            await generateFromServer(true);
-            return;
-          }
+          setMatrixConfirmLarge(true);
+          setMatrixConfirmOpen(true);
+          return;
         }
-        setMatrixMessage(data.message ?? data.error ?? "Không thể tạo biến thể.");
+        const comboError = data.fieldErrors?.variants;
+        setMatrixMessage(comboError ?? data.message ?? data.error ?? "Không thể tạo biến thể.");
         return;
       }
 
@@ -600,7 +615,17 @@ export default function ProductCatalogVariantsSection({
       setMatrixMessage("Không thể kết nối máy chủ khi tạo biến thể.");
     } finally {
       setGenerating(false);
+      setMatrixConfirmOpen(false);
     }
+  }
+
+  async function confirmMatrixGeneration() {
+    setMatrixConfirmOpen(false);
+    if (!productId) {
+      generateClientSideCombinations();
+      return;
+    }
+    await generateFromServer(matrixConfirmLarge || matrixPreview.requiresConfirmation);
   }
 
   function addManualStructuredVariant() {
@@ -616,26 +641,42 @@ export default function ProductCatalogVariantsSection({
     <div className="admin-variant-matrix-section">
       <ProductOptionGroupBuilder
         groups={optionGroups}
+        sharedAttributes={sharedAttributes}
         variantUsageByValueId={variantUsageByValueId}
+        fieldErrors={fieldErrors}
         onChange={onOptionGroupsChange}
       />
 
       <section className="admin-product-section">
         <h3>Tổ hợp biến thể</h3>
         <p className="admin-field-hint">{previewText}</p>
-        {theoreticalCount >= VARIANT_MATRIX_WARN_THRESHOLD && (
+        <dl className="admin-matrix-preview-stats admin-matrix-preview-stats--inline">
+          <div>
+            <dt>Tổ hợp lý thuyết</dt>
+            <dd>{matrixPreview.theoreticalCount}</dd>
+          </div>
+          <div>
+            <dt>Đã có</dt>
+            <dd>{matrixPreview.existingCount}</dd>
+          </div>
+          <div>
+            <dt>Sẽ tạo mới</dt>
+            <dd><strong>{matrixPreview.missingCount}</strong></dd>
+          </div>
+        </dl>
+        {matrixPreview.requiresWarning && (
           <p className="admin-kb-warning-list" role="status">
-            Ma trận lớn: {theoreticalCount} tổ hợp lý thuyết. Hãy kiểm tra trước khi tạo hàng loạt.
+            Ma trận lớn: {matrixPreview.theoreticalCount} tổ hợp lý thuyết. Hãy kiểm tra trước khi tạo hàng loạt.
           </p>
         )}
         <div className="admin-variant-matrix-actions">
           <button
             type="button"
             className="btn-primary"
-            disabled={generating}
-            onClick={() => void generateFromServer(false)}
+            disabled={generating || !matrixPreview.canGenerate}
+            onClick={openMatrixConfirm}
           >
-            {generating ? "Đang tạo…" : "Tạo biến thể từ tổ hợp"}
+            {generating ? "Đang tạo…" : "Tạo tổ hợp biến thể"}
           </button>
           <button type="button" className="btn-secondary" onClick={addManualStructuredVariant}>
             Thêm biến thể thủ công
@@ -643,6 +684,20 @@ export default function ProductCatalogVariantsSection({
         </div>
         {matrixMessage && <p className="admin-field-hint" role="status">{matrixMessage}</p>}
       </section>
+
+      <VariantMatrixConfirmDialog
+        open={matrixConfirmOpen}
+        previewText={matrixPreview.previewText}
+        theoreticalCount={matrixPreview.theoreticalCount}
+        existingCount={matrixPreview.existingCount}
+        missingCount={matrixPreview.missingCount}
+        missingCombinations={matrixPreview.missingCombinations}
+        requiresWarning={matrixPreview.requiresWarning}
+        requiresConfirmation={matrixConfirmLarge || matrixPreview.requiresConfirmation}
+        submitting={generating}
+        onCancel={() => setMatrixConfirmOpen(false)}
+        onConfirm={() => void confirmMatrixGeneration()}
+      />
 
       <section className="admin-product-section">
         <div className="admin-section-head">
@@ -677,6 +732,40 @@ export default function ProductCatalogVariantsSection({
               ? ` (${selectedPersistedIds.length} đã lưu)`
               : ""}
           </p>
+        )}
+
+        {Object.keys(fieldErrors).some((key) => key.startsWith("variants.")) && (
+          <div className="admin-variant-error-summary" role="alert">
+            <p className="admin-variant-error-summary__title">Lỗi biến thể cần sửa:</p>
+            <ul className="admin-variant-error-summary__list">
+              {Object.entries(fieldErrors)
+                .filter(([key]) => key.startsWith("variants."))
+                .map(([key, message]) => {
+                  const match = /^variants\.(\d+)\.(.+)$/.exec(key);
+                  const variantIndex = match ? Number(match[1]) : -1;
+                  const field = match?.[2] ?? key;
+                  const variant = variants[variantIndex];
+                  const label = variant?.displayLabel || variant?.sku || `Hàng ${variantIndex + 1}`;
+                  return (
+                    <li key={key}>
+                      <button
+                        type="button"
+                        className="admin-variant-error-summary__item"
+                        onClick={() => {
+                          const row = document.querySelector<HTMLElement>(
+                            `[data-variant-row="${variantIndex}"]`,
+                          );
+                          row?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          row?.querySelector<HTMLElement>("input,select,textarea")?.focus();
+                        }}
+                      >
+                        <strong>{label}</strong> — {field}: {message}
+                      </button>
+                    </li>
+                  );
+                })}
+            </ul>
+          </div>
         )}
 
         {selectedPersistedIds.length > 0 && (
@@ -740,8 +829,16 @@ export default function ProductCatalogVariantsSection({
                 </tr>
               </thead>
               <tbody>
-                {filteredStructuredVariants.map((variant) => (
-                  <tr key={variant.clientKey} className={variantMatrixRowClass(variant.variantStatus)}>
+                {filteredStructuredVariants.map((variant) => {
+                  const variantIndex = variants.findIndex((row) => row.clientKey === variant.clientKey);
+                  const hasRowError = variantIndex >= 0 && variantRowHasError(fieldErrors, variantIndex);
+                  return (
+                  <tr
+                    key={variant.clientKey}
+                    className={`${variantMatrixRowClass(variant.variantStatus)}${hasRowError ? " admin-variant-row--error" : ""}`}
+                    data-variant-row={variantIndex >= 0 ? variantIndex : undefined}
+                    data-field-prefix={variantIndex >= 0 ? `variants.${variantIndex}` : undefined}
+                  >
                     <td>
                       <input
                         type="checkbox"
@@ -758,7 +855,7 @@ export default function ProductCatalogVariantsSection({
                       )}
                     </td>
                     <td>
-                      <div className="admin-variant-cell-truncate" title={variant.displayLabel || undefined}>
+                      <div className="admin-variant-cell-wrap" title={variant.displayLabel || undefined}>
                         {variant.displayLabel || "—"}
                       </div>
                       {variant.variantStatus !== "ACTIVE" && (
@@ -777,13 +874,36 @@ export default function ProductCatalogVariantsSection({
                       </div>
                     </td>
                     <td>
-                      <input
-                        className="form-input admin-variant-cell-truncate"
-                        value={variant.sku}
-                        title={variant.sku}
-                        onChange={(e) => updateVariant(variant.clientKey, { sku: e.target.value })}
-                        placeholder={productCode ? "Tự sinh khi lưu" : ""}
-                      />
+                      {manualSkuKeys.has(variant.clientKey) || variant.sku.trim() ? (
+                        <>
+                          <input
+                            className={`form-input admin-variant-cell-truncate${fieldErrors[`variants.${variantIndex}.sku`] ? " admin-input--error" : ""}`}
+                            value={variant.sku}
+                            title={variant.sku}
+                            data-field={variantIndex >= 0 ? `variants.${variantIndex}.sku` : undefined}
+                            onChange={(e) => updateVariant(variant.clientKey, { sku: e.target.value })}
+                            placeholder={productCode ? "SKU thủ công" : ""}
+                          />
+                          {fieldErrors[`variants.${variantIndex}.sku`] && (
+                            <p className="admin-field-error" role="alert">
+                              {fieldErrors[`variants.${variantIndex}.sku`]}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <div className="admin-variant-sku-auto">
+                          <span className="admin-field-hint">Tự sinh khi lưu</span>
+                          <button
+                            type="button"
+                            className="btn-tertiary btn-sm"
+                            onClick={() =>
+                              setManualSkuKeys((prev) => new Set(prev).add(variant.clientKey))
+                            }
+                          >
+                            Chỉnh mã thủ công
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td>
                       <select
@@ -854,7 +974,8 @@ export default function ProductCatalogVariantsSection({
                     </td>
                     <td>{renderVariantActions(variant)}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
