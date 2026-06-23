@@ -2183,13 +2183,78 @@ body:has(.mobile-action-bar) .site-footer {
 /* ── Floating contact widget (desktop) ─────────────────────────────────────── */
 
 .floating-contact {
-  display: none;
+  display: flex;
   position: fixed;
   bottom: 28px;
   right: 28px;
   z-index: 180;
   flex-direction: column;
   gap: 10px;
+  align-items: flex-end;
+}
+
+.floating-contact-actions {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+@media (min-width: 768px) {
+  .floating-contact-actions {
+    display: flex;
+  }
+}
+
+.floating-contact-btn--top {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #111827;
+  border-color: var(--border);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.floating-contact-btn--top.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.floating-contact-btn--top:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.floating-contact-btn--top:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .floating-contact {
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+body:has(.mp-pdp--b2b) .floating-contact {
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 899px) {
+  body:has(.mp-pdp--b2b) .floating-contact {
+    bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @media (min-width: 768px) {
@@ -15839,6 +15904,217 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
   .mp-pdp--b2b .mp-pdp-core-facts {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ─── Sprint 27.2.8 — PDP layout rebalance + true sticky conversion ─────────── */
+
+.mp-pdp-shell {
+  padding: 20px 0 0;
+}
+
+.mp-pdp-shell-grid {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.45fr) minmax(320px, 1fr) minmax(280px, 0.82fr);
+  grid-template-areas:
+    "gallery summary aside"
+    "content content aside";
+  gap: 24px 28px;
+  align-items: start;
+}
+
+.mp-pdp--b2b .product-detail-left {
+  grid-area: gallery;
+  min-width: 0;
+}
+
+.mp-pdp--b2b .product-detail-center {
+  grid-area: summary;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.mp-pdp--b2b .mp-pdp-conversion-aside {
+  grid-area: aside;
+  position: sticky;
+  top: calc(var(--mp-header-stack-height, var(--header-height, 112px)) + 20px);
+  align-self: start;
+  z-index: 3;
+  max-height: none;
+  overflow: visible;
+}
+
+.mp-pdp--b2b .product-detail-right.mp-pdp-conversion-aside {
+  max-height: none;
+  overflow: visible;
+  scrollbar-width: auto;
+}
+
+.mp-pdp-shell-content {
+  grid-area: content;
+  min-width: 0;
+}
+
+.mp-pdp--b2b .mp-pdp-gallery-main,
+.mp-pdp--b2b .mp-pdp-gallery--empty {
+  max-height: min(640px, 56vw);
+}
+
+@media (min-width: 1280px) {
+  .mp-pdp--b2b .mp-pdp-gallery-main,
+  .mp-pdp--b2b .mp-pdp-gallery--empty {
+    max-height: min(680px, 48vw);
+  }
+
+  .mp-pdp--b2b .mp-pdp-gallery-thumbs {
+    max-height: min(680px, 48vw);
+  }
+}
+
+.mp-pdp--b2b .mp-pdp-overview-title {
+  font-size: clamp(24px, 2.2vw, 32px);
+  line-height: 1.14;
+}
+
+.mp-pdp--b2b .mp-pdp-overview-summary {
+  max-width: none;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.mp-pdp--b2b .mp-pdp-core-facts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mp-pdp-spec-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+}
+
+.mp-pdp-spec-preview-item {
+  display: grid;
+  grid-template-columns: minmax(96px, 40%) 1fr;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.mp-pdp-spec-preview-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.mp-pdp-spec-preview-item dt {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.mp-pdp-spec-preview-item dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.45;
+}
+
+.mp-pdp-spec-more {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.mp-pdp-spec-more a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mp-pdp-spec-more a:hover {
+  text-decoration: underline;
+}
+
+.mp-pdp-tabs--in-shell {
+  position: sticky;
+  top: calc(var(--mp-header-stack-height, var(--header-height, 112px)) - 1px);
+  z-index: 30;
+  margin: 0 0 8px;
+  border-radius: 12px;
+}
+
+.mp-pdp-shell-content .mp-pdp-section {
+  padding: 40px 0 0;
+}
+
+.mp-pdp-shell-content .mp-pdp-section:first-of-type {
+  padding-top: 24px;
+}
+
+@media (max-width: 1279px) and (min-width: 1024px) {
+  .mp-pdp-shell-grid {
+    grid-template-columns: minmax(340px, 1.25fr) minmax(280px, 1fr) minmax(250px, 0.78fr);
+    gap: 20px 22px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .mp-pdp-shell-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "gallery gallery"
+      "summary summary"
+      "aside aside"
+      "content content";
+    gap: 20px;
+  }
+
+  .mp-pdp--b2b .mp-pdp-conversion-aside {
+    position: static;
+    max-width: 520px;
+  }
+
+  .mp-pdp--b2b .mp-pdp-gallery-main,
+  .mp-pdp--b2b .mp-pdp-gallery--empty {
+    max-height: min(520px, 72vw);
+  }
+}
+
+@media (max-width: 899px) {
+  .mp-pdp-shell-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "gallery"
+      "summary"
+      "aside"
+      "content";
+  }
+
+  .mp-pdp--b2b .mp-pdp-conversion-aside {
+    display: none;
+  }
+
+  .mp-pdp--b2b .mp-pdp-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .mp-pdp--b2b .mp-pdp-gallery-thumbs {
+    flex-direction: row;
+    order: 2;
+    max-height: none;
+  }
+
+  .mp-pdp--b2b .mp-pdp-gallery-stage {
+    order: 1;
+  }
+}
+
+@media (max-width: 639px) {
+  .mp-pdp--b2b .mp-pdp-core-facts {
+    grid-template-columns: 1fr;
   }
 }
 

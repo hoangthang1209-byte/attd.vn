@@ -153,12 +153,25 @@ export default function ProductDetailInteractive({
     optionSelections: selectedVariant?.optionSelections ?? selection,
   };
 
+  const conversionPanel = (
+    <ProductPdpConversionPanel
+      productName={displayName}
+      productCode={displayedCode}
+      variantLabel={selectedVariant?.label}
+      moq={effectiveMoq}
+      leadTime={effectiveLeadTime}
+      stockLabel={stockLabel}
+      stockColor={stockColor}
+      onRequestQuote={openQuote}
+    />
+  );
+
   return (
     <>
-      <section className="mp-pdp-hero">
+      <div className="mp-pdp-shell">
         <div className="container">
-          <div className="product-detail-grid" id="mp-pdp-overview">
-            <div className="product-detail-left">
+          <div className="mp-pdp-shell-grid">
+            <div className="product-detail-left" id="mp-pdp-overview">
               <ProductGallery
                 images={galleryImages}
                 productName={displayName}
@@ -243,79 +256,47 @@ export default function ProductDetailInteractive({
                   <ProductSpecificationsSection rows={specifications} preview />
                 </div>
               )}
-
-              {(displayContent || specifications.length > 0 || customizations.length > 0) && (
-                <nav className="mp-pdp-overview-anchors" aria-label="Đi tới mục chi tiết">
-                  {specifications.length > 0 && (
-                    <a href="#mp-pdp-specs" className="mp-pdp-overview-anchor">
-                      Thông số
-                    </a>
-                  )}
-                  {displayContent && (
-                    <a href="#mp-pdp-desc" className="mp-pdp-overview-anchor">
-                      Mô tả
-                    </a>
-                  )}
-                  {customizations.length > 0 && (
-                    <a href="#mp-pdp-custom" className="mp-pdp-overview-anchor">
-                      Tùy chỉnh
-                    </a>
-                  )}
-                  {showFaqTab && (
-                    <a href="#mp-pdp-faq" className="mp-pdp-overview-anchor">
-                      FAQ
-                    </a>
-                  )}
-                </nav>
-              )}
             </div>
 
-            <ProductPdpConversionPanel
-              productName={displayName}
-              productCode={displayedCode}
-              variantLabel={selectedVariant?.label}
-              moq={effectiveMoq}
-              leadTime={effectiveLeadTime}
-              stockLabel={stockLabel}
-              stockColor={stockColor}
-              onRequestQuote={openQuote}
-            />
+            {conversionPanel}
+
+            <div className="mp-pdp-shell-content">
+              <ProductDetailTabs tabs={anchorTabs} />
+
+              {specifications.length > 0 && (
+                <ProductSpecificationsSection rows={specifications} />
+              )}
+
+              {(displayContent || displayShortDescription) && (
+                <section className="mp-section mp-pdp-section" id="mp-pdp-desc">
+                  <div className="mp-pdp-desc">
+                    <header className="mp-pdp-section-head">
+                      <h2 className="mp-pdp-section-title">Mô tả sản phẩm</h2>
+                      <p className="mp-pdp-section-subtitle">
+                        Thông tin chi tiết về chất liệu, ứng dụng và khả năng cung ứng B2B.
+                      </p>
+                    </header>
+                    <div className="mp-pdp-desc-content">
+                      {displayShortDescription && !displayContent && (
+                        <p className="mp-pdp-desc-lead">{displayShortDescription}</p>
+                      )}
+                      {displayContent && (
+                        <div className="mp-pdp-desc-body">
+                          {displayContent.split("\n\n").map((paragraph) => (
+                            <p key={paragraph.slice(0, 48)}>{paragraph}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              <ProductCustomizationsSection items={customizations} onRequestQuote={openQuote} />
+            </div>
           </div>
         </div>
-
-        <ProductDetailTabs tabs={anchorTabs} />
-      </section>
-
-      {specifications.length > 0 && (
-        <ProductSpecificationsSection rows={specifications} />
-      )}
-
-      {(displayContent || displayShortDescription) && (
-        <section className="mp-section mp-pdp-section" id="mp-pdp-desc">
-          <div className="container mp-pdp-desc">
-            <header className="mp-pdp-section-head">
-              <h2 className="mp-pdp-section-title">Mô tả sản phẩm</h2>
-              <p className="mp-pdp-section-subtitle">
-                Thông tin chi tiết về chất liệu, ứng dụng và khả năng cung ứng B2B.
-              </p>
-            </header>
-            <div className="mp-pdp-desc-content">
-              {displayShortDescription && !displayContent && (
-                <p className="mp-pdp-desc-lead">{displayShortDescription}</p>
-              )}
-              {displayContent && (
-                <div className="mp-pdp-desc-body">
-                  {displayContent.split("\n\n").map((paragraph) => (
-                    <p key={paragraph.slice(0, 48)}>{paragraph}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      <ProductCustomizationsSection items={customizations} onRequestQuote={openQuote} />
+      </div>
 
       <ProductPdpMobileBar onRequestQuote={openQuote} />
 

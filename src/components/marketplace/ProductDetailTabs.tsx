@@ -42,7 +42,7 @@ export default function ProductDetailTabs({ tabs }: Props) {
   if (!tabs.length) return null;
 
   return (
-    <nav className="mp-pdp-tabs" aria-label="Mục chi tiết sản phẩm">
+    <nav className="mp-pdp-tabs mp-pdp-tabs--in-shell" aria-label="Mục chi tiết sản phẩm">
       <div className="mp-pdp-tabs-inner">
         <div className="mp-pdp-tabs-scroll">
           {tabs.map((tab) => (

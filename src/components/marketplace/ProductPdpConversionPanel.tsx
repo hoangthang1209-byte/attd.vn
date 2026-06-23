@@ -27,7 +27,7 @@ export default function ProductPdpConversionPanel({
   onRequestQuote,
 }: Props) {
   return (
-    <aside className="product-detail-right" aria-label="Yêu cầu báo giá">
+    <aside className="product-detail-right mp-pdp-conversion-aside" aria-label="Yêu cầu báo giá">
       <div className="mp-pdp-conversion-card">
         <div className="mp-pdp-conversion-head">
           <p className="mp-pdp-conversion-kicker">Báo giá B2B</p>

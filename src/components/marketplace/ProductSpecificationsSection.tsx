@@ -9,7 +9,7 @@ export default function ProductSpecificationsSection({ rows, preview = false }: 
   const visible = rows.filter((row) => row.label.trim() && row.value.trim());
   if (!visible.length) return null;
 
-  const list = preview ? visible.slice(0, 6) : visible;
+  const list = preview ? visible.slice(0, 4) : visible;
   const Wrapper = preview ? "div" : "section";
   const wrapperProps = preview
     ? { className: "mp-pdp-spec-preview-card" }
@@ -29,20 +29,31 @@ export default function ProductSpecificationsSection({ rows, preview = false }: 
           )}
         </header>
 
-        <div className={`mp-pdp-spec-table${preview ? " mp-pdp-spec-table--preview" : ""}`}>
-          <dl className="mp-pdp-spec-grid">
+        {preview ? (
+          <dl className="mp-pdp-spec-preview-list">
             {list.map((row) => (
-              <div key={row.id} className="mp-pdp-spec-row">
+              <div key={row.id} className="mp-pdp-spec-preview-item">
                 <dt>{row.label}</dt>
                 <dd>{row.value}</dd>
               </div>
             ))}
           </dl>
-        </div>
+        ) : (
+          <div className="mp-pdp-spec-table">
+            <dl className="mp-pdp-spec-grid">
+              {list.map((row) => (
+                <div key={row.id} className="mp-pdp-spec-row">
+                  <dt>{row.label}</dt>
+                  <dd>{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
 
         {preview && visible.length > list.length && (
           <p className="mp-pdp-spec-more">
-            <a href="#mp-pdp-specs">Xem đầy đủ thông số ↓</a>
+            <a href="#mp-pdp-specs">Xem đầy đủ thông số</a>
           </p>
         )}
       </div>
