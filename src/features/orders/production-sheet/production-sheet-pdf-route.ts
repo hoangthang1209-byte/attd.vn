@@ -8,6 +8,7 @@ import {
   parseOrderPdfDisposition,
   type OrderPdfDisposition,
 } from "@/features/orders/pdf/order-pdf-disposition";
+import { mergePdfNoindexHeaders } from "@/lib/seo/indexation-policy";
 
 type PdfRouteContext = {
   route: string;
@@ -25,13 +26,13 @@ function pdfResponseHeaders(
   filename: string,
   disposition: OrderPdfDisposition,
 ): Record<string, string> {
-  return {
+  return mergePdfNoindexHeaders({
     "Content-Type": "application/pdf",
     "Content-Disposition": orderPdfContentDisposition(filename, disposition),
     "Cache-Control": "no-store",
     "X-Order-Pdf-Renderer": "chromium",
     "X-Order-Pdf-Bytes": String(buffer.length),
-  };
+  });
 }
 
 export async function buildProductionSheetPdfResponse(

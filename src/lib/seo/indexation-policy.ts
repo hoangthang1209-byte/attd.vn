@@ -13,20 +13,24 @@ export const ROBOTS_INDEX_FOLLOW = { index: true, follow: true } as const;
 export const ROBOTS_NOINDEX_FOLLOW = { index: false, follow: true } as const;
 export const ROBOTS_NOINDEX_NOFOLLOW = { index: false, follow: false } as const;
 
-const CATALOG_QUERY_KEYS = new Set([
-  "category",
-  "q",
-  "search",
-  "material",
-  "inStock",
-  "print",
-  "embroidery",
-  "oem",
-  "sort",
-  "page",
+/** Tracking params stripped from substantive canonical decisions. */
+export const TRACKING_QUERY_KEYS = new Set([
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "gclid",
+  "fbclid",
+  "msclkid",
 ]);
 
-const BLOG_INDEX_QUERY_KEYS = new Set(["page", "tag", "q", "search"]);
+export type PartitionedSearchParams = {
+  /** Non-tracking, non-empty substantive params in stable sort order. */
+  meaningful: URLSearchParams;
+  /** Input contained tracking params (even when substantive set is empty). */
+  hadTrackingParams: boolean;
+};
 
 /** Build absolute URL using the shared site URL config. */
 export function absoluteUrl(path: string): string {
@@ -54,6 +58,34 @@ export function normalizeQuerySearchParams(input: SearchParamInput): URLSearchPa
     params.append(key, val);
   }
   return params;
+}
+
+/**
+ * Split raw query input into substantive params vs tracking-only noise.
+ * Empty substantive values (e.g. `?q=`, `?page=`) are ignored.
+ */
+export function partitionSearchParams(input: SearchParamInput): PartitionedSearchParams {
+  const normalized = normalizeQuerySearchParams(input);
+  let hadTrackingParams = false;
+  const substantiveEntries: Array<[string, string]> = [];
+
+  for (const [key, value] of normalized.entries()) {
+    if (TRACKING_QUERY_KEYS.has(key.toLowerCase())) {
+      hadTrackingParams = true;
+      continue;
+    }
+    if (!value.trim()) continue;
+    substantiveEntries.push([key, value]);
+  }
+
+  substantiveEntries.sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1]));
+
+  const meaningful = new URLSearchParams();
+  for (const [key, val] of substantiveEntries) {
+    meaningful.append(key, val);
+  }
+
+  return { meaningful, hadTrackingParams };
 }
 
 function canonicalFromPath(path: string, params?: URLSearchParams): string {
@@ -90,80 +122,76 @@ export function mergePdfNoindexHeaders(headers: Record<string, string>): Record<
   };
 }
 
-function paramsHasMeaningfulKeys(params: URLSearchParams, keys: Set<string>): boolean {
-  for (const key of params.keys()) {
-    if (keys.has(key)) return true;
-  }
-  return false;
+function hasSubstantiveQuery(meaningful: URLSearchParams): boolean {
+  return meaningful.toString().length > 0;
 }
 
-/** `/san-pham` catalog metadata policy. */
+function isCategoryOnlySubstantiveQuery(meaningful: URLSearchParams): boolean {
+  const keys = [...new Set(meaningful.keys())];
+  return keys.length === 1 && keys[0] === "category" && Boolean(meaningful.get("category")?.trim());
+}
+
+function buildCleanArchiveMetadata(
+  basePath: string,
+  partitioned: PartitionedSearchParams,
+): Pick<Metadata, "alternates" | "robots"> {
+  if (!hasSubstantiveQuery(partitioned.meaningful)) {
+    return {
+      ...buildCanonicalMetadata(basePath),
+      robots: partitioned.hadTrackingParams ? ROBOTS_NOINDEX_FOLLOW : ROBOTS_INDEX_FOLLOW,
+    };
+  }
+
+  return {
+    ...buildCanonicalMetadata(basePath, partitioned.meaningful),
+    robots: ROBOTS_NOINDEX_FOLLOW,
+  };
+}
+
+/**
+ * `/san-pham` catalog metadata policy.
+ *
+ * A. No substantive query → index, canonical `/san-pham` (tracking-only → noindex, clean canonical)
+ * B. Category-only substantive query → noindex, canonical `/{slug}` when approved
+ * C. Category + any other substantive param → noindex, self canonical
+ * D. Any other substantive query (incl. unknown keys) → noindex, self canonical
+ */
 export function buildCatalogMetadata(searchParams: SearchParamInput): Metadata {
-  const normalized = normalizeQuerySearchParams(searchParams);
+  const partitioned = partitionSearchParams(searchParams);
 
-  if (!paramsHasMeaningfulKeys(normalized, CATALOG_QUERY_KEYS)) {
+  if (!hasSubstantiveQuery(partitioned.meaningful)) {
+    return buildCleanArchiveMetadata("/san-pham", partitioned);
+  }
+
+  if (isCategoryOnlySubstantiveQuery(partitioned.meaningful)) {
+    const landingPath = resolveCatalogCategoryCanonicalPath(partitioned.meaningful.get("category"));
+    const canonical = landingPath
+      ? absoluteUrl(landingPath)
+      : canonicalFromPath("/san-pham", partitioned.meaningful);
+
     return {
-      ...buildCanonicalMetadata("/san-pham"),
-      robots: ROBOTS_INDEX_FOLLOW,
+      alternates: { canonical },
+      robots: ROBOTS_NOINDEX_FOLLOW,
     };
   }
 
-  const categorySlug = normalized.get("category");
-  const landingPath = resolveCatalogCategoryCanonicalPath(categorySlug);
-  const canonical = landingPath
-    ? absoluteUrl(landingPath)
-    : canonicalFromPath("/san-pham", normalized);
-
   return {
-    alternates: { canonical },
+    ...buildCanonicalMetadata("/san-pham", partitioned.meaningful),
     robots: ROBOTS_NOINDEX_FOLLOW,
   };
 }
 
-/** `/blog` archive metadata policy. */
+/** `/blog` archive metadata policy — any substantive query is noindex with self canonical. */
 export function buildBlogIndexMetadata(searchParams: SearchParamInput): Metadata {
-  const normalized = normalizeQuerySearchParams(searchParams);
-
-  if (!paramsHasMeaningfulKeys(normalized, BLOG_INDEX_QUERY_KEYS)) {
-    return {
-      ...buildCanonicalMetadata("/blog"),
-      robots: ROBOTS_INDEX_FOLLOW,
-    };
-  }
-
-  return {
-    ...buildCanonicalMetadata("/blog", normalized),
-    robots: ROBOTS_NOINDEX_FOLLOW,
-  };
+  return buildCleanArchiveMetadata("/blog", partitionSearchParams(searchParams));
 }
 
-/** `/blog/danh-muc/[slug]` archive metadata policy. */
+/** `/blog/danh-muc/[slug]` archive metadata policy — any substantive query is noindex with self canonical. */
 export function buildBlogCategoryMetadata(
   slug: string,
   searchParams: SearchParamInput,
 ): Pick<Metadata, "alternates" | "robots"> {
-  const normalized = normalizeQuerySearchParams(searchParams);
-  const basePath = `/blog/danh-muc/${slug}`;
-  const page = Math.max(1, parseInt(normalized.get("page") ?? "1", 10) || 1);
-  const hasArchiveFilters = Boolean(
-    normalized.get("tag")?.trim() ||
-      normalized.get("q")?.trim() ||
-      normalized.get("search")?.trim(),
-  );
-
-  const isIndexable = page === 1 && !hasArchiveFilters;
-
-  if (isIndexable) {
-    return {
-      ...buildCanonicalMetadata(basePath),
-      robots: ROBOTS_INDEX_FOLLOW,
-    };
-  }
-
-  return {
-    ...buildCanonicalMetadata(basePath, normalized),
-    robots: ROBOTS_NOINDEX_FOLLOW,
-  };
+  return buildCleanArchiveMetadata(`/blog/danh-muc/${slug}`, partitionSearchParams(searchParams));
 }
 
 /** `/{category}` landing metadata indexation overlay. */
