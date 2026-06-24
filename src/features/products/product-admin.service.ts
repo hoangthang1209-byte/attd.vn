@@ -24,7 +24,7 @@ import { generateProductSystemCode } from "@/features/products/product-system-co
 import {
   PRODUCT_CMS_INCLUDE,
   syncProductCmsData,
-  resolveOptionValueIdsForProduct,
+  resolveOptionValueRefsFromLoadedOptions,
   type ProductCustomizationInput,
   type ProductOptionInput,
   type ProductSpecificationInput,
@@ -183,10 +183,11 @@ async function runProductSaveTransaction<T>(
     return await prisma.$transaction(fn, PRODUCT_SAVE_TRANSACTION_OPTIONS);
   } catch (err) {
     if (isPrismaTransactionTimeoutError(err)) {
+      const staffMessage = PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE;
       throw new ProductAdminValidationError(
-        PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE,
+        staffMessage,
         {},
-        err instanceof Error ? err.message : PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE,
+        process.env.NODE_ENV === "development" && err instanceof Error ? err.message : staffMessage,
       );
     }
     throw err;
@@ -685,6 +686,10 @@ async function writeProductDependentRelations(
   }
 
   if (input.variants?.some((v) => v.optionValueIds?.length)) {
+    const loadedOptions = await db.productOption.findMany({
+      where: { productId },
+      include: { values: true },
+    });
     const variantOptionValueIds: Record<string, string[]> = {};
     let newVariantIndex = 0;
     for (const v of input.variants) {
@@ -695,10 +700,9 @@ async function writeProductDependentRelations(
       const variantId = v.id ?? createdVariantIds[newVariantIndex];
       if (!v.id) newVariantIndex += 1;
       if (!variantId) continue;
-      variantOptionValueIds[variantId] = await resolveOptionValueIdsForProduct(
-        productId,
+      variantOptionValueIds[variantId] = resolveOptionValueRefsFromLoadedOptions(
+        loadedOptions,
         v.optionValueIds,
-        db,
       );
     }
     await syncProductCmsData(productId, { variantOptionValueIds }, db);

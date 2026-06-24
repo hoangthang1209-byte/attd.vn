@@ -26,10 +26,6 @@ import {
   isUuid,
   buildOptionValueRef,
 } from "@/features/products/product-variant-matrix.utils";
-import {
-  countVariantsUsingOption,
-  countVariantsUsingOptionValue,
-} from "@/features/products/product-variant-matrix.service";
 import type { ProductAttributeAssignmentInput } from "@/features/products/product-attribute-assignment.utils";
 
 export type ProductOptionValueInput = {
@@ -116,18 +112,14 @@ function validateOptionCombinations(
   }
 }
 
-export async function resolveOptionValueIdsForProduct(
-  productId: string,
-  refs: string[],
-  db: DbClient = prisma,
-): Promise<string[]> {
-  if (!refs.length) return [];
-
-  const options = await db.productOption.findMany({
-    where: { productId },
-    include: { values: true },
-  });
-
+function buildOptionValueRefMaps(
+  options: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    values: Array<{ id: string; label: string }>;
+  }>,
+) {
   const byId = new Map<string, string>();
   const byRef = new Map<string, string>();
 
@@ -143,6 +135,20 @@ export async function resolveOptionValueIdsForProduct(
     }
   }
 
+  return { byId, byRef };
+}
+
+export function resolveOptionValueRefsFromLoadedOptions(
+  options: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    values: Array<{ id: string; label: string }>;
+  }>,
+  refs: string[],
+): string[] {
+  if (!refs.length) return [];
+  const { byId, byRef } = buildOptionValueRefMaps(options);
   return refs.map((ref) => {
     if (isUuid(ref) && byId.has(ref)) return ref;
     const resolved = byRef.get(ref);
@@ -150,6 +156,91 @@ export async function resolveOptionValueIdsForProduct(
     if (isUuid(ref)) throwProductRelationOwnershipError();
     return ref;
   });
+}
+
+async function assertRemovedOptionsNotInUse(
+  db: DbClient,
+  productId: string,
+  removedOptions: Array<{ id: string; name: string }>,
+): Promise<void> {
+  if (!removedOptions.length) return;
+
+  const links = await db.productVariantOptionValue.findMany({
+    where: {
+      optionValue: { optionId: { in: removedOptions.map((option) => option.id) } },
+      variant: { productId },
+    },
+    select: {
+      variantId: true,
+      optionValue: { select: { optionId: true } },
+    },
+  });
+
+  const variantCountByOption = new Map<string, Set<string>>();
+  for (const link of links) {
+    const optionId = link.optionValue.optionId;
+    const set = variantCountByOption.get(optionId) ?? new Set<string>();
+    set.add(link.variantId);
+    variantCountByOption.set(optionId, set);
+  }
+
+  for (const option of removedOptions) {
+    const usage = variantCountByOption.get(option.id)?.size ?? 0;
+    if (usage > 0) {
+      throw new ProductAdminValidationError(
+        `Không thể xóa nhóm "${option.name}" vì ${usage} biến thể đang dùng giá trị trong nhóm này.`,
+        { options: "Nhóm biến thể đang được sử dụng." },
+      );
+    }
+  }
+}
+
+async function assertRemovedOptionValuesNotInUse(
+  db: DbClient,
+  productId: string,
+  removedValues: Array<{ id: string; label: string }>,
+): Promise<void> {
+  if (!removedValues.length) return;
+
+  const links = await db.productVariantOptionValue.findMany({
+    where: {
+      optionValueId: { in: removedValues.map((value) => value.id) },
+      variant: { productId },
+    },
+    select: { optionValueId: true, variantId: true },
+  });
+
+  const variantCountByValue = new Map<string, Set<string>>();
+  for (const link of links) {
+    const set = variantCountByValue.get(link.optionValueId) ?? new Set<string>();
+    set.add(link.variantId);
+    variantCountByValue.set(link.optionValueId, set);
+  }
+
+  for (const value of removedValues) {
+    const usage = variantCountByValue.get(value.id)?.size ?? 0;
+    if (usage > 0) {
+      throw new ProductAdminValidationError(
+        `Không thể xóa giá trị "${value.label}" vì ${usage} biến thể đang dùng giá trị này.`,
+        { options: "Giá trị biến thể đang được sử dụng." },
+      );
+    }
+  }
+}
+
+export async function resolveOptionValueIdsForProduct(
+  productId: string,
+  refs: string[],
+  db: DbClient = prisma,
+): Promise<string[]> {
+  if (!refs.length) return [];
+
+  const options = await db.productOption.findMany({
+    where: { productId },
+    include: { values: true },
+  });
+
+  return resolveOptionValueRefsFromLoadedOptions(options, refs);
 }
 
 export async function syncProductCmsData(
@@ -195,27 +286,23 @@ export async function syncProductCmsData(
 
     const existingOptions = await db.productOption.findMany({
       where: { productId },
-      include: { values: { select: { id: true } } },
+      include: { values: { select: { id: true, label: true } } },
     });
     const keepOptionIds = new Set(
       data.options.map((o) => o.id).filter(Boolean) as string[],
     );
-    for (const existing of existingOptions) {
-      if (keepOptionIds.has(existing.id)) continue;
-      const usage = await countVariantsUsingOption(existing.id, db);
-      if (usage > 0) {
-        throw new ProductAdminValidationError(
-          `Không thể xóa nhóm "${existing.name}" vì ${usage} biến thể đang dùng giá trị trong nhóm này.`,
-          { options: "Nhóm biến thể đang được sử dụng." },
-        );
-      }
-    }
-
     const deleteOptionIds = existingOptions
       .map((o) => o.id)
       .filter((id) => !keepOptionIds.has(id));
 
     if (deleteOptionIds.length) {
+      await assertRemovedOptionsNotInUse(
+        db,
+        productId,
+        existingOptions
+          .filter((option) => deleteOptionIds.includes(option.id))
+          .map((option) => ({ id: option.id, name: option.name })),
+      );
       await deleteProductOptionsOwned(db, productId, deleteOptionIds);
     }
 
@@ -248,20 +335,17 @@ export async function syncProductCmsData(
       const keepValueIds = new Set(
         option.values.map((v) => v.id).filter(Boolean) as string[],
       );
-      for (const existingValue of existingValues) {
-        if (keepValueIds.has(existingValue.id)) continue;
-        const usage = await countVariantsUsingOptionValue(existingValue.id, db);
-        if (usage > 0) {
-          throw new ProductAdminValidationError(
-            `Không thể xóa giá trị "${existingValue.label}" vì ${usage} biến thể đang dùng giá trị này.`,
-            { options: "Giá trị biến thể đang được sử dụng." },
-          );
-        }
-      }
       const deleteValueIds = existingValues
         .map((v) => v.id)
         .filter((id) => !keepValueIds.has(id));
       if (deleteValueIds.length) {
+        await assertRemovedOptionValuesNotInUse(
+          db,
+          productId,
+          existingValues
+            .filter((value) => deleteValueIds.includes(value.id))
+            .map((value) => ({ id: value.id, label: value.label })),
+        );
         await deleteProductOptionValuesOwned(db, productId, savedOption.id, deleteValueIds);
       }
 
@@ -333,10 +417,6 @@ export async function syncProductCmsData(
       }
     }
 
-    if (deleteIds.length) {
-      await deleteProductSpecificationsOwned(db, productId, deleteIds);
-    }
-
     if (specCreates.length) {
       await db.productSpecification.createMany({ data: specCreates });
     }
@@ -392,10 +472,6 @@ export async function syncProductCmsData(
       } else {
         customizationCreates.push({ productId, label, description, sortOrder, enabled });
       }
-    }
-
-    if (deleteIds.length) {
-      await deleteProductCustomizationsOwned(db, productId, deleteIds);
     }
 
     if (customizationCreates.length) {

@@ -550,7 +550,9 @@ export default function ProductCatalogForm({
           variants?: Parameters<typeof mapVariantsToFormRows>[0];
         };
         if (!res.ok) {
-          setErrorDetail(body.detail ?? null);
+          setErrorDetail(
+            process.env.NODE_ENV === "development" ? body.detail ?? null : null,
+          );
           const summary =
             body.code === SEO_PUBLISH_QUALITY_GATE_FAILED
               ? SEO_PUBLISH_QUALITY_SUMMARY
@@ -1062,7 +1064,7 @@ export default function ProductCatalogForm({
               ))}
             </ul>
           )}
-          {errorDetail && (
+          {errorDetail && process.env.NODE_ENV === "development" && (
             <details className="admin-import-error-detail">
               <summary>Chi tiết lỗi</summary>
               <pre>{errorDetail}</pre>
