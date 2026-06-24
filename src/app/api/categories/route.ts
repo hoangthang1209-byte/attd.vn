@@ -1,5 +1,9 @@
-import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { createProductCategory } from "@/features/products/product-admin.service";
+import { categoryMutationErrorResponse } from "@/features/products/product-mutation-api";
+import { ProductAdminValidationError } from "@/features/products/product-admin-input";
+import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-public-category-cache";
 
 export async function GET() {
   const categories = await prisma.category.findMany({
@@ -10,7 +14,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body: unknown = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ message: "Dữ liệu không hợp lệ" }, { status: 400 });
+  }
 
   if (
     !body ||
@@ -20,53 +29,42 @@ export async function POST(request: Request) {
     typeof (body as Record<string, unknown>).name !== "string" ||
     typeof (body as Record<string, unknown>).slug !== "string"
   ) {
-    return NextResponse.json({ message: "name and slug are required" }, { status: 400 });
+    return NextResponse.json({ message: "Tên danh mục và slug là bắt buộc." }, { status: 400 });
   }
 
-  const { name, slug } = body as Record<string, unknown>;
-  const b = body as Record<string, unknown>;
-
-  const trimmedName = (name as string).trim();
-  const trimmedSlug = (slug as string).trim();
+  const record = body as Record<string, unknown>;
+  const trimmedName = String(record.name).trim();
+  const trimmedSlug = String(record.slug).trim();
 
   if (!trimmedName || !trimmedSlug) {
-    return NextResponse.json({ message: "name and slug must not be empty" }, { status: 400 });
+    return NextResponse.json({ message: "Tên danh mục và slug không được để trống." }, { status: 400 });
   }
 
-  const description =
-    typeof b.description === "string" ? b.description.trim() || null : null;
-  const imageUrl =
-    typeof b.imageUrl === "string" ? b.imageUrl.trim() || null : null;
-  const seoTitle =
-    typeof b.seoTitle === "string" ? b.seoTitle.trim().slice(0, 255) || null : null;
-  const seoDescription =
-    typeof b.seoDescription === "string"
-      ? b.seoDescription.trim().slice(0, 500) || null
-      : null;
-
   try {
-    const category = await prisma.category.create({
-      data: {
-        name: trimmedName,
-        slug: trimmedSlug,
-        description,
-        imageUrl,
-        seoTitle,
-        seoDescription,
-      },
+    const category = await createProductCategory({
+      name: trimmedName,
+      slug: trimmedSlug,
+      description: typeof record.description === "string" ? record.description.trim() || null : null,
+      imageUrl: typeof record.imageUrl === "string" ? record.imageUrl.trim() || null : null,
+      seoTitle: typeof record.seoTitle === "string" ? record.seoTitle.trim().slice(0, 255) || null : null,
+      seoDescription:
+        typeof record.seoDescription === "string"
+          ? record.seoDescription.trim().slice(0, 500) || null
+          : null,
     });
-
+    revalidatePublicCategoryCache();
     return NextResponse.json(category, { status: 201 });
-  } catch (err: unknown) {
-    if (
-      err &&
-      typeof err === "object" &&
-      "code" in err &&
-      (err as { code: string }).code === "P2002"
-    ) {
-      return NextResponse.json({ message: "Slug đã tồn tại" }, { status: 409 });
+  } catch (err) {
+    if (err instanceof ProductAdminValidationError) {
+      const message =
+        err.fieldErrors.slug ??
+        err.fieldErrors.skuCode ??
+        err.message;
+      if (message.includes("Slug") || err.fieldErrors.slug) {
+        return NextResponse.json({ message, fieldErrors: err.fieldErrors }, { status: 409 });
+      }
+      return categoryMutationErrorResponse(err, "Không thể tạo danh mục.");
     }
-    console.error("[api/categories POST]", err);
-    return NextResponse.json({ message: "Lỗi máy chủ" }, { status: 500 });
+    return categoryMutationErrorResponse(err, "Không thể tạo danh mục.");
   }
 }

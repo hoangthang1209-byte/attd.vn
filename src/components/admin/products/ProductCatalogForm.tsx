@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
+import PublishQualityChecklist from "@/components/admin/products/PublishQualityChecklist";
+import ProductB2BSharedAttributeField from "@/components/admin/products/ProductB2BSharedAttributeField";
 import ProductMaterialSection from "@/components/admin/products/ProductMaterialSection";
 import ProductCatalogSpecificationsSection, {
   type ProductSpecificationFormRow,
@@ -31,10 +33,14 @@ import {
   validateProductCatalogFormLocal,
 } from "@/features/products/product-catalog-form-validation";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import {
+  SEO_PUBLISH_QUALITY_GATE_FAILED,
+  SEO_PUBLISH_QUALITY_SUMMARY,
+  buildProductPublishChecklist,
+  type ProductPublishQualityInput,
+} from "@/lib/seo/publish-quality-gate";
 
 type Category = { id: string; name: string; slug: string; skuCode: string | null };
-type AttributeOption = { id: string; type: string; name: string; code: string | null; value: string | null };
-type AttrMap = Record<string, AttributeOption[]>;
 
 type ProductFormData = {
   id?: string;
@@ -101,7 +107,6 @@ export default function ProductCatalogForm({
   const searchParams = useSearchParams();
   const mutate = useAdminMutation();
   const [categories, setCategories] = useState<Category[]>(propCategories ?? []);
-  const [attributes, setAttributes] = useState<AttrMap>({});
   const [sharedAttributes, setSharedAttributes] = useState<SharedAttributePickerOption[]>([]);
   const [sharedAttributesLoading, setSharedAttributesLoading] = useState(false);
   const [sharedAttributesError, setSharedAttributesError] = useState<string | null>(null);
@@ -151,6 +156,39 @@ export default function ProductCatalogForm({
   const deletedVariantIdsRef = useRef<Set<string>>(new Set());
   const attributeSectionRef = useRef<HTMLElement | null>(null);
   const preselectHandledRef = useRef(false);
+  const [initialStatus] = useState(() => initialData?.status ?? "DRAFT");
+  const [initialLegacyFit] = useState(() => initialData?.fit?.trim() ?? "");
+  const [legacyFitClearPending, setLegacyFitClearPending] = useState(false);
+
+  const productPublishQualityInput = useMemo((): ProductPublishQualityInput => ({
+    name: form.name,
+    slug: form.slug,
+    categoryId: form.categoryId,
+    description: form.description,
+    seoTitle: form.seoTitle,
+    seoDescription: form.seoDescription,
+    featuredImage: form.featuredImage,
+    gallery: form.gallery,
+    variants: form.variants.map((variant) => ({
+      variantStatus: variant.variantStatus,
+      imageUrl: variant.imageUrl,
+    })),
+    specifications: form.specifications,
+    attributeAssignments: form.attributeAssignments,
+    options: form.options,
+  }), [form]);
+
+  const productPublishChecklist = useMemo(
+    () => buildProductPublishChecklist(productPublishQualityInput),
+    [productPublishQualityInput],
+  );
+
+  const showProductPublishChecklist = form.status === "ACTIVE";
+  const showProductLegacySeoWarning =
+    Boolean(form.id) &&
+    initialStatus === "ACTIVE" &&
+    form.status === "ACTIVE" &&
+    productPublishChecklist.some((item) => !item.complete);
 
   const loadSharedAttributes = useCallback(async () => {
     setSharedAttributesLoading(true);
@@ -172,16 +210,6 @@ export default function ProductCatalogForm({
         .then((r) => r.json())
         .then((cats: Category[]) => setCategories(cats));
     }
-    void fetch("/api/admin/products/attributes")
-      .then((r) => r.json())
-      .then((opts: AttributeOption[]) => {
-        const map: AttrMap = {};
-        for (const opt of opts) {
-          if (!map[opt.type]) map[opt.type] = [];
-          map[opt.type].push(opt);
-        }
-        setAttributes(map);
-      });
     const timer = window.setTimeout(() => {
       void loadSharedAttributes();
     }, 0);
@@ -343,9 +371,11 @@ export default function ProductCatalogForm({
       description: form.description.trim() || undefined,
       seoTitle: form.seoTitle.trim() || undefined,
       seoDescription: form.seoDescription.trim() || undefined,
-      material: form.material.trim() || undefined,
-      form: form.form.trim() || undefined,
-      fit: form.fit.trim() || undefined,
+      ...(legacyFitClearPending
+        ? { fit: null }
+        : initialLegacyFit
+          ? { fit: initialLegacyFit }
+          : {}),
       defaultMoq: form.defaultMoq.trim() ? parseNumberField(form.defaultMoq) : undefined,
       leadTime: form.leadTime.trim() || undefined,
       useCases: form.useCases.split(",").map((s) => s.trim()).filter(Boolean),
@@ -513,21 +543,24 @@ export default function ProductCatalogForm({
           message?: string;
           error?: string;
           detail?: string;
+          code?: string;
           fieldErrors?: Record<string, string>;
+          issues?: Array<{ field: string; message: string }>;
           options?: Parameters<typeof mapOptionsToFormRows>[0];
           variants?: Parameters<typeof mapVariantsToFormRows>[0];
         };
         if (!res.ok) {
           setErrorDetail(body.detail ?? null);
+          const summary =
+            body.code === SEO_PUBLISH_QUALITY_GATE_FAILED
+              ? SEO_PUBLISH_QUALITY_SUMMARY
+              : body.error ?? body.message ?? "Không thể lưu sản phẩm.";
           if (body.fieldErrors && Object.keys(body.fieldErrors).length > 0) {
-            applyValidationErrors(
-              body.fieldErrors,
-              body.error ?? body.message ?? "Không thể lưu sản phẩm.",
-            );
+            applyValidationErrors(body.fieldErrors, summary);
           } else {
-            setError(body.error ?? body.message ?? "Không thể lưu sản phẩm.");
+            setError(summary);
           }
-          return { ok: false as const, message: body.error ?? body.message };
+          return { ok: false as const, message: summary };
         }
         return { ok: true as const, data: body };
       },
@@ -709,15 +742,28 @@ export default function ProductCatalogForm({
               <option value="INACTIVE">Tạm dừng</option>
               <option value="ARCHIVED">Lưu trữ</option>
             </select>
+            {showProductPublishChecklist && (
+              <PublishQualityChecklist
+                items={productPublishChecklist}
+                legacyWarning={showProductLegacySeoWarning}
+              />
+            )}
           </div>
         </div>
         <div className="admin-field">
           <label className="admin-label">Mô tả ngắn</label>
           <textarea className="admin-textarea" rows={2} value={form.shortDescription} onChange={(e) => setField("shortDescription", e.target.value)} />
         </div>
-        <div className="admin-field">
+        <div className="admin-field" data-field="description">
           <label className="admin-label">Mô tả chi tiết</label>
-          <textarea className="admin-textarea" rows={4} value={form.description} onChange={(e) => setField("description", e.target.value)} />
+          <textarea
+            className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.description))}`}
+            rows={4}
+            data-field="description"
+            value={form.description}
+            onChange={(e) => setField("description", e.target.value)}
+          />
+          {fieldErrors.description && <p className="admin-field-error" role="alert">{fieldErrors.description}</p>}
         </div>
         <div className="admin-field">
           <label className="admin-label">Tags (cách nhau bởi dấu phẩy)</label>
@@ -729,29 +775,50 @@ export default function ProductCatalogForm({
       <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "basic"}>
         <legend>2. Thông tin B2B & Sản xuất</legend>
         <div className="admin-seo-brief-form-grid">
+          <ProductB2BSharedAttributeField
+            attributeCode="MATERIAL"
+            label="Chất liệu"
+            customValueActionLabel="Nhập chất liệu riêng"
+            assignments={form.attributeAssignments}
+            sharedAttributes={sharedAttributes}
+            sharedAttributesLoading={sharedAttributesLoading}
+            fieldErrors={fieldErrors}
+            onAssignmentsChange={(attributeAssignments) => setField("attributeAssignments", attributeAssignments)}
+            onRefreshSharedAttributes={loadSharedAttributes}
+          />
           <div className="admin-field">
-            <label className="admin-label">Chất liệu</label>
-            {(attributes.MATERIAL?.length ?? 0) > 0 && (
-              <select className="admin-input" value={form.material} onChange={(e) => setField("material", e.target.value)} style={{ marginBottom: 4 }}>
-                <option value="">— Chọn —</option>
-                {(attributes.MATERIAL ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
-              </select>
+            <ProductB2BSharedAttributeField
+              attributeCode="FIT"
+              label="Form / Kiểu dáng"
+              customValueActionLabel="Nhập form riêng"
+              assignments={form.attributeAssignments}
+              sharedAttributes={sharedAttributes}
+              sharedAttributesLoading={sharedAttributesLoading}
+              fieldErrors={fieldErrors}
+              onAssignmentsChange={(attributeAssignments) => setField("attributeAssignments", attributeAssignments)}
+              onRefreshSharedAttributes={loadSharedAttributes}
+            />
+            {initialLegacyFit && !legacyFitClearPending && (
+              <div className="admin-field-hint" style={{ marginTop: 8 }}>
+                Fit cũ: {initialLegacyFit}
+                {" "}
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  onClick={() => {
+                    if (!window.confirm("Xóa dữ liệu Fit cũ khỏi sản phẩm khi lưu?")) return;
+                    setLegacyFitClearPending(true);
+                  }}
+                >
+                  Xóa dữ liệu Fit cũ
+                </button>
+              </div>
             )}
-            <input className="admin-input" value={form.material} onChange={(e) => setField("material", e.target.value)} placeholder="CVC 65/35, Cotton 100%… (nhập thủ công)" />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Form / Kiểu dáng</label>
-            {(attributes.FORM?.length ?? 0) > 0 && (
-              <select className="admin-input" value={form.form} onChange={(e) => setField("form", e.target.value)} style={{ marginBottom: 4 }}>
-                <option value="">— Chọn —</option>
-                {(attributes.FORM ?? []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
-              </select>
+            {legacyFitClearPending && (
+              <p className="admin-field-hint" style={{ marginTop: 8 }}>
+                Dữ liệu Fit cũ sẽ được xóa khi lưu sản phẩm.
+              </p>
             )}
-            <input className="admin-input" value={form.form} onChange={(e) => setField("form", e.target.value)} placeholder="Regular fit, Slim fit, Oversize… (nhập thủ công)" />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Fit</label>
-            <input className="admin-input" value={form.fit} onChange={(e) => setField("fit", e.target.value)} placeholder="Unisex, Regular, Slim…" />
           </div>
           <div className="admin-field" data-field="defaultMoq">
             <label className="admin-label">MOQ tối thiểu (cái)</label>
@@ -957,13 +1024,26 @@ export default function ProductCatalogForm({
 
       <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "seo"}>
         <legend>SEO & hiển thị</legend>
-        <div className="admin-field">
+        <div className="admin-field" data-field="seoTitle">
           <label className="admin-label">SEO title</label>
-          <input className="admin-input" value={form.seoTitle} onChange={(e) => setField("seoTitle", e.target.value)} />
+          <input
+            className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.seoTitle))}`}
+            data-field="seoTitle"
+            value={form.seoTitle}
+            onChange={(e) => setField("seoTitle", e.target.value)}
+          />
+          {fieldErrors.seoTitle && <p className="admin-field-error" role="alert">{fieldErrors.seoTitle}</p>}
         </div>
-        <div className="admin-field">
+        <div className="admin-field" data-field="seoDescription">
           <label className="admin-label">SEO description</label>
-          <textarea className="admin-textarea" rows={3} value={form.seoDescription} onChange={(e) => setField("seoDescription", e.target.value)} />
+          <textarea
+            className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.seoDescription))}`}
+            rows={3}
+            data-field="seoDescription"
+            value={form.seoDescription}
+            onChange={(e) => setField("seoDescription", e.target.value)}
+          />
+          {fieldErrors.seoDescription && <p className="admin-field-error" role="alert">{fieldErrors.seoDescription}</p>}
         </div>
         {publicUrl && (
           <p className="admin-field-hint">

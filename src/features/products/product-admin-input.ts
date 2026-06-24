@@ -1,6 +1,10 @@
 import type { ProductStatus, StockStatus, VariantStatus } from "@prisma/client";
 import type { ProductInput, VariantInput } from "@/features/products/product-admin.service";
 import { isValidProductImageUrl, PRODUCT_IMAGE_URL_ERROR } from "@/features/products/product-image-url";
+import {
+  SeoPublishQualityGateError,
+  formatSeoPublishQualityGateApiError,
+} from "@/lib/seo/publish-quality-gate";
 
 export class ProductAdminValidationError extends Error {
   fieldErrors: Record<string, string>;
@@ -12,6 +16,23 @@ export class ProductAdminValidationError extends Error {
     this.fieldErrors = fieldErrors;
     this.detail = detail;
   }
+}
+
+export const PRODUCT_RELATION_OWNERSHIP_MESSAGE =
+  "Dữ liệu lựa chọn hoặc thông số sản phẩm không hợp lệ.";
+
+/** Ownership violations are validation failures, not publish-quality gate issues. */
+export class ProductRelationOwnershipError extends ProductAdminValidationError {
+  readonly httpStatus = 422 as const;
+
+  constructor(detail = PRODUCT_RELATION_OWNERSHIP_MESSAGE) {
+    super(detail, {}, detail);
+    this.name = "ProductRelationOwnershipError";
+  }
+}
+
+export function throwProductRelationOwnershipError(): never {
+  throw new ProductRelationOwnershipError();
 }
 
 const VALID_STOCK_STATUSES = new Set<StockStatus>(["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK", "PREORDER"]);
@@ -368,7 +389,32 @@ export function formatProductAdminApiError(err: unknown): {
   detail: string;
   fieldErrors: Record<string, string>;
   status: number;
+  code?: string;
+  issues?: Array<{ field: string; label: string; message: string }>;
 } {
+  if (err instanceof SeoPublishQualityGateError) {
+    const formatted = formatSeoPublishQualityGateApiError(err);
+    return {
+      ok: false,
+      error: formatted.error,
+      detail: formatted.error,
+      fieldErrors: formatted.fieldErrors,
+      status: formatted.status,
+      code: formatted.code,
+      issues: formatted.issues,
+    };
+  }
+
+  if (err instanceof ProductRelationOwnershipError) {
+    return {
+      ok: false,
+      error: err.message,
+      detail: err.detail,
+      fieldErrors: err.fieldErrors,
+      status: err.httpStatus,
+    };
+  }
+
   if (err instanceof ProductAdminValidationError) {
     return {
       ok: false,

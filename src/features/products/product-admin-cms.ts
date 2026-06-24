@@ -2,6 +2,24 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 import {
+  assertNoDuplicateRelationIds,
+  assertOptionIdsBelongToProduct,
+  assertOptionValueIdsBelongToProduct,
+  assertSpecificationIdsBelongToProduct,
+  assertCustomizationIdsBelongToProduct,
+  assertVariantOptionValueLinksBelongToProduct,
+  deleteProductCustomizationsOwned,
+  deleteProductOptionValuesOwned,
+  deleteProductOptionsOwned,
+  deleteProductSpecificationsOwned,
+  throwProductRelationOwnershipError,
+  updateProductCustomizationOwned,
+  updateProductOptionOwned,
+  updateProductOptionValueOwned,
+  updateProductSpecificationOwned,
+  type DbClient,
+} from "@/features/products/product-relation-ownership";
+import {
   validateOptionGroupNames,
   validateOptionValues,
   normalizeOptionName,
@@ -101,10 +119,11 @@ function validateOptionCombinations(
 export async function resolveOptionValueIdsForProduct(
   productId: string,
   refs: string[],
+  db: DbClient = prisma,
 ): Promise<string[]> {
   if (!refs.length) return [];
 
-  const options = await prisma.productOption.findMany({
+  const options = await db.productOption.findMany({
     where: { productId },
     include: { values: true },
   });
@@ -128,6 +147,7 @@ export async function resolveOptionValueIdsForProduct(
     if (isUuid(ref) && byId.has(ref)) return ref;
     const resolved = byRef.get(ref);
     if (resolved) return resolved;
+    if (isUuid(ref)) throwProductRelationOwnershipError();
     return ref;
   });
 }
@@ -141,8 +161,24 @@ export async function syncProductCmsData(
   attributeAssignments?: ProductAttributeAssignmentInput[];
   variantOptionValueIds?: Record<string, string[]>;
   },
+  db: DbClient = prisma,
 ) {
   if (data.options) {
+    assertNoDuplicateRelationIds(data.options.map((option) => option.id));
+    for (const option of data.options) {
+      assertNoDuplicateRelationIds(option.values.map((value) => value.id));
+    }
+    await assertOptionIdsBelongToProduct(
+      db,
+      productId,
+      data.options.map((option) => option.id).filter(Boolean) as string[],
+    );
+    await assertOptionValueIdsBelongToProduct(
+      db,
+      productId,
+      data.options.flatMap((option) => option.values.map((value) => value.id)).filter(Boolean) as string[],
+    );
+
     validateOptionCombinations(
       data.options,
       Object.values(data.variantOptionValueIds ?? {}),
@@ -157,7 +193,7 @@ export async function syncProductCmsData(
       throw new ProductAdminValidationError(valueError, { options: valueError });
     }
 
-    const existingOptions = await prisma.productOption.findMany({
+    const existingOptions = await db.productOption.findMany({
       where: { productId },
       include: { values: { select: { id: true } } },
     });
@@ -166,7 +202,7 @@ export async function syncProductCmsData(
     );
     for (const existing of existingOptions) {
       if (keepOptionIds.has(existing.id)) continue;
-      const usage = await countVariantsUsingOption(existing.id);
+      const usage = await countVariantsUsingOption(existing.id, db);
       if (usage > 0) {
         throw new ProductAdminValidationError(
           `Không thể xóa nhóm "${existing.name}" vì ${usage} biến thể đang dùng giá trị trong nhóm này.`,
@@ -180,22 +216,22 @@ export async function syncProductCmsData(
       .filter((id) => !keepOptionIds.has(id));
 
     if (deleteOptionIds.length) {
-      await prisma.productOption.deleteMany({ where: { id: { in: deleteOptionIds } } });
+      await deleteProductOptionsOwned(db, productId, deleteOptionIds);
     }
 
     for (const [optIndex, option] of data.options.entries()) {
       const slug = option.slug?.trim() || toOptionSlug(option.name, `option-${optIndex + 1}`);
+      if (option.id) {
+        await updateProductOptionOwned(db, productId, option.id, {
+          name: option.name.trim(),
+          attributeId: option.attributeId ?? null,
+          slug,
+          sortOrder: option.sortOrder ?? optIndex,
+        });
+      }
       const savedOption = option.id
-        ? await prisma.productOption.update({
-            where: { id: option.id },
-            data: {
-              name: option.name.trim(),
-              attributeId: option.attributeId ?? null,
-              slug,
-              sortOrder: option.sortOrder ?? optIndex,
-            },
-          })
-        : await prisma.productOption.create({
+        ? { id: option.id }
+        : await db.productOption.create({
             data: {
               productId,
               attributeId: option.attributeId ?? null,
@@ -205,7 +241,7 @@ export async function syncProductCmsData(
             },
           });
 
-      const existingValues = await prisma.productOptionValue.findMany({
+      const existingValues = await db.productOptionValue.findMany({
         where: { optionId: savedOption.id },
         select: { id: true, label: true },
       });
@@ -214,7 +250,7 @@ export async function syncProductCmsData(
       );
       for (const existingValue of existingValues) {
         if (keepValueIds.has(existingValue.id)) continue;
-        const usage = await countVariantsUsingOptionValue(existingValue.id);
+        const usage = await countVariantsUsingOptionValue(existingValue.id, db);
         if (usage > 0) {
           throw new ProductAdminValidationError(
             `Không thể xóa giá trị "${existingValue.label}" vì ${usage} biến thể đang dùng giá trị này.`,
@@ -226,23 +262,20 @@ export async function syncProductCmsData(
         .map((v) => v.id)
         .filter((id) => !keepValueIds.has(id));
       if (deleteValueIds.length) {
-        await prisma.productOptionValue.deleteMany({ where: { id: { in: deleteValueIds } } });
+        await deleteProductOptionValuesOwned(db, productId, savedOption.id, deleteValueIds);
       }
 
       for (const [valIndex, value] of option.values.entries()) {
         if (value.id) {
-          await prisma.productOptionValue.update({
-            where: { id: value.id },
-            data: {
-              label: value.label.trim(),
-              attributeValueId: value.attributeValueId ?? null,
-              valueCode: value.valueCode?.trim() || null,
-              imageUrl: value.imageUrl?.trim() || null,
-              sortOrder: value.sortOrder ?? valIndex,
-            },
+          await updateProductOptionValueOwned(db, productId, savedOption.id, value.id, {
+            label: value.label.trim(),
+            attributeValueId: value.attributeValueId ?? null,
+            valueCode: value.valueCode?.trim() || null,
+            imageUrl: value.imageUrl?.trim() || null,
+            sortOrder: value.sortOrder ?? valIndex,
           });
         } else {
-          await prisma.productOptionValue.create({
+          await db.productOptionValue.create({
             data: {
               optionId: savedOption.id,
               attributeValueId: value.attributeValueId ?? null,
@@ -258,29 +291,33 @@ export async function syncProductCmsData(
   }
 
   if (data.specifications) {
-    const existing = await prisma.productSpecification.findMany({
+    assertNoDuplicateRelationIds(data.specifications.map((spec) => spec.id));
+    await assertSpecificationIdsBelongToProduct(
+      db,
+      productId,
+      data.specifications.map((spec) => spec.id).filter(Boolean) as string[],
+    );
+
+    const existing = await db.productSpecification.findMany({
       where: { productId },
       select: { id: true },
     });
     const keepIds = new Set(data.specifications.map((s) => s.id).filter(Boolean) as string[]);
     const deleteIds = existing.map((s) => s.id).filter((id) => !keepIds.has(id));
     if (deleteIds.length) {
-      await prisma.productSpecification.deleteMany({ where: { id: { in: deleteIds } } });
+      await deleteProductSpecificationsOwned(db, productId, deleteIds);
     }
 
     for (const [index, spec] of data.specifications.entries()) {
       if (!spec.label.trim() || !spec.value.trim()) continue;
       if (spec.id) {
-        await prisma.productSpecification.update({
-          where: { id: spec.id },
-          data: {
-            label: spec.label.trim(),
-            value: spec.value.trim(),
-            sortOrder: spec.sortOrder ?? index,
-          },
+        await updateProductSpecificationOwned(db, productId, spec.id, {
+          label: spec.label.trim(),
+          value: spec.value.trim(),
+          sortOrder: spec.sortOrder ?? index,
         });
       } else {
-        await prisma.productSpecification.create({
+        await db.productSpecification.create({
           data: {
             productId,
             label: spec.label.trim(),
@@ -293,32 +330,34 @@ export async function syncProductCmsData(
   }
 
   if (data.customizations) {
-    const existing = await prisma.productCustomizationCapability.findMany({
+    assertNoDuplicateRelationIds(data.customizations.map((cap) => cap.id));
+    await assertCustomizationIdsBelongToProduct(
+      db,
+      productId,
+      data.customizations.map((cap) => cap.id).filter(Boolean) as string[],
+    );
+
+    const existing = await db.productCustomizationCapability.findMany({
       where: { productId },
       select: { id: true },
     });
     const keepIds = new Set(data.customizations.map((c) => c.id).filter(Boolean) as string[]);
     const deleteIds = existing.map((c) => c.id).filter((id) => !keepIds.has(id));
     if (deleteIds.length) {
-      await prisma.productCustomizationCapability.deleteMany({
-        where: { id: { in: deleteIds } },
-      });
+      await deleteProductCustomizationsOwned(db, productId, deleteIds);
     }
 
     for (const [index, cap] of data.customizations.entries()) {
       if (!cap.label.trim()) continue;
       if (cap.id) {
-        await prisma.productCustomizationCapability.update({
-          where: { id: cap.id },
-          data: {
-            label: cap.label.trim(),
-            description: cap.description?.trim() || null,
-            sortOrder: cap.sortOrder ?? index,
-            enabled: cap.enabled ?? true,
-          },
+        await updateProductCustomizationOwned(db, productId, cap.id, {
+          label: cap.label.trim(),
+          description: cap.description?.trim() || null,
+          sortOrder: cap.sortOrder ?? index,
+          enabled: cap.enabled ?? true,
         });
       } else {
-        await prisma.productCustomizationCapability.create({
+        await db.productCustomizationCapability.create({
           data: {
             productId,
             label: cap.label.trim(),
@@ -332,11 +371,13 @@ export async function syncProductCmsData(
   }
 
   if (data.variantOptionValueIds) {
+    await assertVariantOptionValueLinksBelongToProduct(db, productId, data.variantOptionValueIds);
+
     const combos = Object.values(data.variantOptionValueIds).filter((combo) => combo.length);
     if (combos.length) {
       let optionsForValidation = data.options;
       if (!optionsForValidation) {
-        const dbOptions = await prisma.productOption.findMany({
+        const dbOptions = await db.productOption.findMany({
           where: { productId },
           include: { values: { orderBy: { sortOrder: "asc" } } },
           orderBy: { sortOrder: "asc" },
@@ -361,9 +402,11 @@ export async function syncProductCmsData(
     }
 
     for (const [variantId, valueIds] of Object.entries(data.variantOptionValueIds)) {
-      await prisma.productVariantOptionValue.deleteMany({ where: { variantId } });
+      await db.productVariantOptionValue.deleteMany({
+        where: { variantId, variant: { productId } },
+      });
       if (!valueIds.length) continue;
-      await prisma.productVariantOptionValue.createMany({
+      await db.productVariantOptionValue.createMany({
         data: valueIds.map((optionValueId) => ({ variantId, optionValueId })),
         skipDuplicates: true,
       });

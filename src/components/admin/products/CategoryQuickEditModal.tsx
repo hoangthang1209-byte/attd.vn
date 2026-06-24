@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import AdminQuickCreateShell from "@/components/admin/AdminQuickCreateShell";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import {
@@ -9,6 +10,12 @@ import {
   type CategoryTreeItem,
 } from "@/features/categories/category-tree-utils";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import { isIndexableCategoryLanding } from "@/lib/seo/indexable-category-routes";
+import {
+  SEO_PUBLISH_QUALITY_GATE_FAILED,
+  SEO_PUBLISH_QUALITY_SUMMARY,
+  evaluateCategoryPublishQuality,
+} from "@/lib/seo/publish-quality-gate";
 import { toSlug } from "@/lib/slug";
 
 export type CategoryQuickEditRecord = CategoryTreeItem & {
@@ -223,7 +230,11 @@ function CategoryQuickEditModalForm({
             setFieldErrors(body.fieldErrors as Record<string, string>);
           }
           const message =
-            (typeof body.message === "string" && body.message) || undefined;
+            body.code === SEO_PUBLISH_QUALITY_GATE_FAILED
+              ? SEO_PUBLISH_QUALITY_SUMMARY
+              : (typeof body.message === "string" && body.message) ||
+                (typeof body.error === "string" && body.error) ||
+                undefined;
           return { ok: false as const, message };
         }
 
@@ -243,6 +254,21 @@ function CategoryQuickEditModalForm({
     allCategories,
     category?.id ?? null,
   );
+
+  const indexableSeoIncomplete = useMemo(() => {
+    if (!isIndexableCategoryLanding(slug)) return false;
+    return !evaluateCategoryPublishQuality(
+      {
+        name,
+        slug,
+        description: category.description,
+        seoTitle: category.seoTitle,
+        seoDescription: category.seoDescription,
+        imageUrl: imageUrl || category.imageUrl,
+      },
+      { requireIndexableLandingFields: true },
+    ).valid;
+  }, [category, imageUrl, name, slug]);
 
   return (
     <AdminQuickCreateShell
@@ -276,6 +302,14 @@ function CategoryQuickEditModalForm({
     >
       <div ref={formContainerRef}>
         {formError && <p className="admin-error">{formError}</p>}
+        {indexableSeoIncomplete && (
+          <p className="admin-field-hint admin-publish-quality-legacy-warning">
+            Danh mục này cần hoàn thiện nội dung SEO trước khi có thể dùng làm trang đích.{" "}
+            <Link href={`/admin/products/categories?editCategory=${category.id}`}>
+              Mở trình sửa đầy đủ
+            </Link>
+          </p>
+        )}
         <form id={FORM_ID} noValidate onSubmit={(event) => void handleSubmit(event)}>
           <div className="admin-quick-create-grid">
             <div className="admin-field admin-quick-create-grid__full">

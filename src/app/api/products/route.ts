@@ -1,5 +1,9 @@
-import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { createProductAdmin } from "@/features/products/product-admin.service";
+import { productMutationErrorResponse } from "@/features/products/product-mutation-api";
+import { ProductAdminValidationError } from "@/features/products/product-admin-input";
+import type { ProductStatus } from "@prisma/client";
 
 export async function GET() {
   const products = await prisma.product.findMany({
@@ -16,37 +20,48 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-
-  if (!body.productCode?.trim()) {
-    return NextResponse.json(
-      {
-        message: "Mã sản phẩm là bắt buộc",
-      },
-      {
-        status: 400,
-      }
-    );
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ message: "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
-  const slug = body.name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replaceAll("đ", "d")
-    .replaceAll(" ", "-");
+  if (!body.productCode || typeof body.productCode !== "string" || !body.productCode.trim()) {
+    return NextResponse.json({ message: "Mã sản phẩm là bắt buộc" }, { status: 400 });
+  }
+  if (!body.name || typeof body.name !== "string" || !body.name.trim()) {
+    return NextResponse.json({ message: "Tên sản phẩm là bắt buộc" }, { status: 400 });
+  }
+  if (!body.categoryId || typeof body.categoryId !== "string") {
+    return NextResponse.json({ message: "Danh mục là bắt buộc" }, { status: 400 });
+  }
 
-  const product = await prisma.product.create({
-    data: {
-      name: body.name,
-      productCode: body.productCode,
-      slug,
+  const status =
+    typeof body.status === "string" ? (body.status as ProductStatus) : undefined;
+
+  try {
+    const product = await createProductAdmin({
+      name: body.name.trim(),
+      productCode: body.productCode.trim(),
       categoryId: body.categoryId,
-    },
-    include: {
-      category: true,
-    },
-  });
-
-  return NextResponse.json(product);
+      slug: typeof body.slug === "string" ? body.slug.trim() : undefined,
+      description: typeof body.description === "string" ? body.description.trim() : undefined,
+      seoTitle: typeof body.seoTitle === "string" ? body.seoTitle.trim() : undefined,
+      seoDescription:
+        typeof body.seoDescription === "string" ? body.seoDescription.trim() : undefined,
+      featuredImage:
+        typeof body.featuredImage === "string" ? body.featuredImage.trim() : undefined,
+      gallery: Array.isArray(body.gallery)
+        ? body.gallery.map((item) => String(item).trim()).filter(Boolean)
+        : undefined,
+      status,
+    });
+    return NextResponse.json(product, { status: 201 });
+  } catch (err) {
+    if (err instanceof ProductAdminValidationError) {
+      return productMutationErrorResponse(err, "Không thể tạo sản phẩm.");
+    }
+    return productMutationErrorResponse(err, "Không thể tạo sản phẩm.");
+  }
 }

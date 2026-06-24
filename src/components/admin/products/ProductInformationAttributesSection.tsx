@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import type { SharedAttributePickerOption } from "@/components/admin/products/ProductOptionGroupBuilder";
+import {
+  B2B_MANAGED_SHARED_ATTRIBUTE_CODES,
+} from "@/features/products/product-b2b-attribute-controls.utils";
 import type { ProductAttributeAssignmentFormRow } from "@/features/products/product-catalog-form-mappers";
 import { fieldErrorInputClass } from "@/features/products/product-catalog-form-validation";
 
@@ -34,8 +37,15 @@ export default function ProductInformationAttributesSection({
   onRefreshSharedAttributes,
   sectionRef,
 }: Props) {
+  const managedInB2BSection = new Set<string>(B2B_MANAGED_SHARED_ATTRIBUTE_CODES);
   const assignedAttributeIds = new Set(rows.map((row) => row.attributeId));
-  const specificationAttributes = sharedAttributes.filter((attr) => attr.isSpecificationAttribute);
+  const specificationAttributes = sharedAttributes.filter(
+    (attr) => attr.isSpecificationAttribute && !managedInB2BSection.has(attr.code),
+  );
+  const visibleRows = rows.filter((row) => {
+    const attribute = sharedAttributes.find((item) => item.id === row.attributeId);
+    return attribute && !managedInB2BSection.has(attribute.code);
+  });
   const availableAttributes = specificationAttributes.filter((attr) => !assignedAttributeIds.has(attr.id));
 
   function updateRow(clientKey: string, patch: Partial<ProductAttributeAssignmentFormRow>) {
@@ -84,9 +94,10 @@ export default function ProductInformationAttributesSection({
       {sharedAttributesError && <p className="admin-field-error" role="alert">{sharedAttributesError}</p>}
       {sharedAttributesLoading && <p className="admin-field-hint">Đang tải thuộc tính dùng chung…</p>}
 
-      {rows.length > 0 && (
+      {visibleRows.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
-          {rows.map((row, index) => {
+          {visibleRows.map((row) => {
+            const index = rows.findIndex((item) => item.clientKey === row.clientKey);
             const attribute = specificationAttributes.find((item) => item.id === row.attributeId);
             const activeValues = (attribute?.values ?? []).filter((value) => value.status === "ACTIVE");
             const attrError = fieldErrors[assignmentFieldKey(index, "attributeId")];
@@ -224,14 +235,14 @@ export default function ProductInformationAttributesSection({
           <p className="admin-field-hint">
             {specificationAttributes.length === 0
               ? "Chưa có thuộc tính nào được đánh dấu “Dùng làm thông số”. Tạo hoặc cập nhật tại Quản lý thuộc tính."
-              : rows.length > 0
+              : visibleRows.length > 0
                 ? "Đã thêm tất cả thuộc tính thông tin khả dụng."
                 : "Không có thuộc tính thông tin khả dụng."}
           </p>
         )
       )}
 
-      {rows.length === 0 && availableAttributes.length > 0 && (
+      {visibleRows.length === 0 && availableAttributes.length > 0 && (
         <button
           type="button"
           className="admin-btn admin-btn--primary"

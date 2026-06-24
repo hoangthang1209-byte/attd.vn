@@ -15,6 +15,41 @@ export type PlaceholderVariant = "product" | "category" | "client" | "generic";
 
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|webp|gif|svg|avif)(\?.*)?$/i;
 
+/** Route namespaces that must never satisfy publish image requirements. */
+const BLOCKED_LOCAL_IMAGE_PREFIXES = ["/api/", "/admin/", "/quan-tri/"] as const;
+
+/**
+ * Publish gate: local paths must point to a real file under an approved public upload directory.
+ */
+export function isPublishableLocalImagePath(src: string): boolean {
+  const trimmed = src.trim();
+  if (!trimmed.startsWith("/")) return false;
+  if (trimmed.includes("..")) return false;
+  if (trimmed.length <= 1) return false;
+
+  const lower = trimmed.toLowerCase();
+  for (const prefix of BLOCKED_LOCAL_IMAGE_PREFIXES) {
+    if (lower.startsWith(prefix) || lower === prefix.slice(0, -1)) return false;
+  }
+
+  const matchedBase = Object.values(UPLOAD_PATHS).find(
+    (base) => trimmed === base || trimmed.startsWith(`${base}/`),
+  );
+  if (!matchedBase) return false;
+  if (trimmed === matchedBase || trimmed.endsWith("/")) return false;
+
+  const relativePath = trimmed.slice(matchedBase.length);
+  if (!relativePath.startsWith("/") || relativePath === "/") return false;
+
+  const segments = relativePath.split("/").filter(Boolean);
+  if (!segments.length || segments.some((segment) => segment === ".")) return false;
+
+  const filename = segments[segments.length - 1] ?? "";
+  if (!IMAGE_EXTENSIONS.test(filename)) return false;
+
+  return true;
+}
+
 /**
  * Resolve an upload filename or pass through absolute / remote URLs unchanged.
  * Returns null when no image is configured.

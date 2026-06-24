@@ -2,7 +2,15 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 import {
+  assertAttributeAssignmentIdsBelongToProduct,
+  assertNoDuplicateRelationIds,
+  deleteProductAttributeAssignmentsOwned,
+  updateProductAttributeAssignmentOwned,
+  type DbClient,
+} from "@/features/products/product-relation-ownership";
+import {
   computeLegacyMirrorFromAssignments,
+  LEGACY_MIRROR_FIELD_BY_ATTRIBUTE_CODE,
   type ProductAttributeAssignmentInput,
   resolveAssignmentDisplayValue,
   type ResolvedAssignmentValue,
@@ -16,14 +24,13 @@ export const PRODUCT_ATTRIBUTE_ASSIGNMENT_INCLUDE = {
   },
 } satisfies Prisma.ProductAttributeAssignmentFindManyArgs;
 
-type DbClient = Prisma.TransactionClient | typeof prisma;
-
 function assignmentFieldKey(index: number, field: string): string {
   return `attributeAssignments.${index}.${field}`;
 }
 
 export async function validateProductAttributeAssignments(
   assignments: ProductAttributeAssignmentInput[],
+  db: DbClient = prisma,
 ): Promise<ResolvedAssignmentValue[]> {
   if (!assignments.length) return [];
 
@@ -31,7 +38,7 @@ export async function validateProductAttributeAssignments(
   const seenAttributes = new Set<string>();
   const attributeIds = [...new Set(assignments.map((row) => row.attributeId))];
 
-  const attributes = await prisma.productAttribute.findMany({
+  const attributes = await db.productAttribute.findMany({
     where: { id: { in: attributeIds } },
     select: {
       id: true,
@@ -129,22 +136,57 @@ export async function syncProductAttributeAssignments(
   productId: string,
   assignments: ProductAttributeAssignmentInput[] | undefined,
   db: DbClient = prisma,
-): Promise<Partial<Record<"material" | "form", string>>> {
+): Promise<Partial<Record<"material" | "form", string | null>>> {
   if (assignments === undefined) return {};
 
-  const resolved = await validateProductAttributeAssignments(assignments);
+  assertNoDuplicateRelationIds(assignments.map((row) => row.id));
+  await assertAttributeAssignmentIdsBelongToProduct(
+    db,
+    productId,
+    assignments.map((row) => row.id).filter(Boolean) as string[],
+  );
 
-  const existing = await db.productAttributeAssignment.findMany({
-    where: { productId },
-    select: { id: true, attributeId: true },
-  });
+  const [product, existingAssignments] = await Promise.all([
+    db.product.findUnique({
+      where: { id: productId },
+      select: { material: true, form: true },
+    }),
+    db.productAttributeAssignment.findMany({
+      where: { productId },
+      select: {
+        id: true,
+        attributeId: true,
+        customValue: true,
+        attribute: { select: { code: true } },
+        attributeValue: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  const previousDisplayByCode = new Map<string, string>();
+  for (const row of existingAssignments) {
+    const displayValue = resolveAssignmentDisplayValue(
+      row.attributeValue?.name,
+      row.customValue,
+    );
+    if (displayValue) {
+      previousDisplayByCode.set(row.attribute.code, displayValue);
+    }
+  }
+
+  const resolved = await validateProductAttributeAssignments(assignments, db);
+
+  const existing = existingAssignments.map((row) => ({
+    id: row.id,
+    attributeId: row.attributeId,
+  }));
   const keepIds = new Set(
     assignments.map((row) => row.id).filter(Boolean) as string[],
   );
   const deleteIds = existing.filter((row) => !keepIds.has(row.id)).map((row) => row.id);
 
   if (deleteIds.length) {
-    await db.productAttributeAssignment.deleteMany({ where: { id: { in: deleteIds } } });
+    await deleteProductAttributeAssignmentsOwned(db, productId, deleteIds);
   }
 
   for (const [index, row] of resolved.entries()) {
@@ -158,30 +200,48 @@ export async function syncProductAttributeAssignments(
     };
 
     if (inputRow?.id) {
-      await db.productAttributeAssignment.update({
-        where: { id: inputRow.id },
-        data,
-      });
+      await updateProductAttributeAssignmentOwned(db, productId, inputRow.id, data);
       continue;
     }
 
     await db.productAttributeAssignment.create({ data });
   }
 
-  return computeLegacyMirrorFromAssignments(resolved);
+  const mirror = computeLegacyMirrorFromAssignments(resolved);
+  const legacyUpdates: Partial<Record<"material" | "form", string | null>> = { ...mirror };
+
+  /**
+   * Clear mirrored legacy scalars only when the removed assignment previously owned
+   * the same display value. Legacy-only scalars with no assignment stay untouched.
+   */
+  for (const [code, field] of Object.entries(LEGACY_MIRROR_FIELD_BY_ATTRIBUTE_CODE) as Array<
+    [string, "material" | "form"]
+  >) {
+    const hadAssignment = previousDisplayByCode.has(code);
+    const stillAssigned = resolved.some((row) => row.attributeCode === code);
+    if (!hadAssignment || stillAssigned) continue;
+
+    const mirroredValue = previousDisplayByCode.get(code)?.trim() ?? "";
+    const currentScalar = (field === "material" ? product?.material : product?.form)?.trim() ?? "";
+    if (mirroredValue && currentScalar === mirroredValue) {
+      legacyUpdates[field] = null;
+    }
+  }
+
+  return legacyUpdates;
 }
 
 export async function applyLegacyMirrorToProduct(
   productId: string,
-  mirror: Partial<Record<"material" | "form", string>>,
+  mirror: Partial<Record<"material" | "form", string | null>>,
   db: DbClient = prisma,
 ): Promise<void> {
-  if (!Object.keys(mirror).length) return;
+  const data: Prisma.ProductUpdateInput = {};
+  if ("material" in mirror) data.material = mirror.material;
+  if ("form" in mirror) data.form = mirror.form;
+  if (!Object.keys(data).length) return;
   await db.product.update({
     where: { id: productId },
-    data: {
-      ...(mirror.material !== undefined ? { material: mirror.material } : {}),
-      ...(mirror.form !== undefined ? { form: mirror.form } : {}),
-    },
+    data,
   });
 }

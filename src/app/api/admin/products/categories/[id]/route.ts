@@ -6,6 +6,10 @@ import {
   type CategoryAdminInput,
 } from "@/features/products/product-admin.service";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
+import {
+  SeoPublishQualityGateError,
+  formatSeoPublishQualityGateApiError,
+} from "@/lib/seo/publish-quality-gate";
 import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-public-category-cache";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -63,6 +67,10 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
     return NextResponse.json(category);
   } catch (err) {
     console.error("[PUT /api/admin/products/categories/[id]]", err);
+    if (err instanceof SeoPublishQualityGateError) {
+      const formatted = formatSeoPublishQualityGateApiError(err);
+      return NextResponse.json(formatted, { status: formatted.status });
+    }
     if (err instanceof ProductAdminValidationError) {
       const message =
         err.fieldErrors.slug ??

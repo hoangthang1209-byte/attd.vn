@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import CategoryQuickEditModal, {
   type CategoryQuickEditRecord,
@@ -14,6 +14,14 @@ import {
   getCategoryIndentPx,
 } from "@/features/categories/category-tree-utils";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import PublishQualityChecklist from "@/components/admin/products/PublishQualityChecklist";
+import {
+  SEO_PUBLISH_QUALITY_GATE_FAILED,
+  SEO_PUBLISH_QUALITY_SUMMARY,
+  buildCategoryPublishChecklist,
+  evaluateCategoryPublishQuality,
+} from "@/lib/seo/publish-quality-gate";
+import { isIndexableCategoryLanding } from "@/lib/seo/indexable-category-routes";
 import { toSlug } from "@/lib/slug";
 
 type CategoryRow = CategoryQuickEditRecord & {
@@ -52,8 +60,10 @@ async function fetchCategoryRows(): Promise<CategoryRow[]> {
 
 export default function CategoryAdminManager() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const mutate = useAdminMutation();
   const tableWrapRef = useRef<HTMLDivElement>(null);
+  const editCategoryHandledRef = useRef<string | null>(null);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,6 +78,36 @@ export default function CategoryAdminManager() {
   const [skuCodeEdited, setSkuCodeEdited] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const categoryPublishQualityInput = useMemo(
+    () => ({
+      name: form.name,
+      slug: form.slug,
+      description: form.description,
+      seoTitle: form.seoTitle,
+      seoDescription: form.seoDescription,
+      imageUrl: form.imageUrl,
+    }),
+    [form],
+  );
+
+  const categoryPublishChecklist = useMemo(
+    () => buildCategoryPublishChecklist(categoryPublishQualityInput),
+    [categoryPublishQualityInput],
+  );
+
+  const editingCategory = useMemo(
+    () => (editingId ? categories.find((cat) => cat.id === editingId) : null),
+    [categories, editingId],
+  );
+
+  const showCategoryLegacySeoWarning = Boolean(
+    editingCategory &&
+      isIndexableCategoryLanding(editingCategory.slug) &&
+      !evaluateCategoryPublishQuality(categoryPublishQualityInput, {
+        requireIndexableLandingFields: true,
+      }).valid,
+  );
 
   const flattenedCategories = useMemo(
     () => flattenCategoryTree(categories),
@@ -111,6 +151,36 @@ export default function CategoryAdminManager() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const editId = searchParams.get("editCategory");
+    if (!editId || loading || editCategoryHandledRef.current === editId) return;
+    const cat = categories.find((row) => row.id === editId);
+    if (!cat) return;
+    editCategoryHandledRef.current = editId;
+    openFullEditor(cat);
+  }, [searchParams, loading, categories]);
+
+  function openFullEditor(cat: CategoryRow) {
+    setEditingId(cat.id);
+    setForm({
+      name: cat.name,
+      slug: cat.slug,
+      skuCode: cat.skuCode ?? "",
+      description: cat.description ?? "",
+      seoTitle: cat.seoTitle ?? "",
+      seoDescription: cat.seoDescription ?? "",
+      imageUrl: cat.imageUrl ?? "",
+      sortOrder: String(cat.sortOrder),
+      parentId: cat.parentId ?? "",
+    });
+    setSlugEdited(true);
+    setSkuCodeEdited(Boolean(cat.skuCode));
+    setShowForm(true);
+    setQuickEditCategory(null);
+    setFieldErrors({});
+    setMessage(null);
+  }
 
   function startCreate() {
     setEditingId(null);
@@ -175,9 +245,10 @@ export default function CategoryAdminManager() {
     };
 
     setSaving(true);
-    const saved = await mutate({
+    await mutate({
       loadingMessage: "Đang lưu thông tin…",
       successMessage: "Đã lưu thông tin.",
+      onError: (message) => setMessage({ type: "error", text: message }),
       action: async () => {
         const url = editingId
           ? `/api/admin/products/categories/${editingId}`
@@ -187,12 +258,21 @@ export default function CategoryAdminManager() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const data = await res.json() as { message?: string; fieldErrors?: Record<string, string> };
+        const data = await res.json() as {
+          message?: string;
+          error?: string;
+          code?: string;
+          fieldErrors?: Record<string, string>;
+        };
         if (!res.ok) {
+          const summary =
+            data.code === SEO_PUBLISH_QUALITY_GATE_FAILED
+              ? SEO_PUBLISH_QUALITY_SUMMARY
+              : data.message ?? data.error ?? "Không thể lưu danh mục.";
           setFieldErrors(data.fieldErrors ?? {});
           return {
             ok: false as const,
-            message: data.message ?? "Không thể lưu danh mục.",
+            message: summary,
           };
         }
         return { ok: true as const, data: true };
@@ -205,9 +285,6 @@ export default function CategoryAdminManager() {
         router.refresh();
       },
     });
-    if (!saved) {
-      setMessage({ type: "error", text: "Không thể lưu danh mục." });
-    }
     setSaving(false);
   }
 
@@ -353,12 +430,16 @@ export default function CategoryAdminManager() {
           <div style={{ marginTop: 16 }}>
             <label className="admin-label">Mô tả ngắn</label>
             <textarea
-              className="admin-input"
+              className={`admin-input${fieldErrors.description ? " admin-input--error" : ""}`}
               rows={3}
+              data-field="description"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               placeholder="Mô tả hiển thị trên trang danh mục công khai"
             />
+            {fieldErrors.description && (
+              <p className="admin-field-error" role="alert">{fieldErrors.description}</p>
+            )}
           </div>
 
           <div style={{ marginTop: 16 }}>
@@ -373,7 +454,8 @@ export default function CategoryAdminManager() {
                 }}
               />
               <input
-                className="admin-input"
+                className={`admin-input${fieldErrors.imageUrl ? " admin-input--error" : ""}`}
+                data-field="imageUrl"
                 value={form.imageUrl}
                 onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
                 placeholder="Hoặc dán URL ảnh"
@@ -387,7 +469,15 @@ export default function CategoryAdminManager() {
                 />
               )}
             </div>
+            {fieldErrors.imageUrl && (
+              <p className="admin-field-error" role="alert">{fieldErrors.imageUrl}</p>
+            )}
           </div>
+
+          <PublishQualityChecklist
+            items={categoryPublishChecklist}
+            legacyWarning={showCategoryLegacySeoWarning}
+          />
 
           <fieldset className="admin-catalog-fieldset" style={{ marginTop: 20 }}>
             <legend className="admin-subtitle">SEO</legend>
@@ -395,21 +485,29 @@ export default function CategoryAdminManager() {
               <div>
                 <label className="admin-label">SEO title</label>
                 <input
-                  className="admin-input"
+                  className={`admin-input${fieldErrors.seoTitle ? " admin-input--error" : ""}`}
+                  data-field="seoTitle"
                   value={form.seoTitle}
                   onChange={(e) => setForm((f) => ({ ...f, seoTitle: e.target.value }))}
                   maxLength={255}
                 />
+                {fieldErrors.seoTitle && (
+                  <p className="admin-field-error" role="alert">{fieldErrors.seoTitle}</p>
+                )}
               </div>
               <div>
                 <label className="admin-label">SEO description</label>
                 <textarea
-                  className="admin-input"
+                  className={`admin-input${fieldErrors.seoDescription ? " admin-input--error" : ""}`}
                   rows={2}
+                  data-field="seoDescription"
                   value={form.seoDescription}
                   onChange={(e) => setForm((f) => ({ ...f, seoDescription: e.target.value }))}
                   maxLength={500}
                 />
+                {fieldErrors.seoDescription && (
+                  <p className="admin-field-error" role="alert">{fieldErrors.seoDescription}</p>
+                )}
               </div>
             </div>
           </fieldset>

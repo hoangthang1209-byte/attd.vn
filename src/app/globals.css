@@ -977,7 +977,7 @@ body:has(.mobile-action-bar) .site-footer {
   display: inline-flex;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 900px) {
   .site-header-logo-desktop {
     display: inline-flex;
   }

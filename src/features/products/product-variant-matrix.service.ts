@@ -1,5 +1,6 @@
 import type { VariantStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { DbClient } from "@/features/products/product-relation-ownership";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 import { generateSku, ensureUniqueSku } from "@/features/products/product-sku-utils";
 import {
@@ -263,17 +264,23 @@ export async function generateVariantMatrix(
   };
 }
 
-export async function countVariantsUsingOptionValue(optionValueId: string): Promise<number> {
-  return prisma.productVariantOptionValue.count({ where: { optionValueId } });
+export async function countVariantsUsingOptionValue(
+  optionValueId: string,
+  db: DbClient = prisma,
+): Promise<number> {
+  return db.productVariantOptionValue.count({ where: { optionValueId } });
 }
 
-export async function countVariantsUsingOption(optionId: string): Promise<number> {
-  const valueIds = await prisma.productOptionValue.findMany({
+export async function countVariantsUsingOption(
+  optionId: string,
+  db: DbClient = prisma,
+): Promise<number> {
+  const valueIds = await db.productOptionValue.findMany({
     where: { optionId },
     select: { id: true },
   });
   if (!valueIds.length) return 0;
-  return prisma.productVariantOptionValue.count({
+  return db.productVariantOptionValue.count({
     where: { optionValueId: { in: valueIds.map((value) => value.id) } },
   });
 }

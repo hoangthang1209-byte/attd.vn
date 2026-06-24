@@ -9,7 +9,8 @@ import type { ProductSpecificationRow } from "@/features/products/product-detail
  * - GSM stays a legacy numeric field; not mirrored from assignments in this sprint
  * - CAPACITY must NOT map to ProductVariant.capacity
  *
- * Removing an assignment does not clear legacy fields (handled in sync service).
+ * Removing an assignment clears mirrored legacy fields only when the scalar still
+ * matches the removed assignment display value (see syncProductAttributeAssignments).
  */
 export const LEGACY_MIRROR_FIELD_BY_ATTRIBUTE_CODE: Record<string, "material" | "form"> = {
   MATERIAL: "material",

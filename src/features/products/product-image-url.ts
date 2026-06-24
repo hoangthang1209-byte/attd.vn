@@ -1,3 +1,5 @@
+import { isPublishableLocalImagePath } from "@/lib/imagePaths";
+
 /**
  * URL-based product media validation (Sprint 27.2.6).
  * Cloudinary/R2/MediaAsset unification will replace direct URL fields later.
@@ -16,8 +18,29 @@ export const MEDIA_ASSET_INTEGRATION_POINTS = [
   "bulk variant image assignment",
 ] as const;
 
+const UNSAFE_IMAGE_PROTOCOL = /^(javascript|data|vbscript):/i;
+
 export function isValidProductImageUrl(value: string): boolean {
-  return /^https?:\/\/.+/i.test(value.trim());
+  const trimmed = value.trim();
+  if (!trimmed || UNSAFE_IMAGE_PROTOCOL.test(trimmed)) return false;
+  if (!/^https?:\/\/.+/i.test(trimmed)) return false;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/** Publish gate: remote https URL or approved local public upload file path. */
+export function isUsablePublishImageReference(value: string | null | undefined): boolean {
+  if (!value?.trim()) return false;
+  const trimmed = value.trim();
+  if (UNSAFE_IMAGE_PROTOCOL.test(trimmed)) return false;
+  if (/^https?:\/\//i.test(trimmed)) {
+    return isValidProductImageUrl(trimmed);
+  }
+  return isPublishableLocalImagePath(trimmed);
 }
 
 export function normalizeProductImageUrl(value: string): string | null {

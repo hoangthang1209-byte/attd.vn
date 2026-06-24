@@ -5,6 +5,10 @@ import {
   type CategoryAdminInput,
 } from "@/features/products/product-admin.service";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
+import {
+  SeoPublishQualityGateError,
+  formatSeoPublishQualityGateApiError,
+} from "@/lib/seo/publish-quality-gate";
 import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-public-category-cache";
 
 export async function GET() {
@@ -55,6 +59,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(cat, { status: 201 });
   } catch (err) {
     console.error("[POST /api/admin/products/categories]", err);
+    if (err instanceof SeoPublishQualityGateError) {
+      const formatted = formatSeoPublishQualityGateApiError(err);
+      return NextResponse.json(formatted, { status: formatted.status });
+    }
     if (err instanceof ProductAdminValidationError) {
       const message =
         err.fieldErrors.slug ??

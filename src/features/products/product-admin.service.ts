@@ -33,6 +33,43 @@ import {
   applyLegacyMirrorToProduct,
   syncProductAttributeAssignments,
 } from "@/features/products/product-attribute-assignment.service";
+import {
+  assertAttributeAssignmentIdsBelongToProduct,
+  assertCustomizationIdsBelongToProduct,
+  assertNoDuplicateRelationIds,
+  assertOptionIdsBelongToProduct,
+  assertOptionValueIdsBelongToProduct,
+  assertSpecificationIdsBelongToProduct,
+  assertVariantIdsBelongToProduct,
+  throwProductRelationOwnershipError,
+  updateProductVariantOwned,
+  type DbClient,
+} from "@/features/products/product-relation-ownership";
+import {
+  assertCategoryPublishQuality,
+  assertProductPublishQuality,
+  interimProductStatusForAtomicPublish,
+  isProductPublishTransition,
+  requiresAtomicActiveProductPublish,
+  shouldEnforceCategoryIndexableSeoGate,
+  type CategoryPublishQualityInput,
+  type ProductPublishQualityInput,
+} from "@/lib/seo/publish-quality-gate";
+import { isIndexableCategoryLanding } from "@/lib/seo/indexable-category-routes";
+
+const PUBLISH_QUALITY_INCLUDE = {
+  images: { select: { imageUrl: true } },
+  variants: { select: { variantStatus: true, imageUrl: true } },
+  specifications: { select: { label: true, value: true } },
+  attributeAssignments: {
+    select: { attributeId: true, attributeValueId: true, customValue: true },
+  },
+  options: {
+    include: {
+      values: { select: { label: true } },
+    },
+  },
+} satisfies Prisma.ProductInclude;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -292,9 +329,394 @@ export async function getProductAdminKpis() {
   return { totalProducts, activeProducts, totalVariants, lowStockVariants, outOfStockVariants, preorderVariants };
 }
 
+// ─── Publish quality gate ─────────────────────────────────────────────────────
+
+function assertNoRelationIdsOnCreate(
+  input: Pick<
+    ProductInput,
+    "variants" | "options" | "specifications" | "customizations" | "attributeAssignments"
+  >,
+): void {
+  const relationIds = [
+    ...(input.variants?.map((variant) => variant.id) ?? []),
+    ...(input.specifications?.map((spec) => spec.id) ?? []),
+    ...(input.options?.map((option) => option.id) ?? []),
+    ...(input.options?.flatMap((option) => option.values.map((value) => value.id)) ?? []),
+    ...(input.customizations?.map((cap) => cap.id) ?? []),
+    ...(input.attributeAssignments?.map((row) => row.id) ?? []),
+  ];
+  assertNoDuplicateRelationIds(relationIds);
+  if (relationIds.some((id) => id?.trim())) {
+    throwProductRelationOwnershipError();
+  }
+}
+
+async function verifyProductRelationInputOwnership(
+  productId: string,
+  input: Partial<
+    Pick<
+      ProductInput,
+      "variants" | "options" | "specifications" | "customizations" | "attributeAssignments"
+    >
+  >,
+  db: DbClient = prisma,
+): Promise<void> {
+  if (input.variants?.length) {
+    assertNoDuplicateRelationIds(input.variants.map((variant) => variant.id));
+    await assertVariantIdsBelongToProduct(
+      db,
+      productId,
+      input.variants.map((variant) => variant.id).filter(Boolean) as string[],
+    );
+  }
+
+  if (input.specifications?.length) {
+    assertNoDuplicateRelationIds(input.specifications.map((spec) => spec.id));
+    await assertSpecificationIdsBelongToProduct(
+      db,
+      productId,
+      input.specifications.map((spec) => spec.id).filter(Boolean) as string[],
+    );
+  }
+
+  if (input.options?.length) {
+    assertNoDuplicateRelationIds(input.options.map((option) => option.id));
+    for (const option of input.options) {
+      assertNoDuplicateRelationIds(option.values.map((value) => value.id));
+    }
+    await assertOptionIdsBelongToProduct(
+      db,
+      productId,
+      input.options.map((option) => option.id).filter(Boolean) as string[],
+    );
+    await assertOptionValueIdsBelongToProduct(
+      db,
+      productId,
+      input.options.flatMap((option) => option.values.map((value) => value.id)).filter(Boolean) as string[],
+    );
+  }
+
+  if (input.customizations?.length) {
+    assertNoDuplicateRelationIds(input.customizations.map((cap) => cap.id));
+    await assertCustomizationIdsBelongToProduct(
+      db,
+      productId,
+      input.customizations.map((cap) => cap.id).filter(Boolean) as string[],
+    );
+  }
+
+  if (input.attributeAssignments !== undefined) {
+    assertNoDuplicateRelationIds(input.attributeAssignments.map((row) => row.id));
+    await assertAttributeAssignmentIdsBelongToProduct(
+      db,
+      productId,
+      input.attributeAssignments.map((row) => row.id).filter(Boolean) as string[],
+    );
+  }
+}
+
+function mapPersistedProductToPublishQualityInput(
+  product: NonNullable<Awaited<ReturnType<typeof loadPersistedProductForPublishQuality>>>,
+): ProductPublishQualityInput {
+  return {
+    name: product.name,
+    slug: product.slug,
+    categoryId: product.categoryId,
+    description: product.description,
+    seoTitle: product.seoTitle,
+    seoDescription: product.seoDescription,
+    featuredImage: product.featuredImage,
+    gallery: product.gallery,
+    productImages: product.images.map((image) => image.imageUrl),
+    variants: product.variants.map((variant) => ({
+      variantStatus: variant.variantStatus,
+      imageUrl: variant.imageUrl,
+    })),
+    specifications: product.specifications.map((row) => ({
+      label: row.label,
+      value: row.value,
+    })),
+    attributeAssignments: product.attributeAssignments.map((row) => ({
+      attributeId: row.attributeId,
+      attributeValueId: row.attributeValueId,
+      customValue: row.customValue,
+    })),
+    options: product.options.map((group) => ({
+      values: group.values.map((value) => ({ label: value.label })),
+    })),
+  };
+}
+
+async function loadPersistedProductForPublishQuality(productId: string, db: DbClient = prisma) {
+  return db.product.findUnique({
+    where: { id: productId },
+    include: PUBLISH_QUALITY_INCLUDE,
+  });
+}
+
+async function assertPersistedProductPublishQuality(
+  productId: string,
+  db: DbClient,
+): Promise<void> {
+  const product = await loadPersistedProductForPublishQuality(productId, db);
+  if (!product) {
+    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+  }
+  assertProductPublishQuality(mapPersistedProductToPublishQualityInput(product));
+}
+
+async function loadProductPublishQualitySnapshot(
+  productId: string,
+  input: Partial<ProductInput>,
+  db: DbClient = prisma,
+): Promise<ProductPublishQualityInput> {
+  await verifyProductRelationInputOwnership(productId, input, db);
+
+  const existing = await db.product.findUnique({
+    where: { id: productId },
+    include: PUBLISH_QUALITY_INCLUDE,
+  });
+
+  if (!existing) {
+    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+  }
+
+  const mergedVariants = input.variants
+    ? input.variants.map((variant) => ({
+        variantStatus: variant.variantStatus,
+        imageUrl: variant.imageUrl ?? null,
+      }))
+    : existing.variants.map((variant) => ({
+        variantStatus: variant.variantStatus,
+        imageUrl: variant.imageUrl,
+      }));
+
+  return {
+    name: input.name ?? existing.name,
+    slug: input.slug ?? existing.slug,
+    categoryId: input.categoryId ?? existing.categoryId,
+    description: input.description !== undefined ? input.description ?? null : existing.description,
+    seoTitle: input.seoTitle !== undefined ? input.seoTitle ?? null : existing.seoTitle,
+    seoDescription:
+      input.seoDescription !== undefined ? input.seoDescription ?? null : existing.seoDescription,
+    featuredImage:
+      input.featuredImage !== undefined ? input.featuredImage ?? null : existing.featuredImage,
+    gallery: input.gallery ?? existing.gallery,
+    productImages: existing.images.map((image) => image.imageUrl),
+    variants: mergedVariants,
+    specifications: input.specifications
+      ? input.specifications.map((row) => ({ label: row.label, value: row.value }))
+      : existing.specifications.map((row) => ({ label: row.label, value: row.value })),
+    attributeAssignments: input.attributeAssignments
+      ? input.attributeAssignments.map((row) => ({
+          attributeId: row.attributeId,
+          attributeValueId: row.attributeValueId ?? null,
+          customValue: row.customValue ?? null,
+        }))
+      : existing.attributeAssignments.map((row) => ({
+          attributeId: row.attributeId,
+          attributeValueId: row.attributeValueId,
+          customValue: row.customValue,
+        })),
+    options: input.options
+      ? input.options.map((group) => ({
+          values: group.values?.map((value) => ({ label: value.label })),
+        }))
+      : existing.options.map((group) => ({
+          values: group.values.map((value) => ({ label: value.label })),
+        })),
+  };
+}
+
+function categoryInputToPublishQualityInput(data: CategoryAdminInput): CategoryPublishQualityInput {
+  return {
+    name: data.name,
+    slug: data.slug,
+    description: data.description ?? null,
+    seoTitle: data.seoTitle ?? null,
+    seoDescription: data.seoDescription ?? null,
+    imageUrl: data.imageUrl ?? null,
+  };
+}
+
+async function writeProductDependentRelations(
+  productId: string,
+  productCode: string,
+  input: Pick<
+    ProductInput,
+    "variants" | "options" | "specifications" | "customizations" | "attributeAssignments"
+  >,
+  db: DbClient = prisma,
+): Promise<void> {
+  await verifyProductRelationInputOwnership(productId, input, db);
+
+  if (input.options || input.specifications || input.customizations) {
+    await syncProductCmsData(
+      productId,
+      {
+        options: input.options,
+        specifications: input.specifications,
+        customizations: input.customizations,
+      },
+      db,
+    );
+  }
+
+  if (input.attributeAssignments !== undefined) {
+    const mirror = await syncProductAttributeAssignments(
+      productId,
+      input.attributeAssignments,
+      db,
+    );
+    await applyLegacyMirrorToProduct(productId, mirror, db);
+  }
+
+  const createdVariantIds: string[] = [];
+  if (input.variants?.length) {
+    for (const v of input.variants) {
+      if (v.id) {
+        try {
+          await updateProductVariantOwned(db, productId, v.id, {
+            ...(v.sku?.trim() ? { sku: v.sku.trim() } : {}),
+            colorName: v.colorName,
+            colorCode: v.colorCode,
+            sizeName: v.sizeName,
+            dimensions: v.dimensions,
+            capacity: v.capacity,
+            displayLabel:
+              v.displayLabel !== undefined ? (v.displayLabel?.trim() || null) : undefined,
+            moqOverride: v.moqOverride !== undefined ? v.moqOverride : undefined,
+            leadTimeOverride:
+              v.leadTimeOverride !== undefined ? (v.leadTimeOverride?.trim() || null) : undefined,
+            materialOverride:
+              v.materialOverride !== undefined ? (v.materialOverride?.trim() || null) : undefined,
+            wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
+            dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
+            costPrice: v.costPrice != null ? v.costPrice : undefined,
+            ...(v.priceTiers ? { priceTiers: v.priceTiers as Prisma.InputJsonValue } : {}),
+            stockQty: v.stockQty,
+            stockStatus: v.stockStatus,
+            weight: v.weight != null ? v.weight : undefined,
+            imageUrl:
+              v.imageUrl !== undefined ? (v.imageUrl?.trim() ? v.imageUrl.trim() : null) : undefined,
+            internalNote: v.internalNote,
+            variantStatus: v.variantStatus,
+          });
+        } catch (error) {
+          if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
+            throwVariantSkuConflict(v, v.sku?.trim() ?? "");
+          }
+          throw error;
+        }
+        continue;
+      }
+
+      const sku = await buildVariantSku(v, productCode);
+      try {
+        const created = await db.productVariant.create({
+          data: {
+            productId,
+            sku: v.sku?.trim() || sku,
+            colorName: v.colorName,
+            colorCode: v.colorCode,
+            sizeName: v.sizeName,
+            dimensions: v.dimensions,
+            capacity: v.capacity,
+            displayLabel: v.displayLabel?.trim() || null,
+            moqOverride: v.moqOverride ?? null,
+            leadTimeOverride: v.leadTimeOverride?.trim() || null,
+            materialOverride: v.materialOverride?.trim() || null,
+            wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
+            dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
+            costPrice: v.costPrice != null ? v.costPrice : undefined,
+            ...(v.priceTiers ? { priceTiers: v.priceTiers as Prisma.InputJsonValue } : {}),
+            stockQty: v.stockQty ?? 0,
+            stockStatus: v.stockStatus ?? "IN_STOCK",
+            weight: v.weight != null ? v.weight : undefined,
+            imageUrl: v.imageUrl?.trim() ? v.imageUrl.trim() : null,
+            internalNote: v.internalNote,
+            variantStatus: v.variantStatus ?? "ACTIVE",
+            ...(v.metadata ? { metadata: v.metadata as Prisma.InputJsonValue } : {}),
+          },
+        });
+        createdVariantIds.push(created.id);
+      } catch (error) {
+        if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
+          throwVariantSkuConflict(v, v.sku?.trim() || sku);
+        }
+        throw error;
+      }
+    }
+  }
+
+  if (input.variants?.some((v) => v.optionValueIds?.length)) {
+    const variantOptionValueIds: Record<string, string[]> = {};
+    let newVariantIndex = 0;
+    for (const v of input.variants) {
+      if (!v.optionValueIds?.length) {
+        if (!v.id) newVariantIndex += 1;
+        continue;
+      }
+      const variantId = v.id ?? createdVariantIds[newVariantIndex];
+      if (!v.id) newVariantIndex += 1;
+      if (!variantId) continue;
+      variantOptionValueIds[variantId] = await resolveOptionValueIdsForProduct(
+        productId,
+        v.optionValueIds,
+        db,
+      );
+    }
+    await syncProductCmsData(productId, { variantOptionValueIds }, db);
+  }
+}
+
+function buildProductCreateData(
+  input: ProductInput,
+  productCode: string,
+  slug: string,
+  systemCode: string,
+  status: ProductStatus,
+): Prisma.ProductCreateInput {
+  return {
+    name: input.name,
+    slug,
+    productCode,
+    systemCode,
+    category: { connect: { id: input.categoryId } },
+    shortDescription: input.shortDescription,
+    description: input.description,
+    seoTitle: input.seoTitle,
+    seoDescription: input.seoDescription,
+    aiSummary: input.aiSummary,
+    gsm: input.gsm,
+    material: input.material,
+    form: input.form,
+    fit: input.fit,
+    defaultMoq: input.defaultMoq,
+    useCases: input.useCases ?? [],
+    targetCustomers: input.targetCustomers ?? [],
+    supportsPrinting: input.supportsPrinting ?? false,
+    supportsEmbroidery: input.supportsEmbroidery ?? false,
+    supportsOem: input.supportsOem ?? false,
+    tags: input.tags ?? [],
+    featuredImage: input.featuredImage ?? null,
+    gallery: input.gallery ?? [],
+    leadTime: input.leadTime ?? null,
+    status,
+    ...(input.metadata ? { metadata: input.metadata as Prisma.InputJsonValue } : {}),
+  };
+}
+
 // ─── Create ───────────────────────────────────────────────────────────────────
 
 export async function createProductAdmin(input: ProductInput) {
+  const finalStatus = input.status ?? "DRAFT";
+  const isPublishing = finalStatus === "ACTIVE";
+
+  if (isPublishing) {
+    assertNoRelationIdsOnCreate(input);
+  }
+
   const category = await prisma.category.findUnique({
     where: { id: input.categoryId },
     select: { name: true, skuCode: true },
@@ -330,112 +752,46 @@ export async function createProductAdmin(input: ProductInput) {
   const slug = await ensureUniqueSlug(input.slug ?? toSlug(input.name));
   const systemCode = await generateProductSystemCode();
 
+  if (isPublishing) {
+    const productId = await prisma.$transaction(async (tx) => {
+      const interimStatus = interimProductStatusForAtomicPublish("ACTIVE") as ProductStatus;
+      const product = await tx.product.create({
+        data: buildProductCreateData(input, productCode, slug, systemCode, interimStatus),
+      });
+      await writeProductDependentRelations(product.id, productCode, input, tx);
+      await assertPersistedProductPublishQuality(product.id, tx);
+      await tx.product.update({ where: { id: product.id }, data: { status: "ACTIVE" } });
+      return product.id;
+    });
+    return await getProductAdminById(productId);
+  }
+
   const product = await prisma.product.create({
-    data: {
-      name: input.name,
-      slug,
-      productCode,
-      systemCode,
-      categoryId: input.categoryId,
-      shortDescription: input.shortDescription,
-      description: input.description,
-      seoTitle: input.seoTitle,
-      seoDescription: input.seoDescription,
-      aiSummary: input.aiSummary,
-      gsm: input.gsm,
-      material: input.material,
-      form: input.form,
-      fit: input.fit,
-      defaultMoq: input.defaultMoq,
-      useCases: input.useCases ?? [],
-      targetCustomers: input.targetCustomers ?? [],
-      supportsPrinting: input.supportsPrinting ?? false,
-      supportsEmbroidery: input.supportsEmbroidery ?? false,
-      supportsOem: input.supportsOem ?? false,
-      tags: input.tags ?? [],
-      featuredImage: input.featuredImage ?? null,
-      gallery: input.gallery ?? [],
-      leadTime: input.leadTime ?? null,
-      status: input.status ?? "DRAFT",
-      ...(input.metadata ? { metadata: input.metadata as Prisma.InputJsonValue } : {}),
-    },
+    data: buildProductCreateData(input, productCode, slug, systemCode, finalStatus),
     include: PRODUCT_INCLUDE,
   });
 
-  if (input.options || input.specifications || input.customizations) {
-    await syncProductCmsData(product.id, {
-      options: input.options,
-      specifications: input.specifications,
-      customizations: input.customizations,
-    });
-  }
-
-  if (input.attributeAssignments !== undefined) {
-    const mirror = await syncProductAttributeAssignments(product.id, input.attributeAssignments);
-    await applyLegacyMirrorToProduct(product.id, mirror);
-  }
-
-  const createdVariantIds: string[] = [];
-  if (input.variants?.length) {
-    for (const v of input.variants) {
-      const sku = await buildVariantSku(v, productCode);
-      try {
-        const created = await prisma.productVariant.create({
-          data: {
-            productId: product.id,
-            sku: v.sku?.trim() || sku,
-          colorName: v.colorName,
-          colorCode: v.colorCode,
-          sizeName: v.sizeName,
-          dimensions: v.dimensions,
-          capacity: v.capacity,
-          displayLabel: v.displayLabel?.trim() || null,
-          moqOverride: v.moqOverride ?? null,
-          leadTimeOverride: v.leadTimeOverride?.trim() || null,
-          materialOverride: v.materialOverride?.trim() || null,
-          wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
-          dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
-          costPrice: v.costPrice != null ? v.costPrice : undefined,
-          ...(v.priceTiers ? { priceTiers: v.priceTiers as Prisma.InputJsonValue } : {}),
-          stockQty: v.stockQty ?? 0,
-          stockStatus: v.stockStatus ?? "IN_STOCK",
-          weight: v.weight != null ? v.weight : undefined,
-          imageUrl: v.imageUrl?.trim() ? v.imageUrl.trim() : null,
-          internalNote: v.internalNote,
-          variantStatus: v.variantStatus ?? "ACTIVE",
-          ...(v.metadata ? { metadata: v.metadata as Prisma.InputJsonValue } : {}),
-        },
-      });
-      createdVariantIds.push(created.id);
-      } catch (error) {
-        if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
-          throwVariantSkuConflict(v, v.sku?.trim() || sku);
-        }
-        throw error;
-      }
-    }
-  }
-
-  if (input.variants?.some((v) => v.optionValueIds?.length)) {
-    const variantOptionValueIds: Record<string, string[]> = {};
-    for (const [index, v] of (input.variants ?? []).entries()) {
-      const variantId = v.id ?? createdVariantIds[index];
-      if (variantId && v.optionValueIds?.length) {
-        variantOptionValueIds[variantId] = await resolveOptionValueIdsForProduct(
-          product.id,
-          v.optionValueIds,
-        );
-      }
-    }
-    await syncProductCmsData(product.id, { variantOptionValueIds });
-  }
-
+  await writeProductDependentRelations(product.id, productCode, input);
   return await getProductAdminById(product.id);
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────
 
 export async function updateProductAdmin(id: string, input: Partial<ProductInput>) {
+  const existingStatus = await prisma.product.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!existingStatus) {
+    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+  }
+
+  const nextStatus = input.status ?? existingStatus.status;
+  if (isProductPublishTransition(existingStatus.status, nextStatus)) {
+    const snapshot = await loadProductPublishQualitySnapshot(id, input);
+    assertProductPublishQuality(snapshot);
+  }
+
   if (input.categoryId) {
     const category = await prisma.category.findUnique({
       where: { id: input.categoryId },
@@ -495,130 +851,56 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
   if (input.featuredImage !== undefined) updateData.featuredImage = input.featuredImage;
   if (input.gallery !== undefined) updateData.gallery = input.gallery;
   if (input.leadTime !== undefined) updateData.leadTime = input.leadTime;
-  if (input.status !== undefined) updateData.status = input.status;
 
-  await prisma.product.update({ where: { id }, data: updateData });
+  const isAtomicPublish = requiresAtomicActiveProductPublish(existingStatus.status, nextStatus);
+  if (isAtomicPublish) {
+    delete updateData.status;
+  } else if (input.status !== undefined) {
+    updateData.status = input.status;
+  }
 
-  const createdVariantIds: string[] = [];
-  if (input.variants) {
-    const product = await prisma.product.findUnique({
+  if (isAtomicPublish) {
+    const productCodeRow = await prisma.product.findUnique({
       where: { id },
-      select: { productCode: true, name: true, material: true },
+      select: { productCode: true },
     });
-    const prodCode = product?.productCode;
-    if (!prodCode) {
+    const productCode = productCodeRow?.productCode;
+    if (!productCode) {
       throw new ProductAdminValidationError(
         "Không thể tạo biến thể vì sản phẩm chưa có ID sản phẩm.",
-        { productCode: "Thiếu ID sản phẩm." }
+        { productCode: "Thiếu ID sản phẩm." },
       );
     }
 
-    for (const v of input.variants) {
-      if (v.id) {
-        try {
-          await prisma.productVariant.update({
-            where: { id: v.id },
-            data: {
-              ...(v.sku?.trim() ? { sku: v.sku.trim() } : {}),
-            colorName: v.colorName,
-            colorCode: v.colorCode,
-            sizeName: v.sizeName,
-            dimensions: v.dimensions,
-            capacity: v.capacity,
-            displayLabel: v.displayLabel !== undefined ? (v.displayLabel?.trim() || null) : undefined,
-            moqOverride: v.moqOverride !== undefined ? v.moqOverride : undefined,
-            leadTimeOverride:
-              v.leadTimeOverride !== undefined ? (v.leadTimeOverride?.trim() || null) : undefined,
-            materialOverride:
-              v.materialOverride !== undefined ? (v.materialOverride?.trim() || null) : undefined,
-            wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
-            dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
-            costPrice: v.costPrice != null ? v.costPrice : undefined,
-            ...(v.priceTiers ? { priceTiers: v.priceTiers as Prisma.InputJsonValue } : {}),
-            stockQty: v.stockQty,
-            stockStatus: v.stockStatus,
-            weight: v.weight != null ? v.weight : undefined,
-            imageUrl: v.imageUrl !== undefined ? (v.imageUrl?.trim() ? v.imageUrl.trim() : null) : undefined,
-            internalNote: v.internalNote,
-            variantStatus: v.variantStatus,
-          },
-        });
-        } catch (error) {
-          if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
-            throwVariantSkuConflict(v, v.sku?.trim() ?? "");
-          }
-          throw error;
-        }
-      } else {
-        const sku = await buildVariantSku(v, prodCode);
-        try {
-          const created = await prisma.productVariant.create({
-          data: {
-            productId: id,
-            sku: v.sku?.trim() || sku,
-            colorName: v.colorName,
-            colorCode: v.colorCode,
-            sizeName: v.sizeName,
-            dimensions: v.dimensions,
-            capacity: v.capacity,
-            displayLabel: v.displayLabel?.trim() || null,
-            moqOverride: v.moqOverride ?? null,
-            leadTimeOverride: v.leadTimeOverride?.trim() || null,
-            materialOverride: v.materialOverride?.trim() || null,
-            wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
-            dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
-            costPrice: v.costPrice != null ? v.costPrice : undefined,
-            ...(v.priceTiers ? { priceTiers: v.priceTiers as Prisma.InputJsonValue } : {}),
-            stockQty: v.stockQty ?? 0,
-            stockStatus: v.stockStatus ?? "IN_STOCK",
-            weight: v.weight != null ? v.weight : undefined,
-            imageUrl: v.imageUrl?.trim() ? v.imageUrl.trim() : null,
-            internalNote: v.internalNote,
-            variantStatus: v.variantStatus ?? "ACTIVE",
-            ...(v.metadata ? { metadata: v.metadata as Prisma.InputJsonValue } : {}),
-          },
-        });
-        createdVariantIds.push(created.id);
-        } catch (error) {
-          if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
-            throwVariantSkuConflict(v, v.sku?.trim() || sku);
-          }
-          throw error;
-        }
+    await prisma.$transaction(async (tx) => {
+      if (Object.keys(updateData).length > 0) {
+        await tx.product.update({ where: { id }, data: updateData });
       }
-    }
-  }
-
-  if (input.options || input.specifications || input.customizations) {
-    await syncProductCmsData(id, {
-      options: input.options,
-      specifications: input.specifications,
-      customizations: input.customizations,
+      await writeProductDependentRelations(id, productCode, input, tx);
+      await assertPersistedProductPublishQuality(id, tx);
+      await tx.product.update({ where: { id }, data: { status: "ACTIVE" } });
     });
+    return await getProductAdminById(id);
   }
 
-  if (input.attributeAssignments !== undefined) {
-    const mirror = await syncProductAttributeAssignments(id, input.attributeAssignments);
-    await applyLegacyMirrorToProduct(id, mirror);
+  if (Object.keys(updateData).length > 0) {
+    await prisma.product.update({ where: { id }, data: updateData });
   }
 
-  if (input.variants?.some((v) => v.optionValueIds?.length)) {
-    const variantOptionValueIds: Record<string, string[]> = {};
-    let newVariantIndex = 0;
-    for (const v of input.variants) {
-      if (!v.optionValueIds?.length) {
-        if (!v.id) newVariantIndex += 1;
-        continue;
-      }
-      const variantId = v.id ?? createdVariantIds[newVariantIndex];
-      if (!v.id) newVariantIndex += 1;
-      if (!variantId) continue;
-      variantOptionValueIds[variantId] = await resolveOptionValueIdsForProduct(
-        id,
-        v.optionValueIds,
-      );
-    }
-    await syncProductCmsData(id, { variantOptionValueIds });
+  const productCodeRow = await prisma.product.findUnique({
+    where: { id },
+    select: { productCode: true },
+  });
+  const productCode = productCodeRow?.productCode;
+  if (!productCode && input.variants?.some((variant) => !variant.id)) {
+    throw new ProductAdminValidationError(
+      "Không thể tạo biến thể vì sản phẩm chưa có ID sản phẩm.",
+      { productCode: "Thiếu ID sản phẩm." },
+    );
+  }
+
+  if (productCode) {
+    await writeProductDependentRelations(id, productCode, input);
   }
 
   return await getProductAdminById(id);
@@ -737,6 +1019,10 @@ async function assertValidCategoryParent(
 }
 
 export async function createProductCategory(data: CategoryAdminInput) {
+  assertCategoryPublishQuality(categoryInputToPublishQualityInput(data), {
+    requireIndexableLandingFields: isIndexableCategoryLanding(data.slug),
+  });
+
   await assertUniqueCategorySlug(data.slug);
   const parentId = await assertValidCategoryParent(null, data.parentId);
 
@@ -766,6 +1052,24 @@ export async function createProductCategory(data: CategoryAdminInput) {
 }
 
 export async function updateProductCategory(id: string, data: CategoryAdminInput) {
+  const existing = await prisma.category.findUnique({
+    where: { id },
+    select: { slug: true },
+  });
+  if (!existing) {
+    throw new ProductAdminValidationError("Không tìm thấy danh mục.", {}, "Không tìm thấy danh mục.");
+  }
+
+  if (shouldEnforceCategoryIndexableSeoGate(existing.slug, data.slug)) {
+    assertCategoryPublishQuality(categoryInputToPublishQualityInput(data), {
+      requireIndexableLandingFields: true,
+    });
+  } else {
+    assertCategoryPublishQuality(categoryInputToPublishQualityInput(data), {
+      requireIndexableLandingFields: false,
+    });
+  }
+
   await assertUniqueCategorySlug(data.slug, id);
   const parentId = await assertValidCategoryParent(id, data.parentId);
 

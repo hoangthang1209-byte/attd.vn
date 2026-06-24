@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CTA } from "@/lib/ctaConfig";
 
 type Props = {
@@ -12,9 +13,9 @@ export default function ProductPdpMobileBar({ onRequestQuote }: Props) {
       <button type="button" className="pdp-mobile-action-bar__btn pdp-mobile-action-bar__btn--quote" onClick={onRequestQuote}>
         Báo giá
       </button>
-      <a href={CTA.primary.href} className="pdp-mobile-action-bar__btn pdp-mobile-action-bar__btn--dealer">
+      <Link href={CTA.primary.href} className="pdp-mobile-action-bar__btn pdp-mobile-action-bar__btn--dealer">
         Đại lý
-      </a>
+      </Link>
     </div>
   );
 }
