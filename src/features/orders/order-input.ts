@@ -90,6 +90,10 @@ function parseOrderFormBody(raw: Record<string, unknown>): CreateManualOrderInpu
     shippingFee: parseMoneyInput(raw.shippingFee) ?? 0,
     vatRate: raw.vatRate != null ? Number(raw.vatRate) : undefined,
     vatAmount: parseOptionalMoney(raw.vatAmount) ?? undefined,
+    productionDueDate: parseOptionalString(raw.productionDueDate),
+    productionOwnerId: parseOptionalString(raw.productionOwnerId),
+    productionNote: parseOptionalString(raw.productionNote),
+    requireItemClassification: raw.requireItemClassification === true,
     items: parseOrderItems(raw.items),
   };
 }

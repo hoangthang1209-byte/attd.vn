@@ -1,5 +1,7 @@
 import type {
   OrderActivityType,
+  OrderItemProcessingMethod,
+  OrderItemSupplySource,
   OrderPaymentMethod,
   OrderPaymentStatus,
   OrderPaymentType,
@@ -64,6 +66,11 @@ export type OrderItemRecord = {
   unitPrice: number;
   lineTotal: number;
   sortOrder: number;
+  supplySource: OrderItemSupplySource | null;
+  processingMethod: OrderItemProcessingMethod | null;
+  revenueCategoryId: string | null;
+  revenueCategoryNameSnapshot: string | null;
+  revenueCategoryCodeSnapshot: string | null;
   variants: OrderItemVariantRecord[];
 };
 
@@ -222,6 +229,9 @@ export type OrderItemInputPayload = {
   unit?: string | null;
   unitPrice: number;
   sortOrder?: number;
+  supplySource?: OrderItemSupplySource | null;
+  processingMethod?: OrderItemProcessingMethod | null;
+  revenueCategoryId?: string | null;
   variants?: OrderItemVariantInputPayload[];
 };
 
@@ -251,10 +261,14 @@ export type CreateManualOrderInput = {
   sampleFee?: number | null;
   sampleLeadTime?: string | null;
   sampleRefundCondition?: string | null;
+  productionDueDate?: string | null;
+  productionOwnerId?: string | null;
+  productionNote?: string | null;
   discountAmount?: number;
   shippingFee?: number;
   vatRate?: number;
   vatAmount?: number;
+  requireItemClassification?: boolean;
   items: OrderItemInputPayload[];
 };
 

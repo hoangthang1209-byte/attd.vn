@@ -31,6 +31,11 @@ import {
   ORDER_PAYMENT_TYPE_LABELS,
   ORDER_STATUS_LABELS,
 } from "@/features/orders/order-labels";
+import {
+  getOrderItemProcessingMethodLabel,
+  getOrderItemSupplySourceLabel,
+} from "@/features/orders/order-item-classification";
+import { getRevenueCategoryDisplay } from "@/features/revenue-categories/revenue-category-display";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import type { DeliveryMethodRecord } from "@/features/delivery/delivery-method.service";
@@ -916,6 +921,9 @@ export default function OrderDetailView({ id }: Props) {
             <thead>
               <tr>
                 <th>Sản phẩm</th>
+                <th>Sản phẩm lấy từ</th>
+                <th>Cách xử lý</th>
+                <th>Nhóm doanh thu</th>
                 <th>SKU</th>
                 <th>Màu</th>
                 <th>SL</th>
@@ -933,6 +941,14 @@ export default function OrderDetailView({ id }: Props) {
                       {item.description && <div className="admin-field-hint">{item.description}</div>}
                       {item.itemNote && <div className="admin-field-hint">Ghi chú: {item.itemNote}</div>}
                     </td>
+                    <td>{getOrderItemSupplySourceLabel(item.supplySource)}</td>
+                    <td>{getOrderItemProcessingMethodLabel(item.processingMethod)}</td>
+                    <td>
+                      {getRevenueCategoryDisplay({
+                        nameSnapshot: item.revenueCategoryNameSnapshot,
+                        codeSnapshot: item.revenueCategoryCodeSnapshot,
+                      })}
+                    </td>
                     <td>{item.skuSnapshot ?? "—"}</td>
                     <td>{item.colorSnapshot ?? "—"}</td>
                     <td>{item.quantity} {item.unit}</td>
@@ -942,7 +958,7 @@ export default function OrderDetailView({ id }: Props) {
                   </tr>
                   {item.variants.length > 0 && (
                     <tr key={`${item.id}-variants`}>
-                      <td colSpan={7} style={{ paddingTop: 0 }}>
+                      <td colSpan={10} style={{ paddingTop: 0 }}>
                         <div className="admin-table-wrap">
                           <table className="admin-table admin-table--compact">
                             <thead>

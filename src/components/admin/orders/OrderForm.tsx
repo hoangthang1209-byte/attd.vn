@@ -80,6 +80,9 @@ function orderToItemRows(order: OrderDetailRecord): OrderItemRow[] {
     unit: item.unit,
     unitPrice: item.unitPrice,
     sortOrder: item.sortOrder,
+    supplySource: item.supplySource,
+    processingMethod: item.processingMethod,
+    revenueCategoryId: item.revenueCategoryId,
     variants: item.variants.map((variant) => ({
       key: variant.id,
       id: variant.id,
@@ -116,6 +119,9 @@ export default function OrderForm({ mode, orderId }: Props) {
   const [injectCustomProductCategoryId, setInjectCustomProductCategoryId] = useState<string | null>(null);
   const [colors, setColors] = useState<ColorRecord[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [revenueCategories, setRevenueCategories] = useState<
+    Array<{ id: string; displayPath: string }>
+  >([]);
 
   const [customerId, setCustomerId] = useState("");
   const [contactId, setContactId] = useState("");
@@ -267,7 +273,8 @@ export default function OrderForm({ mode, orderId }: Props) {
       fetch("/api/employees?active=1&role=ADMIN&limit=200").then((r) => r.json()),
       fetch("/api/colors?active=1").then((r) => r.json()),
       fetch("/api/admin/products/categories").then((r) => r.json()),
-    ]).then(([productsData, salesData, adminData, colorsData, categoriesData]) => {
+      fetch("/api/admin/revenue-categories?picker=1").then((r) => r.json()),
+    ]).then(([productsData, salesData, adminData, colorsData, categoriesData, revenueData]) => {
       setProducts((productsData as { products?: ProductOption[] }).products ?? []);
       const sales = (salesData as { employees?: EmployeeRecord[] }).employees ?? [];
       const admins = (adminData as { employees?: EmployeeRecord[] }).employees ?? [];
@@ -278,6 +285,8 @@ export default function OrderForm({ mode, orderId }: Props) {
       setSalesEmployees(merged);
       setColors((colorsData as { colors?: ColorRecord[] }).colors ?? []);
       setCategories((categoriesData as CategoryOption[]) ?? []);
+      const revenueList = (revenueData as Array<{ id: string; displayPath: string }>) ?? [];
+      setRevenueCategories(revenueList);
     });
   }, []);
 
@@ -472,6 +481,11 @@ export default function OrderForm({ mode, orderId }: Props) {
       <AdminBackLink href={mode === "edit" && orderId ? `/admin/orders/${orderId}` : "/admin/orders"} />
       <div className="admin-section-header">
         <h2>{mode === "create" ? "Tạo đơn hàng mới" : "Chỉnh sửa đơn hàng"}</h2>
+        {mode === "create" && (
+          <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
+            Nhập nhanh dạng bảng
+          </Link>
+        )}
       </div>
 
       {error && (
@@ -657,6 +671,7 @@ export default function OrderForm({ mode, orderId }: Props) {
             variants={item.productId ? variantsMap[item.productId] ?? [] : []}
             colors={colors}
             categories={categories}
+            revenueCategories={revenueCategories}
             onChange={(patch) =>
               setItems((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
             }

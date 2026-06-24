@@ -1,4 +1,4 @@
-import type { OrderProductGender } from "@prisma/client";
+import type { OrderItemProcessingMethod, OrderItemSupplySource, OrderProductGender } from "@prisma/client";
 import { parseMoneyInput } from "@/features/pricing/parse-money";
 import { isOrderProductGender } from "@/features/orders/order-gender";
 
@@ -37,6 +37,11 @@ export type OrderItemInput = {
   unit?: string | null;
   unitPrice: number;
   sortOrder?: number;
+  supplySource?: OrderItemSupplySource | null;
+  processingMethod?: OrderItemProcessingMethod | null;
+  revenueCategoryId?: string | null;
+  revenueCategoryNameSnapshot?: string | null;
+  revenueCategoryCodeSnapshot?: string | null;
   variants?: OrderItemVariantInput[];
   systemCode?: string | null;
 };
@@ -146,6 +151,19 @@ export function parseOrderItemInput(raw: Record<string, unknown>, index: number)
         : 1;
   const unitPrice = parseMoneyInput(raw.unitPrice) ?? 0;
 
+  const supplySource =
+    typeof raw.supplySource === "string" &&
+    ["ATTD_STOCK", "EXTERNAL_PURCHASE", "MADE_TO_ORDER", "CUSTOMER_SUPPLIED"].includes(raw.supplySource)
+      ? (raw.supplySource as OrderItemSupplySource)
+      : null;
+  const processingMethod =
+    typeof raw.processingMethod === "string" &&
+    ["AS_IS", "PRINT", "EMBROIDERY", "PRINT_AND_EMBROIDERY", "MADE_TO_ORDER", "OTHER_SERVICE"].includes(
+      raw.processingMethod,
+    )
+      ? (raw.processingMethod as OrderItemProcessingMethod)
+      : null;
+
   const variants = Array.isArray(raw.variants)
     ? raw.variants.map((v, vi) =>
         v && typeof v === "object"
@@ -188,6 +206,9 @@ export function parseOrderItemInput(raw: Record<string, unknown>, index: number)
     unit: typeof raw.unit === "string" ? raw.unit : "cái",
     unitPrice,
     sortOrder: index,
+    supplySource,
+    processingMethod,
+    revenueCategoryId: typeof raw.revenueCategoryId === "string" ? raw.revenueCategoryId : null,
     variants,
     systemCode: typeof raw.systemCode === "string" ? raw.systemCode : null,
   };

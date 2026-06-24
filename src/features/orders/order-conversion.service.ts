@@ -82,6 +82,9 @@ async function buildQuoteConversionItems(
     unitPrice: Prisma.Decimal;
     lineTotal: Prisma.Decimal;
     sortOrder: number;
+    revenueCategoryId: string | null;
+    revenueCategoryNameSnapshot: string | null;
+    revenueCategoryCodeSnapshot: string | null;
   }>,
 ) {
   const variantIds = quoteItems.map((item) => item.variantId).filter(Boolean) as string[];
@@ -130,6 +133,9 @@ async function buildQuoteConversionItems(
       unitPrice: item.unitPrice,
       lineTotal: item.lineTotal,
       sortOrder: item.sortOrder ?? index,
+      revenueCategoryId: item.revenueCategoryId,
+      revenueCategoryNameSnapshot: item.revenueCategoryNameSnapshot,
+      revenueCategoryCodeSnapshot: item.revenueCategoryCodeSnapshot,
       ...(variantCreates.length ? { variants: { create: variantCreates } } : {}),
     };
   });

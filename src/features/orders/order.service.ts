@@ -26,6 +26,7 @@ import {
   resolveSalesEmployeeSnapshot,
 } from "@/features/employees/employee.service";
 import { copyProductBomToOrderItems } from "@/features/orders/production-pack.service";
+import { getRevenueCategorySnapshots } from "@/features/revenue-categories/revenue-category.service";
 import {
   evaluateProductionReadiness,
   formatReadinessAcknowledgementDetail,
@@ -213,6 +214,11 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
       unitPrice: item.unitPrice.toNumber(),
       lineTotal: item.lineTotal.toNumber(),
       sortOrder: item.sortOrder,
+      supplySource: item.supplySource,
+      processingMethod: item.processingMethod,
+      revenueCategoryId: item.revenueCategoryId,
+      revenueCategoryNameSnapshot: item.revenueCategoryNameSnapshot,
+      revenueCategoryCodeSnapshot: item.revenueCategoryCodeSnapshot,
       variants: item.variants.map((variant) => ({
         id: variant.id,
         colorId: variant.colorId,
@@ -698,6 +704,11 @@ function buildOrderItemCreates(items: ReturnType<typeof computeOrderItem>[]) {
     unitPrice: item.unitPrice,
     lineTotal: item.lineTotal,
     sortOrder: item.sortOrder ?? index,
+    supplySource: item.supplySource ?? null,
+    processingMethod: item.processingMethod ?? null,
+    revenueCategoryId: item.revenueCategoryId ?? null,
+    revenueCategoryNameSnapshot: item.revenueCategoryNameSnapshot?.trim() || null,
+    revenueCategoryCodeSnapshot: item.revenueCategoryCodeSnapshot?.trim() || null,
     ...(item.variants?.length
       ? {
           variants: {
@@ -761,6 +772,11 @@ function buildOrderDataFromInput(
     deliveryRecipientName: input.contactName?.trim() || null,
     deliveryRecipientPhone: input.contactPhone?.trim() || null,
     deliveryAddress: input.customerAddress?.trim() || null,
+    productionDueDate: input.productionDueDate
+      ? parseProductionDueDate(input.productionDueDate)
+      : undefined,
+    productionOwnerId: input.productionOwnerId ?? undefined,
+    productionNote: input.productionNote?.trim() || undefined,
   };
 }
 
@@ -772,20 +788,44 @@ function validateOrderItemsInput(input: CreateManualOrderInput) {
     if (!item.productNameSnapshot?.trim()) {
       throw new OrderValidationError("Vui lòng nhập tên sản phẩm cho tất cả dòng.");
     }
+    if (input.requireItemClassification) {
+      if (!item.supplySource) {
+        throw new OrderValidationError("Vui lòng chọn sản phẩm lấy từ cho dòng này.");
+      }
+      if (!item.processingMethod) {
+        throw new OrderValidationError("Vui lòng chọn cách xử lý cho dòng này.");
+      }
+      if (!item.revenueCategoryId) {
+        throw new OrderValidationError("Vui lòng chọn nhóm doanh thu cho dòng này.");
+      }
+    }
     if (item.variants?.length) {
       const seen = new Set<string>();
+      let variantTotal = 0;
       for (const variant of item.variants) {
         const key = `${variant.colorId ?? ""}|${(variant.sizeValue ?? "").trim().toUpperCase()}`;
         if (seen.has(key)) {
           throw new OrderValidationError("Màu và size này đã tồn tại trong sản phẩm.");
         }
         seen.add(key);
-        if (variant.quantity < 1) {
-          throw new OrderValidationError("Số lượng biến thể phải lớn hơn 0.");
+        if (variant.quantity < 0) {
+          throw new OrderValidationError("Số lượng phải là số lớn hơn hoặc bằng 0.");
         }
+        variantTotal += Math.max(0, Math.floor(variant.quantity));
+      }
+      if (variantTotal < 1) {
+        throw new OrderValidationError(
+          input.requireItemClassification
+            ? "Dòng sản phẩm phải có số lượng lớn hơn 0."
+            : "Số lượng biến thể phải lớn hơn 0.",
+        );
       }
     } else if (item.quantity < 1) {
-      throw new OrderValidationError("Số lượng phải lớn hơn 0.");
+      throw new OrderValidationError(
+        input.requireItemClassification
+          ? "Dòng sản phẩm phải có số lượng lớn hơn 0."
+          : "Số lượng phải lớn hơn 0.",
+      );
     }
     if (item.unitPrice < 0) {
       throw new OrderValidationError("Đơn giá không hợp lệ.");
@@ -914,10 +954,14 @@ async function prepareOrderItemsForSave(
       customerCode,
       tx,
     );
+    const revenueSnapshots = raw.revenueCategoryId
+      ? await getRevenueCategorySnapshots(raw.revenueCategoryId)
+      : null;
     const resolved = await resolveOrderItemSnapshot(
       {
         ...raw,
         variants: preparedVariants,
+        ...(revenueSnapshots ?? {}),
       },
       tx,
     );
@@ -966,6 +1010,9 @@ export async function createManualOrder(input: CreateManualOrderInput) {
   const salesSnapshots = input.salesEmployeeId
     ? await resolveSalesEmployeeSnapshot(input.salesEmployeeId)
     : undefined;
+  const productionOwnerSnapshot = input.productionOwnerId
+    ? await resolveProductionOwnerSnapshot(input.productionOwnerId)
+    : undefined;
   const computedItems = await prepareOrderItemsForSave(input.items, input.customerCode);
   const totals = computeOrderTotals(computedItems, {
     discountAmount: input.discountAmount,
@@ -973,7 +1020,15 @@ export async function createManualOrder(input: CreateManualOrderInput) {
     vatRate: input.vatRate,
     vatAmount: input.vatAmount,
   });
-  const orderData = buildOrderDataFromInput(input, totals, salesSnapshots);
+  const orderData = {
+    ...buildOrderDataFromInput(input, totals, salesSnapshots),
+    ...(productionOwnerSnapshot
+      ? {
+          productionOwnerId: productionOwnerSnapshot.productionOwnerId,
+          productionOwnerName: productionOwnerSnapshot.productionOwnerName,
+        }
+      : {}),
+  };
   const itemCreates = buildOrderItemCreates(computedItems);
 
   const maxAttempts = 5;

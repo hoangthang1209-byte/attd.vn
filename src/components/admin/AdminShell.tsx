@@ -48,6 +48,7 @@ const NAV_GROUPS = [
       { href: "/admin/crm", label: "CRM" },
       { href: "/admin/crm/leads", label: "Lead" },
       { href: "/admin/crm/customers", label: "Khách hàng" },
+      { href: "/admin/crm/revenue-categories", label: "Nhóm doanh thu" },
     ],
   },
   {

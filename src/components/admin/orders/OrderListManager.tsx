@@ -86,9 +86,14 @@ export default function OrderListManager() {
         description="Quản lý trạng thái vận hành, thanh toán và tiến độ đơn hàng."
         meta={<span>Tổng: {total} đơn hàng</span>}
         actions={
-          <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
-            Tạo đơn hàng
-          </Link>
+          <>
+            <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
+              Tạo đơn nhanh
+            </Link>
+            <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
+              Tạo đơn hàng
+            </Link>
+          </>
         }
       />
 
@@ -125,7 +130,16 @@ export default function OrderListManager() {
         <EmptyState
           title="Chưa có đơn hàng phù hợp"
           description="Hãy tạo đơn hàng mới hoặc điều chỉnh bộ lọc hiện tại."
-          action={<Link href="/admin/orders/new" className="admin-btn admin-btn--primary">Tạo đơn hàng</Link>}
+          action={
+            <>
+              <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
+                Tạo đơn nhanh
+              </Link>
+              <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
+                Tạo đơn hàng
+              </Link>
+            </>
+          }
         />
       ) : (
         <div className="admin-table-wrap">

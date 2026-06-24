@@ -12,6 +12,11 @@ import {
   ORDER_PRODUCT_GENDER_OPTIONS,
   orderProductGenderLabel,
 } from "@/features/orders/order-gender";
+import {
+  PROCESSING_METHOD_OPTIONS,
+  SUPPLY_SOURCE_OPTIONS,
+} from "@/features/orders/order-item-classification";
+import type { RevenueCategoryPickerOption } from "@/features/revenue-categories/revenue-category.service";
 
 type ProductOption = { id: string; name: string };
 type VariantOption = {
@@ -33,6 +38,7 @@ type Props = {
   variants: VariantOption[];
   colors: ColorRecord[];
   categories: CategoryOption[];
+  revenueCategories: Array<Pick<RevenueCategoryPickerOption, "id" | "displayPath">>;
   onChange: (patch: Partial<OrderItemRow>) => void;
   onRemove?: () => void;
   onLoadVariants: (productId: string) => void;
@@ -74,6 +80,7 @@ export default function OrderItemFormRow({
   variants,
   colors,
   categories,
+  revenueCategories,
   onChange,
   onRemove,
   onLoadVariants,
@@ -228,6 +235,59 @@ export default function OrderItemFormRow({
           <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onAddCategory}>
             Thêm danh mục mới
           </button>
+        </div>
+        <div className="admin-field">
+          <label className="admin-label">Sản phẩm lấy từ</label>
+          <select
+            className="admin-input"
+            value={item.supplySource ?? ""}
+            onChange={(e) =>
+              onChange({
+                supplySource: (e.target.value || null) as OrderItemRow["supplySource"],
+              })
+            }
+          >
+            <option value="">— Chưa phân loại —</option>
+            {SUPPLY_SOURCE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="admin-field">
+          <label className="admin-label">Cách xử lý</label>
+          <select
+            className="admin-input"
+            value={item.processingMethod ?? ""}
+            onChange={(e) =>
+              onChange({
+                processingMethod: (e.target.value || null) as OrderItemRow["processingMethod"],
+              })
+            }
+          >
+            <option value="">— Chưa phân loại —</option>
+            {PROCESSING_METHOD_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="admin-field">
+          <label className="admin-label">Nhóm doanh thu</label>
+          <select
+            className="admin-input"
+            value={item.revenueCategoryId ?? ""}
+            onChange={(e) => onChange({ revenueCategoryId: e.target.value || null })}
+          >
+            <option value="">— Chưa phân loại —</option>
+            {revenueCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.displayPath}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="admin-field">
           <label className="admin-label">Giới tính *</label>
