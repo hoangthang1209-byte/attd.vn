@@ -136,6 +136,7 @@ export async function syncProductAttributeAssignments(
   productId: string,
   assignments: ProductAttributeAssignmentInput[] | undefined,
   db: DbClient = prisma,
+  options?: { preResolved?: ResolvedAssignmentValue[] },
 ): Promise<Partial<Record<"material" | "form", string | null>>> {
   if (assignments === undefined) return {};
 
@@ -174,7 +175,8 @@ export async function syncProductAttributeAssignments(
     }
   }
 
-  const resolved = await validateProductAttributeAssignments(assignments, db);
+  const resolved =
+    options?.preResolved ?? (await validateProductAttributeAssignments(assignments, db));
 
   const existing = existingAssignments.map((row) => ({
     id: row.id,
@@ -189,6 +191,12 @@ export async function syncProductAttributeAssignments(
     await deleteProductAttributeAssignmentsOwned(db, productId, deleteIds);
   }
 
+  const assignmentCreates: Prisma.ProductAttributeAssignmentCreateManyInput[] = [];
+  const assignmentUpdates: Array<{
+    id: string;
+    data: Prisma.ProductAttributeAssignmentUpdateManyMutationInput;
+  }> = [];
+
   for (const [index, row] of resolved.entries()) {
     const inputRow = assignments.find((item) => item.attributeId === row.attributeId);
     const data = {
@@ -200,11 +208,23 @@ export async function syncProductAttributeAssignments(
     };
 
     if (inputRow?.id) {
-      await updateProductAttributeAssignmentOwned(db, productId, inputRow.id, data);
+      assignmentUpdates.push({ id: inputRow.id, data });
       continue;
     }
 
-    await db.productAttributeAssignment.create({ data });
+    assignmentCreates.push(data);
+  }
+
+  if (assignmentCreates.length) {
+    await db.productAttributeAssignment.createMany({ data: assignmentCreates });
+  }
+
+  if (assignmentUpdates.length) {
+    await Promise.all(
+      assignmentUpdates.map((row) =>
+        updateProductAttributeAssignmentOwned(db, productId, row.id, row.data),
+      ),
+    );
   }
 
   const mirror = computeLegacyMirrorFromAssignments(resolved);

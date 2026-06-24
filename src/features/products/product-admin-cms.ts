@@ -274,18 +274,23 @@ export async function syncProductCmsData(
             imageUrl: value.imageUrl?.trim() || null,
             sortOrder: value.sortOrder ?? valIndex,
           });
-        } else {
-          await db.productOptionValue.create({
-            data: {
-              optionId: savedOption.id,
-              attributeValueId: value.attributeValueId ?? null,
-              label: value.label.trim(),
-              valueCode: value.valueCode?.trim() || null,
-              imageUrl: value.imageUrl?.trim() || null,
-              sortOrder: value.sortOrder ?? valIndex,
-            },
-          });
         }
+      }
+
+      const newValues = option.values
+        .map((value, valIndex) => ({ value, valIndex }))
+        .filter(({ value }) => !value.id);
+      if (newValues.length) {
+        await db.productOptionValue.createMany({
+          data: newValues.map(({ value, valIndex }) => ({
+            optionId: savedOption.id,
+            attributeValueId: value.attributeValueId ?? null,
+            label: value.label.trim(),
+            valueCode: value.valueCode?.trim() || null,
+            imageUrl: value.imageUrl?.trim() || null,
+            sortOrder: value.sortOrder ?? valIndex,
+          })),
+        });
       }
     }
   }
@@ -308,24 +313,44 @@ export async function syncProductCmsData(
       await deleteProductSpecificationsOwned(db, productId, deleteIds);
     }
 
+    const specCreates: Prisma.ProductSpecificationCreateManyInput[] = [];
+    const specUpdates: Array<{
+      id: string;
+      label: string;
+      value: string;
+      sortOrder: number;
+    }> = [];
+
     for (const [index, spec] of data.specifications.entries()) {
       if (!spec.label.trim() || !spec.value.trim()) continue;
+      const label = spec.label.trim();
+      const value = spec.value.trim();
+      const sortOrder = spec.sortOrder ?? index;
       if (spec.id) {
-        await updateProductSpecificationOwned(db, productId, spec.id, {
-          label: spec.label.trim(),
-          value: spec.value.trim(),
-          sortOrder: spec.sortOrder ?? index,
-        });
+        specUpdates.push({ id: spec.id, label, value, sortOrder });
       } else {
-        await db.productSpecification.create({
-          data: {
-            productId,
-            label: spec.label.trim(),
-            value: spec.value.trim(),
-            sortOrder: spec.sortOrder ?? index,
-          },
-        });
+        specCreates.push({ productId, label, value, sortOrder });
       }
+    }
+
+    if (deleteIds.length) {
+      await deleteProductSpecificationsOwned(db, productId, deleteIds);
+    }
+
+    if (specCreates.length) {
+      await db.productSpecification.createMany({ data: specCreates });
+    }
+
+    if (specUpdates.length) {
+      await Promise.all(
+        specUpdates.map((row) =>
+          updateProductSpecificationOwned(db, productId, row.id, {
+            label: row.label,
+            value: row.value,
+            sortOrder: row.sortOrder,
+          }),
+        ),
+      );
     }
   }
 
@@ -347,26 +372,47 @@ export async function syncProductCmsData(
       await deleteProductCustomizationsOwned(db, productId, deleteIds);
     }
 
+    const customizationCreates: Prisma.ProductCustomizationCapabilityCreateManyInput[] = [];
+    const customizationUpdates: Array<{
+      id: string;
+      label: string;
+      description: string | null;
+      sortOrder: number;
+      enabled: boolean;
+    }> = [];
+
     for (const [index, cap] of data.customizations.entries()) {
       if (!cap.label.trim()) continue;
+      const label = cap.label.trim();
+      const description = cap.description?.trim() || null;
+      const sortOrder = cap.sortOrder ?? index;
+      const enabled = cap.enabled ?? true;
       if (cap.id) {
-        await updateProductCustomizationOwned(db, productId, cap.id, {
-          label: cap.label.trim(),
-          description: cap.description?.trim() || null,
-          sortOrder: cap.sortOrder ?? index,
-          enabled: cap.enabled ?? true,
-        });
+        customizationUpdates.push({ id: cap.id, label, description, sortOrder, enabled });
       } else {
-        await db.productCustomizationCapability.create({
-          data: {
-            productId,
-            label: cap.label.trim(),
-            description: cap.description?.trim() || null,
-            sortOrder: cap.sortOrder ?? index,
-            enabled: cap.enabled ?? true,
-          },
-        });
+        customizationCreates.push({ productId, label, description, sortOrder, enabled });
       }
+    }
+
+    if (deleteIds.length) {
+      await deleteProductCustomizationsOwned(db, productId, deleteIds);
+    }
+
+    if (customizationCreates.length) {
+      await db.productCustomizationCapability.createMany({ data: customizationCreates });
+    }
+
+    if (customizationUpdates.length) {
+      await Promise.all(
+        customizationUpdates.map((row) =>
+          updateProductCustomizationOwned(db, productId, row.id, {
+            label: row.label,
+            description: row.description,
+            sortOrder: row.sortOrder,
+            enabled: row.enabled,
+          }),
+        ),
+      );
     }
   }
 

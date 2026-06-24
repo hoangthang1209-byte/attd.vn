@@ -3,11 +3,22 @@ import type { OrderItemProcessingMethod, OrderItemSupplySource } from "@prisma/c
 import { normalizeRevenueCategoryLookup } from "@/features/revenue-categories/revenue-category-display";
 import type { RevenueCategoryPickerOption } from "@/features/revenue-categories/revenue-category.service";
 import {
+  sanitizeQuickOrderColorCode,
+  sanitizeQuickOrderColorName,
+} from "@/features/orders/quick-order/quick-order-color";
+import {
+  buildSizeColumnsFromImportHeaders,
+  columnFromHeaderLabel,
+  DEFAULT_QUICK_ORDER_SIZE_COLUMNS,
+  emptyQuickOrderSizeQuantities,
+  ensureRowSizesForColumns,
+  findDuplicateSizeColumn,
+  isOperationalHeader,
+  type QuickOrderSizeColumn,
+} from "@/features/orders/quick-order/quick-order-sizes";
+import {
   createEmptyQuickOrderRow,
-  emptyQuickOrderSizes,
-  QUICK_ORDER_SIZE_KEYS,
   type QuickOrderGridRow,
-  type QuickOrderSizeKey,
 } from "@/features/orders/quick-order/quick-order.types";
 import {
   ORDER_ITEM_PROCESSING_METHOD_LABELS,
@@ -22,12 +33,12 @@ export const QUICK_ORDER_TEMPLATE_HEADERS = [
   "Nhóm doanh thu",
   "Màu",
   "Mô tả / yêu cầu kỹ thuật",
-  ...QUICK_ORDER_SIZE_KEYS,
+  ...DEFAULT_QUICK_ORDER_SIZE_COLUMNS.map((col) => col.label),
   "Đơn vị",
   "Đơn giá",
 ] as const;
 
-const HEADER_ALIASES: Record<string, keyof ParsedQuickRow | QuickOrderSizeKey> = {
+const HEADER_ALIASES: Record<string, keyof ParsedQuickRow> = {
   "mã dòng": "lineCode",
   code: "lineCode",
   sku: "lineCode",
@@ -54,14 +65,6 @@ const HEADER_ALIASES: Record<string, keyof ParsedQuickRow | QuickOrderSizeKey> =
   "đơn giá": "unitPrice",
   price: "unitPrice",
   giá: "unitPrice",
-  s: "S",
-  m: "M",
-  l: "L",
-  xl: "XL",
-  "2xl": "2XL",
-  "3xl": "3XL",
-  "4xl": "4XL",
-  free: "Free",
 };
 
 type ParsedQuickRow = {
@@ -71,10 +74,16 @@ type ParsedQuickRow = {
   processingMethod: string;
   revenueCategory: string;
   colorName: string;
+  colorCode: string;
   description: string;
   unit: string;
   unitPrice: string;
 };
+
+type ColumnMapping =
+  | { type: "field"; key: keyof ParsedQuickRow }
+  | { type: "size"; column: QuickOrderSizeColumn }
+  | { type: "skip" };
 
 export type QuickOrderImportSummary = {
   importedCount: number;
@@ -82,6 +91,7 @@ export type QuickOrderImportSummary = {
   unresolvedRevenueCategoryCount: number;
   invalidQuantityCount: number;
   rows: QuickOrderGridRow[];
+  sizeColumns: QuickOrderSizeColumn[];
   message?: string;
 };
 
@@ -146,13 +156,63 @@ function resolveProduct(value: string, products: ProductLookup[]): ProductLookup
   return null;
 }
 
-function resolveColor(product: ProductLookup | null, colorName: string) {
-  if (!product || !colorName.trim()) return { colorId: null, colorName: colorName.trim() };
-  const match = product.colors.find(
-    (color) => normalizeLookup(color.name) === normalizeLookup(colorName),
-  );
-  if (match) return { colorId: match.id, colorName: match.name };
-  return { colorId: null, colorName: "Chưa xác định màu" };
+function resolveColor(product: ProductLookup | null, colorName: string, supplySource: OrderItemSupplySource | null) {
+  const trimmed = colorName.trim();
+  if (!trimmed) {
+    return { colorId: null, colorName: "", colorCode: "", isCustomColor: false };
+  }
+
+  if (product && supplySource === "ATTD_STOCK") {
+    const match = product.colors.find(
+      (color) => normalizeLookup(color.name) === normalizeLookup(trimmed),
+    );
+    if (match && !match.id.startsWith("name:")) {
+      return { colorId: match.id, colorName: match.name, colorCode: "", isCustomColor: false };
+    }
+    return { colorId: null, colorName: trimmed, colorCode: "", isCustomColor: false };
+  }
+
+  if (product) {
+    const match = product.colors.find(
+      (color) => normalizeLookup(color.name) === normalizeLookup(trimmed),
+    );
+    if (match && !match.id.startsWith("name:")) {
+      return { colorId: match.id, colorName: match.name, colorCode: "", isCustomColor: false };
+    }
+  }
+
+  const sanitizedName = sanitizeQuickOrderColorName(trimmed);
+  return {
+    colorId: null,
+    colorName: sanitizedName,
+    colorCode: "",
+    isCustomColor: true,
+  };
+}
+
+function buildColumnMappingsFromHeaders(headers: string[]): {
+  mappings: ColumnMapping[];
+  sizeColumns: QuickOrderSizeColumn[];
+} {
+  const rawHeaders = headers.map((h) => h.trim()).filter(Boolean);
+  const sizeColumns = buildSizeColumnsFromImportHeaders(rawHeaders);
+
+  const mappings: ColumnMapping[] = headers.map((cell) => {
+    const normalized = normalizeHeader(cell);
+    const fieldKey = HEADER_ALIASES[normalized];
+    if (fieldKey) return { type: "field", key: fieldKey };
+    if (!cell.trim() || isOperationalHeader(cell)) {
+      return { type: "skip" };
+    }
+    const sizeColumn = columnFromHeaderLabel(cell);
+    if (sizeColumn) {
+      const merged = findDuplicateSizeColumn(sizeColumns, sizeColumn.label) ?? sizeColumn;
+      return { type: "size", column: merged };
+    }
+    return { type: "skip" };
+  });
+
+  return { mappings, sizeColumns };
 }
 
 export function parseQuickOrderClipboard(
@@ -165,27 +225,27 @@ export function parseQuickOrderClipboard(
     .map((line) => line.split("\t"))
     .filter((cells) => cells.some((cell) => cell.trim()));
   if (!lines.length) {
-    return {
-      importedCount: 0,
-      unresolvedProductCount: 0,
-      unresolvedRevenueCategoryCount: 0,
-      invalidQuantityCount: 0,
-      rows: [],
-      message: "File không có dữ liệu hợp lệ.",
-    };
+    return emptyImportSummary("File không có dữ liệu hợp lệ.");
   }
 
-  const headerCells = lines[0]!.map(normalizeHeader);
-  const hasHeader = headerCells.some((cell) => HEADER_ALIASES[cell]);
+  const headerCells = lines[0]!.map((cell) => cell.trim());
+  const hasHeader = headerCells.some((cell) => HEADER_ALIASES[normalizeHeader(cell)] != null || columnFromHeaderLabel(cell));
   const dataLines = hasHeader ? lines.slice(1) : lines;
-  const columnMap = hasHeader
-    ? headerCells.map((cell) => HEADER_ALIASES[cell] ?? null)
-    : QUICK_ORDER_TEMPLATE_HEADERS.map((header, index) => {
-        const alias = HEADER_ALIASES[normalizeHeader(header)];
-        return alias ?? null;
-      });
 
-  return buildRowsFromMatrix(dataLines, columnMap, products);
+  const { mappings, sizeColumns } = hasHeader
+    ? buildColumnMappingsFromHeaders(headerCells)
+    : {
+        mappings: QUICK_ORDER_TEMPLATE_HEADERS.map((header) => {
+          const alias = HEADER_ALIASES[normalizeHeader(header)];
+          if (alias) return { type: "field" as const, key: alias };
+          const sizeColumn = columnFromHeaderLabel(header);
+          if (sizeColumn) return { type: "size" as const, column: sizeColumn };
+          return { type: "field" as const, key: "lineCode" as const };
+        }),
+        sizeColumns: [...DEFAULT_QUICK_ORDER_SIZE_COLUMNS],
+      };
+
+  return buildRowsFromMatrix(dataLines, mappings, sizeColumns, products);
 }
 
 export function parseQuickOrderWorkbook(
@@ -203,16 +263,28 @@ export function parseQuickOrderWorkbook(
     const nonEmpty = matrix.filter((row) => row.some((cell) => String(cell).trim()));
     if (!nonEmpty.length) return emptyImportSummary("File không có dữ liệu hợp lệ.");
 
-    const headerCells = nonEmpty[0]!.map((cell) => normalizeHeader(String(cell)));
-    const hasHeader = headerCells.some((cell) => HEADER_ALIASES[cell]);
+    const headerCells = nonEmpty[0]!.map((cell) => String(cell).trim());
+    const hasHeader = headerCells.some(
+      (cell) => HEADER_ALIASES[normalizeHeader(cell)] != null || columnFromHeaderLabel(cell),
+    );
     const dataLines = (hasHeader ? nonEmpty.slice(1) : nonEmpty).map((row) =>
       row.map((cell) => String(cell)),
     );
-    const columnMap = hasHeader
-      ? headerCells.map((cell) => HEADER_ALIASES[cell] ?? null)
-      : QUICK_ORDER_TEMPLATE_HEADERS.map((header) => HEADER_ALIASES[normalizeHeader(header)] ?? null);
 
-    return buildRowsFromMatrix(dataLines, columnMap, products);
+    const { mappings, sizeColumns } = hasHeader
+      ? buildColumnMappingsFromHeaders(headerCells)
+      : {
+          mappings: QUICK_ORDER_TEMPLATE_HEADERS.map((header) => {
+            const alias = HEADER_ALIASES[normalizeHeader(header)];
+            if (alias) return { type: "field" as const, key: alias };
+            const sizeColumn = columnFromHeaderLabel(header);
+            if (sizeColumn) return { type: "size" as const, column: sizeColumn };
+            return { type: "field" as const, key: "lineCode" as const };
+          }),
+          sizeColumns: [...DEFAULT_QUICK_ORDER_SIZE_COLUMNS],
+        };
+
+    return buildRowsFromMatrix(dataLines, mappings, sizeColumns, products);
   } catch {
     return emptyImportSummary("Không đọc được file Excel.");
   }
@@ -225,13 +297,15 @@ function emptyImportSummary(message: string): QuickOrderImportSummary {
     unresolvedRevenueCategoryCount: 0,
     invalidQuantityCount: 0,
     rows: [],
+    sizeColumns: [...DEFAULT_QUICK_ORDER_SIZE_COLUMNS],
     message,
   };
 }
 
 function buildRowsFromMatrix(
   dataLines: string[][],
-  columnMap: Array<keyof ParsedQuickRow | QuickOrderSizeKey | null>,
+  columnMap: ColumnMapping[],
+  sizeColumns: QuickOrderSizeColumn[],
   products: ProductLookup[],
 ): QuickOrderImportSummary {
   const rows: QuickOrderGridRow[] = [];
@@ -247,42 +321,48 @@ function buildRowsFromMatrix(
       processingMethod: "",
       revenueCategory: "",
       colorName: "",
+      colorCode: "",
       description: "",
       unit: "cái",
       unitPrice: "",
     };
-    const sizes = emptyQuickOrderSizes();
+    const sizes = emptyQuickOrderSizeQuantities(sizeColumns);
 
-    columnMap.forEach((key, colIndex) => {
-      if (!key) return;
+    columnMap.forEach((mapping, colIndex) => {
       const raw = (cells[colIndex] ?? "").trim();
-      if (QUICK_ORDER_SIZE_KEYS.includes(key as QuickOrderSizeKey)) {
+      if (mapping.type === "skip") return;
+      if (mapping.type === "size") {
         const qty = parseQuantityCell(raw);
         if (qty < 0) invalidQuantityCount += 1;
-        sizes[key as QuickOrderSizeKey] = Math.max(0, qty);
+        sizes[mapping.column.key] = Math.max(0, qty);
         return;
       }
-      parsed[key as keyof ParsedQuickRow] = raw;
+      parsed[mapping.key] = raw;
     });
 
     if (!parsed.productName.trim() && !Object.values(sizes).some((qty) => qty > 0)) continue;
 
     const product = resolveProduct(parsed.productName, products);
     if (parsed.productName.trim() && !product) unresolvedProductCount += 1;
-    const color = resolveColor(product, parsed.colorName);
 
-    const row = createEmptyQuickOrderRow(index + 1);
+    const supplySource =
+      parseSupplySourceLabel(parsed.supplySource) ??
+      (product?.hasStockVariants ? "ATTD_STOCK" : null);
+
+    const color = resolveColor(product, parsed.colorName, supplySource);
+
+    const row = createEmptyQuickOrderRow(index + 1, sizeColumns);
     row.lineCode = parsed.lineCode;
     row.productId = product?.id ?? null;
     row.productName = product?.name ?? parsed.productName;
-    row.supplySource =
-      parseSupplySourceLabel(parsed.supplySource) ??
-      (product?.hasStockVariants ? "ATTD_STOCK" : null);
+    row.supplySource = supplySource;
     row.processingMethod = parseProcessingMethodLabel(parsed.processingMethod) ?? "AS_IS";
     row.colorId = color.colorId;
     row.colorName = color.colorName;
+    row.colorCode = color.colorCode || sanitizeQuickOrderColorCode(parsed.colorCode);
+    row.isCustomColor = color.isCustomColor;
     row.description = parsed.description;
-    row.sizes = sizes;
+    row.sizes = ensureRowSizesForColumns(sizes, sizeColumns);
     row.unit = parsed.unit.trim() || "cái";
     row.unitPrice = Number(parsed.unitPrice.replace(/,/g, "")) || 0;
     row.importWarnings = [];
@@ -290,7 +370,6 @@ function buildRowsFromMatrix(
       row.importWarnings.push("Một số dòng cần chọn lại sản phẩm hoặc màu sắc.");
     }
     if (parsed.revenueCategory.trim()) {
-      // Revenue category resolved asynchronously in UI layer when applying import.
       row.importWarnings?.push(`RC:${parsed.revenueCategory}`);
     } else {
       unresolvedRevenueCategoryCount += 1;
@@ -304,6 +383,7 @@ function buildRowsFromMatrix(
     unresolvedRevenueCategoryCount,
     invalidQuantityCount,
     rows,
+    sizeColumns,
   };
 }
 
@@ -354,8 +434,20 @@ export function applyRevenueCategoriesToImportedRows(
 }
 
 export function downloadQuickOrderTemplate(): void {
-  const ws = XLSX.utils.aoa_to_sheet([Array.from(QUICK_ORDER_TEMPLATE_HEADERS)]);
+  const instruction =
+    "Có thể thêm cột size mới như XS, 5XL, 28 hoặc size riêng của khách.";
+  const ws = XLSX.utils.aoa_to_sheet([
+    Array.from(QUICK_ORDER_TEMPLATE_HEADERS),
+    [instruction],
+  ]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "NhapDonNhanh");
+  const guide = XLSX.utils.aoa_to_sheet([
+    ["Hướng dẫn nhập đơn nhanh"],
+    [instruction],
+    ["Các cột size mặc định: S, M, L, XL, 2XL, 3XL, 4XL, Free"],
+    ["Thêm cột size tùy ý ở giữa mô tả và đơn vị — hệ thống sẽ nhận diện khi import."],
+  ]);
+  XLSX.utils.book_append_sheet(wb, guide, "HuongDan");
   XLSX.writeFile(wb, "mau-nhap-don-nhanh.xlsx");
 }

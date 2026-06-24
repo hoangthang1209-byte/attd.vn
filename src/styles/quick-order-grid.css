@@ -119,6 +119,125 @@
   gap: 4px;
 }
 
+.quick-order-grid thead th.quick-order-grid__size-header {
+  white-space: normal;
+  min-width: 48px;
+  max-width: 72px;
+  vertical-align: bottom;
+}
+
+.quick-order-grid__size-label {
+  display: block;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.quick-order-grid__size-remove {
+  display: block;
+  margin: 2px auto 0;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--admin-muted, #6b7280);
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.quick-order-grid__size-remove:hover {
+  color: #b91c1c;
+}
+
+.quick-order-grid__color-cell {
+  min-width: 120px;
+}
+
+.quick-order-color-custom,
+.quick-order-color-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.quick-order-color-switch {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--admin-link, #2563eb);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.quick-order-color-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.quick-order-add-size {
+  position: relative;
+}
+
+.quick-order-add-size__popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 10;
+  min-width: 240px;
+  padding: 12px;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.quick-order-add-size__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.quick-order-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.quick-order-dialog {
+  width: min(400px, calc(100vw - 32px));
+  padding: 20px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+}
+
+.quick-order-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.quick-order-dialog p {
+  margin: 0 0 16px;
+  font-size: 0.875rem;
+  color: var(--admin-muted, #6b7280);
+}
+
+.quick-order-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .quick-order-footer {
   position: sticky;
   bottom: 0;

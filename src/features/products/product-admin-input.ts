@@ -35,6 +35,19 @@ export function throwProductRelationOwnershipError(): never {
   throw new ProductRelationOwnershipError();
 }
 
+export const PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE =
+  "Không thể lưu sản phẩm do hệ thống xử lý quá lâu. Vui lòng thử lại.";
+
+export function isPrismaTransactionTimeoutError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const message = err.message;
+  return (
+    message.includes("Transaction already closed") ||
+    message.includes("timeout for this transaction") ||
+    message.includes("A query cannot be executed on an expired transaction")
+  );
+}
+
 const VALID_STOCK_STATUSES = new Set<StockStatus>(["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK", "PREORDER"]);
 const VALID_PRODUCT_STATUSES = new Set<ProductStatus>(["ACTIVE", "DRAFT", "INACTIVE", "ARCHIVED"]);
 const VALID_VARIANT_STATUSES = new Set<VariantStatus>(["ACTIVE", "INACTIVE", "ARCHIVED"]);
@@ -422,6 +435,19 @@ export function formatProductAdminApiError(err: unknown): {
       detail: err.detail,
       fieldErrors: err.fieldErrors,
       status: 400,
+    };
+  }
+
+  if (isPrismaTransactionTimeoutError(err)) {
+    return {
+      ok: false,
+      error: PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE,
+      detail:
+        process.env.NODE_ENV === "development" && err instanceof Error
+          ? err.message
+          : PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE,
+      fieldErrors: {},
+      status: 503,
     };
   }
 

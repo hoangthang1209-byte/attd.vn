@@ -15,7 +15,7 @@ import {
   isCategoryCodeTaken,
   normalizeCode,
 } from "@/features/products/product-sku-utils";
-import { ProductAdminValidationError } from "@/features/products/product-admin-input";
+import { ProductAdminValidationError, isPrismaTransactionTimeoutError, PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE } from "@/features/products/product-admin-input";
 import {
   CATEGORY_SLUG_DUPLICATE_ERROR,
   validateCategoryParentSelection,
@@ -32,7 +32,9 @@ import {
 import {
   applyLegacyMirrorToProduct,
   syncProductAttributeAssignments,
+  validateProductAttributeAssignments,
 } from "@/features/products/product-attribute-assignment.service";
+import type { ResolvedAssignmentValue } from "@/features/products/product-attribute-assignment.utils";
 import {
   assertAttributeAssignmentIdsBelongToProduct,
   assertCustomizationIdsBelongToProduct,
@@ -162,6 +164,35 @@ const PRODUCT_INCLUDE = {
   ...PRODUCT_CMS_INCLUDE,
 } as const;
 
+/** Narrow interactive transaction budget for product save (publish) paths only. */
+const PRODUCT_SAVE_TRANSACTION_OPTIONS = {
+  timeout: 15000,
+  maxWait: 5000,
+} as const;
+
+type WriteDependentRelationsOptions = {
+  preparedVariantSkus?: ReadonlyMap<VariantInput, string>;
+  resolvedAssignments?: ResolvedAssignmentValue[];
+  skipOwnershipVerify?: boolean;
+};
+
+async function runProductSaveTransaction<T>(
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  try {
+    return await prisma.$transaction(fn, PRODUCT_SAVE_TRANSACTION_OPTIONS);
+  } catch (err) {
+    if (isPrismaTransactionTimeoutError(err)) {
+      throw new ProductAdminValidationError(
+        PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE,
+        {},
+        err instanceof Error ? err.message : PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE,
+      );
+    }
+    throw err;
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function toSlug(text: string): string {
@@ -199,7 +230,8 @@ async function ensureUniqueSlug(baseSlug: string, excludeId?: string): Promise<s
 
 async function buildVariantSku(
   variantInput: VariantInput,
-  productCode: string
+  productCode: string,
+  db: Pick<typeof prisma, "productVariant"> = prisma,
 ): Promise<string> {
   if (variantInput.sku?.trim()) return variantInput.sku.trim();
   const base = generateSku({
@@ -210,7 +242,20 @@ async function buildVariantSku(
     dimensions: variantInput.dimensions,
     capacity: variantInput.capacity,
   });
-  return await ensureUniqueSku(base);
+  return await ensureUniqueSku(base, db);
+}
+
+async function prepareVariantSkusForInput(
+  variants: VariantInput[] | undefined,
+  productCode: string,
+): Promise<Map<VariantInput, string>> {
+  const prepared = new Map<VariantInput, string>();
+  if (!variants?.length) return prepared;
+  for (const variant of variants) {
+    if (variant.id) continue;
+    prepared.set(variant, await buildVariantSku(variant, productCode));
+  }
+  return prepared;
 }
 
 function variantSkuFieldKey(v: VariantInput): string {
@@ -415,54 +460,37 @@ async function verifyProductRelationInputOwnership(
   }
 }
 
-function mapPersistedProductToPublishQualityInput(
-  product: NonNullable<Awaited<ReturnType<typeof loadPersistedProductForPublishQuality>>>,
+function mapProductInputToPublishQualityInput(
+  input: ProductInput,
+  slug: string,
 ): ProductPublishQualityInput {
   return {
-    name: product.name,
-    slug: product.slug,
-    categoryId: product.categoryId,
-    description: product.description,
-    seoTitle: product.seoTitle,
-    seoDescription: product.seoDescription,
-    featuredImage: product.featuredImage,
-    gallery: product.gallery,
-    productImages: product.images.map((image) => image.imageUrl),
-    variants: product.variants.map((variant) => ({
-      variantStatus: variant.variantStatus,
-      imageUrl: variant.imageUrl,
+    name: input.name,
+    slug,
+    categoryId: input.categoryId,
+    description: input.description ?? null,
+    seoTitle: input.seoTitle ?? null,
+    seoDescription: input.seoDescription ?? null,
+    featuredImage: input.featuredImage ?? null,
+    gallery: input.gallery ?? [],
+    productImages: input.gallery ?? [],
+    variants: (input.variants ?? []).map((variant) => ({
+      variantStatus: variant.variantStatus ?? "ACTIVE",
+      imageUrl: variant.imageUrl ?? null,
     })),
-    specifications: product.specifications.map((row) => ({
+    specifications: (input.specifications ?? []).map((row) => ({
       label: row.label,
       value: row.value,
     })),
-    attributeAssignments: product.attributeAssignments.map((row) => ({
+    attributeAssignments: (input.attributeAssignments ?? []).map((row) => ({
       attributeId: row.attributeId,
-      attributeValueId: row.attributeValueId,
-      customValue: row.customValue,
+      attributeValueId: row.attributeValueId ?? null,
+      customValue: row.customValue ?? null,
     })),
-    options: product.options.map((group) => ({
+    options: (input.options ?? []).map((group) => ({
       values: group.values.map((value) => ({ label: value.label })),
     })),
   };
-}
-
-async function loadPersistedProductForPublishQuality(productId: string, db: DbClient = prisma) {
-  return db.product.findUnique({
-    where: { id: productId },
-    include: PUBLISH_QUALITY_INCLUDE,
-  });
-}
-
-async function assertPersistedProductPublishQuality(
-  productId: string,
-  db: DbClient,
-): Promise<void> {
-  const product = await loadPersistedProductForPublishQuality(productId, db);
-  if (!product) {
-    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
-  }
-  assertProductPublishQuality(mapPersistedProductToPublishQualityInput(product));
 }
 
 async function loadProductPublishQualitySnapshot(
@@ -547,8 +575,11 @@ async function writeProductDependentRelations(
     "variants" | "options" | "specifications" | "customizations" | "attributeAssignments"
   >,
   db: DbClient = prisma,
+  options: WriteDependentRelationsOptions = {},
 ): Promise<void> {
-  await verifyProductRelationInputOwnership(productId, input, db);
+  if (!options.skipOwnershipVerify) {
+    await verifyProductRelationInputOwnership(productId, input, db);
+  }
 
   if (input.options || input.specifications || input.customizations) {
     await syncProductCmsData(
@@ -567,6 +598,7 @@ async function writeProductDependentRelations(
       productId,
       input.attributeAssignments,
       db,
+      { preResolved: options.resolvedAssignments },
     );
     await applyLegacyMirrorToProduct(productId, mirror, db);
   }
@@ -611,12 +643,15 @@ async function writeProductDependentRelations(
         continue;
       }
 
-      const sku = await buildVariantSku(v, productCode);
+      const sku =
+        v.sku?.trim() ||
+        options.preparedVariantSkus?.get(v) ||
+        (await buildVariantSku(v, productCode, db));
       try {
         const created = await db.productVariant.create({
           data: {
             productId,
-            sku: v.sku?.trim() || sku,
+            sku,
             colorName: v.colorName,
             colorCode: v.colorCode,
             sizeName: v.sizeName,
@@ -753,13 +788,24 @@ export async function createProductAdmin(input: ProductInput) {
   const systemCode = await generateProductSystemCode();
 
   if (isPublishing) {
-    const productId = await prisma.$transaction(async (tx) => {
+    assertProductPublishQuality(mapProductInputToPublishQualityInput(input, slug));
+
+    const preparedVariantSkus = await prepareVariantSkusForInput(input.variants, productCode);
+    const resolvedAssignments =
+      input.attributeAssignments !== undefined
+        ? await validateProductAttributeAssignments(input.attributeAssignments)
+        : undefined;
+
+    const productId = await runProductSaveTransaction(async (tx) => {
       const interimStatus = interimProductStatusForAtomicPublish("ACTIVE") as ProductStatus;
       const product = await tx.product.create({
         data: buildProductCreateData(input, productCode, slug, systemCode, interimStatus),
       });
-      await writeProductDependentRelations(product.id, productCode, input, tx);
-      await assertPersistedProductPublishQuality(product.id, tx);
+      await writeProductDependentRelations(product.id, productCode, input, tx, {
+        preparedVariantSkus,
+        resolvedAssignments,
+        skipOwnershipVerify: true,
+      });
       await tx.product.update({ where: { id: product.id }, data: { status: "ACTIVE" } });
       return product.id;
     });
@@ -872,12 +918,22 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
       );
     }
 
-    await prisma.$transaction(async (tx) => {
+    const preparedVariantSkus = await prepareVariantSkusForInput(input.variants, productCode);
+    const resolvedAssignments =
+      input.attributeAssignments !== undefined
+        ? await validateProductAttributeAssignments(input.attributeAssignments)
+        : undefined;
+    await verifyProductRelationInputOwnership(id, input);
+
+    await runProductSaveTransaction(async (tx) => {
       if (Object.keys(updateData).length > 0) {
         await tx.product.update({ where: { id }, data: updateData });
       }
-      await writeProductDependentRelations(id, productCode, input, tx);
-      await assertPersistedProductPublishQuality(id, tx);
+      await writeProductDependentRelations(id, productCode, input, tx, {
+        preparedVariantSkus,
+        resolvedAssignments,
+        skipOwnershipVerify: true,
+      });
       await tx.product.update({ where: { id }, data: { status: "ACTIVE" } });
     });
     return await getProductAdminById(id);

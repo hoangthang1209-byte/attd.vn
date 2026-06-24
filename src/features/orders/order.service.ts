@@ -26,6 +26,10 @@ import {
   resolveSalesEmployeeSnapshot,
 } from "@/features/employees/employee.service";
 import { copyProductBomToOrderItems } from "@/features/orders/production-pack.service";
+import {
+  sanitizeOrderColorSnapshot,
+  validateStockBackedOrderItem,
+} from "@/features/orders/quick-order/quick-order-stock-validation";
 import { getRevenueCategorySnapshots } from "@/features/revenue-categories/revenue-category.service";
 import {
   evaluateProductionReadiness,
@@ -847,7 +851,10 @@ async function resolveOrderItemSnapshot(
     if (!color) throw new OrderValidationError("Màu sắc không hợp lệ.");
     colorSnapshot = color.name;
   } else if (item.colorSnapshot?.trim()) {
-    throw new OrderValidationError("Vui lòng chọn màu sắc từ danh sách hệ thống.");
+    if (item.supplySource === "ATTD_STOCK") {
+      throw new OrderValidationError("Sản phẩm lấy từ Kho ATTD cần chọn màu có trong kho.");
+    }
+    colorSnapshot = sanitizeOrderColorSnapshot(item.colorSnapshot);
   }
 
   if (item.categoryId) {
@@ -965,6 +972,7 @@ async function prepareOrderItemsForSave(
       },
       tx,
     );
+    await validateStockBackedOrderItem(resolved, db);
     let skuSnapshot = resolved.skuSnapshot?.trim() || null;
 
     if (!skuSnapshot && customerCode?.trim() && resolved.productId && !preparedVariants?.length) {

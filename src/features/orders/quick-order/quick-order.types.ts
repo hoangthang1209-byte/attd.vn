@@ -1,15 +1,27 @@
 import type { OrderItemProcessingMethod, OrderItemSupplySource } from "@prisma/client";
+import {
+  DEFAULT_QUICK_ORDER_SIZE_COLUMNS,
+  emptyQuickOrderSizeQuantities,
+  ensureRowSizesForColumns,
+  migrateLegacyFixedSizes,
+  QUICK_ORDER_FREE_SIZE_VALUE,
+  sumQuickOrderSizeQuantities,
+  type QuickOrderSizeColumn,
+} from "@/features/orders/quick-order/quick-order-sizes";
 
-export const QUICK_ORDER_SIZE_KEYS = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "Free"] as const;
+export type { QuickOrderSizeColumn } from "@/features/orders/quick-order/quick-order-sizes";
 
-export type QuickOrderSizeKey = (typeof QUICK_ORDER_SIZE_KEYS)[number];
+/** @deprecated Use DEFAULT_QUICK_ORDER_SIZE_COLUMNS */
+export const QUICK_ORDER_SIZE_KEYS = DEFAULT_QUICK_ORDER_SIZE_COLUMNS.map((col) => col.key);
 
-/** Canonical free-size value used by variant matrix / SKU helpers. */
-export const QUICK_ORDER_FREE_SIZE_VALUE = "Free size";
+export type QuickOrderSizeKey = string;
 
-export const QUICK_ORDER_DRAFT_STORAGE_KEY = "attd.quick-order.draft.v1";
+export { QUICK_ORDER_FREE_SIZE_VALUE } from "@/features/orders/quick-order/quick-order-sizes";
 
-export type QuickOrderSizeQuantities = Record<QuickOrderSizeKey, number>;
+export const QUICK_ORDER_DRAFT_STORAGE_KEY = "attd.quick-order.draft.v2";
+export const QUICK_ORDER_DRAFT_STORAGE_KEY_V1 = "attd.quick-order.draft.v1";
+
+export type QuickOrderSizeQuantities = Record<string, number>;
 
 export type QuickOrderGridRow = {
   key: string;
@@ -21,6 +33,8 @@ export type QuickOrderGridRow = {
   revenueCategoryId: string | null;
   colorId: string | null;
   colorName: string;
+  colorCode: string;
+  isCustomColor: boolean;
   description: string;
   sizes: QuickOrderSizeQuantities;
   unit: string;
@@ -44,6 +58,7 @@ export type QuickOrderHeaderState = {
 
 export type QuickOrderDraft = {
   header: QuickOrderHeaderState;
+  sizeColumns: QuickOrderSizeColumn[];
   rows: QuickOrderGridRow[];
   discountAmount: number;
   shippingFee: number;
@@ -51,15 +66,23 @@ export type QuickOrderDraft = {
   savedAt: string;
 };
 
-export function emptyQuickOrderSizes(): QuickOrderSizeQuantities {
-  return { S: 0, M: 0, L: 0, XL: 0, "2XL": 0, "3XL": 0, "4XL": 0, Free: 0 };
+export function emptyQuickOrderSizes(
+  columns: QuickOrderSizeColumn[] = DEFAULT_QUICK_ORDER_SIZE_COLUMNS,
+): QuickOrderSizeQuantities {
+  return emptyQuickOrderSizeQuantities(columns);
 }
 
-export function sumQuickOrderSizes(sizes: QuickOrderSizeQuantities): number {
-  return QUICK_ORDER_SIZE_KEYS.reduce((sum, key) => sum + Math.max(0, Math.floor(sizes[key] || 0)), 0);
+export function sumQuickOrderSizes(
+  sizes: QuickOrderSizeQuantities,
+  columns: QuickOrderSizeColumn[] = DEFAULT_QUICK_ORDER_SIZE_COLUMNS,
+): number {
+  return sumQuickOrderSizeQuantities(sizes, columns);
 }
 
-export function createEmptyQuickOrderRow(index = 1): QuickOrderGridRow {
+export function createEmptyQuickOrderRow(
+  index = 1,
+  columns: QuickOrderSizeColumn[] = DEFAULT_QUICK_ORDER_SIZE_COLUMNS,
+): QuickOrderGridRow {
   return {
     key: `row-${Date.now()}-${index}`,
     lineCode: "",
@@ -70,13 +93,65 @@ export function createEmptyQuickOrderRow(index = 1): QuickOrderGridRow {
     revenueCategoryId: null,
     colorId: null,
     colorName: "",
+    colorCode: "",
+    isCustomColor: false,
     description: "",
-    sizes: emptyQuickOrderSizes(),
+    sizes: emptyQuickOrderSizes(columns),
     unit: "cái",
     unitPrice: 0,
   };
 }
 
-export function sizeKeyToVariantSizeValue(sizeKey: QuickOrderSizeKey): string {
-  return sizeKey === "Free" ? QUICK_ORDER_FREE_SIZE_VALUE : sizeKey;
+export function normalizeQuickOrderDraft(
+  draft: Partial<QuickOrderDraft> & {
+    rows?: Array<Partial<QuickOrderGridRow> & { sizes?: Record<string, number> }>;
+  },
+): QuickOrderDraft {
+  const sizeColumns = draft.sizeColumns?.length
+    ? draft.sizeColumns
+    : DEFAULT_QUICK_ORDER_SIZE_COLUMNS;
+
+  const rows = (draft.rows ?? []).map((row, index) => {
+    const base = createEmptyQuickOrderRow(index + 1, sizeColumns);
+    const sizes = ensureRowSizesForColumns(
+      migrateLegacyFixedSizes(row.sizes, sizeColumns),
+      sizeColumns,
+    );
+    return {
+      ...base,
+      ...row,
+      colorCode: row.colorCode ?? "",
+      isCustomColor: row.isCustomColor ?? false,
+      sizes,
+    };
+  });
+
+  return {
+    header: draft.header ?? {
+      customerId: null,
+      contactId: null,
+      salesEmployeeId: null,
+      orderDate: "",
+      currency: "VND",
+      priceVatType: "EXCLUDING_VAT",
+      customerNote: "",
+      internalNote: "",
+      productionDueDate: "",
+      productionOwnerId: null,
+    },
+    sizeColumns,
+    rows: rows.length ? rows : [createEmptyQuickOrderRow(1, sizeColumns)],
+    discountAmount: draft.discountAmount ?? 0,
+    shippingFee: draft.shippingFee ?? 0,
+    vatRate: draft.vatRate ?? 8,
+    savedAt: draft.savedAt ?? new Date().toISOString(),
+  };
+}
+
+/** @deprecated Use sizeColumnLabelToVariantSizeValue from quick-order-sizes */
+export function sizeKeyToVariantSizeValue(sizeKey: string): string {
+  const column = DEFAULT_QUICK_ORDER_SIZE_COLUMNS.find((col) => col.key === sizeKey);
+  if (!column) return sizeKey;
+  if (column.key === "Free") return QUICK_ORDER_FREE_SIZE_VALUE;
+  return column.label;
 }

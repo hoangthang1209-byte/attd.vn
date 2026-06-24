@@ -203,6 +203,78 @@ describeDb("product relation ownership (database-backed)", () => {
     const persisted = await prisma.product.findUnique({ where: { id: product.id } });
     assert.equal(persisted?.status, "ACTIVE");
   });
+
+  it("creates and publishes a structured product with many specifications without timing out", async () => {
+    const specifications = Array.from({ length: 10 }, (_, index) => ({
+      label: `Thông số ${index + 1}`,
+      value: `Giá trị ${index + 1}`,
+      sortOrder: index,
+    }));
+
+    const product = requireProduct(
+      await createProductAdmin(
+        publishableProductInput(categoryId, {
+          status: "ACTIVE",
+          specifications,
+          variants: [
+            { colorName: "Đen", sizeName: "M", variantStatus: "ACTIVE" as const },
+            { colorName: "Đen", sizeName: "L", variantStatus: "ACTIVE" as const },
+            { colorName: "Trắng", sizeName: "M", variantStatus: "ACTIVE" as const },
+          ],
+        }),
+      ),
+      "structured product",
+    );
+    createdProductIds.push(product.id);
+
+    assert.equal(product.status, "ACTIVE");
+    const specs = await prisma.productSpecification.findMany({
+      where: { productId: product.id },
+      orderBy: { sortOrder: "asc" },
+    });
+    assert.equal(specs.length, 10);
+    assert.equal(specs[0]?.label, "Thông số 1");
+    assert.equal(specs[9]?.value, "Giá trị 10");
+
+    const variants = await prisma.productVariant.findMany({ where: { productId: product.id } });
+    assert.equal(variants.length, 3);
+  });
+
+  it("updates structured product specifications without duplicating rows", async () => {
+    const product = requireProduct(
+      await createProductAdmin(
+        publishableProductInput(categoryId, {
+          specifications: [
+            { label: "Chất liệu", value: "Cotton" },
+            { label: "Form", value: "Regular" },
+          ],
+        }),
+      ),
+      "product",
+    );
+    createdProductIds.push(product.id);
+
+    const existingSpecs = await prisma.productSpecification.findMany({
+      where: { productId: product.id },
+    });
+    assert.equal(existingSpecs.length, 2);
+
+    const updated = await updateProductAdmin(product.id, {
+      specifications: [
+        { id: existingSpecs[0]!.id, label: "Chất liệu", value: "Cotton 2 chiều" },
+        { label: "Co giãn", value: "2 chiều" },
+      ],
+    });
+
+    const afterSpecs = await prisma.productSpecification.findMany({
+      where: { productId: product.id },
+      orderBy: { sortOrder: "asc" },
+    });
+    assert.equal(afterSpecs.length, 2);
+    assert.equal(afterSpecs[0]?.value, "Cotton 2 chiều");
+    assert.equal(afterSpecs[1]?.label, "Co giãn");
+    assert.ok(updated);
+  });
 });
 
 describe("publish image reference rules", () => {

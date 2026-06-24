@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AdminBackLink from "@/components/admin/AdminBackLink";
 import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
-import QuickOrderGrid from "@/components/admin/orders/QuickOrderGrid";
+import QuickOrderGrid, { syncRowsToSizeColumns } from "@/components/admin/orders/QuickOrderGrid";
 import OrderTotalsSummary from "@/components/admin/orders/OrderTotalsSummary";
 import { contactToQuoteSnapshots, customerToQuoteSnapshots } from "@/features/quotes/quote-party-utils";
 import { toDateInputValue } from "@/features/quotes/format";
@@ -24,7 +24,14 @@ import {
   saveQuickOrderDraft,
 } from "@/features/orders/quick-order/quick-order-draft";
 import {
+  addSizeColumnFromLabel,
+  DEFAULT_QUICK_ORDER_SIZE_COLUMNS,
+  mergeImportedSizeColumns,
+  type QuickOrderSizeColumn,
+} from "@/features/orders/quick-order/quick-order-sizes";
+import {
   createEmptyQuickOrderRow,
+  normalizeQuickOrderDraft,
   type QuickOrderGridRow,
   type QuickOrderHeaderState,
 } from "@/features/orders/quick-order/quick-order.types";
@@ -35,6 +42,12 @@ import type { EmployeeRecord } from "@/features/employees/employee.service";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import "@/styles/quick-order-grid.css";
+
+type ProductStockVariant = {
+  colorId: string | null;
+  colorName: string | null;
+  sizeName: string | null;
+};
 
 type ProductListItem = {
   id: string;
@@ -62,6 +75,9 @@ export default function QuickOrderForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [header, setHeader] = useState<QuickOrderHeaderState>(defaultHeader);
+  const [sizeColumns, setSizeColumns] = useState<QuickOrderSizeColumn[]>([
+    ...DEFAULT_QUICK_ORDER_SIZE_COLUMNS,
+  ]);
   const [rows, setRows] = useState<QuickOrderGridRow[]>([createEmptyQuickOrderRow()]);
   const [products, setProducts] = useState<ProductListItem[]>([]);
   const [revenueCategories, setRevenueCategories] = useState<RevenueCategoryPickerOption[]>([]);
@@ -70,6 +86,12 @@ export default function QuickOrderForm() {
   const [productColorsByProductId, setProductColorsByProductId] = useState<
     Record<string, Array<{ id: string; name: string }>>
   >({});
+  const [productStockVariantsByProductId, setProductStockVariantsByProductId] = useState<
+    Record<string, ProductStockVariant[]>
+  >({});
+  const [addSizeOpen, setAddSizeOpen] = useState(false);
+  const [addSizeLabel, setAddSizeLabel] = useState("");
+  const [addSizeError, setAddSizeError] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomerRecord | null>(null);
   const [contacts, setContacts] = useState<CrmContactRecord[]>([]);
   const [customerCompany, setCustomerCompany] = useState("");
@@ -91,8 +113,8 @@ export default function QuickOrderForm() {
   const toast = useAdminToast();
 
   const computedItems = useMemo(
-    () => quickOrderRowsToOrderItems(rows).map((item) => computeOrderItem(item)),
-    [rows],
+    () => quickOrderRowsToOrderItems(rows, sizeColumns).map((item) => computeOrderItem(item)),
+    [rows, sizeColumns],
   );
   const totals = useMemo(
     () =>
@@ -107,24 +129,39 @@ export default function QuickOrderForm() {
   const loadProductColors = useCallback(async (productId: string) => {
     const res = await fetch(`/api/admin/products/${productId}`);
     const data = (await res.json()) as {
-      product?: { variants?: Array<{ colorName?: string | null; colorId?: string | null }> };
+      product?: {
+        variants?: Array<{
+          colorName?: string | null;
+          colorId?: string | null;
+          sizeName?: string | null;
+          stockQty?: number | null;
+        }>;
+      };
     };
     const variants = data.product?.variants ?? [];
     const colorMap = new Map<string, { id: string; name: string }>();
+    const stockVariants: ProductStockVariant[] = [];
     for (const variant of variants) {
       const name = variant.colorName?.trim();
+      const sizeName = variant.sizeName?.trim() || null;
+      const colorId = variant.colorId?.trim() || null;
+      stockVariants.push({ colorId, colorName: name ?? null, sizeName });
       if (!name) continue;
-      const id = variant.colorId?.trim() || `name:${name.toLowerCase()}`;
+      const id = colorId && !colorId.startsWith("name:") ? colorId : `name:${name.toLowerCase()}`;
       colorMap.set(id, { id, name });
     }
     setProductColorsByProductId((prev) => ({
       ...prev,
       [productId]: Array.from(colorMap.values()),
     }));
+    setProductStockVariantsByProductId((prev) => ({
+      ...prev,
+      [productId]: stockVariants,
+    }));
     setProducts((prev) =>
       prev.map((product) =>
         product.id === productId
-          ? { ...product, hasStockVariants: variants.some((v) => (v as { stockQty?: number }).stockQty != null) }
+          ? { ...product, hasStockVariants: variants.some((v) => v.stockQty != null) }
           : product,
       ),
     );
@@ -146,11 +183,13 @@ export default function QuickOrderForm() {
 
     const draft = loadQuickOrderDraft();
     if (draft) {
-      setHeader(draft.header);
-      setRows(draft.rows.length ? draft.rows : [createEmptyQuickOrderRow()]);
-      setDiscountAmount(String(draft.discountAmount ?? 0));
-      setShippingFee(String(draft.shippingFee ?? 0));
-      setVatRate(String(draft.vatRate ?? 8));
+      const normalized = normalizeQuickOrderDraft(draft);
+      setHeader(normalized.header);
+      setSizeColumns(normalized.sizeColumns);
+      setRows(normalized.rows.length ? normalized.rows : [createEmptyQuickOrderRow(1, normalized.sizeColumns)]);
+      setDiscountAmount(String(normalized.discountAmount ?? 0));
+      setShippingFee(String(normalized.shippingFee ?? 0));
+      setVatRate(String(normalized.vatRate ?? 8));
       setDraftToast("Đã khôi phục bản nháp chưa lưu.");
     }
   }, []);
@@ -159,6 +198,7 @@ export default function QuickOrderForm() {
     const timer = window.setTimeout(() => {
       saveQuickOrderDraft({
         header,
+        sizeColumns,
         rows,
         discountAmount: Number(discountAmount) || 0,
         shippingFee: Number(shippingFee) || 0,
@@ -167,7 +207,7 @@ export default function QuickOrderForm() {
       });
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [header, rows, discountAmount, shippingFee, vatRate]);
+  }, [header, sizeColumns, rows, discountAmount, shippingFee, vatRate]);
 
   function applyCustomer(
     customer: CrmCustomerRecord,
@@ -209,6 +249,23 @@ export default function QuickOrderForm() {
     setContactEmail(snapshots.customerEmailSnapshot ?? "");
   }
 
+  function applyImportedSummary(summary: QuickOrderImportSummary) {
+    const mergedColumns = mergeImportedSizeColumns(sizeColumns, summary.sizeColumns);
+    const resolvedRows = applyRevenueCategoriesToImportedRows(summary.rows, revenueCategories);
+    const nextRows = resolvedRows.length
+      ? resolvedRows.map((row) => ({
+          ...row,
+          sizes: {
+            ...Object.fromEntries(mergedColumns.map((col) => [col.key, 0])),
+            ...row.sizes,
+          },
+        }))
+      : [createEmptyQuickOrderRow(1, mergedColumns)];
+    setSizeColumns(mergedColumns);
+    setRows(nextRows);
+    setImportSummary({ ...summary, rows: nextRows, sizeColumns: mergedColumns });
+  }
+
   async function handlePasteFromClipboard() {
     try {
       const text = await navigator.clipboard.readText();
@@ -223,8 +280,7 @@ export default function QuickOrderForm() {
         })),
       );
       const resolvedRows = applyRevenueCategoriesToImportedRows(summary.rows, revenueCategories);
-      setRows(resolvedRows.length ? resolvedRows : [createEmptyQuickOrderRow()]);
-      setImportSummary({ ...summary, rows: resolvedRows });
+      applyImportedSummary({ ...summary, rows: resolvedRows });
     } catch {
       setError("Không đọc được dữ liệu từ clipboard.");
     }
@@ -243,19 +299,37 @@ export default function QuickOrderForm() {
       })),
     );
     const resolvedRows = applyRevenueCategoriesToImportedRows(summary.rows, revenueCategories);
-    setRows(resolvedRows.length ? resolvedRows : [createEmptyQuickOrderRow()]);
-    setImportSummary({ ...summary, rows: resolvedRows, message: summary.message });
+    applyImportedSummary({ ...summary, rows: resolvedRows, message: summary.message });
   }
 
   function validateAllRows(): boolean {
     let valid = true;
     const next = rows.map((row) => {
-      const fieldErrors = validateQuickOrderRow(row);
+      const fieldErrors = validateQuickOrderRow(row, {
+        sizeColumns,
+        productColors: row.productId ? productColorsByProductId[row.productId] ?? [] : [],
+        productStockVariants: row.productId
+          ? productStockVariantsByProductId[row.productId] ?? []
+          : [],
+      });
       if (Object.keys(fieldErrors).length) valid = false;
       return { ...row, fieldErrors };
     });
     setRows(next);
     return valid;
+  }
+
+  function handleAddSizeColumn() {
+    const result = addSizeColumnFromLabel(sizeColumns, addSizeLabel);
+    if (result.error) {
+      setAddSizeError(result.error);
+      return;
+    }
+    setSizeColumns(result.columns);
+    setRows((prev) => syncRowsToSizeColumns(prev, result.columns));
+    setAddSizeLabel("");
+    setAddSizeError(null);
+    setAddSizeOpen(false);
   }
 
   async function handleSubmit() {
@@ -298,7 +372,7 @@ export default function QuickOrderForm() {
         shippingFee: Number(shippingFee) || 0,
         vatRate: Number(vatRate) || 0,
         requireItemClassification: true,
-        items: quickOrderRowsToOrderItems(rows),
+        items: quickOrderRowsToOrderItems(rows, sizeColumns),
       };
 
       const res = await fetch("/api/orders", {
@@ -446,9 +520,66 @@ export default function QuickOrderForm() {
       </fieldset>
 
       <div className="quick-order-toolbar">
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setRows((prev) => [...prev, createEmptyQuickOrderRow(prev.length + 1)])}>
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary"
+          onClick={() => setRows((prev) => [...prev, createEmptyQuickOrderRow(prev.length + 1, sizeColumns)])}
+        >
           Thêm dòng
         </button>
+        <div className="quick-order-add-size">
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary"
+            onClick={() => {
+              setAddSizeOpen((open) => !open);
+              setAddSizeError(null);
+            }}
+          >
+            + Thêm size
+          </button>
+          {addSizeOpen && (
+            <div className="quick-order-add-size__popover">
+              <label className="admin-label" htmlFor="quick-order-add-size-input">
+                Tên size
+              </label>
+              <input
+                id="quick-order-add-size-input"
+                className="admin-input admin-input--compact"
+                value={addSizeLabel}
+                placeholder="Ví dụ: XS, 5XL, 28, 30, 2 tuổi"
+                onChange={(e) => {
+                  setAddSizeLabel(e.target.value);
+                  setAddSizeError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddSizeColumn();
+                }}
+              />
+              {addSizeError && <p className="admin-field-error">{addSizeError}</p>}
+              <div className="quick-order-add-size__actions">
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--ghost admin-btn--xs"
+                  onClick={() => {
+                    setAddSizeOpen(false);
+                    setAddSizeLabel("");
+                    setAddSizeError(null);
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  onClick={handleAddSizeColumn}
+                >
+                  Thêm size
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
         <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void handlePasteFromClipboard()}>
           Dán từ Excel
         </button>
@@ -458,7 +589,14 @@ export default function QuickOrderForm() {
         <button type="button" className="admin-btn admin-btn--secondary" onClick={() => fileInputRef.current?.click()}>
           Nhập file Excel
         </button>
-        <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setRows([createEmptyQuickOrderRow()])}>
+        <button
+          type="button"
+          className="admin-btn admin-btn--ghost"
+          onClick={() => {
+            setSizeColumns([...DEFAULT_QUICK_ORDER_SIZE_COLUMNS]);
+            setRows([createEmptyQuickOrderRow(1, DEFAULT_QUICK_ORDER_SIZE_COLUMNS)]);
+          }}
+        >
           Xóa toàn bộ dòng
         </button>
         <input
@@ -486,6 +624,7 @@ export default function QuickOrderForm() {
 
       <QuickOrderGrid
         rows={rows}
+        sizeColumns={sizeColumns}
         products={products}
         revenueCategories={revenueCategories}
         productColorsByProductId={productColorsByProductId}
@@ -499,6 +638,9 @@ export default function QuickOrderForm() {
               revenueCategories.find((c) => c.id === row.revenueCategoryId)?.code?.startsWith("WHOLESALE_BLANK"),
           );
           if (changed) setRevenueSuggestionRowKey(changed.key);
+        }}
+        onSizeColumnsChange={(nextColumns) => {
+          setSizeColumns(nextColumns);
         }}
         onLoadProductColors={loadProductColors}
         revenueSuggestionRowKey={revenueSuggestionRowKey}
@@ -560,6 +702,7 @@ export default function QuickOrderForm() {
             onClick={() => {
               saveQuickOrderDraft({
                 header,
+                sizeColumns,
                 rows,
                 discountAmount: Number(discountAmount) || 0,
                 shippingFee: Number(shippingFee) || 0,
