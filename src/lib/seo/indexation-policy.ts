@@ -37,6 +37,21 @@ export function absoluteUrl(path: string): string {
   return canonicalUrl(path);
 }
 
+/**
+ * True when raw input includes a tracking key, including empty values (`?utm_source=`).
+ * Must run before normalization drops empty values.
+ */
+export function hasRawTrackingParameter(input: SearchParamInput): boolean {
+  for (const [key, value] of Object.entries(input)) {
+    if (!TRACKING_QUERY_KEYS.has(key.toLowerCase())) continue;
+    if (value === undefined || value === null) continue;
+    const values = Array.isArray(value) ? value : [value];
+    if (values.length === 0) continue;
+    return true;
+  }
+  return false;
+}
+
 /** Normalize search params for stable canonical URLs (sorted keys). */
 export function normalizeQuerySearchParams(input: SearchParamInput): URLSearchParams {
   const entries: Array<[string, string]> = [];
@@ -65,13 +80,12 @@ export function normalizeQuerySearchParams(input: SearchParamInput): URLSearchPa
  * Empty substantive values (e.g. `?q=`, `?page=`) are ignored.
  */
 export function partitionSearchParams(input: SearchParamInput): PartitionedSearchParams {
+  const hadTrackingParams = hasRawTrackingParameter(input);
   const normalized = normalizeQuerySearchParams(input);
-  let hadTrackingParams = false;
   const substantiveEntries: Array<[string, string]> = [];
 
   for (const [key, value] of normalized.entries()) {
     if (TRACKING_QUERY_KEYS.has(key.toLowerCase())) {
-      hadTrackingParams = true;
       continue;
     }
     if (!value.trim()) continue;

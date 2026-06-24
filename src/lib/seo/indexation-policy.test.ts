@@ -71,6 +71,24 @@ describe("buildCatalogMetadata", () => {
     assert.equal(canonicalOf(meta), "https://www.attd.vn/san-pham");
     assert.deepEqual(robotsOf(meta), ROBOTS_INDEX_FOLLOW);
   });
+
+  it("noindexes empty tracking param to clean /san-pham", () => {
+    const meta = buildCatalogMetadata({ utm_source: "" });
+    assert.equal(canonicalOf(meta), "https://www.attd.vn/san-pham");
+    assert.deepEqual(robotsOf(meta), ROBOTS_NOINDEX_FOLLOW);
+  });
+
+  it("noindexes category + empty tracking to approved landing canonical", () => {
+    const meta = buildCatalogMetadata({ category: "ao-thun-tron", utm_source: "" });
+    assert.equal(canonicalOf(meta), "https://www.attd.vn/ao-thun-tron");
+    assert.deepEqual(robotsOf(meta), ROBOTS_NOINDEX_FOLLOW);
+  });
+
+  it("preserves non-substantive behavior for empty q only", () => {
+    const meta = buildCatalogMetadata({ q: "" });
+    assert.equal(canonicalOf(meta), "https://www.attd.vn/san-pham");
+    assert.deepEqual(robotsOf(meta), ROBOTS_INDEX_FOLLOW);
+  });
 });
 
 describe("buildBlogIndexMetadata", () => {
@@ -91,12 +109,30 @@ describe("buildBlogIndexMetadata", () => {
     assert.equal(canonicalOf(meta), "https://www.attd.vn/blog?unknownFilter=x");
     assert.deepEqual(robotsOf(meta), ROBOTS_NOINDEX_FOLLOW);
   });
+
+  it("noindexes empty tracking param to clean /blog", () => {
+    const meta = buildBlogIndexMetadata({ gclid: "" });
+    assert.equal(canonicalOf(meta), "https://www.attd.vn/blog");
+    assert.deepEqual(robotsOf(meta), ROBOTS_NOINDEX_FOLLOW);
+  });
+
+  it("preserves non-substantive behavior for empty page only", () => {
+    const meta = buildBlogIndexMetadata({ page: "" });
+    assert.equal(canonicalOf(meta), "https://www.attd.vn/blog");
+    assert.deepEqual(robotsOf(meta), ROBOTS_INDEX_FOLLOW);
+  });
 });
 
 describe("buildBlogCategoryMetadata", () => {
   it("noindexes paginated category archive with self canonical", () => {
     const meta = buildBlogCategoryMetadata("huong-dan", { page: "2" });
     assert.equal(canonicalOf(meta), "https://www.attd.vn/blog/danh-muc/huong-dan?page=2");
+    assert.deepEqual(robotsOf(meta), ROBOTS_NOINDEX_FOLLOW);
+  });
+
+  it("noindexes empty tracking param to clean category archive canonical", () => {
+    const meta = buildBlogCategoryMetadata("example", { fbclid: "" });
+    assert.equal(canonicalOf(meta), "https://www.attd.vn/blog/danh-muc/example");
     assert.deepEqual(robotsOf(meta), ROBOTS_NOINDEX_FOLLOW);
   });
 });
