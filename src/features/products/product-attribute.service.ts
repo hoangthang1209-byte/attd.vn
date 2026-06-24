@@ -60,6 +60,73 @@ function normalizeValueSlug(raw: string): string {
     .replace(/^-+|-+$/g, "") || "value";
 }
 
+const CODE_SLUG_LOCKED_MESSAGE =
+  "Mã không thể thay đổi vì thuộc tính này đang được sử dụng trong sản phẩm, biến thể hoặc dữ liệu liên quan.";
+
+async function assertUniqueAttributeCodeManual(code: string, excludeId?: string): Promise<string> {
+  const normalized = normalizeSkuPart(code).slice(0, 16) || "ATTR";
+  const existing = await prisma.productAttribute.findUnique({ where: { code: normalized } });
+  if (existing && existing.id !== excludeId) {
+    throw new ProductAttributeValidationError(
+      "Mã thuộc tính bị trùng.",
+      { code: "Mã thuộc tính đã tồn tại." },
+      409,
+    );
+  }
+  return normalized;
+}
+
+async function assertUniqueAttributeSlugManual(slug: string, excludeId?: string): Promise<string> {
+  const normalized = normalizeSlug(slug);
+  const existing = await prisma.productAttribute.findUnique({ where: { slug: normalized } });
+  if (existing && existing.id !== excludeId) {
+    throw new ProductAttributeValidationError(
+      "Đường dẫn định danh bị trùng.",
+      { slug: "Đường dẫn định danh đã tồn tại." },
+      409,
+    );
+  }
+  return normalized;
+}
+
+async function assertUniqueValueCodeManual(
+  attributeId: string,
+  code: string,
+  excludeId?: string,
+): Promise<string> {
+  const normalized = normalizeSkuPart(code).slice(0, 16) || "VAL";
+  const existing = await prisma.productAttributeValue.findUnique({
+    where: { attributeId_code: { attributeId, code: normalized } },
+  });
+  if (existing && existing.id !== excludeId) {
+    throw new ProductAttributeValidationError(
+      "Mã giá trị bị trùng.",
+      { code: "Mã giá trị đã tồn tại trong thuộc tính này." },
+      409,
+    );
+  }
+  return normalized;
+}
+
+async function assertUniqueValueSlugManual(
+  attributeId: string,
+  slug: string,
+  excludeId?: string,
+): Promise<string> {
+  const normalized = normalizeValueSlug(slug);
+  const existing = await prisma.productAttributeValue.findUnique({
+    where: { attributeId_slug: { attributeId, slug: normalized } },
+  });
+  if (existing && existing.id !== excludeId) {
+    throw new ProductAttributeValidationError(
+      "Đường dẫn định danh bị trùng.",
+      { slug: "Đường dẫn định danh đã tồn tại." },
+      409,
+    );
+  }
+  return normalized;
+}
+
 async function ensureUniqueAttributeSlug(base: string, excludeId?: string): Promise<string> {
   const normalized = normalizeSlug(base);
   for (let i = 1; i <= 99; i++) {
@@ -171,30 +238,114 @@ export async function listSharedAttributes(options?: {
         where: options?.includeInactiveValues ? undefined : { status: "ACTIVE" },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       },
-      _count: { select: { productOptions: true } },
+      _count: { select: { productOptions: true, productAssignments: true } },
     },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
 
-  const valueUsage = await prisma.productOptionValue.groupBy({
-    by: ["attributeValueId"],
-    where: { attributeValueId: { not: null } },
-    _count: { _all: true },
-  });
-  const usageByValueId = new Map(
-    valueUsage
-      .filter((row) => row.attributeValueId)
-      .map((row) => [row.attributeValueId!, row._count._all]),
-  );
+  const attributeIds = attributes.map((attribute) => attribute.id);
+  const valueIds = attributes.flatMap((attribute) => attribute.values.map((value) => value.id));
 
-  return attributes.map((attribute) => ({
-    ...attribute,
-    usageCount: attribute._count.productOptions,
-    values: attribute.values.map((value) => ({
-      ...value,
-      usageCount: usageByValueId.get(value.id) ?? 0,
-    })),
-  }));
+  const [
+    optionProducts,
+    assignmentProducts,
+    optionValueUsage,
+    assignmentValueUsage,
+    optionValueRefsByAttribute,
+  ] = await Promise.all([
+    attributeIds.length
+      ? prisma.productOption.findMany({
+          where: { attributeId: { in: attributeIds } },
+          select: { attributeId: true, productId: true },
+        })
+      : Promise.resolve([]),
+    attributeIds.length
+      ? prisma.productAttributeAssignment.findMany({
+          where: { attributeId: { in: attributeIds } },
+          select: { attributeId: true, productId: true },
+        })
+      : Promise.resolve([]),
+    valueIds.length
+      ? prisma.productOptionValue.groupBy({
+          by: ["attributeValueId"],
+          where: { attributeValueId: { in: valueIds } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
+    valueIds.length
+      ? prisma.productAttributeAssignment.groupBy({
+          by: ["attributeValueId"],
+          where: { attributeValueId: { in: valueIds } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
+    attributeIds.length
+      ? prisma.productOptionValue.groupBy({
+          by: ["attributeValueId"],
+          where: { attributeValue: { attributeId: { in: attributeIds } }, attributeValueId: { not: null } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const productsByAttributeId = new Map<string, Set<string>>();
+  for (const attributeId of attributeIds) {
+    productsByAttributeId.set(attributeId, new Set());
+  }
+  for (const row of optionProducts) {
+    if (!row.attributeId) continue;
+    productsByAttributeId.get(row.attributeId)?.add(row.productId);
+  }
+  for (const row of assignmentProducts) {
+    productsByAttributeId.get(row.attributeId)?.add(row.productId);
+  }
+
+  const valueIdToAttributeId = new Map<string, string>();
+  for (const attribute of attributes) {
+    for (const value of attribute.values) {
+      valueIdToAttributeId.set(value.id, attribute.id);
+    }
+  }
+
+  const attributesWithOptionValues = new Set<string>();
+  for (const row of optionValueRefsByAttribute) {
+    if (!row.attributeValueId) continue;
+    const attributeId = valueIdToAttributeId.get(row.attributeValueId);
+    if (attributeId) attributesWithOptionValues.add(attributeId);
+  }
+
+  const usageByValueId = new Map<string, number>();
+  const referencedValueIds = new Set<string>();
+  for (const row of optionValueUsage) {
+    if (!row.attributeValueId) continue;
+    usageByValueId.set(row.attributeValueId, (usageByValueId.get(row.attributeValueId) ?? 0) + row._count._all);
+    referencedValueIds.add(row.attributeValueId);
+  }
+  for (const row of assignmentValueUsage) {
+    if (!row.attributeValueId) continue;
+    usageByValueId.set(row.attributeValueId, (usageByValueId.get(row.attributeValueId) ?? 0) + row._count._all);
+    referencedValueIds.add(row.attributeValueId);
+  }
+
+  return attributes.map((attribute) => {
+    const usageCount = productsByAttributeId.get(attribute.id)?.size ?? 0;
+    const isReferenced =
+      usageCount > 0
+      || attribute._count.productOptions > 0
+      || attribute._count.productAssignments > 0
+      || attributesWithOptionValues.has(attribute.id);
+
+    return {
+      ...attribute,
+      usageCount,
+      isReferenced,
+      values: attribute.values.map((value) => ({
+        ...value,
+        usageCount: usageByValueId.get(value.id) ?? 0,
+        isReferenced: referencedValueIds.has(value.id),
+      })),
+    };
+  });
 }
 
 export async function createSharedAttribute(raw: Record<string, unknown>) {
@@ -234,17 +385,46 @@ export async function updateSharedAttribute(id: string, raw: Record<string, unkn
     throw new ProductAttributeValidationError("Không tìm thấy thuộc tính.", {}, 404);
   }
 
+  const referenced = (await getAttributeDependencyCounts(id)).total > 0;
   const data: Prisma.ProductAttributeUpdateInput = {};
+
   if (raw.name !== undefined) {
     const name = String(raw.name).trim();
-    if (!name) throw new ProductAttributeValidationError("Dữ liệu thuộc tính chưa hợp lệ.", { name: "Tên thuộc tính là bắt buộc." });
+    if (!name) {
+      throw new ProductAttributeValidationError("Dữ liệu thuộc tính chưa hợp lệ.", { name: "Tên thuộc tính là bắt buộc." });
+    }
     await assertUniqueAttributeName(name, id);
     data.name = name;
-    if (raw.slug === undefined) data.slug = await ensureUniqueAttributeSlug(name, id);
-    if (raw.code === undefined) data.code = await ensureUniqueAttributeCode(name, id);
   }
-  if (raw.code !== undefined) data.code = await ensureUniqueAttributeCode(String(raw.code), id);
-  if (raw.slug !== undefined) data.slug = await ensureUniqueAttributeSlug(String(raw.slug), id);
+
+  if (raw.code !== undefined) {
+    const code = String(raw.code).trim();
+    if (!code) {
+      throw new ProductAttributeValidationError("Dữ liệu thuộc tính chưa hợp lệ.", { code: "Mã thuộc tính là bắt buộc." });
+    }
+    const normalized = normalizeSkuPart(code).slice(0, 16) || "ATTR";
+    if (referenced && normalized !== existing.code) {
+      throw new ProductAttributeValidationError(CODE_SLUG_LOCKED_MESSAGE, { code: CODE_SLUG_LOCKED_MESSAGE }, 409);
+    }
+    if (!referenced) {
+      data.code = await assertUniqueAttributeCodeManual(normalized, id);
+    }
+  }
+
+  if (raw.slug !== undefined) {
+    const slug = String(raw.slug).trim();
+    if (!slug) {
+      throw new ProductAttributeValidationError("Dữ liệu thuộc tính chưa hợp lệ.", { slug: "Slug là bắt buộc." });
+    }
+    const normalized = normalizeSlug(slug);
+    if (referenced && normalized !== existing.slug) {
+      throw new ProductAttributeValidationError(CODE_SLUG_LOCKED_MESSAGE, { slug: CODE_SLUG_LOCKED_MESSAGE }, 409);
+    }
+    if (!referenced) {
+      data.slug = await assertUniqueAttributeSlugManual(normalized, id);
+    }
+  }
+
   if (raw.displayType !== undefined) {
     const displayType = String(raw.displayType).toUpperCase() as ProductAttributeDisplayType;
     if (!VALID_DISPLAY_TYPES.has(displayType)) {
@@ -303,19 +483,46 @@ export async function updateSharedAttributeValue(id: string, raw: Record<string,
     throw new ProductAttributeValidationError("Không tìm thấy giá trị thuộc tính.", {}, 404);
   }
 
+  const referenced = (await getAttributeValueDependencyCounts(id)).total > 0;
   const data: Prisma.ProductAttributeValueUpdateInput = {};
+
   if (raw.name !== undefined) {
     const name = String(raw.name).trim();
-    if (!name) throw new ProductAttributeValidationError("Dữ liệu giá trị thuộc tính chưa hợp lệ.", { name: "Tên hiển thị là bắt buộc." });
+    if (!name) {
+      throw new ProductAttributeValidationError("Dữ liệu giá trị thuộc tính chưa hợp lệ.", { name: "Tên hiển thị là bắt buộc." });
+    }
     await assertUniqueValueName(existing.attributeId, name, id);
     data.name = name;
-    if (raw.slug === undefined) data.slug = await ensureUniqueValueSlug(existing.attributeId, name, id);
-    if (raw.code === undefined) data.code = await ensureUniqueValueCode(existing.attribute, name, undefined, id);
   }
+
   if (raw.code !== undefined) {
-    data.code = await ensureUniqueValueCode(existing.attribute, existing.name, String(raw.code), id);
+    const code = String(raw.code).trim();
+    if (!code) {
+      throw new ProductAttributeValidationError("Dữ liệu giá trị thuộc tính chưa hợp lệ.", { code: "Mã giá trị là bắt buộc." });
+    }
+    const normalized = normalizeSkuPart(code).slice(0, 16) || "VAL";
+    if (referenced && normalized !== existing.code) {
+      throw new ProductAttributeValidationError(CODE_SLUG_LOCKED_MESSAGE, { code: CODE_SLUG_LOCKED_MESSAGE }, 409);
+    }
+    if (!referenced) {
+      data.code = await assertUniqueValueCodeManual(existing.attributeId, normalized, id);
+    }
   }
-  if (raw.slug !== undefined) data.slug = await ensureUniqueValueSlug(existing.attributeId, String(raw.slug), id);
+
+  if (raw.slug !== undefined) {
+    const slug = String(raw.slug).trim();
+    if (!slug) {
+      throw new ProductAttributeValidationError("Dữ liệu giá trị thuộc tính chưa hợp lệ.", { slug: "Slug là bắt buộc." });
+    }
+    const normalized = normalizeValueSlug(slug);
+    if (referenced && normalized !== existing.slug) {
+      throw new ProductAttributeValidationError(CODE_SLUG_LOCKED_MESSAGE, { slug: CODE_SLUG_LOCKED_MESSAGE }, 409);
+    }
+    if (!referenced) {
+      data.slug = await assertUniqueValueSlugManual(existing.attributeId, normalized, id);
+    }
+  }
+
   if (raw.hexCode !== undefined) {
     const hexCode = raw.hexCode ? String(raw.hexCode).trim() : null;
     if (hexCode && !HEX_RE.test(hexCode)) {
@@ -331,30 +538,44 @@ export async function updateSharedAttributeValue(id: string, raw: Record<string,
 }
 
 export async function getAttributeDependencyCounts(attributeId: string) {
-  const [productOptions, productValues, variantLinks] = await Promise.all([
+  const [productOptions, productValues, variantLinks, productAssignments] = await Promise.all([
     prisma.productOption.count({ where: { attributeId } }),
     prisma.productOptionValue.count({ where: { attributeValue: { attributeId } } }),
     prisma.productVariantOptionValue.count({
       where: { optionValue: { attributeValue: { attributeId } } },
     }),
+    prisma.productAttributeAssignment.count({ where: { attributeId } }),
   ]);
-  return { productOptions, productValues, variantLinks, total: productOptions + productValues + variantLinks };
+  return {
+    productOptions,
+    productValues,
+    variantLinks,
+    productAssignments,
+    total: productOptions + productValues + variantLinks + productAssignments,
+  };
 }
 
 export async function getAttributeValueDependencyCounts(valueId: string) {
-  const [productValues, variantLinks] = await Promise.all([
+  const [productValues, variantLinks, productAssignments] = await Promise.all([
     prisma.productOptionValue.count({ where: { attributeValueId: valueId } }),
     prisma.productVariantOptionValue.count({ where: { optionValue: { attributeValueId: valueId } } }),
+    prisma.productAttributeAssignment.count({ where: { attributeValueId: valueId } }),
   ]);
-  return { productValues, variantLinks, total: productValues + variantLinks };
+  return {
+    productValues,
+    variantLinks,
+    productAssignments,
+    total: productValues + variantLinks + productAssignments,
+  };
 }
 
 export async function deleteSharedAttribute(id: string) {
   const deps = await getAttributeDependencyCounts(id);
   if (deps.total > 0) {
+    const productCount = deps.productOptions + deps.productAssignments;
     throw new ProductAttributeValidationError(
-      `Không thể xóa thuộc tính vì đang được sử dụng (${deps.productOptions} nhóm sản phẩm, ${deps.productValues} giá trị sản phẩm, ${deps.variantLinks} liên kết biến thể).`,
-      { delete: "Thuộc tính đang được sử dụng. Hãy ngừng sử dụng thay vì xóa." },
+      `Không thể xóa thuộc tính vì đang được sử dụng trong ${productCount || deps.total} sản phẩm hoặc nhóm biến thể.`,
+      { delete: "Không thể xóa thuộc tính vì đang được sử dụng trong sản phẩm hoặc nhóm biến thể." },
       409,
     );
   }
@@ -365,8 +586,8 @@ export async function deleteSharedAttributeValue(id: string) {
   const deps = await getAttributeValueDependencyCounts(id);
   if (deps.total > 0) {
     throw new ProductAttributeValidationError(
-      `Không thể xóa giá trị vì đang được sử dụng (${deps.productValues} giá trị sản phẩm, ${deps.variantLinks} liên kết biến thể).`,
-      { delete: "Giá trị đang được sử dụng. Hãy ngừng sử dụng thay vì xóa." },
+      "Không thể xóa giá trị vì đang được sử dụng trong dữ liệu sản phẩm hiện có.",
+      { delete: "Không thể xóa giá trị vì đang được sử dụng trong dữ liệu sản phẩm hiện có." },
       409,
     );
   }

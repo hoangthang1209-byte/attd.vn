@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AttributePresetDialog from "@/components/admin/products/AttributePresetDialog";
+import { useAdminAction } from "@/hooks/useAdminAction";
 
 type DisplayType = "TEXT" | "COLOR_SWATCH" | "SIZE" | "SELECT" | "IMAGE_SWATCH";
 type Status = "ACTIVE" | "INACTIVE";
@@ -15,6 +16,11 @@ const DISPLAY_TYPE_LABELS: Record<DisplayType, string> = {
   IMAGE_SWATCH: "image swatch",
 };
 
+const CODE_SLUG_LOCKED_HINT =
+  "Mã không thể thay đổi vì thuộc tính này đang được sử dụng trong sản phẩm, biến thể hoặc dữ liệu liên quan.";
+
+const FORM_SCROLL_MARGIN = 88;
+
 type AttributeValue = {
   id: string;
   name: string;
@@ -25,6 +31,7 @@ type AttributeValue = {
   status: Status;
   sortOrder: number;
   usageCount: number;
+  isReferenced: boolean;
 };
 
 type Attribute = {
@@ -39,6 +46,7 @@ type Attribute = {
   sortOrder: number;
   note: string | null;
   usageCount: number;
+  isReferenced: boolean;
   values: AttributeValue[];
 };
 
@@ -53,6 +61,7 @@ type AttributeForm = {
   status: Status;
   sortOrder: string;
   note: string;
+  isReferenced?: boolean;
 };
 
 type ValueForm = {
@@ -65,6 +74,7 @@ type ValueForm = {
   imageUrl: string;
   status: Status;
   sortOrder: string;
+  isReferenced?: boolean;
 };
 
 const defaultAttributeForm = (): AttributeForm => ({
@@ -94,18 +104,35 @@ function errorClass(fieldErrors: Record<string, string>, field: string) {
   return fieldErrors[field] ? " admin-input--error" : "";
 }
 
+function scrollFormIntoView(node: HTMLElement | null) {
+  node?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 export default function ProductAttributesClient() {
+  const { toast } = useAdminAction();
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(true);
   const [attributeForm, setAttributeForm] = useState<AttributeForm>(defaultAttributeForm());
   const [valueForm, setValueForm] = useState<ValueForm>(defaultValueForm());
-  const [saving, setSaving] = useState(false);
+  const [isSavingAttribute, setIsSavingAttribute] = useState(false);
+  const [isSavingValue, setIsSavingValue] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [attributeFieldErrors, setAttributeFieldErrors] = useState<Record<string, string>>({});
+  const [valueFieldErrors, setValueFieldErrors] = useState<Record<string, string>>({});
   const [presetDialogOpen, setPresetDialogOpen] = useState(false);
+  const [editingAttributeId, setEditingAttributeId] = useState<string | null>(null);
+  const [editingAttributeName, setEditingAttributeName] = useState<string | null>(null);
+  const [editingValueId, setEditingValueId] = useState<string | null>(null);
+  const [editingValueName, setEditingValueName] = useState<string | null>(null);
+  const [editingValueAttributeName, setEditingValueAttributeName] = useState<string | null>(null);
+
   const attributeSectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const attributeFormRef = useRef<HTMLFormElement>(null);
+  const valueFormRef = useRef<HTMLFormElement>(null);
+  const attributeNameInputRef = useRef<HTMLInputElement>(null);
+  const valueNameInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -132,6 +159,90 @@ export default function ProductAttributesClient() {
     section?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function clearAttributeFieldError(field: string) {
+    setAttributeFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function clearValueFieldError(field: string) {
+    setValueFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function startEditAttribute(attribute: Attribute) {
+    setAttributeForm({
+      id: attribute.id,
+      name: attribute.name,
+      code: attribute.code,
+      slug: attribute.slug,
+      displayType: attribute.displayType,
+      isVariantAttribute: attribute.isVariantAttribute,
+      isSpecificationAttribute: attribute.isSpecificationAttribute,
+      status: attribute.status,
+      sortOrder: String(attribute.sortOrder),
+      note: attribute.note ?? "",
+      isReferenced: attribute.isReferenced,
+    });
+    setEditingAttributeId(attribute.id);
+    setEditingAttributeName(attribute.name);
+    setAttributeFieldErrors({});
+    setError(null);
+
+    window.requestAnimationFrame(() => {
+      scrollFormIntoView(attributeFormRef.current);
+      window.setTimeout(() => attributeNameInputRef.current?.focus(), 320);
+    });
+  }
+
+  function cancelAttributeEdit() {
+    setAttributeForm(defaultAttributeForm());
+    setEditingAttributeId(null);
+    setEditingAttributeName(null);
+    setAttributeFieldErrors({});
+  }
+
+  function startEditValue(attribute: Attribute, value: AttributeValue) {
+    setValueForm({
+      id: value.id,
+      attributeId: attribute.id,
+      name: value.name,
+      code: value.code,
+      slug: value.slug,
+      hexCode: value.hexCode ?? "",
+      imageUrl: value.imageUrl ?? "",
+      status: value.status,
+      sortOrder: String(value.sortOrder),
+      isReferenced: value.isReferenced,
+    });
+    setEditingValueId(value.id);
+    setEditingValueName(value.name);
+    setEditingValueAttributeName(attribute.name);
+    setValueFieldErrors({});
+    setError(null);
+
+    window.requestAnimationFrame(() => {
+      scrollFormIntoView(valueFormRef.current);
+      window.setTimeout(() => valueNameInputRef.current?.focus(), 320);
+    });
+  }
+
+  function cancelValueEdit() {
+    const attributeId = valueForm.attributeId;
+    setValueForm(defaultValueForm(attributeId));
+    setEditingValueId(null);
+    setEditingValueName(null);
+    setEditingValueAttributeName(null);
+    setValueFieldErrors({});
+  }
+
   async function handlePresetSuccess(attributeId: string, successMessage: string) {
     setMessage(successMessage);
     setError(null);
@@ -141,13 +252,14 @@ export default function ProductAttributesClient() {
 
   async function handleAttributeSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setFieldErrors({});
+    setAttributeFieldErrors({});
     setError(null);
     if (!attributeForm.name.trim()) {
-      setFieldErrors({ name: "Tên thuộc tính là bắt buộc." });
+      setAttributeFieldErrors({ name: "Tên thuộc tính là bắt buộc." });
       return;
     }
-    setSaving(true);
+
+    setIsSavingAttribute(true);
     try {
       const payload = {
         name: attributeForm.name.trim(),
@@ -172,34 +284,40 @@ export default function ProductAttributesClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-      const data = await res.json() as { message?: string; fieldErrors?: Record<string, string> };
+      const data = await res.json().catch(() => null) as { message?: string; fieldErrors?: Record<string, string> } | null;
       if (!res.ok) {
-        setFieldErrors(data.fieldErrors ?? {});
-        setError(data.message ?? "Không thể lưu thuộc tính.");
+        setAttributeFieldErrors(data?.fieldErrors ?? {});
+        setError(data?.message ?? "Không thể lưu thuộc tính.");
         return;
       }
+
+      const wasEdit = Boolean(attributeForm.id);
       setAttributeForm(defaultAttributeForm());
-      setMessage(attributeForm.id ? "Đã cập nhật thuộc tính." : "Đã tạo thuộc tính.");
+      setEditingAttributeId(null);
+      setEditingAttributeName(null);
+      setMessage(wasEdit ? "Đã cập nhật thuộc tính." : "Đã tạo thuộc tính.");
       void load();
     } catch {
-      setError("Lỗi lưu thuộc tính.");
+      setError("Lỗi mạng hoặc lỗi không xác định khi lưu thuộc tính.");
+    } finally {
+      setIsSavingAttribute(false);
     }
-    setSaving(false);
   }
 
   async function handleValueSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setFieldErrors({});
+    setValueFieldErrors({});
     setError(null);
     if (!valueForm.attributeId) {
-      setFieldErrors({ attributeId: "Vui lòng chọn thuộc tính cha." });
+      setValueFieldErrors({ attributeId: "Vui lòng chọn thuộc tính cha." });
       return;
     }
     if (!valueForm.name.trim()) {
-      setFieldErrors({ name: "Tên hiển thị là bắt buộc." });
+      setValueFieldErrors({ name: "Tên hiển thị là bắt buộc." });
       return;
     }
-    setSaving(true);
+
+    setIsSavingValue(true);
     try {
       const payload = {
         name: valueForm.name.trim(),
@@ -221,37 +339,64 @@ export default function ProductAttributesClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-      const data = await res.json() as { message?: string; fieldErrors?: Record<string, string> };
+      const data = await res.json().catch(() => null) as { message?: string; fieldErrors?: Record<string, string> } | null;
       if (!res.ok) {
-        setFieldErrors(data.fieldErrors ?? {});
-        setError(data.message ?? "Không thể lưu giá trị thuộc tính.");
+        setValueFieldErrors(data?.fieldErrors ?? {});
+        setError(data?.message ?? "Không thể lưu giá trị thuộc tính.");
         return;
       }
-      setValueForm(defaultValueForm(valueForm.attributeId));
-      setMessage(valueForm.id ? "Đã cập nhật giá trị." : "Đã tạo giá trị.");
+
+      const wasEdit = Boolean(valueForm.id);
+      const parentAttributeId = valueForm.attributeId;
+      setValueForm(defaultValueForm(parentAttributeId));
+      setEditingValueId(null);
+      setEditingValueName(null);
+      setEditingValueAttributeName(null);
+      setMessage(wasEdit ? "Đã cập nhật giá trị." : "Đã tạo giá trị.");
       void load();
     } catch {
-      setError("Lỗi lưu giá trị thuộc tính.");
+      setError("Lỗi mạng hoặc lỗi không xác định khi lưu giá trị thuộc tính.");
+    } finally {
+      setIsSavingValue(false);
     }
-    setSaving(false);
   }
 
   async function patchAttribute(attribute: Attribute, patch: Partial<AttributeForm>) {
-    await fetch(`/api/admin/attributes/${attribute.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    void load();
+    try {
+      const res = await fetch(`/api/admin/attributes/${attribute.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => null) as { message?: string } | null;
+      if (!res.ok) {
+        toast.error(data?.message ?? "Không thể cập nhật trạng thái. Vui lòng thử lại.");
+        return;
+      }
+      toast.success("Đã cập nhật trạng thái thuộc tính.");
+      void load();
+    } catch {
+      toast.error("Không thể cập nhật trạng thái. Vui lòng thử lại.");
+    }
   }
 
   async function patchValue(attribute: Attribute, value: AttributeValue, patch: Partial<ValueForm>) {
-    await fetch(`/api/admin/attributes/${attribute.id}/values/${value.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    void load();
+    try {
+      const res = await fetch(`/api/admin/attributes/${attribute.id}/values/${value.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json().catch(() => null) as { message?: string } | null;
+      if (!res.ok) {
+        toast.error(data?.message ?? "Không thể cập nhật trạng thái. Vui lòng thử lại.");
+        return;
+      }
+      toast.success("Đã cập nhật trạng thái giá trị.");
+      void load();
+    } catch {
+      toast.error("Không thể cập nhật trạng thái. Vui lòng thử lại.");
+    }
   }
 
   async function deleteAttribute(attribute: Attribute) {
@@ -262,6 +407,7 @@ export default function ProductAttributesClient() {
       setError(data.message ?? "Không thể xóa thuộc tính. Hãy ngừng sử dụng thay vì xóa.");
       return;
     }
+    if (editingAttributeId === attribute.id) cancelAttributeEdit();
     setMessage("Đã xóa thuộc tính.");
     void load();
   }
@@ -274,9 +420,14 @@ export default function ProductAttributesClient() {
       setError(data.message ?? "Không thể xóa giá trị. Hãy ngừng sử dụng thay vì xóa.");
       return;
     }
+    if (editingValueId === value.id) cancelValueEdit();
     setMessage("Đã xóa giá trị.");
     void load();
   }
+
+  const editingValueParentName = attributes.find((attribute) => attribute.id === valueForm.attributeId)?.name
+    ?? editingValueAttributeName
+    ?? "";
 
   return (
     <div className="admin-catalog-page">
@@ -302,37 +453,95 @@ export default function ProductAttributesClient() {
       {message && <p className="admin-success">{message}</p>}
       {error && <p className="admin-error" role="alert">{error}</p>}
 
-      <form className="admin-catalog-fieldset" onSubmit={(e) => void handleAttributeSubmit(e)}>
+      <form
+        ref={attributeFormRef}
+        className="admin-catalog-fieldset"
+        style={{ scrollMarginTop: FORM_SCROLL_MARGIN }}
+        onSubmit={(e) => void handleAttributeSubmit(e)}
+      >
         <legend style={{ fontWeight: 600, fontSize: 14 }}>
-          {attributeForm.id ? "Cập nhật thuộc tính" : "Thêm thuộc tính mới"}
+          {attributeForm.id && editingAttributeName
+            ? `Cập nhật thuộc tính: ${editingAttributeName}`
+            : attributeForm.id
+              ? "Cập nhật thuộc tính"
+              : "Thêm thuộc tính mới"}
         </legend>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field">
             <label className="admin-label">Tên thuộc tính <span className="admin-required">*</span></label>
-            <input className={`admin-input${errorClass(fieldErrors, "name")}`} data-field="name" value={attributeForm.name} onChange={(e) => setAttributeForm((f) => ({ ...f, name: e.target.value }))} placeholder="Màu sắc, Kích thước, Form dáng…" />
-            {fieldErrors.name && <p className="admin-field-error" role="alert">{fieldErrors.name}</p>}
+            <input
+              ref={attributeNameInputRef}
+              className={`admin-input${errorClass(attributeFieldErrors, "name")}`}
+              data-field="name"
+              value={attributeForm.name}
+              onChange={(e) => {
+                clearAttributeFieldError("name");
+                setAttributeForm((f) => ({ ...f, name: e.target.value }));
+              }}
+              placeholder="Màu sắc, Kích thước, Form dáng…"
+            />
+            {attributeFieldErrors.name && <p className="admin-field-error" role="alert">{attributeFieldErrors.name}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Mã thuộc tính</label>
-            <input className={`admin-input${errorClass(fieldErrors, "code")}`} value={attributeForm.code} onChange={(e) => setAttributeForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="COLOR, SIZE, FIT…" />
-            {fieldErrors.code && <p className="admin-field-error" role="alert">{fieldErrors.code}</p>}
+            <input
+              className={`admin-input${errorClass(attributeFieldErrors, "code")}`}
+              value={attributeForm.code}
+              readOnly={Boolean(attributeForm.isReferenced)}
+              onChange={(e) => {
+                clearAttributeFieldError("code");
+                setAttributeForm((f) => ({ ...f, code: e.target.value.toUpperCase() }));
+              }}
+              placeholder="COLOR, SIZE, FIT…"
+            />
+            {attributeForm.isReferenced && (
+              <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>
+            )}
+            {attributeFieldErrors.code && <p className="admin-field-error" role="alert">{attributeFieldErrors.code}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Slug</label>
-            <input className={`admin-input${errorClass(fieldErrors, "slug")}`} value={attributeForm.slug} onChange={(e) => setAttributeForm((f) => ({ ...f, slug: e.target.value }))} placeholder="Tự sinh nếu bỏ trống" />
-            {fieldErrors.slug && <p className="admin-field-error" role="alert">{fieldErrors.slug}</p>}
+            <input
+              className={`admin-input${errorClass(attributeFieldErrors, "slug")}`}
+              value={attributeForm.slug}
+              readOnly={Boolean(attributeForm.isReferenced)}
+              onChange={(e) => {
+                clearAttributeFieldError("slug");
+                setAttributeForm((f) => ({ ...f, slug: e.target.value }));
+              }}
+              placeholder="Tự sinh nếu bỏ trống"
+            />
+            {attributeForm.isReferenced && (
+              <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>
+            )}
+            {attributeFieldErrors.slug && <p className="admin-field-error" role="alert">{attributeFieldErrors.slug}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Kiểu hiển thị</label>
-            <select className={`admin-input${errorClass(fieldErrors, "displayType")}`} value={attributeForm.displayType} onChange={(e) => setAttributeForm((f) => ({ ...f, displayType: e.target.value as DisplayType }))}>
+            <select
+              className={`admin-input${errorClass(attributeFieldErrors, "displayType")}`}
+              value={attributeForm.displayType}
+              onChange={(e) => {
+                clearAttributeFieldError("displayType");
+                setAttributeForm((f) => ({ ...f, displayType: e.target.value as DisplayType }));
+              }}
+            >
               {Object.entries(DISPLAY_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            {fieldErrors.displayType && <p className="admin-field-error" role="alert">{fieldErrors.displayType}</p>}
+            {attributeFieldErrors.displayType && <p className="admin-field-error" role="alert">{attributeFieldErrors.displayType}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Thứ tự sắp xếp</label>
-            <input className={`admin-input${errorClass(fieldErrors, "sortOrder")}`} type="number" value={attributeForm.sortOrder} onChange={(e) => setAttributeForm((f) => ({ ...f, sortOrder: e.target.value }))} />
-            {fieldErrors.sortOrder && <p className="admin-field-error" role="alert">{fieldErrors.sortOrder}</p>}
+            <input
+              className={`admin-input${errorClass(attributeFieldErrors, "sortOrder")}`}
+              type="number"
+              value={attributeForm.sortOrder}
+              onChange={(e) => {
+                clearAttributeFieldError("sortOrder");
+                setAttributeForm((f) => ({ ...f, sortOrder: e.target.value }));
+              }}
+            />
+            {attributeFieldErrors.sortOrder && <p className="admin-field-error" role="alert">{attributeFieldErrors.sortOrder}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Trạng thái</label>
@@ -357,49 +566,110 @@ export default function ProductAttributesClient() {
           <textarea className="admin-textarea" value={attributeForm.note} onChange={(e) => setAttributeForm((f) => ({ ...f, note: e.target.value }))} />
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-            {saving ? "Đang lưu…" : attributeForm.id ? "Cập nhật thuộc tính" : "Thêm thuộc tính"}
+          <button type="submit" className="admin-btn admin-btn--primary" disabled={isSavingAttribute}>
+            {isSavingAttribute ? "Đang lưu…" : attributeForm.id ? "Cập nhật thuộc tính" : "Thêm thuộc tính"}
           </button>
           {attributeForm.id && (
-            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setAttributeForm(defaultAttributeForm())}>
-              Hủy
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={cancelAttributeEdit}>
+              Hủy chỉnh sửa
             </button>
           )}
         </div>
       </form>
 
-      <form className="admin-catalog-fieldset" onSubmit={(e) => void handleValueSubmit(e)}>
+      <form
+        ref={valueFormRef}
+        className="admin-catalog-fieldset"
+        style={{ scrollMarginTop: FORM_SCROLL_MARGIN }}
+        onSubmit={(e) => void handleValueSubmit(e)}
+      >
         <legend style={{ fontWeight: 600, fontSize: 14 }}>
-          {valueForm.id ? "Cập nhật giá trị thuộc tính" : "Thêm giá trị thuộc tính"}
+          {valueForm.id && editingValueAttributeName && editingValueName
+            ? `Cập nhật giá trị: ${editingValueParentName || editingValueAttributeName} — ${editingValueName}`
+            : valueForm.id
+              ? "Cập nhật giá trị thuộc tính"
+              : "Thêm giá trị thuộc tính"}
         </legend>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field">
             <label className="admin-label">Thuộc tính cha <span className="admin-required">*</span></label>
-            <select className={`admin-input${errorClass(fieldErrors, "attributeId")}`} value={valueForm.attributeId} onChange={(e) => setValueForm((f) => ({ ...f, attributeId: e.target.value }))}>
+            <select
+              className={`admin-input${errorClass(valueFieldErrors, "attributeId")}`}
+              value={valueForm.attributeId}
+              disabled={Boolean(valueForm.id)}
+              onChange={(e) => {
+                clearValueFieldError("attributeId");
+                setValueForm((f) => ({ ...f, attributeId: e.target.value }));
+              }}
+            >
               <option value="">— Chọn thuộc tính —</option>
               {attributes.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name} ({attribute.code})</option>)}
             </select>
-            {fieldErrors.attributeId && <p className="admin-field-error" role="alert">{fieldErrors.attributeId}</p>}
+            {valueForm.id && (
+              <p className="admin-field-hint">Không thể chuyển giá trị sang thuộc tính khác sau khi đã tạo.</p>
+            )}
+            {valueFieldErrors.attributeId && <p className="admin-field-error" role="alert">{valueFieldErrors.attributeId}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Tên hiển thị <span className="admin-required">*</span></label>
-            <input className={`admin-input${errorClass(fieldErrors, "name")}`} value={valueForm.name} onChange={(e) => setValueForm((f) => ({ ...f, name: e.target.value }))} placeholder="Đen, Trắng, S, Regular fit…" />
-            {fieldErrors.name && <p className="admin-field-error" role="alert">{fieldErrors.name}</p>}
+            <input
+              ref={valueNameInputRef}
+              className={`admin-input${errorClass(valueFieldErrors, "name")}`}
+              value={valueForm.name}
+              onChange={(e) => {
+                clearValueFieldError("name");
+                setValueForm((f) => ({ ...f, name: e.target.value }));
+              }}
+              placeholder="Đen, Trắng, S, Regular fit…"
+            />
+            {valueFieldErrors.name && <p className="admin-field-error" role="alert">{valueFieldErrors.name}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Mã giá trị</label>
-            <input className={`admin-input${errorClass(fieldErrors, "code")}`} value={valueForm.code} onChange={(e) => setValueForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="BLK, WHT, S…" />
-            {fieldErrors.code && <p className="admin-field-error" role="alert">{fieldErrors.code}</p>}
+            <input
+              className={`admin-input${errorClass(valueFieldErrors, "code")}`}
+              value={valueForm.code}
+              readOnly={Boolean(valueForm.isReferenced)}
+              onChange={(e) => {
+                clearValueFieldError("code");
+                setValueForm((f) => ({ ...f, code: e.target.value.toUpperCase() }));
+              }}
+              placeholder="BLK, WHT, S…"
+            />
+            {valueForm.isReferenced && (
+              <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>
+            )}
+            {valueFieldErrors.code && <p className="admin-field-error" role="alert">{valueFieldErrors.code}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Slug</label>
-            <input className={`admin-input${errorClass(fieldErrors, "slug")}`} value={valueForm.slug} onChange={(e) => setValueForm((f) => ({ ...f, slug: e.target.value }))} placeholder="Tự sinh nếu bỏ trống" />
-            {fieldErrors.slug && <p className="admin-field-error" role="alert">{fieldErrors.slug}</p>}
+            <input
+              className={`admin-input${errorClass(valueFieldErrors, "slug")}`}
+              value={valueForm.slug}
+              readOnly={Boolean(valueForm.isReferenced)}
+              onChange={(e) => {
+                clearValueFieldError("slug");
+                setValueForm((f) => ({ ...f, slug: e.target.value }));
+              }}
+              placeholder="Tự sinh nếu bỏ trống"
+            />
+            {valueForm.isReferenced && (
+              <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>
+            )}
+            {valueFieldErrors.slug && <p className="admin-field-error" role="alert">{valueFieldErrors.slug}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">HEX màu</label>
-            <input className={`admin-input${errorClass(fieldErrors, "hexCode")}`} value={valueForm.hexCode} onChange={(e) => setValueForm((f) => ({ ...f, hexCode: e.target.value }))} placeholder="#000000" />
-            {fieldErrors.hexCode && <p className="admin-field-error" role="alert">{fieldErrors.hexCode}</p>}
+            <input
+              className={`admin-input${errorClass(valueFieldErrors, "hexCode")}`}
+              value={valueForm.hexCode}
+              onChange={(e) => {
+                clearValueFieldError("hexCode");
+                setValueForm((f) => ({ ...f, hexCode: e.target.value }));
+              }}
+              placeholder="#000000"
+            />
+            {valueFieldErrors.hexCode && <p className="admin-field-error" role="alert">{valueFieldErrors.hexCode}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Ảnh giá trị</label>
@@ -407,8 +677,16 @@ export default function ProductAttributesClient() {
           </div>
           <div className="admin-field">
             <label className="admin-label">Thứ tự</label>
-            <input className={`admin-input${errorClass(fieldErrors, "sortOrder")}`} type="number" value={valueForm.sortOrder} onChange={(e) => setValueForm((f) => ({ ...f, sortOrder: e.target.value }))} />
-            {fieldErrors.sortOrder && <p className="admin-field-error" role="alert">{fieldErrors.sortOrder}</p>}
+            <input
+              className={`admin-input${errorClass(valueFieldErrors, "sortOrder")}`}
+              type="number"
+              value={valueForm.sortOrder}
+              onChange={(e) => {
+                clearValueFieldError("sortOrder");
+                setValueForm((f) => ({ ...f, sortOrder: e.target.value }));
+              }}
+            />
+            {valueFieldErrors.sortOrder && <p className="admin-field-error" role="alert">{valueFieldErrors.sortOrder}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Trạng thái</label>
@@ -419,12 +697,12 @@ export default function ProductAttributesClient() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-            {saving ? "Đang lưu…" : valueForm.id ? "Cập nhật giá trị" : "Thêm giá trị"}
+          <button type="submit" className="admin-btn admin-btn--primary" disabled={isSavingValue}>
+            {isSavingValue ? "Đang lưu…" : valueForm.id ? "Cập nhật giá trị" : "Thêm giá trị"}
           </button>
           {valueForm.id && (
-            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setValueForm(defaultValueForm(valueForm.attributeId))}>
-              Hủy
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={cancelValueEdit}>
+              Hủy chỉnh sửa
             </button>
           )}
         </div>
@@ -435,6 +713,7 @@ export default function ProductAttributesClient() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {attributes.map((attribute) => {
+            const isEditingAttribute = editingAttributeId === attribute.id;
             return (
               <section
                 key={attribute.id}
@@ -443,9 +722,14 @@ export default function ProductAttributesClient() {
               >
                 <div className="admin-section-head">
                   <div>
-                    <h3 className="admin-subtitle" style={{ marginBottom: 4 }}>{attribute.name}</h3>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <h3 className="admin-subtitle" style={{ marginBottom: 0 }}>{attribute.name}</h3>
+                      {isEditingAttribute && (
+                        <span className="admin-kb-badge admin-kb-badge--verified">Đang chỉnh sửa</span>
+                      )}
+                    </div>
                     <p className="admin-field-hint">
-                      <code className="admin-catalog-code">{attribute.code}</code> · {attribute.slug} · {DISPLAY_TYPE_LABELS[attribute.displayType]} · {attribute.usageCount} nhóm sản phẩm đang dùng
+                      <code className="admin-catalog-code">{attribute.code}</code> · {attribute.slug} · {DISPLAY_TYPE_LABELS[attribute.displayType]} · Đang dùng trong {attribute.usageCount} sản phẩm / biến thể
                     </p>
                   </div>
                   <div className="admin-catalog-actions-cell">
@@ -457,18 +741,9 @@ export default function ProductAttributesClient() {
                         Dùng cho sản phẩm mới
                       </Link>
                     )}
-                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setAttributeForm({
-                      id: attribute.id,
-                      name: attribute.name,
-                      code: attribute.code,
-                      slug: attribute.slug,
-                      displayType: attribute.displayType,
-                      isVariantAttribute: attribute.isVariantAttribute,
-                      isSpecificationAttribute: attribute.isSpecificationAttribute,
-                      status: attribute.status,
-                      sortOrder: String(attribute.sortOrder),
-                      note: attribute.note ?? "",
-                    })}>Sửa</button>
+                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => startEditAttribute(attribute)}>
+                      Sửa
+                    </button>
                     <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchAttribute(attribute, { status: attribute.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}>
                       {attribute.status === "ACTIVE" ? "Ngừng sử dụng" : "Kích hoạt"}
                     </button>
@@ -490,42 +765,44 @@ export default function ProductAttributesClient() {
                       </tr>
                     </thead>
                     <tbody>
-                      {attribute.values.map((value) => (
-                        <tr key={value.id}>
-                          <td>{value.name}</td>
-                          <td><code className="admin-catalog-code">{value.code}</code></td>
-                          <td>{value.slug}</td>
-                          <td>
-                            {value.hexCode ? <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 4, background: value.hexCode, border: "1px solid #d1d5db" }} title={value.hexCode} /> : value.imageUrl ? "Có ảnh" : "—"}
-                          </td>
-                          <td>{value.sortOrder}</td>
-                          <td>
-                            <span className={`admin-kb-badge ${value.status === "ACTIVE" ? "admin-kb-badge--verified" : "admin-kb-badge--low"}`}>
-                              {value.status === "ACTIVE" ? "Đang hoạt động" : "Ngừng sử dụng"}
-                            </span>
-                          </td>
-                          <td>{value.usageCount}</td>
-                          <td>
-                            <div className="admin-catalog-actions-cell">
-                              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setValueForm({
-                                id: value.id,
-                                attributeId: attribute.id,
-                                name: value.name,
-                                code: value.code,
-                                slug: value.slug,
-                                hexCode: value.hexCode ?? "",
-                                imageUrl: value.imageUrl ?? "",
-                                status: value.status,
-                                sortOrder: String(value.sortOrder),
-                              })}>Sửa</button>
-                              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchValue(attribute, value, { status: value.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}>
-                                {value.status === "ACTIVE" ? "Ngừng" : "Kích hoạt"}
-                              </button>
-                              <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void deleteValue(attribute, value)}>Xóa</button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {attribute.values.map((value) => {
+                        const isEditingValue = editingValueId === value.id;
+                        return (
+                          <tr key={value.id}>
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                <span>{value.name}</span>
+                                {isEditingValue && (
+                                  <span className="admin-kb-badge admin-kb-badge--verified">Đang chỉnh sửa</span>
+                                )}
+                              </div>
+                            </td>
+                            <td><code className="admin-catalog-code">{value.code}</code></td>
+                            <td>{value.slug}</td>
+                            <td>
+                              {value.hexCode ? <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 4, background: value.hexCode, border: "1px solid #d1d5db" }} title={value.hexCode} /> : value.imageUrl ? "Có ảnh" : "—"}
+                            </td>
+                            <td>{value.sortOrder}</td>
+                            <td>
+                              <span className={`admin-kb-badge ${value.status === "ACTIVE" ? "admin-kb-badge--verified" : "admin-kb-badge--low"}`}>
+                                {value.status === "ACTIVE" ? "Đang hoạt động" : "Ngừng sử dụng"}
+                              </span>
+                            </td>
+                            <td>Đang dùng trong {value.usageCount} sản phẩm / biến thể</td>
+                            <td>
+                              <div className="admin-catalog-actions-cell">
+                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => startEditValue(attribute, value)}>
+                                  Sửa
+                                </button>
+                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchValue(attribute, value, { status: value.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}>
+                                  {value.status === "ACTIVE" ? "Ngừng" : "Kích hoạt"}
+                                </button>
+                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void deleteValue(attribute, value)}>Xóa</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                       {attribute.values.length === 0 && (
                         <tr>
                           <td colSpan={8}>Chưa có giá trị. Thêm giá trị ở biểu mẫu phía trên.</td>
