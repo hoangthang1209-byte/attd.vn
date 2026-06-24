@@ -1,11 +1,16 @@
 import { prisma } from "@/lib/prisma";
-import type { CrmContactRecord } from "@/features/crm/types";
+import {
+  validateCrmEmail,
+  validateCrmPhone,
+} from "@/features/crm/crm-validation";
+import type { CrmContactRecord, UpdateContactInput } from "@/features/crm/types";
 
 function mapContact(row: {
   id: string;
   customerId: string;
   fullName: string;
   title: string | null;
+  department: string | null;
   phone: string | null;
   email: string | null;
   zalo: string | null;
@@ -19,6 +24,7 @@ function mapContact(row: {
     customerId: row.customerId,
     fullName: row.fullName,
     title: row.title,
+    department: row.department,
     phone: row.phone,
     email: row.email,
     zalo: row.zalo,
@@ -37,6 +43,11 @@ export async function listCustomerContacts(customerId: string): Promise<CrmConta
   return rows.map(mapContact);
 }
 
+export async function getContactById(contactId: string): Promise<CrmContactRecord | null> {
+  const row = await prisma.contact.findUnique({ where: { id: contactId } });
+  return row ? mapContact(row) : null;
+}
+
 export async function validateContactBelongsToCustomer(
   customerId: string,
   contactId: string,
@@ -46,4 +57,59 @@ export async function validateContactBelongsToCustomer(
     select: { customerId: true },
   });
   return contact?.customerId === customerId;
+}
+
+export async function updateContact(
+  customerId: string,
+  contactId: string,
+  input: UpdateContactInput,
+): Promise<CrmContactRecord | null> {
+  const existing = await prisma.contact.findFirst({
+    where: { id: contactId, customerId },
+  });
+  if (!existing) {
+    throw new Error("Người liên hệ không thuộc khách hàng đã chọn.");
+  }
+
+  if (input.fullName !== undefined && !input.fullName.trim()) {
+    throw new Error("Họ tên người liên hệ là bắt buộc.");
+  }
+
+  const row = await prisma.$transaction(async (tx) => {
+    if (input.isPrimary) {
+      await tx.contact.updateMany({
+        where: { customerId },
+        data: { isPrimary: false },
+      });
+    }
+
+    return tx.contact.update({
+      where: { id: contactId },
+      data: {
+        ...(input.fullName !== undefined ? { fullName: input.fullName.trim() } : {}),
+        ...(input.title !== undefined ? { title: input.title?.trim() || null } : {}),
+        ...(input.department !== undefined ? { department: input.department?.trim() || null } : {}),
+        ...(input.phone !== undefined ? { phone: validateCrmPhone(input.phone) } : {}),
+        ...(input.email !== undefined ? { email: validateCrmEmail(input.email) } : {}),
+        ...(input.zalo !== undefined ? { zalo: input.zalo?.trim() || null } : {}),
+        ...(input.note !== undefined ? { note: input.note?.trim() || null } : {}),
+        ...(input.isPrimary !== undefined ? { isPrimary: input.isPrimary } : {}),
+      },
+    });
+  });
+
+  return mapContact(row);
+}
+
+export async function deleteContact(customerId: string, contactId: string): Promise<boolean> {
+  const existing = await prisma.contact.findFirst({
+    where: { id: contactId, customerId },
+    select: { id: true },
+  });
+  if (!existing) {
+    throw new Error("Người liên hệ không thuộc khách hàng đã chọn.");
+  }
+
+  await prisma.contact.delete({ where: { id: contactId } });
+  return true;
 }

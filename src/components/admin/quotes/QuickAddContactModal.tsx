@@ -18,6 +18,7 @@ export default function QuickAddContactModal({
 }: Props) {
   const [fullName, setFullName] = useState("");
   const [title, setTitle] = useState("");
+  const [department, setDepartment] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [zalo, setZalo] = useState("");
@@ -34,7 +35,7 @@ export default function QuickAddContactModal({
       const res = await fetch(`/api/crm/customers/${customerId}/contacts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, title, phone, email, zalo }),
+        body: JSON.stringify({ fullName, title, department, phone, email, zalo }),
       });
       const data = (await res.json()) as { contact?: CrmContactRecord; message?: string };
       if (!res.ok) throw new Error(data.message ?? "Không thể tạo người liên hệ");
@@ -42,6 +43,7 @@ export default function QuickAddContactModal({
       onCreated(data.contact);
       setFullName("");
       setTitle("");
+      setDepartment("");
       setPhone("");
       setEmail("");
       setZalo("");
@@ -71,6 +73,10 @@ export default function QuickAddContactModal({
         <div className="admin-field">
           <label className="admin-label">Chức vụ</label>
           <input className="admin-input" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="admin-field">
+          <label className="admin-label">Phòng ban</label>
+          <input className="admin-input" value={department} onChange={(e) => setDepartment(e.target.value)} />
         </div>
         <div className="admin-field">
           <label className="admin-label">Số điện thoại</label>

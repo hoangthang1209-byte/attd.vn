@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { generateOrderNo } from "@/features/orders/order-code";
 import { copyProductBomToOrderItems } from "@/features/orders/production-pack.service";
 import { getOrderDetail } from "@/features/orders/order.service";
+import {
+  enrichOrderInputFromCrmSnapshots,
+} from "@/features/crm/order-customer-snapshot";
 
 export class OrderConversionError extends Error {
   constructor(message: string) {
@@ -156,7 +159,32 @@ export async function convertQuoteToOrder(quoteId: string) {
   const quote = await prisma.quote.findUnique({
     where: { id: quoteId },
     include: {
-      customer: { select: { code: true } },
+      customer: {
+        select: {
+          code: true,
+          name: true,
+          legalName: true,
+          taxCode: true,
+          phone: true,
+          email: true,
+          website: true,
+          addressLine1: true,
+          wardNameSnapshot: true,
+          provinceNameSnapshot: true,
+          address: true,
+          district: true,
+          province: true,
+        },
+      },
+      contact: {
+        select: {
+          fullName: true,
+          title: true,
+          department: true,
+          phone: true,
+          email: true,
+        },
+      },
       items: { orderBy: { sortOrder: "asc" } },
       order: { select: { id: true } },
     },
@@ -197,6 +225,27 @@ export async function convertQuoteToOrder(quoteId: string) {
 
         const itemCreates = await buildQuoteConversionItems(tx, quote.items);
 
+        const enriched = quote.customer
+          ? enrichOrderInputFromCrmSnapshots(
+              {
+                customerId: quote.customerId,
+                contactId: quote.contactId,
+                orderDate: new Date().toISOString(),
+                items: [],
+                customerCompanyName: quote.customerCompanySnapshot,
+                customerCode: quote.customer?.code ?? null,
+                customerTaxCode: quote.customerTaxCodeSnapshot,
+                customerAddress: quote.customerAddressSnapshot,
+                contactName: quote.customerContactNameSnapshot,
+                contactTitle: quote.customerContactTitleSnapshot,
+                contactPhone: quote.customerPhoneSnapshot,
+                contactEmail: quote.customerEmailSnapshot,
+              },
+              quote.customer,
+              quote.contact,
+            )
+          : null;
+
         const created = await tx.order.create({
           data: {
             orderNo,
@@ -219,14 +268,23 @@ export async function convertQuoteToOrder(quoteId: string) {
             sampleFee: quote.sampleFee,
             sampleLeadTime: quote.sampleLeadTime,
             sampleRefundCondition: quote.sampleRefundCondition,
-            customerCompanyName: quote.customerCompanySnapshot,
-            customerCode: quote.customer?.code ?? null,
-            customerTaxCode: quote.customerTaxCodeSnapshot,
-            customerAddress: quote.customerAddressSnapshot,
-            contactName: quote.customerContactNameSnapshot,
-            contactTitle: quote.customerContactTitleSnapshot,
-            contactPhone: quote.customerPhoneSnapshot,
-            contactEmail: quote.customerEmailSnapshot,
+            customerCompanyName: enriched?.customerCompanyName ?? quote.customerCompanySnapshot,
+            customerCode: enriched?.customerCode ?? quote.customer?.code ?? null,
+            customerTaxCode: enriched?.customerTaxCode ?? quote.customerTaxCodeSnapshot,
+            customerAddress: enriched?.customerAddress ?? quote.customerAddressSnapshot,
+            customerNameSnapshot: enriched?.customerNameSnapshot ?? null,
+            customerLegalNameSnapshot: enriched?.customerLegalNameSnapshot ?? null,
+            customerPhoneSnapshot: enriched?.customerPhoneSnapshot ?? quote.customerPhoneSnapshot,
+            customerEmailSnapshot: enriched?.customerEmailSnapshot ?? quote.customerEmailSnapshot,
+            customerWebsiteSnapshot: enriched?.customerWebsiteSnapshot ?? null,
+            customerProvinceNameSnapshot: enriched?.customerProvinceNameSnapshot ?? null,
+            customerWardNameSnapshot: enriched?.customerWardNameSnapshot ?? null,
+            customerAddressLine1Snapshot: enriched?.customerAddressLine1Snapshot ?? null,
+            contactName: enriched?.contactName ?? quote.customerContactNameSnapshot,
+            contactTitle: enriched?.contactTitle ?? quote.customerContactTitleSnapshot,
+            contactDepartment: enriched?.contactDepartment ?? quote.contact?.department ?? null,
+            contactPhone: enriched?.contactPhone ?? quote.customerPhoneSnapshot,
+            contactEmail: enriched?.contactEmail ?? quote.customerEmailSnapshot,
             salesName: quote.salesName,
             salesTitle: quote.salesTitleSnapshot,
             salesPhone: quote.salesPhone,

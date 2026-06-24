@@ -66,6 +66,10 @@ import {
 } from "@/features/orders/order-totals";
 import { generateOrderNo } from "@/features/orders/order-code";
 import {
+  OrderCustomerSnapshotError,
+  resolveOrderCustomerSnapshots,
+} from "@/features/orders/order-customer-resolve";
+import {
   ORDER_PAYMENT_METHOD_LABELS,
   ORDER_PAYMENT_TYPE_LABELS,
   type OrderPaymentStateFilter,
@@ -162,8 +166,17 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
     customerCode: row.customerCode,
     customerTaxCode: row.customerTaxCode,
     customerAddress: row.customerAddress,
+    customerNameSnapshot: row.customerNameSnapshot,
+    customerLegalNameSnapshot: row.customerLegalNameSnapshot,
+    customerPhoneSnapshot: row.customerPhoneSnapshot,
+    customerEmailSnapshot: row.customerEmailSnapshot,
+    customerWebsiteSnapshot: row.customerWebsiteSnapshot,
+    customerProvinceNameSnapshot: row.customerProvinceNameSnapshot,
+    customerWardNameSnapshot: row.customerWardNameSnapshot,
+    customerAddressLine1Snapshot: row.customerAddressLine1Snapshot,
     contactName: row.contactName,
     contactTitle: row.contactTitle,
+    contactDepartment: row.contactDepartment,
     contactPhone: row.contactPhone,
     contactEmail: row.contactEmail,
     salesName: row.salesName,
@@ -765,8 +778,17 @@ function buildOrderDataFromInput(
     customerCode: input.customerCode?.trim() || null,
     customerTaxCode: input.customerTaxCode?.trim() || null,
     customerAddress: input.customerAddress?.trim() || null,
+    customerNameSnapshot: input.customerNameSnapshot?.trim() || null,
+    customerLegalNameSnapshot: input.customerLegalNameSnapshot?.trim() || null,
+    customerPhoneSnapshot: input.customerPhoneSnapshot?.trim() || null,
+    customerEmailSnapshot: input.customerEmailSnapshot?.trim() || null,
+    customerWebsiteSnapshot: input.customerWebsiteSnapshot?.trim() || null,
+    customerProvinceNameSnapshot: input.customerProvinceNameSnapshot?.trim() || null,
+    customerWardNameSnapshot: input.customerWardNameSnapshot?.trim() || null,
+    customerAddressLine1Snapshot: input.customerAddressLine1Snapshot?.trim() || null,
     contactName: input.contactName?.trim() || null,
     contactTitle: input.contactTitle?.trim() || null,
+    contactDepartment: input.contactDepartment?.trim() || null,
     contactPhone: input.contactPhone?.trim() || null,
     contactEmail: input.contactEmail?.trim() || null,
     salesName: salesSnapshots?.salesName ?? (input.salesName?.trim() || null),
@@ -1015,21 +1037,30 @@ async function prepareOrderItemsForSave(
 
 export async function createManualOrder(input: CreateManualOrderInput) {
   validateOrderItemsInput(input);
-  const salesSnapshots = input.salesEmployeeId
-    ? await resolveSalesEmployeeSnapshot(input.salesEmployeeId)
+  let resolvedInput: CreateManualOrderInput;
+  try {
+    resolvedInput = await resolveOrderCustomerSnapshots(input);
+  } catch (err) {
+    if (err instanceof OrderCustomerSnapshotError) {
+      throw new OrderValidationError(err.message);
+    }
+    throw err;
+  }
+  const salesSnapshots = resolvedInput.salesEmployeeId
+    ? await resolveSalesEmployeeSnapshot(resolvedInput.salesEmployeeId)
     : undefined;
-  const productionOwnerSnapshot = input.productionOwnerId
-    ? await resolveProductionOwnerSnapshot(input.productionOwnerId)
+  const productionOwnerSnapshot = resolvedInput.productionOwnerId
+    ? await resolveProductionOwnerSnapshot(resolvedInput.productionOwnerId)
     : undefined;
-  const computedItems = await prepareOrderItemsForSave(input.items, input.customerCode);
+  const computedItems = await prepareOrderItemsForSave(resolvedInput.items, resolvedInput.customerCode);
   const totals = computeOrderTotals(computedItems, {
-    discountAmount: input.discountAmount,
-    shippingFee: input.shippingFee,
-    vatRate: input.vatRate,
-    vatAmount: input.vatAmount,
+    discountAmount: resolvedInput.discountAmount,
+    shippingFee: resolvedInput.shippingFee,
+    vatRate: resolvedInput.vatRate,
+    vatAmount: resolvedInput.vatAmount,
   });
   const orderData = {
-    ...buildOrderDataFromInput(input, totals, salesSnapshots),
+    ...buildOrderDataFromInput(resolvedInput, totals, salesSnapshots),
     ...(productionOwnerSnapshot
       ? {
           productionOwnerId: productionOwnerSnapshot.productionOwnerId,
@@ -1058,7 +1089,7 @@ export async function createManualOrder(input: CreateManualOrderInput) {
             orderId: created.id,
             type: "CREATED",
             title: "Tạo đơn hàng thủ công",
-            detail: `${orderNo} · ${input.customerCompanyName?.trim() ?? ""}`.trim(),
+            detail: `${orderNo} · ${resolvedInput.customerCompanyName?.trim() ?? ""}`.trim(),
           },
         });
         await copyProductBomToOrderItems(tx, created.id);
@@ -1085,17 +1116,26 @@ export async function updateOrderDetails(id: string, input: UpdateOrderInput) {
   }
 
   validateOrderItemsInput(input);
-  const salesSnapshots = input.salesEmployeeId
-    ? await resolveSalesEmployeeSnapshot(input.salesEmployeeId)
+  let resolvedInput: UpdateOrderInput;
+  try {
+    resolvedInput = await resolveOrderCustomerSnapshots(input);
+  } catch (err) {
+    if (err instanceof OrderCustomerSnapshotError) {
+      throw new OrderValidationError(err.message);
+    }
+    throw err;
+  }
+  const salesSnapshots = resolvedInput.salesEmployeeId
+    ? await resolveSalesEmployeeSnapshot(resolvedInput.salesEmployeeId)
     : undefined;
-  const computedItems = await prepareOrderItemsForSave(input.items, input.customerCode);
+  const computedItems = await prepareOrderItemsForSave(resolvedInput.items, resolvedInput.customerCode);
   const totals = computeOrderTotals(computedItems, {
-    discountAmount: input.discountAmount,
-    shippingFee: input.shippingFee,
-    vatRate: input.vatRate,
-    vatAmount: input.vatAmount,
+    discountAmount: resolvedInput.discountAmount,
+    shippingFee: resolvedInput.shippingFee,
+    vatRate: resolvedInput.vatRate,
+    vatAmount: resolvedInput.vatAmount,
   });
-  const orderData = buildOrderDataFromInput(input, totals, salesSnapshots);
+  const orderData = buildOrderDataFromInput(resolvedInput, totals, salesSnapshots);
   const itemCreates = buildOrderItemCreates(computedItems);
 
   const previousItemCount = await prisma.orderItem.count({ where: { orderId: id } });

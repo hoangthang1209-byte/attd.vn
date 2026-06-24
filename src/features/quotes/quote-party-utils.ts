@@ -1,29 +1,36 @@
 /** Build a single-line customer address from CRM fields. */
+import { formatCustomerAddressPreview } from "@/features/crm/customer-address";
+
 export function formatCustomerAddress(customer: {
+  addressLine1?: string | null;
+  wardNameSnapshot?: string | null;
+  provinceNameSnapshot?: string | null;
   address?: string | null;
   district?: string | null;
   province?: string | null;
 }): string {
-  return [customer.address, customer.district, customer.province]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(", ");
+  return formatCustomerAddressPreview(customer);
 }
 
 export type CustomerSnapshotInput = {
   legalName?: string | null;
   name: string;
   taxCode?: string | null;
+  addressLine1?: string | null;
+  wardNameSnapshot?: string | null;
+  provinceNameSnapshot?: string | null;
   address?: string | null;
   district?: string | null;
   province?: string | null;
   phone?: string | null;
   email?: string | null;
+  website?: string | null;
 };
 
 export type ContactSnapshotInput = {
   fullName: string;
   title?: string | null;
+  department?: string | null;
   phone?: string | null;
   email?: string | null;
 };

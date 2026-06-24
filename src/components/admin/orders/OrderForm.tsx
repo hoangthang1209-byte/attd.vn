@@ -4,8 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminBackLink from "@/components/admin/AdminBackLink";
-import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
-import QuickAddContactModal from "@/components/admin/quotes/QuickAddContactModal";
+import OrderCustomerPartyFields, {
+  type OrderCustomerPartyValues,
+} from "@/components/admin/orders/OrderCustomerPartyFields";
+import {
+  contactToOrderSnapshots,
+  customerToOrderSnapshots,
+} from "@/features/crm/order-customer-snapshot";
 import QuickAddCustomerModal from "@/components/admin/orders/QuickAddCustomerModal";
 import QuickAddColorModal from "@/components/admin/orders/QuickAddColorModal";
 import QuickAddCategoryModal, {
@@ -20,10 +25,6 @@ import OrderItemFormRow, {
 } from "@/components/admin/orders/OrderItemFormRow";
 import OrderTotalsSummary from "@/components/admin/orders/OrderTotalsSummary";
 import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
-import {
-  contactToQuoteSnapshots,
-  customerToQuoteSnapshots,
-} from "@/features/quotes/quote-party-utils";
 import { DEFAULT_QUOTE_TERMS } from "@/features/quotes/quote-code";
 import { toDateInputValue } from "@/features/quotes/format";
 import { computeOrderItem, computeOrderTotals } from "@/features/orders/order-totals";
@@ -97,6 +98,28 @@ function orderToItemRows(order: OrderDetailRecord): OrderItemRow[] {
   }));
 }
 
+const EMPTY_PARTY: OrderCustomerPartyValues = {
+  customerId: "",
+  contactId: "",
+  customerCode: "",
+  customerCompanyName: "",
+  customerNameSnapshot: "",
+  customerLegalNameSnapshot: "",
+  customerTaxCode: "",
+  customerAddress: "",
+  customerPhoneSnapshot: "",
+  customerEmailSnapshot: "",
+  customerWebsiteSnapshot: "",
+  customerProvinceNameSnapshot: "",
+  customerWardNameSnapshot: "",
+  customerAddressLine1Snapshot: "",
+  contactName: "",
+  contactTitle: "",
+  contactDepartment: "",
+  contactPhone: "",
+  contactEmail: "",
+};
+
 export default function OrderForm({ mode, orderId }: Props) {
   const router = useRouter();
   const mutate = useAdminMutation();
@@ -106,9 +129,8 @@ export default function OrderForm({ mode, orderId }: Props) {
   const [variantsMap, setVariantsMap] = useState<Record<string, VariantOption[]>>({});
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomerRecord | null>(null);
   const [contacts, setContacts] = useState<CrmContactRecord[]>([]);
+  const [partyValues, setPartyValues] = useState<OrderCustomerPartyValues>(EMPTY_PARTY);
   const [salesEmployees, setSalesEmployees] = useState<EmployeeRecord[]>([]);
-  const skipContactAutofill = useRef(false);
-  const [quickAddContactOpen, setQuickAddContactOpen] = useState(false);
   const [quickAddCustomerOpen, setQuickAddCustomerOpen] = useState(false);
   const [quickAddColorOpen, setQuickAddColorOpen] = useState(false);
   const [quickAddCategoryOpen, setQuickAddCategoryOpen] = useState(false);
@@ -123,19 +145,9 @@ export default function OrderForm({ mode, orderId }: Props) {
     Array<{ id: string; displayPath: string }>
   >([]);
 
-  const [customerId, setCustomerId] = useState("");
-  const [contactId, setContactId] = useState("");
   const [orderDate, setOrderDate] = useState(toDateInputValue(new Date().toISOString()));
   const [currency, setCurrency] = useState("VND");
   const [priceVatType, setPriceVatType] = useState("EXCLUDING_VAT");
-  const [customerCompany, setCustomerCompany] = useState("");
-  const [customerCode, setCustomerCode] = useState("");
-  const [customerTaxCode, setCustomerTaxCode] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
-  const [customerContactName, setCustomerContactName] = useState("");
-  const [customerContactTitle, setCustomerContactTitle] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
   const [salesRepresentativeId, setSalesRepresentativeId] = useState("");
   const [salesEmployeeId, setSalesEmployeeId] = useState("");
   const [salesName, setSalesName] = useState("");
@@ -216,54 +228,14 @@ export default function OrderForm({ mode, orderId }: Props) {
     setQuickCreateTarget(null);
   }
 
-  async function loadCustomerContacts(id: string) {
-    const res = await fetch(`/api/crm/customers/${id}/contacts`);
-    const data = (await res.json()) as { contacts?: CrmContactRecord[] };
-    setContacts(data.contacts ?? []);
-  }
-
-  function applyCustomer(
-    customer: CrmCustomerRecord,
-    options?: { contacts?: CrmContactRecord[] },
-  ) {
-    const snapshots = customerToQuoteSnapshots(customer);
-    setSelectedCustomer(customer);
-    setCustomerId(customer.id);
-    setCustomerCode(customer.code ?? "");
-    setCustomerCompany(snapshots.customerCompanySnapshot ?? "");
-    setCustomerTaxCode(snapshots.customerTaxCodeSnapshot ?? "");
-    setCustomerAddress(snapshots.customerAddressSnapshot ?? "");
-    setCustomerContactName("");
-    setCustomerContactTitle("");
-    setCustomerPhone(snapshots.customerPhoneSnapshot ?? "");
-    setCustomerEmail(snapshots.customerEmailSnapshot ?? "");
-    setContactId("");
-    if (options?.contacts) {
-      setContacts(options.contacts);
-    } else {
-      void loadCustomerContacts(customer.id);
-    }
-  }
-
-  function applyContact(contact: CrmContactRecord, customerOverride?: CrmCustomerRecord) {
-    const customer = customerOverride ?? selectedCustomer;
-    const snapshots = contactToQuoteSnapshots(contact, {
-      phone: customer?.phone,
-      email: customer?.email,
-    });
-    setContactId(contact.id);
-    setCustomerContactName(snapshots.customerContactNameSnapshot ?? "");
-    setCustomerContactTitle(snapshots.customerContactTitleSnapshot ?? "");
-    setCustomerPhone(snapshots.customerPhoneSnapshot ?? "");
-    setCustomerEmail(snapshots.customerEmailSnapshot ?? "");
-  }
-
   async function loadCustomerById(id: string) {
     const res = await fetch(`/api/crm/customers/${id}`);
     const data = (await res.json()) as { customer?: CrmCustomerRecord };
     if (!data.customer) return;
     setSelectedCustomer(data.customer);
-    await loadCustomerContacts(id);
+    const contactsRes = await fetch(`/api/crm/customers/${id}/contacts`);
+    const contactsData = (await contactsRes.json()) as { contacts?: CrmContactRecord[] };
+    setContacts(contactsData.contacts ?? data.customer.contacts ?? []);
   }
 
   useEffect(() => {
@@ -291,17 +263,6 @@ export default function OrderForm({ mode, orderId }: Props) {
   }, []);
 
   useEffect(() => {
-    if (skipContactAutofill.current) {
-      skipContactAutofill.current = false;
-      return;
-    }
-    if (!contactId) return;
-    const contact = contacts.find((c) => c.id === contactId);
-    if (contact) applyContact(contact);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contactId]);
-
-  useEffect(() => {
     if (mode !== "edit" || !orderId) return;
     void fetch(`/api/orders/${orderId}`)
       .then(async (res) => {
@@ -311,18 +272,27 @@ export default function OrderForm({ mode, orderId }: Props) {
         setOrderDate(toDateInputValue(order.orderDate));
         setCurrency(order.currency);
         setPriceVatType(order.priceVatType);
-        const cid = order.customerId ?? "";
-        setCustomerId(cid);
-        skipContactAutofill.current = true;
-        setContactId(order.contactId ?? "");
-        setCustomerCompany(order.customerCompanyName ?? "");
-        setCustomerCode(order.customerCode ?? "");
-        setCustomerTaxCode(order.customerTaxCode ?? "");
-        setCustomerAddress(order.customerAddress ?? "");
-        setCustomerContactName(order.contactName ?? "");
-        setCustomerContactTitle(order.contactTitle ?? "");
-        setCustomerPhone(order.contactPhone ?? "");
-        setCustomerEmail(order.contactEmail ?? "");
+        setPartyValues({
+          customerId: order.customerId ?? "",
+          contactId: order.contactId ?? "",
+          customerCode: order.customerCode ?? "",
+          customerCompanyName: order.customerCompanyName ?? "",
+          customerNameSnapshot: order.customerNameSnapshot ?? order.customerCompanyName ?? "",
+          customerLegalNameSnapshot: order.customerLegalNameSnapshot ?? "",
+          customerTaxCode: order.customerTaxCode ?? "",
+          customerAddress: order.customerAddress ?? "",
+          customerPhoneSnapshot: order.customerPhoneSnapshot ?? "",
+          customerEmailSnapshot: order.customerEmailSnapshot ?? "",
+          customerWebsiteSnapshot: order.customerWebsiteSnapshot ?? "",
+          customerProvinceNameSnapshot: order.customerProvinceNameSnapshot ?? "",
+          customerWardNameSnapshot: order.customerWardNameSnapshot ?? "",
+          customerAddressLine1Snapshot: order.customerAddressLine1Snapshot ?? "",
+          contactName: order.contactName ?? "",
+          contactTitle: order.contactTitle ?? "",
+          contactDepartment: order.contactDepartment ?? "",
+          contactPhone: order.contactPhone ?? "",
+          contactEmail: order.contactEmail ?? "",
+        });
         setSalesRepresentativeId(order.salesRepresentativeId ?? "");
         setSalesEmployeeId(order.salesEmployeeId ?? "");
         setSalesName(order.salesName ?? "");
@@ -344,7 +314,7 @@ export default function OrderForm({ mode, orderId }: Props) {
             : "0",
         );
         setItems(orderToItemRows(order).length ? orderToItemRows(order) : [emptyOrderItem()]);
-        if (cid) void loadCustomerById(cid);
+        if (order.customerId) void loadCustomerById(order.customerId);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -417,21 +387,31 @@ export default function OrderForm({ mode, orderId }: Props) {
 
   function buildPayload() {
     return {
-      customerId: customerId || null,
-      contactId: contactId || null,
+      ...partyValues,
+      customerId: partyValues.customerId || null,
+      contactId: partyValues.contactId || null,
       salesRepresentativeId: salesRepresentativeId || null,
       salesEmployeeId: salesEmployeeId || null,
       orderDate: new Date(orderDate).toISOString(),
       currency,
       priceVatType,
-      customerCompanyName: customerCompany,
-      customerCode: customerCode || null,
-      customerTaxCode: customerTaxCode || null,
-      customerAddress: customerAddress || null,
-      contactName: customerContactName || null,
-      contactTitle: customerContactTitle || null,
-      contactPhone: customerPhone || null,
-      contactEmail: customerEmail || null,
+      customerCompanyName: partyValues.customerCompanyName,
+      customerCode: partyValues.customerCode || null,
+      customerTaxCode: partyValues.customerTaxCode || null,
+      customerAddress: partyValues.customerAddress || null,
+      customerNameSnapshot: partyValues.customerNameSnapshot || null,
+      customerLegalNameSnapshot: partyValues.customerLegalNameSnapshot || null,
+      customerPhoneSnapshot: partyValues.customerPhoneSnapshot || null,
+      customerEmailSnapshot: partyValues.customerEmailSnapshot || null,
+      customerWebsiteSnapshot: partyValues.customerWebsiteSnapshot || null,
+      customerProvinceNameSnapshot: partyValues.customerProvinceNameSnapshot || null,
+      customerWardNameSnapshot: partyValues.customerWardNameSnapshot || null,
+      customerAddressLine1Snapshot: partyValues.customerAddressLine1Snapshot || null,
+      contactName: partyValues.contactName || null,
+      contactTitle: partyValues.contactTitle || null,
+      contactDepartment: partyValues.contactDepartment || null,
+      contactPhone: partyValues.contactPhone || null,
+      contactEmail: partyValues.contactEmail || null,
       salesName: salesName || null,
       salesTitle: salesTitle || null,
       salesPhone: salesPhone || null,
@@ -494,88 +474,21 @@ export default function OrderForm({ mode, orderId }: Props) {
         </div>
       )}
 
-      <div className="quote-form__card">
-        <CustomerSearchField
-          value={selectedCustomer}
-          onSelect={(customer) => {
-            if (customer) applyCustomer(customer);
-            else {
-              setSelectedCustomer(null);
-              setCustomerId("");
-              setCustomerCode("");
-              setContacts([]);
-              setContactId("");
-            }
-          }}
-        />
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary admin-btn--small"
-          style={{ marginTop: 8 }}
-          onClick={() => setQuickAddCustomerOpen(true)}
-        >
-          Thêm khách hàng mới
-        </button>
-      </div>
+      <OrderCustomerPartyFields
+        values={partyValues}
+        selectedCustomer={selectedCustomer}
+        contacts={contacts}
+        onCustomerSelect={(customer, nextContacts) => {
+          setSelectedCustomer(customer);
+          if (nextContacts) setContacts(nextContacts);
+        }}
+        onContactsChange={setContacts}
+        onChange={(patch) => setPartyValues((prev) => ({ ...prev, ...patch }))}
+        onQuickAddCustomer={() => setQuickAddCustomerOpen(true)}
+      />
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>A. Thông tin khách hàng</legend>
-        <div className="quote-form__party-grid">
-          <div className="quote-form__party-fields">
-            <div className="admin-field">
-              <label className="admin-label">Tên công ty / khách hàng *</label>
-              <input className="admin-input" required value={customerCompany} onChange={(e) => setCustomerCompany(e.target.value)} />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Mã số thuế</label>
-              <input className="admin-input" value={customerTaxCode} onChange={(e) => setCustomerTaxCode(e.target.value)} />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Địa chỉ</label>
-              <input className="admin-input" value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} />
-            </div>
-          </div>
-          <div className="quote-form__party-fields">
-            {customerId ? (
-              <div className="admin-field">
-                <label className="admin-label">Người liên hệ</label>
-                <select className="admin-input" value={contactId} onChange={(e) => setContactId(e.target.value)}>
-                  <option value="">— Chọn người liên hệ —</option>
-                  {contacts.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.fullName}{c.title ? ` · ${c.title}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setQuickAddContactOpen(true)}>
-                  Thêm người liên hệ
-                </button>
-              </div>
-            ) : (
-              <p className="admin-field-hint">Chọn khách hàng để tải danh sách liên hệ</p>
-            )}
-            <div className="admin-field">
-              <label className="admin-label">Tên người liên hệ</label>
-              <input className="admin-input" value={customerContactName} onChange={(e) => setCustomerContactName(e.target.value)} />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Chức vụ</label>
-              <input className="admin-input" value={customerContactTitle} onChange={(e) => setCustomerContactTitle(e.target.value)} />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Số điện thoại</label>
-              <input className="admin-input" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Email</label>
-              <input className="admin-input" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
-            </div>
-          </div>
-        </div>
-      </fieldset>
-
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>B. Thông tin đơn hàng</legend>
+        <legend>Thông tin đơn hàng</legend>
         <div className="admin-catalog-variant-fields">
           <div className="admin-field">
             <label className="admin-label">Ngày đơn hàng</label>
@@ -666,7 +579,7 @@ export default function OrderForm({ mode, orderId }: Props) {
             index={index}
             item={item}
             currency={currency}
-            customerCode={customerCode}
+            customerCode={partyValues.customerCode}
             products={products}
             variants={item.productId ? variantsMap[item.productId] ?? [] : []}
             colors={colors}
@@ -741,28 +654,45 @@ export default function OrderForm({ mode, orderId }: Props) {
       </div>
     </form>
 
-      {customerId && (
-        <QuickAddContactModal
-          customerId={customerId}
-          open={quickAddContactOpen}
-          onClose={() => setQuickAddContactOpen(false)}
-          onCreated={(contact) => {
-            setContacts((prev) => [...prev, contact]);
-            applyContact(contact);
-            setQuickAddContactOpen(false);
-          }}
-        />
-      )}
-
       <QuickAddCustomerModal
         open={quickAddCustomerOpen}
         onClose={() => setQuickAddCustomerOpen(false)}
         onCreated={(customer, contact) => {
-          applyCustomer(customer, { contacts: customer.contacts ?? [] });
-          if (contact) {
-            skipContactAutofill.current = true;
-            applyContact(contact, customer);
-          }
+          const snapshots = customerToOrderSnapshots(customer);
+          setSelectedCustomer(customer);
+          setContacts(customer.contacts ?? []);
+          setPartyValues((prev) => ({
+            ...prev,
+            customerId: customer.id,
+            contactId: contact?.id ?? "",
+            customerCode: snapshots.customerCode ?? "",
+            customerCompanyName: snapshots.customerCompanyName ?? customer.name,
+            customerNameSnapshot: snapshots.customerNameSnapshot ?? customer.name,
+            customerLegalNameSnapshot: snapshots.customerLegalNameSnapshot ?? "",
+            customerTaxCode: snapshots.customerTaxCode ?? "",
+            customerAddress: snapshots.customerAddress ?? "",
+            customerPhoneSnapshot: snapshots.customerPhoneSnapshot ?? "",
+            customerEmailSnapshot: snapshots.customerEmailSnapshot ?? "",
+            customerWebsiteSnapshot: snapshots.customerWebsiteSnapshot ?? "",
+            customerProvinceNameSnapshot: snapshots.customerProvinceNameSnapshot ?? "",
+            customerWardNameSnapshot: snapshots.customerWardNameSnapshot ?? "",
+            customerAddressLine1Snapshot: snapshots.customerAddressLine1Snapshot ?? "",
+            ...(contact
+              ? {
+                  contactName: contactToOrderSnapshots(contact).contactName ?? "",
+                  contactTitle: contactToOrderSnapshots(contact).contactTitle ?? "",
+                  contactDepartment: contactToOrderSnapshots(contact).contactDepartment ?? "",
+                  contactPhone: contactToOrderSnapshots(contact).contactPhone ?? "",
+                  contactEmail: contactToOrderSnapshots(contact).contactEmail ?? "",
+                }
+              : {
+                  contactName: "",
+                  contactTitle: "",
+                  contactDepartment: "",
+                  contactPhone: "",
+                  contactEmail: "",
+                }),
+          }));
           setQuickAddCustomerOpen(false);
         }}
       />
@@ -787,7 +717,7 @@ export default function OrderForm({ mode, orderId }: Props) {
 
       <CustomProductModal
         open={customProductOpen}
-        customerCode={customerCode}
+        customerCode={partyValues.customerCode}
         colors={colors}
         categories={categories}
         selectColorId={injectCustomProductColorId}

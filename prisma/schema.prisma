@@ -291,30 +291,70 @@ model Lead {
   @@index([nextFollowUpAt])
 }
 
+model AdministrativeProvince {
+  id        String               @id @default(cuid())
+  code      String               @unique
+  name      String
+  sortOrder Int                  @default(0)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  wards     AdministrativeWard[]
+  customers Customer[]
+
+  @@index([code])
+  @@index([name])
+}
+
+model AdministrativeWard {
+  id         String                 @id @default(cuid())
+  code       String                 @unique
+  provinceId String
+  name       String
+  sortOrder  Int                    @default(0)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  province   AdministrativeProvince @relation(fields: [provinceId], references: [id], onDelete: Cascade)
+  customers  Customer[]
+
+  @@index([provinceId])
+  @@index([code])
+  @@index([name])
+}
+
 model Customer {
-  id                  String               @id @default(cuid())
-  code                String               @unique
-  type                CustomerType         @default(BUSINESS)
-  name                String
-  legalName           String?
-  taxCode             String?
-  phone               String?
-  email               String?
-  website             String?
-  address             String?
-  province            String?
-  district            String?
-  status              CustomerStatus       @default(PROSPECT)
-  note                String?              @db.Text
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  contacts            Contact[]
-  leads               Lead[]
-  activities          CRMActivity[]
-  productInterests    CRMProductInterest[]
-  pricingCalculations PricingCalculation[]
-  quotes              Quote[]
-  orders              Order[]
+  id                   String                  @id @default(cuid())
+  code                 String                  @unique
+  type                 CustomerType            @default(BUSINESS)
+  name                 String
+  legalName            String?
+  taxCode              String?
+  phone                String?
+  email                String?
+  website              String?
+  address              String?
+  province             String?
+  district             String?
+  provinceId           String?
+  wardId               String?
+  provinceNameSnapshot String?
+  wardNameSnapshot     String?
+  addressLine1         String?
+  addressLine2         String?
+  status               CustomerStatus          @default(PROSPECT)
+  note                 String?                 @db.Text
+  internalNote         String?                 @db.Text
+  billingNote          String?                 @db.Text
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  provinceRef          AdministrativeProvince? @relation(fields: [provinceId], references: [id], onDelete: SetNull)
+  wardRef              AdministrativeWard?     @relation(fields: [wardId], references: [id], onDelete: SetNull)
+  contacts             Contact[]
+  leads                Lead[]
+  activities           CRMActivity[]
+  productInterests     CRMProductInterest[]
+  pricingCalculations  PricingCalculation[]
+  quotes               Quote[]
+  orders               Order[]
 
   @@index([code])
   @@index([name])
@@ -322,6 +362,8 @@ model Customer {
   @@index([email])
   @@index([type])
   @@index([status])
+  @@index([provinceId])
+  @@index([wardId])
 }
 
 model Contact {
@@ -329,6 +371,7 @@ model Contact {
   customerId          String
   fullName            String
   title               String?
+  department          String?
   phone               String?
   email               String?
   zalo                String?
@@ -1635,14 +1678,23 @@ model Order {
   sampleFee                Decimal?                  @db.Decimal(12, 2)
   sampleLeadTime           String?
   sampleRefundCondition    String?                   @db.Text
-  customerCompanyName      String?
-  customerCode             String?
-  customerTaxCode          String?
-  customerAddress          String?
-  contactName              String?
-  contactTitle             String?
-  contactPhone             String?
-  contactEmail             String?
+  customerCompanyName           String?
+  customerCode                  String?
+  customerTaxCode               String?
+  customerAddress               String?
+  customerNameSnapshot          String?
+  customerLegalNameSnapshot     String?
+  customerPhoneSnapshot         String?
+  customerEmailSnapshot         String?
+  customerWebsiteSnapshot       String?
+  customerProvinceNameSnapshot  String?
+  customerWardNameSnapshot      String?
+  customerAddressLine1Snapshot  String?
+  contactName                   String?
+  contactTitle                  String?
+  contactDepartment             String?
+  contactPhone                  String?
+  contactEmail                  String?
   salesName                String?
   salesTitle               String?
   salesPhone               String?

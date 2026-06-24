@@ -3,17 +3,33 @@
 import { useRouter } from "next/navigation";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CustomerStatus, CustomerType } from "@prisma/client";
+import CrmCustomerAddressFields, {
+  type CrmAddressFieldValues,
+} from "@/components/admin/crm/CrmCustomerAddressFields";
 import {
   CUSTOMER_STATUS_LABELS,
   CUSTOMER_TYPE_LABELS,
 } from "@/features/crm/labels";
 import { CRM_CUSTOMER_STATUSES, CRM_CUSTOMER_TYPES } from "@/features/crm/types";
 
+const emptyAddress: CrmAddressFieldValues = {
+  provinceId: "",
+  wardId: "",
+  provinceNameSnapshot: "",
+  wardNameSnapshot: "",
+  addressLine1: "",
+  addressLine2: "",
+  address: "",
+  province: "",
+  district: "",
+};
+
 export default function CrmCustomerForm() {
   const router = useRouter();
   const mutate = useAdminMutation();
+  const submitLock = useRef(false);
   const [type, setType] = useState<CustomerType>("BUSINESS");
   const [name, setName] = useState("");
   const [legalName, setLegalName] = useState("");
@@ -21,22 +37,23 @@ export default function CrmCustomerForm() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
-  const [address, setAddress] = useState("");
-  const [province, setProvince] = useState("");
-  const [district, setDistrict] = useState("");
+  const [addressValues, setAddressValues] = useState<CrmAddressFieldValues>(emptyAddress);
   const [status, setStatus] = useState<CustomerStatus>("PROSPECT");
   const [note, setNote] = useState("");
   const [contactFullName, setContactFullName] = useState("");
   const [contactTitle, setContactTitle] = useState("");
+  const [contactDepartment, setContactDepartment] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
-  const [contactZalo, setContactZalo] = useState("");
   const [contactNote, setContactNote] = useState("");
+  const [contactIsPrimary, setContactIsPrimary] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (submitLock.current) return;
+    submitLock.current = true;
     setSaving(true);
     setError(null);
 
@@ -55,18 +72,24 @@ export default function CrmCustomerForm() {
             phone,
             email,
             website,
-            address,
-            province,
-            district,
+            address: addressValues.address || null,
+            province: addressValues.province || null,
+            district: addressValues.district || null,
+            provinceId: addressValues.provinceId || null,
+            wardId: addressValues.wardId || null,
+            provinceNameSnapshot: addressValues.provinceNameSnapshot || null,
+            wardNameSnapshot: addressValues.wardNameSnapshot || null,
+            addressLine1: addressValues.addressLine1 || null,
+            addressLine2: addressValues.addressLine2 || null,
             status,
             note,
             primaryContact: contactFullName.trim()
               ? {
                   fullName: contactFullName,
                   title: contactTitle,
+                  department: contactDepartment,
                   phone: contactPhone,
                   email: contactEmail,
-                  zalo: contactZalo,
                   note: contactNote,
                 }
               : null,
@@ -82,24 +105,15 @@ export default function CrmCustomerForm() {
     if (!customer) {
       setError("Không thể tạo khách hàng");
     }
+    submitLock.current = false;
     setSaving(false);
   }
 
   return (
     <form className="admin-form admin-form--wide" onSubmit={handleSubmit}>
       <section className="admin-section-card">
-        <h2>Thông tin khách hàng</h2>
+        <h2>Thông tin doanh nghiệp</h2>
         <div className="admin-form-grid">
-          <label>
-            Loại khách *
-            <select className="admin-input" value={type} onChange={(e) => setType(e.target.value as CustomerType)}>
-              {CRM_CUSTOMER_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {CUSTOMER_TYPE_LABELS[t]}
-                </option>
-              ))}
-            </select>
-          </label>
           <label>
             Tên khách hàng *
             <input className="admin-input" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -113,16 +127,26 @@ export default function CrmCustomerForm() {
             <input className="admin-input" value={taxCode} onChange={(e) => setTaxCode(e.target.value)} />
           </label>
           <label>
-            SĐT
+            Số điện thoại công ty
             <input className="admin-input" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </label>
           <label>
-            Email
+            Email công ty
             <input type="email" className="admin-input" value={email} onChange={(e) => setEmail(e.target.value)} />
           </label>
           <label>
             Website
-            <input className="admin-input" value={website} onChange={(e) => setWebsite(e.target.value)} />
+            <input className="admin-input" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="example.com" />
+          </label>
+          <label>
+            Loại khách
+            <select className="admin-input" value={type} onChange={(e) => setType(e.target.value as CustomerType)}>
+              {CRM_CUSTOMER_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {CUSTOMER_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Trạng thái
@@ -134,19 +158,15 @@ export default function CrmCustomerForm() {
               ))}
             </select>
           </label>
-          <label className="admin-form-grid-span-2">
-            Địa chỉ
-            <input className="admin-input" value={address} onChange={(e) => setAddress(e.target.value)} />
-          </label>
-          <label>
-            Tỉnh/TP
-            <input className="admin-input" value={province} onChange={(e) => setProvince(e.target.value)} />
-          </label>
-          <label>
-            Quận/Huyện
-            <input className="admin-input" value={district} onChange={(e) => setDistrict(e.target.value)} />
-          </label>
         </div>
+      </section>
+
+      <section className="admin-section-card">
+        <h2>Địa chỉ</h2>
+        <CrmCustomerAddressFields
+          values={addressValues}
+          onChange={(patch) => setAddressValues((prev) => ({ ...prev, ...patch }))}
+        />
       </section>
 
       <section className="admin-section-card">
@@ -157,30 +177,34 @@ export default function CrmCustomerForm() {
             <input className="admin-input" value={contactFullName} onChange={(e) => setContactFullName(e.target.value)} />
           </label>
           <label>
-            Chức danh
+            Chức vụ
             <input className="admin-input" value={contactTitle} onChange={(e) => setContactTitle(e.target.value)} />
           </label>
           <label>
-            SĐT
+            Phòng ban
+            <input className="admin-input" value={contactDepartment} onChange={(e) => setContactDepartment(e.target.value)} />
+          </label>
+          <label>
+            Số điện thoại
             <input className="admin-input" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
           </label>
           <label>
             Email
             <input type="email" className="admin-input" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
           </label>
-          <label>
-            Zalo
-            <input className="admin-input" value={contactZalo} onChange={(e) => setContactZalo(e.target.value)} />
-          </label>
           <label className="admin-form-grid-span-2">
-            Ghi chú liên hệ
+            Ghi chú
             <textarea className="admin-input" rows={2} value={contactNote} onChange={(e) => setContactNote(e.target.value)} />
+          </label>
+          <label className="admin-checkbox-row admin-form-grid-span-2">
+            <input type="checkbox" checked={contactIsPrimary} onChange={(e) => setContactIsPrimary(e.target.checked)} />
+            Người liên hệ chính
           </label>
         </div>
       </section>
 
       <section className="admin-section-card">
-        <h2>Ghi chú nội bộ</h2>
+        <h2>Ghi chú</h2>
         <textarea className="admin-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
       </section>
 

@@ -8,6 +8,10 @@ import {
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+function parseOptionalString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
 export async function GET(_req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const customer = await getCustomerById(id);
@@ -55,24 +59,40 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
     patch.name = name;
   }
-  if (raw.legalName !== undefined) patch.legalName = typeof raw.legalName === "string" ? raw.legalName : null;
-  if (raw.taxCode !== undefined) patch.taxCode = typeof raw.taxCode === "string" ? raw.taxCode : null;
-  if (raw.phone !== undefined) patch.phone = typeof raw.phone === "string" ? raw.phone : null;
-  if (raw.email !== undefined) patch.email = typeof raw.email === "string" ? raw.email : null;
-  if (raw.website !== undefined) patch.website = typeof raw.website === "string" ? raw.website : null;
-  if (raw.address !== undefined) patch.address = typeof raw.address === "string" ? raw.address : null;
-  if (raw.province !== undefined) patch.province = typeof raw.province === "string" ? raw.province : null;
-  if (raw.district !== undefined) patch.district = typeof raw.district === "string" ? raw.district : null;
-  if (raw.note !== undefined) patch.note = typeof raw.note === "string" ? raw.note : null;
+  if (raw.legalName !== undefined) patch.legalName = parseOptionalString(raw.legalName);
+  if (raw.taxCode !== undefined) patch.taxCode = parseOptionalString(raw.taxCode);
+  if (raw.phone !== undefined) patch.phone = parseOptionalString(raw.phone);
+  if (raw.email !== undefined) patch.email = parseOptionalString(raw.email);
+  if (raw.website !== undefined) patch.website = parseOptionalString(raw.website);
+  if (raw.address !== undefined) patch.address = parseOptionalString(raw.address);
+  if (raw.province !== undefined) patch.province = parseOptionalString(raw.province);
+  if (raw.district !== undefined) patch.district = parseOptionalString(raw.district);
+  if (raw.provinceId !== undefined) patch.provinceId = parseOptionalString(raw.provinceId);
+  if (raw.wardId !== undefined) patch.wardId = parseOptionalString(raw.wardId);
+  if (raw.provinceNameSnapshot !== undefined) {
+    patch.provinceNameSnapshot = parseOptionalString(raw.provinceNameSnapshot);
+  }
+  if (raw.wardNameSnapshot !== undefined) patch.wardNameSnapshot = parseOptionalString(raw.wardNameSnapshot);
+  if (raw.addressLine1 !== undefined) patch.addressLine1 = parseOptionalString(raw.addressLine1);
+  if (raw.addressLine2 !== undefined) patch.addressLine2 = parseOptionalString(raw.addressLine2);
+  if (raw.note !== undefined) patch.note = parseOptionalString(raw.note);
+  if (raw.internalNote !== undefined) patch.internalNote = parseOptionalString(raw.internalNote);
+  if (raw.billingNote !== undefined) patch.billingNote = parseOptionalString(raw.billingNote);
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });
   }
 
-  const customer = await updateCustomer(id, patch);
-  if (!customer) {
-    return NextResponse.json({ message: "Không tìm thấy khách hàng" }, { status: 404 });
+  try {
+    const customer = await updateCustomer(id, patch);
+    if (!customer) {
+      return NextResponse.json({ message: "Không tìm thấy khách hàng" }, { status: 404 });
+    }
+    return NextResponse.json({ customer });
+  } catch (err) {
+    return NextResponse.json(
+      { message: err instanceof Error ? err.message : "Không thể cập nhật khách hàng" },
+      { status: 400 },
+    );
   }
-
-  return NextResponse.json({ customer });
 }

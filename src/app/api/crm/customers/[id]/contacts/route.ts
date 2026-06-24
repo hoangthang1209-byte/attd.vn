@@ -26,16 +26,20 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
   const raw = body as Record<string, unknown>;
   const fullName = typeof raw.fullName === "string" ? raw.fullName.trim() : "";
   if (!fullName) {
-    return NextResponse.json({ message: "Họ tên là bắt buộc" }, { status: 400 });
+    return NextResponse.json({ message: "Họ tên người liên hệ là bắt buộc." }, { status: 400 });
   }
 
-  const customer = await createContact({
+  try {
+    const customer = await createContact({
     customerId,
     fullName,
     title: typeof raw.title === "string" ? raw.title : null,
+    department: typeof raw.department === "string" ? raw.department : null,
     phone: typeof raw.phone === "string" ? raw.phone : null,
     email: typeof raw.email === "string" ? raw.email : null,
     zalo: typeof raw.zalo === "string" ? raw.zalo : null,
+    isPrimary: raw.isPrimary === true,
+    note: typeof raw.note === "string" ? raw.note : null,
   });
 
   if (!customer) {
@@ -50,5 +54,11 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     return NextResponse.json({ message: "Không thể tạo người liên hệ" }, { status: 500 });
   }
 
-  return NextResponse.json({ contact }, { status: 201 });
+  return NextResponse.json({ contact, customer }, { status: 201 });
+  } catch (err) {
+    return NextResponse.json(
+      { message: err instanceof Error ? err.message : "Không thể tạo người liên hệ" },
+      { status: 400 },
+    );
+  }
 }

@@ -7,6 +7,10 @@ import {
   listCustomers,
 } from "@/features/crm/services/crm-customer.service";
 
+function parseOptionalString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? undefined;
@@ -25,6 +29,7 @@ export async function GET(req: NextRequest) {
       search,
       type: typeParam as CustomerType | undefined,
       status: statusParam as CustomerStatus | undefined,
+      limit: Number(searchParams.get("limit") ?? undefined) || undefined,
     });
     return NextResponse.json(result);
   } catch (err) {
@@ -65,11 +70,12 @@ export async function POST(req: NextRequest) {
     if (fullName) {
       primaryContact = {
         fullName,
-        title: typeof pc.title === "string" ? pc.title : null,
-        phone: typeof pc.phone === "string" ? pc.phone : null,
-        email: typeof pc.email === "string" ? pc.email : null,
-        zalo: typeof pc.zalo === "string" ? pc.zalo : null,
-        note: typeof pc.note === "string" ? pc.note : null,
+        title: parseOptionalString(pc.title),
+        department: parseOptionalString(pc.department),
+        phone: parseOptionalString(pc.phone),
+        email: parseOptionalString(pc.email),
+        zalo: parseOptionalString(pc.zalo),
+        note: parseOptionalString(pc.note),
       };
     }
   }
@@ -78,16 +84,24 @@ export async function POST(req: NextRequest) {
     const customer = await createCustomer({
       type,
       name,
-      legalName: typeof raw.legalName === "string" ? raw.legalName : null,
-      taxCode: typeof raw.taxCode === "string" ? raw.taxCode : null,
-      phone: typeof raw.phone === "string" ? raw.phone : null,
-      email: typeof raw.email === "string" ? raw.email : null,
-      website: typeof raw.website === "string" ? raw.website : null,
-      address: typeof raw.address === "string" ? raw.address : null,
-      province: typeof raw.province === "string" ? raw.province : null,
-      district: typeof raw.district === "string" ? raw.district : null,
+      legalName: parseOptionalString(raw.legalName),
+      taxCode: parseOptionalString(raw.taxCode),
+      phone: parseOptionalString(raw.phone),
+      email: parseOptionalString(raw.email),
+      website: parseOptionalString(raw.website),
+      address: parseOptionalString(raw.address),
+      province: parseOptionalString(raw.province),
+      district: parseOptionalString(raw.district),
+      provinceId: parseOptionalString(raw.provinceId),
+      wardId: parseOptionalString(raw.wardId),
+      provinceNameSnapshot: parseOptionalString(raw.provinceNameSnapshot),
+      wardNameSnapshot: parseOptionalString(raw.wardNameSnapshot),
+      addressLine1: parseOptionalString(raw.addressLine1),
+      addressLine2: parseOptionalString(raw.addressLine2),
       status,
-      note: typeof raw.note === "string" ? raw.note : null,
+      note: parseOptionalString(raw.note),
+      internalNote: parseOptionalString(raw.internalNote),
+      billingNote: parseOptionalString(raw.billingNote),
       primaryContact,
     });
 

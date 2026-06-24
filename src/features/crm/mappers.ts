@@ -162,6 +162,7 @@ export function mapContactRow(row: {
   customerId: string;
   fullName: string;
   title: string | null;
+  department?: string | null;
   phone: string | null;
   email: string | null;
   zalo: string | null;
@@ -175,6 +176,7 @@ export function mapContactRow(row: {
     customerId: row.customerId,
     fullName: row.fullName,
     title: row.title,
+    department: row.department ?? null,
     phone: row.phone,
     email: row.email,
     zalo: row.zalo,
@@ -198,8 +200,16 @@ export function mapCustomerRow(row: {
   address: string | null;
   province: string | null;
   district: string | null;
+  provinceId?: string | null;
+  wardId?: string | null;
+  provinceNameSnapshot?: string | null;
+  wardNameSnapshot?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
   status: CrmCustomerRecord["status"];
   note: string | null;
+  internalNote?: string | null;
+  billingNote?: string | null;
   createdAt: Date;
   updatedAt: Date;
   contacts?: Parameters<typeof mapContactRow>[0][];
@@ -220,8 +230,16 @@ export function mapCustomerRow(row: {
     address: row.address,
     province: row.province,
     district: row.district,
+    provinceId: row.provinceId ?? null,
+    wardId: row.wardId ?? null,
+    provinceNameSnapshot: row.provinceNameSnapshot ?? null,
+    wardNameSnapshot: row.wardNameSnapshot ?? null,
+    addressLine1: row.addressLine1 ?? null,
+    addressLine2: row.addressLine2 ?? null,
     status: row.status,
     note: row.note,
+    internalNote: row.internalNote ?? null,
+    billingNote: row.billingNote ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     contacts: row.contacts?.map(mapContactRow),

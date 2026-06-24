@@ -86,6 +86,7 @@ export type CrmContactRecord = {
   customerId: string;
   fullName: string;
   title: string | null;
+  department: string | null;
   phone: string | null;
   email: string | null;
   zalo: string | null;
@@ -108,8 +109,16 @@ export type CrmCustomerRecord = {
   address: string | null;
   province: string | null;
   district: string | null;
+  provinceId: string | null;
+  wardId: string | null;
+  provinceNameSnapshot: string | null;
+  wardNameSnapshot: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
   status: CustomerStatus;
   note: string | null;
+  internalNote: string | null;
+  billingNote: string | null;
   createdAt: string;
   updatedAt: string;
   contacts?: CrmContactRecord[];
@@ -192,16 +201,48 @@ export type CreateCustomerInput = {
   address?: string | null;
   province?: string | null;
   district?: string | null;
+  provinceId?: string | null;
+  wardId?: string | null;
+  provinceNameSnapshot?: string | null;
+  wardNameSnapshot?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
   status?: CustomerStatus;
   note?: string | null;
+  internalNote?: string | null;
+  billingNote?: string | null;
   primaryContact?: {
     fullName: string;
     title?: string | null;
+    department?: string | null;
     phone?: string | null;
     email?: string | null;
     zalo?: string | null;
     note?: string | null;
   } | null;
+};
+
+export type CreateContactInput = {
+  customerId: string;
+  fullName: string;
+  title?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  zalo?: string | null;
+  isPrimary?: boolean;
+  note?: string | null;
+};
+
+export type UpdateContactInput = {
+  fullName?: string;
+  title?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  zalo?: string | null;
+  isPrimary?: boolean;
+  note?: string | null;
 };
 
 export type ListCrmLeadsResult = {

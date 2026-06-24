@@ -4,10 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AdminBackLink from "@/components/admin/AdminBackLink";
-import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
 import QuickOrderGrid, { syncRowsToSizeColumns } from "@/components/admin/orders/QuickOrderGrid";
 import OrderTotalsSummary from "@/components/admin/orders/OrderTotalsSummary";
-import { contactToQuoteSnapshots, customerToQuoteSnapshots } from "@/features/quotes/quote-party-utils";
+import OrderCustomerPartyFields, {
+  type OrderCustomerPartyValues,
+} from "@/components/admin/orders/OrderCustomerPartyFields";
+import {
+  contactToOrderSnapshots,
+  customerToOrderSnapshots,
+} from "@/features/crm/order-customer-snapshot";
 import { toDateInputValue } from "@/features/quotes/format";
 import { computeOrderItem, computeOrderTotals } from "@/features/orders/order-totals";
 import { quickOrderRowsToOrderItems, validateQuickOrderRow } from "@/features/orders/quick-order/quick-order-mapper";
@@ -56,6 +61,28 @@ type ProductListItem = {
   hasStockVariants?: boolean;
 };
 
+const EMPTY_PARTY: OrderCustomerPartyValues = {
+  customerId: "",
+  contactId: "",
+  customerCode: "",
+  customerCompanyName: "",
+  customerNameSnapshot: "",
+  customerLegalNameSnapshot: "",
+  customerTaxCode: "",
+  customerAddress: "",
+  customerPhoneSnapshot: "",
+  customerEmailSnapshot: "",
+  customerWebsiteSnapshot: "",
+  customerProvinceNameSnapshot: "",
+  customerWardNameSnapshot: "",
+  customerAddressLine1Snapshot: "",
+  contactName: "",
+  contactTitle: "",
+  contactDepartment: "",
+  contactPhone: "",
+  contactEmail: "",
+};
+
 function defaultHeader(): QuickOrderHeaderState {
   return {
     customerId: null,
@@ -94,14 +121,7 @@ export default function QuickOrderForm() {
   const [addSizeError, setAddSizeError] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomerRecord | null>(null);
   const [contacts, setContacts] = useState<CrmContactRecord[]>([]);
-  const [customerCompany, setCustomerCompany] = useState("");
-  const [customerCode, setCustomerCode] = useState("");
-  const [customerTaxCode, setCustomerTaxCode] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [contactTitle, setContactTitle] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
+  const [partyValues, setPartyValues] = useState<OrderCustomerPartyValues>(EMPTY_PARTY);
   const [discountAmount, setDiscountAmount] = useState("0");
   const [shippingFee, setShippingFee] = useState("0");
   const [vatRate, setVatRate] = useState("8");
@@ -190,6 +210,13 @@ export default function QuickOrderForm() {
       setDiscountAmount(String(normalized.discountAmount ?? 0));
       setShippingFee(String(normalized.shippingFee ?? 0));
       setVatRate(String(normalized.vatRate ?? 8));
+      if (normalized.header.customerId) {
+        void fetch(`/api/crm/customers/${normalized.header.customerId}`)
+          .then((res) => res.json())
+          .then((data: { customer?: CrmCustomerRecord }) => {
+            if (data.customer) applyCustomer(data.customer);
+          });
+      }
       setDraftToast("Đã khôi phục bản nháp chưa lưu.");
     }
   }, []);
@@ -213,19 +240,35 @@ export default function QuickOrderForm() {
     customer: CrmCustomerRecord,
     options?: { contacts?: CrmContactRecord[] },
   ) {
-    const snapshots = customerToQuoteSnapshots(customer);
+    const snapshots = customerToOrderSnapshots(customer);
     setSelectedCustomer(customer);
     setHeader((prev) => ({ ...prev, customerId: customer.id, contactId: null }));
-    setCustomerCompany(snapshots.customerCompanySnapshot ?? customer.name);
-    setCustomerCode(customer.code ?? "");
-    setCustomerTaxCode(snapshots.customerTaxCodeSnapshot ?? "");
-    setCustomerAddress(snapshots.customerAddressSnapshot ?? "");
-    setContactName("");
-    setContactTitle("");
-    setContactPhone(snapshots.customerPhoneSnapshot ?? "");
-    setContactEmail(snapshots.customerEmailSnapshot ?? "");
+    setPartyValues((prev) => ({
+      ...prev,
+      customerId: customer.id,
+      contactId: "",
+      customerCode: snapshots.customerCode ?? "",
+      customerCompanyName: snapshots.customerCompanyName ?? customer.name,
+      customerNameSnapshot: snapshots.customerNameSnapshot ?? customer.name,
+      customerLegalNameSnapshot: snapshots.customerLegalNameSnapshot ?? "",
+      customerTaxCode: snapshots.customerTaxCode ?? "",
+      customerAddress: snapshots.customerAddress ?? "",
+      customerPhoneSnapshot: snapshots.customerPhoneSnapshot ?? "",
+      customerEmailSnapshot: snapshots.customerEmailSnapshot ?? "",
+      customerWebsiteSnapshot: snapshots.customerWebsiteSnapshot ?? "",
+      customerProvinceNameSnapshot: snapshots.customerProvinceNameSnapshot ?? "",
+      customerWardNameSnapshot: snapshots.customerWardNameSnapshot ?? "",
+      customerAddressLine1Snapshot: snapshots.customerAddressLine1Snapshot ?? "",
+      contactName: "",
+      contactTitle: "",
+      contactDepartment: "",
+      contactPhone: "",
+      contactEmail: "",
+    }));
     if (options?.contacts) {
       setContacts(options.contacts);
+      const primary = options.contacts.find((c) => c.isPrimary);
+      if (primary) applyContact(primary);
     } else {
       void loadCustomerContacts(customer.id);
     }
@@ -234,19 +277,24 @@ export default function QuickOrderForm() {
   async function loadCustomerContacts(id: string) {
     const res = await fetch(`/api/crm/customers/${id}/contacts`);
     const data = (await res.json()) as { contacts?: CrmContactRecord[] };
-    setContacts(data.contacts ?? []);
+    const list = data.contacts ?? [];
+    setContacts(list);
+    const primary = list.find((c) => c.isPrimary);
+    if (primary) applyContact(primary);
   }
 
   function applyContact(contact: CrmContactRecord) {
-    const snapshots = contactToQuoteSnapshots(contact, {
-      phone: selectedCustomer?.phone,
-      email: selectedCustomer?.email,
-    });
+    const snapshots = contactToOrderSnapshots(contact);
     setHeader((prev) => ({ ...prev, contactId: contact.id }));
-    setContactName(snapshots.customerContactNameSnapshot ?? "");
-    setContactTitle(snapshots.customerContactTitleSnapshot ?? "");
-    setContactPhone(snapshots.customerPhoneSnapshot ?? "");
-    setContactEmail(snapshots.customerEmailSnapshot ?? "");
+    setPartyValues((prev) => ({
+      ...prev,
+      contactId: contact.id,
+      contactName: snapshots.contactName ?? "",
+      contactTitle: snapshots.contactTitle ?? "",
+      contactDepartment: snapshots.contactDepartment ?? "",
+      contactPhone: snapshots.contactPhone ?? "",
+      contactEmail: snapshots.contactEmail ?? "",
+    }));
   }
 
   function applyImportedSummary(summary: QuickOrderImportSummary) {
@@ -334,7 +382,7 @@ export default function QuickOrderForm() {
 
   async function handleSubmit() {
     setError(null);
-    if (!customerCompany.trim()) {
+    if (!partyValues.customerCompanyName.trim()) {
       setError("Vui lòng chọn hoặc nhập thông tin khách hàng.");
       return;
     }
@@ -350,20 +398,29 @@ export default function QuickOrderForm() {
     setSubmitting(true);
     try {
       const payload = {
-        customerId: header.customerId,
-        contactId: header.contactId,
         salesEmployeeId: header.salesEmployeeId,
         orderDate: header.orderDate,
         currency: header.currency,
         priceVatType: header.priceVatType,
-        customerCompanyName: customerCompany,
-        customerCode: customerCode || null,
-        customerTaxCode: customerTaxCode || null,
-        customerAddress: customerAddress || null,
-        contactName: contactName || null,
-        contactTitle: contactTitle || null,
-        contactPhone: contactPhone || null,
-        contactEmail: contactEmail || null,
+        customerId: header.customerId,
+        contactId: header.contactId,
+        customerCompanyName: partyValues.customerCompanyName,
+        customerCode: partyValues.customerCode || null,
+        customerTaxCode: partyValues.customerTaxCode || null,
+        customerAddress: partyValues.customerAddress || null,
+        customerNameSnapshot: partyValues.customerNameSnapshot || null,
+        customerLegalNameSnapshot: partyValues.customerLegalNameSnapshot || null,
+        customerPhoneSnapshot: partyValues.customerPhoneSnapshot || null,
+        customerEmailSnapshot: partyValues.customerEmailSnapshot || null,
+        customerWebsiteSnapshot: partyValues.customerWebsiteSnapshot || null,
+        customerProvinceNameSnapshot: partyValues.customerProvinceNameSnapshot || null,
+        customerWardNameSnapshot: partyValues.customerWardNameSnapshot || null,
+        customerAddressLine1Snapshot: partyValues.customerAddressLine1Snapshot || null,
+        contactName: partyValues.contactName || null,
+        contactTitle: partyValues.contactTitle || null,
+        contactDepartment: partyValues.contactDepartment || null,
+        contactPhone: partyValues.contactPhone || null,
+        contactEmail: partyValues.contactEmail || null,
         customerNote: header.customerNote || null,
         internalNote: header.internalNote || null,
         productionDueDate: header.productionDueDate || null,
@@ -403,47 +460,26 @@ export default function QuickOrderForm() {
       {draftToast && <p className="admin-toast">{draftToast}</p>}
       {error && <p className="admin-error">{error}</p>}
 
-      <fieldset className="admin-catalog-fieldset">
+      <OrderCustomerPartyFields
+        values={partyValues}
+        selectedCustomer={selectedCustomer}
+        contacts={contacts}
+        onCustomerSelect={(customer, nextContacts) => {
+          if (customer) applyCustomer(customer, { contacts: nextContacts });
+          else {
+            setSelectedCustomer(null);
+            setHeader((prev) => ({ ...prev, customerId: null, contactId: null }));
+            setContacts([]);
+            setPartyValues(EMPTY_PARTY);
+          }
+        }}
+        onContactsChange={setContacts}
+        onChange={(patch) => setPartyValues((prev) => ({ ...prev, ...patch }))}
+      />
+
+      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
         <legend>Thông tin đơn hàng</legend>
         <div className="admin-seo-brief-form-grid">
-          <div className="admin-field admin-field--full">
-            <label className="admin-label">Khách hàng</label>
-            <CustomerSearchField
-              value={selectedCustomer}
-              onSelect={(customer) => {
-                if (customer) applyCustomer(customer);
-                else {
-                  setSelectedCustomer(null);
-                  setHeader((prev) => ({ ...prev, customerId: null, contactId: null }));
-                  setContacts([]);
-                }
-              }}
-            />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Tên công ty / khách hàng</label>
-            <input className="admin-input" value={customerCompany} onChange={(e) => setCustomerCompany(e.target.value)} />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Người liên hệ</label>
-            <select
-              className="admin-input"
-              value={header.contactId ?? ""}
-              onChange={(e) => {
-                const contact = contacts.find((c) => c.id === e.target.value);
-                if (contact) applyContact(contact);
-                else setHeader((prev) => ({ ...prev, contactId: e.target.value || null }));
-              }}
-            >
-              <option value="">—</option>
-              {contacts.map((contact) => (
-                <option key={contact.id} value={contact.id}>
-                  {contact.fullName}
-                  {contact.title ? ` · ${contact.title}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
           <div className="admin-field">
             <label className="admin-label">Nhân viên tư vấn</label>
             <select
