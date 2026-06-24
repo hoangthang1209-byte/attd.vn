@@ -22,36 +22,15 @@ export default function PremiumCard({
   const content = (
     <>
       {icon && (
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 10,
-            background: "#f9fafb",
-            border: "1px solid #e5e7eb",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 20,
-            color: "#111827",
-          }}
-        >
+        <div className="premium-card__icon">
           {icon}
         </div>
       )}
-      <div
-        style={{
-          fontWeight: 600,
-          fontSize: "16px",
-          color: "#111827",
-          marginBottom: description ? 8 : 0,
-          letterSpacing: "-0.01em",
-        }}
-      >
+      <div className={`premium-card__title${description ? " has-description" : ""}`}>
         {title}
       </div>
       {description && (
-        <div style={{ fontSize: "14px", color: "#6b7280", lineHeight: 1.65 }}>
+        <div className="premium-card__description">
           {description}
         </div>
       )}
@@ -60,7 +39,7 @@ export default function PremiumCard({
 
   if (href) {
     return (
-      <Link href={href} className={`${cardClass} ${className}`} style={{ color: "inherit" }}>
+      <Link href={href} className={`${cardClass} ${className}`}>
         {content}
       </Link>
     );

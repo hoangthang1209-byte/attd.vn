@@ -19,7 +19,7 @@ const DISPLAY_TYPE_LABELS: Record<DisplayType, string> = {
 const CODE_SLUG_LOCKED_HINT =
   "Mã không thể thay đổi vì thuộc tính này đang được sử dụng trong sản phẩm, biến thể hoặc dữ liệu liên quan.";
 
-const FORM_SCROLL_MARGIN = 88;
+const UNSAVED_INLINE_CONFIRM = "Bạn có muốn bỏ thay đổi chưa lưu?";
 
 type AttributeValue = {
   id: string;
@@ -51,7 +51,6 @@ type Attribute = {
 };
 
 type AttributeForm = {
-  id?: string;
   name: string;
   code: string;
   slug: string;
@@ -61,11 +60,9 @@ type AttributeForm = {
   status: Status;
   sortOrder: string;
   note: string;
-  isReferenced?: boolean;
 };
 
 type ValueForm = {
-  id?: string;
   attributeId: string;
   name: string;
   code: string;
@@ -74,7 +71,54 @@ type ValueForm = {
   imageUrl: string;
   status: Status;
   sortOrder: string;
-  isReferenced?: boolean;
+};
+
+type InlineAttributeDraft = {
+  name: string;
+  note: string;
+  displayType: DisplayType;
+  isVariantAttribute: boolean;
+  isSpecificationAttribute: boolean;
+  sortOrder: string;
+  status: Status;
+  code: string;
+  slug: string;
+  isReferenced: boolean;
+};
+
+type InlineValueDraft = {
+  name: string;
+  hexCode: string;
+  imageUrl: string;
+  sortOrder: string;
+  status: Status;
+  code: string;
+  slug: string;
+  isReferenced: boolean;
+};
+
+type ApiAttributePatch = {
+  id: string;
+  name: string;
+  code: string;
+  slug: string;
+  displayType: DisplayType;
+  isVariantAttribute: boolean;
+  isSpecificationAttribute: boolean;
+  status: Status;
+  sortOrder: number;
+  note: string | null;
+};
+
+type ApiValuePatch = {
+  id: string;
+  name: string;
+  code: string;
+  slug: string;
+  hexCode: string | null;
+  imageUrl: string | null;
+  status: Status;
+  sortOrder: number;
 };
 
 const defaultAttributeForm = (): AttributeForm => ({
@@ -104,8 +148,44 @@ function errorClass(fieldErrors: Record<string, string>, field: string) {
   return fieldErrors[field] ? " admin-input--error" : "";
 }
 
-function scrollFormIntoView(node: HTMLElement | null) {
-  node?.scrollIntoView({ behavior: "smooth", block: "start" });
+function sortAttributes(list: Attribute[]): Attribute[] {
+  return [...list].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"));
+}
+
+function sortValues(list: AttributeValue[]): AttributeValue[] {
+  return [...list].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"));
+}
+
+function inlineAttributeDraftFromAttribute(attribute: Attribute): InlineAttributeDraft {
+  return {
+    name: attribute.name,
+    note: attribute.note ?? "",
+    displayType: attribute.displayType,
+    isVariantAttribute: attribute.isVariantAttribute,
+    isSpecificationAttribute: attribute.isSpecificationAttribute,
+    sortOrder: String(attribute.sortOrder),
+    status: attribute.status,
+    code: attribute.code,
+    slug: attribute.slug,
+    isReferenced: attribute.isReferenced,
+  };
+}
+
+function inlineValueDraftFromValue(value: AttributeValue): InlineValueDraft {
+  return {
+    name: value.name,
+    hexCode: value.hexCode ?? "",
+    imageUrl: value.imageUrl ?? "",
+    sortOrder: String(value.sortOrder),
+    status: value.status,
+    code: value.code,
+    slug: value.slug,
+    isReferenced: value.isReferenced,
+  };
+}
+
+function draftsEqual<T>(a: T, b: T): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export default function ProductAttributesClient() {
@@ -115,24 +195,31 @@ export default function ProductAttributesClient() {
   const [showInactive, setShowInactive] = useState(true);
   const [attributeForm, setAttributeForm] = useState<AttributeForm>(defaultAttributeForm());
   const [valueForm, setValueForm] = useState<ValueForm>(defaultValueForm());
-  const [isSavingAttribute, setIsSavingAttribute] = useState(false);
-  const [isSavingValue, setIsSavingValue] = useState(false);
+  const [isSavingCreateAttribute, setIsSavingCreateAttribute] = useState(false);
+  const [isSavingCreateValue, setIsSavingCreateValue] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [attributeFieldErrors, setAttributeFieldErrors] = useState<Record<string, string>>({});
-  const [valueFieldErrors, setValueFieldErrors] = useState<Record<string, string>>({});
+  const [createAttributeFieldErrors, setCreateAttributeFieldErrors] = useState<Record<string, string>>({});
+  const [createValueFieldErrors, setCreateValueFieldErrors] = useState<Record<string, string>>({});
   const [presetDialogOpen, setPresetDialogOpen] = useState(false);
-  const [editingAttributeId, setEditingAttributeId] = useState<string | null>(null);
-  const [editingAttributeName, setEditingAttributeName] = useState<string | null>(null);
-  const [editingValueId, setEditingValueId] = useState<string | null>(null);
-  const [editingValueName, setEditingValueName] = useState<string | null>(null);
-  const [editingValueAttributeName, setEditingValueAttributeName] = useState<string | null>(null);
+
+  const [inlineAttributeEditId, setInlineAttributeEditId] = useState<string | null>(null);
+  const [inlineAttributeDraft, setInlineAttributeDraft] = useState<InlineAttributeDraft | null>(null);
+  const [inlineAttributeBaseline, setInlineAttributeBaseline] = useState<InlineAttributeDraft | null>(null);
+  const [inlineAttributeFieldErrors, setInlineAttributeFieldErrors] = useState<Record<string, string>>({});
+  const [inlineAttributeAdvancedId, setInlineAttributeAdvancedId] = useState<string | null>(null);
+  const [savingAttributeId, setSavingAttributeId] = useState<string | null>(null);
+
+  const [inlineValueEditId, setInlineValueEditId] = useState<string | null>(null);
+  const [inlineValueAttributeId, setInlineValueAttributeId] = useState<string | null>(null);
+  const [inlineValueDraft, setInlineValueDraft] = useState<InlineValueDraft | null>(null);
+  const [inlineValueBaseline, setInlineValueBaseline] = useState<InlineValueDraft | null>(null);
+  const [inlineValueFieldErrors, setInlineValueFieldErrors] = useState<Record<string, string>>({});
+  const [inlineValueAdvancedId, setInlineValueAdvancedId] = useState<string | null>(null);
+  const [savingValueId, setSavingValueId] = useState<string | null>(null);
 
   const attributeSectionRefs = useRef<Record<string, HTMLElement | null>>({});
-  const attributeFormRef = useRef<HTMLFormElement>(null);
   const valueFormRef = useRef<HTMLFormElement>(null);
-  const attributeNameInputRef = useRef<HTMLInputElement>(null);
-  const valueNameInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,7 +229,7 @@ export default function ProductAttributesClient() {
       if (!showInactive) params.set("activeOnly", "1");
       const res = await fetch(`/api/admin/attributes?${params.toString()}`);
       const data = await res.json() as Attribute[];
-      setAttributes(Array.isArray(data) ? data : []);
+      setAttributes(Array.isArray(data) ? sortAttributes(data) : []);
     } catch {
       setAttributes([]);
     }
@@ -159,8 +246,27 @@ export default function ProductAttributesClient() {
     section?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function clearAttributeFieldError(field: string) {
-    setAttributeFieldErrors((current) => {
+  function updateAttributeInList(attributeId: string, updater: (attribute: Attribute) => Attribute) {
+    setAttributes((previous) => sortAttributes(previous.map((attribute) => (
+      attribute.id === attributeId ? updater(attribute) : attribute
+    ))));
+  }
+
+  function updateValueInList(
+    attributeId: string,
+    valueId: string,
+    updater: (value: AttributeValue) => AttributeValue,
+  ) {
+    updateAttributeInList(attributeId, (attribute) => ({
+      ...attribute,
+      values: sortValues(attribute.values.map((value) => (
+        value.id === valueId ? updater(value) : value
+      ))),
+    }));
+  }
+
+  function clearInlineAttributeFieldError(field: string) {
+    setInlineAttributeFieldErrors((current) => {
       if (!current[field]) return current;
       const next = { ...current };
       delete next[field];
@@ -168,8 +274,8 @@ export default function ProductAttributesClient() {
     });
   }
 
-  function clearValueFieldError(field: string) {
-    setValueFieldErrors((current) => {
+  function clearInlineValueFieldError(field: string) {
+    setInlineValueFieldErrors((current) => {
       if (!current[field]) return current;
       const next = { ...current };
       delete next[field];
@@ -177,70 +283,74 @@ export default function ProductAttributesClient() {
     });
   }
 
-  function startEditAttribute(attribute: Attribute) {
-    setAttributeForm({
-      id: attribute.id,
-      name: attribute.name,
-      code: attribute.code,
-      slug: attribute.slug,
-      displayType: attribute.displayType,
-      isVariantAttribute: attribute.isVariantAttribute,
-      isSpecificationAttribute: attribute.isSpecificationAttribute,
-      status: attribute.status,
-      sortOrder: String(attribute.sortOrder),
-      note: attribute.note ?? "",
-      isReferenced: attribute.isReferenced,
-    });
-    setEditingAttributeId(attribute.id);
-    setEditingAttributeName(attribute.name);
-    setAttributeFieldErrors({});
-    setError(null);
-
-    window.requestAnimationFrame(() => {
-      scrollFormIntoView(attributeFormRef.current);
-      window.setTimeout(() => attributeNameInputRef.current?.focus(), 320);
-    });
+  function closeInlineAttributeEdit() {
+    setInlineAttributeEditId(null);
+    setInlineAttributeDraft(null);
+    setInlineAttributeBaseline(null);
+    setInlineAttributeFieldErrors({});
+    setInlineAttributeAdvancedId(null);
   }
 
-  function cancelAttributeEdit() {
-    setAttributeForm(defaultAttributeForm());
-    setEditingAttributeId(null);
-    setEditingAttributeName(null);
-    setAttributeFieldErrors({});
+  function closeInlineValueEdit() {
+    setInlineValueEditId(null);
+    setInlineValueAttributeId(null);
+    setInlineValueDraft(null);
+    setInlineValueBaseline(null);
+    setInlineValueFieldErrors({});
+    setInlineValueAdvancedId(null);
   }
 
-  function startEditValue(attribute: Attribute, value: AttributeValue) {
-    setValueForm({
-      id: value.id,
-      attributeId: attribute.id,
-      name: value.name,
-      code: value.code,
-      slug: value.slug,
-      hexCode: value.hexCode ?? "",
-      imageUrl: value.imageUrl ?? "",
-      status: value.status,
-      sortOrder: String(value.sortOrder),
-      isReferenced: value.isReferenced,
-    });
-    setEditingValueId(value.id);
-    setEditingValueName(value.name);
-    setEditingValueAttributeName(attribute.name);
-    setValueFieldErrors({});
-    setError(null);
-
-    window.requestAnimationFrame(() => {
-      scrollFormIntoView(valueFormRef.current);
-      window.setTimeout(() => valueNameInputRef.current?.focus(), 320);
-    });
+  function isInlineAttributeDirty(): boolean {
+    if (!inlineAttributeDraft || !inlineAttributeBaseline) return false;
+    return !draftsEqual(inlineAttributeDraft, inlineAttributeBaseline);
   }
 
-  function cancelValueEdit() {
-    const attributeId = valueForm.attributeId;
-    setValueForm(defaultValueForm(attributeId));
-    setEditingValueId(null);
-    setEditingValueName(null);
-    setEditingValueAttributeName(null);
-    setValueFieldErrors({});
+  function isInlineValueDirty(): boolean {
+    if (!inlineValueDraft || !inlineValueBaseline) return false;
+    return !draftsEqual(inlineValueDraft, inlineValueBaseline);
+  }
+
+  function openInlineAttributeEdit(attribute: Attribute) {
+    if (inlineAttributeEditId && inlineAttributeEditId !== attribute.id) {
+      if (isInlineAttributeDirty() && !window.confirm(UNSAVED_INLINE_CONFIRM)) return;
+      closeInlineAttributeEdit();
+    }
+    const draft = inlineAttributeDraftFromAttribute(attribute);
+    setInlineAttributeEditId(attribute.id);
+    setInlineAttributeDraft(draft);
+    setInlineAttributeBaseline(draft);
+    setInlineAttributeFieldErrors({});
+    setInlineAttributeAdvancedId(null);
+  }
+
+  function openInlineValueEdit(attribute: Attribute, value: AttributeValue) {
+    if (inlineValueEditId && inlineValueEditId !== value.id) {
+      if (isInlineValueDirty() && !window.confirm(UNSAVED_INLINE_CONFIRM)) return;
+      closeInlineValueEdit();
+    }
+    const draft = inlineValueDraftFromValue(value);
+    setInlineValueEditId(value.id);
+    setInlineValueAttributeId(attribute.id);
+    setInlineValueDraft(draft);
+    setInlineValueBaseline(draft);
+    setInlineValueFieldErrors({});
+    setInlineValueAdvancedId(null);
+  }
+
+  function cancelInlineAttributeEdit() {
+    if (isInlineAttributeDirty() && !window.confirm(UNSAVED_INLINE_CONFIRM)) return;
+    closeInlineAttributeEdit();
+  }
+
+  function cancelInlineValueEdit() {
+    if (isInlineValueDirty() && !window.confirm(UNSAVED_INLINE_CONFIRM)) return;
+    closeInlineValueEdit();
+  }
+
+  function manageValues(attribute: Attribute) {
+    setValueForm(defaultValueForm(attribute.id));
+    setCreateValueFieldErrors({});
+    valueFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function handlePresetSuccess(attributeId: string, successMessage: string) {
@@ -250,16 +360,16 @@ export default function ProductAttributesClient() {
     window.setTimeout(() => focusAttribute(attributeId), 100);
   }
 
-  async function handleAttributeSubmit(e: React.FormEvent) {
+  async function handleCreateAttributeSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setAttributeFieldErrors({});
+    setCreateAttributeFieldErrors({});
     setError(null);
     if (!attributeForm.name.trim()) {
-      setAttributeFieldErrors({ name: "Tên thuộc tính là bắt buộc." });
+      setCreateAttributeFieldErrors({ name: "Tên thuộc tính là bắt buộc." });
       return;
     }
 
-    setIsSavingAttribute(true);
+    setIsSavingCreateAttribute(true);
     try {
       const payload = {
         name: attributeForm.name.trim(),
@@ -273,51 +383,60 @@ export default function ProductAttributesClient() {
         note: attributeForm.note.trim() || undefined,
       };
 
-      const res = attributeForm.id
-        ? await fetch(`/api/admin/attributes/${attributeForm.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-        : await fetch("/api/admin/attributes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      const data = await res.json().catch(() => null) as { message?: string; fieldErrors?: Record<string, string> } | null;
-      if (!res.ok) {
-        setAttributeFieldErrors(data?.fieldErrors ?? {});
+      const res = await fetch("/api/admin/attributes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => null) as ApiAttributePatch & { message?: string; fieldErrors?: Record<string, string> } | null;
+      if (!res.ok || !data) {
+        setCreateAttributeFieldErrors(data?.fieldErrors ?? {});
         setError(data?.message ?? "Không thể lưu thuộc tính.");
         return;
       }
 
-      const wasEdit = Boolean(attributeForm.id);
+      setAttributes((previous) => sortAttributes([
+        ...previous,
+        {
+          id: data.id,
+          name: data.name,
+          code: data.code,
+          slug: data.slug,
+          displayType: data.displayType,
+          isVariantAttribute: data.isVariantAttribute,
+          isSpecificationAttribute: data.isSpecificationAttribute,
+          status: data.status,
+          sortOrder: data.sortOrder,
+          note: data.note,
+          usageCount: 0,
+          isReferenced: false,
+          values: [],
+        },
+      ]));
       setAttributeForm(defaultAttributeForm());
-      setEditingAttributeId(null);
-      setEditingAttributeName(null);
-      setMessage(wasEdit ? "Đã cập nhật thuộc tính." : "Đã tạo thuộc tính.");
-      void load();
+      setMessage("Đã tạo thuộc tính.");
+      toast.success("Đã tạo thuộc tính.");
     } catch {
       setError("Lỗi mạng hoặc lỗi không xác định khi lưu thuộc tính.");
     } finally {
-      setIsSavingAttribute(false);
+      setIsSavingCreateAttribute(false);
     }
   }
 
-  async function handleValueSubmit(e: React.FormEvent) {
+  async function handleCreateValueSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setValueFieldErrors({});
+    setCreateValueFieldErrors({});
     setError(null);
     if (!valueForm.attributeId) {
-      setValueFieldErrors({ attributeId: "Vui lòng chọn thuộc tính cha." });
+      setCreateValueFieldErrors({ attributeId: "Vui lòng chọn thuộc tính cha." });
       return;
     }
     if (!valueForm.name.trim()) {
-      setValueFieldErrors({ name: "Tên hiển thị là bắt buộc." });
+      setCreateValueFieldErrors({ name: "Tên hiển thị là bắt buộc." });
       return;
     }
 
-    setIsSavingValue(true);
+    setIsSavingCreateValue(true);
     try {
       const payload = {
         name: valueForm.name.trim(),
@@ -328,72 +447,196 @@ export default function ProductAttributesClient() {
         status: valueForm.status,
         sortOrder: valueForm.sortOrder,
       };
-      const res = valueForm.id
-        ? await fetch(`/api/admin/attributes/${valueForm.attributeId}/values/${valueForm.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-        : await fetch(`/api/admin/attributes/${valueForm.attributeId}/values`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      const data = await res.json().catch(() => null) as { message?: string; fieldErrors?: Record<string, string> } | null;
-      if (!res.ok) {
-        setValueFieldErrors(data?.fieldErrors ?? {});
+      const res = await fetch(`/api/admin/attributes/${valueForm.attributeId}/values`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => null) as ApiValuePatch & { message?: string; fieldErrors?: Record<string, string> } | null;
+      if (!res.ok || !data) {
+        setCreateValueFieldErrors(data?.fieldErrors ?? {});
         setError(data?.message ?? "Không thể lưu giá trị thuộc tính.");
         return;
       }
 
-      const wasEdit = Boolean(valueForm.id);
       const parentAttributeId = valueForm.attributeId;
+      updateAttributeInList(parentAttributeId, (attribute) => ({
+        ...attribute,
+        values: sortValues([
+          ...attribute.values,
+          {
+            id: data.id,
+            name: data.name,
+            code: data.code,
+            slug: data.slug,
+            hexCode: data.hexCode,
+            imageUrl: data.imageUrl,
+            status: data.status,
+            sortOrder: data.sortOrder,
+            usageCount: 0,
+            isReferenced: false,
+          },
+        ]),
+      }));
       setValueForm(defaultValueForm(parentAttributeId));
-      setEditingValueId(null);
-      setEditingValueName(null);
-      setEditingValueAttributeName(null);
-      setMessage(wasEdit ? "Đã cập nhật giá trị." : "Đã tạo giá trị.");
-      void load();
+      setMessage("Đã tạo giá trị.");
+      toast.success("Đã tạo giá trị.");
     } catch {
       setError("Lỗi mạng hoặc lỗi không xác định khi lưu giá trị thuộc tính.");
     } finally {
-      setIsSavingValue(false);
+      setIsSavingCreateValue(false);
     }
   }
 
-  async function patchAttribute(attribute: Attribute, patch: Partial<AttributeForm>) {
+  async function saveInlineAttribute(attribute: Attribute) {
+    if (!inlineAttributeDraft) return;
+    setInlineAttributeFieldErrors({});
+    if (!inlineAttributeDraft.name.trim()) {
+      setInlineAttributeFieldErrors({ name: "Tên thuộc tính là bắt buộc." });
+      return;
+    }
+
+    setSavingAttributeId(attribute.id);
+    try {
+      const payload: Record<string, unknown> = {
+        name: inlineAttributeDraft.name.trim(),
+        displayType: inlineAttributeDraft.displayType,
+        isVariantAttribute: inlineAttributeDraft.isVariantAttribute,
+        isSpecificationAttribute: inlineAttributeDraft.isSpecificationAttribute,
+        status: inlineAttributeDraft.status,
+        sortOrder: inlineAttributeDraft.sortOrder,
+        note: inlineAttributeDraft.note.trim() || undefined,
+      };
+      if (inlineAttributeAdvancedId === attribute.id) {
+        payload.code = inlineAttributeDraft.code.trim() || undefined;
+        payload.slug = inlineAttributeDraft.slug.trim() || undefined;
+      }
+
+      const res = await fetch(`/api/admin/attributes/${attribute.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => null) as ApiAttributePatch & { message?: string; fieldErrors?: Record<string, string> } | null;
+      if (!res.ok || !data) {
+        setInlineAttributeFieldErrors(data?.fieldErrors ?? {});
+        if (!data?.fieldErrors || Object.keys(data.fieldErrors).length === 0) {
+          setInlineAttributeFieldErrors({ _form: data?.message ?? "Không thể lưu thuộc tính." });
+        }
+        return;
+      }
+
+      updateAttributeInList(attribute.id, (current) => ({
+        ...current,
+        name: data.name,
+        code: data.code,
+        slug: data.slug,
+        displayType: data.displayType,
+        isVariantAttribute: data.isVariantAttribute,
+        isSpecificationAttribute: data.isSpecificationAttribute,
+        status: data.status,
+        sortOrder: data.sortOrder,
+        note: data.note,
+      }));
+      closeInlineAttributeEdit();
+      toast.success("Đã cập nhật thuộc tính.");
+    } catch {
+      setInlineAttributeFieldErrors({ _form: "Lỗi mạng hoặc lỗi không xác định khi lưu thuộc tính." });
+    } finally {
+      setSavingAttributeId(null);
+    }
+  }
+
+  async function saveInlineValue(attribute: Attribute, value: AttributeValue) {
+    if (!inlineValueDraft) return;
+    setInlineValueFieldErrors({});
+    if (!inlineValueDraft.name.trim()) {
+      setInlineValueFieldErrors({ name: "Tên giá trị không được để trống." });
+      return;
+    }
+
+    setSavingValueId(value.id);
+    try {
+      const payload: Record<string, unknown> = {
+        name: inlineValueDraft.name.trim(),
+        hexCode: inlineValueDraft.hexCode.trim() || undefined,
+        imageUrl: inlineValueDraft.imageUrl.trim() || undefined,
+        status: inlineValueDraft.status,
+        sortOrder: inlineValueDraft.sortOrder,
+      };
+      if (inlineValueAdvancedId === value.id) {
+        payload.code = inlineValueDraft.code.trim() || undefined;
+        payload.slug = inlineValueDraft.slug.trim() || undefined;
+      }
+
+      const res = await fetch(`/api/admin/attributes/${attribute.id}/values/${value.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => null) as ApiValuePatch & { message?: string; fieldErrors?: Record<string, string> } | null;
+      if (!res.ok || !data) {
+        setInlineValueFieldErrors(data?.fieldErrors ?? {});
+        if (!data?.fieldErrors || Object.keys(data.fieldErrors).length === 0) {
+          setInlineValueFieldErrors({ _form: data?.message ?? "Không thể lưu giá trị thuộc tính." });
+        }
+        return;
+      }
+
+      updateValueInList(attribute.id, value.id, (current) => ({
+        ...current,
+        name: data.name,
+        code: data.code,
+        slug: data.slug,
+        hexCode: data.hexCode,
+        imageUrl: data.imageUrl,
+        status: data.status,
+        sortOrder: data.sortOrder,
+      }));
+      closeInlineValueEdit();
+      toast.success("Đã cập nhật giá trị thuộc tính.");
+    } catch {
+      setInlineValueFieldErrors({ _form: "Lỗi mạng hoặc lỗi không xác định khi lưu giá trị thuộc tính." });
+    } finally {
+      setSavingValueId(null);
+    }
+  }
+
+  async function patchAttributeStatus(attribute: Attribute) {
+    const nextStatus: Status = attribute.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
     try {
       const res = await fetch(`/api/admin/attributes/${attribute.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ status: nextStatus }),
       });
-      const data = await res.json().catch(() => null) as { message?: string } | null;
-      if (!res.ok) {
+      const data = await res.json().catch(() => null) as ApiAttributePatch & { message?: string } | null;
+      if (!res.ok || !data) {
         toast.error(data?.message ?? "Không thể cập nhật trạng thái. Vui lòng thử lại.");
         return;
       }
+      updateAttributeInList(attribute.id, (current) => ({ ...current, status: data.status }));
       toast.success("Đã cập nhật trạng thái thuộc tính.");
-      void load();
     } catch {
       toast.error("Không thể cập nhật trạng thái. Vui lòng thử lại.");
     }
   }
 
-  async function patchValue(attribute: Attribute, value: AttributeValue, patch: Partial<ValueForm>) {
+  async function patchValueStatus(attribute: Attribute, value: AttributeValue) {
+    const nextStatus: Status = value.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
     try {
       const res = await fetch(`/api/admin/attributes/${attribute.id}/values/${value.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ status: nextStatus }),
       });
-      const data = await res.json().catch(() => null) as { message?: string } | null;
-      if (!res.ok) {
+      const data = await res.json().catch(() => null) as ApiValuePatch & { message?: string } | null;
+      if (!res.ok || !data) {
         toast.error(data?.message ?? "Không thể cập nhật trạng thái. Vui lòng thử lại.");
         return;
       }
+      updateValueInList(attribute.id, value.id, (current) => ({ ...current, status: data.status }));
       toast.success("Đã cập nhật trạng thái giá trị.");
-      void load();
     } catch {
       toast.error("Không thể cập nhật trạng thái. Vui lòng thử lại.");
     }
@@ -407,9 +650,10 @@ export default function ProductAttributesClient() {
       setError(data.message ?? "Không thể xóa thuộc tính. Hãy ngừng sử dụng thay vì xóa.");
       return;
     }
-    if (editingAttributeId === attribute.id) cancelAttributeEdit();
+    if (inlineAttributeEditId === attribute.id) closeInlineAttributeEdit();
+    setAttributes((previous) => previous.filter((item) => item.id !== attribute.id));
     setMessage("Đã xóa thuộc tính.");
-    void load();
+    toast.success("Đã xóa thuộc tính.");
   }
 
   async function deleteValue(attribute: Attribute, value: AttributeValue) {
@@ -420,14 +664,14 @@ export default function ProductAttributesClient() {
       setError(data.message ?? "Không thể xóa giá trị. Hãy ngừng sử dụng thay vì xóa.");
       return;
     }
-    if (editingValueId === value.id) cancelValueEdit();
+    if (inlineValueEditId === value.id) closeInlineValueEdit();
+    updateAttributeInList(attribute.id, (current) => ({
+      ...current,
+      values: current.values.filter((item) => item.id !== value.id),
+    }));
     setMessage("Đã xóa giá trị.");
-    void load();
+    toast.success("Đã xóa giá trị.");
   }
-
-  const editingValueParentName = attributes.find((attribute) => attribute.id === valueForm.attributeId)?.name
-    ?? editingValueAttributeName
-    ?? "";
 
   return (
     <div className="admin-catalog-page">
@@ -435,6 +679,9 @@ export default function ProductAttributesClient() {
         <div className="admin-catalog-toolbar-left">
           <button type="button" className="admin-btn admin-btn--primary" onClick={() => setPresetDialogOpen(true)}>
             Tạo từ bộ mặc định
+          </button>
+          <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
+            Làm mới danh sách
           </button>
         </div>
         <label className="admin-catalog-toggle">
@@ -453,99 +700,60 @@ export default function ProductAttributesClient() {
       {message && <p className="admin-success">{message}</p>}
       {error && <p className="admin-error" role="alert">{error}</p>}
 
-      <form
-        ref={attributeFormRef}
-        className="admin-catalog-fieldset"
-        style={{ scrollMarginTop: FORM_SCROLL_MARGIN }}
-        onSubmit={(e) => void handleAttributeSubmit(e)}
-      >
-        <legend style={{ fontWeight: 600, fontSize: 14 }}>
-          {attributeForm.id && editingAttributeName
-            ? `Cập nhật thuộc tính: ${editingAttributeName}`
-            : attributeForm.id
-              ? "Cập nhật thuộc tính"
-              : "Thêm thuộc tính mới"}
-        </legend>
+      <form className="admin-catalog-fieldset" onSubmit={(e) => void handleCreateAttributeSubmit(e)}>
+        <legend style={{ fontWeight: 600, fontSize: 14 }}>Thêm thuộc tính mới</legend>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field">
             <label className="admin-label">Tên thuộc tính <span className="admin-required">*</span></label>
             <input
-              ref={attributeNameInputRef}
-              className={`admin-input${errorClass(attributeFieldErrors, "name")}`}
-              data-field="name"
+              className={`admin-input${errorClass(createAttributeFieldErrors, "name")}`}
               value={attributeForm.name}
               onChange={(e) => {
-                clearAttributeFieldError("name");
-                setAttributeForm((f) => ({ ...f, name: e.target.value }));
+                setCreateAttributeFieldErrors((current) => {
+                  if (!current.name) return current;
+                  const next = { ...current };
+                  delete next.name;
+                  return next;
+                });
+                setAttributeForm((form) => ({ ...form, name: e.target.value }));
               }}
               placeholder="Màu sắc, Kích thước, Form dáng…"
             />
-            {attributeFieldErrors.name && <p className="admin-field-error" role="alert">{attributeFieldErrors.name}</p>}
+            {createAttributeFieldErrors.name && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.name}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Mã thuộc tính</label>
             <input
-              className={`admin-input${errorClass(attributeFieldErrors, "code")}`}
+              className={`admin-input${errorClass(createAttributeFieldErrors, "code")}`}
               value={attributeForm.code}
-              readOnly={Boolean(attributeForm.isReferenced)}
-              onChange={(e) => {
-                clearAttributeFieldError("code");
-                setAttributeForm((f) => ({ ...f, code: e.target.value.toUpperCase() }));
-              }}
+              onChange={(e) => setAttributeForm((form) => ({ ...form, code: e.target.value.toUpperCase() }))}
               placeholder="COLOR, SIZE, FIT…"
             />
-            {attributeForm.isReferenced && (
-              <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>
-            )}
-            {attributeFieldErrors.code && <p className="admin-field-error" role="alert">{attributeFieldErrors.code}</p>}
+            {createAttributeFieldErrors.code && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.code}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Slug</label>
             <input
-              className={`admin-input${errorClass(attributeFieldErrors, "slug")}`}
+              className={`admin-input${errorClass(createAttributeFieldErrors, "slug")}`}
               value={attributeForm.slug}
-              readOnly={Boolean(attributeForm.isReferenced)}
-              onChange={(e) => {
-                clearAttributeFieldError("slug");
-                setAttributeForm((f) => ({ ...f, slug: e.target.value }));
-              }}
+              onChange={(e) => setAttributeForm((form) => ({ ...form, slug: e.target.value }))}
               placeholder="Tự sinh nếu bỏ trống"
             />
-            {attributeForm.isReferenced && (
-              <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>
-            )}
-            {attributeFieldErrors.slug && <p className="admin-field-error" role="alert">{attributeFieldErrors.slug}</p>}
+            {createAttributeFieldErrors.slug && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.slug}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Kiểu hiển thị</label>
-            <select
-              className={`admin-input${errorClass(attributeFieldErrors, "displayType")}`}
-              value={attributeForm.displayType}
-              onChange={(e) => {
-                clearAttributeFieldError("displayType");
-                setAttributeForm((f) => ({ ...f, displayType: e.target.value as DisplayType }));
-              }}
-            >
+            <select className="admin-input" value={attributeForm.displayType} onChange={(e) => setAttributeForm((form) => ({ ...form, displayType: e.target.value as DisplayType }))}>
               {Object.entries(DISPLAY_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            {attributeFieldErrors.displayType && <p className="admin-field-error" role="alert">{attributeFieldErrors.displayType}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Thứ tự sắp xếp</label>
-            <input
-              className={`admin-input${errorClass(attributeFieldErrors, "sortOrder")}`}
-              type="number"
-              value={attributeForm.sortOrder}
-              onChange={(e) => {
-                clearAttributeFieldError("sortOrder");
-                setAttributeForm((f) => ({ ...f, sortOrder: e.target.value }));
-              }}
-            />
-            {attributeFieldErrors.sortOrder && <p className="admin-field-error" role="alert">{attributeFieldErrors.sortOrder}</p>}
+            <input className="admin-input" type="number" value={attributeForm.sortOrder} onChange={(e) => setAttributeForm((form) => ({ ...form, sortOrder: e.target.value }))} />
           </div>
           <div className="admin-field">
             <label className="admin-label">Trạng thái</label>
-            <select className="admin-input" value={attributeForm.status} onChange={(e) => setAttributeForm((f) => ({ ...f, status: e.target.value as Status }))}>
+            <select className="admin-input" value={attributeForm.status} onChange={(e) => setAttributeForm((form) => ({ ...form, status: e.target.value as Status }))}>
               <option value="ACTIVE">Đang hoạt động</option>
               <option value="INACTIVE">Ngừng sử dụng</option>
             </select>
@@ -553,158 +761,82 @@ export default function ProductAttributesClient() {
         </div>
         <div className="admin-catalog-toggle-grid">
           <label className="admin-catalog-toggle">
-            <input type="checkbox" checked={attributeForm.isVariantAttribute} onChange={(e) => setAttributeForm((f) => ({ ...f, isVariantAttribute: e.target.checked }))} />
+            <input type="checkbox" checked={attributeForm.isVariantAttribute} onChange={(e) => setAttributeForm((form) => ({ ...form, isVariantAttribute: e.target.checked }))} />
             Dùng để tạo biến thể
           </label>
           <label className="admin-catalog-toggle">
-            <input type="checkbox" checked={attributeForm.isSpecificationAttribute} onChange={(e) => setAttributeForm((f) => ({ ...f, isSpecificationAttribute: e.target.checked }))} />
+            <input type="checkbox" checked={attributeForm.isSpecificationAttribute} onChange={(e) => setAttributeForm((form) => ({ ...form, isSpecificationAttribute: e.target.checked }))} />
             Dùng làm thông số sản phẩm
           </label>
         </div>
         <div className="admin-field">
           <label className="admin-label">Ghi chú nội bộ</label>
-          <textarea className="admin-textarea" value={attributeForm.note} onChange={(e) => setAttributeForm((f) => ({ ...f, note: e.target.value }))} />
+          <textarea className="admin-textarea" value={attributeForm.note} onChange={(e) => setAttributeForm((form) => ({ ...form, note: e.target.value }))} />
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="submit" className="admin-btn admin-btn--primary" disabled={isSavingAttribute}>
-            {isSavingAttribute ? "Đang lưu…" : attributeForm.id ? "Cập nhật thuộc tính" : "Thêm thuộc tính"}
+          <button type="submit" className="admin-btn admin-btn--primary" disabled={isSavingCreateAttribute}>
+            {isSavingCreateAttribute ? "Đang lưu…" : "Thêm thuộc tính"}
           </button>
-          {attributeForm.id && (
-            <button type="button" className="admin-btn admin-btn--secondary" onClick={cancelAttributeEdit}>
-              Hủy chỉnh sửa
-            </button>
-          )}
         </div>
       </form>
 
-      <form
-        ref={valueFormRef}
-        className="admin-catalog-fieldset"
-        style={{ scrollMarginTop: FORM_SCROLL_MARGIN }}
-        onSubmit={(e) => void handleValueSubmit(e)}
-      >
-        <legend style={{ fontWeight: 600, fontSize: 14 }}>
-          {valueForm.id && editingValueAttributeName && editingValueName
-            ? `Cập nhật giá trị: ${editingValueParentName || editingValueAttributeName} — ${editingValueName}`
-            : valueForm.id
-              ? "Cập nhật giá trị thuộc tính"
-              : "Thêm giá trị thuộc tính"}
-        </legend>
+      <form ref={valueFormRef} className="admin-catalog-fieldset" onSubmit={(e) => void handleCreateValueSubmit(e)}>
+        <legend style={{ fontWeight: 600, fontSize: 14 }}>Thêm giá trị thuộc tính</legend>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field">
             <label className="admin-label">Thuộc tính cha <span className="admin-required">*</span></label>
             <select
-              className={`admin-input${errorClass(valueFieldErrors, "attributeId")}`}
+              className={`admin-input${errorClass(createValueFieldErrors, "attributeId")}`}
               value={valueForm.attributeId}
-              disabled={Boolean(valueForm.id)}
-              onChange={(e) => {
-                clearValueFieldError("attributeId");
-                setValueForm((f) => ({ ...f, attributeId: e.target.value }));
-              }}
+              onChange={(e) => setValueForm((form) => ({ ...form, attributeId: e.target.value }))}
             >
               <option value="">— Chọn thuộc tính —</option>
               {attributes.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name} ({attribute.code})</option>)}
             </select>
-            {valueForm.id && (
-              <p className="admin-field-hint">Không thể chuyển giá trị sang thuộc tính khác sau khi đã tạo.</p>
-            )}
-            {valueFieldErrors.attributeId && <p className="admin-field-error" role="alert">{valueFieldErrors.attributeId}</p>}
+            {createValueFieldErrors.attributeId && <p className="admin-field-error" role="alert">{createValueFieldErrors.attributeId}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Tên hiển thị <span className="admin-required">*</span></label>
             <input
-              ref={valueNameInputRef}
-              className={`admin-input${errorClass(valueFieldErrors, "name")}`}
+              className={`admin-input${errorClass(createValueFieldErrors, "name")}`}
               value={valueForm.name}
-              onChange={(e) => {
-                clearValueFieldError("name");
-                setValueForm((f) => ({ ...f, name: e.target.value }));
-              }}
+              onChange={(e) => setValueForm((form) => ({ ...form, name: e.target.value }))}
               placeholder="Đen, Trắng, S, Regular fit…"
             />
-            {valueFieldErrors.name && <p className="admin-field-error" role="alert">{valueFieldErrors.name}</p>}
+            {createValueFieldErrors.name && <p className="admin-field-error" role="alert">{createValueFieldErrors.name}</p>}
           </div>
           <div className="admin-field">
             <label className="admin-label">Mã giá trị</label>
-            <input
-              className={`admin-input${errorClass(valueFieldErrors, "code")}`}
-              value={valueForm.code}
-              readOnly={Boolean(valueForm.isReferenced)}
-              onChange={(e) => {
-                clearValueFieldError("code");
-                setValueForm((f) => ({ ...f, code: e.target.value.toUpperCase() }));
-              }}
-              placeholder="BLK, WHT, S…"
-            />
-            {valueForm.isReferenced && (
-              <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>
-            )}
-            {valueFieldErrors.code && <p className="admin-field-error" role="alert">{valueFieldErrors.code}</p>}
+            <input className="admin-input" value={valueForm.code} onChange={(e) => setValueForm((form) => ({ ...form, code: e.target.value.toUpperCase() }))} placeholder="BLK, WHT, S…" />
           </div>
           <div className="admin-field">
             <label className="admin-label">Slug</label>
-            <input
-              className={`admin-input${errorClass(valueFieldErrors, "slug")}`}
-              value={valueForm.slug}
-              readOnly={Boolean(valueForm.isReferenced)}
-              onChange={(e) => {
-                clearValueFieldError("slug");
-                setValueForm((f) => ({ ...f, slug: e.target.value }));
-              }}
-              placeholder="Tự sinh nếu bỏ trống"
-            />
-            {valueForm.isReferenced && (
-              <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>
-            )}
-            {valueFieldErrors.slug && <p className="admin-field-error" role="alert">{valueFieldErrors.slug}</p>}
+            <input className="admin-input" value={valueForm.slug} onChange={(e) => setValueForm((form) => ({ ...form, slug: e.target.value }))} placeholder="Tự sinh nếu bỏ trống" />
           </div>
           <div className="admin-field">
             <label className="admin-label">HEX màu</label>
-            <input
-              className={`admin-input${errorClass(valueFieldErrors, "hexCode")}`}
-              value={valueForm.hexCode}
-              onChange={(e) => {
-                clearValueFieldError("hexCode");
-                setValueForm((f) => ({ ...f, hexCode: e.target.value }));
-              }}
-              placeholder="#000000"
-            />
-            {valueFieldErrors.hexCode && <p className="admin-field-error" role="alert">{valueFieldErrors.hexCode}</p>}
+            <input className="admin-input" value={valueForm.hexCode} onChange={(e) => setValueForm((form) => ({ ...form, hexCode: e.target.value }))} placeholder="#000000" />
           </div>
           <div className="admin-field">
             <label className="admin-label">Ảnh giá trị</label>
-            <input className="admin-input" value={valueForm.imageUrl} onChange={(e) => setValueForm((f) => ({ ...f, imageUrl: e.target.value }))} placeholder="URL ảnh nếu dùng image swatch" />
+            <input className="admin-input" value={valueForm.imageUrl} onChange={(e) => setValueForm((form) => ({ ...form, imageUrl: e.target.value }))} placeholder="URL ảnh nếu dùng image swatch" />
           </div>
           <div className="admin-field">
             <label className="admin-label">Thứ tự</label>
-            <input
-              className={`admin-input${errorClass(valueFieldErrors, "sortOrder")}`}
-              type="number"
-              value={valueForm.sortOrder}
-              onChange={(e) => {
-                clearValueFieldError("sortOrder");
-                setValueForm((f) => ({ ...f, sortOrder: e.target.value }));
-              }}
-            />
-            {valueFieldErrors.sortOrder && <p className="admin-field-error" role="alert">{valueFieldErrors.sortOrder}</p>}
+            <input className="admin-input" type="number" value={valueForm.sortOrder} onChange={(e) => setValueForm((form) => ({ ...form, sortOrder: e.target.value }))} />
           </div>
           <div className="admin-field">
             <label className="admin-label">Trạng thái</label>
-            <select className="admin-input" value={valueForm.status} onChange={(e) => setValueForm((f) => ({ ...f, status: e.target.value as Status }))}>
+            <select className="admin-input" value={valueForm.status} onChange={(e) => setValueForm((form) => ({ ...form, status: e.target.value as Status }))}>
               <option value="ACTIVE">Đang hoạt động</option>
               <option value="INACTIVE">Ngừng sử dụng</option>
             </select>
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="submit" className="admin-btn admin-btn--primary" disabled={isSavingValue}>
-            {isSavingValue ? "Đang lưu…" : valueForm.id ? "Cập nhật giá trị" : "Thêm giá trị"}
+          <button type="submit" className="admin-btn admin-btn--primary" disabled={isSavingCreateValue}>
+            {isSavingCreateValue ? "Đang lưu…" : "Thêm giá trị"}
           </button>
-          {valueForm.id && (
-            <button type="button" className="admin-btn admin-btn--secondary" onClick={cancelValueEdit}>
-              Hủy chỉnh sửa
-            </button>
-          )}
         </div>
       </form>
 
@@ -713,43 +845,189 @@ export default function ProductAttributesClient() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {attributes.map((attribute) => {
-            const isEditingAttribute = editingAttributeId === attribute.id;
+            const isInlineEditingAttribute = inlineAttributeEditId === attribute.id && inlineAttributeDraft;
             return (
               <section
                 key={attribute.id}
                 ref={(node) => { attributeSectionRefs.current[attribute.id] = node; }}
                 className="admin-product-section"
               >
-                <div className="admin-section-head">
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <h3 className="admin-subtitle" style={{ marginBottom: 0 }}>{attribute.name}</h3>
-                      {isEditingAttribute && (
-                        <span className="admin-kb-badge admin-kb-badge--verified">Đang chỉnh sửa</span>
-                      )}
+                {isInlineEditingAttribute ? (
+                  <div className="admin-attribute-inline-edit-panel">
+                    <div className="admin-attribute-inline-edit-meta">
+                      <code className="admin-catalog-code">{inlineAttributeDraft.code}</code>
+                      <span>{attribute.slug}</span>
+                      <span>Đang dùng trong {attribute.usageCount} sản phẩm / biến thể</span>
+                      <span className={`admin-kb-badge ${attribute.status === "ACTIVE" ? "admin-kb-badge--verified" : "admin-kb-badge--low"}`}>
+                        {attribute.status === "ACTIVE" ? "Đang hoạt động" : "Ngừng sử dụng"}
+                      </span>
                     </div>
-                    <p className="admin-field-hint">
-                      <code className="admin-catalog-code">{attribute.code}</code> · {attribute.slug} · {DISPLAY_TYPE_LABELS[attribute.displayType]} · Đang dùng trong {attribute.usageCount} sản phẩm / biến thể
-                    </p>
-                  </div>
-                  <div className="admin-catalog-actions-cell">
-                    {attribute.status === "ACTIVE" && attribute.isSpecificationAttribute && (
-                      <Link
-                        href={`/admin/products/new?attributeId=${attribute.id}&usage=specification`}
+                    <div className="admin-attribute-inline-edit-grid">
+                      <div className="admin-field">
+                        <label className="admin-label">Tên thuộc tính</label>
+                        <input
+                          className={`admin-input${errorClass(inlineAttributeFieldErrors, "name")}`}
+                          value={inlineAttributeDraft.name}
+                          onChange={(e) => {
+                            clearInlineAttributeFieldError("name");
+                            setInlineAttributeDraft((draft) => draft ? { ...draft, name: e.target.value } : draft);
+                          }}
+                        />
+                        {inlineAttributeFieldErrors.name && <p className="admin-field-error" role="alert">{inlineAttributeFieldErrors.name}</p>}
+                      </div>
+                      <div className="admin-field">
+                        <label className="admin-label">Kiểu hiển thị</label>
+                        <select
+                          className={`admin-input${errorClass(inlineAttributeFieldErrors, "displayType")}`}
+                          value={inlineAttributeDraft.displayType}
+                          onChange={(e) => {
+                            clearInlineAttributeFieldError("displayType");
+                            setInlineAttributeDraft((draft) => draft ? { ...draft, displayType: e.target.value as DisplayType } : draft);
+                          }}
+                        >
+                          {Object.entries(DISPLAY_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                        {inlineAttributeFieldErrors.displayType && <p className="admin-field-error" role="alert">{inlineAttributeFieldErrors.displayType}</p>}
+                      </div>
+                      <div className="admin-field">
+                        <label className="admin-label">Thứ tự</label>
+                        <input
+                          className={`admin-input${errorClass(inlineAttributeFieldErrors, "sortOrder")}`}
+                          type="number"
+                          value={inlineAttributeDraft.sortOrder}
+                          onChange={(e) => {
+                            clearInlineAttributeFieldError("sortOrder");
+                            setInlineAttributeDraft((draft) => draft ? { ...draft, sortOrder: e.target.value } : draft);
+                          }}
+                        />
+                        {inlineAttributeFieldErrors.sortOrder && <p className="admin-field-error" role="alert">{inlineAttributeFieldErrors.sortOrder}</p>}
+                      </div>
+                      <div className="admin-field">
+                        <label className="admin-label">Trạng thái</label>
+                        <select
+                          className="admin-input"
+                          value={inlineAttributeDraft.status}
+                          onChange={(e) => setInlineAttributeDraft((draft) => draft ? { ...draft, status: e.target.value as Status } : draft)}
+                        >
+                          <option value="ACTIVE">Đang hoạt động</option>
+                          <option value="INACTIVE">Ngừng sử dụng</option>
+                        </select>
+                      </div>
+                      <div className="admin-field admin-attribute-inline-edit-grid--full">
+                        <label className="admin-label">Ghi chú</label>
+                        <textarea
+                          className="admin-textarea"
+                          value={inlineAttributeDraft.note}
+                          onChange={(e) => setInlineAttributeDraft((draft) => draft ? { ...draft, note: e.target.value } : draft)}
+                        />
+                      </div>
+                      <div className="admin-catalog-toggle-grid admin-attribute-inline-edit-grid--full">
+                        <label className="admin-catalog-toggle">
+                          <input
+                            type="checkbox"
+                            checked={inlineAttributeDraft.isVariantAttribute}
+                            onChange={(e) => setInlineAttributeDraft((draft) => draft ? { ...draft, isVariantAttribute: e.target.checked } : draft)}
+                          />
+                          Dùng tạo biến thể
+                        </label>
+                        <label className="admin-catalog-toggle">
+                          <input
+                            type="checkbox"
+                            checked={inlineAttributeDraft.isSpecificationAttribute}
+                            onChange={(e) => setInlineAttributeDraft((draft) => draft ? { ...draft, isSpecificationAttribute: e.target.checked } : draft)}
+                          />
+                          Dùng làm thông số
+                        </label>
+                      </div>
+                    </div>
+                    {inlineAttributeAdvancedId === attribute.id ? (
+                      <div className="admin-attribute-inline-edit-identifiers">
+                        <div className="admin-field">
+                          <label className="admin-label">Mã</label>
+                          <input
+                            className={`admin-input${errorClass(inlineAttributeFieldErrors, "code")}`}
+                            value={inlineAttributeDraft.code}
+                            readOnly={inlineAttributeDraft.isReferenced}
+                            onChange={(e) => {
+                              clearInlineAttributeFieldError("code");
+                              setInlineAttributeDraft((draft) => draft ? { ...draft, code: e.target.value.toUpperCase() } : draft);
+                            }}
+                          />
+                          {inlineAttributeDraft.isReferenced && <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>}
+                          {inlineAttributeFieldErrors.code && <p className="admin-field-error" role="alert">{inlineAttributeFieldErrors.code}</p>}
+                        </div>
+                        <div className="admin-field">
+                          <label className="admin-label">Slug</label>
+                          <input
+                            className={`admin-input${errorClass(inlineAttributeFieldErrors, "slug")}`}
+                            value={inlineAttributeDraft.slug}
+                            readOnly={inlineAttributeDraft.isReferenced}
+                            onChange={(e) => {
+                              clearInlineAttributeFieldError("slug");
+                              setInlineAttributeDraft((draft) => draft ? { ...draft, slug: e.target.value } : draft);
+                            }}
+                          />
+                          {inlineAttributeDraft.isReferenced && <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>}
+                          {inlineAttributeFieldErrors.slug && <p className="admin-field-error" role="alert">{inlineAttributeFieldErrors.slug}</p>}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
                         className="admin-btn admin-btn--secondary admin-btn--xs"
+                        onClick={() => setInlineAttributeAdvancedId(attribute.id)}
                       >
-                        Dùng cho sản phẩm mới
-                      </Link>
+                        Chỉnh mã nâng cao
+                      </button>
                     )}
-                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => startEditAttribute(attribute)}>
-                      Sửa
-                    </button>
-                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchAttribute(attribute, { status: attribute.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}>
-                      {attribute.status === "ACTIVE" ? "Ngừng sử dụng" : "Kích hoạt"}
-                    </button>
-                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void deleteAttribute(attribute)}>Xóa</button>
+                    {inlineAttributeFieldErrors._form && (
+                      <p className="admin-field-error" role="alert">{inlineAttributeFieldErrors._form}</p>
+                    )}
+                    <div className="admin-attribute-inline-edit-actions">
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--primary admin-btn--xs"
+                        disabled={savingAttributeId === attribute.id}
+                        onClick={() => void saveInlineAttribute(attribute)}
+                      >
+                        {savingAttributeId === attribute.id ? "Đang lưu…" : "Lưu"}
+                      </button>
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={cancelInlineAttributeEdit}>
+                        Hủy
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="admin-section-head">
+                    <div>
+                      <h3 className="admin-subtitle" style={{ marginBottom: 4 }}>{attribute.name}</h3>
+                      <p className="admin-field-hint">
+                        <code className="admin-catalog-code">{attribute.code}</code> · {attribute.slug} · {DISPLAY_TYPE_LABELS[attribute.displayType]} · Đang dùng trong {attribute.usageCount} sản phẩm / biến thể
+                      </p>
+                    </div>
+                    <div className="admin-catalog-actions-cell">
+                      {attribute.status === "ACTIVE" && attribute.isSpecificationAttribute && (
+                        <Link
+                          href={`/admin/products/new?attributeId=${attribute.id}&usage=specification`}
+                          className="admin-btn admin-btn--secondary admin-btn--xs"
+                        >
+                          Dùng cho sản phẩm mới
+                        </Link>
+                      )}
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => openInlineAttributeEdit(attribute)}>
+                        Sửa nhanh
+                      </button>
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => manageValues(attribute)}>
+                        Quản lý giá trị
+                      </button>
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchAttributeStatus(attribute)}>
+                        {attribute.status === "ACTIVE" ? "Ngừng sử dụng" : "Kích hoạt"}
+                      </button>
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void deleteAttribute(attribute)}>Xóa</button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="admin-catalog-table-wrap">
                   <table className="admin-catalog-table">
                     <thead>
@@ -766,21 +1044,152 @@ export default function ProductAttributesClient() {
                     </thead>
                     <tbody>
                       {attribute.values.map((value) => {
-                        const isEditingValue = editingValueId === value.id;
+                        const isInlineEditingValue =
+                          inlineValueEditId === value.id
+                          && inlineValueAttributeId === attribute.id
+                          && inlineValueDraft;
+
+                        if (isInlineEditingValue) {
+                          return (
+                            <tr key={value.id} className="admin-attribute-value-inline-edit">
+                              <td colSpan={8}>
+                                <div className="admin-attribute-value-inline-fields">
+                                  <div className="admin-field">
+                                    <label className="admin-label">Tên giá trị</label>
+                                    <input
+                                      className={`admin-input${errorClass(inlineValueFieldErrors, "name")}`}
+                                      value={inlineValueDraft.name}
+                                      onChange={(e) => {
+                                        clearInlineValueFieldError("name");
+                                        setInlineValueDraft((draft) => draft ? { ...draft, name: e.target.value } : draft);
+                                      }}
+                                    />
+                                    {inlineValueFieldErrors.name && <p className="admin-field-error" role="alert">{inlineValueFieldErrors.name}</p>}
+                                  </div>
+                                  <div className="admin-field">
+                                    <label className="admin-label">HEX màu</label>
+                                    <input
+                                      className={`admin-input${errorClass(inlineValueFieldErrors, "hexCode")}`}
+                                      value={inlineValueDraft.hexCode}
+                                      onChange={(e) => {
+                                        clearInlineValueFieldError("hexCode");
+                                        setInlineValueDraft((draft) => draft ? { ...draft, hexCode: e.target.value } : draft);
+                                      }}
+                                    />
+                                    {inlineValueFieldErrors.hexCode && <p className="admin-field-error" role="alert">{inlineValueFieldErrors.hexCode}</p>}
+                                  </div>
+                                  <div className="admin-field">
+                                    <label className="admin-label">Ảnh (URL)</label>
+                                    <input
+                                      className="admin-input"
+                                      value={inlineValueDraft.imageUrl}
+                                      onChange={(e) => setInlineValueDraft((draft) => draft ? { ...draft, imageUrl: e.target.value } : draft)}
+                                    />
+                                  </div>
+                                  <div className="admin-field">
+                                    <label className="admin-label">Thứ tự</label>
+                                    <input
+                                      className={`admin-input${errorClass(inlineValueFieldErrors, "sortOrder")}`}
+                                      type="number"
+                                      value={inlineValueDraft.sortOrder}
+                                      onChange={(e) => {
+                                        clearInlineValueFieldError("sortOrder");
+                                        setInlineValueDraft((draft) => draft ? { ...draft, sortOrder: e.target.value } : draft);
+                                      }}
+                                    />
+                                    {inlineValueFieldErrors.sortOrder && <p className="admin-field-error" role="alert">{inlineValueFieldErrors.sortOrder}</p>}
+                                  </div>
+                                  <div className="admin-field">
+                                    <label className="admin-label">Trạng thái</label>
+                                    <select
+                                      className="admin-input"
+                                      value={inlineValueDraft.status}
+                                      onChange={(e) => setInlineValueDraft((draft) => draft ? { ...draft, status: e.target.value as Status } : draft)}
+                                    >
+                                      <option value="ACTIVE">Đang hoạt động</option>
+                                      <option value="INACTIVE">Ngừng sử dụng</option>
+                                    </select>
+                                  </div>
+                                  <div className="admin-field">
+                                    <label className="admin-label">Mã / slug</label>
+                                    <p className="admin-field-hint">
+                                      <code className="admin-catalog-code">{inlineValueDraft.code}</code> · {inlineValueDraft.slug}
+                                    </p>
+                                  </div>
+                                  {inlineValueAdvancedId === value.id ? (
+                                    <>
+                                      <div className="admin-field">
+                                        <label className="admin-label">Mã giá trị</label>
+                                        <input
+                                          className={`admin-input${errorClass(inlineValueFieldErrors, "code")}`}
+                                          value={inlineValueDraft.code}
+                                          readOnly={inlineValueDraft.isReferenced}
+                                          onChange={(e) => {
+                                            clearInlineValueFieldError("code");
+                                            setInlineValueDraft((draft) => draft ? { ...draft, code: e.target.value.toUpperCase() } : draft);
+                                          }}
+                                        />
+                                        {inlineValueDraft.isReferenced && <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>}
+                                        {inlineValueFieldErrors.code && <p className="admin-field-error" role="alert">{inlineValueFieldErrors.code}</p>}
+                                      </div>
+                                      <div className="admin-field">
+                                        <label className="admin-label">Slug</label>
+                                        <input
+                                          className={`admin-input${errorClass(inlineValueFieldErrors, "slug")}`}
+                                          value={inlineValueDraft.slug}
+                                          readOnly={inlineValueDraft.isReferenced}
+                                          onChange={(e) => {
+                                            clearInlineValueFieldError("slug");
+                                            setInlineValueDraft((draft) => draft ? { ...draft, slug: e.target.value } : draft);
+                                          }}
+                                        />
+                                        {inlineValueDraft.isReferenced && <p className="admin-field-hint">{CODE_SLUG_LOCKED_HINT}</p>}
+                                        {inlineValueFieldErrors.slug && <p className="admin-field-error" role="alert">{inlineValueFieldErrors.slug}</p>}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="admin-field" style={{ display: "flex", alignItems: "end" }}>
+                                      <button
+                                        type="button"
+                                        className="admin-btn admin-btn--secondary admin-btn--xs"
+                                        onClick={() => setInlineValueAdvancedId(value.id)}
+                                      >
+                                        Chỉnh mã nâng cao
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                {inlineValueFieldErrors._form && (
+                                  <p className="admin-field-error" role="alert">{inlineValueFieldErrors._form}</p>
+                                )}
+                                <div className="admin-attribute-inline-edit-actions" style={{ marginTop: 8 }}>
+                                  <button
+                                    type="button"
+                                    className="admin-btn admin-btn--primary admin-btn--xs"
+                                    disabled={savingValueId === value.id}
+                                    onClick={() => void saveInlineValue(attribute, value)}
+                                  >
+                                    {savingValueId === value.id ? "Đang lưu…" : "Lưu"}
+                                  </button>
+                                  <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={cancelInlineValueEdit}>
+                                    Hủy
+                                  </button>
+                                  <span className="admin-field-hint">Đang dùng trong {value.usageCount} sản phẩm / biến thể</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
                         return (
                           <tr key={value.id}>
-                            <td>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                <span>{value.name}</span>
-                                {isEditingValue && (
-                                  <span className="admin-kb-badge admin-kb-badge--verified">Đang chỉnh sửa</span>
-                                )}
-                              </div>
-                            </td>
+                            <td>{value.name}</td>
                             <td><code className="admin-catalog-code">{value.code}</code></td>
                             <td>{value.slug}</td>
                             <td>
-                              {value.hexCode ? <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 4, background: value.hexCode, border: "1px solid #d1d5db" }} title={value.hexCode} /> : value.imageUrl ? "Có ảnh" : "—"}
+                              {value.hexCode
+                                ? <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 4, background: value.hexCode, border: "1px solid #d1d5db" }} title={value.hexCode} />
+                                : value.imageUrl ? "Có ảnh" : "—"}
                             </td>
                             <td>{value.sortOrder}</td>
                             <td>
@@ -791,10 +1200,10 @@ export default function ProductAttributesClient() {
                             <td>Đang dùng trong {value.usageCount} sản phẩm / biến thể</td>
                             <td>
                               <div className="admin-catalog-actions-cell">
-                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => startEditValue(attribute, value)}>
-                                  Sửa
+                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => openInlineValueEdit(attribute, value)}>
+                                  Sửa nhanh
                                 </button>
-                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchValue(attribute, value, { status: value.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })}>
+                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchValueStatus(attribute, value)}>
                                   {value.status === "ACTIVE" ? "Ngừng" : "Kích hoạt"}
                                 </button>
                                 <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void deleteValue(attribute, value)}>Xóa</button>
@@ -805,7 +1214,7 @@ export default function ProductAttributesClient() {
                       })}
                       {attribute.values.length === 0 && (
                         <tr>
-                          <td colSpan={8}>Chưa có giá trị. Thêm giá trị ở biểu mẫu phía trên.</td>
+                          <td colSpan={8}>Chưa có giá trị. Thêm giá trị ở biểu mẫu phía trên hoặc dùng &quot;Quản lý giá trị&quot;.</td>
                         </tr>
                       )}
                     </tbody>

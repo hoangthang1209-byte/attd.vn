@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { QuoteStatus } from "@prisma/client";
 import QuoteStatusBadge from "@/components/admin/quotes/QuoteStatusBadge";
+import {
+  AdminLoadingState,
+  AdminPageShell,
+  DataToolbar,
+  EmptyState,
+  PageHeader,
+} from "@/components/admin/AdminUi";
 import { formatQuoteCurrency, formatQuoteDate } from "@/features/quotes/format";
 import { QUOTE_STATUS_LABELS } from "@/features/quotes/labels";
 import type { QuoteListRecord } from "@/features/quotes/types";
@@ -38,26 +45,37 @@ export default function QuoteListManager() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <div className="admin-panel">
-      <div className="admin-section-header">
-        <p>Tổng: {quotes.length} báo giá</p>
-        <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">Tạo báo giá</Link>
-      </div>
+    <AdminPageShell>
+      <PageHeader
+        description="Theo dõi báo giá, thời hạn hiệu lực và giá trị giao dịch."
+        meta={<span>Tổng: {quotes.length} báo giá</span>}
+        actions={
+          <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
+            Tạo báo giá
+          </Link>
+        }
+      />
 
-      <form className="admin-crm-filters" onSubmit={(e) => { e.preventDefault(); void load(); }}>
-        <input className="admin-input" placeholder="Tìm mã, khách hàng, lead..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value as QuoteStatus | "")}>
-          <option value="">Tất cả trạng thái</option>
-          {(Object.keys(QUOTE_STATUS_LABELS) as QuoteStatus[]).map((s) => (
-            <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>
-          ))}
-        </select>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>Tìm</button>
+      <form onSubmit={(e) => { e.preventDefault(); void load(); }}>
+        <DataToolbar>
+          <input className="admin-input admin-data-toolbar__search" placeholder="Tìm mã, khách hàng, lead..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value as QuoteStatus | "")}>
+            <option value="">Tất cả trạng thái</option>
+            {(Object.keys(QUOTE_STATUS_LABELS) as QuoteStatus[]).map((s) => (
+              <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+          <button type="submit" className="admin-btn admin-btn--secondary">Tìm</button>
+        </DataToolbar>
       </form>
 
       {error && <p className="admin-error">{error}</p>}
-      {loading ? <p className="admin-loading">Đang tải...</p> : quotes.length === 0 ? (
-        <div className="admin-empty-state"><p>Chưa có báo giá nào</p><Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">Tạo báo giá</Link></div>
+      {loading ? <AdminLoadingState label="Đang tải danh sách báo giá…" /> : quotes.length === 0 ? (
+        <EmptyState
+          title="Chưa có báo giá phù hợp"
+          description="Hãy tạo báo giá mới hoặc điều chỉnh bộ lọc để xem thêm kết quả."
+          action={<Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">Tạo báo giá</Link>}
+        />
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">
@@ -88,6 +106,6 @@ export default function QuoteListManager() {
           </table>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

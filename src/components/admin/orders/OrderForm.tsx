@@ -19,6 +19,7 @@ import OrderItemFormRow, {
   type OrderItemRow,
 } from "@/components/admin/orders/OrderItemFormRow";
 import OrderTotalsSummary from "@/components/admin/orders/OrderTotalsSummary";
+import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
 import {
   contactToQuoteSnapshots,
   customerToQuoteSnapshots,
@@ -568,27 +569,33 @@ export default function OrderForm({ mode, orderId }: Props) {
           </div>
           <div className="admin-field">
             <label className="admin-label">Nhân viên tư vấn</label>
-            <select
-              className="admin-input"
+            <AdminSearchableSelect
               value={salesEmployeeId}
-              onChange={(e) => {
-                const employee = salesEmployees.find((r) => r.id === e.target.value);
+              onChange={(employeeId) => {
+                const employee = salesEmployees.find((record) => record.id === employeeId);
                 if (employee) applySalesEmployee(employee);
                 else {
                   setSalesEmployeeId("");
                   setSalesRepresentativeId("");
+                  setSalesName("");
+                  setSalesTitle("");
+                  setSalesPhone("");
+                  setSalesEmail("");
                 }
               }}
-            >
-              <option value="">— Chọn nhân viên —</option>
-              {salesEmployees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.fullName}
-                  {employee.jobTitle ? ` · ${employee.jobTitle}` : ""}
-                  {employee.role ? ` · ${employeeRoleLabel(employee.role)}` : ""}
-                </option>
-              ))}
-            </select>
+              options={salesEmployees.map((employee) => ({
+                value: employee.id,
+                label: employee.fullName,
+                sublabel: [
+                  employee.employeeCode,
+                  employee.jobTitle,
+                  employee.role ? employeeRoleLabel(employee.role) : null,
+                ].filter(Boolean).join(" · "),
+              }))}
+              placeholder="— Chọn nhân viên —"
+              searchPlaceholder="Tìm theo tên, mã hoặc chức vụ…"
+              emptyMessage="Chưa có nhân viên tư vấn đang hoạt động."
+            />
           </div>
           <div className="admin-field">
             <label className="admin-label">Loại tiền</label>

@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { OrderStatus } from "@prisma/client";
 import OrderListQuickStatus from "@/components/admin/orders/OrderListQuickStatus";
+import {
+  AdminLoadingState,
+  AdminPageShell,
+  DataToolbar,
+  EmptyState,
+  PageHeader,
+} from "@/components/admin/AdminUi";
 import { formatOrderCurrency, formatOrderDate } from "@/features/orders/order-format";
 import {
   ORDER_PAYMENT_STATE_LABELS,
@@ -74,43 +81,52 @@ export default function OrderListManager() {
   }
 
   return (
-    <div className="admin-panel">
-      <div className="admin-section-header">
-        <p>Tổng: {total} đơn hàng</p>
-        <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
-          Tạo đơn hàng
-        </Link>
-      </div>
+    <AdminPageShell>
+      <PageHeader
+        description="Quản lý trạng thái vận hành, thanh toán và tiến độ đơn hàng."
+        meta={<span>Tổng: {total} đơn hàng</span>}
+        actions={
+          <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
+            Tạo đơn hàng
+          </Link>
+        }
+      />
 
-      <form className="admin-crm-filters" onSubmit={(e) => { e.preventDefault(); void load(); }}>
-        <input
-          className="admin-input"
-          placeholder="Tìm mã đơn, báo giá, khách hàng..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value as OrderStatus | "")}>
-          <option value="">Tất cả trạng thái</option>
-          {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((s) => (
-            <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
-          ))}
-        </select>
-        <select
-          className="admin-input"
-          value={paymentState}
-          onChange={(e) => setPaymentState(e.target.value as OrderPaymentStateFilter | "")}
-        >
-          <option value="">Tất cả thanh toán</option>
-          {(Object.keys(ORDER_PAYMENT_STATE_LABELS) as OrderPaymentStateFilter[]).map((s) => (
-            <option key={s} value={s}>{ORDER_PAYMENT_STATE_LABELS[s]}</option>
-          ))}
-        </select>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>Tìm</button>
+      <form onSubmit={(e) => { e.preventDefault(); void load(); }}>
+        <DataToolbar>
+          <input
+            className="admin-input admin-data-toolbar__search"
+            placeholder="Tìm mã đơn, báo giá, khách hàng..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value as OrderStatus | "")}>
+            <option value="">Tất cả trạng thái</option>
+            {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((s) => (
+              <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+          <select
+            className="admin-input"
+            value={paymentState}
+            onChange={(e) => setPaymentState(e.target.value as OrderPaymentStateFilter | "")}
+          >
+            <option value="">Tất cả thanh toán</option>
+            {(Object.keys(ORDER_PAYMENT_STATE_LABELS) as OrderPaymentStateFilter[]).map((s) => (
+              <option key={s} value={s}>{ORDER_PAYMENT_STATE_LABELS[s]}</option>
+            ))}
+          </select>
+          <button type="submit" className="admin-btn admin-btn--secondary">Tìm</button>
+        </DataToolbar>
       </form>
 
       {error && <p className="admin-error">{error}</p>}
-      {loading ? <p className="admin-loading">Đang tải...</p> : orders.length === 0 ? (
-        <div className="admin-empty-state"><p>Chưa có đơn hàng nào</p></div>
+      {loading ? <AdminLoadingState label="Đang tải danh sách đơn hàng…" /> : orders.length === 0 ? (
+        <EmptyState
+          title="Chưa có đơn hàng phù hợp"
+          description="Hãy tạo đơn hàng mới hoặc điều chỉnh bộ lọc hiện tại."
+          action={<Link href="/admin/orders/new" className="admin-btn admin-btn--primary">Tạo đơn hàng</Link>}
+        />
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">
@@ -163,6 +179,6 @@ export default function OrderListManager() {
           </table>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

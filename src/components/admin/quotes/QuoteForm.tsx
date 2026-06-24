@@ -20,6 +20,7 @@ import QuoteItemFormRow, {
   type QuoteItemRow,
 } from "@/components/admin/quotes/QuoteItemFormRow";
 import QuickAddContactModal from "@/components/admin/quotes/QuickAddContactModal";
+import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import { employeeRoleLabel } from "@/features/employees/employee-role";
 
@@ -745,24 +746,33 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
           <div className="quote-form__party-fields">
             <div className="admin-field">
               <label className="admin-label">Chọn nhân viên tư vấn</label>
-              <select
-                className="admin-input"
-                value={salesName ? salesEmployees.find((e) => e.fullName === salesName)?.id ?? "" : ""}
-                onChange={(e) => {
-                  const employee = salesEmployees.find((r) => r.id === e.target.value);
+              <AdminSearchableSelect
+                value={salesRepresentativeId}
+                onChange={(employeeId) => {
+                  const employee = salesEmployees.find((record) => record.id === employeeId);
                   if (employee) applySalesEmployee(employee);
-                  else setSalesRepresentativeId("");
+                  else {
+                    setSalesRepresentativeId("");
+                    setSalesName("");
+                    setSalesTitle("");
+                    setSalesPhone("");
+                    setSalesEmail("");
+                    setSalesAddress("");
+                  }
                 }}
-              >
-                <option value="">— Chọn nhân viên —</option>
-                {salesEmployees.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.fullName}
-                    {employee.jobTitle ? ` · ${employee.jobTitle}` : ""}
-                    {employee.role ? ` · ${employeeRoleLabel(employee.role)}` : ""}
-                  </option>
-                ))}
-              </select>
+                options={salesEmployees.map((employee) => ({
+                  value: employee.id,
+                  label: employee.fullName,
+                  sublabel: [
+                    employee.employeeCode,
+                    employee.jobTitle,
+                    employee.role ? employeeRoleLabel(employee.role) : null,
+                  ].filter(Boolean).join(" · "),
+                }))}
+                placeholder="— Chọn nhân viên —"
+                searchPlaceholder="Tìm theo tên, mã hoặc chức vụ…"
+                emptyMessage="Chưa có nhân viên tư vấn đang hoạt động."
+              />
             </div>
             <div className="admin-field">
               <label className="admin-label">Họ tên</label>

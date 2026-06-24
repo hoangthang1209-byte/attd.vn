@@ -15,20 +15,15 @@ export default function SectionHeader({
 
   return (
     <div
-      className={className}
-      style={{
-        marginBottom: "48px",
-        textAlign: isCenter ? "center" : "left",
-      }}
+      className={`section-header${isCenter ? " section-header--center" : ""}${
+        className ? ` ${className}` : ""
+      }`}
     >
-      <h2 className="section-title" style={isCenter ? { margin: "0 auto 16px" } : undefined}>
+      <h2 className="section-title">
         {title}
       </h2>
       {description && (
-        <p
-          className="section-description"
-          style={isCenter ? { margin: "0 auto" } : undefined}
-        >
+        <p className="section-description">
           {description}
         </p>
       )}

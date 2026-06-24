@@ -1,4 +1,5 @@
 import CaseStudyCard from "@/components/public/CaseStudyCard";
+import ResponsiveGrid from "@/components/public/ResponsiveGrid";
 import { getVisibleCaseStudiesFromDb } from "@/features/case-studies/services/case-study.service";
 import { CASE_STUDIES_SECTION } from "@/lib/caseStudies";
 
@@ -16,11 +17,11 @@ export default async function CaseStudySection() {
           {CASE_STUDIES_SECTION.description}
         </p>
 
-        <div className="case-study-grid">
+        <ResponsiveGrid className="case-study-grid" minItemWidth={280} gap={20}>
           {studies.map((study) => (
             <CaseStudyCard key={study.id} study={study} />
           ))}
-        </div>
+        </ResponsiveGrid>
       </div>
     </section>
   );

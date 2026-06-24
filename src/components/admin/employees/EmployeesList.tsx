@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { EmployeeRole } from "@prisma/client";
 import { formatCrmDateTime } from "@/features/crm/format";
+import {
+  AdminLoadingState,
+  AdminPageShell,
+  DataToolbar,
+  EmptyState,
+  PageHeader,
+  StatusBadge,
+} from "@/components/admin/AdminUi";
 import { EMPLOYEE_ROLES, EMPLOYEE_ROLE_LABELS, employeeRoleLabel } from "@/features/employees/employee-role";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 
@@ -60,49 +68,57 @@ export default function EmployeesList() {
   }
 
   return (
-    <div className="admin-panel">
-      <div className="admin-section-header">
-        <p>Tổng: {total} nhân viên</p>
-        <Link href="/admin/employees/new" className="admin-btn admin-btn--primary">
-          Thêm nhân viên
-        </Link>
-      </div>
+    <AdminPageShell>
+      <PageHeader
+        description="Quản lý nhân sự được sử dụng trong báo giá, đơn hàng, sản xuất và giao hàng."
+        meta={<span>Tổng: {total} nhân viên</span>}
+        actions={
+          <Link href="/admin/employees/new" className="admin-btn admin-btn--primary">
+            Thêm nhân viên
+          </Link>
+        }
+      />
 
       <form
-        className="admin-crm-filters"
         onSubmit={(e) => {
           e.preventDefault();
           void load();
         }}
       >
-        <input
-          className="admin-input"
-          placeholder="Tìm mã, tên, SĐT, email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <label className="admin-checkbox-label">
-          <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} />
-          Chỉ đang hoạt động
-        </label>
-        <select
-          className="admin-input"
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value as EmployeeRole | "")}
-        >
-          <option value="">Tất cả vai trò</option>
-          {EMPLOYEE_ROLES.map((role) => (
-            <option key={role} value={role}>{EMPLOYEE_ROLE_LABELS[role]}</option>
-          ))}
-        </select>
-        <button type="submit" className="admin-btn">Tìm kiếm</button>
+        <DataToolbar>
+          <input
+            className="admin-input admin-data-toolbar__search"
+            placeholder="Tìm mã, tên, SĐT, email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className="admin-input"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as EmployeeRole | "")}
+          >
+            <option value="">Tất cả vai trò</option>
+            {EMPLOYEE_ROLES.map((role) => (
+              <option key={role} value={role}>{EMPLOYEE_ROLE_LABELS[role]}</option>
+            ))}
+          </select>
+          <label className="admin-checkbox-label admin-data-toolbar__checkbox">
+            <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} />
+            Chỉ đang hoạt động
+          </label>
+          <button type="submit" className="admin-btn admin-btn--secondary">Tìm kiếm</button>
+        </DataToolbar>
       </form>
 
       {error && <p className="admin-error">{error}</p>}
-      {loading && <p className="admin-loading">Đang tải...</p>}
+      {loading && <AdminLoadingState label="Đang tải danh sách nhân viên…" />}
 
       {!loading && employees.length === 0 && (
-        <p className="admin-empty-state">Chưa có nhân viên.</p>
+        <EmptyState
+          title="Chưa có nhân viên phù hợp"
+          description="Thêm nhân viên mới hoặc thay đổi bộ lọc để xem thêm kết quả."
+          action={<Link href="/admin/employees/new" className="admin-btn admin-btn--primary">Thêm nhân viên</Link>}
+        />
       )}
 
       {!loading && employees.length > 0 && (
@@ -132,7 +148,11 @@ export default function EmployeesList() {
                   <td>{emp.department ?? "—"}</td>
                   <td>{emp.phone ?? "—"}</td>
                   <td>{emp.email ?? "—"}</td>
-                  <td>{emp.isActive ? "Đang hoạt động" : "Ngưng sử dụng"}</td>
+                  <td>
+                    <StatusBadge tone={emp.isActive ? "success" : "neutral"}>
+                      {emp.isActive ? "Đang hoạt động" : "Ngưng sử dụng"}
+                    </StatusBadge>
+                  </td>
                   <td>{formatCrmDateTime(emp.createdAt)}</td>
                   <td className="admin-table-actions">
                     <button
@@ -156,6 +176,6 @@ export default function EmployeesList() {
           </table>
         </div>
       )}
-    </div>
+    </AdminPageShell>
   );
 }

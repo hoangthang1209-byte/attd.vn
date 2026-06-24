@@ -23,6 +23,7 @@ import {
 import type { DeliveryCarrierRecord } from "@/features/delivery/delivery-carrier.service";
 import ProductionOwnerSelect from "@/components/admin/orders/ProductionOwnerSelect";
 import DeliveryCarrierSelect from "@/components/admin/orders/DeliveryCarrierSelect";
+import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
 import {
   ORDER_PAYMENT_METHOD_LABELS,
   ORDER_PAYMENT_STATE_LABELS,
@@ -776,25 +777,31 @@ export default function OrderDetailView({ id }: Props) {
               </div>
               <div className="admin-field">
                 <label className="admin-label">Người phụ trách giao hàng</label>
-                <select
-                  className="admin-input"
+                <AdminSearchableSelect
                   value={deliveryFields.deliveryOwnerId}
-                  onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryOwnerId: e.target.value }))}
-                >
-                  <option value="">— Chọn nhân viên —</option>
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.fullName} ({emp.employeeCode})
-                    </option>
-                  ))}
-                  {order.deliveryOwnerId &&
-                    !employees.some((e) => e.id === order.deliveryOwnerId) &&
-                    order.deliveryOwnerName && (
-                      <option value={order.deliveryOwnerId}>
-                        {order.deliveryOwnerName} (lưu trước)
-                      </option>
-                    )}
-                </select>
+                  onChange={(deliveryOwnerId) =>
+                    setDeliveryFields((fields) => ({ ...fields, deliveryOwnerId }))
+                  }
+                  options={[
+                    ...employees.map((employee) => ({
+                      value: employee.id,
+                      label: employee.fullName,
+                      sublabel: employee.employeeCode,
+                    })),
+                    ...(order.deliveryOwnerId &&
+                    !employees.some((employee) => employee.id === order.deliveryOwnerId) &&
+                    order.deliveryOwnerName
+                      ? [{
+                          value: order.deliveryOwnerId,
+                          label: order.deliveryOwnerName,
+                          sublabel: "Dữ liệu đã lưu",
+                        }]
+                      : []),
+                  ]}
+                  placeholder="— Chọn nhân viên —"
+                  searchPlaceholder="Tìm nhân viên phụ trách…"
+                  emptyMessage="Chưa có nhân viên đang hoạt động."
+                />
               </div>
               <div className="admin-field">
                 <label className="admin-label">Đơn vị vận chuyển</label>

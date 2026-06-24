@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense } from "react";
+import { Menu, X } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import AdminScrollRestoration from "@/components/admin/AdminScrollRestoration";
@@ -178,7 +179,12 @@ function AdminShellMain({ children }: { children: React.ReactNode }) {
 /** Persistent admin app shell — mounted once in admin layout. */
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isLogin = pathname === "/admin/login";
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   if (isLogin) {
     return children;
@@ -187,16 +193,30 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   return (
     <AdminTitleProvider>
       <div className="admin-app-shell admin-shell">
-        <aside className="admin-sidebar">
+        <aside className={`admin-sidebar${mobileNavOpen ? " is-mobile-open" : ""}`}>
           <div className="admin-sidebar-top">
             <Link href="/admin/dashboard" scroll={false} className="admin-brand">
               ATTD CMS
             </Link>
-            <AdminLogoutButton />
+            <div className="admin-sidebar-actions">
+              <AdminLogoutButton />
+              <button
+                type="button"
+                className="admin-mobile-nav-toggle"
+                onClick={() => setMobileNavOpen((current) => !current)}
+                aria-expanded={mobileNavOpen}
+                aria-controls="admin-primary-navigation"
+                aria-label={mobileNavOpen ? "Đóng menu quản trị" : "Mở menu quản trị"}
+              >
+                {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            </div>
           </div>
-          <Suspense fallback={null}>
-            <AdminShellNav />
-          </Suspense>
+          <div id="admin-primary-navigation" className="admin-sidebar-nav-wrap">
+            <Suspense fallback={null}>
+              <AdminShellNav />
+            </Suspense>
+          </div>
         </aside>
         <AdminShellMain>{children}</AdminShellMain>
       </div>
