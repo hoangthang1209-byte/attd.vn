@@ -17,6 +17,7 @@ import {
   canonicalUrl,
   buildOgImages,
 } from "@/lib/seo";
+import { applyCategoryLandingIndexation } from "@/lib/seo/indexation-policy";
 import {
   getCategoryHeroImage,
   getCategoryGalleryImages,
@@ -49,9 +50,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    alternates: {
-      canonical: canonicalUrl(`/${category}`),
-    },
     openGraph: {
       title: content?.seoTitle ?? cat.seoTitle ?? cat.name,
       description,
@@ -65,6 +63,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description,
       images: ogImages,
     },
+    ...applyCategoryLandingIndexation(category),
   };
 }
 

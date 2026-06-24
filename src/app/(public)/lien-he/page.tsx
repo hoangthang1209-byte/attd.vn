@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ContactForm from "@/components/public/ContactForm";
+import { buildContactMetadata } from "@/lib/seo/indexation-policy";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildContactMetadata({
   title: "Liên hệ báo giá | ATTD",
   description:
     "Gửi yêu cầu báo giá nguồn hàng đồng phục và quà tặng doanh nghiệp. ATTD phản hồi trong 24 giờ làm việc.",
-};
+});
 
 const CONTEXT_CARDS = [
   {

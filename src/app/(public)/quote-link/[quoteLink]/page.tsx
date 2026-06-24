@@ -8,6 +8,7 @@ import {
   getQuotePublicPath,
   parseQuotePublicLinkSegment,
 } from "@/features/quotes/quote-public-link.service";
+import { buildPrivateNoindexMetadata } from "@/lib/seo/indexation-policy";
 
 type Props = { params: Promise<{ quoteLink: string }> };
 
@@ -19,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = parsed ? `Báo giá ${parsed.quoteNo}` : "Báo giá";
   return {
     title,
-    robots: { index: false, follow: false },
+    ...buildPrivateNoindexMetadata(),
   };
 }
 

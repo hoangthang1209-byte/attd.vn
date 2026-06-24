@@ -6,6 +6,7 @@ import {
   orderPdfContentDisposition,
   parseOrderPdfDisposition,
 } from "@/features/orders/pdf/order-pdf-disposition";
+import { mergePdfNoindexHeaders } from "@/lib/seo/indexation-policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,12 +36,12 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     });
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
-      headers: {
+      headers: mergePdfNoindexHeaders({
         "Content-Type": "application/pdf",
         "Content-Disposition": orderPdfContentDisposition(filename, disposition),
         "Cache-Control": "no-store",
         "X-Order-Pdf-Renderer": "chromium",
-      },
+      }),
     });
   } catch (err) {
     console.error("[GET delivery-note/pdf]", err);

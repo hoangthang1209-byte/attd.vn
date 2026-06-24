@@ -1,6 +1,12 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/seo";
+import {
+  INDEXABLE_STATIC_COMMERCIAL_PATHS,
+  isIndexableCategoryLanding,
+  isReservedStaticPublicSlug,
+  normalizeCategorySlug,
+} from "@/lib/seo/indexable-category-routes";
 
 /** True when the slug is a non-empty, non-whitespace string. */
 function isValidSlug(slug: string | null | undefined): slug is string {
@@ -13,7 +19,6 @@ function isValidSlug(slug: string | null | undefined): slug is string {
  *  - but keep the bare origin intact (https://www.attd.vn stays as-is)
  */
 function normalizeUrl(url: string): string {
-  // Only strip a trailing slash when there is a path after the origin
   return url.replace(/([^/])\/$/, "$1");
 }
 
@@ -31,7 +36,6 @@ function dedup(entries: MetadataRoute.Sitemap): MetadataRoute.Sitemap {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [categories, products, blogPosts, legacyPosts] = await Promise.all([
-    // Layer 1: filter empty slugs at the DB level
     prisma.category.findMany({
       where: { slug: { not: "" } },
       select: { slug: true, updatedAt: true },
@@ -54,152 +58,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
   ]);
 
-  const posts =
-    blogPosts.length > 0
-      ? blogPosts
-      : legacyPosts;
+  const posts = blogPosts.length > 0 ? blogPosts : legacyPosts;
 
-  const staticRoutes: MetadataRoute.Sitemap = [
-    {
-      url: SITE_URL,
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 1.0,
-    },
-    {
-      url: `${SITE_URL}/dai-ly`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/lien-he`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/nguon-hang`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/oem`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/qua-tang-doanh-nghiep`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/chinh-sach-dai-ly`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    // Knowledge cluster — fabric, size, color guides (Sprint 18.5)
-    {
-      url: `${SITE_URL}/bang-mau-ao-thun-tron`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/size-ao-thun-tron`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/vai-cotton-2-chieu`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/vai-cvc-la-gi`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/vai-tc-la-gi`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.7,
-    },
-    // Wholesale blank apparel SEO cluster (Sprint 18)
-    {
-      url: `${SITE_URL}/kho-ao-thun-tron`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/ao-thun-tron-si`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/nguon-hang-ao-thun-tron`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/kho-ao-polo-tron`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/ao-polo-tron-si`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    // Industry landing pages (Sprint 17)
-    {
-      url: `${SITE_URL}/ao-thun-cong-ty`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/ao-thun-su-kien`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/ao-thun-team-building`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/ao-thun-nhan-vien`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-    {
-      url: `${SITE_URL}/ao-thun-doanh-nghiep`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
-    },
-  ];
+  const staticRoutes: MetadataRoute.Sitemap = INDEXABLE_STATIC_COMMERCIAL_PATHS.map((path) => ({
+    url: path === "/" ? SITE_URL : `${SITE_URL}${path}`,
+    lastModified: new Date(),
+    changeFrequency: path === "/" || path === "/san-pham" ? ("weekly" as const) : ("monthly" as const),
+    priority: path === "/" ? 1.0 : path === "/san-pham" ? 0.9 : 0.7,
+  }));
 
-  // Layer 2: guard at build time — skip any slug that is still empty after DB filter
   const categoryRoutes: MetadataRoute.Sitemap = categories
-    .filter((cat) => isValidSlug(cat.slug))
+    .filter((cat) => {
+      if (!isValidSlug(cat.slug)) return false;
+      const normalized = normalizeCategorySlug(cat.slug);
+      if (isReservedStaticPublicSlug(normalized)) return false;
+      return isIndexableCategoryLanding(normalized);
+    })
     .map((cat) => ({
       url: `${SITE_URL}/${cat.slug}`,
       lastModified: cat.updatedAt,
@@ -225,11 +99,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
-  // Layer 3: deduplicate the final array by URL
-  return dedup([
-    ...staticRoutes,
-    ...categoryRoutes,
-    ...productRoutes,
-    ...blogRoutes,
-  ]);
+  return dedup([...staticRoutes, ...categoryRoutes, ...productRoutes, ...blogRoutes]);
 }

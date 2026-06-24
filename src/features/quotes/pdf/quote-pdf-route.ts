@@ -12,6 +12,7 @@ import {
   quotePdfContentDisposition,
   type QuotePdfDisposition,
 } from "@/features/quotes/pdf/quote-pdf-disposition";
+import { mergePdfNoindexHeaders } from "@/lib/seo/indexation-policy";
 
 type PdfRouteContext = {
   route: string;
@@ -34,14 +35,14 @@ function pdfResponseHeaders(
   renderer: "chromium" | "pdfkit",
   usedFallback?: boolean,
 ): Record<string, string> {
-  return {
+  return mergePdfNoindexHeaders({
     "Content-Type": "application/pdf",
     "Content-Disposition": quotePdfContentDisposition(filename, disposition),
     "Cache-Control": "no-store",
     "X-Quote-Pdf-Renderer": renderer,
     "X-Quote-Pdf-Bytes": String(buffer.length),
     ...(usedFallback ? { "X-Quote-Pdf-Fallback": "1" } : {}),
-  };
+  });
 }
 
 function countDesignImages(data: QuotePdfData): number {

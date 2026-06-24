@@ -9,8 +9,12 @@ import MarketplaceFinalCta from "@/components/marketplace/MarketplaceFinalCta";
 import HomeCategoryGridSection from "@/components/home/HomeCategoryGridSection";
 import HomeProductDiscoverySection from "@/components/home/HomeProductDiscoverySection";
 import HomeBlogTeaserSection from "@/components/home/HomeBlogTeaserSection";
+import type { Metadata } from "next";
+import { buildHomepageMetadata } from "@/lib/seo/indexation-policy";
 
 export const revalidate = 3600;
+
+export const metadata: Metadata = buildHomepageMetadata();
 
 const WHY_ATTD = [
   "Danh mục dễ bán cho đại lý",

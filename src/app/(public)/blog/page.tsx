@@ -4,16 +4,24 @@ import Image from "next/image";
 import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
 import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
 import MarketplaceFinalCta from "@/components/marketplace/MarketplaceFinalCta";
-import { SITE_NAME, canonicalUrl } from "@/lib/seo";
+import { SITE_NAME } from "@/lib/seo";
+import { buildBlogIndexMetadata } from "@/lib/seo/indexation-policy";
 import { isValidImageSrc } from "@/lib/imagePaths";
 
-export const metadata: Metadata = {
-  title: `Blog | ${SITE_NAME}`,
-  description: "Kiến thức đồng phục, quà tặng doanh nghiệp và nguồn hàng B2B.",
-  alternates: { canonical: canonicalUrl("/blog") },
-};
-
 const PER_PAGE = 9;
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; tag?: string; q?: string; search?: string }>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  return {
+    title: `Blog | ${SITE_NAME}`,
+    description: "Kiến thức đồng phục, quà tặng doanh nghiệp và nguồn hàng B2B.",
+    ...buildBlogIndexMetadata(params),
+  };
+}
 
 export default async function BlogPage({
   searchParams,

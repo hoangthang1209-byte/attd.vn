@@ -12,17 +12,12 @@ import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectio
 import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
 import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
-import { SITE_NAME, DEFAULT_DESCRIPTION, canonicalUrl } from "@/lib/seo";
+import { SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/seo";
+import { buildCatalogMetadata } from "@/lib/seo/indexation-policy";
 import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
 import { buildClearFiltersUrl } from "@/lib/catalog-filter-url";
 
 export const revalidate = 3600;
-
-export const metadata: Metadata = {
-  title: `Danh sách sản phẩm sỉ | ${SITE_NAME}`,
-  description: `Danh mục sản phẩm đồng phục và quà tặng doanh nghiệp sỉ — áo thun, polo, nón, tote bag, bình giữ nhiệt, bandana và gift set. ${DEFAULT_DESCRIPTION}`,
-  alternates: { canonical: canonicalUrl("/san-pham") },
-};
 
 const STOCK_LABELS: Record<string, string> = {
   IN_STOCK: "Còn hàng",
@@ -41,8 +36,18 @@ type Props = {
     embroidery?: string;
     oem?: string;
     material?: string;
+    sort?: string;
   }>;
 };
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const params = await searchParams;
+  return {
+    title: `Danh sách sản phẩm sỉ | ${SITE_NAME}`,
+    description: `Danh mục sản phẩm đồng phục và quà tặng doanh nghiệp sỉ — áo thun, polo, nón, tote bag, bình giữ nhiệt, bandana và gift set. ${DEFAULT_DESCRIPTION}`,
+    ...buildCatalogMetadata(params),
+  };
+}
 
 export default async function ProductCatalogPage({ searchParams }: Props) {
   const params = await searchParams;

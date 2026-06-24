@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublishedPostsByCategorySlug } from "@/features/blog/services/blog-public.service";
-import { SITE_NAME, canonicalUrl } from "@/lib/seo";
+import { SITE_NAME } from "@/lib/seo";
+import { buildBlogCategoryMetadata } from "@/lib/seo/indexation-policy";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -19,8 +20,8 @@ function formatDate(date: Date): string {
   }).format(new Date(date));
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
   const result = await getPublishedPostsByCategorySlug(slug, 1, 1);
   if (!result) return {};
 
@@ -32,9 +33,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
-    alternates: {
-      canonical: canonicalUrl(`/blog/danh-muc/${slug}`),
-    },
+    ...buildBlogCategoryMetadata(slug, query),
   };
 }
 
