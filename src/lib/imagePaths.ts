@@ -13,41 +13,121 @@ export type UploadFolder = keyof typeof UPLOAD_PATHS;
 
 export type PlaceholderVariant = "product" | "category" | "client" | "generic";
 
+/** Allowed image filename extensions for publishable local upload files. */
+export const PUBLISHABLE_IMAGE_EXTENSIONS = [
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "gif",
+  "svg",
+  "avif",
+] as const;
+
+const PUBLISHABLE_IMAGE_EXTENSION_PATTERN = /\.(jpg|jpeg|png|webp|gif|svg|avif)$/i;
+
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|webp|gif|svg|avif)(\?.*)?$/i;
 
 /** Route namespaces that must never satisfy publish image requirements. */
 const BLOCKED_LOCAL_IMAGE_PREFIXES = ["/api/", "/admin/", "/quan-tri/"] as const;
 
+const APPROVED_UPLOAD_ROOTS = Object.values(UPLOAD_PATHS);
+
+/** Encoded or literal traversal / separator signals in a pathname (case-insensitive). */
+const RAW_PATH_TRAVERSAL_PATTERN =
+  /(?:\.\.|\\|%2e|%2f|%5c|%252e|%252f|%255c)/i;
+
+function extractLocalPathname(src: string): string | null {
+  const trimmed = src.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return null;
+
+  const queryIndex = trimmed.indexOf("?");
+  const hashIndex = trimmed.indexOf("#");
+  let end = trimmed.length;
+  if (queryIndex >= 0) end = Math.min(end, queryIndex);
+  if (hashIndex >= 0) end = Math.min(end, hashIndex);
+
+  const pathname = trimmed.slice(0, end);
+  if (!pathname || pathname === "/") return null;
+  return pathname;
+}
+
+function safeDecodePathname(pathname: string): string | null {
+  if (pathname.includes("\\")) return null;
+  if (RAW_PATH_TRAVERSAL_PATTERN.test(pathname)) return null;
+
+  let current = pathname;
+  for (let pass = 0; pass < 3; pass += 1) {
+    if (!/%[0-9A-Fa-f]{0,2}/.test(current)) break;
+    try {
+      const decoded = decodeURIComponent(current);
+      if (decoded === current) break;
+      current = decoded;
+    } catch {
+      return null;
+    }
+    if (current.includes("\\")) return null;
+    if (RAW_PATH_TRAVERSAL_PATTERN.test(current)) return null;
+  }
+
+  return current;
+}
+
+function normalizeAbsolutePath(pathname: string): string | null {
+  const segments = pathname.split("/");
+  const normalized: string[] = [];
+
+  for (const segment of segments) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") return null;
+    normalized.push(segment);
+  }
+
+  return `/${normalized.join("/")}`;
+}
+
+function hasPublishableFilename(pathname: string): boolean {
+  const filename = pathname.split("/").filter(Boolean).pop() ?? "";
+  if (!filename) return false;
+  return PUBLISHABLE_IMAGE_EXTENSION_PATTERN.test(filename);
+}
+
+function isUnderApprovedUploadRoot(pathname: string): boolean {
+  const matchedBase = APPROVED_UPLOAD_ROOTS.find(
+    (base) => pathname === base || pathname.startsWith(`${base}/`),
+  );
+  if (!matchedBase) return false;
+  if (pathname === matchedBase || pathname.endsWith("/")) return false;
+
+  const relativePath = pathname.slice(matchedBase.length);
+  if (!relativePath.startsWith("/") || relativePath === "/") return false;
+
+  const segments = relativePath.split("/").filter(Boolean);
+  if (!segments.length) return false;
+  if (segments.some((segment) => segment === "." || segment === "..")) return false;
+
+  return hasPublishableFilename(pathname);
+}
+
 /**
  * Publish gate: local paths must point to a real file under an approved public upload directory.
  */
 export function isPublishableLocalImagePath(src: string): boolean {
-  const trimmed = src.trim();
-  if (!trimmed.startsWith("/")) return false;
-  if (trimmed.includes("..")) return false;
-  if (trimmed.length <= 1) return false;
+  const pathname = extractLocalPathname(src);
+  if (!pathname) return false;
 
-  const lower = trimmed.toLowerCase();
+  const lower = pathname.toLowerCase();
   for (const prefix of BLOCKED_LOCAL_IMAGE_PREFIXES) {
     if (lower.startsWith(prefix) || lower === prefix.slice(0, -1)) return false;
   }
 
-  const matchedBase = Object.values(UPLOAD_PATHS).find(
-    (base) => trimmed === base || trimmed.startsWith(`${base}/`),
-  );
-  if (!matchedBase) return false;
-  if (trimmed === matchedBase || trimmed.endsWith("/")) return false;
+  const decoded = safeDecodePathname(pathname);
+  if (!decoded) return false;
 
-  const relativePath = trimmed.slice(matchedBase.length);
-  if (!relativePath.startsWith("/") || relativePath === "/") return false;
+  const normalized = normalizeAbsolutePath(decoded);
+  if (!normalized) return false;
 
-  const segments = relativePath.split("/").filter(Boolean);
-  if (!segments.length || segments.some((segment) => segment === ".")) return false;
-
-  const filename = segments[segments.length - 1] ?? "";
-  if (!IMAGE_EXTENSIONS.test(filename)) return false;
-
-  return true;
+  return isUnderApprovedUploadRoot(normalized);
 }
 
 /**

@@ -58,10 +58,15 @@ import {
   type ProductPublishQualityInput,
 } from "@/lib/seo/publish-quality-gate";
 import { isIndexableCategoryLanding } from "@/lib/seo/indexable-category-routes";
+import {
+  buildPublishQualityVariantsFromUpdateInput,
+  mapCreateInputVariantsToPublishQualityInput,
+  mapPersistedProductToPublishQualityInput,
+} from "@/features/products/product-publish-quality-snapshot";
 
 const PUBLISH_QUALITY_INCLUDE = {
   images: { select: { imageUrl: true } },
-  variants: { select: { variantStatus: true, imageUrl: true } },
+  variants: { select: { id: true, variantStatus: true, imageUrl: true } },
   specifications: { select: { label: true, value: true } },
   attributeAssignments: {
     select: { attributeId: true, attributeValueId: true, customValue: true },
@@ -475,10 +480,7 @@ function mapProductInputToPublishQualityInput(
     featuredImage: input.featuredImage ?? null,
     gallery: input.gallery ?? [],
     productImages: input.gallery ?? [],
-    variants: (input.variants ?? []).map((variant) => ({
-      variantStatus: variant.variantStatus ?? "ACTIVE",
-      imageUrl: variant.imageUrl ?? null,
-    })),
+    variants: mapCreateInputVariantsToPublishQualityInput(input.variants),
     specifications: (input.specifications ?? []).map((row) => ({
       label: row.label,
       value: row.value,
@@ -492,6 +494,22 @@ function mapProductInputToPublishQualityInput(
       values: group.values.map((value) => ({ label: value.label })),
     })),
   };
+}
+
+async function loadPersistedProductPublishQualitySnapshot(
+  productId: string,
+  db: DbClient,
+): Promise<ProductPublishQualityInput> {
+  const product = await db.product.findUnique({
+    where: { id: productId },
+    include: PUBLISH_QUALITY_INCLUDE,
+  });
+
+  if (!product) {
+    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+  }
+
+  return mapPersistedProductToPublishQualityInput(product);
 }
 
 async function loadProductPublishQualitySnapshot(
@@ -511,10 +529,7 @@ async function loadProductPublishQualitySnapshot(
   }
 
   const mergedVariants = input.variants
-    ? input.variants.map((variant) => ({
-        variantStatus: variant.variantStatus,
-        imageUrl: variant.imageUrl ?? null,
-      }))
+    ? buildPublishQualityVariantsFromUpdateInput(input.variants, existing.variants)
     : existing.variants.map((variant) => ({
         variantStatus: variant.variantStatus,
         imageUrl: variant.imageUrl,
@@ -810,6 +825,8 @@ export async function createProductAdmin(input: ProductInput) {
         resolvedAssignments,
         skipOwnershipVerify: true,
       });
+      const finalSnapshot = await loadPersistedProductPublishQualitySnapshot(product.id, tx);
+      assertProductPublishQuality(finalSnapshot);
       await tx.product.update({ where: { id: product.id }, data: { status: "ACTIVE" } });
       return product.id;
     });
@@ -938,6 +955,8 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
         resolvedAssignments,
         skipOwnershipVerify: true,
       });
+      const finalSnapshot = await loadPersistedProductPublishQualitySnapshot(id, tx);
+      assertProductPublishQuality(finalSnapshot);
       await tx.product.update({ where: { id }, data: { status: "ACTIVE" } });
     });
     return await getProductAdminById(id);

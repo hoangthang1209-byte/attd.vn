@@ -90,7 +90,17 @@ describe("publish slug and image validation", () => {
     assert.equal(isUsablePublishImageReference("/not-an-image"), false);
     assert.equal(isUsablePublishImageReference("/api/admin"), false);
     assert.equal(isUsablePublishImageReference("/uploads"), false);
+    assert.equal(isUsablePublishImageReference("/uploads/products"), false);
+    assert.equal(isUsablePublishImageReference("/uploads/products/"), false);
     assert.equal(isUsablePublishImageReference("data:image/png;base64,abc"), false);
+    assert.equal(isUsablePublishImageReference("http://cdn.example.com/products/ao-thun.jpg"), false);
+    assert.equal(isUsablePublishImageReference("/uploads/products/../secret.jpg"), false);
+    assert.equal(isUsablePublishImageReference("/uploads/products/%2e%2e/secret.jpg"), false);
+    assert.equal(isUsablePublishImageReference("/uploads/products/%2E%2E/secret.jpg"), false);
+    assert.equal(isUsablePublishImageReference("/uploads/products/%252e%252e/secret.jpg"), false);
+    assert.equal(isUsablePublishImageReference("/uploads/products/%2fsecret.jpg"), false);
+    assert.equal(isUsablePublishImageReference("/uploads/products/%5csecret.jpg"), false);
+    assert.equal(isUsablePublishImageReference("/uploads/products/%ZZ/secret.jpg"), false);
     const result = evaluateProductPublishQuality(
       completeProductInput({ featuredImage: "x" }),
     );
@@ -104,6 +114,7 @@ describe("publish slug and image validation", () => {
       true,
     );
     assert.equal(isUsablePublishImageReference("/uploads/products/ao-thun.jpg"), true);
+    assert.equal(isUsablePublishImageReference("/uploads/products/ao-thun.jpg?v=2"), true);
     const result = evaluateProductPublishQuality(
       completeProductInput({
         featuredImage: "https://res.cloudinary.com/demo/image/upload/sample.jpg",

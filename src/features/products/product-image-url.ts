@@ -18,15 +18,30 @@ export const MEDIA_ASSET_INTEGRATION_POINTS = [
   "bulk variant image assignment",
 ] as const;
 
-const UNSAFE_IMAGE_PROTOCOL = /^(javascript|data|vbscript):/i;
+const UNSAFE_IMAGE_PROTOCOL = /^(javascript|data|vbscript|file):/i;
 
+/** Draft/form URL fields: allow http or https remote URLs. */
 export function isValidProductImageUrl(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed || UNSAFE_IMAGE_PROTOCOL.test(trimmed)) return false;
   if (!/^https?:\/\/.+/i.test(trimmed)) return false;
   try {
     const url = new URL(trimmed);
-    return url.protocol === "http:" || url.protocol === "https:";
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    return Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Publish gate remote images: HTTPS only, with a valid hostname. */
+export function isPublishableRemoteImageUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || UNSAFE_IMAGE_PROTOCOL.test(trimmed)) return false;
+  if (!/^https:\/\/.+/i.test(trimmed)) return false;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "https:" && Boolean(url.hostname);
   } catch {
     return false;
   }
@@ -38,9 +53,12 @@ export function isUsablePublishImageReference(value: string | null | undefined):
   const trimmed = value.trim();
   if (UNSAFE_IMAGE_PROTOCOL.test(trimmed)) return false;
   if (/^https?:\/\//i.test(trimmed)) {
-    return isValidProductImageUrl(trimmed);
+    return isPublishableRemoteImageUrl(trimmed);
   }
-  return isPublishableLocalImagePath(trimmed);
+  if (trimmed.startsWith("/")) {
+    return isPublishableLocalImagePath(trimmed);
+  }
+  return false;
 }
 
 export function normalizeProductImageUrl(value: string): string | null {
