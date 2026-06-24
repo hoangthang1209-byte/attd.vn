@@ -104,7 +104,7 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
   const [preparedBy, setPreparedBy] = useState("");
 
   function applySalesEmployee(employee: EmployeeRecord) {
-    setSalesRepresentativeId("");
+    setSalesRepresentativeId(employee.id);
     setSalesName(employee.fullName);
     setSalesTitle(employee.jobTitle ?? "");
     setSalesPhone(employee.phone ?? "");
@@ -772,6 +772,12 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
                 placeholder="— Chọn nhân viên —"
                 searchPlaceholder="Tìm theo tên, mã hoặc chức vụ…"
                 emptyMessage="Chưa có nhân viên tư vấn đang hoạt động."
+                fallbackLabel={salesName || undefined}
+                fallbackSublabel={
+                  salesName && !salesEmployees.some((employee) => employee.id === salesRepresentativeId)
+                    ? "Dữ liệu đã lưu"
+                    : undefined
+                }
               />
             </div>
             <div className="admin-field">

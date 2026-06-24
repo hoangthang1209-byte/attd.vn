@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import AdminScrollRestoration from "@/components/admin/AdminScrollRestoration";
@@ -182,10 +182,6 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isLogin = pathname === "/admin/login";
 
-  useEffect(() => {
-    setMobileNavOpen(false);
-  }, [pathname]);
-
   if (isLogin) {
     return children;
   }
@@ -193,7 +189,14 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   return (
     <AdminTitleProvider>
       <div className="admin-app-shell admin-shell">
-        <aside className={`admin-sidebar${mobileNavOpen ? " is-mobile-open" : ""}`}>
+        <aside
+          className={`admin-sidebar${mobileNavOpen ? " is-mobile-open" : ""}`}
+          onClick={(event) => {
+            if ((event.target as HTMLElement).closest("a")) {
+              setMobileNavOpen(false);
+            }
+          }}
+        >
           <div className="admin-sidebar-top">
             <Link href="/admin/dashboard" scroll={false} className="admin-brand">
               ATTD CMS

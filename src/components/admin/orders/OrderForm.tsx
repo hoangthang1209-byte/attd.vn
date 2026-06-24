@@ -595,6 +595,12 @@ export default function OrderForm({ mode, orderId }: Props) {
               placeholder="— Chọn nhân viên —"
               searchPlaceholder="Tìm theo tên, mã hoặc chức vụ…"
               emptyMessage="Chưa có nhân viên tư vấn đang hoạt động."
+              fallbackLabel={salesName || undefined}
+              fallbackSublabel={
+                salesName && !salesEmployees.some((employee) => employee.id === salesEmployeeId)
+                  ? "Dữ liệu đã lưu"
+                  : undefined
+              }
             />
           </div>
           <div className="admin-field">

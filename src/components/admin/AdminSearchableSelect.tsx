@@ -27,6 +27,8 @@ type Props = {
   disabled?: boolean;
   emptyMessage?: string;
   className?: string;
+  fallbackLabel?: string;
+  fallbackSublabel?: string;
 };
 
 export default function AdminSearchableSelect({
@@ -39,13 +41,14 @@ export default function AdminSearchableSelect({
   disabled = false,
   emptyMessage,
   className,
+  fallbackLabel,
+  fallbackSublabel,
 }: Props) {
   const generatedId = useId();
   const controlId = id ?? `admin-combobox-${generatedId.replace(/:/g, "")}`;
   const listboxId = `${controlId}-listbox`;
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [position, setPosition] = useState({
     left: 0,
@@ -58,10 +61,6 @@ export default function AdminSearchableSelect({
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return options;
@@ -73,7 +72,15 @@ export default function AdminSearchableSelect({
     );
   }, [options, search]);
 
-  const selected = options.find((opt) => opt.value === value);
+  const selected =
+    options.find((opt) => opt.value === value) ??
+    (fallbackLabel
+      ? {
+          value,
+          label: fallbackLabel,
+          sublabel: fallbackSublabel,
+        }
+      : undefined);
 
   function updatePosition() {
     const trigger = triggerRef.current;
@@ -124,7 +131,7 @@ export default function AdminSearchableSelect({
         !triggerRef.current?.contains(target) &&
         !panelRef.current?.contains(target)
       ) {
-        setOpen(false);
+        closeCombobox();
       }
     }
 
@@ -143,27 +150,39 @@ export default function AdminSearchableSelect({
     };
   }, [open]);
 
-  useEffect(() => {
-    if (!open) {
-      setSearch("");
-      setActiveIndex(-1);
-      return;
+  const safeActiveIndex =
+    activeIndex >= 0 && activeIndex < filtered.length
+      ? activeIndex
+      : filtered.length
+        ? 0
+        : -1;
+
+  function closeCombobox({ restoreFocus = false } = {}) {
+    setOpen(false);
+    setSearch("");
+    setActiveIndex(-1);
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => triggerRef.current?.focus());
     }
-    const selectedIndex = filtered.findIndex((opt) => opt.value === value);
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : filtered.length ? 0 : -1);
-  }, [filtered, open, value]);
+  }
+
+  function openCombobox() {
+    const selectedIndex = options.findIndex((opt) => opt.value === value);
+    setSearch("");
+    setActiveIndex(selectedIndex >= 0 ? selectedIndex : options.length ? 0 : -1);
+    setOpen(true);
+  }
 
   function selectOption(nextValue: string) {
     onChange(nextValue);
-    setOpen(false);
-    triggerRef.current?.focus();
+    closeCombobox({ restoreFocus: true });
   }
 
   function handleKeyDown(event: React.KeyboardEvent) {
     if (event.key === "Escape") {
       event.preventDefault();
-      setOpen(false);
-      triggerRef.current?.focus();
+      event.stopPropagation();
+      closeCombobox({ restoreFocus: true });
       return;
     }
     if (event.key === "ArrowDown") {
@@ -178,9 +197,9 @@ export default function AdminSearchableSelect({
       setActiveIndex((current) => Math.max(current - 1, 0));
       return;
     }
-    if (event.key === "Enter" && activeIndex >= 0) {
+    if (event.key === "Enter" && safeActiveIndex >= 0) {
       event.preventDefault();
-      selectOption(filtered[activeIndex].value);
+      selectOption(filtered[safeActiveIndex].value);
     }
   }
 
@@ -195,11 +214,14 @@ export default function AdminSearchableSelect({
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={listboxId}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          if (open) closeCombobox();
+          else openCombobox();
+        }}
         onKeyDown={(event) => {
           if (!open && (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ")) {
             event.preventDefault();
-            setOpen(true);
+            openCombobox();
           }
         }}
       >
@@ -216,7 +238,7 @@ export default function AdminSearchableSelect({
         />
       </button>
 
-      {mounted && open && createPortal(
+      {open && createPortal(
         <div
           ref={panelRef}
           className={`admin-combobox__popover admin-combobox__popover--${position.placement}`}
@@ -236,12 +258,15 @@ export default function AdminSearchableSelect({
               type="search"
               placeholder={searchPlaceholder}
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setActiveIndex(0);
+              }}
               aria-autocomplete="list"
               aria-controls={listboxId}
               aria-activedescendant={
-                activeIndex >= 0
-                  ? `${listboxId}-option-${activeIndex}`
+                safeActiveIndex >= 0
+                  ? `${listboxId}-option-${safeActiveIndex}`
                   : undefined
               }
             />
@@ -252,7 +277,7 @@ export default function AdminSearchableSelect({
             role="listbox"
             aria-label={placeholder}
           >
-            {value && (
+            {selected && (
               <button
                 type="button"
                 className="admin-combobox__option admin-combobox__option--clear"
@@ -269,7 +294,7 @@ export default function AdminSearchableSelect({
                 key={opt.value}
                 type="button"
                 className={`admin-combobox__option${
-                  index === activeIndex ? " is-active" : ""
+                  index === safeActiveIndex ? " is-active" : ""
                 }`}
                 role="option"
                 aria-selected={opt.value === value}

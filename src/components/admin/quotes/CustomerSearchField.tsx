@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import type { CrmCustomerRecord } from "@/features/crm/types";
 
 type Props = {
@@ -15,6 +22,15 @@ export default function CustomerSearchField({ value, onSelect, disabled }: Props
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLUListElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({
+    left: 0,
+    top: 0,
+    width: 320,
+    maxHeight: 280,
+    placement: "bottom" as "bottom" | "top",
+  });
 
   const searchCustomers = useCallback(async (q: string) => {
     setLoading(true);
@@ -40,13 +56,64 @@ export default function CustomerSearchField({ value, onSelect, disabled }: Props
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !dropdownRef.current?.contains(target)
+      ) {
         setOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const updateDropdownPosition = useCallback(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const rect = input.getBoundingClientRect();
+    const viewportPadding = 12;
+    const gap = 6;
+    const roomBelow = window.innerHeight - rect.bottom - viewportPadding - gap;
+    const roomAbove = rect.top - viewportPadding - gap;
+    const placement =
+      roomBelow < 220 && roomAbove > roomBelow ? "top" : "bottom";
+    const availableHeight = placement === "bottom" ? roomBelow : roomAbove;
+    const width = Math.min(
+      Math.max(rect.width, 320),
+      window.innerWidth - viewportPadding * 2,
+    );
+    const left = Math.min(
+      Math.max(viewportPadding, rect.left),
+      window.innerWidth - width - viewportPadding,
+    );
+
+    setDropdownPosition({
+      left,
+      top: placement === "bottom" ? rect.bottom + gap : rect.top - gap,
+      width,
+      maxHeight: Math.max(160, Math.min(280, availableHeight)),
+      placement,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open || value) return;
+    updateDropdownPosition();
+  }, [open, updateDropdownPosition, value]);
+
+  useEffect(() => {
+    if (!open || value) return;
+
+    window.addEventListener("resize", updateDropdownPosition);
+    window.addEventListener("scroll", updateDropdownPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateDropdownPosition);
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+    };
+  }, [open, updateDropdownPosition, value]);
 
   function formatLabel(c: CrmCustomerRecord) {
     const parts = [c.code, c.name];
@@ -79,6 +146,7 @@ export default function CustomerSearchField({ value, onSelect, disabled }: Props
       ) : (
         <>
           <input
+            ref={inputRef}
             className="admin-input"
             type="search"
             placeholder="Nhập tên công ty, mã khách hàng, SĐT, email hoặc MST"
@@ -93,8 +161,19 @@ export default function CustomerSearchField({ value, onSelect, disabled }: Props
               void searchCustomers(query);
             }}
           />
-          {open && (
-            <ul className="quote-customer-search__dropdown" role="listbox">
+          {open && createPortal(
+            <ul
+              ref={dropdownRef}
+              className={`quote-customer-search__dropdown quote-customer-search__dropdown--portal quote-customer-search__dropdown--${dropdownPosition.placement}`}
+              role="listbox"
+              style={{
+                left: dropdownPosition.left,
+                top: dropdownPosition.top,
+                right: "auto",
+                width: dropdownPosition.width,
+                maxHeight: dropdownPosition.maxHeight,
+              }}
+            >
               {loading && (
                 <li className="quote-customer-search__empty">Đang tìm…</li>
               )}
@@ -124,7 +203,8 @@ export default function CustomerSearchField({ value, onSelect, disabled }: Props
                     </button>
                   </li>
                 ))}
-            </ul>
+            </ul>,
+            document.body,
           )}
         </>
       )}
