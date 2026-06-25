@@ -27,6 +27,14 @@ import {
   buildOptionValueRef,
 } from "@/features/products/product-variant-matrix.utils";
 import type { ProductAttributeAssignmentInput } from "@/features/products/product-attribute-assignment.utils";
+import type { ExistingProductRelationState } from "@/features/products/product-save-relation-diff";
+import {
+  customizationNeedsUpdate,
+  optionGroupNeedsUpdate,
+  optionValueNeedsUpdate,
+  specificationNeedsUpdate,
+  variantOptionLinksNeedUpdate,
+} from "@/features/products/product-save-relation-diff";
 
 export type ProductOptionValueInput = {
   id?: string;
@@ -253,6 +261,9 @@ export async function syncProductCmsData(
   variantOptionValueIds?: Record<string, string[]>;
   },
   db: DbClient = prisma,
+  syncOptions?: {
+    existing?: Pick<ExistingProductRelationState, "options" | "specifications" | "customizations" | "variants">;
+  },
 ) {
   if (data.options) {
     assertNoDuplicateRelationIds(data.options.map((option) => option.id));
@@ -284,10 +295,31 @@ export async function syncProductCmsData(
       throw new ProductAdminValidationError(valueError, { options: valueError });
     }
 
-    const existingOptions = await db.productOption.findMany({
-      where: { productId },
-      include: { values: { select: { id: true, label: true } } },
-    });
+    const existingOptions =
+      syncOptions?.existing?.options ??
+      (await db.productOption.findMany({
+        where: { productId },
+        include: { values: { select: { id: true, label: true, valueCode: true, imageUrl: true, sortOrder: true, attributeValueId: true } } },
+      }));
+    const existingOptionById = new Map(existingOptions.map((option) => [option.id, option]));
+    const existingValueById = new Map<
+      string,
+      {
+        id: string;
+        optionId: string;
+        label: string;
+        valueCode: string | null;
+        imageUrl: string | null;
+        sortOrder: number;
+        attributeValueId: string | null;
+      }
+    >();
+    for (const option of existingOptions) {
+      for (const value of option.values) {
+        existingValueById.set(value.id, { ...value, optionId: option.id });
+      }
+    }
+
     const keepOptionIds = new Set(
       data.options.map((o) => o.id).filter(Boolean) as string[],
     );
@@ -308,13 +340,19 @@ export async function syncProductCmsData(
 
     for (const [optIndex, option] of data.options.entries()) {
       const slug = option.slug?.trim() || toOptionSlug(option.name, `option-${optIndex + 1}`);
+      const existingGroup = option.id ? existingOptionById.get(option.id) : undefined;
       if (option.id) {
-        await updateProductOptionOwned(db, productId, option.id, {
-          name: option.name.trim(),
-          attributeId: option.attributeId ?? null,
-          slug,
-          sortOrder: option.sortOrder ?? optIndex,
-        });
+        if (
+          !existingGroup ||
+          optionGroupNeedsUpdate(option, existingGroup, optIndex)
+        ) {
+          await updateProductOptionOwned(db, productId, option.id, {
+            name: option.name.trim(),
+            attributeId: option.attributeId ?? null,
+            slug,
+            sortOrder: option.sortOrder ?? optIndex,
+          });
+        }
       }
       const savedOption = option.id
         ? { id: option.id }
@@ -328,10 +366,7 @@ export async function syncProductCmsData(
             },
           });
 
-      const existingValues = await db.productOptionValue.findMany({
-        where: { optionId: savedOption.id },
-        select: { id: true, label: true },
-      });
+      const existingValues = existingGroup?.values ?? [];
       const keepValueIds = new Set(
         option.values.map((v) => v.id).filter(Boolean) as string[],
       );
@@ -349,16 +384,25 @@ export async function syncProductCmsData(
         await deleteProductOptionValuesOwned(db, productId, savedOption.id, deleteValueIds);
       }
 
+      const valueUpdates: Array<Promise<void>> = [];
       for (const [valIndex, value] of option.values.entries()) {
-        if (value.id) {
-          await updateProductOptionValueOwned(db, productId, savedOption.id, value.id, {
+        if (!value.id) continue;
+        const existingValue = existingValueById.get(value.id);
+        if (existingValue && !optionValueNeedsUpdate(value, existingValue, valIndex)) {
+          continue;
+        }
+        valueUpdates.push(
+          updateProductOptionValueOwned(db, productId, savedOption.id, value.id, {
             label: value.label.trim(),
             attributeValueId: value.attributeValueId ?? null,
             valueCode: value.valueCode?.trim() || null,
             imageUrl: value.imageUrl?.trim() || null,
             sortOrder: value.sortOrder ?? valIndex,
-          });
-        }
+          }),
+        );
+      }
+      if (valueUpdates.length) {
+        await Promise.all(valueUpdates);
       }
 
       const newValues = option.values
@@ -387,10 +431,13 @@ export async function syncProductCmsData(
       data.specifications.map((spec) => spec.id).filter(Boolean) as string[],
     );
 
-    const existing = await db.productSpecification.findMany({
-      where: { productId },
-      select: { id: true },
-    });
+    const existing =
+      syncOptions?.existing?.specifications ??
+      (await db.productSpecification.findMany({
+        where: { productId },
+        select: { id: true, label: true, value: true, sortOrder: true },
+      }));
+    const existingSpecById = new Map(existing.map((row) => [row.id, row]));
     const keepIds = new Set(data.specifications.map((s) => s.id).filter(Boolean) as string[]);
     const deleteIds = existing.map((s) => s.id).filter((id) => !keepIds.has(id));
     if (deleteIds.length) {
@@ -411,7 +458,10 @@ export async function syncProductCmsData(
       const value = spec.value.trim();
       const sortOrder = spec.sortOrder ?? index;
       if (spec.id) {
-        specUpdates.push({ id: spec.id, label, value, sortOrder });
+        const existingRow = existingSpecById.get(spec.id);
+        if (!existingRow || specificationNeedsUpdate(spec, existingRow, index)) {
+          specUpdates.push({ id: spec.id, label, value, sortOrder });
+        }
       } else {
         specCreates.push({ productId, label, value, sortOrder });
       }
@@ -442,10 +492,13 @@ export async function syncProductCmsData(
       data.customizations.map((cap) => cap.id).filter(Boolean) as string[],
     );
 
-    const existing = await db.productCustomizationCapability.findMany({
-      where: { productId },
-      select: { id: true },
-    });
+    const existing =
+      syncOptions?.existing?.customizations ??
+      (await db.productCustomizationCapability.findMany({
+        where: { productId },
+        select: { id: true, label: true, description: true, sortOrder: true, enabled: true },
+      }));
+    const existingCustomizationById = new Map(existing.map((row) => [row.id, row]));
     const keepIds = new Set(data.customizations.map((c) => c.id).filter(Boolean) as string[]);
     const deleteIds = existing.map((c) => c.id).filter((id) => !keepIds.has(id));
     if (deleteIds.length) {
@@ -468,7 +521,10 @@ export async function syncProductCmsData(
       const sortOrder = cap.sortOrder ?? index;
       const enabled = cap.enabled ?? true;
       if (cap.id) {
-        customizationUpdates.push({ id: cap.id, label, description, sortOrder, enabled });
+        const existingRow = existingCustomizationById.get(cap.id);
+        if (!existingRow || customizationNeedsUpdate(cap, existingRow, index)) {
+          customizationUpdates.push({ id: cap.id, label, description, sortOrder, enabled });
+        }
       } else {
         customizationCreates.push({ productId, label, description, sortOrder, enabled });
       }
@@ -523,16 +579,40 @@ export async function syncProductCmsData(
       validateOptionCombinations(optionsForValidation, combos);
     }
 
-    for (const [variantId, valueIds] of Object.entries(data.variantOptionValueIds)) {
-      await db.productVariantOptionValue.deleteMany({
-        where: { variantId, variant: { productId } },
-      });
-      if (!valueIds.length) continue;
-      await db.productVariantOptionValue.createMany({
-        data: valueIds.map((optionValueId) => ({ variantId, optionValueId })),
-        skipDuplicates: true,
-      });
+    const existingLinksByVariant = new Map<string, string[]>();
+    if (syncOptions?.existing?.variants?.length) {
+      for (const variant of syncOptions.existing.variants) {
+        existingLinksByVariant.set(variant.id, variant.optionValueIds);
+      }
+    } else {
+      const variantIds = Object.keys(data.variantOptionValueIds);
+      if (variantIds.length) {
+        const links = await db.productVariantOptionValue.findMany({
+          where: { variantId: { in: variantIds }, variant: { productId } },
+          select: { variantId: true, optionValueId: true },
+        });
+        for (const link of links) {
+          const current = existingLinksByVariant.get(link.variantId) ?? [];
+          current.push(link.optionValueId);
+          existingLinksByVariant.set(link.variantId, current);
+        }
+      }
     }
+
+    await Promise.all(
+      Object.entries(data.variantOptionValueIds).map(async ([variantId, valueIds]) => {
+        const existingValueIds = existingLinksByVariant.get(variantId) ?? [];
+        if (!variantOptionLinksNeedUpdate(valueIds, existingValueIds)) return;
+        await db.productVariantOptionValue.deleteMany({
+          where: { variantId, variant: { productId } },
+        });
+        if (!valueIds.length) return;
+        await db.productVariantOptionValue.createMany({
+          data: valueIds.map((optionValueId) => ({ variantId, optionValueId })),
+          skipDuplicates: true,
+        });
+      }),
+    );
   }
 }
 

@@ -15,6 +15,10 @@ import {
   resolveAssignmentDisplayValue,
   type ResolvedAssignmentValue,
 } from "@/features/products/product-attribute-assignment.utils";
+import {
+  assignmentNeedsUpdate,
+  type ExistingAssignmentRow,
+} from "@/features/products/product-save-relation-diff";
 
 export const PRODUCT_ATTRIBUTE_ASSIGNMENT_INCLUDE = {
   orderBy: { sortOrder: "asc" as const },
@@ -136,7 +140,10 @@ export async function syncProductAttributeAssignments(
   productId: string,
   assignments: ProductAttributeAssignmentInput[] | undefined,
   db: DbClient = prisma,
-  options?: { preResolved?: ResolvedAssignmentValue[] },
+  options?: {
+    preResolved?: ResolvedAssignmentValue[];
+    existingAssignments?: ExistingAssignmentRow[];
+  },
 ): Promise<Partial<Record<"material" | "form", string | null>>> {
   if (assignments === undefined) return {};
 
@@ -152,26 +159,37 @@ export async function syncProductAttributeAssignments(
       where: { id: productId },
       select: { material: true, form: true },
     }),
-    db.productAttributeAssignment.findMany({
-      where: { productId },
-      select: {
-        id: true,
-        attributeId: true,
-        customValue: true,
-        attribute: { select: { code: true } },
-        attributeValue: { select: { name: true } },
-      },
-    }),
+    options?.existingAssignments
+      ? Promise.resolve(options.existingAssignments)
+      : db.productAttributeAssignment.findMany({
+          where: { productId },
+          select: {
+            id: true,
+            attributeId: true,
+            attributeValueId: true,
+            customValue: true,
+            sortOrder: true,
+            attribute: { select: { code: true } },
+            attributeValue: { select: { name: true } },
+          },
+        }).then((rows) =>
+          rows.map((row) => ({
+            id: row.id,
+            attributeId: row.attributeId,
+            attributeCode: row.attribute.code,
+            attributeValueName: row.attributeValue?.name ?? null,
+            attributeValueId: row.attributeValueId,
+            customValue: row.customValue,
+            sortOrder: row.sortOrder,
+          })),
+        ),
   ]);
 
   const previousDisplayByCode = new Map<string, string>();
   for (const row of existingAssignments) {
-    const displayValue = resolveAssignmentDisplayValue(
-      row.attributeValue?.name,
-      row.customValue,
-    );
-    if (displayValue) {
-      previousDisplayByCode.set(row.attribute.code, displayValue);
+    const displayValue = resolveAssignmentDisplayValue(row.attributeValueName, row.customValue);
+    if (displayValue && row.attributeCode) {
+      previousDisplayByCode.set(row.attributeCode, displayValue);
     }
   }
 
@@ -182,6 +200,7 @@ export async function syncProductAttributeAssignments(
     id: row.id,
     attributeId: row.attributeId,
   }));
+  const existingById = new Map(existingAssignments.map((row) => [row.id, row]));
   const keepIds = new Set(
     assignments.map((row) => row.id).filter(Boolean) as string[],
   );
@@ -208,6 +227,22 @@ export async function syncProductAttributeAssignments(
     };
 
     if (inputRow?.id) {
+      const existingRow = existingById.get(inputRow.id);
+      if (
+        existingRow &&
+        !assignmentNeedsUpdate(
+          {
+            attributeId: row.attributeId,
+            attributeValueId: row.attributeValueId,
+            customValue: row.customValue,
+            sortOrder: row.sortOrder ?? index,
+          },
+          existingRow,
+          index,
+        )
+      ) {
+        continue;
+      }
       assignmentUpdates.push({ id: inputRow.id, data });
       continue;
     }
@@ -255,10 +290,15 @@ export async function applyLegacyMirrorToProduct(
   productId: string,
   mirror: Partial<Record<"material" | "form", string | null>>,
   db: DbClient = prisma,
+  current?: { material: string | null; form: string | null },
 ): Promise<void> {
   const data: Prisma.ProductUpdateInput = {};
-  if ("material" in mirror) data.material = mirror.material;
-  if ("form" in mirror) data.form = mirror.form;
+  if ("material" in mirror && mirror.material !== (current?.material ?? null)) {
+    data.material = mirror.material;
+  }
+  if ("form" in mirror && mirror.form !== (current?.form ?? null)) {
+    data.form = mirror.form;
+  }
   if (!Object.keys(data).length) return;
   await db.product.update({
     where: { id: productId },

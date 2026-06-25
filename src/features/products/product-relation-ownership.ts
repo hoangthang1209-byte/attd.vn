@@ -55,16 +55,10 @@ export async function updateProductOptionOwned(
       name: data.name,
       slug: data.slug,
       sortOrder: data.sortOrder,
+      ...(data.attributeId !== undefined ? { attributeId: data.attributeId } : {}),
     },
   });
   await assertExactUpdateCount(result, 1);
-  if (data.attributeId !== undefined) {
-    const attributeResult = await db.productOption.updateMany({
-      where: { id: optionId, productId },
-      data: { attributeId: data.attributeId },
-    });
-    await assertExactUpdateCount(attributeResult, 1);
-  }
 }
 
 export async function updateProductOptionValueOwned(
@@ -87,16 +81,10 @@ export async function updateProductOptionValueOwned(
       valueCode: data.valueCode,
       imageUrl: data.imageUrl,
       sortOrder: data.sortOrder,
+      ...(data.attributeValueId !== undefined ? { attributeValueId: data.attributeValueId } : {}),
     },
   });
   await assertExactUpdateCount(result, 1);
-  if (data.attributeValueId !== undefined) {
-    const attributeValueResult = await db.productOptionValue.updateMany({
-      where: { id: valueId, optionId, option: { productId } },
-      data: { attributeValueId: data.attributeValueId },
-    });
-    await assertExactUpdateCount(attributeValueResult, 1);
-  }
 }
 
 export async function updateProductSpecificationOwned(

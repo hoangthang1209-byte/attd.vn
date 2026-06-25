@@ -63,6 +63,13 @@ import {
   mapCreateInputVariantsToPublishQualityInput,
   mapPersistedProductToPublishQualityInput,
 } from "@/features/products/product-publish-quality-snapshot";
+import {
+  type ExistingProductRelationState,
+  variantNeedsUpdate,
+} from "@/features/products/product-save-relation-diff";
+import { createProductSaveTimer } from "@/features/products/product-save-timing";
+
+export { createProductSaveTimer } from "@/features/products/product-save-timing";
 
 const PUBLISH_QUALITY_INCLUDE = {
   images: { select: { imageUrl: true } },
@@ -179,6 +186,7 @@ type WriteDependentRelationsOptions = {
   preparedVariantSkus?: ReadonlyMap<VariantInput, string>;
   resolvedAssignments?: ResolvedAssignmentValue[];
   skipOwnershipVerify?: boolean;
+  existingState?: ExistingProductRelationState;
 };
 
 async function runProductSaveTransaction<T>(
@@ -583,6 +591,112 @@ function categoryInputToPublishQualityInput(data: CategoryAdminInput): CategoryP
   };
 }
 
+async function loadExistingProductRelationState(
+  productId: string,
+  db: DbClient = prisma,
+): Promise<ExistingProductRelationState> {
+  const [productScalars, variants, options, specifications, customizations, assignments] = await Promise.all([
+    db.product.findUnique({
+      where: { id: productId },
+      select: { material: true, form: true },
+    }),
+    db.productVariant.findMany({
+      where: { productId },
+      include: { optionValues: { select: { optionValueId: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
+    db.productOption.findMany({
+      where: { productId },
+      include: {
+        values: { orderBy: { sortOrder: "asc" } },
+      },
+      orderBy: { sortOrder: "asc" },
+    }),
+    db.productSpecification.findMany({
+      where: { productId },
+      orderBy: { sortOrder: "asc" },
+    }),
+    db.productCustomizationCapability.findMany({
+      where: { productId },
+      orderBy: { sortOrder: "asc" },
+    }),
+    db.productAttributeAssignment.findMany({
+      where: { productId },
+      include: {
+        attribute: { select: { code: true } },
+        attributeValue: { select: { name: true } },
+      },
+      orderBy: { sortOrder: "asc" },
+    }),
+  ]);
+
+  return {
+    material: productScalars?.material ?? null,
+    form: productScalars?.form ?? null,
+    variants: variants.map((variant) => ({
+      id: variant.id,
+      sku: variant.sku,
+      colorName: variant.colorName,
+      colorCode: variant.colorCode,
+      sizeName: variant.sizeName,
+      dimensions: variant.dimensions,
+      capacity: variant.capacity,
+      displayLabel: variant.displayLabel,
+      moqOverride: variant.moqOverride,
+      leadTimeOverride: variant.leadTimeOverride,
+      materialOverride: variant.materialOverride,
+      wholesalePrice: variant.wholesalePrice,
+      dealerPrice: variant.dealerPrice,
+      costPrice: variant.costPrice,
+      stockQty: variant.stockQty,
+      stockStatus: variant.stockStatus,
+      weight: variant.weight,
+      imageUrl: variant.imageUrl,
+      internalNote: variant.internalNote,
+      variantStatus: variant.variantStatus,
+      optionValueIds: variant.optionValues.map((link) => link.optionValueId),
+    })),
+    options: options.map((option) => ({
+      id: option.id,
+      name: option.name,
+      slug: option.slug,
+      sortOrder: option.sortOrder,
+      attributeId: option.attributeId,
+      values: option.values.map((value) => ({
+        id: value.id,
+        optionId: option.id,
+        label: value.label,
+        valueCode: value.valueCode,
+        imageUrl: value.imageUrl,
+        sortOrder: value.sortOrder,
+        attributeValueId: value.attributeValueId,
+      })),
+    })),
+    specifications: specifications.map((row) => ({
+      id: row.id,
+      label: row.label,
+      value: row.value,
+      sortOrder: row.sortOrder,
+    })),
+    customizations: customizations.map((row) => ({
+      id: row.id,
+      label: row.label,
+      description: row.description,
+      sortOrder: row.sortOrder,
+      enabled: row.enabled,
+    })),
+    assignments: assignments.map((row) => ({
+      id: row.id,
+      attributeId: row.attributeId,
+      attributeCode: row.attribute.code,
+      attributeValueName: row.attributeValue?.name ?? null,
+      attributeValueId: row.attributeValueId,
+      customValue: row.customValue,
+      sortOrder: row.sortOrder,
+    })),
+  };
+}
+
 async function writeProductDependentRelations(
   productId: string,
   productCode: string,
@@ -597,6 +711,8 @@ async function writeProductDependentRelations(
     await verifyProductRelationInputOwnership(productId, input, db);
   }
 
+  const existingState = options.existingState;
+
   if (input.options || input.specifications || input.customizations) {
     await syncProductCmsData(
       productId,
@@ -606,6 +722,7 @@ async function writeProductDependentRelations(
         customizations: input.customizations,
       },
       db,
+      { existing: existingState },
     );
   }
 
@@ -614,48 +731,74 @@ async function writeProductDependentRelations(
       productId,
       input.attributeAssignments,
       db,
-      { preResolved: options.resolvedAssignments },
+      {
+        preResolved: options.resolvedAssignments,
+        existingAssignments: existingState?.assignments,
+      },
     );
-    await applyLegacyMirrorToProduct(productId, mirror, db);
+    const currentScalars = existingState
+      ? { material: existingState.material, form: existingState.form }
+      : await db.product.findUnique({
+          where: { id: productId },
+          select: { material: true, form: true },
+        });
+    await applyLegacyMirrorToProduct(
+      productId,
+      mirror,
+      db,
+      currentScalars ?? undefined,
+    );
   }
 
   const createdVariantIds: string[] = [];
+  const existingVariantById = new Map((existingState?.variants ?? []).map((row) => [row.id, row]));
+
   if (input.variants?.length) {
+    const variantUpdates: Array<Promise<void>> = [];
+
     for (const v of input.variants) {
       if (v.id) {
-        try {
-          await updateProductVariantOwned(db, productId, v.id, {
-            ...(v.sku?.trim() ? { sku: v.sku.trim() } : {}),
-            colorName: v.colorName,
-            colorCode: v.colorCode,
-            sizeName: v.sizeName,
-            dimensions: v.dimensions,
-            capacity: v.capacity,
-            displayLabel:
-              v.displayLabel !== undefined ? (v.displayLabel?.trim() || null) : undefined,
-            moqOverride: v.moqOverride !== undefined ? v.moqOverride : undefined,
-            leadTimeOverride:
-              v.leadTimeOverride !== undefined ? (v.leadTimeOverride?.trim() || null) : undefined,
-            materialOverride:
-              v.materialOverride !== undefined ? (v.materialOverride?.trim() || null) : undefined,
-            wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
-            dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
-            costPrice: v.costPrice != null ? v.costPrice : undefined,
-            ...(v.priceTiers ? { priceTiers: v.priceTiers as Prisma.InputJsonValue } : {}),
-            stockQty: v.stockQty,
-            stockStatus: v.stockStatus,
-            weight: v.weight != null ? v.weight : undefined,
-            imageUrl:
-              v.imageUrl !== undefined ? (v.imageUrl?.trim() ? v.imageUrl.trim() : null) : undefined,
-            internalNote: v.internalNote,
-            variantStatus: v.variantStatus,
-          });
-        } catch (error) {
-          if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
-            throwVariantSkuConflict(v, v.sku?.trim() ?? "");
-          }
-          throw error;
+        const existingVariant = existingVariantById.get(v.id);
+        if (existingVariant && !variantNeedsUpdate(v, existingVariant)) {
+          continue;
         }
+        variantUpdates.push(
+          (async () => {
+            try {
+              await updateProductVariantOwned(db, productId, v.id!, {
+                ...(v.sku?.trim() ? { sku: v.sku.trim() } : {}),
+                colorName: v.colorName,
+                colorCode: v.colorCode,
+                sizeName: v.sizeName,
+                dimensions: v.dimensions,
+                capacity: v.capacity,
+                displayLabel:
+                  v.displayLabel !== undefined ? (v.displayLabel?.trim() || null) : undefined,
+                moqOverride: v.moqOverride !== undefined ? v.moqOverride : undefined,
+                leadTimeOverride:
+                  v.leadTimeOverride !== undefined ? (v.leadTimeOverride?.trim() || null) : undefined,
+                materialOverride:
+                  v.materialOverride !== undefined ? (v.materialOverride?.trim() || null) : undefined,
+                wholesalePrice: v.wholesalePrice != null ? v.wholesalePrice : undefined,
+                dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
+                costPrice: v.costPrice != null ? v.costPrice : undefined,
+                ...(v.priceTiers ? { priceTiers: v.priceTiers as Prisma.InputJsonValue } : {}),
+                stockQty: v.stockQty,
+                stockStatus: v.stockStatus,
+                weight: v.weight != null ? v.weight : undefined,
+                imageUrl:
+                  v.imageUrl !== undefined ? (v.imageUrl?.trim() ? v.imageUrl.trim() : null) : undefined,
+                internalNote: v.internalNote,
+                variantStatus: v.variantStatus,
+              });
+            } catch (error) {
+              if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === "P2002") {
+                throwVariantSkuConflict(v, v.sku?.trim() ?? "");
+              }
+              throw error;
+            }
+          })(),
+        );
         continue;
       }
 
@@ -698,16 +841,22 @@ async function writeProductDependentRelations(
         throw error;
       }
     }
+
+    if (variantUpdates.length) {
+      await Promise.all(variantUpdates);
+    }
   }
 
-  if (input.variants?.some((v) => v.optionValueIds?.length)) {
-    const loadedOptions = await db.productOption.findMany({
-      where: { productId },
-      include: { values: true },
-    });
+  if (input.variants?.some((variant) => variant.optionValueIds?.length)) {
+    const loadedOptions =
+      existingState?.options ??
+      (await db.productOption.findMany({
+        where: { productId },
+        include: { values: true },
+      }));
     const variantOptionValueIds: Record<string, string[]> = {};
     let newVariantIndex = 0;
-    for (const v of input.variants) {
+    for (const v of input.variants ?? []) {
       if (!v.optionValueIds?.length) {
         if (!v.id) newVariantIndex += 1;
         continue;
@@ -720,7 +869,7 @@ async function writeProductDependentRelations(
         v.optionValueIds,
       );
     }
-    await syncProductCmsData(productId, { variantOptionValueIds }, db);
+    await syncProductCmsData(productId, { variantOptionValueIds }, db, { existing: existingState });
   }
 }
 
@@ -856,10 +1005,13 @@ export async function createProductAdmin(input: ProductInput) {
 // ─── Update ───────────────────────────────────────────────────────────────────
 
 export async function updateProductAdmin(id: string, input: Partial<ProductInput>) {
-  const existingStatus = await prisma.product.findUnique({
-    where: { id },
-    select: { status: true },
-  });
+  const timer = createProductSaveTimer(`update:${id}`);
+  const existingStatus = await timer.measure("status_lookup", () =>
+    prisma.product.findUnique({
+      where: { id },
+      select: { status: true },
+    }),
+  );
   if (!existingStatus) {
     throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
   }
@@ -956,6 +1108,7 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
         ? await validateProductAttributeAssignments(input.attributeAssignments)
         : undefined;
     await verifyProductRelationInputOwnership(id, input);
+    const existingState = await loadExistingProductRelationState(id);
 
     await runProductSaveTransaction(async (tx) => {
       if (Object.keys(updateData).length > 0) {
@@ -965,6 +1118,7 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
         preparedVariantSkus,
         resolvedAssignments,
         skipOwnershipVerify: true,
+        existingState,
       });
       const finalSnapshot = await loadPersistedProductPublishQualitySnapshot(id, tx);
       assertProductPublishQuality(finalSnapshot);
@@ -988,31 +1142,43 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
   if (Object.keys(updateData).length > 0 || productCode) {
     const resolvedAssignments =
       input.attributeAssignments !== undefined
-        ? await validateProductAttributeAssignments(input.attributeAssignments)
+        ? await timer.measure("assignment_validation", () =>
+            validateProductAttributeAssignments(input.attributeAssignments!),
+          )
         : undefined;
     if (productCode) {
-      await verifyProductRelationInputOwnership(id, input);
+      await timer.measure("ownership_verify", () => verifyProductRelationInputOwnership(id, input));
     }
+    const existingState = productCode
+      ? await timer.measure("relation_state_preload", () => loadExistingProductRelationState(id))
+      : undefined;
     const preparedVariantSkus =
       productCode && input.variants?.some((variant) => !variant.id)
-        ? await prepareVariantSkusForInput(input.variants, productCode)
+        ? await timer.measure("variant_sku_prepare", () =>
+            prepareVariantSkusForInput(input.variants, productCode),
+          )
         : undefined;
 
-    await runProductSaveTransaction(async (tx) => {
-      if (Object.keys(updateData).length > 0) {
-        await tx.product.update({ where: { id }, data: updateData });
-      }
-      if (productCode) {
-        await writeProductDependentRelations(id, productCode, input, tx, {
-          preparedVariantSkus,
-          resolvedAssignments,
-          skipOwnershipVerify: true,
-        });
-      }
-    });
+    await timer.measure("transaction", () =>
+      runProductSaveTransaction(async (tx) => {
+        if (Object.keys(updateData).length > 0) {
+          await tx.product.update({ where: { id }, data: updateData });
+        }
+        if (productCode) {
+          await writeProductDependentRelations(id, productCode, input, tx, {
+            preparedVariantSkus,
+            resolvedAssignments,
+            skipOwnershipVerify: true,
+            existingState,
+          });
+        }
+      }),
+    );
   }
 
-  return await getProductAdminById(id);
+  const result = await timer.measure("response_reload", () => getProductAdminById(id));
+  timer.flush();
+  return result;
 }
 
 export async function deleteProductAdmin(id: string) {

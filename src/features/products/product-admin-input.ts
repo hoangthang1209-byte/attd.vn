@@ -36,7 +36,7 @@ export function throwProductRelationOwnershipError(): never {
 }
 
 export const PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE =
-  "Không thể lưu sản phẩm do hệ thống xử lý quá lâu. Vui lòng thử lại.";
+  "Không thể lưu sản phẩm do hệ thống xử lý quá lâu. Dữ liệu bạn đã nhập vẫn được giữ lại. Vui lòng thử lại.";
 
 export function isPrismaTransactionTimeoutError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
