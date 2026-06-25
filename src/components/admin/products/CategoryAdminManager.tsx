@@ -8,11 +8,17 @@ import CategoryQuickEditModal, {
   type CategoryQuickEditRecord,
 } from "@/components/admin/products/CategoryQuickEditModal";
 import {
-  buildHierarchicalParentOptions,
+  buildLevel1ParentOptions,
   flattenCategoryTree,
   formatParentHint,
   getCategoryIndentPx,
 } from "@/features/categories/category-tree-utils";
+import {
+  CATEGORY_CODE_FORMAT_ERROR,
+  CATEGORY_NAME_EN_REQUIRED,
+  CATEGORY_NAME_VI_REQUIRED,
+  isValidFourLetterCategoryCode,
+} from "@/features/categories/category-admin-constants";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import PublishQualityChecklist from "@/components/admin/products/PublishQualityChecklist";
 import {
@@ -26,10 +32,16 @@ import { toSlug } from "@/lib/slug";
 
 type CategoryRow = CategoryQuickEditRecord & {
   parentName: string | null;
+  parentNameEn?: string | null;
+  nameEn?: string | null;
+  isActive?: boolean;
+  codeFormat?: "valid" | "legacy";
+  childCount?: number;
 };
 
 type CategoryForm = {
   name: string;
+  nameEn: string;
   slug: string;
   skuCode: string;
   description: string;
@@ -38,10 +50,17 @@ type CategoryForm = {
   imageUrl: string;
   sortOrder: string;
   parentId: string;
+  isActive: boolean;
+};
+
+type CodePreviewState = {
+  status: "idle" | "suggested" | "available" | "taken" | "invalid";
+  message: string;
 };
 
 const emptyForm = (): CategoryForm => ({
   name: "",
+  nameEn: "",
   slug: "",
   skuCode: "",
   description: "",
@@ -50,6 +69,7 @@ const emptyForm = (): CategoryForm => ({
   imageUrl: "",
   sortOrder: "0",
   parentId: "",
+  isActive: true,
 });
 
 async function fetchCategoryRows(): Promise<CategoryRow[]> {
@@ -76,6 +96,11 @@ export default function CategoryAdminManager() {
   const [form, setForm] = useState<CategoryForm>(emptyForm());
   const [slugEdited, setSlugEdited] = useState(false);
   const [skuCodeEdited, setSkuCodeEdited] = useState(false);
+  const [manualCodeMode, setManualCodeMode] = useState(false);
+  const [codePreview, setCodePreview] = useState<CodePreviewState>({
+    status: "idle",
+    message: "",
+  });
   const [showForm, setShowForm] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -152,19 +177,11 @@ export default function CategoryAdminManager() {
     };
   }, []);
 
-  useEffect(() => {
-    const editId = searchParams.get("editCategory");
-    if (!editId || loading || editCategoryHandledRef.current === editId) return;
-    const cat = categories.find((row) => row.id === editId);
-    if (!cat) return;
-    editCategoryHandledRef.current = editId;
-    openFullEditor(cat);
-  }, [searchParams, loading, categories]);
-
   function openFullEditor(cat: CategoryRow) {
     setEditingId(cat.id);
     setForm({
       name: cat.name,
+      nameEn: cat.nameEn ?? "",
       slug: cat.slug,
       skuCode: cat.skuCode ?? "",
       description: cat.description ?? "",
@@ -173,20 +190,40 @@ export default function CategoryAdminManager() {
       imageUrl: cat.imageUrl ?? "",
       sortOrder: String(cat.sortOrder),
       parentId: cat.parentId ?? "",
+      isActive: cat.isActive !== false,
     });
     setSlugEdited(true);
-    setSkuCodeEdited(Boolean(cat.skuCode));
+    setSkuCodeEdited(true);
+    setManualCodeMode(Boolean(cat.skuCode));
+    setCodePreview({
+      status: cat.codeFormat === "legacy" ? "invalid" : cat.skuCode ? "available" : "idle",
+      message:
+        cat.codeFormat === "legacy"
+          ? "Mã hiện tại chưa đúng 4 chữ cái — cần chỉnh thủ công khi cập nhật."
+          : "",
+    });
     setShowForm(true);
     setQuickEditCategory(null);
     setFieldErrors({});
     setMessage(null);
   }
 
+  useEffect(() => {
+    const editId = searchParams.get("editCategory");
+    if (!editId || loading || editCategoryHandledRef.current === editId) return;
+    const cat = categories.find((row) => row.id === editId);
+    if (!cat) return;
+    editCategoryHandledRef.current = editId;
+    queueMicrotask(() => openFullEditor(cat));
+  }, [searchParams, loading, categories]);
+
   function startCreate() {
     setEditingId(null);
     setForm(emptyForm());
     setSlugEdited(false);
     setSkuCodeEdited(false);
+    setManualCodeMode(false);
+    setCodePreview({ status: "idle", message: "" });
     setShowForm(true);
     setMessage(null);
     setFieldErrors({});
@@ -200,23 +237,77 @@ export default function CategoryAdminManager() {
   }
 
   useEffect(() => {
-    if (!showForm || skuCodeEdited || !form.name.trim()) return;
+    if (!showForm || editingId || skuCodeEdited || manualCodeMode || !form.nameEn.trim()) {
+      return;
+    }
 
     const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ name: form.name.trim() });
-      if (editingId) params.set("excludeId", editingId);
+      const params = new URLSearchParams({ nameEn: form.nameEn.trim() });
       void fetch(`/api/admin/products/categories/code-preview?${params}`)
         .then((r) => r.json())
-        .then((data: { code?: string }) => {
-          if (data.code && !skuCodeEdited) {
+        .then((data: { code?: string; taken?: boolean; suggested?: boolean; formatError?: string }) => {
+          if (skuCodeEdited || manualCodeMode) return;
+          if (data.formatError) {
+            setCodePreview({ status: "invalid", message: data.formatError });
+            return;
+          }
+          if (data.code) {
             setForm((f) => ({ ...f, skuCode: data.code ?? "" }));
+          }
+          if (data.taken) {
+            setCodePreview({ status: "taken", message: "Mã đã tồn tại" });
+          } else if (data.suggested) {
+            setCodePreview({ status: "suggested", message: "Mã được gợi ý tự động" });
+          } else if (data.code) {
+            setCodePreview({ status: "available", message: "Mã khả dụng" });
           }
         })
         .catch(() => {});
     }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [form.name, showForm, skuCodeEdited, editingId]);
+  }, [form.nameEn, showForm, skuCodeEdited, manualCodeMode, editingId]);
+
+  async function refreshCodePreview(manualCode?: string) {
+    const params = new URLSearchParams();
+    if (manualCode?.trim()) {
+      params.set("code", manualCode.trim());
+    } else if (form.nameEn.trim()) {
+      params.set("nameEn", form.nameEn.trim());
+    } else {
+      return;
+    }
+    if (editingId) params.set("excludeId", editingId);
+
+    const response = await fetch(`/api/admin/products/categories/code-preview?${params}`);
+    const data = (await response.json()) as {
+      code?: string;
+      taken?: boolean;
+      suggested?: boolean;
+      formatError?: string;
+      generationError?: string;
+    };
+
+    if (data.formatError || data.generationError) {
+      setCodePreview({
+        status: "invalid",
+        message: data.formatError ?? data.generationError ?? CATEGORY_CODE_FORMAT_ERROR,
+      });
+      return;
+    }
+
+    if (!manualCode && data.code && !skuCodeEdited) {
+      setForm((f) => ({ ...f, skuCode: data.code ?? "" }));
+    }
+
+    if (data.taken) {
+      setCodePreview({ status: "taken", message: "Mã đã tồn tại" });
+    } else if (data.suggested) {
+      setCodePreview({ status: "suggested", message: "Mã được gợi ý tự động" });
+    } else {
+      setCodePreview({ status: "available", message: "Mã khả dụng" });
+    }
+  }
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -225,15 +316,28 @@ export default function CategoryAdminManager() {
 
     if (!form.name.trim() || !form.slug.trim()) {
       setFieldErrors({
-        ...(!form.name.trim() ? { name: "Tên danh mục là bắt buộc." } : {}),
+        ...(!form.name.trim() ? { name: CATEGORY_NAME_VI_REQUIRED } : {}),
         ...(!form.slug.trim() ? { slug: "Slug là bắt buộc." } : {}),
       });
-      setMessage({ type: "error", text: "Tên danh mục và slug là bắt buộc." });
+      setMessage({ type: "error", text: "Vui lòng kiểm tra các trường bắt buộc." });
+      return;
+    }
+
+    if (!editingId && !form.nameEn.trim()) {
+      setFieldErrors({ nameEn: CATEGORY_NAME_EN_REQUIRED });
+      setMessage({ type: "error", text: CATEGORY_NAME_EN_REQUIRED });
+      return;
+    }
+
+    if (form.skuCode.trim() && !isValidFourLetterCategoryCode(form.skuCode)) {
+      setFieldErrors({ skuCode: CATEGORY_CODE_FORMAT_ERROR });
+      setMessage({ type: "error", text: CATEGORY_CODE_FORMAT_ERROR });
       return;
     }
 
     const payload = {
       name: form.name.trim(),
+      nameEn: form.nameEn.trim() || null,
       slug: form.slug.trim(),
       skuCode: form.skuCode.trim() || null,
       description: form.description.trim() || null,
@@ -242,6 +346,7 @@ export default function CategoryAdminManager() {
       imageUrl: form.imageUrl.trim() || null,
       sortOrder: Number(form.sortOrder) || 0,
       parentId: form.parentId.trim() || null,
+      isActive: form.isActive,
     };
 
     setSaving(true);
@@ -323,7 +428,7 @@ export default function CategoryAdminManager() {
     router.refresh();
   }
 
-  const parentOptions = buildHierarchicalParentOptions(categories, editingId);
+  const parentOptions = buildLevel1ParentOptions(categories, editingId);
 
   return (
     <div className="admin-category-page">
@@ -350,7 +455,7 @@ export default function CategoryAdminManager() {
 
           <div className="admin-form-grid admin-form-grid--2">
             <div>
-              <label className="admin-label">Tên danh mục *</label>
+              <label className="admin-label">Tên danh mục tiếng Việt *</label>
               <input
                 className={`admin-input${fieldErrors.name ? " admin-input--error" : ""}`}
                 value={form.name}
@@ -368,6 +473,69 @@ export default function CategoryAdminManager() {
               {fieldErrors.name && <p className="admin-field-error" role="alert">{fieldErrors.name}</p>}
             </div>
             <div>
+              <label className="admin-label">Tên danh mục tiếng Anh *</label>
+              <input
+                className={`admin-input${fieldErrors.nameEn ? " admin-input--error" : ""}`}
+                value={form.nameEn}
+                data-field="nameEn"
+                onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))}
+                required={!editingId}
+                placeholder="Polo Shirts"
+              />
+              {fieldErrors.nameEn && <p className="admin-field-error" role="alert">{fieldErrors.nameEn}</p>}
+            </div>
+            <div>
+              <label className="admin-label">Mã danh mục *</label>
+              <input
+                className={`admin-input${fieldErrors.skuCode ? " admin-input--error" : ""}`}
+                value={form.skuCode}
+                data-field="skuCode"
+                readOnly={!manualCodeMode && !editingId}
+                maxLength={4}
+                onChange={(e) => {
+                  setSkuCodeEdited(true);
+                  setManualCodeMode(true);
+                  const next = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+                  setForm((f) => ({ ...f, skuCode: next }));
+                  void refreshCodePreview(next);
+                }}
+                placeholder="POLS"
+              />
+              {fieldErrors.skuCode && <p className="admin-field-error" role="alert">{fieldErrors.skuCode}</p>}
+              {codePreview.message && (
+                <p
+                  className={`admin-category-code-status admin-category-code-status--${codePreview.status}`}
+                >
+                  {codePreview.message}
+                </p>
+              )}
+              <div className="admin-category-code-actions">
+                {!editingId && (
+                  <button
+                    type="button"
+                    className="btn-tertiary btn-sm"
+                    onClick={() => {
+                      setSkuCodeEdited(false);
+                      setManualCodeMode(false);
+                      void refreshCodePreview();
+                    }}
+                  >
+                    Tạo lại mã
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn-tertiary btn-sm"
+                  onClick={() => {
+                    setManualCodeMode(true);
+                    setSkuCodeEdited(true);
+                  }}
+                >
+                  Chỉnh mã thủ công
+                </button>
+              </div>
+            </div>
+            <div>
               <label className="admin-label">Slug *</label>
               <input
                 className={`admin-input${fieldErrors.slug ? " admin-input--error" : ""}`}
@@ -383,34 +551,6 @@ export default function CategoryAdminManager() {
               <p className="admin-field-hint">attd.vn/{form.slug || "danh-muc"}</p>
             </div>
             <div>
-              <label className="admin-label">Mã danh mục</label>
-              <input
-                className={`admin-input${fieldErrors.skuCode ? " admin-input--error" : ""}`}
-                value={form.skuCode}
-                data-field="skuCode"
-                onChange={(e) => {
-                  setSkuCodeEdited(true);
-                  setForm((f) => ({ ...f, skuCode: e.target.value.toUpperCase() }));
-                }}
-                placeholder="Tự động từ tên (vd. TS, POLO, TOTE)"
-              />
-              {fieldErrors.skuCode && <p className="admin-field-error" role="alert">{fieldErrors.skuCode}</p>}
-              {!skuCodeEdited && form.name.trim() && (
-                <p className="admin-field-hint">
-                  Mã dự kiến sẽ được tạo tự động khi lưu. Có thể chỉnh tay nếu cần.
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="admin-label">Thứ tự hiển thị</label>
-              <input
-                className="admin-input"
-                type="number"
-                value={form.sortOrder}
-                onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))}
-              />
-            </div>
-            <div>
               <label className="admin-label">Danh mục cha</label>
               <select
                 className="admin-input"
@@ -424,6 +564,29 @@ export default function CategoryAdminManager() {
                   </option>
                 ))}
               </select>
+              <p className="admin-field-hint">Chỉ chọn danh mục cấp 1 (loại sản phẩm).</p>
+            </div>
+            <div>
+              <label className="admin-label">Trạng thái</label>
+              <select
+                className="admin-input"
+                value={form.isActive ? "active" : "inactive"}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, isActive: e.target.value === "active" }))
+                }
+              >
+                <option value="active">Đang hoạt động</option>
+                <option value="inactive">Tạm ẩn</option>
+              </select>
+            </div>
+            <div>
+              <label className="admin-label">Thứ tự hiển thị</label>
+              <input
+                className="admin-input"
+                type="number"
+                value={form.sortOrder}
+                onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))}
+              />
             </div>
           </div>
 
@@ -537,11 +700,12 @@ export default function CategoryAdminManager() {
             <table className="admin-table admin-category-table">
               <thead>
                 <tr>
-                  <th>Ảnh</th>
-                  <th>Tên danh mục</th>
-                  <th>Slug</th>
-                  <th>Mã danh mục</th>
+                  <th>Tên tiếng Việt</th>
+                  <th>Tên tiếng Anh</th>
+                  <th>Mã</th>
+                  <th>Danh mục cha</th>
                   <th>Sản phẩm</th>
+                  <th>Trạng thái</th>
                   <th>Thứ tự</th>
                   <th>Hành động</th>
                 </tr>
@@ -562,18 +726,6 @@ export default function CategoryAdminManager() {
                           : "admin-category-table__row--child"
                       }
                     >
-                      <td className="admin-category-table__image-cell">
-                        {cat.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={cat.imageUrl}
-                            alt={cat.name}
-                            className="admin-category-list-thumb"
-                          />
-                        ) : (
-                          <span className="admin-field-hint">—</span>
-                        )}
-                      </td>
                       <td className="admin-category-table__name-cell">
                         <div
                           className="admin-category-table__name-inner"
@@ -607,9 +759,23 @@ export default function CategoryAdminManager() {
                           </div>
                         </div>
                       </td>
-                      <td><code>{cat.slug}</code></td>
-                      <td>{cat.skuCode ?? "—"}</td>
+                      <td>{cat.nameEn?.trim() ? cat.nameEn : <span className="admin-field-hint">—</span>}</td>
+                      <td>
+                        <code
+                          className={
+                            cat.codeFormat === "legacy"
+                              ? "admin-category-table__code--legacy"
+                              : cat.skuCode && !isValidFourLetterCategoryCode(cat.skuCode)
+                                ? "admin-category-table__code--invalid"
+                                : undefined
+                          }
+                        >
+                          {cat.skuCode ?? "—"}
+                        </code>
+                      </td>
+                      <td>{cat.parentName ?? "—"}</td>
                       <td>{cat.productCount}</td>
+                      <td>{cat.isActive === false ? "Tạm ẩn" : "Hoạt động"}</td>
                       <td>{cat.sortOrder}</td>
                       <td>
                         <div className="admin-table-actions">

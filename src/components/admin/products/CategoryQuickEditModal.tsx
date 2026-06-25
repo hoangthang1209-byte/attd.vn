@@ -5,10 +5,15 @@ import Link from "next/link";
 import AdminQuickCreateShell from "@/components/admin/AdminQuickCreateShell";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import {
-  buildHierarchicalParentOptions,
+  buildLevel1ParentOptions,
   validateCategoryParentSelection,
   type CategoryTreeItem,
 } from "@/features/categories/category-tree-utils";
+import {
+  CATEGORY_CODE_FORMAT_ERROR,
+  CATEGORY_NAME_VI_REQUIRED,
+  isValidFourLetterCategoryCode,
+} from "@/features/categories/category-admin-constants";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { isIndexableCategoryLanding } from "@/lib/seo/indexable-category-routes";
 import {
@@ -20,12 +25,15 @@ import { toSlug } from "@/lib/slug";
 
 export type CategoryQuickEditRecord = CategoryTreeItem & {
   slug: string;
+  nameEn?: string | null;
   skuCode: string | null;
   description: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
   imageUrl: string | null;
   productCount: number;
+  isActive?: boolean;
+  codeFormat?: "valid" | "legacy";
 };
 
 type Props = {
@@ -115,27 +123,30 @@ function CategoryQuickEditModalForm({
   const submitLock = useRef(false);
   const [pending, setPending] = useState(false);
   const [name, setName] = useState(category.name);
+  const [nameEn, setNameEn] = useState(category.nameEn ?? "");
   const [slug, setSlug] = useState(category.slug);
   const [skuCode, setSkuCode] = useState(category.skuCode ?? "");
   const [sortOrder, setSortOrder] = useState(String(category.sortOrder));
   const [parentId, setParentId] = useState(category.parentId ?? "");
+  const [isActive, setIsActive] = useState(category.isActive !== false);
   const [imageUrl, setImageUrl] = useState(category.imageUrl ?? "");
   const [slugEdited, setSlugEdited] = useState(false);
-  const [skuCodeEdited, setSkuCodeEdited] = useState(Boolean(category.skuCode));
+  const [skuCodeEdited, setSkuCodeEdited] = useState(true);
+  const [manualCodeMode, setManualCodeMode] = useState(Boolean(category.skuCode));
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useModalFocusTrap(true, formContainerRef);
 
   useEffect(() => {
-    if (skuCodeEdited || !name.trim()) return;
+    if (skuCodeEdited || manualCodeMode || !nameEn.trim()) return;
 
     const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ name: name.trim(), excludeId: category.id });
+      const params = new URLSearchParams({ nameEn: nameEn.trim(), excludeId: category.id });
       void fetch(`/api/admin/products/categories/code-preview?${params}`)
         .then((response) => response.json())
         .then((data: { code?: string }) => {
-          if (data.code && !skuCodeEdited) {
+          if (data.code && !skuCodeEdited && !manualCodeMode) {
             setSkuCode(data.code);
           }
         })
@@ -143,7 +154,7 @@ function CategoryQuickEditModalForm({
     }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [category.id, name, skuCodeEdited]);
+  }, [category.id, nameEn, skuCodeEdited, manualCodeMode]);
 
   function resetAndClose() {
     if (pending) return;
@@ -156,10 +167,13 @@ function CategoryQuickEditModalForm({
     const nextFieldErrors: Record<string, string> = {};
 
     if (!name.trim()) {
-      nextFieldErrors.name = "Vui lòng nhập tên danh mục.";
+      nextFieldErrors.name = CATEGORY_NAME_VI_REQUIRED;
     }
     if (!slug.trim()) {
       nextFieldErrors.slug = "Vui lòng nhập slug.";
+    }
+    if (skuCode.trim() && !isValidFourLetterCategoryCode(skuCode) && skuCode !== (category.skuCode ?? "")) {
+      nextFieldErrors.skuCode = CATEGORY_CODE_FORMAT_ERROR;
     }
 
     const parentError = category
@@ -193,6 +207,7 @@ function CategoryQuickEditModalForm({
 
     const payload = {
       name: name.trim(),
+      nameEn: nameEn.trim() || null,
       slug: slug.trim(),
       skuCode: skuCode.trim() || null,
       description: category.description,
@@ -201,6 +216,7 @@ function CategoryQuickEditModalForm({
       imageUrl: imageUrl.trim() || null,
       sortOrder: Number(sortOrder) || 0,
       parentId: parentId.trim() || null,
+      isActive,
     };
 
     await mutate({
@@ -250,7 +266,7 @@ function CategoryQuickEditModalForm({
     submitLock.current = false;
   }
 
-  const parentOptions = buildHierarchicalParentOptions(
+  const parentOptions = buildLevel1ParentOptions(
     allCategories,
     category?.id ?? null,
   );
@@ -333,7 +349,7 @@ function CategoryQuickEditModalForm({
 
             <div className="admin-field">
               <label className="admin-label" htmlFor="quick-edit-category-name">
-                Tên danh mục *
+                Tên danh mục tiếng Việt *
               </label>
               <input
                 id="quick-edit-category-name"
@@ -356,6 +372,20 @@ function CategoryQuickEditModalForm({
                 }}
               />
               {fieldErrors.name && <p className="admin-field-error">{fieldErrors.name}</p>}
+            </div>
+
+            <div className="admin-field">
+              <label className="admin-label" htmlFor="quick-edit-category-name-en">
+                Tên danh mục tiếng Anh
+              </label>
+              <input
+                id="quick-edit-category-name-en"
+                className="admin-input"
+                value={nameEn}
+                disabled={pending}
+                onChange={(event) => setNameEn(event.target.value)}
+                placeholder="Polo Shirts"
+              />
             </div>
 
             <div className="admin-field">
@@ -389,12 +419,14 @@ function CategoryQuickEditModalForm({
               </label>
               <input
                 id="quick-edit-category-code"
-                className="admin-input"
+                className={`admin-input${fieldErrors.skuCode ? " admin-input--error" : ""}`}
                 value={skuCode}
+                maxLength={4}
                 disabled={pending}
                 onChange={(event) => {
                   setSkuCodeEdited(true);
-                  setSkuCode(event.target.value.toUpperCase());
+                  setManualCodeMode(true);
+                  setSkuCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4));
                   if (fieldErrors.skuCode) {
                     setFieldErrors((current) => {
                       const next = { ...current };
@@ -404,9 +436,35 @@ function CategoryQuickEditModalForm({
                   }
                 }}
               />
+              {category.codeFormat === "legacy" && (
+                <p className="admin-field-hint admin-field-hint--warning">
+                  Mã hiện tại chưa đúng 4 chữ cái. Chỉnh mã mới sẽ không tự đổi mã sản phẩm hiện có.
+                </p>
+              )}
+              {category.productCount > 0 && skuCode !== (category.skuCode ?? "") && (
+                <p className="admin-field-hint admin-field-hint--warning">
+                  Thay đổi mã danh mục không tự động đổi mã {category.productCount} sản phẩm liên quan.
+                </p>
+              )}
               {fieldErrors.skuCode && (
                 <p className="admin-field-error">{fieldErrors.skuCode}</p>
               )}
+            </div>
+
+            <div className="admin-field">
+              <label className="admin-label" htmlFor="quick-edit-category-status">
+                Trạng thái
+              </label>
+              <select
+                id="quick-edit-category-status"
+                className="admin-input"
+                value={isActive ? "active" : "inactive"}
+                disabled={pending}
+                onChange={(event) => setIsActive(event.target.value === "active")}
+              >
+                <option value="active">Đang hoạt động</option>
+                <option value="inactive">Tạm ẩn</option>
+              </select>
             </div>
 
             <div className="admin-field">

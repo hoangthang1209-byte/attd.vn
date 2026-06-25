@@ -7,19 +7,27 @@ import {
   ensureUniqueProductCode,
   ProductSkuError,
   CATEGORY_SKU_CODE_MISSING_ERROR,
-  CATEGORY_CODE_DUPLICATE_ERROR,
   validateProductCodeForCategory,
   requireCategorySkuCode,
-  generateCategoryCodeFromName,
-  ensureUniqueCategoryCode,
   isCategoryCodeTaken,
-  normalizeCode,
 } from "@/features/products/product-sku-utils";
 import { ProductAdminValidationError, isPrismaTransactionTimeoutError, PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE } from "@/features/products/product-admin-input";
 import {
   CATEGORY_SLUG_DUPLICATE_ERROR,
   validateCategoryParentSelection,
 } from "@/features/categories/category-tree-utils";
+import {
+  CATEGORY_CODE_DUPLICATE_ERROR as CATEGORY_CODE_DUPLICATE_VI,
+  CATEGORY_CODE_FORMAT_ERROR,
+  CATEGORY_NAME_EN_REQUIRED,
+  CATEGORY_NAME_VI_REQUIRED,
+  isValidFourLetterCategoryCode,
+  normalizeFourLetterCategoryCode,
+} from "@/features/categories/category-admin-constants";
+import {
+  CategoryCodeGenerationError,
+  generateUniqueCategoryCodeFromEnglishName,
+} from "@/features/categories/category-code-generator";
 import { generateProductSystemCode } from "@/features/products/product-system-code";
 import {
   PRODUCT_CMS_INCLUDE,
@@ -1193,22 +1201,28 @@ export async function listProductCategories() {
   const cats = await prisma.category.findMany({
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     include: {
-      _count: { select: { products: true } },
-      parent: { select: { id: true, name: true } },
+      _count: { select: { products: true, children: true } },
+      parent: { select: { id: true, name: true, nameEn: true } },
     },
   });
   return cats.map((c) => ({
     id: c.id,
     name: c.name,
+    nameVi: c.name,
+    nameEn: c.nameEn,
     slug: c.slug,
     skuCode: c.skuCode,
+    codeFormat: isValidFourLetterCategoryCode(c.skuCode) ? ("valid" as const) : ("legacy" as const),
     description: c.description,
     seoTitle: c.seoTitle,
     seoDescription: c.seoDescription,
     imageUrl: c.imageUrl,
     sortOrder: c.sortOrder,
+    isActive: c.isActive,
     parentId: c.parentId,
     parentName: c.parent?.name ?? null,
+    parentNameEn: c.parent?.nameEn ?? null,
+    childCount: c._count.children,
     productCount: c._count.products,
   }));
 }
@@ -1217,29 +1231,36 @@ export async function getProductCategoryById(id: string) {
   const c = await prisma.category.findUnique({
     where: { id },
     include: {
-      _count: { select: { products: true } },
-      parent: { select: { id: true, name: true } },
+      _count: { select: { products: true, children: true } },
+      parent: { select: { id: true, name: true, nameEn: true } },
     },
   });
   if (!c) return null;
   return {
     id: c.id,
     name: c.name,
+    nameVi: c.name,
+    nameEn: c.nameEn,
     slug: c.slug,
     skuCode: c.skuCode,
+    codeFormat: isValidFourLetterCategoryCode(c.skuCode) ? ("valid" as const) : ("legacy" as const),
     description: c.description,
     seoTitle: c.seoTitle,
     seoDescription: c.seoDescription,
     imageUrl: c.imageUrl,
     sortOrder: c.sortOrder,
+    isActive: c.isActive,
     parentId: c.parentId,
     parentName: c.parent?.name ?? null,
+    parentNameEn: c.parent?.nameEn ?? null,
+    childCount: c._count.children,
     productCount: c._count.products,
   };
 }
 
 export type CategoryAdminInput = {
   name: string;
+  nameEn?: string | null;
   slug: string;
   skuCode?: string | null;
   description?: string | null;
@@ -1248,7 +1269,109 @@ export type CategoryAdminInput = {
   imageUrl?: string | null;
   sortOrder?: number;
   parentId?: string | null;
+  isActive?: boolean;
 };
+
+function mapCategoryNameFields(data: CategoryAdminInput) {
+  const nameVi = data.name.trim();
+  const nameEn = data.nameEn?.trim() ? data.nameEn.trim() : null;
+  return { nameVi, nameEn, name: nameVi };
+}
+
+async function resolveCategorySkuCodeForCreate(data: CategoryAdminInput): Promise<string> {
+  const manualCode = data.skuCode?.trim()
+    ? normalizeFourLetterCategoryCode(data.skuCode)
+    : "";
+
+  if (manualCode) {
+    if (!isValidFourLetterCategoryCode(manualCode)) {
+      throw new ProductAdminValidationError(CATEGORY_CODE_FORMAT_ERROR, {
+        skuCode: CATEGORY_CODE_FORMAT_ERROR,
+      });
+    }
+    if (await isCategoryCodeTaken(manualCode)) {
+      throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_VI, {
+        skuCode: CATEGORY_CODE_DUPLICATE_VI,
+      });
+    }
+    return manualCode;
+  }
+
+  const nameEn = data.nameEn?.trim();
+  if (!nameEn) {
+    throw new ProductAdminValidationError(CATEGORY_NAME_EN_REQUIRED, {
+      nameEn: CATEGORY_NAME_EN_REQUIRED,
+    });
+  }
+
+  try {
+    return await generateUniqueCategoryCodeFromEnglishName(nameEn, async (code) =>
+      isCategoryCodeTaken(code),
+    );
+  } catch (error) {
+    if (error instanceof CategoryCodeGenerationError) {
+      throw new ProductAdminValidationError(error.message, {
+        skuCode: error.message,
+      });
+    }
+    throw error;
+  }
+}
+
+async function resolveCategorySkuCodeForUpdate(
+  id: string,
+  data: CategoryAdminInput,
+  existingSkuCode: string | null,
+): Promise<string | null | undefined> {
+  if (data.skuCode === undefined) {
+    return undefined;
+  }
+
+  const trimmed = data.skuCode?.trim() ?? "";
+  if (!trimmed) {
+    return existingSkuCode;
+  }
+
+  const normalized = normalizeFourLetterCategoryCode(trimmed);
+  const existingNormalized = existingSkuCode?.trim().toUpperCase() ?? "";
+
+  if (normalized === existingNormalized) {
+    return existingSkuCode;
+  }
+
+  if (!isValidFourLetterCategoryCode(normalized)) {
+    throw new ProductAdminValidationError(CATEGORY_CODE_FORMAT_ERROR, {
+      skuCode: CATEGORY_CODE_FORMAT_ERROR,
+    });
+  }
+
+  if (await isCategoryCodeTaken(normalized, id)) {
+    throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_VI, {
+      skuCode: CATEGORY_CODE_DUPLICATE_VI,
+    });
+  }
+
+  return normalized;
+}
+
+function assertCategoryNameFields(data: CategoryAdminInput, isCreate: boolean) {
+  const fieldErrors: Record<string, string> = {};
+
+  if (!data.name.trim()) {
+    fieldErrors.name = CATEGORY_NAME_VI_REQUIRED;
+  }
+
+  if (isCreate && !data.nameEn?.trim()) {
+    fieldErrors.nameEn = CATEGORY_NAME_EN_REQUIRED;
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    throw new ProductAdminValidationError(
+      fieldErrors.name ?? fieldErrors.nameEn ?? "Thông tin danh mục không hợp lệ.",
+      fieldErrors,
+    );
+  }
+}
 
 async function assertUniqueCategorySlug(slug: string, excludeId?: string) {
   const existing = await prisma.category.findUnique({ where: { slug } });
@@ -1294,26 +1417,20 @@ async function assertValidCategoryParent(
 }
 
 export async function createProductCategory(data: CategoryAdminInput) {
+  assertCategoryNameFields(data, true);
   assertCategoryPublishQuality(categoryInputToPublishQualityInput(data), {
     requireIndexableLandingFields: isIndexableCategoryLanding(data.slug),
   });
 
   await assertUniqueCategorySlug(data.slug);
   const parentId = await assertValidCategoryParent(null, data.parentId);
-
-  let skuCode = data.skuCode?.trim() ? normalizeCode(data.skuCode) : "";
-  if (!skuCode) {
-    const base = generateCategoryCodeFromName(data.name);
-    skuCode = await ensureUniqueCategoryCode(base);
-  } else if (await isCategoryCodeTaken(skuCode)) {
-    throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_ERROR, {
-      skuCode: CATEGORY_CODE_DUPLICATE_ERROR,
-    });
-  }
+  const skuCode = await resolveCategorySkuCodeForCreate(data);
+  const { nameVi, nameEn } = mapCategoryNameFields(data);
 
   return prisma.category.create({
     data: {
-      name: data.name,
+      name: nameVi,
+      nameEn,
       slug: data.slug,
       skuCode,
       description: data.description ?? null,
@@ -1321,6 +1438,7 @@ export async function createProductCategory(data: CategoryAdminInput) {
       seoDescription: data.seoDescription ?? null,
       imageUrl: data.imageUrl ?? null,
       sortOrder: data.sortOrder ?? 0,
+      isActive: data.isActive ?? true,
       parentId,
     },
   });
@@ -1329,11 +1447,13 @@ export async function createProductCategory(data: CategoryAdminInput) {
 export async function updateProductCategory(id: string, data: CategoryAdminInput) {
   const existing = await prisma.category.findUnique({
     where: { id },
-    select: { slug: true },
+    select: { slug: true, skuCode: true },
   });
   if (!existing) {
     throw new ProductAdminValidationError("Không tìm thấy danh mục.", {}, "Không tìm thấy danh mục.");
   }
+
+  assertCategoryNameFields(data, false);
 
   if (shouldEnforceCategoryIndexableSeoGate(existing.slug, data.slug)) {
     assertCategoryPublishQuality(categoryInputToPublishQualityInput(data), {
@@ -1347,25 +1467,22 @@ export async function updateProductCategory(id: string, data: CategoryAdminInput
 
   await assertUniqueCategorySlug(data.slug, id);
   const parentId = await assertValidCategoryParent(id, data.parentId);
-
-  const skuCode = data.skuCode?.trim() ? normalizeCode(data.skuCode) : null;
-  if (skuCode && (await isCategoryCodeTaken(skuCode, id))) {
-    throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_ERROR, {
-      skuCode: CATEGORY_CODE_DUPLICATE_ERROR,
-    });
-  }
+  const skuCode = await resolveCategorySkuCodeForUpdate(id, data, existing.skuCode);
+  const { nameVi, nameEn } = mapCategoryNameFields(data);
 
   return prisma.category.update({
     where: { id },
     data: {
-      name: data.name,
+      name: nameVi,
+      nameEn,
       slug: data.slug,
-      skuCode,
+      ...(skuCode !== undefined ? { skuCode } : {}),
       description: data.description ?? null,
       seoTitle: data.seoTitle ?? null,
       seoDescription: data.seoDescription ?? null,
       imageUrl: data.imageUrl ?? null,
       sortOrder: data.sortOrder ?? 0,
+      ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       parentId,
     },
   });

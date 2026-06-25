@@ -20,8 +20,10 @@ model User {
 model Category {
   id             String      @id @default(cuid())
   name           String
+  nameEn         String?
   slug           String      @unique
   skuCode        String?
+  isActive       Boolean     @default(true)
   parentId       String?
   description    String?
   seoTitle       String?

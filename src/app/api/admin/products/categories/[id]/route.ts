@@ -15,12 +15,12 @@ import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-
 type RouteContext = { params: Promise<{ id: string }> };
 
 function parseBody(raw: Record<string, unknown>): CategoryAdminInput | null {
-  if (!raw.name || !raw.slug) return null;
-  const name = String(raw.name).trim();
-  const slug = String(raw.slug).trim();
+  const name = raw.name != null ? String(raw.name).trim() : "";
+  const slug = raw.slug != null ? String(raw.slug).trim() : "";
   if (!name || !slug) return null;
   return {
     name,
+    nameEn: raw.nameEn != null ? String(raw.nameEn).trim() || null : null,
     slug,
     skuCode: raw.skuCode != null ? String(raw.skuCode).trim() || null : null,
     description: raw.description != null ? String(raw.description).trim() || null : null,
@@ -32,6 +32,7 @@ function parseBody(raw: Record<string, unknown>): CategoryAdminInput | null {
     imageUrl: raw.imageUrl != null ? String(raw.imageUrl).trim() || null : null,
     sortOrder: raw.sortOrder != null ? Number(raw.sortOrder) || 0 : 0,
     parentId: raw.parentId != null ? String(raw.parentId).trim() || null : null,
+    isActive: raw.isActive === undefined ? undefined : Boolean(raw.isActive),
   };
 }
 
@@ -59,7 +60,10 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
   }
   const data = parseBody(body as Record<string, unknown>);
   if (!data) {
-    return NextResponse.json({ message: "Tên và slug là bắt buộc." }, { status: 400 });
+    return NextResponse.json(
+      { message: "Tên danh mục tiếng Việt và slug là bắt buộc." },
+      { status: 400 },
+    );
   }
   try {
     const category = await updateProductCategory(id, data);

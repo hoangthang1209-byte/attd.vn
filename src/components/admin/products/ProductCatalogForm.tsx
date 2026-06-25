@@ -24,6 +24,7 @@ import {
   type ProductAttributeAssignmentFormRow,
 } from "@/features/products/product-catalog-form-mappers";
 import ProductCatalogFormErrorSummary from "@/components/admin/products/ProductCatalogFormErrorSummary";
+import ProductCategoryCascadingPicker from "@/components/admin/products/ProductCategoryCascadingPicker";
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
 import {
@@ -44,6 +45,7 @@ import {
   type ProductFormErrorDescriptor,
 } from "@/features/products/product-form-error-descriptors";
 import { normalizeProductFormFieldErrors } from "@/features/products/product-form-row-error-keys";
+import { validateProductCategorySelection } from "@/features/categories/category-cascade-utils";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import {
   SEO_PUBLISH_QUALITY_GATE_FAILED,
@@ -52,7 +54,15 @@ import {
   type ProductPublishQualityInput,
 } from "@/lib/seo/publish-quality-gate";
 
-type Category = { id: string; name: string; slug: string; skuCode: string | null };
+type Category = {
+  id: string;
+  name: string;
+  nameEn?: string | null;
+  slug: string;
+  skuCode: string | null;
+  parentId?: string | null;
+  isActive?: boolean;
+};
 
 type ProductFormData = {
   id?: string;
@@ -623,6 +633,10 @@ export default function ProductCatalogForm({
     setFieldErrors({});
 
     const localErrors = validateProductCatalogFormLocal(form);
+    const categoryError = validateProductCategorySelection(form.categoryId, categories);
+    if (categoryError) {
+      localErrors.categoryId = categoryError;
+    }
     if (Object.keys(localErrors).length > 0) {
       applyValidationErrors(
         localErrors,
@@ -884,20 +898,13 @@ export default function ProductCatalogForm({
             />
             {fieldErrors.name && <p className="admin-field-error" role="alert">{fieldErrors.name}</p>}
           </div>
-          <div className="admin-field" data-field="categoryId">
-            <label className="admin-label">Danh mục <span className="admin-required">*</span></label>
-            <select
-              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.categoryId))}`}
-              value={form.categoryId}
-              data-field="categoryId"
-              aria-invalid={Boolean(fieldErrors.categoryId)}
-              onChange={(e) => setField("categoryId", e.target.value)}
-            >
-              <option value="">— Chọn danh mục —</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name} {c.skuCode ? `(${c.skuCode})` : ""}</option>)}
-            </select>
-            {fieldErrors.categoryId && <p className="admin-field-error" role="alert">{fieldErrors.categoryId}</p>}
-          </div>
+          <ProductCategoryCascadingPicker
+            categories={categories}
+            value={form.categoryId}
+            onChange={(categoryId) => setField("categoryId", categoryId)}
+            error={fieldErrors.categoryId}
+            onClearError={() => clearFieldErrorKey("categoryId")}
+          />
           <div className="admin-field" data-field="productCode">
             <label className="admin-label">
               {form.id ? "ID sản phẩm" : "ID sản phẩm tự động"}

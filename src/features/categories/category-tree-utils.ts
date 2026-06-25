@@ -159,7 +159,69 @@ export const CATEGORY_PARENT_SELF_ERROR =
 export const CATEGORY_PARENT_DESCENDANT_ERROR =
   "Không thể chọn danh mục con làm danh mục cha.";
 
+export const CATEGORY_PARENT_NOT_LEVEL1_ERROR =
+  "Chỉ có thể chọn danh mục cấp 1 làm danh mục cha.";
+
+export const CATEGORY_PARENT_HAS_CHILDREN_ERROR =
+  "Không thể đặt danh mục cha vì danh mục này đang có danh mục con.";
+
+export const CATEGORY_MAX_DEPTH_ERROR =
+  "Danh mục chỉ được có tối đa 2 cấp (loại sản phẩm và form/công dụng).";
+
 export const CATEGORY_SLUG_DUPLICATE_ERROR = "Slug danh mục đã tồn tại.";
+
+export const CATEGORY_MAX_DEPTH = 2;
+
+export function categoryHasChildren(
+  categoryId: string,
+  categories: Pick<CategoryTreeItem, "id" | "parentId">[],
+): boolean {
+  return categories.some((category) => category.parentId === categoryId);
+}
+
+export function getCategoryDepth(
+  categoryId: string,
+  categories: Pick<CategoryTreeItem, "id" | "parentId">[],
+): number {
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  let depth = 0;
+  let current = byId.get(categoryId);
+
+  while (current?.parentId) {
+    depth += 1;
+    current = byId.get(current.parentId);
+    if (depth > CATEGORY_MAX_DEPTH) break;
+  }
+
+  return depth;
+}
+
+export function validateCategoryMaxDepth(
+  categoryId: string | null,
+  parentId: string | null,
+  categories: Pick<CategoryTreeItem, "id" | "parentId">[],
+): string | null {
+  if (!parentId) return null;
+
+  const parent = categories.find((category) => category.id === parentId);
+  if (!parent) return null;
+
+  if (parent.parentId) {
+    return CATEGORY_PARENT_NOT_LEVEL1_ERROR;
+  }
+
+  if (categoryId) {
+    const current = categories.find((category) => category.id === categoryId);
+    if (current?.parentId === parentId) {
+      return null;
+    }
+    if (categoryHasChildren(categoryId, categories)) {
+      return CATEGORY_PARENT_HAS_CHILDREN_ERROR;
+    }
+  }
+
+  return null;
+}
 
 export function validateCategoryParentSelection(
   categoryId: string | null,
@@ -176,7 +238,8 @@ export function validateCategoryParentSelection(
       return CATEGORY_PARENT_DESCENDANT_ERROR;
     }
   }
-  return null;
+
+  return validateCategoryMaxDepth(categoryId, parentId, categories);
 }
 
 export type HierarchicalParentOption = {
@@ -189,6 +252,29 @@ export function formatParentOptionLabel(name: string, depth: number): string {
   if (depth === 0) return name;
   const indent = "\u00A0\u00A0".repeat(depth);
   return `${indent}↳ ${name}`;
+}
+
+export function buildLevel1ParentOptions(
+  categories: CategoryTreeItem[],
+  excludeCategoryId: string | null,
+): HierarchicalParentOption[] {
+  const excludeIds = new Set<string>();
+
+  if (excludeCategoryId) {
+    excludeIds.add(excludeCategoryId);
+    for (const id of getCategoryDescendantIds(excludeCategoryId, categories)) {
+      excludeIds.add(id);
+    }
+  }
+
+  return categories
+    .filter((category) => !category.parentId && !excludeIds.has(category.id))
+    .sort(compareCategorySiblings)
+    .map((category) => ({
+      id: category.id,
+      depth: 0,
+      label: category.name,
+    }));
 }
 
 export function buildHierarchicalParentOptions(
