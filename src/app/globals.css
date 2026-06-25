@@ -9261,7 +9261,49 @@ body:has(.mp-pdp--b2b) .floating-contact {
 
 .admin-category-table__image-cell {
   width: 56px;
+  min-width: 56px;
   vertical-align: middle;
+}
+
+.admin-category-table__thumb-link {
+  display: inline-flex;
+  line-height: 0;
+  border-radius: 6px;
+}
+
+.admin-category-table__thumb-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.admin-category-table__thumb-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: #f1f5f9;
+  color: #94a3b8;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 768px) {
+  .admin-category-table__image-cell {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: inherit;
+  }
+
+  .admin-category-table__row--child .admin-category-table__image-cell {
+    background: rgba(248, 250, 252, 0.98);
+  }
+
+  .admin-category-table__row--root .admin-category-table__image-cell {
+    background: #fff;
+  }
 }
 
 .admin-category-table__name-cell {

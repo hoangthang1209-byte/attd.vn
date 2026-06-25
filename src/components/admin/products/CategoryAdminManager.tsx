@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
+import CategoryListThumbnail from "@/components/admin/products/CategoryListThumbnail";
 import CategoryQuickEditModal, {
   type CategoryQuickEditRecord,
 } from "@/components/admin/products/CategoryQuickEditModal";
@@ -609,6 +610,7 @@ export default function CategoryAdminManager() {
             <table className="admin-table admin-category-table">
               <thead>
                 <tr>
+                  <th className="admin-category-table__image-cell">Ảnh</th>
                   <th>Tên tiếng Việt</th>
                   <th>Tên tiếng Anh</th>
                   <th>Mã</th>
@@ -635,6 +637,9 @@ export default function CategoryAdminManager() {
                           : "admin-category-table__row--child"
                       }
                     >
+                      <td className="admin-category-table__image-cell">
+                        <CategoryListThumbnail imageUrl={cat.imageUrl} name={cat.name} />
+                      </td>
                       <td className="admin-category-table__name-cell">
                         <div
                           className="admin-category-table__name-inner"
