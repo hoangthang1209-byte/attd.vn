@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import PublishQualityChecklist from "@/components/admin/products/PublishQualityChecklist";
 import ProductB2BSharedAttributeField from "@/components/admin/products/ProductB2BSharedAttributeField";
@@ -12,7 +12,9 @@ import ProductCatalogSpecificationsSection, {
 import ProductCatalogContentSection, {
   type ProductCustomizationFormRow,
 } from "@/components/admin/products/ProductCatalogContentSection";
-import ProductCatalogVariantsSection from "@/components/admin/products/ProductCatalogVariantsSection";
+import ProductCatalogVariantsSection, {
+  type ProductCatalogVariantsSectionHandle,
+} from "@/components/admin/products/ProductCatalogVariantsSection";
 import ProductInformationAttributesSection from "@/components/admin/products/ProductInformationAttributesSection";
 import type { SharedAttributePickerOption } from "@/components/admin/products/ProductOptionGroupBuilder";
 import {
@@ -31,6 +33,7 @@ import {
   resolveTabForField,
   scrollToFirstFieldError,
   validateProductCatalogFormLocal,
+  validateProductDraftForMatrixGeneration,
 } from "@/features/products/product-catalog-form-validation";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import {
@@ -104,13 +107,16 @@ export default function ProductCatalogForm({
   preselectUsage,
 }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const mutate = useAdminMutation();
   const [categories, setCategories] = useState<Category[]>(propCategories ?? []);
   const [sharedAttributes, setSharedAttributes] = useState<SharedAttributePickerOption[]>([]);
   const [sharedAttributesLoading, setSharedAttributesLoading] = useState(false);
   const [sharedAttributesError, setSharedAttributesError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<FormTabId>("basic");
+  const [activeTab, setActiveTab] = useState<FormTabId>(() =>
+    searchParams.get("generateVariants") === "1" ? "variants" : "basic",
+  );
   const [form, setForm] = useState<ProductFormData>({
     id: initialData?.id,
     slug: initialData?.slug,
@@ -143,6 +149,8 @@ export default function ProductCatalogForm({
   });
   const [saving, setSaving] = useState(false);
   const [bulkOpInProgress, setBulkOpInProgress] = useState(false);
+  const variantsSectionRef = useRef<ProductCatalogVariantsSectionHandle>(null);
+  const matrixAutoOpenTriggeredRef = useRef(false);
   const [exportDialog, setExportDialog] = useState<"export" | "clone" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -345,10 +353,62 @@ export default function ProductCatalogForm({
   function applyValidationErrors(errors: Record<string, string>, summaryMessage: string) {
     setFieldErrors(errors);
     const firstField = Object.keys(errors)[0];
-    if (firstField) setActiveTab(resolveTabForField(firstField));
+    if (firstField) {
+      setActiveTab(resolveTabForField(firstField, { form, sharedAttributes }));
+    }
     setError(summaryMessage);
     requestAnimationFrame(() => scrollToFirstFieldError(errors));
   }
+
+  function buildValidAttributeAssignments() {
+    return form.attributeAssignments
+      .filter((row) => {
+        const customValue = row.useCustomValue ? row.customValue?.trim() : "";
+        const sharedValueId = row.useCustomValue ? "" : row.attributeValueId?.trim();
+        return Boolean(customValue || sharedValueId);
+      })
+      .map((row, index) => ({
+        id: row.id,
+        attributeId: row.attributeId,
+        attributeValueId: row.useCustomValue ? null : row.attributeValueId || null,
+        customValue: row.useCustomValue ? row.customValue?.trim() || null : null,
+        sortOrder: row.sortOrder ?? index,
+      }));
+  }
+
+  function buildMatrixDraftPayload() {
+    const payload = buildPayload();
+    return {
+      ...payload,
+      status: "DRAFT",
+      attributeAssignments: buildValidAttributeAssignments(),
+      variants: [],
+    };
+  }
+
+  function consumeMatrixAutoOpenParam() {
+    if (searchParams.get("generateVariants") !== "1") return;
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("generateVariants");
+    const query = nextParams.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function tryOpenMatrixFromQueryParam() {
+    if (searchParams.get("generateVariants") !== "1") return;
+    if (!form.id || matrixAutoOpenTriggeredRef.current) return;
+    const hasPersistedOptionValues = form.options.some((group) =>
+      group.values.some((value) => Boolean(value.id)),
+    );
+    if (form.options.length > 0 && !hasPersistedOptionValues) return;
+    matrixAutoOpenTriggeredRef.current = true;
+    variantsSectionRef.current?.openMatrixConfirmation();
+    consumeMatrixAutoOpenParam();
+  }
+
+  useEffect(() => {
+    tryOpenMatrixFromQueryParam();
+  }, [form.id, form.options, searchParams]);
 
   function parseNumberField(value: string): number | undefined {
     const trimmed = value.trim();
@@ -473,7 +533,7 @@ export default function ProductCatalogForm({
 
   async function ensureOptionsSavedForMatrix(): Promise<boolean> {
     if (!form.id) return true;
-    const localErrors = validateProductCatalogFormLocal(form);
+    const localErrors = validateProductDraftForMatrixGeneration(form);
     const optionErrors = Object.fromEntries(
       Object.entries(localErrors).filter(([key]) => key.startsWith("options")),
     );
@@ -601,8 +661,94 @@ export default function ProductCatalogForm({
     await saveProduct(false);
   }
 
+  async function saveProductForMatrixGeneration(): Promise<boolean> {
+    setError(null);
+    setErrorDetail(null);
+    setFieldErrors({});
+
+    const localErrors = validateProductDraftForMatrixGeneration(form);
+    if (Object.keys(localErrors).length > 0) {
+      applyValidationErrors(
+        localErrors,
+        form.id
+          ? "Không thể lưu sản phẩm. Vui lòng kiểm tra các trường được đánh dấu."
+          : "Không thể tạo sản phẩm. Vui lòng kiểm tra các trường được đánh dấu.",
+      );
+      return false;
+    }
+
+    setSaving(true);
+    const payload = buildMatrixDraftPayload();
+    const url = form.id ? `/api/admin/products/${form.id}` : "/api/admin/products";
+    const method = form.id ? "PATCH" : "POST";
+
+    const saved = await mutate({
+      loadingMessage: "Đang lưu sản phẩm…",
+      successMessage: "Đã lưu sản phẩm. Tiếp tục tạo tổ hợp biến thể.",
+      action: async () => {
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const body = (await res.json()) as {
+          id?: string;
+          productCode?: string;
+          slug?: string;
+          message?: string;
+          error?: string;
+          detail?: string;
+          code?: string;
+          fieldErrors?: Record<string, string>;
+          issues?: Array<{ field: string; message: string }>;
+          options?: Parameters<typeof mapOptionsToFormRows>[0];
+          variants?: Parameters<typeof mapVariantsToFormRows>[0];
+        };
+        if (!res.ok) {
+          setErrorDetail(
+            process.env.NODE_ENV === "development" ? body.detail ?? null : null,
+          );
+          const summary =
+            body.code === SEO_PUBLISH_QUALITY_GATE_FAILED
+              ? SEO_PUBLISH_QUALITY_SUMMARY
+              : body.error ?? body.message ?? "Không thể lưu sản phẩm.";
+          if (body.fieldErrors && Object.keys(body.fieldErrors).length > 0) {
+            applyValidationErrors(body.fieldErrors, summary);
+          } else {
+            setError(summary);
+          }
+          return { ok: false as const, message: summary };
+        }
+        return { ok: true as const, data: body };
+      },
+      onSuccess: (product) => {
+        if (!product?.id) return;
+        setForm((prev) => ({
+          ...prev,
+          id: product.id,
+          productCode: product.productCode ?? prev.productCode,
+          slug: product.slug ?? prev.slug,
+          options: product.options ? mapOptionsToFormRows(product.options) : prev.options,
+          variants: product.variants
+            ? mapVariantsToFormRows(product.variants).filter(
+                (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
+              )
+            : [],
+        }));
+        setActiveTab("variants");
+        matrixAutoOpenTriggeredRef.current = false;
+        router.replace(`/admin/products/${product.id}/edit?generateVariants=1`);
+        router.refresh();
+        queueMicrotask(() => tryOpenMatrixFromQueryParam());
+      },
+    });
+
+    setSaving(false);
+    return Boolean(saved);
+  }
+
   async function saveAndContinueForMatrix(): Promise<boolean> {
-    return saveProduct(true);
+    return saveProductForMatrixGeneration();
   }
 
   const publicSlug = form.slug ?? "";
@@ -967,6 +1113,7 @@ export default function ProductCatalogForm({
       <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "variants"}>
         <legend>Thuộc tính &amp; biến thể</legend>
         <ProductCatalogVariantsSection
+          ref={variantsSectionRef}
           productId={form.id}
           productCode={form.productCode || productCodePreview || ""}
           defaultMoq={form.defaultMoq}

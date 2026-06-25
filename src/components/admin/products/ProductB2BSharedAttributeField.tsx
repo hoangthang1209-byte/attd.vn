@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
 import type { SharedAttributePickerOption } from "@/components/admin/products/ProductOptionGroupBuilder";
 import type { ProductAttributeAssignmentFormRow } from "@/features/products/product-catalog-form-mappers";
@@ -42,6 +43,11 @@ export default function ProductB2BSharedAttributeField({
 }: Props) {
   const attribute = findSharedAttributeByCode(sharedAttributes, attributeCode);
   const assignment = attribute ? findAssignmentForAttribute(assignments, attribute.id) : undefined;
+  const [customModeOverride, setCustomModeOverride] = useState<boolean | null>(null);
+  const [customDraft, setCustomDraft] = useState("");
+  const customMode = customModeOverride ?? Boolean(assignment?.useCustomValue);
+  const customInputValue = customMode ? customDraft || assignment?.customValue || "" : "";
+
   const valueError =
     (attribute &&
       (assignmentFieldError(fieldErrors, assignments, attribute.id, "attributeValueId") ??
@@ -65,8 +71,18 @@ export default function ProductB2BSharedAttributeField({
     assignment?.attributeValueId &&
     attribute?.values.find((value) => value.id === assignment.attributeValueId)?.status === "INACTIVE";
 
+  const showCustomInput = customMode;
+
   function updateAssignments(next: ProductAttributeAssignmentFormRow[]) {
     onAssignmentsChange(next);
+  }
+
+  function exitCustomMode() {
+    setCustomModeOverride(false);
+    setCustomDraft("");
+    if (attribute) {
+      updateAssignments(removeAssignmentForAttribute(assignments, attribute.id));
+    }
   }
 
   if (!attribute && !sharedAttributesLoading) {
@@ -101,10 +117,12 @@ export default function ProductB2BSharedAttributeField({
         <p className="admin-field-hint">Đang tải thuộc tính dùng chung…</p>
       )}
 
-      {attribute && !assignment?.useCustomValue && (
+      {attribute && !showCustomInput && (
         <AdminSearchableSelect
           value={assignment?.attributeValueId ?? ""}
           onChange={(valueId) => {
+            setCustomModeOverride(false);
+            setCustomDraft("");
             if (!valueId) {
               updateAssignments(removeAssignmentForAttribute(assignments, attribute.id));
               return;
@@ -125,13 +143,14 @@ export default function ProductB2BSharedAttributeField({
         />
       )}
 
-      {attribute && assignment?.useCustomValue && (
+      {attribute && showCustomInput && (
         <div className="admin-field">
           <input
             className={`admin-input${fieldErrorInputClass(Boolean(valueError))}`}
-            value={assignment.customValue ?? ""}
+            value={customInputValue}
             onChange={(event) => {
               const customValue = event.target.value;
+              setCustomDraft(customValue);
               if (!customValue.trim()) {
                 updateAssignments(removeAssignmentForAttribute(assignments, attribute.id));
                 return;
@@ -158,26 +177,15 @@ export default function ProductB2BSharedAttributeField({
           className="admin-btn admin-btn--secondary admin-btn--xs"
           style={{ marginTop: 8 }}
           onClick={() => {
-            if (assignment?.useCustomValue) {
-              updateAssignments(
-                upsertAssignmentForAttribute(assignments, attribute.id, {
-                  useCustomValue: false,
-                  customValue: undefined,
-                  attributeValueId: undefined,
-                }),
-              );
+            if (customMode) {
+              exitCustomMode();
               return;
             }
-            updateAssignments(
-              upsertAssignmentForAttribute(assignments, attribute.id, {
-                useCustomValue: true,
-                attributeValueId: undefined,
-                customValue: assignment?.customValue ?? "",
-              }),
-            );
+            setCustomModeOverride(true);
+            setCustomDraft(assignment?.customValue ?? "");
           }}
         >
-          {assignment?.useCustomValue ? "Chọn giá trị dùng chung" : customValueActionLabel}
+          {customMode ? "Chọn giá trị dùng chung" : customValueActionLabel}
         </button>
       )}
 

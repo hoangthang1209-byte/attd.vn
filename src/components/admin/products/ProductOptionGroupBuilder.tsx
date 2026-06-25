@@ -78,9 +78,14 @@ export default function ProductOptionGroupBuilder({
   const [selectedSharedValueIds, setSelectedSharedValueIds] = useState<Set<string>>(new Set());
   const [valueSearch, setValueSearch] = useState("");
 
+  const variantSharedAttributes = useMemo(
+    () => sharedAttributes.filter((attribute) => attribute.isVariantAttribute === true),
+    [sharedAttributes],
+  );
+
   const selectedAttribute = useMemo(
-    () => sharedAttributes.find((item) => item.id === selectedAttributeId) ?? null,
-    [sharedAttributes, selectedAttributeId],
+    () => variantSharedAttributes.find((item) => item.id === selectedAttributeId) ?? null,
+    [variantSharedAttributes, selectedAttributeId],
   );
 
   const activeValues = useMemo(() => {
@@ -276,9 +281,9 @@ export default function ProductOptionGroupBuilder({
           <button
             type="button"
             className="btn-primary btn-sm"
-            disabled={sharedAttributesLoading || sharedAttributes.length === 0}
+            disabled={sharedAttributesLoading || variantSharedAttributes.length === 0}
             onClick={() => {
-              const first = sharedAttributes.find((item) => item.isVariantAttribute && !usedAttributeIds.has(item.id));
+              const first = variantSharedAttributes.find((item) => !usedAttributeIds.has(item.id));
               if (first) setSelectedAttributeId(first.id);
             }}
           >
@@ -300,18 +305,18 @@ export default function ProductOptionGroupBuilder({
         {sharedAttributesLoading && <p className="admin-field-hint">Đang tải thuộc tính dùng chung…</p>}
         {sharedAttributesError && <p className="admin-error" role="alert">{sharedAttributesError}</p>}
 
-        {!sharedAttributesLoading && sharedAttributes.length === 0 && (
+        {!sharedAttributesLoading && variantSharedAttributes.length === 0 && (
           <div className="admin-shared-attribute-empty">
-            <p>Chưa có thuộc tính dùng chung.</p>
+            <p>Chưa có thuộc tính dùng chung phù hợp để tạo biến thể.</p>
             <Link href="/admin/attributes" className="btn-secondary btn-sm">
               Quản lý thuộc tính sản phẩm
             </Link>
           </div>
         )}
 
-        {sharedAttributes.length > 0 && (
+        {variantSharedAttributes.length > 0 && (
           <div className="admin-shared-attribute-card-grid">
-            {sharedAttributes.map((attribute) => {
+            {variantSharedAttributes.map((attribute) => {
               const activeCount = attribute.values.filter((value) => value.status === "ACTIVE").length;
               const isSelected = selectedAttributeId === attribute.id;
               const isUsed = usedAttributeIds.has(attribute.id);

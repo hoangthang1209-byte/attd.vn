@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import ProductOptionGroupBuilder, {
   type OptionGroupFormRow,
   type SharedAttributePickerOption,
@@ -69,6 +70,10 @@ type Props = {
   onBulkOperationChange?: (inProgress: boolean) => void;
 };
 
+export type ProductCatalogVariantsSectionHandle = {
+  openMatrixConfirmation: () => void;
+};
+
 function defaultStructuredVariant(): MatrixVariantFormRow {
   return {
     clientKey: createClientKey("var"),
@@ -117,7 +122,7 @@ const EMPTY_LIFECYCLE_DIALOG: VariantLifecycleDialogState = {
   dependencies: null,
 };
 
-export default function ProductCatalogVariantsSection({
+export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function ProductCatalogVariantsSection({
   productId,
   productCode,
   defaultMoq,
@@ -136,7 +141,8 @@ export default function ProductCatalogVariantsSection({
   onSaveAndContinue,
   onVariantDeleted,
   onBulkOperationChange,
-}: Props) {
+}, ref) {
+  const toast = useAdminToast();
   const [matrixFilter, setMatrixFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -188,6 +194,29 @@ export default function ProductCatalogVariantsSection({
     () => computeFormMatrixPreview(matrixGroups, structuredVariants),
     [matrixGroups, structuredVariants],
   );
+
+  const hasPersistedOptionValues = useMemo(
+    () => optionGroups.some((group) => group.values.some((value) => Boolean(value.id))),
+    [optionGroups],
+  );
+
+  function openMatrixConfirm() {
+    setMatrixMessage(null);
+    if (!matrixPreview.canGenerate) {
+      setMatrixMessage(matrixPreview.message ?? "Không có tổ hợp mới để tạo.");
+      return;
+    }
+    setMatrixConfirmLarge(false);
+    setMatrixConfirmOpen(true);
+  }
+
+  useImperativeHandle(ref, () => ({
+    openMatrixConfirmation: () => {
+      if (!productId) return;
+      if (optionGroups.length > 0 && !hasPersistedOptionValues) return;
+      openMatrixConfirm();
+    },
+  }), [productId, optionGroups.length, hasPersistedOptionValues, matrixPreview.canGenerate, matrixPreview.message]);
 
   const variantUsageByValueId = useMemo(() => {
     const usage: Record<string, number> = {};
@@ -515,16 +544,6 @@ export default function ProductCatalogVariantsSection({
     onVariantsChange([...variants, defaultStructuredVariant()]);
   }
 
-  function openMatrixConfirm() {
-    setMatrixMessage(null);
-    if (!matrixPreview.canGenerate) {
-      setMatrixMessage(matrixPreview.message ?? "Không có tổ hợp mới để tạo.");
-      return;
-    }
-    setMatrixConfirmLarge(false);
-    setMatrixConfirmOpen(true);
-  }
-
   function generateClientSideCombinations() {
     if (!matrixGroups.length || matrixGroups.some((group) => group.values.length === 0)) {
       setMatrixMessage("Thêm nhóm biến thể và ít nhất một giá trị cho mỗi nhóm trước khi tạo tổ hợp.");
@@ -607,6 +626,9 @@ export default function ProductCatalogVariantsSection({
       setMatrixMessage(
         `Đã tạo ${data.created ?? 0} biến thể mới. Giữ nguyên ${data.preserved ?? 0} biến thể hiện có.`,
       );
+      if ((data.created ?? 0) > 0) {
+        toast.success(`Đã tạo ${data.created} biến thể.`);
+      }
       if (onReloadProduct) await onReloadProduct();
     } catch {
       setMatrixMessage("Không thể kết nối máy chủ khi tạo biến thể.");
@@ -688,7 +710,7 @@ export default function ProductCatalogVariantsSection({
               disabled={!onSaveAndContinue || !matrixPreview.canGenerate}
               onClick={() => void onSaveAndContinue?.()}
             >
-              Lưu sản phẩm và tiếp tục
+              Lưu sản phẩm và tạo tổ hợp
             </button>
           )}
           <button type="button" className="btn-secondary" onClick={addManualStructuredVariant}>
@@ -902,4 +924,4 @@ export default function ProductCatalogVariantsSection({
       />
     </div>
   );
-}
+});

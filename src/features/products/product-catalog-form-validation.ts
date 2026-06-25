@@ -48,22 +48,118 @@ export function fieldErrorInputClass(hasError: boolean): string {
   return hasError ? " admin-input--error" : "";
 }
 
-export function resolveTabForField(field: string): "basic" | "media" | "variants" | "content" | "seo" {
+const BASIC_TAB_ASSIGNMENT_CODES = new Set(["MATERIAL", "FIT"]);
+
+export type ValidationTabContext = {
+  form?: ProductCatalogFormShape;
+  sharedAttributes?: Array<{ id: string; code: string }>;
+};
+
+function resolveAssignmentErrorTab(
+  field: string,
+  form: ProductCatalogFormShape,
+  sharedAttributes: Array<{ id: string; code: string }>,
+): "basic" | "content" {
+  const match = field.match(/^attributeAssignments\.(\d+)\./);
+  if (!match) return "content";
+  const index = Number(match[1]);
+  const assignment = form.attributeAssignments?.[index];
+  if (!assignment?.attributeId) return "basic";
+  const attribute = sharedAttributes.find((item) => item.id === assignment.attributeId);
+  if (attribute && BASIC_TAB_ASSIGNMENT_CODES.has(attribute.code)) return "basic";
+  return "content";
+}
+
+export function resolveTabForField(
+  field: string,
+  context?: ValidationTabContext,
+): "basic" | "media" | "variants" | "content" | "seo" {
   if (field.startsWith("options") || field.startsWith("variants") || field === "variants") {
     return "variants";
   }
   if (field.startsWith("gallery") || field === "featuredImage") return "media";
+  if (field.startsWith("attributeAssignments") && context?.form) {
+    return resolveAssignmentErrorTab(field, context.form, context.sharedAttributes ?? []);
+  }
   if (
     field === "shortDescription" ||
     field === "description" ||
     field.startsWith("specifications") ||
-    field.startsWith("customizations") ||
-    field.startsWith("attributeAssignments")
+    field.startsWith("customizations")
   ) {
     return "content";
   }
   if (field.startsWith("seo")) return "seo";
   return "basic";
+}
+
+function collectOptionMatrixValidationErrors(
+  form: ProductCatalogFormShape,
+  errors: Record<string, string>,
+): void {
+  const optionInputs = form.options
+    .filter((group) => group.name.trim())
+    .map((group, index) => ({
+      name: group.name.trim(),
+      slug: group.slug.trim() || undefined,
+      sortOrder: group.sortOrder ?? index,
+      values: group.values
+        .filter((value) => value.label.trim())
+        .map((value, valueIndex) => ({
+          label: value.label.trim(),
+          valueCode: value.valueCode.trim() || undefined,
+          sortOrder: value.sortOrder ?? valueIndex,
+        })),
+    }));
+
+  const groupNameError = validateOptionGroupNames(optionInputs);
+  if (groupNameError) errors.options = groupNameError;
+
+  const valueLabelError = validateOptionValues(optionInputs);
+  if (valueLabelError && !errors.options) errors.options = valueLabelError;
+
+  form.options.forEach((group, groupIndex) => {
+    if (!group.name.trim()) return;
+    Object.assign(
+      errors,
+      validateOptionValueCodesInGroup(groupIndex, group.name, group.values),
+    );
+    group.values.forEach((value, valueIndex) => {
+      const dup = group.values.some(
+        (other, otherIndex) =>
+          otherIndex !== valueIndex &&
+          value.label.trim() &&
+          normalizeOptionName(other.label) === normalizeOptionName(value.label),
+      );
+      if (dup) {
+        errors[`options.${groupIndex}.values.${valueIndex}.label`] =
+          `Giá trị "${value.label}" bị trùng trong nhóm.`;
+      }
+    });
+  });
+}
+
+export function validateProductDraftForMatrixGeneration(
+  form: ProductCatalogFormShape,
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+
+  if (!form.name.trim()) errors.name = "Tên sản phẩm là bắt buộc.";
+  if (!form.categoryId) errors.categoryId = "Vui lòng chọn danh mục.";
+  if (form.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug)) {
+    errors.slug = "Slug chỉ gồm chữ thường, số và dấu gạch ngang.";
+  }
+
+  collectOptionMatrixValidationErrors(form, errors);
+
+  const groupsWithValues = form.options.filter(
+    (group) => group.name.trim() && group.values.some((value) => value.label.trim()),
+  );
+  if (groupsWithValues.length === 0 && !errors.options) {
+    errors.options = "Thêm ít nhất một nhóm biến thể với giá trị đã chọn.";
+  }
+
+  return errors;
 }
 
 export function scrollToFirstFieldError(fieldErrors: Record<string, string>): void {
@@ -113,46 +209,7 @@ export function validateProductCatalogFormLocal(form: ProductCatalogFormShape): 
     errors.defaultMoq = "MOQ phải là số.";
   }
 
-  const optionInputs = form.options
-    .filter((group) => group.name.trim())
-    .map((group, index) => ({
-      name: group.name.trim(),
-      slug: group.slug.trim() || undefined,
-      sortOrder: group.sortOrder ?? index,
-      values: group.values
-        .filter((value) => value.label.trim())
-        .map((value, valueIndex) => ({
-          label: value.label.trim(),
-          valueCode: value.valueCode.trim() || undefined,
-          sortOrder: value.sortOrder ?? valueIndex,
-        })),
-    }));
-
-  const groupNameError = validateOptionGroupNames(optionInputs);
-  if (groupNameError) errors.options = groupNameError;
-
-  const valueLabelError = validateOptionValues(optionInputs);
-  if (valueLabelError && !errors.options) errors.options = valueLabelError;
-
-  form.options.forEach((group, groupIndex) => {
-    if (!group.name.trim()) return;
-    Object.assign(
-      errors,
-      validateOptionValueCodesInGroup(groupIndex, group.name, group.values),
-    );
-    group.values.forEach((value, valueIndex) => {
-      const dup = group.values.some(
-        (other, otherIndex) =>
-          otherIndex !== valueIndex &&
-          value.label.trim() &&
-          normalizeOptionName(other.label) === normalizeOptionName(value.label),
-      );
-      if (dup) {
-        errors[`options.${groupIndex}.values.${valueIndex}.label`] =
-          `Giá trị "${value.label}" bị trùng trong nhóm.`;
-      }
-    });
-  });
+  collectOptionMatrixValidationErrors(form, errors);
 
   form.variants.forEach((v) => {
     const ref = variantRefFromRow(v);

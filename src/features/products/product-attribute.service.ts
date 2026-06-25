@@ -647,7 +647,7 @@ export async function seedSharedAttributes(): Promise<{ createdAttributes: numbe
           code: item.code,
           slug: item.slug,
           displayType: item.displayType,
-          isVariantAttribute: true,
+          isVariantAttribute: item.code === "COLOR" || item.code === "SIZE",
           isSpecificationAttribute: item.code !== "COLOR" && item.code !== "SIZE",
           sortOrder: item.sortOrder,
         },
