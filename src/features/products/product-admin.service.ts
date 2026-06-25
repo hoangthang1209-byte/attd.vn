@@ -833,12 +833,23 @@ export async function createProductAdmin(input: ProductInput) {
     return await getProductAdminById(productId);
   }
 
-  const product = await prisma.product.create({
-    data: buildProductCreateData(input, productCode, slug, systemCode, finalStatus),
-    include: PRODUCT_INCLUDE,
+  const product = await runProductSaveTransaction(async (tx) => {
+    const created = await tx.product.create({
+      data: buildProductCreateData(input, productCode, slug, systemCode, finalStatus),
+    });
+    const resolvedAssignments =
+      input.attributeAssignments !== undefined
+        ? await validateProductAttributeAssignments(input.attributeAssignments, tx)
+        : undefined;
+    const preparedVariantSkus = await prepareVariantSkusForInput(input.variants, productCode);
+    await writeProductDependentRelations(created.id, productCode, input, tx, {
+      preparedVariantSkus,
+      resolvedAssignments,
+      skipOwnershipVerify: true,
+    });
+    return created;
   });
 
-  await writeProductDependentRelations(product.id, productCode, input);
   return await getProductAdminById(product.id);
 }
 
@@ -962,10 +973,6 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
     return await getProductAdminById(id);
   }
 
-  if (Object.keys(updateData).length > 0) {
-    await prisma.product.update({ where: { id }, data: updateData });
-  }
-
   const productCodeRow = await prisma.product.findUnique({
     where: { id },
     select: { productCode: true },
@@ -978,8 +985,31 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
     );
   }
 
-  if (productCode) {
-    await writeProductDependentRelations(id, productCode, input);
+  if (Object.keys(updateData).length > 0 || productCode) {
+    const resolvedAssignments =
+      input.attributeAssignments !== undefined
+        ? await validateProductAttributeAssignments(input.attributeAssignments)
+        : undefined;
+    if (productCode) {
+      await verifyProductRelationInputOwnership(id, input);
+    }
+    const preparedVariantSkus =
+      productCode && input.variants?.some((variant) => !variant.id)
+        ? await prepareVariantSkusForInput(input.variants, productCode)
+        : undefined;
+
+    await runProductSaveTransaction(async (tx) => {
+      if (Object.keys(updateData).length > 0) {
+        await tx.product.update({ where: { id }, data: updateData });
+      }
+      if (productCode) {
+        await writeProductDependentRelations(id, productCode, input, tx, {
+          preparedVariantSkus,
+          resolvedAssignments,
+          skipOwnershipVerify: true,
+        });
+      }
+    });
   }
 
   return await getProductAdminById(id);

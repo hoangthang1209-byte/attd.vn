@@ -111,7 +111,11 @@ export default function ProductB2BSharedAttributeField({
   }
 
   return (
-    <div className="admin-field" data-field-prefix={`b2b-${attributeCode.toLowerCase()}`}>
+    <div
+      className={`admin-field${valueError || duplicateError ? " admin-section--has-error" : ""}`}
+      data-field={attributeCode === "MATERIAL" ? "b2b-material" : "b2b-fit"}
+      data-field-prefix={`b2b-${attributeCode.toLowerCase()}`}
+    >
       <label className="admin-label">{label}</label>
       {sharedAttributesLoading && (
         <p className="admin-field-hint">Đang tải thuộc tính dùng chung…</p>
@@ -148,6 +152,8 @@ export default function ProductB2BSharedAttributeField({
           <input
             className={`admin-input${fieldErrorInputClass(Boolean(valueError))}`}
             value={customInputValue}
+            aria-invalid={Boolean(valueError)}
+            data-field={attributeCode === "MATERIAL" ? "b2b-material" : "b2b-fit"}
             onChange={(event) => {
               const customValue = event.target.value;
               setCustomDraft(customValue);

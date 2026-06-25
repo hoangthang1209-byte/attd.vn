@@ -7,6 +7,11 @@ import {
 } from "@/features/products/product-b2b-attribute-controls.utils";
 import type { ProductAttributeAssignmentFormRow } from "@/features/products/product-catalog-form-mappers";
 import { fieldErrorInputClass } from "@/features/products/product-catalog-form-validation";
+import {
+  assignmentFieldKey,
+  legacyKeysForAssignment,
+  resolveFieldError,
+} from "@/features/products/product-form-row-error-keys";
 
 type Props = {
   rows: ProductAttributeAssignmentFormRow[];
@@ -18,10 +23,6 @@ type Props = {
   onRefreshSharedAttributes?: () => void;
   sectionRef?: React.RefObject<HTMLElement | null>;
 };
-
-function assignmentFieldKey(index: number, field: string): string {
-  return `attributeAssignments.${index}.${field}`;
-}
 
 function createClientKey(): string {
   return `assign-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -97,19 +98,31 @@ export default function ProductInformationAttributesSection({
       {visibleRows.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>
           {visibleRows.map((row) => {
-            const index = rows.findIndex((item) => item.clientKey === row.clientKey);
             const attribute = specificationAttributes.find((item) => item.id === row.attributeId);
             const activeValues = (attribute?.values ?? []).filter((value) => value.status === "ACTIVE");
-            const attrError = fieldErrors[assignmentFieldKey(index, "attributeId")];
+            const attrError = resolveFieldError(
+              fieldErrors,
+              assignmentFieldKey(row, "attributeId"),
+              legacyKeysForAssignment(rows, row, "attributeId"),
+            );
             const valueError =
-              fieldErrors[assignmentFieldKey(index, "attributeValueId")] ??
-              fieldErrors[assignmentFieldKey(index, "customValue")];
+              resolveFieldError(
+                fieldErrors,
+                assignmentFieldKey(row, "attributeValueId"),
+                legacyKeysForAssignment(rows, row, "attributeValueId"),
+              ) ??
+              resolveFieldError(
+                fieldErrors,
+                assignmentFieldKey(row, "customValue"),
+                legacyKeysForAssignment(rows, row, "customValue"),
+              );
+            const rowHasError = Boolean(attrError || valueError);
 
             return (
               <div
                 key={row.clientKey}
-                className="admin-catalog-fieldset"
-                data-field={`attributeAssignments.${index}.attributeValueId`}
+                className={`admin-catalog-fieldset${rowHasError ? " admin-section--has-error" : ""}`}
+                data-field={assignmentFieldKey(row, "attributeValueId")}
               >
                 <div className="admin-section-head">
                   <div>
@@ -144,6 +157,8 @@ export default function ProductInformationAttributesSection({
                     <select
                       className={`admin-input${fieldErrorInputClass(Boolean(valueError))}`}
                       value={row.attributeValueId ?? ""}
+                      aria-invalid={Boolean(valueError)}
+                      data-field={assignmentFieldKey(row, "attributeValueId")}
                       onChange={(e) =>
                         updateRow(row.clientKey, {
                           attributeValueId: e.target.value || undefined,
@@ -159,11 +174,13 @@ export default function ProductInformationAttributesSection({
                     {valueError && <p className="admin-field-error" role="alert">{valueError}</p>}
                   </div>
                 ) : (
-                  <div className="admin-field" data-field={`attributeAssignments.${index}.customValue`}>
+                  <div className="admin-field" data-field={assignmentFieldKey(row, "customValue")}>
                     <label className="admin-label">Giá trị riêng cho sản phẩm</label>
                     <input
                       className={`admin-input${fieldErrorInputClass(Boolean(valueError))}`}
                       value={row.customValue ?? ""}
+                      aria-invalid={Boolean(valueError)}
+                      data-field={assignmentFieldKey(row, "customValue")}
                       onChange={(e) =>
                         updateRow(row.clientKey, {
                           customValue: e.target.value,

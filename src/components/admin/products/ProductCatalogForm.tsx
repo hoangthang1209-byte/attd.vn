@@ -23,6 +23,7 @@ import {
   type MatrixVariantFormRow,
   type ProductAttributeAssignmentFormRow,
 } from "@/features/products/product-catalog-form-mappers";
+import ProductCatalogFormErrorSummary from "@/components/admin/products/ProductCatalogFormErrorSummary";
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
 import {
@@ -35,6 +36,14 @@ import {
   validateProductCatalogFormLocal,
   validateProductDraftForMatrixGeneration,
 } from "@/features/products/product-catalog-form-validation";
+import {
+  buildProductFormErrorDescriptors,
+  countErrorsByTab,
+  clearFieldErrorsForEdit,
+  focusProductFormError,
+  type ProductFormErrorDescriptor,
+} from "@/features/products/product-form-error-descriptors";
+import { normalizeProductFormFieldErrors } from "@/features/products/product-form-row-error-keys";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import {
   SEO_PUBLISH_QUALITY_GATE_FAILED,
@@ -198,6 +207,29 @@ export default function ProductCatalogForm({
     form.status === "ACTIVE" &&
     productPublishChecklist.some((item) => !item.complete);
 
+  const errorDescriptorContext = useMemo(
+    () => ({
+      form,
+      sharedAttributes,
+      attributeAssignments: form.attributeAssignments,
+      options: form.options,
+      specifications: form.specifications,
+      customizations: form.customizations,
+      variants: form.variants,
+    }),
+    [form, sharedAttributes],
+  );
+
+  const errorDescriptors = useMemo(
+    () => buildProductFormErrorDescriptors(fieldErrors, errorDescriptorContext),
+    [fieldErrors, errorDescriptorContext],
+  );
+
+  const tabErrorCounts = useMemo(
+    () => countErrorsByTab(errorDescriptors),
+    [errorDescriptors],
+  );
+
   const loadSharedAttributes = useCallback(async () => {
     setSharedAttributesLoading(true);
     setSharedAttributesError(null);
@@ -315,6 +347,13 @@ export default function ProductCatalogForm({
 
   function setField<K extends keyof ProductFormData>(key: K, value: ProductFormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (typeof key === "string") {
+      setFieldErrors((prev) => clearFieldErrorsForEdit(prev, key));
+    }
+  }
+
+  function clearFieldErrorKey(fieldKey: string) {
+    setFieldErrors((prev) => clearFieldErrorsForEdit(prev, fieldKey));
   }
 
   async function reloadProductFromServer() {
@@ -351,13 +390,25 @@ export default function ProductCatalogForm({
   }
 
   function applyValidationErrors(errors: Record<string, string>, summaryMessage: string) {
-    setFieldErrors(errors);
-    const firstField = Object.keys(errors)[0];
+    const normalized = normalizeProductFormFieldErrors(errors, {
+      attributeAssignments: form.attributeAssignments,
+      options: form.options,
+      specifications: form.specifications,
+      customizations: form.customizations,
+    });
+    setFieldErrors(normalized);
+    const firstField = Object.keys(normalized)[0];
     if (firstField) {
       setActiveTab(resolveTabForField(firstField, { form, sharedAttributes }));
     }
     setError(summaryMessage);
-    requestAnimationFrame(() => scrollToFirstFieldError(errors));
+    requestAnimationFrame(() => scrollToFirstFieldError(normalized));
+  }
+
+  async function handleFocusError(descriptor: ProductFormErrorDescriptor) {
+    await focusProductFormError(descriptor, {
+      setActiveTab,
+    });
   }
 
   function buildValidAttributeAssignments() {
@@ -791,6 +842,13 @@ export default function ProductCatalogForm({
         />
       )}
 
+      <ProductCatalogFormErrorSummary
+        descriptors={errorDescriptors}
+        formError={error}
+        errorDetail={errorDetail}
+        onFocusError={(descriptor) => void handleFocusError(descriptor)}
+      />
+
       <div className="admin-catalog-tabs" role="tablist" aria-label="Các phần biểu mẫu sản phẩm">
         {FORM_TABS.map((tab) => (
           <button
@@ -802,6 +860,11 @@ export default function ProductCatalogForm({
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
+            {tabErrorCounts[tab.id] > 0 && (
+              <span className="admin-catalog-tab__badge" aria-label={`${tabErrorCounts[tab.id]} lỗi`}>
+                {tabErrorCounts[tab.id]}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -815,6 +878,7 @@ export default function ProductCatalogForm({
               className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.name))}`}
               value={form.name}
               data-field="name"
+              aria-invalid={Boolean(fieldErrors.name)}
               onChange={(e) => setField("name", e.target.value)}
               placeholder="Áo thun CVC basic"
             />
@@ -826,6 +890,7 @@ export default function ProductCatalogForm({
               className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.categoryId))}`}
               value={form.categoryId}
               data-field="categoryId"
+              aria-invalid={Boolean(fieldErrors.categoryId)}
               onChange={(e) => setField("categoryId", e.target.value)}
             >
               <option value="">— Chọn danh mục —</option>
@@ -842,8 +907,12 @@ export default function ProductCatalogForm({
               value={form.id ? form.productCode : (productCodePreview ?? "")}
               readOnly={!form.id || !allowManualProductCode}
               data-field="productCode"
+              aria-invalid={Boolean(fieldErrors.productCode)}
               placeholder={form.categoryId ? "Đang tải ID dự kiến…" : "Chọn danh mục để xem ID dự kiến"}
-              onChange={(e) => setField("productCode", e.target.value)}
+              onChange={(e) => {
+                setField("productCode", e.target.value);
+                clearFieldErrorKey("productCode");
+              }}
             />
             {!form.id && form.categoryId && categorySkuCode && (
               <p className="admin-field-hint">
@@ -1091,6 +1160,7 @@ export default function ProductCatalogForm({
                     const next = [...form.gallery];
                     next[idx] = e.target.value;
                     setField("gallery", next);
+                    clearFieldErrorKey(`gallery.${idx}`);
                   }}
                   placeholder="URL ảnh gallery"
                 />
@@ -1163,11 +1233,13 @@ export default function ProductCatalogForm({
           rows={form.specifications}
           fieldErrors={fieldErrors}
           onChange={(specifications) => setField("specifications", specifications)}
+          onFieldEdit={clearFieldErrorKey}
         />
         <ProductCatalogContentSection
           rows={form.customizations}
           fieldErrors={fieldErrors}
           onChange={(customizations) => setField("customizations", customizations)}
+          onFieldEdit={clearFieldErrorKey}
         />
       </fieldset>
 
@@ -1200,25 +1272,6 @@ export default function ProductCatalogForm({
           </p>
         )}
       </fieldset>
-
-      {error && (
-        <div className="admin-catalog-fieldset admin-import-error-panel">
-          <p className="admin-error">{error}</p>
-          {Object.keys(fieldErrors).length > 0 && (
-            <ul className="admin-kb-warning-list">
-              {Object.entries(fieldErrors).map(([field, message]) => (
-                <li key={field}><strong>{fieldLabel(field)}:</strong> {message}</li>
-              ))}
-            </ul>
-          )}
-          {errorDetail && process.env.NODE_ENV === "development" && (
-            <details className="admin-import-error-detail">
-              <summary>Chi tiết lỗi</summary>
-              <pre>{errorDetail}</pre>
-            </details>
-          )}
-        </div>
-      )}
 
       {form.id && <ProductMaterialSection productId={form.id} />}
 

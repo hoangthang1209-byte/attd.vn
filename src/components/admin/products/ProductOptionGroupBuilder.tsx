@@ -12,6 +12,13 @@ import {
   normalizeOptionName,
 } from "@/features/products/product-variant-matrix.utils";
 import { fieldErrorInputClass } from "@/features/products/product-catalog-form-validation";
+import {
+  legacyKeysForOptionGroup,
+  legacyKeysForOptionValue,
+  optionGroupFieldKey,
+  optionValueFieldKey,
+  resolveFieldError,
+} from "@/features/products/product-form-row-error-keys";
 
 export type OptionValueFormRow = {
   id?: string;
@@ -422,9 +429,22 @@ export default function ProductOptionGroupBuilder({
                 normalizeOptionName(other.name) === normalizeOptionName(group.name) &&
                 group.name.trim(),
             );
+            const groupNameError = resolveFieldError(
+              fieldErrors,
+              optionGroupFieldKey(group, "name"),
+              legacyKeysForOptionGroup(groups, group, "name"),
+            );
+            const groupErrorCount = Object.keys(fieldErrors).filter((key) =>
+              key.startsWith(optionGroupFieldKey(group, "").slice(0, -1)),
+            ).length;
+            const legacyGroupPrefix = `options.${groupIndex}`;
 
             return (
-              <div key={group.clientKey} className="admin-option-group-card">
+              <div
+                key={group.clientKey}
+                className={`admin-option-group-card${groupErrorCount > 0 ? " admin-option-group-card--has-error" : ""}`}
+                data-field-prefix={optionGroupFieldKey(group, "name").replace(/\.name$/, "")}
+              >
                 <div className="admin-option-group-head">
                   <strong>Nhóm #{groupIndex + 1}</strong>
                   {group.attributeId && (
@@ -439,20 +459,21 @@ export default function ProductOptionGroupBuilder({
                   </div>
                 </div>
 
-                <div className="admin-spec-row" data-field-prefix={`options.${groupIndex}`}>
+                <div className="admin-spec-row" data-field-prefix={legacyGroupPrefix}>
                   <div className="admin-field">
                     <input
-                      className={`form-input${fieldErrorInputClass(Boolean(fieldErrors[`options.${groupIndex}.name`]))}`}
+                      className={`form-input${fieldErrorInputClass(Boolean(groupNameError))}`}
                       value={group.name}
                       placeholder="VD: Màu sắc"
-                      data-field={`options.${groupIndex}.name`}
+                      data-field={optionGroupFieldKey(group, "name")}
+                      aria-invalid={Boolean(groupNameError)}
                       onChange={(e) => updateGroup(groupIndex, { name: e.target.value })}
                       onBlur={() => handleGroupNameBlur(groupIndex)}
                       aria-label={`Tên nhóm biến thể ${groupIndex + 1}`}
                       readOnly={Boolean(group.attributeId)}
                     />
-                    {fieldErrors[`options.${groupIndex}.name`] && (
-                      <p className="admin-field-error" role="alert">{fieldErrors[`options.${groupIndex}.name`]}</p>
+                    {groupNameError && (
+                      <p className="admin-field-error" role="alert">{groupNameError}</p>
                     )}
                   </div>
                   <input
@@ -470,35 +491,57 @@ export default function ProductOptionGroupBuilder({
                 <div className="admin-option-values">
                   {group.values.map((value, valueIndex) => {
                     const usage = value.id ? variantUsageByValueId[value.id] ?? 0 : 0;
+                    const labelError = resolveFieldError(
+                      fieldErrors,
+                      optionValueFieldKey(group, value, "label"),
+                      legacyKeysForOptionValue(groups, group, value, "label"),
+                    );
+                    const valueCodeError = resolveFieldError(
+                      fieldErrors,
+                      optionValueFieldKey(group, value, "valueCode"),
+                      legacyKeysForOptionValue(groups, group, value, "valueCode"),
+                    );
+                    const imageUrlError = resolveFieldError(
+                      fieldErrors,
+                      optionValueFieldKey(group, value, "imageUrl"),
+                      legacyKeysForOptionValue(groups, group, value, "imageUrl"),
+                    );
+                    const rowHasError = Boolean(labelError || valueCodeError || imageUrlError);
+
                     return (
-                      <div key={value.clientKey} className="admin-option-value-row">
+                      <div
+                        key={value.clientKey}
+                        className={`admin-option-value-row${rowHasError ? " admin-spec-row--has-error" : ""}`}
+                      >
                         <input
-                          className={`form-input${fieldErrorInputClass(Boolean(fieldErrors[`options.${groupIndex}.values.${valueIndex}.label`]))}`}
+                          className={`form-input${fieldErrorInputClass(Boolean(labelError))}`}
                           value={value.label}
                           placeholder="Giá trị hiển thị"
-                          data-field={`options.${groupIndex}.values.${valueIndex}.label`}
+                          data-field={optionValueFieldKey(group, value, "label")}
+                          aria-invalid={Boolean(labelError)}
                           onChange={(e) => updateValue(groupIndex, valueIndex, { label: e.target.value })}
                           onBlur={() => handleValueLabelBlur(groupIndex, valueIndex)}
                           aria-label={`Giá trị ${valueIndex + 1} nhóm ${group.name}`}
                           readOnly={Boolean(value.attributeValueId)}
                         />
-                        {fieldErrors[`options.${groupIndex}.values.${valueIndex}.label`] && (
+                        {labelError && (
                           <p className="admin-field-error" role="alert">
-                            {fieldErrors[`options.${groupIndex}.values.${valueIndex}.label`]}
+                            {labelError}
                           </p>
                         )}
                         <input
-                          className={`form-input${fieldErrorInputClass(Boolean(fieldErrors[`options.${groupIndex}.values.${valueIndex}.valueCode`]))}`}
+                          className={`form-input${fieldErrorInputClass(Boolean(valueCodeError))}`}
                           value={value.valueCode}
                           placeholder="Mã hệ thống"
-                          data-field={`options.${groupIndex}.values.${valueIndex}.valueCode`}
+                          data-field={optionValueFieldKey(group, value, "valueCode")}
+                          aria-invalid={Boolean(valueCodeError)}
                           onChange={(e) => updateValue(groupIndex, valueIndex, { valueCode: e.target.value.toUpperCase() })}
                           readOnly={Boolean(value.attributeValueId)}
                           title={value.attributeValueId ? "Mã từ thuộc tính chung — không sửa tại sản phẩm" : "Mã nội bộ dùng cho SKU — tự sinh khi nhập tên"}
                         />
-                        {fieldErrors[`options.${groupIndex}.values.${valueIndex}.valueCode`] && (
+                        {valueCodeError && (
                           <p className="admin-field-error" role="alert">
-                            {fieldErrors[`options.${groupIndex}.values.${valueIndex}.valueCode`]}
+                            {valueCodeError}
                           </p>
                         )}
                         <div className="admin-option-value-media">
@@ -509,11 +552,16 @@ export default function ProductOptionGroupBuilder({
                             folder="products"
                           />
                           <input
-                            className="form-input"
+                            className={`form-input${fieldErrorInputClass(Boolean(imageUrlError))}`}
                             value={value.imageUrl}
+                            data-field={optionValueFieldKey(group, value, "imageUrl")}
+                            aria-invalid={Boolean(imageUrlError)}
                             onChange={(e) => updateValue(groupIndex, valueIndex, { imageUrl: e.target.value })}
                             placeholder="URL ảnh giá trị"
                           />
+                          {imageUrlError && (
+                            <p className="admin-field-error" role="alert">{imageUrlError}</p>
+                          )}
                         </div>
                         <div className="admin-option-value-meta">
                           {usage > 0 && (

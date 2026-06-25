@@ -17,13 +17,15 @@
   --shadow-lg: 0 12px 32px rgba(17, 24, 39, 0.08);
   --shadow-glow: 0 0 0 1px rgba(220, 38, 38, 0.08), 0 8px 24px rgba(17, 24, 39, 0.06);
   --header-height: 112px;
+  --font-sans-stack: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono-stack: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans-stack);
+  --font-mono: var(--font-mono-stack);
 }
 
 * {
@@ -39,7 +41,7 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans-stack);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -3048,7 +3050,7 @@ body:has(.mp-pdp--b2b) .floating-contact {
 }
 
 .admin-toast {
-  font-family: var(--font-geist-sans), system-ui, sans-serif !important;
+  font-family: var(--font-sans-stack) !important;
   border: 1px solid #e2e8f0 !important;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12) !important;
 }
@@ -4280,7 +4282,7 @@ body:has(.mp-pdp--b2b) .floating-contact {
 }
 
 .prose-blog code {
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-mono-stack);
   font-size: 0.9em;
 }
 
@@ -4981,7 +4983,7 @@ body:has(.mp-pdp--b2b) .floating-contact {
   padding: 14px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-mono-stack);
   font-size: 14px;
   line-height: 1.65;
   resize: vertical;
@@ -5381,7 +5383,7 @@ body:has(.mp-pdp--b2b) .floating-contact {
 }
 
 .admin-block-edit-textarea {
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-mono-stack);
   font-size: 14px;
 }
 
@@ -5837,7 +5839,7 @@ body:has(.mp-pdp--b2b) .floating-contact {
 }
 
 .admin-ai-factory-prompt-preview {
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-mono-stack);
   font-size: 12px;
 }
 
@@ -7128,7 +7130,7 @@ body:has(.mp-pdp--b2b) .floating-contact {
 }
 
 .admin-kb-context-text {
-  font-family: var(--font-geist-mono), monospace;
+  font-family: var(--font-mono-stack);
   font-size: 12px;
 }
 
@@ -8286,7 +8288,7 @@ body:has(.mp-pdp--b2b) .floating-contact {
 .product-variant-table th { padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; background: var(--section-bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
 .product-variant-table td { padding: 10px 14px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
 .product-variant-table tr:last-child td { border-bottom: none; }
-.product-sku-code { font-family: var(--font-geist-mono), monospace; font-size: 12px; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; color: #374151; }
+.product-sku-code { font-family: var(--font-mono-stack); font-size: 12px; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; color: #374151; }
 .product-variant-color { display: flex; align-items: center; gap: 6px; }
 .product-color-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #d1d5db; display: inline-block; flex-shrink: 0; }
 .product-stock-chip { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; border: 1px solid; }
@@ -11562,6 +11564,88 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   border-color: var(--primary);
   color: #fff;
 }
+.admin-catalog-tab__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.admin-catalog-tab.is-active .admin-catalog-tab__badge {
+  background: #fff;
+  color: #dc2626;
+}
+.admin-product-form-error-summary {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+}
+.admin-product-form-error-summary__title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #991b1b;
+}
+.admin-product-form-error-summary__body {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #7f1d1d;
+}
+.admin-product-form-error-summary__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+.admin-product-form-error-summary__item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  background: #fff;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.admin-product-form-error-summary__item:hover {
+  background: #fff1f2;
+  border-color: #f87171;
+}
+.admin-section--has-error,
+.admin-option-group-card--has-error,
+.admin-spec-row--has-error,
+.admin-catalog-variant-row--has-error {
+  outline: 2px solid #fca5a5;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.admin-section-error-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 8px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
 .admin-spec-list { display: grid; gap: 10px; }
 .admin-spec-row {
   display: grid;
@@ -11874,7 +11958,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 .quote-document-pdf-root,
 .quote-document-print-host {
   background: #fff;
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans-stack);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -11891,7 +11975,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 .quote-document-root[data-mode="print"],
 .quote-document-root,
 .quote-doc {
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans-stack);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -14423,7 +14507,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 .order-document-root {
   color: #111827;
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans-stack);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -14643,7 +14727,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 .production-sheet-document {
   color: #111827;
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans-stack);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
   width: 100%;

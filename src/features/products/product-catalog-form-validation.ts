@@ -1,13 +1,19 @@
 import { isValidImageUrl } from "@/features/products/product-admin-input";
 import { PRODUCT_IMAGE_URL_ERROR } from "@/features/products/product-image-url";
 import {
+  assignmentFieldKey,
+  optionGroupFieldKey,
+  optionValueFieldKey,
+  specificationFieldKey,
+  customizationFieldKey,
+} from "@/features/products/product-form-row-error-keys";
+import {
   combinationSignature,
   normalizeOptionName,
   resolveOptionValueRefFromGroups,
   validateOptionGroupNames,
   validateOptionValues,
 } from "@/features/products/product-variant-matrix.utils";
-import { validateOptionValueCodesInGroup } from "@/features/products/product-option-code.utils";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
 import type { MatrixVariantFormRow } from "@/features/products/product-catalog-form-mappers";
 import {
@@ -27,14 +33,16 @@ export type ProductCatalogFormShape = {
   slug?: string;
   options: OptionGroupFormRow[];
   variants: MatrixVariantFormRow[];
-  specifications?: Array<{ label: string; value: string }>;
-  customizations?: Array<{ label: string; description?: string }>;
   attributeAssignments?: Array<{
+    id?: string;
+    clientKey: string;
     attributeId: string;
     attributeValueId?: string;
     customValue?: string;
     useCustomValue?: boolean;
   }>;
+  specifications?: Array<{ id?: string; clientKey?: string; label: string; value: string }>;
+  customizations?: Array<{ id?: string; clientKey?: string; label: string; description?: string }>;
 };
 
 function parseNumberField(value: string): number | undefined {
@@ -55,15 +63,31 @@ export type ValidationTabContext = {
   sharedAttributes?: Array<{ id: string; code: string }>;
 };
 
+function findAssignmentForFieldKey(
+  field: string,
+  form: ProductCatalogFormShape,
+) {
+  const byId = /^attributeAssignments\.byId\.([^.]+)\./.exec(field);
+  if (byId) {
+    return form.attributeAssignments?.find((row) => row.id === byId[1]);
+  }
+  const byClientKey = /^attributeAssignments\.byClientKey\.([^.]+)\./.exec(field);
+  if (byClientKey) {
+    return form.attributeAssignments?.find((row) => row.clientKey === byClientKey[1]);
+  }
+  const byIndex = /^attributeAssignments\.(\d+)\./.exec(field);
+  if (byIndex) {
+    return form.attributeAssignments?.[Number(byIndex[1])];
+  }
+  return undefined;
+}
+
 function resolveAssignmentErrorTab(
   field: string,
   form: ProductCatalogFormShape,
   sharedAttributes: Array<{ id: string; code: string }>,
 ): "basic" | "content" {
-  const match = field.match(/^attributeAssignments\.(\d+)\./);
-  if (!match) return "content";
-  const index = Number(match[1]);
-  const assignment = form.attributeAssignments?.[index];
+  const assignment = findAssignmentForFieldKey(field, form);
   if (!assignment?.attributeId) return "basic";
   const attribute = sharedAttributes.find((item) => item.id === assignment.attributeId);
   if (attribute && BASIC_TAB_ASSIGNMENT_CODES.has(attribute.code)) return "basic";
@@ -118,22 +142,31 @@ function collectOptionMatrixValidationErrors(
   const valueLabelError = validateOptionValues(optionInputs);
   if (valueLabelError && !errors.options) errors.options = valueLabelError;
 
-  form.options.forEach((group, groupIndex) => {
+  form.options.forEach((group) => {
     if (!group.name.trim()) return;
-    Object.assign(
-      errors,
-      validateOptionValueCodesInGroup(groupIndex, group.name, group.values),
-    );
-    group.values.forEach((value, valueIndex) => {
-      const dup = group.values.some(
-        (other, otherIndex) =>
-          otherIndex !== valueIndex &&
-          value.label.trim() &&
-          normalizeOptionName(other.label) === normalizeOptionName(value.label),
-      );
-      if (dup) {
-        errors[`options.${groupIndex}.values.${valueIndex}.label`] =
-          `Giá trị "${value.label}" bị trùng trong nhóm.`;
+    const seenCodes = new Set<string>();
+    const seenLabels = new Set<string>();
+    group.values.forEach((value) => {
+      const label = value.label.trim();
+      const labelKey = optionValueFieldKey(group, value, "label");
+      if (!label) {
+        errors[labelKey] = `Giá trị trong nhóm "${group.name}" không được để trống.`;
+        return;
+      }
+      const normalizedLabel = normalizeOptionName(label);
+      if (seenLabels.has(normalizedLabel)) {
+        errors[labelKey] = `Giá trị "${label}" bị trùng trong nhóm "${group.name}".`;
+      }
+      seenLabels.add(normalizedLabel);
+
+      const code = value.valueCode.trim();
+      if (code) {
+        const codeKey = code.toUpperCase();
+        if (seenCodes.has(codeKey)) {
+          errors[optionValueFieldKey(group, value, "valueCode")] =
+            `Mã "${code}" bị trùng trong nhóm "${group.name}".`;
+        }
+        seenCodes.add(codeKey);
       }
     });
   });
@@ -240,29 +273,31 @@ export function validateProductCatalogFormLocal(form: ProductCatalogFormShape): 
     }
   });
 
-  form.specifications?.forEach((spec, index) => {
+  form.specifications?.forEach((spec) => {
+    const row = spec as { id?: string; clientKey?: string; label: string; value: string };
     if (spec.label.trim() && !spec.value.trim()) {
-      errors[`specifications.${index}.value`] = "Giá trị thông số là bắt buộc.";
+      errors[specificationFieldKey(row, "value")] = "Giá trị thông số là bắt buộc.";
     }
     if (!spec.label.trim() && spec.value.trim()) {
-      errors[`specifications.${index}.label`] = "Tên thông số là bắt buộc.";
+      errors[specificationFieldKey(row, "label")] = "Tên thông số là bắt buộc.";
     }
   });
 
-  form.customizations?.forEach((cap, index) => {
+  form.customizations?.forEach((cap) => {
+    const row = cap as { id?: string; clientKey?: string; label: string; description?: string };
     if (!cap.label.trim() && cap.description?.trim()) {
-      errors[`customizations.${index}.label`] = "Tên khả năng tùy chỉnh là bắt buộc.";
+      errors[customizationFieldKey(row, "label")] = "Tên khả năng tùy chỉnh là bắt buộc.";
     }
   });
 
   const seenAssignmentAttributes = new Set<string>();
-  form.attributeAssignments?.forEach((row, index) => {
+  form.attributeAssignments?.forEach((row) => {
     if (!row.attributeId) {
-      errors[`attributeAssignments.${index}.attributeId`] = "Thiếu thuộc tính được gán.";
+      errors[assignmentFieldKey(row, "attributeId")] = "Thiếu thuộc tính được gán.";
       return;
     }
     if (seenAssignmentAttributes.has(row.attributeId)) {
-      errors[`attributeAssignments.${index}.attributeId`] = "Thuộc tính đã được gán trùng.";
+      errors[assignmentFieldKey(row, "attributeId")] = "Thuộc tính đã được gán trùng.";
       return;
     }
     seenAssignmentAttributes.add(row.attributeId);
@@ -270,14 +305,15 @@ export function validateProductCatalogFormLocal(form: ProductCatalogFormShape): 
     const customValue = row.useCustomValue ? row.customValue?.trim() : "";
     const sharedValueId = row.useCustomValue ? "" : row.attributeValueId?.trim();
     if (!customValue && !sharedValueId) {
-      errors[`attributeAssignments.${index}.attributeValueId`] = "Vui lòng chọn giá trị hoặc nhập giá trị riêng.";
+      errors[assignmentFieldKey(row, "attributeValueId")] =
+        "Vui lòng chọn giá trị hoặc nhập giá trị riêng.";
     }
     if (customValue && sharedValueId) {
-      errors[`attributeAssignments.${index}.customValue`] =
+      errors[assignmentFieldKey(row, "customValue")] =
         "Chỉ chọn một: giá trị dùng chung hoặc giá trị riêng cho sản phẩm.";
     }
     if (row.useCustomValue && customValue && customValue.length > 200) {
-      errors[`attributeAssignments.${index}.customValue`] = "Giá trị riêng quá dài (tối đa 200 ký tự).";
+      errors[assignmentFieldKey(row, "customValue")] = "Giá trị riêng quá dài (tối đa 200 ký tự).";
     }
   });
 

@@ -302,6 +302,7 @@ export function buildProductAdminEditInitialData(
     gallery: Array.isArray(product.gallery) ? product.gallery.map(String) : [],
     specifications: (product.specifications ?? []).map((row) => ({
       id: row.id,
+      clientKey: row.id,
       label: row.label,
       value: row.value,
       sortOrder: row.sortOrder,
@@ -309,6 +310,7 @@ export function buildProductAdminEditInitialData(
     attributeAssignments: mapAttributeAssignmentsToFormRows(product.attributeAssignments),
     customizations: (product.customizationCapabilities ?? []).map((row) => ({
       id: row.id,
+      clientKey: row.id,
       label: row.label,
       description: row.description ?? "",
       sortOrder: row.sortOrder,

@@ -1,5 +1,10 @@
 import type { SharedAttributePickerOption } from "@/components/admin/products/ProductOptionGroupBuilder";
 import type { ProductAttributeAssignmentFormRow } from "@/features/products/product-catalog-form-mappers";
+import {
+  assignmentFieldKey,
+  legacyKeysForAssignment,
+  resolveFieldError,
+} from "@/features/products/product-form-row-error-keys";
 
 export const B2B_MANAGED_SHARED_ATTRIBUTE_CODES = ["MATERIAL", "FIT"] as const;
 
@@ -38,9 +43,13 @@ export function assignmentFieldError(
   attributeId: string,
   field: "attributeId" | "attributeValueId" | "customValue",
 ): string | undefined {
-  const index = assignmentIndexForAttribute(rows, attributeId);
-  if (index < 0) return undefined;
-  return fieldErrors[`attributeAssignments.${index}.${field}`];
+  const row = findAssignmentForAttribute(rows, attributeId);
+  if (!row) return undefined;
+  return resolveFieldError(
+    fieldErrors,
+    assignmentFieldKey(row, field),
+    legacyKeysForAssignment(rows, row, field),
+  );
 }
 
 export function upsertAssignmentForAttribute(
