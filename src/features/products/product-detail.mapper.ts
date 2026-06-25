@@ -1,5 +1,6 @@
 import { buildProductImages } from "@/lib/productImages";
 import {
+  buildPdpGalleryAllowlist,
   buildPdpImageAllowlist,
   filterProductGalleryImages,
   acceptProductScopedImageUrl,
@@ -320,14 +321,18 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     mapVariant(v, product.material, product.defaultMoq, product.leadTime, hasStructuredOptions),
   );
 
-  const canonicalAllowlist = buildPdpImageAllowlist({
-    images: [],
+  const variantImageUrls = (product.variants ?? []).map((variant) => variant.imageUrl);
+  const optionValueImageUrls = hasStructuredOptions
+    ? (product.options ?? []).flatMap((option) => option.values.map((value) => value.imageUrl))
+    : [];
+
+  const rawImages = buildProductImages(product);
+  const galleryAllowlist = buildPdpGalleryAllowlist({
+    images: product.images,
     featuredImage: product.featuredImage,
     gallery: product.gallery,
   });
-
-  const rawImages = buildProductImages(product);
-  const filteredImages = filterProductGalleryImages(rawImages, canonicalAllowlist);
+  const filteredImages = filterProductGalleryImages(rawImages, galleryAllowlist);
   const images =
     filteredImages.length > 0
       ? filteredImages
@@ -341,6 +346,8 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     images,
     featuredImage: product.featuredImage,
     gallery: product.gallery,
+    variantImageUrls,
+    optionValueImageUrls,
   });
 
   const scopedVariants = variants.map((v) => ({

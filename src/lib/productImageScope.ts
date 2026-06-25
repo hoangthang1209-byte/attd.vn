@@ -18,9 +18,25 @@ type AllowlistInput = {
   images: ProductImageRecord[];
   featuredImage?: string | null;
   gallery?: string[] | null;
+  /** ProductVariant.imageUrl values loaded for this product. */
+  variantImageUrls?: Iterable<string | null | undefined>;
+  /** ProductOptionValue.imageUrl values loaded for this product. */
+  optionValueImageUrls?: Iterable<string | null | undefined>;
 };
 
-/** Image URLs stored on the product record itself (not inferred from other products). */
+function addValidatedUrls(
+  set: Set<string>,
+  urls: Iterable<string | null | undefined> | undefined,
+): void {
+  if (!urls) return;
+  for (const url of urls) {
+    if (url && isValidImageSrc(url)) {
+      set.add(url.trim());
+    }
+  }
+}
+
+/** Image URLs owned by the currently loaded product record (gallery + variants + options). */
 export function buildPdpImageAllowlist(input: AllowlistInput): ReadonlySet<string> {
   const set = new Set(buildProductImageUrlSet(input.images));
 
@@ -34,7 +50,17 @@ export function buildPdpImageAllowlist(input: AllowlistInput): ReadonlySet<strin
     }
   }
 
+  addValidatedUrls(set, input.variantImageUrls);
+  addValidatedUrls(set, input.optionValueImageUrls);
+
   return set;
+}
+
+/** Gallery-only allowlist: stored product media without variant/option-only URLs. */
+export function buildPdpGalleryAllowlist(
+  input: Pick<AllowlistInput, "images" | "featuredImage" | "gallery">,
+): ReadonlySet<string> {
+  return buildPdpImageAllowlist(input);
 }
 
 /** Gallery strip: only URLs present on this product's own media records. */

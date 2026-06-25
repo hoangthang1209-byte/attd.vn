@@ -1,6 +1,6 @@
 import { isValidImageSrc } from "@/lib/imagePaths";
 import type { ProductImageRecord } from "@/lib/productImages";
-import { buildProductImageUrlSet, isProductScopedImageUrl, acceptProductScopedImageUrl } from "@/lib/productImageScope";
+import { buildProductImageUrlSet, buildPdpImageAllowlist, isProductScopedImageUrl, acceptProductScopedImageUrl } from "@/lib/productImageScope";
 
 export type PublicVariantRow = {
   id: string;
@@ -171,13 +171,17 @@ export function getInitialSelection(variants: PublicVariantRow[]): {
   return { color, size, variant };
 }
 
-/** Put selected variant image first without duplicating URLs. */
+/**
+ * Prepend the currently selected product-owned image to the gallery strip.
+ * Selected variant/color URLs are allowed even when absent from stored gallery.
+ */
 export function mergeGalleryWithVariantImage(
   baseImages: ProductImageRecord[],
-  variantImageUrl?: string | null,
+  selectedImageUrl?: string | null,
+  productOwnedUrls?: ReadonlySet<string>,
 ): ProductImageRecord[] {
-  const allowed = buildProductImageUrlSet(baseImages);
-  const scopedUrl = acceptProductScopedImageUrl(variantImageUrl, allowed);
+  const allowed = productOwnedUrls ?? buildProductImageUrlSet(baseImages);
+  const scopedUrl = acceptProductScopedImageUrl(selectedImageUrl, allowed);
   if (!scopedUrl) {
     return baseImages;
   }
@@ -228,9 +232,13 @@ export function buildInteractiveGalleryImages(
   selectedVariant: PublicVariantRow | null,
   prependVariantImage = false
 ): ProductImageRecord[] {
+  const ownedUrls = buildPdpImageAllowlist({
+    images: baseImages,
+    variantImageUrls: variants.map((variant) => variant.imageUrl),
+  });
   const withVariants = appendVariantImagesToGallery(baseImages, variants);
   if (!prependVariantImage || !selectedVariant?.imageUrl) {
     return withVariants;
   }
-  return mergeGalleryWithVariantImage(withVariants, selectedVariant.imageUrl);
+  return mergeGalleryWithVariantImage(withVariants, selectedVariant.imageUrl, ownedUrls);
 }

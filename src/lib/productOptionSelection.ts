@@ -93,57 +93,54 @@ export function findVariantBySelection(
 
 /**
  * Resolve the gallery hero image from current option selection.
- * Color is the dominant visual selector; size alone does not change image unless
- * the exact selected variant has its own image.
+ *
+ * Priority:
+ * 1. Exact fully selected variant image
+ * 2. Selected color product-specific option-value image
+ * 3. Same-color sibling variant image (stable SKU, then id)
+ * 4. Product featured/primary image
  */
 export function resolvePdpGalleryImageUrl(
   variants: PublicProductVariantDetail[],
   optionGroups: ProductOptionGroup[],
   selection: OptionSelectionState,
   productImageUrls?: ReadonlySet<string>,
+  primaryImageUrl?: string | null,
 ): string | null {
-  if (!variants.length) return null;
-
   const accept = (url: string | null | undefined) =>
     productImageUrls
       ? acceptProductScopedImageUrl(url, productImageUrls)
       : url && isValidImageSrc(url)
-        ? url
+        ? url.trim()
         : null;
 
-  const selectedVariant = findVariantBySelection(variants, optionGroups, selection);
-  const fromSelected = accept(selectedVariant?.imageUrl);
-  if (fromSelected) return fromSelected;
+  if (variants.length > 0) {
+    const selectedVariant = findVariantBySelection(variants, optionGroups, selection);
+    const fromSelected = accept(selectedVariant?.imageUrl);
+    if (fromSelected) return fromSelected;
 
-  const colorSlug = findColorGroupSlug(optionGroups);
-  const selectedColor = colorSlug ? selection[colorSlug] : null;
-  if (!selectedColor || !colorSlug) {
-    return null;
+    const colorSlug = findColorGroupSlug(optionGroups);
+    const selectedColor = colorSlug ? selection[colorSlug] : null;
+
+    if (selectedColor && colorSlug) {
+      const colorGroup = optionGroups.find((group) => group.slug === colorSlug);
+      const optionValue = colorGroup?.values.find((value) => value.label === selectedColor);
+      const fromColorOption = accept(optionValue?.imageUrl);
+      if (fromColorOption) return fromColorOption;
+
+      const colorVariants = variants
+        .filter((variant) => variant.optionSelections[colorSlug] === selectedColor)
+        .slice()
+        .sort((a, b) => a.sku.localeCompare(b.sku) || a.id.localeCompare(b.id));
+
+      const fromSibling = colorVariants
+        .map((variant) => accept(variant.imageUrl))
+        .find((url): url is string => Boolean(url));
+      if (fromSibling) return fromSibling;
+    }
   }
 
-  const colorVariants = variants.filter(
-    (variant) => variant.optionSelections[colorSlug] === selectedColor,
-  );
-
-  const partialMatch = colorVariants.find((variant) => {
-    if (!accept(variant.imageUrl)) return false;
-    return optionGroups.every((group) => {
-      if (group.slug === colorSlug) return true;
-      const selected = selection[group.slug];
-      if (!selected) return true;
-      return variant.optionSelections[group.slug] === selected;
-    });
-  });
-  const fromPartial = accept(partialMatch?.imageUrl);
-  if (fromPartial) return fromPartial;
-
-  const anyColorVariant = colorVariants.find((variant) => accept(variant.imageUrl));
-  const fromColor = accept(anyColorVariant?.imageUrl);
-  if (fromColor) return fromColor;
-
-  const colorGroup = optionGroups.find((group) => group.slug === colorSlug);
-  const optionValue = colorGroup?.values.find((value) => value.label === selectedColor);
-  return accept(optionValue?.imageUrl);
+  return accept(primaryImageUrl);
 }
 
 export function selectionSignature(selection: OptionSelectionState): string {

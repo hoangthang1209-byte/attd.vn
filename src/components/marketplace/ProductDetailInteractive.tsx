@@ -20,6 +20,7 @@ import {
 import { formatPdpDescriptionContent } from "@/lib/formatPdpDescription";
 import { resolveQuoteVariantId } from "@/features/products/product-pdp.utils";
 import { mergeGalleryWithVariantImage } from "@/lib/productVariants";
+import { getPrimaryProductImage } from "@/lib/productImages";
 import {
   buildPdpImageAllowlist,
   filterProductGalleryImages,
@@ -106,17 +107,36 @@ export default function ProductDetailInteractive({
   const hasActiveVariants = variants.length > 0;
   const showVariantSelector = optionGroups.length > 0 && hasActiveVariants;
 
-  const productImageUrls = useMemo(() => buildPdpImageAllowlist({ images }), [images]);
+  const productImageUrls = useMemo(
+    () =>
+      buildPdpImageAllowlist({
+        images,
+        variantImageUrls: variants.map((variant) => variant.imageUrl),
+        optionValueImageUrls: optionGroups.flatMap((group) =>
+          group.values.map((value) => value.imageUrl),
+        ),
+      }),
+    [images, variants, optionGroups],
+  );
+
+  const primaryImageUrl = useMemo(() => getPrimaryProductImage(images), [images]);
 
   const displayImageUrl = useMemo(
-    () => resolvePdpGalleryImageUrl(variants, optionGroups, selection, productImageUrls),
-    [variants, optionGroups, selection, productImageUrls],
+    () =>
+      resolvePdpGalleryImageUrl(
+        variants,
+        optionGroups,
+        selection,
+        productImageUrls,
+        primaryImageUrl,
+      ),
+    [variants, optionGroups, selection, productImageUrls, primaryImageUrl],
   );
 
   const galleryImages = useMemo(() => {
     const base = filterProductGalleryImages(images, productImageUrls);
     if (displayImageUrl) {
-      return mergeGalleryWithVariantImage(base, displayImageUrl);
+      return mergeGalleryWithVariantImage(base, displayImageUrl, productImageUrls);
     }
     return base;
   }, [images, displayImageUrl, productImageUrls]);
