@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import AdminQuickCreateShell from "@/components/admin/AdminQuickCreateShell";
 import MediaPicker from "@/components/admin/media/MediaPicker";
@@ -10,10 +10,14 @@ import {
   type CategoryTreeItem,
 } from "@/features/categories/category-tree-utils";
 import {
-  CATEGORY_CODE_FORMAT_ERROR,
   CATEGORY_NAME_VI_REQUIRED,
   isValidFourLetterCategoryCode,
 } from "@/features/categories/category-admin-constants";
+import CategoryGeneratedCodeField, {
+  emptyCategoryCodePreview,
+  type CategoryCodePreviewState,
+} from "@/components/admin/products/CategoryGeneratedCodeField";
+import { fetchCategoryCodePreview } from "@/features/categories/category-code-preview.client";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { isIndexableCategoryLanding } from "@/lib/seo/indexable-category-routes";
 import {
@@ -125,36 +129,47 @@ function CategoryQuickEditModalForm({
   const [name, setName] = useState(category.name);
   const [nameEn, setNameEn] = useState(category.nameEn ?? "");
   const [slug, setSlug] = useState(category.slug);
-  const [skuCode, setSkuCode] = useState(category.skuCode ?? "");
+  const [savedSkuCode] = useState(category.skuCode ?? "");
   const [sortOrder, setSortOrder] = useState(String(category.sortOrder));
   const [parentId, setParentId] = useState(category.parentId ?? "");
   const [isActive, setIsActive] = useState(category.isActive !== false);
   const [imageUrl, setImageUrl] = useState(category.imageUrl ?? "");
   const [slugEdited, setSlugEdited] = useState(false);
-  const [skuCodeEdited, setSkuCodeEdited] = useState(true);
-  const [manualCodeMode, setManualCodeMode] = useState(Boolean(category.skuCode));
+  const [codePreview, setCodePreview] = useState<CategoryCodePreviewState>(emptyCategoryCodePreview());
+  const [regenerateOnSave, setRegenerateOnSave] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useModalFocusTrap(true, formContainerRef);
 
+  const showLegacyCodeNotice = Boolean(savedSkuCode && !isValidFourLetterCategoryCode(savedSkuCode));
+
+  const loadCodePreview = useCallback(async (options?: { markRegenerate?: boolean }) => {
+    if (!nameEn.trim()) {
+      setCodePreview(emptyCategoryCodePreview());
+      return;
+    }
+
+    setCodePreview((current) => ({ ...current, status: "loading", message: "Đang tạo mã..." }));
+    const preview = await fetchCategoryCodePreview({
+      nameEn,
+      excludeId: category.id,
+    });
+    setCodePreview({ ...preview, isPreview: true });
+    if (options?.markRegenerate) {
+      setRegenerateOnSave(true);
+    }
+  }, [category.id, nameEn]);
+
   useEffect(() => {
-    if (skuCodeEdited || manualCodeMode || !nameEn.trim()) return;
+    if (!nameEn.trim()) return;
 
     const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ nameEn: nameEn.trim(), excludeId: category.id });
-      void fetch(`/api/admin/products/categories/code-preview?${params}`)
-        .then((response) => response.json())
-        .then((data: { code?: string }) => {
-          if (data.code && !skuCodeEdited && !manualCodeMode) {
-            setSkuCode(data.code);
-          }
-        })
-        .catch(() => {});
+      void loadCodePreview();
     }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [category.id, nameEn, skuCodeEdited, manualCodeMode]);
+  }, [loadCodePreview, nameEn]);
 
   function resetAndClose() {
     if (pending) return;
@@ -172,8 +187,8 @@ function CategoryQuickEditModalForm({
     if (!slug.trim()) {
       nextFieldErrors.slug = "Vui lòng nhập slug.";
     }
-    if (skuCode.trim() && !isValidFourLetterCategoryCode(skuCode) && skuCode !== (category.skuCode ?? "")) {
-      nextFieldErrors.skuCode = CATEGORY_CODE_FORMAT_ERROR;
+    if (regenerateOnSave && codePreview.status === "error") {
+      nextFieldErrors.skuCode = codePreview.message;
     }
 
     const parentError = category
@@ -209,7 +224,6 @@ function CategoryQuickEditModalForm({
       name: name.trim(),
       nameEn: nameEn.trim() || null,
       slug: slug.trim(),
-      skuCode: skuCode.trim() || null,
       description: category.description,
       seoTitle: category.seoTitle,
       seoDescription: category.seoDescription,
@@ -217,6 +231,7 @@ function CategoryQuickEditModalForm({
       sortOrder: Number(sortOrder) || 0,
       parentId: parentId.trim() || null,
       isActive,
+      ...(regenerateOnSave ? { regenerateCode: true } : {}),
     };
 
     await mutate({
@@ -413,43 +428,20 @@ function CategoryQuickEditModalForm({
               {fieldErrors.slug && <p className="admin-field-error">{fieldErrors.slug}</p>}
             </div>
 
-            <div className="admin-field">
-              <label className="admin-label" htmlFor="quick-edit-category-code">
-                Mã danh mục
-              </label>
-              <input
-                id="quick-edit-category-code"
-                className={`admin-input${fieldErrors.skuCode ? " admin-input--error" : ""}`}
-                value={skuCode}
-                maxLength={4}
-                disabled={pending}
-                onChange={(event) => {
-                  setSkuCodeEdited(true);
-                  setManualCodeMode(true);
-                  setSkuCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4));
-                  if (fieldErrors.skuCode) {
-                    setFieldErrors((current) => {
-                      const next = { ...current };
-                      delete next.skuCode;
-                      return next;
-                    });
-                  }
-                }}
-              />
-              {category.codeFormat === "legacy" && (
-                <p className="admin-field-hint admin-field-hint--warning">
-                  Mã hiện tại chưa đúng 4 chữ cái. Chỉnh mã mới sẽ không tự đổi mã sản phẩm hiện có.
-                </p>
-              )}
-              {category.productCount > 0 && skuCode !== (category.skuCode ?? "") && (
-                <p className="admin-field-hint admin-field-hint--warning">
-                  Thay đổi mã danh mục không tự động đổi mã {category.productCount} sản phẩm liên quan.
-                </p>
-              )}
-              {fieldErrors.skuCode && (
-                <p className="admin-field-error">{fieldErrors.skuCode}</p>
-              )}
-            </div>
+            <CategoryGeneratedCodeField
+              id="quick-edit-category-code"
+              value={savedSkuCode}
+              preview={codePreview}
+              legacyNotice={showLegacyCodeNotice}
+              disabled={pending}
+              onRegenerate={() => void loadCodePreview({ markRegenerate: true })}
+            />
+            {regenerateOnSave && category.productCount > 0 && (
+              <p className="admin-field-hint admin-field-hint--warning">
+                Thay đổi mã danh mục không tự động đổi mã {category.productCount} sản phẩm liên quan.
+              </p>
+            )}
+            {fieldErrors.skuCode && <p className="admin-field-error">{fieldErrors.skuCode}</p>}
 
             <div className="admin-field">
               <label className="admin-label" htmlFor="quick-edit-category-status">

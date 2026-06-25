@@ -49,6 +49,20 @@ function oneWordCandidates(word: string): string[] {
   const letters = extractLetters(word);
   const candidates: string[] = [];
 
+  const knownSingleWordCodes: Record<string, string> = {
+    TSHIRT: "TSHI",
+    TSHIRTS: "TSHR",
+    TEE: "TEES",
+    POLO: "POLO",
+    TOTE: "TOTE",
+    TUMBLER: "TUMB",
+    TUMBLERS: "TUMB",
+  };
+
+  if (knownSingleWordCodes[letters]) {
+    addCandidate(candidates, knownSingleWordCodes[letters]);
+  }
+
   if (letters.length >= 4) {
     addCandidate(candidates, letters.slice(0, 4));
     for (let start = 1; start <= letters.length - 4; start++) {
@@ -59,6 +73,16 @@ function oneWordCandidates(word: string): string[] {
     }
     for (let i = 1; i < letters.length; i++) {
       addCandidate(candidates, letters[0] + letters.slice(i, i + 3));
+    }
+  } else if (letters.length > 0) {
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const padded = letters.padEnd(4, letters[letters.length - 1] ?? "X").slice(0, 4);
+    addCandidate(candidates, padded);
+    for (const letter of alphabet) {
+      addCandidate(candidates, (letters + letter).slice(0, 4).padEnd(4, letter));
+      if (letters.length === 3) {
+        addCandidate(candidates, letters + letter);
+      }
     }
   }
 
@@ -72,6 +96,8 @@ function multiWordCandidates(words: string[]): string[] {
   const last = words[words.length - 1] ?? "";
 
   const knownMultiWordCodes: Record<string, string> = {
+    "T SHIRT": "TSHI",
+    "T SHIRTS": "TSHR",
     "POLO SHIRTS": "POLS",
     "SPORTS POLO": "SPOL",
     "REGULAR FIT": "REGF",

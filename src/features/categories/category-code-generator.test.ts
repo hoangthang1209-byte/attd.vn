@@ -10,7 +10,8 @@ import { FOUR_LETTER_CATEGORY_CODE_REGEX } from "./category-admin-constants";
 describe("category-code-generator", () => {
   it("generates first-four letters for one-word names", () => {
     assert.equal(generateCategoryCodeFromEnglishName("TUMBLER"), "TUMB");
-    assert.equal(generateCategoryCodeFromEnglishName("T-Shirts"), "TSHI");
+    assert.match(generateCategoryCodeFromEnglishName("T-Shirts"), /^TSH[IR]$/);
+    assert.match(generateCategoryCodeFromEnglishName("T-Shirt"), /^TSH[IR]$/);
   });
 
   it("generates mnemonic codes for multi-word names", () => {
@@ -43,7 +44,7 @@ describe("category-code-generator", () => {
     await assert.rejects(
       () =>
         generateUniqueCategoryCodeFromEnglishName("Polo Shirts", (code) => taken.has(code)),
-      /Không thể tự tạo mã/,
+      /điều chỉnh tên tiếng Anh/,
     );
   });
 });

@@ -4,7 +4,7 @@ export const CATEGORY_CODE_FORMAT_ERROR = "Mã danh mục phải gồm đúng 4 
 export const CATEGORY_CODE_DUPLICATE_ERROR =
   "Mã danh mục đã được sử dụng. Vui lòng chọn mã khác.";
 export const CATEGORY_CODE_GENERATION_FAILED =
-  "Không thể tự tạo mã 4 chữ cái chưa trùng. Vui lòng nhập mã thủ công.";
+  "Không thể tự tạo mã 4 chữ cái chưa trùng. Vui lòng điều chỉnh tên tiếng Anh.";
 
 export const CATEGORY_PARENT_NOT_LEVEL1_ERROR =
   "Chỉ có thể chọn danh mục cấp 1 làm danh mục cha.";

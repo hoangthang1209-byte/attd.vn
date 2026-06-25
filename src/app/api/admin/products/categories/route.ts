@@ -40,6 +40,7 @@ function parseBody(raw: Record<string, unknown>): CategoryAdminInput | null {
     sortOrder: raw.sortOrder != null ? Number(raw.sortOrder) || 0 : 0,
     parentId: raw.parentId != null ? String(raw.parentId).trim() || null : null,
     isActive: raw.isActive === undefined ? undefined : Boolean(raw.isActive),
+    regenerateCode: raw.regenerateCode === true,
   };
 }
 

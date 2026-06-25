@@ -17,17 +17,15 @@ import {
   validateCategoryParentSelection,
 } from "@/features/categories/category-tree-utils";
 import {
-  CATEGORY_CODE_DUPLICATE_ERROR as CATEGORY_CODE_DUPLICATE_VI,
-  CATEGORY_CODE_FORMAT_ERROR,
   CATEGORY_NAME_EN_REQUIRED,
   CATEGORY_NAME_VI_REQUIRED,
   isValidFourLetterCategoryCode,
-  normalizeFourLetterCategoryCode,
 } from "@/features/categories/category-admin-constants";
 import {
   CategoryCodeGenerationError,
   generateUniqueCategoryCodeFromEnglishName,
 } from "@/features/categories/category-code-generator";
+import { shouldGenerateCategoryCodeOnSave } from "@/features/categories/category-admin-code-policy";
 import { generateProductSystemCode } from "@/features/products/product-system-code";
 import {
   PRODUCT_CMS_INCLUDE,
@@ -1270,6 +1268,7 @@ export type CategoryAdminInput = {
   sortOrder?: number;
   parentId?: string | null;
   isActive?: boolean;
+  regenerateCode?: boolean;
 };
 
 function mapCategoryNameFields(data: CategoryAdminInput) {
@@ -1279,24 +1278,6 @@ function mapCategoryNameFields(data: CategoryAdminInput) {
 }
 
 async function resolveCategorySkuCodeForCreate(data: CategoryAdminInput): Promise<string> {
-  const manualCode = data.skuCode?.trim()
-    ? normalizeFourLetterCategoryCode(data.skuCode)
-    : "";
-
-  if (manualCode) {
-    if (!isValidFourLetterCategoryCode(manualCode)) {
-      throw new ProductAdminValidationError(CATEGORY_CODE_FORMAT_ERROR, {
-        skuCode: CATEGORY_CODE_FORMAT_ERROR,
-      });
-    }
-    if (await isCategoryCodeTaken(manualCode)) {
-      throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_VI, {
-        skuCode: CATEGORY_CODE_DUPLICATE_VI,
-      });
-    }
-    return manualCode;
-  }
-
   const nameEn = data.nameEn?.trim();
   if (!nameEn) {
     throw new ProductAdminValidationError(CATEGORY_NAME_EN_REQUIRED, {
@@ -1321,37 +1302,30 @@ async function resolveCategorySkuCodeForCreate(data: CategoryAdminInput): Promis
 async function resolveCategorySkuCodeForUpdate(
   id: string,
   data: CategoryAdminInput,
-  existingSkuCode: string | null,
 ): Promise<string | null | undefined> {
-  if (data.skuCode === undefined) {
+  if (!shouldGenerateCategoryCodeOnSave({ isCreate: false, regenerateCode: data.regenerateCode })) {
     return undefined;
   }
 
-  const trimmed = data.skuCode?.trim() ?? "";
-  if (!trimmed) {
-    return existingSkuCode;
-  }
-
-  const normalized = normalizeFourLetterCategoryCode(trimmed);
-  const existingNormalized = existingSkuCode?.trim().toUpperCase() ?? "";
-
-  if (normalized === existingNormalized) {
-    return existingSkuCode;
-  }
-
-  if (!isValidFourLetterCategoryCode(normalized)) {
-    throw new ProductAdminValidationError(CATEGORY_CODE_FORMAT_ERROR, {
-      skuCode: CATEGORY_CODE_FORMAT_ERROR,
+  const nameEn = data.nameEn?.trim();
+  if (!nameEn) {
+    throw new ProductAdminValidationError(CATEGORY_NAME_EN_REQUIRED, {
+      nameEn: "Vui lòng nhập tên tiếng Anh để tạo lại mã danh mục.",
     });
   }
 
-  if (await isCategoryCodeTaken(normalized, id)) {
-    throw new ProductAdminValidationError(CATEGORY_CODE_DUPLICATE_VI, {
-      skuCode: CATEGORY_CODE_DUPLICATE_VI,
-    });
+  try {
+    return await generateUniqueCategoryCodeFromEnglishName(nameEn, async (code) =>
+      isCategoryCodeTaken(code, id),
+    );
+  } catch (error) {
+    if (error instanceof CategoryCodeGenerationError) {
+      throw new ProductAdminValidationError(error.message, {
+        skuCode: error.message,
+      });
+    }
+    throw error;
   }
-
-  return normalized;
 }
 
 function assertCategoryNameFields(data: CategoryAdminInput, isCreate: boolean) {
@@ -1467,7 +1441,7 @@ export async function updateProductCategory(id: string, data: CategoryAdminInput
 
   await assertUniqueCategorySlug(data.slug, id);
   const parentId = await assertValidCategoryParent(id, data.parentId);
-  const skuCode = await resolveCategorySkuCodeForUpdate(id, data, existing.skuCode);
+  const skuCode = await resolveCategorySkuCodeForUpdate(id, data);
   const { nameVi, nameEn } = mapCategoryNameFields(data);
 
   return prisma.category.update({

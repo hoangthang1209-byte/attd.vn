@@ -14,11 +14,15 @@ import {
   getCategoryIndentPx,
 } from "@/features/categories/category-tree-utils";
 import {
-  CATEGORY_CODE_FORMAT_ERROR,
   CATEGORY_NAME_EN_REQUIRED,
   CATEGORY_NAME_VI_REQUIRED,
   isValidFourLetterCategoryCode,
 } from "@/features/categories/category-admin-constants";
+import CategoryGeneratedCodeField, {
+  emptyCategoryCodePreview,
+  type CategoryCodePreviewState,
+} from "@/components/admin/products/CategoryGeneratedCodeField";
+import { fetchCategoryCodePreview } from "@/features/categories/category-code-preview.client";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import PublishQualityChecklist from "@/components/admin/products/PublishQualityChecklist";
 import {
@@ -43,7 +47,7 @@ type CategoryForm = {
   name: string;
   nameEn: string;
   slug: string;
-  skuCode: string;
+  savedSkuCode: string;
   description: string;
   seoTitle: string;
   seoDescription: string;
@@ -53,16 +57,11 @@ type CategoryForm = {
   isActive: boolean;
 };
 
-type CodePreviewState = {
-  status: "idle" | "suggested" | "available" | "taken" | "invalid";
-  message: string;
-};
-
 const emptyForm = (): CategoryForm => ({
   name: "",
   nameEn: "",
   slug: "",
-  skuCode: "",
+  savedSkuCode: "",
   description: "",
   seoTitle: "",
   seoDescription: "",
@@ -95,12 +94,8 @@ export default function CategoryAdminManager() {
   const [quickEditCategory, setQuickEditCategory] = useState<CategoryRow | null>(null);
   const [form, setForm] = useState<CategoryForm>(emptyForm());
   const [slugEdited, setSlugEdited] = useState(false);
-  const [skuCodeEdited, setSkuCodeEdited] = useState(false);
-  const [manualCodeMode, setManualCodeMode] = useState(false);
-  const [codePreview, setCodePreview] = useState<CodePreviewState>({
-    status: "idle",
-    message: "",
-  });
+  const [codePreview, setCodePreview] = useState<CategoryCodePreviewState>(emptyCategoryCodePreview());
+  const [regenerateOnSave, setRegenerateOnSave] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -183,7 +178,7 @@ export default function CategoryAdminManager() {
       name: cat.name,
       nameEn: cat.nameEn ?? "",
       slug: cat.slug,
-      skuCode: cat.skuCode ?? "",
+      savedSkuCode: cat.skuCode ?? "",
       description: cat.description ?? "",
       seoTitle: cat.seoTitle ?? "",
       seoDescription: cat.seoDescription ?? "",
@@ -193,15 +188,8 @@ export default function CategoryAdminManager() {
       isActive: cat.isActive !== false,
     });
     setSlugEdited(true);
-    setSkuCodeEdited(true);
-    setManualCodeMode(Boolean(cat.skuCode));
-    setCodePreview({
-      status: cat.codeFormat === "legacy" ? "invalid" : cat.skuCode ? "available" : "idle",
-      message:
-        cat.codeFormat === "legacy"
-          ? "Mã hiện tại chưa đúng 4 chữ cái — cần chỉnh thủ công khi cập nhật."
-          : "",
-    });
+    setRegenerateOnSave(false);
+    setCodePreview(emptyCategoryCodePreview());
     setShowForm(true);
     setQuickEditCategory(null);
     setFieldErrors({});
@@ -221,9 +209,8 @@ export default function CategoryAdminManager() {
     setEditingId(null);
     setForm(emptyForm());
     setSlugEdited(false);
-    setSkuCodeEdited(false);
-    setManualCodeMode(false);
-    setCodePreview({ status: "idle", message: "" });
+    setRegenerateOnSave(false);
+    setCodePreview(emptyCategoryCodePreview());
     setShowForm(true);
     setMessage(null);
     setFieldErrors({});
@@ -233,81 +220,44 @@ export default function CategoryAdminManager() {
     setShowForm(false);
     setEditingId(null);
     setForm(emptyForm());
+    setRegenerateOnSave(false);
+    setCodePreview(emptyCategoryCodePreview());
     setFieldErrors({});
   }
 
-  useEffect(() => {
-    if (!showForm || editingId || skuCodeEdited || manualCodeMode || !form.nameEn.trim()) {
+  const showLegacyCodeNotice = Boolean(
+    editingId && form.savedSkuCode && !isValidFourLetterCategoryCode(form.savedSkuCode),
+  );
+
+  const loadCodePreview = useCallback(async (options?: { markRegenerate?: boolean }) => {
+    if (!form.nameEn.trim()) {
+      setCodePreview(emptyCategoryCodePreview());
       return;
     }
 
+    setCodePreview((current) => ({ ...current, status: "loading", message: "Đang tạo mã..." }));
+    const preview = await fetchCategoryCodePreview({
+      nameEn: form.nameEn,
+      excludeId: editingId ?? undefined,
+    });
+    setCodePreview({
+      ...preview,
+      isPreview: Boolean(editingId) || Boolean(options?.markRegenerate),
+    });
+    if (options?.markRegenerate) {
+      setRegenerateOnSave(true);
+    }
+  }, [editingId, form.nameEn]);
+
+  useEffect(() => {
+    if (!showForm || !form.nameEn.trim()) return;
+
     const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ nameEn: form.nameEn.trim() });
-      void fetch(`/api/admin/products/categories/code-preview?${params}`)
-        .then((r) => r.json())
-        .then((data: { code?: string; taken?: boolean; suggested?: boolean; formatError?: string }) => {
-          if (skuCodeEdited || manualCodeMode) return;
-          if (data.formatError) {
-            setCodePreview({ status: "invalid", message: data.formatError });
-            return;
-          }
-          if (data.code) {
-            setForm((f) => ({ ...f, skuCode: data.code ?? "" }));
-          }
-          if (data.taken) {
-            setCodePreview({ status: "taken", message: "Mã đã tồn tại" });
-          } else if (data.suggested) {
-            setCodePreview({ status: "suggested", message: "Mã được gợi ý tự động" });
-          } else if (data.code) {
-            setCodePreview({ status: "available", message: "Mã khả dụng" });
-          }
-        })
-        .catch(() => {});
+      void loadCodePreview();
     }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [form.nameEn, showForm, skuCodeEdited, manualCodeMode, editingId]);
-
-  async function refreshCodePreview(manualCode?: string) {
-    const params = new URLSearchParams();
-    if (manualCode?.trim()) {
-      params.set("code", manualCode.trim());
-    } else if (form.nameEn.trim()) {
-      params.set("nameEn", form.nameEn.trim());
-    } else {
-      return;
-    }
-    if (editingId) params.set("excludeId", editingId);
-
-    const response = await fetch(`/api/admin/products/categories/code-preview?${params}`);
-    const data = (await response.json()) as {
-      code?: string;
-      taken?: boolean;
-      suggested?: boolean;
-      formatError?: string;
-      generationError?: string;
-    };
-
-    if (data.formatError || data.generationError) {
-      setCodePreview({
-        status: "invalid",
-        message: data.formatError ?? data.generationError ?? CATEGORY_CODE_FORMAT_ERROR,
-      });
-      return;
-    }
-
-    if (!manualCode && data.code && !skuCodeEdited) {
-      setForm((f) => ({ ...f, skuCode: data.code ?? "" }));
-    }
-
-    if (data.taken) {
-      setCodePreview({ status: "taken", message: "Mã đã tồn tại" });
-    } else if (data.suggested) {
-      setCodePreview({ status: "suggested", message: "Mã được gợi ý tự động" });
-    } else {
-      setCodePreview({ status: "available", message: "Mã khả dụng" });
-    }
-  }
+  }, [form.nameEn, showForm, loadCodePreview]);
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
@@ -329,9 +279,9 @@ export default function CategoryAdminManager() {
       return;
     }
 
-    if (form.skuCode.trim() && !isValidFourLetterCategoryCode(form.skuCode)) {
-      setFieldErrors({ skuCode: CATEGORY_CODE_FORMAT_ERROR });
-      setMessage({ type: "error", text: CATEGORY_CODE_FORMAT_ERROR });
+    if (!editingId && codePreview.status === "error") {
+      setFieldErrors({ skuCode: codePreview.message });
+      setMessage({ type: "error", text: codePreview.message });
       return;
     }
 
@@ -339,7 +289,6 @@ export default function CategoryAdminManager() {
       name: form.name.trim(),
       nameEn: form.nameEn.trim() || null,
       slug: form.slug.trim(),
-      skuCode: form.skuCode.trim() || null,
       description: form.description.trim() || null,
       seoTitle: form.seoTitle.trim() || null,
       seoDescription: form.seoDescription.trim() || null,
@@ -347,6 +296,7 @@ export default function CategoryAdminManager() {
       sortOrder: Number(form.sortOrder) || 0,
       parentId: form.parentId.trim() || null,
       isActive: form.isActive,
+      ...(editingId && regenerateOnSave ? { regenerateCode: true } : {}),
     };
 
     setSaving(true);
@@ -484,57 +434,16 @@ export default function CategoryAdminManager() {
               />
               {fieldErrors.nameEn && <p className="admin-field-error" role="alert">{fieldErrors.nameEn}</p>}
             </div>
-            <div>
-              <label className="admin-label">Mã danh mục *</label>
-              <input
-                className={`admin-input${fieldErrors.skuCode ? " admin-input--error" : ""}`}
-                value={form.skuCode}
-                data-field="skuCode"
-                readOnly={!manualCodeMode && !editingId}
-                maxLength={4}
-                onChange={(e) => {
-                  setSkuCodeEdited(true);
-                  setManualCodeMode(true);
-                  const next = e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
-                  setForm((f) => ({ ...f, skuCode: next }));
-                  void refreshCodePreview(next);
-                }}
-                placeholder="POLS"
-              />
-              {fieldErrors.skuCode && <p className="admin-field-error" role="alert">{fieldErrors.skuCode}</p>}
-              {codePreview.message && (
-                <p
-                  className={`admin-category-code-status admin-category-code-status--${codePreview.status}`}
-                >
-                  {codePreview.message}
-                </p>
-              )}
-              <div className="admin-category-code-actions">
-                {!editingId && (
-                  <button
-                    type="button"
-                    className="btn-tertiary btn-sm"
-                    onClick={() => {
-                      setSkuCodeEdited(false);
-                      setManualCodeMode(false);
-                      void refreshCodePreview();
-                    }}
-                  >
-                    Tạo lại mã
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="btn-tertiary btn-sm"
-                  onClick={() => {
-                    setManualCodeMode(true);
-                    setSkuCodeEdited(true);
-                  }}
-                >
-                  Chỉnh mã thủ công
-                </button>
-              </div>
-            </div>
+            <CategoryGeneratedCodeField
+              value={editingId ? form.savedSkuCode : codePreview.code}
+              preview={codePreview}
+              legacyNotice={showLegacyCodeNotice}
+              disabled={saving}
+              onRegenerate={() => void loadCodePreview({ markRegenerate: true })}
+            />
+            {fieldErrors.skuCode && (
+              <p className="admin-field-error" role="alert">{fieldErrors.skuCode}</p>
+            )}
             <div>
               <label className="admin-label">Slug *</label>
               <input
