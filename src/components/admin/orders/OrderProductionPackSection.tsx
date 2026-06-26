@@ -22,6 +22,9 @@ import type { ProductionReadinessResult } from "@/features/orders/production-rea
 import ProductionSheetActions from "@/components/admin/orders/production-sheet/ProductionSheetActions";
 import OrderMaterialAvailabilityPanel from "@/components/admin/orders/OrderMaterialAvailabilityPanel";
 import ProductionPackFileRow from "@/components/admin/orders/ProductionPackFileRow";
+import OrderItemReadinessBadge from "@/components/admin/orders/OrderItemReadinessBadge";
+import { formatOrderItemCardHeading } from "@/features/orders/order-item-display";
+import type { ProductionExecutionBundle } from "@/features/orders/production-execution.service";
 
 type MaterialItemRow = {
   orderItemId: string;
@@ -106,6 +109,7 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   const [files, setFiles] = useState<OrderProductionFileRecord[]>([]);
   const [materials, setMaterials] = useState<MaterialsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [executionBundle, setExecutionBundle] = useState<ProductionExecutionBundle | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [fileFormOpen, setFileFormOpen] = useState(false);
   const [fileScope, setFileScope] = useState<"order" | string>("order");
@@ -128,28 +132,34 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [filesRes, materialsRes] = await Promise.all([
+      const [filesRes, materialsRes, executionRes] = await Promise.all([
         fetch(`/api/orders/${orderId}/production-files`),
         fetch(`/api/orders/${orderId}/materials`),
+        fetch(`/api/orders/${orderId}/production-execution`),
       ]);
       const filesData = await filesRes.json();
       const materialsData = await materialsRes.json();
+      const executionData = await executionRes.json();
       setFiles(Array.isArray(filesData.files) ? filesData.files : []);
       setMaterials(materialsData as MaterialsPayload);
+      setExecutionBundle(executionData.bundle ?? null);
     } finally {
       setLoading(false);
     }
   }, [orderId]);
 
   const refreshFilesAndReadiness = useCallback(async () => {
-    const [filesRes, materialsRes] = await Promise.all([
+    const [filesRes, materialsRes, executionRes] = await Promise.all([
       fetch(`/api/orders/${orderId}/production-files`),
       fetch(`/api/orders/${orderId}/materials`),
+      fetch(`/api/orders/${orderId}/production-execution`),
     ]);
     const filesData = await filesRes.json();
     const materialsData = await materialsRes.json();
+    const executionData = await executionRes.json();
     setFiles(Array.isArray(filesData.files) ? filesData.files : []);
     setMaterials(materialsData as MaterialsPayload);
+    setExecutionBundle(executionData.bundle ?? null);
   }, [orderId]);
 
   useEffect(() => {
@@ -524,14 +534,20 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
     <form className="production-pack-file-form" onSubmit={(e) => void submitFile(e)}>
       <div className="admin-field">
         <label className="admin-label">Phạm vi</label>
-        <select className="admin-input" value={fileScope} onChange={(e) => setFileScope(e.target.value)}>
-          <option value="order">Toàn đơn hàng</option>
-          {order.items.map((item) => (
-            <option key={item.id} value={item.id}>
-              {itemLabel(item)}
-            </option>
-          ))}
-        </select>
+        {fileScope === "order" ? (
+          <select className="admin-input" value={fileScope} onChange={(e) => setFileScope(e.target.value)}>
+            <option value="order">Toàn đơn hàng</option>
+            {order.items.map((item) => (
+              <option key={item.id} value={item.id}>
+                {itemLabel(item)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="admin-field-hint">
+            Sản phẩm: {formatOrderItemCardHeading(order.items.find((i) => i.id === fileScope) ?? order.items[0])}
+          </p>
+        )}
       </div>
       <div className="admin-field">
         <label className="admin-label">Loại file</label>
@@ -647,8 +663,8 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   ) : null;
 
   return (
-    <fieldset className="admin-catalog-fieldset production-pack-section" id="production-pack" style={{ marginTop: 16 }}>
-      <legend>BỘ HỒ SƠ SẢN XUẤT</legend>
+    <fieldset className="admin-catalog-fieldset production-pack-section" id="production-documents" style={{ marginTop: 16 }}>
+      <legend>Tài liệu sản xuất</legend>
 
       <ProductionSheetActions order={order} />
 
@@ -679,7 +695,9 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
 
           <section className="production-pack-section-block">
             <div className="production-pack-section-block__header">
-              <h4 className="admin-subtitle">Tài liệu chung của đơn hàng</h4>
+              <h4 className="admin-subtitle">
+                Tài liệu chung của đơn hàng ({orderLevelFiles.length})
+              </h4>
               <button
                 type="button"
                 className="admin-btn admin-btn--primary admin-btn--small"
@@ -697,24 +715,31 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
 
           <section className="production-pack-section-block">
             <h4 className="admin-subtitle">Tài liệu theo sản phẩm</h4>
-            {itemFilesByItem.map(({ item, files: itemFiles }) => (
+            {itemFilesByItem.map(({ item, files: itemFiles }) => {
+              const readiness = executionBundle?.items.find((i) => i.orderItemId === item.id)?.readiness;
+              return (
               <div key={item.id} className="production-pack-product-card">
                 <div className="production-pack-product-card__header">
-                  <h5 className="admin-subtitle" style={{ margin: 0 }}>
-                    {itemLabel(item)}
-                  </h5>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span className="production-pack-product-card__count">
-                      {itemFiles.length} file đang sử dụng
-                    </span>
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn--secondary admin-btn--small"
-                      onClick={() => openAddFileForm(item.id)}
-                    >
-                      Thêm tài liệu cho sản phẩm
-                    </button>
+                  <div>
+                    <h5 className="admin-subtitle" style={{ margin: 0 }}>
+                      {formatOrderItemCardHeading(item)}
+                    </h5>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+                      <span className="production-pack-product-card__count">
+                        {itemFiles.length} tài liệu đang sử dụng
+                      </span>
+                      {readiness && (
+                        <OrderItemReadinessBadge state={readiness.state} label={readiness.stateLabel} />
+                      )}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--primary admin-btn--small"
+                    onClick={() => openAddFileForm(item.id)}
+                  >
+                    + Thêm tài liệu
+                  </button>
                 </div>
                 {itemFiles.length > 0 ? (
                   renderFileList(itemFiles)
@@ -722,7 +747,8 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
                   <p className="admin-field-hint">Chưa có tài liệu sản xuất cho sản phẩm này.</p>
                 )}
               </div>
-            ))}
+            );
+            })}
           </section>
 
           {archivedFiles.length > 0 && (

@@ -1741,7 +1741,7 @@ model Order {
   materialStockAdjustments MaterialStockAdjustment[] @relation("OrderMaterialStockAdjustments")
   purchaseRequestItems     PurchaseRequestItem[]
   productionStages         OrderProductionStage[]
-  qcInspection             OrderQcInspection?
+  qcInspections            OrderQcInspection[]
   qcEvidence               OrderQcEvidence[]
   deliveryExecutions       OrderDeliveryExecution[]
   deliveryProofs           OrderDeliveryProof[]
@@ -1865,6 +1865,8 @@ model OrderItem {
   revenueCategory        RevenueCategory?               @relation(fields: [revenueCategoryId], references: [id], onDelete: SetNull)
   variants               OrderItemVariant[]
   productionFiles        OrderProductionFile[]
+  productionStages       OrderProductionStage[]
+  qcInspections          OrderQcInspection[]
   materialRequirements   OrderItemMaterialRequirement[]
   deliveryExecutionItems OrderDeliveryExecutionItem[]
 
@@ -2285,6 +2287,7 @@ enum QcEvidenceType {
 model OrderProductionStage {
   id                 String                @id @default(cuid())
   orderId            String
+  orderItemId        String?
   stageType          ProductionStageType
   status             ProductionStageStatus @default(NOT_STARTED)
   assignedEmployeeId String?
@@ -2301,16 +2304,18 @@ model OrderProductionStage {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
   order              Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem          OrderItem?            @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   assignedEmployee   Employee?             @relation("ProductionStageAssignee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
 
-  @@unique([orderId, stageType])
   @@index([orderId])
+  @@index([orderItemId])
   @@index([stageType])
 }
 
 model OrderQcInspection {
   id                    String             @id @default(cuid())
-  orderId               String             @unique
+  orderId               String
+  orderItemId           String?
   inspectedByEmployeeId String?
   status                QcInspectionStatus @default(DRAFT)
   inspectedAt           DateTime?
@@ -2324,10 +2329,12 @@ model OrderQcInspection {
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   order                 Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem             OrderItem?         @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   inspectedBy           Employee?          @relation("QcInspector", fields: [inspectedByEmployeeId], references: [id], onDelete: SetNull)
   evidence              OrderQcEvidence[]
 
   @@index([orderId])
+  @@index([orderItemId])
 }
 
 model OrderQcEvidence {

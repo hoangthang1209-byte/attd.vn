@@ -12,7 +12,7 @@ import {
 } from "@/features/orders/production-execution-labels";
 import {
   computeStageProgressSummary,
-  ensureProductionStagesInitialized,
+  ensureProductionStagesInitializedForOrder,
   type ProductionStageRecord,
 } from "@/features/orders/production-stage.service";
 import {
@@ -24,6 +24,7 @@ import {
   qcBoardStatusLabel,
   type QcInspectionRecord,
 } from "@/features/orders/qc-inspection.service";
+import { buildProductionExecutionBundle } from "@/features/orders/production-execution.service";
 
 export type HandoverReadinessResult = {
   state: HandoverReadinessState;
@@ -100,8 +101,10 @@ export async function evaluateHandoverReadiness(
     throw new ProductionExecutionValidationError("Không tìm thấy đơn hàng.");
   }
 
-  const stages = await ensureProductionStagesInitialized(orderId);
-  const qc = await getQcInspection(orderId);
+  const bundle = await buildProductionExecutionBundle(orderId);
+  const stages = bundle.isLegacy
+    ? bundle.legacyStages
+    : bundle.items.flatMap((item) => item.stages);
   const stageSummary = computeStageProgressSummary(stages);
   const expectedOrderQuantity = order.items.reduce(
     (sum, item) => sum + resolveOrderItemTotalQuantity(item),
@@ -110,12 +113,55 @@ export async function evaluateHandoverReadiness(
 
   const missingConditions: string[] = [];
 
-  const qcPassed = qc ? qtyNum(qc.passedQuantity) : 0;
-  const qcStatus = qc?.status ?? null;
+  let qcPassed = 0;
+  let qcStatus: QcInspectionStatus | null = null;
+  let reworkQuantity = 0;
+  let defectAndScrap = 0;
+
+  if (bundle.isLegacy) {
+    const qc = bundle.legacyQc;
+    qcPassed = qc ? qtyNum(qc.passedQuantity) : 0;
+    qcStatus = qc?.status ?? null;
+    reworkQuantity = qc ? qtyNum(qc.reworkQuantity) : 0;
+    defectAndScrap = qc ? qtyNum(qc.defectQuantity) + qtyNum(qc.scrapQuantity) : 0;
+  } else {
+    const itemQcRecords = bundle.items.map((item) => item.qc).filter(Boolean) as QcInspectionRecord[];
+    qcPassed = itemQcRecords.reduce((sum, qc) => sum + qtyNum(qc.passedQuantity), 0);
+    reworkQuantity = itemQcRecords.reduce((sum, qc) => sum + qtyNum(qc.reworkQuantity), 0);
+    defectAndScrap = itemQcRecords.reduce(
+      (sum, qc) => sum + qtyNum(qc.defectQuantity) + qtyNum(qc.scrapQuantity),
+      0,
+    );
+    const allItemsQcDone = bundle.items.every(
+      (item) =>
+        item.qc &&
+        (item.qc.status === "PASSED" ||
+          item.qc.status === "PASSED_WITH_NOTE" ||
+          item.qc.status === "FAILED" ||
+          item.qc.status === "REWORK_REQUIRED"),
+    );
+    const allItemsPassed = bundle.items.every(
+      (item) =>
+        item.qc &&
+        (item.qc.status === "PASSED" || item.qc.status === "PASSED_WITH_NOTE"),
+    );
+    if (bundle.items.some((item) => item.qc?.status === "REWORK_REQUIRED")) {
+      qcStatus = "REWORK_REQUIRED";
+    } else if (bundle.items.some((item) => item.qc?.status === "FAILED")) {
+      qcStatus = "FAILED";
+    } else if (allItemsPassed) {
+      qcStatus = "PASSED";
+    } else if (allItemsQcDone) {
+      qcStatus = "DRAFT";
+    } else {
+      qcStatus = null;
+    }
+  }
+
   const qcOk = qcStatus === "PASSED" || qcStatus === "PASSED_WITH_NOTE";
 
   if (!qcOk) {
-    if (!qc || qcStatus === "DRAFT") {
+    if (!qcStatus || qcStatus === "DRAFT") {
       missingConditions.push("Chưa hoàn tất kiểm tra chất lượng.");
     } else if (qcStatus === "FAILED") {
       missingConditions.push("Kết quả QC không đạt.");
@@ -130,7 +176,12 @@ export async function evaluateHandoverReadiness(
     missingConditions.push("Số lượng QC đạt chưa đủ.");
   }
 
-  const packingOk = stageSummary.packingCompleted || stageSummary.packingSkipped;
+  const packingOk = bundle.isLegacy
+    ? stageSummary.packingCompleted || stageSummary.packingSkipped
+    : bundle.items.every((item) => {
+        const summary = computeStageProgressSummary(item.stages);
+        return summary.packingCompleted || summary.packingSkipped || item.stages.length === 0;
+      });
   if (!packingOk) {
     missingConditions.push("Chưa hoàn tất đóng gói.");
   }
@@ -161,10 +212,8 @@ export async function evaluateHandoverReadiness(
     qcStatus,
   });
 
-  const reworkQuantity = qc ? qtyNum(qc.reworkQuantity) : 0;
-  const defectAndScrap = qc
-    ? qtyNum(qc.defectQuantity) + qtyNum(qc.scrapQuantity)
-    : 0;
+  const reworkQuantityFinal = reworkQuantity;
+  const defectAndScrapFinal = defectAndScrap;
 
   return {
     state,
@@ -174,8 +223,8 @@ export async function evaluateHandoverReadiness(
     expectedOrderQuantity,
     productionCompletedQuantity: computeProductionCompletedQuantity(stages),
     qcPassedQuantity: qcPassed,
-    reworkQuantity,
-    defectAndScrapQuantity: defectAndScrap,
+    reworkQuantity: reworkQuantityFinal,
+    defectAndScrapQuantity: defectAndScrapFinal,
     packingCompleted: stageSummary.packingCompleted,
     packingSkipped: stageSummary.packingSkipped,
     stageProgressLabel: stageSummary.progressLabel,
@@ -257,10 +306,10 @@ export async function getOrderExecutionSummary(orderId: string): Promise<OrderEx
 
   const stageCount = await prisma.orderProductionStage.count({ where: { orderId } });
   const stages = stageCount > 0
-    ? await ensureProductionStagesInitialized(orderId)
+    ? await ensureProductionStagesInitializedForOrder(orderId)
     : [];
   const stageSummary = computeStageProgressSummary(stages);
-  const qc = await getQcInspection(orderId);
+  const qc = await getQcInspection(orderId, null);
   const readiness = await evaluateHandoverReadiness(orderId);
 
   const overrideActivity = await prisma.orderActivity.findFirst({

@@ -10,6 +10,7 @@ import {
   PRODUCTION_STAGE_STATUS_LABELS,
   PRODUCTION_STAGE_TYPE_LABELS,
 } from "@/features/orders/production-execution-labels";
+import { getRequiredProductionStageTypes } from "@/features/orders/order-item-stage-profile";
 import {
   decimalToNumber,
   parseQuantityInput,
@@ -21,6 +22,7 @@ import {
 export type ProductionStageRecord = {
   id: string;
   orderId: string;
+  orderItemId: string | null;
   stageType: ProductionStageType;
   stageTypeLabel: string;
   status: ProductionStageStatus;
@@ -45,6 +47,7 @@ function mapStage(row: Prisma.OrderProductionStageGetPayload<{
   return {
     id: row.id,
     orderId: row.orderId,
+    orderItemId: row.orderItemId,
     stageType: row.stageType,
     stageTypeLabel: PRODUCTION_STAGE_TYPE_LABELS[row.stageType],
     status: row.status,
@@ -68,13 +71,114 @@ const stageInclude = {
   assignedEmployee: { select: { fullName: true } },
 } as const;
 
-export async function listProductionStages(orderId: string): Promise<ProductionStageRecord[]> {
+export async function listProductionStages(
+  orderId: string,
+  options?: { orderItemId?: string | null },
+): Promise<ProductionStageRecord[]> {
+  const where: Prisma.OrderProductionStageWhereInput = { orderId };
+  if (options?.orderItemId === null) {
+    where.orderItemId = null;
+  } else if (options?.orderItemId) {
+    where.orderItemId = options.orderItemId;
+  }
   const rows = await prisma.orderProductionStage.findMany({
-    where: { orderId },
+    where,
     include: stageInclude,
     orderBy: [{ sortOrder: "asc" }, { stageType: "asc" }],
   });
   return rows.map(mapStage);
+}
+
+export async function listAllProductionStagesForOrder(orderId: string): Promise<ProductionStageRecord[]> {
+  const rows = await prisma.orderProductionStage.findMany({
+    where: { orderId },
+    include: stageInclude,
+    orderBy: [{ orderItemId: "asc" }, { sortOrder: "asc" }, { stageType: "asc" }],
+  });
+  return rows.map(mapStage);
+}
+
+export function hasLegacyOrderLevelStages(stages: ProductionStageRecord[]): boolean {
+  return stages.some((s) => !s.orderItemId);
+}
+
+export async function initializeProductionStagesForOrderItem(
+  orderId: string,
+  orderItemId: string,
+): Promise<ProductionStageRecord[]> {
+  const item = await prisma.orderItem.findFirst({
+    where: { id: orderItemId, orderId },
+    select: { supplySource: true, processingMethod: true },
+  });
+  if (!item) throw new ProductionExecutionValidationError("Không tìm thấy dòng sản phẩm.");
+
+  const stageTypes = getRequiredProductionStageTypes({
+    supplySource: item.supplySource,
+    processingMethod: item.processingMethod,
+  });
+
+  const existing = await prisma.orderProductionStage.findMany({
+    where: { orderId, orderItemId },
+    select: { stageType: true },
+  });
+  const existingTypes = new Set(existing.map((r) => r.stageType));
+
+  const toCreate = stageTypes.filter((t) => !existingTypes.has(t));
+  if (toCreate.length > 0) {
+    await prisma.orderProductionStage.createMany({
+      data: toCreate.map((stageType) => ({
+        orderId,
+        orderItemId,
+        stageType,
+        status: "NOT_STARTED" as const,
+        sortOrder: DEFAULT_STAGE_SORT_ORDER[stageType],
+      })),
+    });
+  }
+
+  return listProductionStages(orderId, { orderItemId });
+}
+
+export async function ensureProductionStagesForOrderItem(
+  orderId: string,
+  orderItemId: string,
+): Promise<ProductionStageRecord[]> {
+  const legacyCount = await prisma.orderProductionStage.count({
+    where: { orderId, orderItemId: null },
+  });
+  if (legacyCount > 0) {
+    return listProductionStages(orderId, { orderItemId: null });
+  }
+
+  const count = await prisma.orderProductionStage.count({ where: { orderId, orderItemId } });
+  if (count === 0) {
+    return initializeProductionStagesForOrderItem(orderId, orderItemId);
+  }
+  return listProductionStages(orderId, { orderItemId });
+}
+
+export async function ensureProductionStagesInitializedForOrder(
+  orderId: string,
+): Promise<ProductionStageRecord[]> {
+  const legacyCount = await prisma.orderProductionStage.count({
+    where: { orderId, orderItemId: null },
+  });
+  if (legacyCount > 0) {
+    return listProductionStages(orderId, { orderItemId: null });
+  }
+
+  const items = await prisma.orderItem.findMany({
+    where: { orderId },
+    select: { id: true },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  const allStages: ProductionStageRecord[] = [];
+  for (const item of items) {
+    const stages = await ensureProductionStagesForOrderItem(orderId, item.id);
+    allStages.push(...stages);
+  }
+  return allStages;
 }
 
 export async function initializeProductionStages(orderId: string): Promise<ProductionStageRecord[]> {
@@ -103,11 +207,7 @@ export async function initializeProductionStages(orderId: string): Promise<Produ
 }
 
 export async function ensureProductionStagesInitialized(orderId: string): Promise<ProductionStageRecord[]> {
-  const count = await prisma.orderProductionStage.count({ where: { orderId } });
-  if (count === 0) {
-    return initializeProductionStages(orderId);
-  }
-  return listProductionStages(orderId);
+  return ensureProductionStagesInitializedForOrder(orderId);
 }
 
 export type UpdateProductionStageInput = {

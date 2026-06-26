@@ -1,21 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
 import { buildFaviconMetadata } from "@/lib/branding/favicon-metadata";
 import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
 import AttributionTracker from "@/components/analytics/AttributionTracker";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 const DEFAULT_TITLE = "ATTD - Kho sỉ đồng phục và quà tặng doanh nghiệp";
 const DEFAULT_DESCRIPTION =
@@ -66,10 +55,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="vi"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="vi" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         <script
           type="application/ld+json"

@@ -78,6 +78,7 @@ export type ProductionSheetExecutionSummary = {
   qcInspectedQuantity: string;
   packingLabel: string;
   handoverStateLabel: string;
+  orderReadinessLabel?: string;
   evidenceThumbnails: Array<{ url: string; title: string }>;
 };
 

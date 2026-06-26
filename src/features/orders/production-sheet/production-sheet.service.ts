@@ -14,8 +14,9 @@ import { evaluateOrderMaterialAvailability } from "@/features/materials/material
 import type { MaterialAvailabilityRow } from "@/features/materials/material-availability.service";
 import { getOrderDetail } from "@/features/orders/order.service";
 import { evaluateHandoverReadiness } from "@/features/orders/handover-readiness.service";
-import { computeStageProgressSummary, listProductionStages } from "@/features/orders/production-stage.service";
-import { getQcInspection } from "@/features/orders/qc-inspection.service";
+import { computeStageProgressSummary } from "@/features/orders/production-stage.service";
+import { buildProductionExecutionBundle } from "@/features/orders/production-execution.service";
+import { ORDER_ITEM_READINESS_LABELS } from "@/features/orders/order-item-readiness";
 import { QC_INSPECTION_STATUS_LABELS } from "@/features/orders/production-execution-labels";
 import { isPreviewableProductionMime } from "@/lib/productionFileValidation";
 import { formatMaterialQuantityDisplay } from "@/features/orders/production-sheet/production-sheet-format";
@@ -219,15 +220,21 @@ export async function buildProductionSheetViewModel(
   const order = await getOrderDetail(orderId);
   if (!order) return null;
 
-  const [files, materials, readiness, availability, stages, qc, handover] = await Promise.all([
+  const [files, materials, readiness, availability, executionBundle, handover] = await Promise.all([
     listOrderProductionFiles(orderId),
     listOrderMaterials(orderId),
     evaluateProductionReadiness(orderId),
     evaluateOrderMaterialAvailability(orderId),
-    listProductionStages(orderId),
-    getQcInspection(orderId),
+    buildProductionExecutionBundle(orderId),
     evaluateHandoverReadiness(orderId),
   ]);
+
+  const stages = executionBundle.isLegacy
+    ? executionBundle.legacyStages
+    : executionBundle.items.flatMap((item) => item.stages);
+  const qc = executionBundle.isLegacy
+    ? executionBundle.legacyQc
+    : executionBundle.items.find((item) => item.qc)?.qc ?? null;
 
   const activeFiles = files.filter((f) => f.status === "ACTIVE");
   const productNameByItemId = new Map(
@@ -238,15 +245,13 @@ export async function buildProductionSheetViewModel(
     .filter((f) => !f.orderItemId)
     .map((f) => mapFileRow(f, productNameByItemId));
 
-  const itemLevelFiles = order.items
-    .map((item) => ({
-      orderItemId: item.id,
-      productName: productDisplayName(item),
-      files: activeFiles
-        .filter((f) => f.orderItemId === item.id)
-        .map((f) => mapFileRow(f, productNameByItemId)),
-    }))
-    .filter((group) => group.files.length > 0);
+  const itemLevelFiles = order.items.map((item) => ({
+    orderItemId: item.id,
+    productName: productDisplayName(item),
+    files: activeFiles
+      .filter((f) => f.orderItemId === item.id)
+      .map((f) => mapFileRow(f, productNameByItemId)),
+  }));
 
   const acknowledgementActivity = order.activities.find(
     (activity) =>
@@ -283,6 +288,7 @@ export async function buildProductionSheetViewModel(
               : "Chưa đóng gói",
           handoverStateLabel: handover.stateLabel,
           evidenceThumbnails,
+          orderReadinessLabel: ORDER_ITEM_READINESS_LABELS[executionBundle.orderReadiness.state],
         }
       : null;
 

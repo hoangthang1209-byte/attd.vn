@@ -62,6 +62,7 @@ function computeIndicatorsFromRecords(input: {
   const stageRecords = input.stages.map((s) => ({
     id: "",
     orderId: "",
+    orderItemId: null,
     stageType: s.stageType as import("@prisma/client").ProductionStageType,
     stageTypeLabel: PRODUCTION_STAGE_TYPE_LABELS[s.stageType as keyof typeof PRODUCTION_STAGE_TYPE_LABELS] ?? s.stageType,
     status: s.status as import("@prisma/client").ProductionStageStatus,

@@ -23,10 +23,11 @@ function parseOptionalString(value: unknown): string | null | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
+  const orderItemId = req.nextUrl.searchParams.get("orderItemId");
   try {
-    const qc = await getQcInspection(id);
+    const qc = await getQcInspection(id, orderItemId || null);
     return NextResponse.json({ qc });
   } catch (err) {
     console.error("[GET /api/orders/[id]/qc]", err);
@@ -43,9 +44,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
     // empty body ok
   }
   const raw = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const orderItemId =
+    typeof raw.orderItemId === "string" && raw.orderItemId.trim()
+      ? raw.orderItemId.trim()
+      : null;
   try {
     const qc = await createQcInspection(id, {
       inspectedByEmployeeId: parseOptionalString(raw.inspectedByEmployeeId) ?? null,
+      orderItemId,
     });
     return NextResponse.json({ qc }, { status: 201 });
   } catch (err) {
@@ -76,7 +82,13 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         ? (raw.status as QcInspectionStatus)
         : undefined;
 
+    const orderItemId =
+      typeof raw.orderItemId === "string" && raw.orderItemId.trim()
+        ? raw.orderItemId.trim()
+        : null;
+
     const qc = await updateQcInspection(id, {
+      orderItemId,
       status,
       inspectedByEmployeeId: parseOptionalString(raw.inspectedByEmployeeId),
       inspectedAt: parseOptionalString(raw.inspectedAt),

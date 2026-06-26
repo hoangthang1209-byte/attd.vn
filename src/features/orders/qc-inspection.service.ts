@@ -32,6 +32,7 @@ export type QcEvidenceRecord = {
 export type QcInspectionRecord = {
   id: string;
   orderId: string;
+  orderItemId: string | null;
   status: QcInspectionStatus;
   statusLabel: string;
   inspectedByEmployeeId: string | null;
@@ -96,6 +97,7 @@ function mapQc(
   return {
     id: row.id,
     orderId: row.orderId,
+    orderItemId: row.orderItemId,
     status: row.status,
     statusLabel: QC_INSPECTION_STATUS_LABELS[row.status],
     inspectedByEmployeeId: row.inspectedByEmployeeId,
@@ -114,20 +116,49 @@ function mapQc(
   };
 }
 
-export async function getOrderExpectedQuantity(orderId: string): Promise<number> {
+export async function getOrderExpectedQuantity(
+  orderId: string,
+  orderItemId?: string | null,
+): Promise<number> {
   const items = await prisma.orderItem.findMany({
-    where: { orderId },
+    where: orderItemId ? { orderId, id: orderItemId } : { orderId },
     include: { variants: true },
   });
   return items.reduce((sum, item) => sum + resolveOrderItemTotalQuantity(item), 0);
 }
 
-export async function getQcInspection(orderId: string): Promise<QcInspectionRecord | null> {
-  const row = await prisma.orderQcInspection.findUnique({
-    where: { orderId },
+async function findQcRow(orderId: string, orderItemId?: string | null) {
+  if (orderItemId) {
+    return prisma.orderQcInspection.findFirst({
+      where: { orderId, orderItemId },
+      include: qcInclude,
+    });
+  }
+  return prisma.orderQcInspection.findFirst({
+    where: { orderId, orderItemId: null },
     include: qcInclude,
   });
+}
+
+export async function getQcInspection(
+  orderId: string,
+  orderItemId?: string | null,
+): Promise<QcInspectionRecord | null> {
+  const row = await findQcRow(orderId, orderItemId);
   return row ? mapQc(row) : null;
+}
+
+export async function listQcInspectionsForOrder(orderId: string): Promise<QcInspectionRecord[]> {
+  const rows = await prisma.orderQcInspection.findMany({
+    where: { orderId },
+    include: qcInclude,
+    orderBy: [{ orderItemId: "asc" }, { createdAt: "asc" }],
+  });
+  return rows.map(mapQc);
+}
+
+export function hasLegacyOrderLevelQc(records: QcInspectionRecord[]): boolean {
+  return records.some((r) => !r.orderItemId);
 }
 
 export type UpsertQcInspectionInput = {
@@ -182,22 +213,27 @@ function validateQcStatusRules(
 
 export async function createQcInspection(
   orderId: string,
-  input?: { inspectedByEmployeeId?: string | null },
+  input?: { inspectedByEmployeeId?: string | null; orderItemId?: string | null },
 ): Promise<QcInspectionRecord> {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) throw new ProductionExecutionValidationError("Không tìm thấy đơn hàng.");
 
-  const existing = await prisma.orderQcInspection.findUnique({ where: { orderId } });
+  const orderItemId = input?.orderItemId ?? null;
+  if (orderItemId) {
+    const item = await prisma.orderItem.findFirst({ where: { id: orderItemId, orderId } });
+    if (!item) throw new ProductionExecutionValidationError("Không tìm thấy dòng sản phẩm.");
+  }
+
+  const existing = await findQcRow(orderId, orderItemId);
   if (existing) {
-    const full = await getQcInspection(orderId);
-    if (!full) throw new ProductionExecutionValidationError("Không tìm thấy QC.");
-    return full;
+    return mapQc(existing);
   }
 
   const row = await prisma.$transaction(async (tx) => {
     const created = await tx.orderQcInspection.create({
       data: {
         orderId,
+        orderItemId,
         status: "DRAFT",
         inspectedByEmployeeId: input?.inspectedByEmployeeId ?? null,
       },
@@ -207,7 +243,7 @@ export async function createQcInspection(
       data: {
         orderId,
         type: "PRODUCTION_UPDATED",
-        title: "Bắt đầu kiểm tra QC",
+        title: orderItemId ? "Bắt đầu kiểm tra QC sản phẩm" : "Bắt đầu kiểm tra QC",
         detail: null,
       },
     });
@@ -219,18 +255,20 @@ export async function createQcInspection(
 
 export async function updateQcInspection(
   orderId: string,
-  input: UpsertQcInspectionInput,
+  input: UpsertQcInspectionInput & { orderItemId?: string | null },
 ): Promise<QcInspectionRecord> {
-  let qc = await prisma.orderQcInspection.findUnique({ where: { orderId }, include: qcInclude });
+  const orderItemId = input.orderItemId ?? null;
+  let qc = await findQcRow(orderId, orderItemId);
   if (!qc) {
     await createQcInspection(orderId, {
       inspectedByEmployeeId: input.inspectedByEmployeeId ?? null,
+      orderItemId,
     });
-    qc = await prisma.orderQcInspection.findUnique({ where: { orderId }, include: qcInclude });
+    qc = await findQcRow(orderId, orderItemId);
   }
   if (!qc) throw new ProductionExecutionValidationError("Không tìm thấy QC.");
 
-  const expectedQuantity = await getOrderExpectedQuantity(orderId);
+  const expectedQuantity = await getOrderExpectedQuantity(orderId, orderItemId);
 
   const inspectedQuantity = input.inspectedQuantity !== undefined
     ? parseQuantityInput(input.inspectedQuantity, "Số lượng kiểm tra")
@@ -292,7 +330,7 @@ export async function updateQcInspection(
   const prevStatus = qc.status;
   const updated = await prisma.$transaction(async (tx) => {
     const row = await tx.orderQcInspection.update({
-      where: { orderId },
+      where: { id: qc!.id },
       data,
       include: qcInclude,
     });
@@ -323,7 +361,7 @@ export type CreateQcEvidenceInput = {
 
 export async function addQcEvidence(
   orderId: string,
-  input: CreateQcEvidenceInput,
+  input: CreateQcEvidenceInput & { orderItemId?: string | null },
 ): Promise<QcEvidenceRecord> {
   if (!input.mediaAssetId?.trim()) {
     throw new ProductionExecutionValidationError("Thiếu tệp đính kèm.");
@@ -332,10 +370,11 @@ export async function addQcEvidence(
   const media = await prisma.mediaAsset.findUnique({ where: { id: input.mediaAssetId } });
   if (!media) throw new ProductionExecutionValidationError("Không tìm thấy tệp media.");
 
-  let qc = await prisma.orderQcInspection.findUnique({ where: { orderId } });
+  const orderItemId = input.orderItemId ?? null;
+  let qc = await findQcRow(orderId, orderItemId);
   if (!qc) {
-    await createQcInspection(orderId);
-    qc = await prisma.orderQcInspection.findUnique({ where: { orderId } });
+    await createQcInspection(orderId, { orderItemId });
+    qc = await findQcRow(orderId, orderItemId);
   }
 
   const row = await prisma.$transaction(async (tx) => {

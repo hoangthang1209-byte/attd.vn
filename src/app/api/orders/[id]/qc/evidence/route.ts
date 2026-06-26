@@ -40,11 +40,17 @@ export async function POST(req: NextRequest, context: RouteContext) {
         ? (raw.evidenceType as QcEvidenceType)
         : undefined;
 
+    const orderItemId =
+      typeof raw.orderItemId === "string" && raw.orderItemId.trim()
+        ? raw.orderItemId.trim()
+        : null;
+
     const evidence = await addQcEvidence(id, {
       mediaAssetId: typeof raw.mediaAssetId === "string" ? raw.mediaAssetId : "",
       title: parseOptionalString(raw.title),
       note: parseOptionalString(raw.note),
       evidenceType,
+      orderItemId,
     });
     return NextResponse.json({ evidence }, { status: 201 });
   } catch (err) {

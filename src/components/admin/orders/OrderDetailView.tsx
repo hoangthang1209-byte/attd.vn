@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { OrderPaymentMethod, OrderPaymentType, OrderStatus } from "@prisma/client";
@@ -31,11 +31,6 @@ import {
   ORDER_PAYMENT_TYPE_LABELS,
   ORDER_STATUS_LABELS,
 } from "@/features/orders/order-labels";
-import {
-  getOrderItemProcessingMethodLabel,
-  getOrderItemSupplySourceLabel,
-} from "@/features/orders/order-item-classification";
-import { getRevenueCategoryDisplay } from "@/features/revenue-categories/revenue-category-display";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import type { DeliveryMethodRecord } from "@/features/delivery/delivery-method.service";
@@ -45,6 +40,7 @@ import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import OrderDocumentActions from "@/components/admin/orders/OrderDocumentActions";
 import OrderProductionPackSection from "@/components/admin/orders/OrderProductionPackSection";
 import OrderProductionExecutionSection from "@/components/admin/orders/OrderProductionExecutionSection";
+import OrderOrderedProductsSection from "@/components/admin/orders/OrderOrderedProductsSection";
 import OrderDeliveryExecutionSection from "@/components/admin/orders/OrderDeliveryExecutionSection";
 import type { ProductionReadinessResult } from "@/features/orders/production-readiness.service";
 import type { HandoverReadinessResult } from "@/features/orders/handover-readiness.service";
@@ -691,14 +687,38 @@ export default function OrderDetailView({ id }: Props) {
       </div>
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>TIẾN ĐỘ SẢN XUẤT</legend>
-        <div className="admin-field-hint" style={{ marginBottom: 12 }}>
-          <p>Trạng thái đơn hàng: <strong>{ORDER_STATUS_LABELS[order.status]}</strong></p>
-          {order.productionStartedAt && <p>Ngày bắt đầu sản xuất: {formatOrderDateTime(order.productionStartedAt)}</p>}
-          {order.readyToShipAt && <p>Ngày sẵn sàng giao: {formatOrderDateTime(order.readyToShipAt)}</p>}
+        <legend>Thông tin đơn hàng</legend>
+        <div className="quote-form__party-grid">
+          <div className="quote-form__party-col">
+            <h4 className="admin-subtitle">Khách hàng</h4>
+            <p>{order.customerCompanyName ?? "—"}</p>
+            {order.customerCode && <p className="admin-field-hint">Mã: {order.customerCode}</p>}
+            {order.customerTaxCode && <p className="admin-field-hint">MST: {order.customerTaxCode}</p>}
+            {order.customerAddress && <p className="admin-field-hint">{order.customerAddress}</p>}
+            {order.contactName && <p className="admin-field-hint">Liên hệ: {order.contactName}{order.contactTitle ? ` · ${order.contactTitle}` : ""}</p>}
+            {order.contactPhone && <p className="admin-field-hint">SĐT: {order.contactPhone}</p>}
+            {order.contactEmail && <p className="admin-field-hint">Email: {order.contactEmail}</p>}
+          </div>
+          <div className="quote-form__party-col">
+            <h4 className="admin-subtitle">Chi tiết đơn</h4>
+            <p className="admin-field-hint">Ngày đơn: {formatOrderDate(order.orderDate)}</p>
+            {order.sourceQuoteDate && <p className="admin-field-hint">Ngày báo giá: {formatOrderDate(order.sourceQuoteDate)}</p>}
+            {order.salesName && <p className="admin-field-hint">Tư vấn: {order.salesName}{order.salesTitle ? ` · ${order.salesTitle}` : ""}</p>}
+            <p className="admin-field-hint">Trạng thái: <strong>{ORDER_STATUS_LABELS[order.status]}</strong></p>
+            {order.productionStartedAt && <p className="admin-field-hint">Ngày bắt đầu sản xuất: {formatOrderDateTime(order.productionStartedAt)}</p>}
+            {order.readyToShipAt && <p className="admin-field-hint">Ngày sẵn sàng giao: {formatOrderDateTime(order.readyToShipAt)}</p>}
+            {order.sampleFee != null && order.sampleFee > 0 && (
+              <p className="admin-field-hint">Phí mẫu: {formatOrderCurrency(order.sampleFee, order.currency)}</p>
+            )}
+            {order.sampleLeadTime && <p className="admin-field-hint">Thời gian làm mẫu: {order.sampleLeadTime}</p>}
+            {order.sampleRefundCondition && (
+              <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.sampleRefundCondition}</pre>
+            )}
+          </div>
         </div>
         {canEditOrder ? (
-          <form onSubmit={(e) => void saveProduction(e)}>
+          <form onSubmit={(e) => void saveProduction(e)} style={{ marginTop: 12 }}>
+            <h4 className="admin-subtitle">Phân công sản xuất</h4>
             <div className="admin-catalog-variant-fields">
               <div className="admin-field">
                 <label className="admin-label">Người phụ trách sản xuất</label>
@@ -744,19 +764,28 @@ export default function OrderDetailView({ id }: Props) {
             </button>
           </form>
         ) : (
-          <>
-            <p className="admin-field-hint">Phụ trách: {order.productionOwnerName ?? "—"}</p>
+          <div style={{ marginTop: 12 }}>
+            <p className="admin-field-hint">Phụ trách SX: {order.productionOwnerName ?? "—"}</p>
             <p className="admin-field-hint">Hạn hoàn thành: {order.productionDueDate ? formatOrderDate(order.productionDueDate) : "—"}</p>
             {order.productionNote && <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.productionNote}</pre>}
-          </>
+          </div>
         )}
       </fieldset>
+
+      {order.terms && (
+        <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
+          <legend>Điều khoản đơn hàng</legend>
+          <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.terms}</pre>
+        </fieldset>
+      )}
+
+      <OrderOrderedProductsSection order={order} />
 
       <OrderProductionPackSection orderId={id} order={order} onOrderChange={setOrder} />
       <OrderProductionExecutionSection orderId={id} order={order} />
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>GIAO HÀNG</legend>
+        <legend>Giao hàng</legend>
         {showDeliveryForm && canEditOrder ? (
           <form onSubmit={(e) => void saveDelivery(e)}>
             <div className="admin-catalog-variant-fields">
@@ -880,118 +909,6 @@ export default function OrderDetailView({ id }: Props) {
         onRequestShip={() => setDeliveryRefreshKey((k) => k + 1)}
       />
 
-      <div className="quote-form__party-grid" style={{ marginTop: 16 }}>
-        <fieldset className="quote-form__party-col admin-catalog-fieldset">
-          <legend>Thông tin khách hàng</legend>
-          <p>{order.customerCompanyName ?? "—"}</p>
-          {order.customerCode && <p className="admin-field-hint">Mã: {order.customerCode}</p>}
-          {order.customerTaxCode && <p className="admin-field-hint">MST: {order.customerTaxCode}</p>}
-          {order.customerAddress && <p className="admin-field-hint">{order.customerAddress}</p>}
-          {order.contactName && <p className="admin-field-hint">Liên hệ: {order.contactName}{order.contactTitle ? ` · ${order.contactTitle}` : ""}</p>}
-          {order.contactPhone && <p className="admin-field-hint">SĐT: {order.contactPhone}</p>}
-          {order.contactEmail && <p className="admin-field-hint">Email: {order.contactEmail}</p>}
-        </fieldset>
-
-        <fieldset className="quote-form__party-col admin-catalog-fieldset">
-          <legend>Thông tin đơn hàng</legend>
-          <p className="admin-field-hint">Ngày đơn: {formatOrderDate(order.orderDate)}</p>
-          {order.sourceQuoteDate && <p className="admin-field-hint">Ngày báo giá: {formatOrderDate(order.sourceQuoteDate)}</p>}
-          {order.salesName && <p className="admin-field-hint">Tư vấn: {order.salesName}{order.salesTitle ? ` · ${order.salesTitle}` : ""}</p>}
-          {order.sampleFee != null && order.sampleFee > 0 && (
-            <p className="admin-field-hint">Phí mẫu: {formatOrderCurrency(order.sampleFee, order.currency)}</p>
-          )}
-          {order.sampleLeadTime && <p className="admin-field-hint">Thời gian làm mẫu: {order.sampleLeadTime}</p>}
-          {order.sampleRefundCondition && (
-            <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.sampleRefundCondition}</pre>
-          )}
-        </fieldset>
-      </div>
-
-      {order.terms && (
-        <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-          <legend>Điều khoản đơn hàng</legend>
-          <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.terms}</pre>
-        </fieldset>
-      )}
-
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>Sản phẩm đặt hàng</legend>
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Sản phẩm</th>
-                <th>Sản phẩm lấy từ</th>
-                <th>Cách xử lý</th>
-                <th>Nhóm doanh thu</th>
-                <th>SKU</th>
-                <th>Màu</th>
-                <th>SL</th>
-                <th>Đơn giá</th>
-                <th>Thành tiền</th>
-                <th>Thời gian SX</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.items.map((item) => (
-                <Fragment key={item.id}>
-                  <tr>
-                    <td>
-                      {[item.productNameSnapshot, item.variantNameSnapshot].filter(Boolean).join(" · ") || "—"}
-                      {item.description && <div className="admin-field-hint">{item.description}</div>}
-                      {item.itemNote && <div className="admin-field-hint">Ghi chú: {item.itemNote}</div>}
-                    </td>
-                    <td>{getOrderItemSupplySourceLabel(item.supplySource)}</td>
-                    <td>{getOrderItemProcessingMethodLabel(item.processingMethod)}</td>
-                    <td>
-                      {getRevenueCategoryDisplay({
-                        nameSnapshot: item.revenueCategoryNameSnapshot,
-                        codeSnapshot: item.revenueCategoryCodeSnapshot,
-                      })}
-                    </td>
-                    <td>{item.skuSnapshot ?? "—"}</td>
-                    <td>{item.colorSnapshot ?? "—"}</td>
-                    <td>{item.quantity} {item.unit}</td>
-                    <td>{formatOrderCurrency(item.unitPrice, order.currency)}</td>
-                    <td>{formatOrderCurrency(item.lineTotal, order.currency)}</td>
-                    <td>{item.productionLeadTime ?? "—"}</td>
-                  </tr>
-                  {item.variants.length > 0 && (
-                    <tr key={`${item.id}-variants`}>
-                      <td colSpan={10} style={{ paddingTop: 0 }}>
-                        <div className="admin-table-wrap">
-                          <table className="admin-table admin-table--compact">
-                            <thead>
-                              <tr>
-                                <th>Màu sắc</th>
-                                <th>Size</th>
-                                <th>SKU</th>
-                                <th>Số lượng</th>
-                                <th>Đơn vị</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {item.variants.map((variant) => (
-                                <tr key={variant.id}>
-                                  <td>{variant.colorNameSnapshot ?? "—"}</td>
-                                  <td>{variant.sizeValue ?? "—"}</td>
-                                  <td>{variant.skuSnapshot ?? "—"}</td>
-                                  <td>{variant.quantity}</td>
-                                  <td>{variant.unit}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </fieldset>
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
         <legend>Thanh toán</legend>
@@ -1048,7 +965,7 @@ export default function OrderDetailView({ id }: Props) {
       </fieldset>
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>Nhật ký đơn hàng</legend>
+        <legend>Lịch sử / hoạt động</legend>
         {order.activities.length === 0 ? (
           <p className="admin-field-hint">Chưa có hoạt động</p>
         ) : (
