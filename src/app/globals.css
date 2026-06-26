@@ -18389,3 +18389,84 @@ select.admin-input:focus {
 .order-item-execution-card__legacy-hint {
   color: #92400e;
 }
+
+.order-variant-matrix-editor {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--admin-border, #e2e8f0);
+}
+.order-variant-matrix-editor__table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.order-variant-matrix-editor__table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.order-variant-matrix-editor__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-muted, #f9fafb);
+  z-index: 1;
+}
+.order-variant-matrix-editor__table th,
+.order-variant-matrix-editor__table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--admin-border, #e2e8f0);
+  vertical-align: top;
+}
+.order-variant-matrix-editor__color-col {
+  min-width: 180px;
+  max-width: 220px;
+}
+.order-variant-matrix-editor__size-col {
+  width: 52px;
+  text-align: center;
+}
+.order-variant-matrix-editor__total-col {
+  width: 48px;
+  text-align: right;
+  white-space: nowrap;
+}
+.order-variant-matrix-editor__action-col {
+  width: 88px;
+  white-space: nowrap;
+}
+.order-variant-matrix-editor__qty {
+  width: 44px;
+  min-width: 44px;
+  padding: 4px 6px;
+  text-align: center;
+}
+.order-variant-matrix-editor__size-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.order-variant-matrix-editor__remove-size {
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+.order-variant-matrix-editor__remove-size:hover {
+  color: #dc2626;
+}
+.order-variant-matrix-editor__swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  margin-top: 4px;
+  vertical-align: middle;
+}
+.order-variant-matrix-editor__total {
+  margin: 0 0 8px;
+}

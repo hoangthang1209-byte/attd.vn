@@ -32,10 +32,6 @@ export async function validateStockBackedOrderItem(
 ): Promise<void> {
   if (item.supplySource !== "ATTD_STOCK") return;
 
-  if (!item.colorId) {
-    throw new OrderValidationError("Sản phẩm lấy từ Kho ATTD cần chọn màu có trong kho.");
-  }
-
   if (!item.productId) {
     throw new OrderValidationError("Sản phẩm lấy từ Kho ATTD cần chọn sản phẩm có trong kho.");
   }
@@ -45,17 +41,29 @@ export async function validateStockBackedOrderItem(
     select: { colorId: true, colorName: true, sizeName: true },
   });
 
-  const color = await db.color.findUnique({
-    where: { id: item.colorId },
-    select: { name: true },
-  });
-  if (!color) {
-    throw new OrderValidationError("Sản phẩm lấy từ Kho ATTD cần chọn màu có trong kho.");
+  const activeVariants = (item.variants ?? []).filter((v) => Math.max(0, Math.floor(v.quantity)) > 0);
+
+  if (activeVariants.length === 0) {
+    if (!item.colorId) {
+      throw new OrderValidationError("Sản phẩm lấy từ Kho ATTD cần chọn màu có trong kho.");
+    }
+    return;
   }
 
-  const variants = item.variants ?? [];
-  for (const variant of variants) {
-    if (variant.quantity < 1) continue;
+  for (const variant of activeVariants) {
+    const variantColorId = variant.colorId ?? item.colorId;
+    if (!variantColorId) {
+      throw new OrderValidationError("Sản phẩm lấy từ Kho ATTD cần chọn màu có trong kho.");
+    }
+
+    const color = await db.color.findUnique({
+      where: { id: variantColorId },
+      select: { name: true },
+    });
+    if (!color) {
+      throw new OrderValidationError("Sản phẩm lấy từ Kho ATTD cần chọn màu có trong kho.");
+    }
+
     const sizeValue = variant.sizeValue?.trim() || "";
     const normalizedOrderSize = normalizeSizeForStockMatch(sizeValue);
     const displaySize =
@@ -63,8 +71,10 @@ export async function validateStockBackedOrderItem(
 
     const hasMatch = stockVariants.some((stock) => {
       const colorMatch =
-        stock.colorId === item.colorId ||
-        normalizeColorLookup(stock.colorName) === normalizeColorLookup(color.name);
+        stock.colorId === variantColorId ||
+        normalizeColorLookup(stock.colorName) === normalizeColorLookup(color.name) ||
+        (variant.colorNameSnapshot &&
+          normalizeColorLookup(stock.colorName) === normalizeColorLookup(variant.colorNameSnapshot));
       const stockSize = normalizeSizeForStockMatch(stock.sizeName);
       return colorMatch && stockSize === normalizedOrderSize;
     });

@@ -825,18 +825,19 @@ function validateOrderItemsInput(input: CreateManualOrderInput) {
         throw new OrderValidationError("Vui lòng chọn nhóm doanh thu cho dòng này.");
       }
     }
-    if (item.variants?.length) {
+    const activeVariants = item.variants?.filter((v) => Math.max(0, Math.floor(v.quantity)) > 0) ?? [];
+    if (activeVariants.length) {
       const seen = new Set<string>();
       let variantTotal = 0;
-      for (const variant of item.variants) {
-        const key = `${variant.colorId ?? ""}|${(variant.sizeValue ?? "").trim().toUpperCase()}`;
+      for (const variant of activeVariants) {
+        const colorKey =
+          variant.colorId ??
+          (variant.colorNameSnapshot ?? "").trim().toUpperCase();
+        const key = `${colorKey}|${(variant.sizeValue ?? "").trim().toUpperCase()}`;
         if (seen.has(key)) {
           throw new OrderValidationError("Màu và size này đã tồn tại trong sản phẩm.");
         }
         seen.add(key);
-        if (variant.quantity < 0) {
-          throw new OrderValidationError("Số lượng phải là số lớn hơn hoặc bằng 0.");
-        }
         variantTotal += Math.max(0, Math.floor(variant.quantity));
       }
       if (variantTotal < 1) {
@@ -846,6 +847,12 @@ function validateOrderItemsInput(input: CreateManualOrderInput) {
             : "Số lượng biến thể phải lớn hơn 0.",
         );
       }
+    } else if (item.variants?.length) {
+      throw new OrderValidationError(
+        input.requireItemClassification
+          ? "Dòng sản phẩm phải có số lượng lớn hơn 0."
+          : "Số lượng biến thể phải lớn hơn 0.",
+      );
     } else if (item.quantity < 1) {
       throw new OrderValidationError(
         input.requireItemClassification
@@ -923,6 +930,9 @@ async function prepareOrderItemVariantsForSave(
 
   for (let index = 0; index < variants.length; index += 1) {
     const variant = variants[index];
+    const quantity = Math.max(0, Math.floor(variant.quantity));
+    if (quantity <= 0) continue;
+
     let colorNameSnapshot = variant.colorNameSnapshot ?? null;
     let colorSlug: string | undefined;
 
@@ -933,7 +943,6 @@ async function prepareOrderItemVariantsForSave(
       colorSlug = color.slug;
     }
 
-    const quantity = Math.max(1, Math.floor(variant.quantity));
     let skuSnapshot = variant.skuSnapshot?.trim() || null;
 
     if (!skuSnapshot && customerCode?.trim() && systemCode) {
@@ -965,7 +974,7 @@ async function prepareOrderItemVariantsForSave(
     });
   }
 
-  return prepared;
+  return prepared.length > 0 ? prepared : undefined;
 }
 
 async function prepareOrderItemsForSave(

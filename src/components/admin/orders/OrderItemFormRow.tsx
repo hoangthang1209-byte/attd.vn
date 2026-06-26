@@ -2,7 +2,8 @@
 
 import type { OrderProductGender } from "@prisma/client";
 import MediaPicker from "@/components/admin/media/MediaPicker";
-import OrderItemVariantMatrix from "@/components/admin/orders/OrderItemVariantMatrix";
+import OrderItemVariantMatrixEditor from "@/components/admin/orders/OrderItemVariantMatrixEditor";
+import type { ProductStockVariant } from "@/features/orders/order-item-variant-matrix-editor.utils";
 import type { CategoryOption } from "@/components/admin/orders/QuickAddCategoryModal";
 import type { ColorRecord } from "@/features/colors/color.service";
 import type { OrderItemInput } from "@/features/orders/order-totals";
@@ -75,7 +76,7 @@ export default function OrderItemFormRow({
   index,
   item,
   currency,
-  customerCode,
+  customerCode: _customerCode,
   products,
   variants,
   colors,
@@ -92,11 +93,11 @@ export default function OrderItemFormRow({
   const lineTotal = computeOrderItem(item).lineTotal;
   const selectedColor = colors.find((c) => c.id === item.colorId);
   const selectedCategory = categories.find((c) => c.id === item.categoryId);
-  const sizeOptions = [
-    ...new Set(
-      variants.map((v) => v.sizeName?.trim()).filter((v): v is string => Boolean(v)),
-    ),
-  ];
+  const stockVariants: ProductStockVariant[] = variants.map((v) => ({
+    colorId: null,
+    colorName: v.colorName,
+    sizeName: v.sizeName,
+  }));
   const showVariantMatrix = Boolean(item.productId || item.variants?.length);
   const variantRows = item.variants ?? [];
 
@@ -388,15 +389,15 @@ export default function OrderItemFormRow({
       </div>
 
       {showVariantMatrix && (
-        <OrderItemVariantMatrix
+        <OrderItemVariantMatrixEditor
           variants={variantRows}
           colors={colors}
-          sizeOptions={sizeOptions}
+          stockVariants={stockVariants}
+          supplySource={item.supplySource}
+          productId={item.productId}
           defaultUnit={item.unit ?? "cái"}
-          customerCode={customerCode}
-          systemCode={item.systemCode}
           onChange={(nextVariants) => onChange({ variants: nextVariants })}
-          onAddColor={(variantIndex) => onAddColor(variantIndex)}
+          onAddCatalogColor={() => onAddColor()}
         />
       )}
     </div>
