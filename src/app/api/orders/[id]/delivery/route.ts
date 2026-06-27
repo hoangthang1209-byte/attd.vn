@@ -4,6 +4,8 @@ import {
   OrderValidationError,
   updateOrderDelivery,
 } from "@/features/orders/order.service";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
+import { jsonOrderDetailResponse } from "@/lib/admin-auth/order-api-response";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -24,7 +26,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       id,
       parseUpdateOrderDeliveryBody(body as Record<string, unknown>),
     );
-    return NextResponse.json({ order });
+    return jsonOrderDetailResponse(order, getAdminSessionFromRequest(req));
   } catch (err) {
     if (err instanceof OrderValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });

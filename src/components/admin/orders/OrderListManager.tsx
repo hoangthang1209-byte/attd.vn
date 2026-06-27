@@ -19,9 +19,12 @@ import {
   type OrderPaymentStateFilter,
 } from "@/features/orders/order-labels";
 import type { OrderListRecord } from "@/features/orders/order.types";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 
 export default function OrderListManager() {
   const router = useRouter();
+  const { permissions } = useAdminPermissions();
+  const canViewFinancials = permissions.canViewFinancials;
   const [orders, setOrders] = useState<OrderListRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -43,6 +46,7 @@ export default function OrderListManager() {
         orders?: OrderListRecord[];
         total?: number;
         message?: string;
+        permissions?: { canViewFinancials?: boolean };
       };
       if (!res.ok) throw new Error(data.message ?? "Không thể tải đơn hàng");
       setOrders(data.orders ?? []);
@@ -83,17 +87,21 @@ export default function OrderListManager() {
   return (
     <AdminPageShell>
       <PageHeader
-        description="Quản lý trạng thái vận hành, thanh toán và tiến độ đơn hàng."
+        description={canViewFinancials
+          ? "Quản lý trạng thái vận hành, thanh toán và tiến độ đơn hàng."
+          : "Quản lý trạng thái vận hành và tiến độ đơn hàng."}
         meta={<span>Tổng: {total} đơn hàng</span>}
         actions={
-          <>
-            <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
-              Tạo đơn nhanh
-            </Link>
-            <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
-              Tạo đơn hàng
-            </Link>
-          </>
+          canViewFinancials ? (
+            <>
+              <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
+                Tạo đơn nhanh
+              </Link>
+              <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
+                Tạo đơn hàng
+              </Link>
+            </>
+          ) : undefined
         }
       />
 
@@ -111,16 +119,18 @@ export default function OrderListManager() {
               <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
             ))}
           </select>
-          <select
-            className="admin-input"
-            value={paymentState}
-            onChange={(e) => setPaymentState(e.target.value as OrderPaymentStateFilter | "")}
-          >
-            <option value="">Tất cả thanh toán</option>
-            {(Object.keys(ORDER_PAYMENT_STATE_LABELS) as OrderPaymentStateFilter[]).map((s) => (
-              <option key={s} value={s}>{ORDER_PAYMENT_STATE_LABELS[s]}</option>
-            ))}
-          </select>
+          {canViewFinancials && (
+            <select
+              className="admin-input"
+              value={paymentState}
+              onChange={(e) => setPaymentState(e.target.value as OrderPaymentStateFilter | "")}
+            >
+              <option value="">Tất cả thanh toán</option>
+              {(Object.keys(ORDER_PAYMENT_STATE_LABELS) as OrderPaymentStateFilter[]).map((s) => (
+                <option key={s} value={s}>{ORDER_PAYMENT_STATE_LABELS[s]}</option>
+              ))}
+            </select>
+          )}
           <button type="submit" className="admin-btn admin-btn--secondary">Tìm</button>
         </DataToolbar>
       </form>
@@ -131,14 +141,16 @@ export default function OrderListManager() {
           title="Chưa có đơn hàng phù hợp"
           description="Hãy tạo đơn hàng mới hoặc điều chỉnh bộ lọc hiện tại."
           action={
-            <>
-              <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
-                Tạo đơn nhanh
-              </Link>
-              <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
-                Tạo đơn hàng
-              </Link>
-            </>
+            canViewFinancials ? (
+              <>
+                <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
+                  Tạo đơn nhanh
+                </Link>
+                <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
+                  Tạo đơn hàng
+                </Link>
+              </>
+            ) : undefined
           }
         />
       ) : (
@@ -150,9 +162,13 @@ export default function OrderListManager() {
                 <th>Báo giá nguồn</th>
                 <th>Khách hàng</th>
                 <th>Trạng thái</th>
-                <th>Tổng giá trị</th>
-                <th>Đã thanh toán</th>
-                <th>Còn phải thu</th>
+                {canViewFinancials && (
+                  <>
+                    <th>Tổng giá trị</th>
+                    <th>Đã thanh toán</th>
+                    <th>Còn phải thu</th>
+                  </>
+                )}
                 <th>Ngày tạo</th>
               </tr>
             </thead>
@@ -175,15 +191,19 @@ export default function OrderListManager() {
                       onUpdated={handleOrderUpdated}
                     />
                   </td>
-                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                    {formatOrderCurrency(o.totalAmount)}
-                  </td>
-                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                    {formatOrderCurrency(o.paidAmount)}
-                  </td>
-                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                    {formatOrderCurrency(o.outstandingAmount)}
-                  </td>
+                  {canViewFinancials && (
+                    <>
+                      <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                        {formatOrderCurrency(o.totalAmount)}
+                      </td>
+                      <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                        {formatOrderCurrency(o.paidAmount)}
+                      </td>
+                      <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
+                        {formatOrderCurrency(o.outstandingAmount)}
+                      </td>
+                    </>
+                  )}
                   <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
                     {formatOrderDate(o.createdAt)}
                   </td>

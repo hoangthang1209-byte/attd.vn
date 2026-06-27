@@ -32,23 +32,6 @@ type Props = {
   onUpdated: (orderId: string, updated: OrderListRecord) => void;
 };
 
-function mapListRecordFromDetail(detail: OrderDetailRecord): OrderListRecord {
-  return {
-    id: detail.id,
-    orderNo: detail.orderNo,
-    sourceQuoteNo: detail.sourceQuoteNo,
-    customerCompanyName: detail.customerCompanyName,
-    contactName: detail.contactName,
-    status: detail.status,
-    totalAmount: detail.financials.totalAmount,
-    paidAmount: detail.financials.paidAmount,
-    outstandingAmount: detail.financials.outstandingAmount,
-    overpaidAmount: detail.financials.overpaidAmount,
-    paymentState: detail.financials.paymentState,
-    createdAt: detail.createdAt,
-  };
-}
-
 export default function OrderListQuickStatus({ order, detailHref, onUpdated }: Props) {
   const mutate = useAdminMutation();
   const popoverId = useId();
@@ -153,7 +136,7 @@ export default function OrderListQuickStatus({ order, detailHref, onUpdated }: P
         return parseAdminJsonResponse(res, (body) => body.order as OrderDetailRecord);
       },
       onSuccess: (detail) => {
-        onUpdated(order.id, mapListRecordFromDetail(detail));
+        onUpdated(order.id, { ...order, status: detail.status });
         setOpen(false);
         setCancelOpen(false);
         setCancelReason("");

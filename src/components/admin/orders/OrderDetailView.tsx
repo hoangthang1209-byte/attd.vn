@@ -45,6 +45,8 @@ import OrderDeliveryExecutionSection from "@/components/admin/orders/OrderDelive
 import type { ProductionReadinessResult } from "@/features/orders/production-readiness.service";
 import type { HandoverReadinessResult } from "@/features/orders/handover-readiness.service";
 import type { CompletionReadinessResult } from "@/features/orders/delivery-fulfillment.service";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
+import { ORDER_FINANCIAL_DENIED_MESSAGE } from "@/features/auth/order-financial-permissions";
 
 type Props = { id: string };
 
@@ -77,6 +79,8 @@ function deliveryMethodDisplay(order: OrderDetailRecord): string {
 export default function OrderDetailView({ id }: Props) {
   const searchParams = useSearchParams();
   const mutate = useAdminMutation();
+  const { permissions } = useAdminPermissions();
+  const canViewFinancials = permissions.canViewFinancials;
   const listBackHref = useMemo(() => {
     if (searchParams.get("from") === "list") {
       const qs = searchParams.get("qs");
@@ -583,8 +587,9 @@ export default function OrderDetailView({ id }: Props) {
 
   const transitions = getAllowedOrderStatusTransitions(order.status);
   const correctionTargets = getOrderStatusCorrectionTargets(order.status);
-  const canRecordPayment = order.status !== "COMPLETED" && order.status !== "CANCELLED";
-  const canEditOrder = isOrderEditable(order.status);
+  const canRecordPayment =
+    canViewFinancials && order.status !== "COMPLETED" && order.status !== "CANCELLED";
+  const canEditOrder = canViewFinancials && isOrderEditable(order.status);
   const showDeliveryForm = order.status !== "SHIPPED" && order.status !== "COMPLETED" && order.status !== "CANCELLED";
 
   return (
@@ -598,8 +603,11 @@ export default function OrderDetailView({ id }: Props) {
           <OrderStatusBadge status={order.status} />
           <p className="admin-field-hint">
             Tạo lúc {formatOrderDateTime(order.createdAt)}
-            {order.sourceQuoteNo && order.quote && (
-              <> · Báo giá nguồn: <Link href={`/admin/quotes/${order.quote.id}`}>{order.sourceQuoteNo}</Link></>
+            {order.sourceQuoteNo && (
+              <> · Báo giá nguồn: {canViewFinancials && order.quote
+                ? <Link href={`/admin/quotes/${order.quote.id}`}>{order.sourceQuoteNo}</Link>
+                : order.sourceQuoteNo}
+              </>
             )}
             {order.customer && (
               <> · Khách hàng: <Link href={`/admin/crm/customers/${order.customer.id}`}>{order.customer.name}</Link></>
@@ -662,27 +670,35 @@ export default function OrderDetailView({ id }: Props) {
       </fieldset>
 
       <div className="admin-catalog-kpi-bar">
-        <div className="admin-catalog-kpi">
-          <strong>{formatOrderCurrency(order.financials.totalAmount, order.currency)}</strong>
-          <span>Tổng giá trị</span>
-        </div>
-        <div className="admin-catalog-kpi admin-catalog-kpi--ok">
-          <strong>{formatOrderCurrency(order.financials.paidAmount, order.currency)}</strong>
-          <span>Đã thanh toán</span>
-        </div>
-        <div className="admin-catalog-kpi">
-          <strong>{formatOrderCurrency(order.financials.outstandingAmount, order.currency)}</strong>
-          <span>Còn phải thu</span>
-        </div>
-        <div className="admin-catalog-kpi">
-          <strong>{ORDER_PAYMENT_STATE_LABELS[order.financials.paymentState]}</strong>
-          <span>Trạng thái thanh toán</span>
-        </div>
-        {order.financials.overpaidAmount > 0 && (
-          <div className="admin-catalog-kpi">
-            <strong>{formatOrderCurrency(order.financials.overpaidAmount, order.currency)}</strong>
-            <span>Thanh toán vượt</span>
-          </div>
+        {canViewFinancials && order.financials ? (
+          <>
+            <div className="admin-catalog-kpi">
+              <strong>{formatOrderCurrency(order.financials.totalAmount, order.currency)}</strong>
+              <span>Tổng giá trị</span>
+            </div>
+            <div className="admin-catalog-kpi admin-catalog-kpi--ok">
+              <strong>{formatOrderCurrency(order.financials.paidAmount, order.currency)}</strong>
+              <span>Đã thanh toán</span>
+            </div>
+            <div className="admin-catalog-kpi">
+              <strong>{formatOrderCurrency(order.financials.outstandingAmount, order.currency)}</strong>
+              <span>Còn phải thu</span>
+            </div>
+            <div className="admin-catalog-kpi">
+              <strong>{ORDER_PAYMENT_STATE_LABELS[order.financials.paymentState]}</strong>
+              <span>Trạng thái thanh toán</span>
+            </div>
+            {order.financials.overpaidAmount > 0 && (
+              <div className="admin-catalog-kpi">
+                <strong>{formatOrderCurrency(order.financials.overpaidAmount, order.currency)}</strong>
+                <span>Thanh toán vượt</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="admin-field-hint admin-message admin-message--info" style={{ margin: 0 }}>
+            {ORDER_FINANCIAL_DENIED_MESSAGE}
+          </p>
         )}
       </div>
 
@@ -693,7 +709,7 @@ export default function OrderDetailView({ id }: Props) {
             <h4 className="admin-subtitle">Khách hàng</h4>
             <p>{order.customerCompanyName ?? "—"}</p>
             {order.customerCode && <p className="admin-field-hint">Mã: {order.customerCode}</p>}
-            {order.customerTaxCode && <p className="admin-field-hint">MST: {order.customerTaxCode}</p>}
+            {canViewFinancials && order.customerTaxCode && <p className="admin-field-hint">MST: {order.customerTaxCode}</p>}
             {order.customerAddress && <p className="admin-field-hint">{order.customerAddress}</p>}
             {order.contactName && <p className="admin-field-hint">Liên hệ: {order.contactName}{order.contactTitle ? ` · ${order.contactTitle}` : ""}</p>}
             {order.contactPhone && <p className="admin-field-hint">SĐT: {order.contactPhone}</p>}
@@ -707,7 +723,7 @@ export default function OrderDetailView({ id }: Props) {
             <p className="admin-field-hint">Trạng thái: <strong>{ORDER_STATUS_LABELS[order.status]}</strong></p>
             {order.productionStartedAt && <p className="admin-field-hint">Ngày bắt đầu sản xuất: {formatOrderDateTime(order.productionStartedAt)}</p>}
             {order.readyToShipAt && <p className="admin-field-hint">Ngày sẵn sàng giao: {formatOrderDateTime(order.readyToShipAt)}</p>}
-            {order.sampleFee != null && order.sampleFee > 0 && (
+            {canViewFinancials && order.sampleFee != null && order.sampleFee > 0 && (
               <p className="admin-field-hint">Phí mẫu: {formatOrderCurrency(order.sampleFee, order.currency)}</p>
             )}
             {order.sampleLeadTime && <p className="admin-field-hint">Thời gian làm mẫu: {order.sampleLeadTime}</p>}
@@ -779,7 +795,7 @@ export default function OrderDetailView({ id }: Props) {
         </fieldset>
       )}
 
-      <OrderOrderedProductsSection order={order} />
+      <OrderOrderedProductsSection order={order} canViewFinancials={canViewFinancials} />
 
       <OrderProductionPackSection orderId={id} order={order} onOrderChange={setOrder} />
       <OrderProductionExecutionSection orderId={id} order={order} />
@@ -910,6 +926,7 @@ export default function OrderDetailView({ id }: Props) {
       />
 
 
+      {canViewFinancials && (
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
         <legend>Thanh toán</legend>
         {canRecordPayment && (
@@ -932,9 +949,9 @@ export default function OrderDetailView({ id }: Props) {
               </tr>
             </thead>
             <tbody>
-              {order.payments.length === 0 ? (
+              {(order.payments ?? []).length === 0 ? (
                 <tr><td colSpan={8}>Chưa có ghi nhận thanh toán</td></tr>
-              ) : order.payments.map((p) => (
+              ) : (order.payments ?? []).map((p) => (
                 <tr key={p.id}>
                   <td>{formatOrderDateTime(p.paidAt)}</td>
                   <td>{ORDER_PAYMENT_TYPE_LABELS[p.type]}</td>
@@ -963,6 +980,7 @@ export default function OrderDetailView({ id }: Props) {
           </table>
         </div>
       </fieldset>
+      )}
 
       <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
         <legend>Lịch sử / hoạt động</legend>

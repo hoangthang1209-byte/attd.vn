@@ -12,9 +12,10 @@ import OrderItemSizeMatrix from "@/components/admin/orders/OrderItemSizeMatrix";
 
 type Props = {
   order: OrderDetailRecord;
+  canViewFinancials?: boolean;
 };
 
-export default function OrderOrderedProductsSection({ order }: Props) {
+export default function OrderOrderedProductsSection({ order, canViewFinancials = true }: Props) {
   return (
     <fieldset className="admin-catalog-fieldset" id="ordered-products" style={{ marginTop: 16 }}>
       <legend>Sản phẩm đặt hàng</legend>
@@ -28,8 +29,12 @@ export default function OrderOrderedProductsSection({ order }: Props) {
               <th>Nhóm doanh thu</th>
               <th>Màu</th>
               <th className="order-item-size-matrix__qty">Tổng SL</th>
-              <th className="order-item-size-matrix__qty">Đơn giá</th>
-              <th className="order-item-size-matrix__qty">Thành tiền</th>
+              {canViewFinancials && (
+                <>
+                  <th className="order-item-size-matrix__qty">Đơn giá</th>
+                  <th className="order-item-size-matrix__qty">Thành tiền</th>
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -56,16 +61,20 @@ export default function OrderOrderedProductsSection({ order }: Props) {
                   <td className="order-item-size-matrix__qty">
                     {item.quantity} {item.unit}
                   </td>
-                  <td className="order-item-size-matrix__qty">
-                    {formatOrderCurrency(item.unitPrice, order.currency)}
-                  </td>
-                  <td className="order-item-size-matrix__qty">
-                    {formatOrderCurrency(item.lineTotal, order.currency)}
-                  </td>
+                  {canViewFinancials && (
+                    <>
+                      <td className="order-item-size-matrix__qty">
+                        {formatOrderCurrency(item.unitPrice, order.currency)}
+                      </td>
+                      <td className="order-item-size-matrix__qty">
+                        {formatOrderCurrency(item.lineTotal, order.currency)}
+                      </td>
+                    </>
+                  )}
                 </tr>
                 {item.variants.length > 0 && (
                   <tr key={`${item.id}-matrix`}>
-                    <td colSpan={8} className="order-ordered-products-table__matrix-cell">
+                    <td colSpan={canViewFinancials ? 8 : 6} className="order-ordered-products-table__matrix-cell">
                       <OrderItemSizeMatrix variants={item.variants} />
                     </td>
                   </tr>

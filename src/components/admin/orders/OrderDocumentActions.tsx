@@ -10,6 +10,7 @@ import {
   orderPdfDownloadUrl,
 } from "@/features/orders/pdf/open-order-pdf.client";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 
 const DOCUMENTS: Array<{
   type: OrderDocumentType;
@@ -47,13 +48,23 @@ type Props = {
 
 export default function OrderDocumentActions({ order }: Props) {
   const mutate = useAdminMutation();
+  const { permissions } = useAdminPermissions();
+
+  const visibleDocuments = useMemo(
+    () =>
+      DOCUMENTS.filter((doc) => {
+        if (doc.type === "production") return true;
+        return permissions.canViewFinancials;
+      }),
+    [permissions.canViewFinancials],
+  );
 
   const availability = useMemo(
     () =>
       Object.fromEntries(
-        DOCUMENTS.map((doc) => [doc.type, getOrderDocumentAvailability(doc.type, order)]),
+        visibleDocuments.map((doc) => [doc.type, getOrderDocumentAvailability(doc.type, order)]),
       ) as Record<OrderDocumentType, ReturnType<typeof getOrderDocumentAvailability>>,
-    [order],
+    [order, visibleDocuments],
   );
 
   async function downloadPdf(docType: OrderDocumentType, label: string) {
@@ -91,7 +102,7 @@ export default function OrderDocumentActions({ order }: Props) {
     <fieldset className="admin-catalog-fieldset order-document-actions">
       <legend>Chứng từ đơn hàng</legend>
       <div className="order-document-actions__groups">
-        {DOCUMENTS.map((doc) => {
+        {visibleDocuments.map((doc) => {
           const state = availability[doc.type];
           return (
             <div key={doc.type} className="order-document-actions__group">

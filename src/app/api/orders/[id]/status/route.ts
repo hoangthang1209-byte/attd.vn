@@ -5,6 +5,8 @@ import {
   updateOrderStatus,
 } from "@/features/orders/order.service";
 import { HandoverValidationError, ShippedValidationError, CompletionValidationError } from "@/features/orders/production-quantity";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
+import { jsonOrderDetailResponse } from "@/lib/admin-auth/order-api-response";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
   try {
     const order = await updateOrderStatus(id, parseUpdateOrderStatusBody(body as Record<string, unknown>));
-    return NextResponse.json({ order });
+    return jsonOrderDetailResponse(order, getAdminSessionFromRequest(req));
   } catch (err) {
     if (err instanceof HandoverValidationError) {
       return NextResponse.json(

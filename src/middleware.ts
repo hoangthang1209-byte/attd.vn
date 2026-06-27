@@ -8,6 +8,12 @@ import {
   shouldBypassAdminPageForProductionSheetPdf,
 } from "@/lib/admin-auth/middleware-utils";
 import { isRequestAdminAuthenticatedEdge } from "@/lib/admin-auth/session-edge";
+import { getAdminSessionFromRequestEdge } from "@/lib/admin-auth/get-admin-session-edge";
+import { assertFinancialRouteAccess, logFinancialAccessDenied } from "@/lib/admin-auth/financial-access";
+import {
+  canViewOrderFinancials,
+  FINANCIAL_ROUTE_DENIED_MESSAGE,
+} from "@/features/auth/order-financial-permissions";
 import { parseQuotePublicLinkSegment } from "@/features/quotes/quote-public-link.shared";
 
 function tryQuotePublicLinkRewrite(request: NextRequest): NextResponse | null {
@@ -43,6 +49,15 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);
     }
+
+    const session = await getAdminSessionFromRequestEdge(request);
+    if (!assertFinancialRouteAccess(session, pathname)) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/admin/orders";
+      redirectUrl.search = `?forbidden=${encodeURIComponent(FINANCIAL_ROUTE_DENIED_MESSAGE)}`;
+      return NextResponse.redirect(redirectUrl);
+    }
+
     return NextResponse.next();
   }
 
@@ -67,7 +82,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
+  if (shouldProtectApiRoute(request) && authenticated && isFinancialApiRoute(pathname)) {
+    const session = await getAdminSessionFromRequestEdge(request);
+    if (!canViewOrderFinancials(session)) {
+      logFinancialAccessDenied({ user: session, route: pathname, action: "api_forbidden" });
+      return NextResponse.json({ message: FINANCIAL_ROUTE_DENIED_MESSAGE }, { status: 403 });
+    }
+  }
+
   return NextResponse.next();
+}
+
+function isFinancialApiRoute(pathname: string): boolean {
+  if (pathname.startsWith("/api/quotes/public/")) return false;
+  if (pathname === "/api/quotes" || pathname.startsWith("/api/quotes/")) return true;
+  if (pathname === "/api/pricing" || pathname.startsWith("/api/pricing/")) return true;
+  if (/\/api\/orders\/[^/]+\/payments(?:\/|$)/.test(pathname)) return true;
+  return false;
 }
 
 export const config = {
@@ -95,6 +126,10 @@ export const config = {
     "/api/variants/:path*",
     "/api/orders",
     "/api/orders/:path*",
+    "/api/quotes",
+    "/api/quotes/:path*",
+    "/api/pricing",
+    "/api/pricing/:path*",
     "/api/materials",
     "/api/materials/:path*",
     "/api/purchase-requests",

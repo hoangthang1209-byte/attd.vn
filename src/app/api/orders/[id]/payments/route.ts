@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseRecordOrderPaymentBody } from "@/features/orders/order-input";
+import { shapeOrderDetailResponse } from "@/features/orders/order-financial-redact";
 import {
   OrderValidationError,
   recordOrderPayment,
 } from "@/features/orders/order.service";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
+import { assertFinancialApiAccess } from "@/lib/admin-auth/financial-access";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
+  const session = getAdminSessionFromRequest(req);
+  const forbidden = assertFinancialApiAccess(session, "POST /api/orders/[id]/payments");
+  if (forbidden) return forbidden;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -24,7 +31,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
       id,
       parseRecordOrderPaymentBody(body as Record<string, unknown>),
     );
-    return NextResponse.json({ order }, { status: 201 });
+    return NextResponse.json(shapeOrderDetailResponse(order, true), { status: 201 });
   } catch (err) {
     if (err instanceof OrderValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });

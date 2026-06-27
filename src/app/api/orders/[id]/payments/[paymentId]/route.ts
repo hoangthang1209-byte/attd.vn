@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseEditOrderPaymentBody } from "@/features/orders/order-input";
+import { shapeOrderDetailResponse } from "@/features/orders/order-financial-redact";
 import {
   editOrderPayment,
   OrderValidationError,
 } from "@/features/orders/order.service";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
+import { assertFinancialApiAccess } from "@/lib/admin-auth/financial-access";
+import { canViewOrderFinancials } from "@/features/auth/order-financial-permissions";
 
 type RouteContext = { params: Promise<{ id: string; paymentId: string }> };
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   const { id, paymentId } = await context.params;
+  const session = getAdminSessionFromRequest(req);
+  const forbidden = assertFinancialApiAccess(session, "PATCH /api/orders/[id]/payments/[paymentId]");
+  if (forbidden) return forbidden;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -25,7 +33,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       paymentId,
       parseEditOrderPaymentBody(body as Record<string, unknown>),
     );
-    return NextResponse.json({ order });
+    return NextResponse.json(shapeOrderDetailResponse(order, canViewOrderFinancials(session)));
   } catch (err) {
     if (err instanceof OrderValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });

@@ -2,15 +2,24 @@
 
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import AdminScrollRestoration from "@/components/admin/AdminScrollRestoration";
 import { AdminTitleProvider, useAdminTitle } from "@/components/admin/AdminTitleContext";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 
-const NAV_GROUPS = [
+type NavItem = { href: string; label: string; financial?: boolean };
+
+type NavGroup = {
+  label: string | null;
+  items: NavItem[];
+  financial?: boolean;
+};
+
+const NAV_GROUPS: NavGroup[] = [
   {
-    label: null as string | null,
+    label: null,
     items: [{ href: "/admin/dashboard", label: "Tổng quan" }],
   },
   {
@@ -48,14 +57,15 @@ const NAV_GROUPS = [
       { href: "/admin/crm", label: "CRM" },
       { href: "/admin/crm/leads", label: "Lead" },
       { href: "/admin/crm/customers", label: "Khách hàng" },
-      { href: "/admin/crm/revenue-categories", label: "Nhóm doanh thu" },
+      { href: "/admin/crm/revenue-categories", label: "Nhóm doanh thu", financial: true },
     ],
   },
   {
     label: "Báo giá",
+    financial: true,
     items: [
-      { href: "/admin/quotes", label: "Danh sách báo giá" },
-      { href: "/admin/quotes/new", label: "Tạo báo giá" },
+      { href: "/admin/quotes", label: "Danh sách báo giá", financial: true },
+      { href: "/admin/quotes/new", label: "Tạo báo giá", financial: true },
     ],
   },
   {
@@ -81,13 +91,14 @@ const NAV_GROUPS = [
   },
   {
     label: "Tính giá",
+    financial: true,
     items: [
-      { href: "/admin/pricing", label: "Tổng quan" },
-      { href: "/admin/pricing/calculator", label: "Bộ tính giá" },
-      { href: "/admin/pricing/price-groups", label: "Nhóm giá" },
-      { href: "/admin/pricing/product-tiers", label: "Bảng giá sản phẩm" },
-      { href: "/admin/pricing/service-rules", label: "Phí dịch vụ" },
-      { href: "/admin/pricing/history", label: "Lịch sử tính giá" },
+      { href: "/admin/pricing", label: "Tổng quan", financial: true },
+      { href: "/admin/pricing/calculator", label: "Bộ tính giá", financial: true },
+      { href: "/admin/pricing/price-groups", label: "Nhóm giá", financial: true },
+      { href: "/admin/pricing/product-tiers", label: "Bảng giá sản phẩm", financial: true },
+      { href: "/admin/pricing/service-rules", label: "Phí dịch vụ", financial: true },
+      { href: "/admin/pricing/history", label: "Lịch sử tính giá", financial: true },
     ],
   },
   {
@@ -137,10 +148,23 @@ function isNavItemActive(
 function AdminShellNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { permissions } = useAdminPermissions();
+
+  const visibleGroups = useMemo(() => {
+    return NAV_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (!permissions.canViewFinancials && (group.financial || item.financial)) {
+          return false;
+        }
+        return true;
+      }),
+    })).filter((group) => group.items.length > 0);
+  }, [permissions.canViewFinancials]);
 
   return (
     <nav className="admin-nav">
-      {NAV_GROUPS.map((group) => (
+      {visibleGroups.map((group) => (
         <div key={group.label ?? "root"} className="admin-nav-group">
           {group.label && <p className="admin-nav-group-label">{group.label}</p>}
           {group.items.map((item) => {

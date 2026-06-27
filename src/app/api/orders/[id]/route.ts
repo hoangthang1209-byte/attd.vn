@@ -1,22 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canViewOrderFinancials } from "@/features/auth/order-financial-permissions";
 import { parseUpdateOrderBody } from "@/features/orders/order-input";
+import { shapeOrderDetailResponse } from "@/features/orders/order-financial-redact";
 import { EmployeeValidationError } from "@/features/employees/employee.service";
 import {
   getOrderDetail,
   OrderValidationError,
   updateOrderDetails,
 } from "@/features/orders/order.service";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
+import { assertFinancialApiAccess } from "@/lib/admin-auth/financial-access";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
+  const session = getAdminSessionFromRequest(req);
   try {
     const order = await getOrderDetail(id);
     if (!order) {
       return NextResponse.json({ message: "Không tìm thấy đơn hàng" }, { status: 404 });
     }
-    return NextResponse.json({ order });
+    const shaped = shapeOrderDetailResponse(order, canViewOrderFinancials(session));
+    return NextResponse.json(shaped);
   } catch (err) {
     console.error("[GET /api/orders/[id]]", err);
     return NextResponse.json({ message: "Không thể tải đơn hàng" }, { status: 500 });
@@ -25,6 +31,10 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
+  const session = getAdminSessionFromRequest(req);
+  const forbidden = assertFinancialApiAccess(session, "PATCH /api/orders/[id]");
+  if (forbidden) return forbidden;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -37,7 +47,8 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
   try {
     const order = await updateOrderDetails(id, parseUpdateOrderBody(body as Record<string, unknown>));
-    return NextResponse.json({ order });
+    const shaped = shapeOrderDetailResponse(order, true);
+    return NextResponse.json(shaped);
   } catch (err) {
     if (err instanceof OrderValidationError || err instanceof EmployeeValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });

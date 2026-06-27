@@ -1,4 +1,5 @@
 export const ADMIN_SESSION_COOKIE = "attd_admin_session";
+export const ADMIN_STAFF_SESSION_COOKIE = "attd_admin_staff_session";
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 export const ADMIN_LOGIN_PATH = "/admin/login";
