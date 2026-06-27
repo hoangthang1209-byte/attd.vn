@@ -1,35 +1,71 @@
 import type { NextRequest } from "next/server";
-import type { AdminSessionUser } from "@/features/auth/order-financial-permissions";
+import type { AdminSessionUser } from "@/features/auth/admin-session.types";
+import {
+  createAnonymousSession,
+  createOwnerSession,
+  grantsToPermissionMap,
+} from "@/features/auth/admin-session.types";
 import {
   getSessionTokenFromCookies,
   getSessionTokenFromRequest,
   verifyAdminSessionCookie,
 } from "@/lib/admin-auth/session-node";
 import {
-  getStaffSessionFromCookies,
-  getStaffSessionFromRequest,
+  getAdminSessionPayloadFromCookies,
+  getAdminSessionPayloadFromRequest,
 } from "@/lib/admin-auth/staff-session-node";
+import { isAdminSessionPayloadV2 } from "@/lib/admin-auth/admin-session.shared";
 
-function toAdminSessionUser(
+function payloadToSession(
   authenticated: boolean,
-  staff: Awaited<ReturnType<typeof getStaffSessionFromCookies>>,
+  payload: Awaited<ReturnType<typeof getAdminSessionPayloadFromCookies>>,
 ): AdminSessionUser {
+  if (!authenticated) return createAnonymousSession();
+
+  if (!payload) {
+    return createOwnerSession();
+  }
+
+  if (!isAdminSessionPayloadV2(payload)) {
+    return {
+      authenticated: true,
+      mode: "legacy",
+      userId: null,
+      username: null,
+      employeeId: payload.employeeId,
+      roleId: null,
+      roleCode: payload.role,
+      legacyEmployeeRole: payload.role,
+      permissions: new Map(),
+    };
+  }
+
+  if (payload.mode === "owner") {
+    return createOwnerSession();
+  }
+
   return {
-    authenticated,
-    employeeId: staff?.employeeId ?? null,
-    role: staff?.role ?? null,
+    authenticated: true,
+    mode: payload.mode,
+    userId: payload.userId,
+    username: payload.username,
+    employeeId: payload.employeeId,
+    roleId: payload.roleId,
+    roleCode: payload.roleCode,
+    legacyEmployeeRole: payload.legacyEmployeeRole,
+    permissions: grantsToPermissionMap(payload.permissions),
   };
 }
 
 export async function getAdminSessionFromCookies(): Promise<AdminSessionUser> {
   const token = await getSessionTokenFromCookies();
   const authenticated = verifyAdminSessionCookie(token);
-  const staff = authenticated ? await getStaffSessionFromCookies() : null;
-  return toAdminSessionUser(authenticated, staff);
+  const payload = authenticated ? await getAdminSessionPayloadFromCookies() : null;
+  return payloadToSession(authenticated, payload);
 }
 
 export function getAdminSessionFromRequest(request: NextRequest): AdminSessionUser {
   const authenticated = verifyAdminSessionCookie(getSessionTokenFromRequest(request));
-  const staff = authenticated ? getStaffSessionFromRequest(request) : null;
-  return toAdminSessionUser(authenticated, staff);
+  const payload = authenticated ? getAdminSessionPayloadFromRequest(request) : null;
+  return payloadToSession(authenticated, payload);
 }

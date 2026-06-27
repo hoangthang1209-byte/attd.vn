@@ -10,10 +10,8 @@ import {
 import { isRequestAdminAuthenticatedEdge } from "@/lib/admin-auth/session-edge";
 import { getAdminSessionFromRequestEdge } from "@/lib/admin-auth/get-admin-session-edge";
 import { assertFinancialRouteAccess, logFinancialAccessDenied } from "@/lib/admin-auth/financial-access";
-import {
-  canViewOrderFinancials,
-  FINANCIAL_ROUTE_DENIED_MESSAGE,
-} from "@/features/auth/order-financial-permissions";
+import { can } from "@/features/auth/admin-permissions";
+import { FINANCIAL_ROUTE_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 import { parseQuotePublicLinkSegment } from "@/features/quotes/quote-public-link.shared";
 
 function tryQuotePublicLinkRewrite(request: NextRequest): NextResponse | null {
@@ -84,7 +82,8 @@ export async function middleware(request: NextRequest) {
 
   if (shouldProtectApiRoute(request) && authenticated && isFinancialApiRoute(pathname)) {
     const session = await getAdminSessionFromRequestEdge(request);
-    if (!canViewOrderFinancials(session)) {
+    const required = requiredPermissionForFinancialApi(pathname);
+    if (required && !can(session, required)) {
       logFinancialAccessDenied({ user: session, route: pathname, action: "api_forbidden" });
       return NextResponse.json({ message: FINANCIAL_ROUTE_DENIED_MESSAGE }, { status: 403 });
     }
@@ -99,6 +98,13 @@ function isFinancialApiRoute(pathname: string): boolean {
   if (pathname === "/api/pricing" || pathname.startsWith("/api/pricing/")) return true;
   if (/\/api\/orders\/[^/]+\/payments(?:\/|$)/.test(pathname)) return true;
   return false;
+}
+
+function requiredPermissionForFinancialApi(pathname: string): string | null {
+  if (pathname.startsWith("/api/quotes")) return "quotes.view";
+  if (pathname.startsWith("/api/pricing")) return "pricing.manage";
+  if (pathname.includes("/payments")) return "payments.manage";
+  return null;
 }
 
 export const config = {

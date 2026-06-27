@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { OrderStatus } from "@prisma/client";
 import type { OrderPaymentStateFilter } from "@/features/orders/order-labels";
-import { canViewOrderFinancials } from "@/features/auth/order-financial-permissions";
+import { canViewOrderFinancials, can } from "@/features/auth/admin-permissions";
+import { buildScopedOrderWhere, canAccessOrderRecord } from "@/features/auth/order-scope";
+import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 import { parseCreateManualOrderBody } from "@/features/orders/order-input";
 import { shapeOrderListResponse } from "@/features/orders/order-financial-redact";
 import { EmployeeValidationError } from "@/features/employees/employee.service";
@@ -15,6 +17,10 @@ import {
 
 export async function GET(req: NextRequest) {
   const session = getAdminSessionFromRequest(req);
+  if (!can(session, "orders.view")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
+
   const { searchParams } = new URL(req.url);
   const paymentState = searchParams.get("paymentState");
   try {
@@ -28,7 +34,7 @@ export async function GET(req: NextRequest) {
       leadId: searchParams.get("leadId") ?? undefined,
       page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
       pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : 50,
-    });
+    }, buildScopedOrderWhere(session, "orders.view"));
     const canViewFinancials = canViewOrderFinancials(session);
     const shaped = shapeOrderListResponse(result.orders, canViewFinancials);
     return NextResponse.json({
@@ -46,6 +52,9 @@ export async function POST(req: NextRequest) {
   const session = getAdminSessionFromRequest(req);
   const forbidden = assertFinancialApiAccess(session, "POST /api/orders");
   if (forbidden) return forbidden;
+  if (!can(session, "orders.create")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
 
   let body: unknown;
   try {

@@ -1,16 +1,19 @@
 import type { NextRequest } from "next/server";
-import type { AdminSessionUser } from "@/features/auth/order-financial-permissions";
+import type { AdminSessionUser } from "@/features/auth/admin-session.types";
 import {
-  ADMIN_SESSION_MESSAGE,
-  getAdminSessionSecret,
-  verifyAdminSessionToken,
-} from "@/lib/admin-auth/config";
-import { ADMIN_SESSION_COOKIE, ADMIN_STAFF_SESSION_COOKIE } from "@/lib/admin-auth/constants";
-import { verifyStaffSessionTokenEdge } from "@/lib/admin-auth/staff-session-edge";
+  createAnonymousSession,
+  createOwnerSession,
+  grantsToPermissionMap,
+} from "@/features/auth/admin-session.types";
+import { verifyAdminSessionToken, getAdminSessionSecret, ADMIN_SESSION_MESSAGE } from "@/lib/admin-auth/config";
+import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth/constants";
+import { getAdminSessionPayloadFromRequestEdge } from "@/lib/admin-auth/staff-session-edge";
+import { isAdminSessionPayloadV2 } from "@/lib/admin-auth/admin-session.shared";
 
-async function getExpectedAdminSessionTokenEdge(): Promise<string | null> {
+async function isAuthenticatedEdge(request: NextRequest): Promise<boolean> {
+  const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   const secret = getAdminSessionSecret();
-  if (!secret) return null;
+  if (!secret) return false;
 
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -21,24 +24,52 @@ async function getExpectedAdminSessionTokenEdge(): Promise<string | null> {
     ["sign"],
   );
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(ADMIN_SESSION_MESSAGE));
-  return Array.from(new Uint8Array(signature))
+  const expected = Array.from(new Uint8Array(signature))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+  return verifyAdminSessionToken(token, expected);
+}
+
+function payloadToSession(
+  authenticated: boolean,
+  payload: Awaited<ReturnType<typeof getAdminSessionPayloadFromRequestEdge>>,
+): AdminSessionUser {
+  if (!authenticated) return createAnonymousSession();
+  if (!payload) return createOwnerSession();
+
+  if (!isAdminSessionPayloadV2(payload)) {
+    return {
+      authenticated: true,
+      mode: "legacy",
+      userId: null,
+      username: null,
+      employeeId: payload.employeeId,
+      roleId: null,
+      roleCode: payload.role,
+      legacyEmployeeRole: payload.role,
+      permissions: new Map(),
+    };
+  }
+
+  if (payload.mode === "owner") return createOwnerSession();
+
+  return {
+    authenticated: true,
+    mode: payload.mode,
+    userId: payload.userId,
+    username: payload.username,
+    employeeId: payload.employeeId,
+    roleId: payload.roleId,
+    roleCode: payload.roleCode,
+    legacyEmployeeRole: payload.legacyEmployeeRole,
+    permissions: grantsToPermissionMap(payload.permissions),
+  };
 }
 
 export async function getAdminSessionFromRequestEdge(
   request: NextRequest,
 ): Promise<AdminSessionUser> {
-  const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  const expected = await getExpectedAdminSessionTokenEdge();
-  const authenticated = verifyAdminSessionToken(token, expected);
-  const staff = authenticated
-    ? await verifyStaffSessionTokenEdge(request.cookies.get(ADMIN_STAFF_SESSION_COOKIE)?.value)
-    : null;
-
-  return {
-    authenticated,
-    employeeId: staff?.employeeId ?? null,
-    role: staff?.role ?? null,
-  };
+  const authenticated = await isAuthenticatedEdge(request);
+  const payload = authenticated ? await getAdminSessionPayloadFromRequestEdge(request) : null;
+  return payloadToSession(authenticated, payload);
 }

@@ -1,0 +1,244 @@
+import type { PermissionScope } from "@prisma/client";
+
+export type SystemRoleSeed = {
+  code: string;
+  name: string;
+  description: string;
+  sortOrder: number;
+  grants: Array<{ permissionCode: string; scope: PermissionScope }>;
+};
+
+const ALL_CODES = [
+  "dashboard.view",
+  "crm.view",
+  "customers.view",
+  "customers.create",
+  "customers.update",
+  "leads.view",
+  "leads.create",
+  "leads.update",
+  "quotes.view",
+  "quotes.create",
+  "quotes.update",
+  "pricing.manage",
+  "orders.view",
+  "orders.create",
+  "orders.update",
+  "orders.delete",
+  "orders.assign",
+  "orders.view_financials",
+  "production.view",
+  "production.update",
+  "qc.update",
+  "warehouse.view",
+  "warehouse.adjust",
+  "purchasing.view",
+  "delivery.view",
+  "delivery.update",
+  "payments.view",
+  "payments.manage",
+  "media.view",
+  "media.manage",
+  "products.view",
+  "products.manage",
+  "categories.manage",
+  "revenue_categories.manage",
+  "employees.manage",
+  "roles_permissions.manage",
+  "users.manage",
+  "cms.manage",
+  "reports.view",
+  "settings.manage",
+] as const;
+
+function allGrants(scope: PermissionScope = "ALL") {
+  return ALL_CODES.map((permissionCode) => ({ permissionCode, scope }));
+}
+
+function grants(
+  entries: Array<{ permissionCode: (typeof ALL_CODES)[number]; scope: PermissionScope }>,
+) {
+  return entries;
+}
+
+export const SYSTEM_ROLE_SEEDS: SystemRoleSeed[] = [
+  {
+    code: "OWNER",
+    name: "Chủ hệ thống",
+    description: "Toàn quyền hệ thống",
+    sortOrder: 10,
+    grants: allGrants("ALL"),
+  },
+  {
+    code: "ADMIN",
+    name: "Quản trị viên",
+    description: "Quản trị vận hành và cấu hình",
+    sortOrder: 20,
+    grants: allGrants("ALL"),
+  },
+  {
+    code: "SALES_MANAGER",
+    name: "Quản lý kinh doanh",
+    description: "Quản lý CRM, báo giá, đơn hàng và báo cáo",
+    sortOrder: 30,
+    grants: grants([
+      { permissionCode: "dashboard.view", scope: "ALL" },
+      { permissionCode: "crm.view", scope: "ALL" },
+      { permissionCode: "customers.view", scope: "ALL" },
+      { permissionCode: "customers.create", scope: "ALL" },
+      { permissionCode: "customers.update", scope: "ALL" },
+      { permissionCode: "leads.view", scope: "ALL" },
+      { permissionCode: "leads.create", scope: "ALL" },
+      { permissionCode: "leads.update", scope: "ALL" },
+      { permissionCode: "quotes.view", scope: "ALL" },
+      { permissionCode: "quotes.create", scope: "ALL" },
+      { permissionCode: "quotes.update", scope: "ALL" },
+      { permissionCode: "orders.view", scope: "ALL" },
+      { permissionCode: "orders.create", scope: "ALL" },
+      { permissionCode: "orders.update", scope: "ALL" },
+      { permissionCode: "orders.assign", scope: "ALL" },
+      { permissionCode: "orders.view_financials", scope: "ALL" },
+      { permissionCode: "payments.view", scope: "ALL" },
+      { permissionCode: "payments.manage", scope: "ALL" },
+      { permissionCode: "reports.view", scope: "ALL" },
+      { permissionCode: "production.view", scope: "ALL" },
+      { permissionCode: "delivery.view", scope: "ALL" },
+    ]),
+  },
+  {
+    code: "SALES",
+    name: "Nhân viên kinh doanh",
+    description: "CRM, báo giá và đơn hàng của bản thân",
+    sortOrder: 40,
+    grants: grants([
+      { permissionCode: "dashboard.view", scope: "ALL" },
+      { permissionCode: "crm.view", scope: "OWN" },
+      { permissionCode: "customers.view", scope: "OWN" },
+      { permissionCode: "customers.create", scope: "ALL" },
+      { permissionCode: "customers.update", scope: "OWN" },
+      { permissionCode: "leads.view", scope: "OWN" },
+      { permissionCode: "leads.create", scope: "ALL" },
+      { permissionCode: "leads.update", scope: "OWN" },
+      { permissionCode: "quotes.view", scope: "OWN" },
+      { permissionCode: "quotes.create", scope: "ALL" },
+      { permissionCode: "quotes.update", scope: "OWN" },
+      { permissionCode: "orders.view", scope: "OWN" },
+      { permissionCode: "orders.create", scope: "ALL" },
+      { permissionCode: "orders.update", scope: "OWN" },
+      { permissionCode: "orders.view_financials", scope: "OWN" },
+      { permissionCode: "payments.view", scope: "OWN" },
+      { permissionCode: "production.view", scope: "OWN" },
+      { permissionCode: "delivery.view", scope: "OWN" },
+    ]),
+  },
+  {
+    code: "PRODUCTION_MANAGER",
+    name: "Quản lý sản xuất",
+    description: "Điều phối sản xuất, QC và phân công",
+    sortOrder: 50,
+    grants: grants([
+      { permissionCode: "dashboard.view", scope: "ALL" },
+      { permissionCode: "orders.view", scope: "ALL" },
+      { permissionCode: "orders.assign", scope: "ALL" },
+      { permissionCode: "production.view", scope: "ALL" },
+      { permissionCode: "production.update", scope: "ALL" },
+      { permissionCode: "qc.update", scope: "ALL" },
+      { permissionCode: "warehouse.view", scope: "ALL" },
+      { permissionCode: "purchasing.view", scope: "ALL" },
+      { permissionCode: "delivery.view", scope: "ALL" },
+      { permissionCode: "media.view", scope: "ALL" },
+    ]),
+  },
+  {
+    code: "PRODUCTION",
+    name: "Nhân viên sản xuất",
+    description: "Sản xuất và QC trên đơn được phân công",
+    sortOrder: 60,
+    grants: grants([
+      { permissionCode: "dashboard.view", scope: "ALL" },
+      { permissionCode: "orders.view", scope: "ASSIGNED" },
+      { permissionCode: "production.view", scope: "ASSIGNED" },
+      { permissionCode: "production.update", scope: "ASSIGNED" },
+      { permissionCode: "qc.update", scope: "ASSIGNED" },
+      { permissionCode: "warehouse.view", scope: "ASSIGNED" },
+      { permissionCode: "media.view", scope: "ALL" },
+    ]),
+  },
+  {
+    code: "WAREHOUSE",
+    name: "Kho",
+    description: "Vận hành kho và vật tư",
+    sortOrder: 70,
+    grants: grants([
+      { permissionCode: "dashboard.view", scope: "ALL" },
+      { permissionCode: "orders.view", scope: "ALL" },
+      { permissionCode: "warehouse.view", scope: "ALL" },
+      { permissionCode: "warehouse.adjust", scope: "ALL" },
+      { permissionCode: "purchasing.view", scope: "ALL" },
+      { permissionCode: "production.view", scope: "ALL" },
+    ]),
+  },
+  {
+    code: "DELIVERY",
+    name: "Giao hàng",
+    description: "Giao hàng trên đơn được phân công",
+    sortOrder: 80,
+    grants: grants([
+      { permissionCode: "dashboard.view", scope: "ALL" },
+      { permissionCode: "orders.view", scope: "ASSIGNED" },
+      { permissionCode: "delivery.view", scope: "ASSIGNED" },
+      { permissionCode: "delivery.update", scope: "ASSIGNED" },
+      { permissionCode: "production.view", scope: "ASSIGNED" },
+    ]),
+  },
+  {
+    code: "ACCOUNTING",
+    name: "Kế toán",
+    description: "Thanh toán và thông tin tài chính đơn hàng",
+    sortOrder: 90,
+    grants: grants([
+      { permissionCode: "dashboard.view", scope: "ALL" },
+      { permissionCode: "orders.view", scope: "ALL" },
+      { permissionCode: "orders.view_financials", scope: "ALL" },
+      { permissionCode: "payments.view", scope: "ALL" },
+      { permissionCode: "payments.manage", scope: "ALL" },
+      { permissionCode: "reports.view", scope: "ALL" },
+      { permissionCode: "customers.view", scope: "ALL" },
+    ]),
+  },
+  {
+    code: "CMS_ADMIN",
+    name: "Quản trị nội dung",
+    description: "Sản phẩm, media và nội dung website",
+    sortOrder: 100,
+    grants: grants([
+      { permissionCode: "dashboard.view", scope: "ALL" },
+      { permissionCode: "products.view", scope: "ALL" },
+      { permissionCode: "products.manage", scope: "ALL" },
+      { permissionCode: "categories.manage", scope: "ALL" },
+      { permissionCode: "media.view", scope: "ALL" },
+      { permissionCode: "media.manage", scope: "ALL" },
+      { permissionCode: "cms.manage", scope: "ALL" },
+    ]),
+  },
+  {
+    code: "VIEWER",
+    name: "Chỉ xem",
+    description: "Xem dữ liệu được cấp quyền",
+    sortOrder: 110,
+    grants: grants([
+      { permissionCode: "dashboard.view", scope: "ALL" },
+      { permissionCode: "orders.view", scope: "ALL" },
+      { permissionCode: "production.view", scope: "ALL" },
+    ]),
+  },
+];
+
+/** Map legacy EmployeeRole to default AdminRole code when auto-linking. */
+export const EMPLOYEE_ROLE_TO_ADMIN_ROLE_CODE: Record<string, string> = {
+  SALES: "SALES",
+  PRODUCTION: "PRODUCTION",
+  DELIVERY: "DELIVERY",
+  ADMIN: "ADMIN",
+  OTHER: "VIEWER",
+};

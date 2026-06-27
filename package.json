@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^20",
     "@types/pdfkit": "^0.17.6",
     "@types/react": "^19",

@@ -312,7 +312,8 @@ export async function getOrderDetailByOrderNo(
   return mapOrderDetail(row);
 }
 
-export async function listOrders(params?: {
+export async function listOrders(
+  params?: {
   search?: string;
   status?: OrderStatus;
   paymentState?: OrderPaymentStateFilter;
@@ -320,28 +321,35 @@ export async function listOrders(params?: {
   leadId?: string;
   page?: number;
   pageSize?: number;
-}) {
+},
+  scopeWhere?: Prisma.OrderWhereInput,
+) {
   const page = Math.max(params?.page ?? 1, 1);
   const pageSize = Math.min(Math.max(params?.pageSize ?? 50, 1), 100);
   const search = params?.search?.trim();
 
   const rows = await prisma.order.findMany({
     where: {
-      status: params?.status,
-      customerId: params?.customerId,
-      ...(params?.leadId
-        ? { quote: { leadId: params.leadId } }
-        : {}),
-      ...(search
-        ? {
-            OR: [
-              { orderNo: { contains: search, mode: "insensitive" } },
-              { sourceQuoteNo: { contains: search, mode: "insensitive" } },
-              { customerCompanyName: { contains: search, mode: "insensitive" } },
-              { contactName: { contains: search, mode: "insensitive" } },
-            ],
-          }
-        : {}),
+      AND: [
+        {
+          status: params?.status,
+          customerId: params?.customerId,
+          ...(params?.leadId
+            ? { quote: { leadId: params.leadId } }
+            : {}),
+          ...(search
+            ? {
+                OR: [
+                  { orderNo: { contains: search, mode: "insensitive" } },
+                  { sourceQuoteNo: { contains: search, mode: "insensitive" } },
+                  { customerCompanyName: { contains: search, mode: "insensitive" } },
+                  { contactName: { contains: search, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+        scopeWhere ?? {},
+      ],
     },
     include: {
       payments: true,

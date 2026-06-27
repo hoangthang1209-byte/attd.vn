@@ -2,20 +2,17 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import type { EmployeeRecord } from "@/features/employees/employee.service";
-import { employeeRoleLabel } from "@/features/employees/employee-role";
 
 type AdminLoginFormProps = {
   configWarning?: string | null;
-  employees: EmployeeRecord[];
 };
 
-function AdminLoginFormInner({ configWarning, employees }: AdminLoginFormProps) {
+function AdminLoginFormInner({ configWarning }: AdminLoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") || "/admin/dashboard";
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [employeeId, setEmployeeId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -29,8 +26,8 @@ function AdminLoginFormInner({ configWarning, employees }: AdminLoginFormProps) 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          username: username.trim() || undefined,
           password,
-          employeeId: employeeId || null,
         }),
       });
       const data = await res.json();
@@ -57,30 +54,25 @@ function AdminLoginFormInner({ configWarning, employees }: AdminLoginFormProps) 
 
         <form className="admin-login-form" onSubmit={(e) => void handleSubmit(e)}>
           <div className="admin-field">
-            <label className="admin-label" htmlFor="admin-employee">
-              Nhân viên (tuỳ chọn)
+            <label className="admin-label" htmlFor="admin-username">
+              Tên đăng nhập
             </label>
-            <select
-              id="admin-employee"
+            <input
+              id="admin-username"
+              type="text"
               className="admin-input"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-            >
-              <option value="">Quản trị / toàn quyền</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.fullName}
-                  {employee.role ? ` · ${employeeRoleLabel(employee.role)}` : ""}
-                </option>
-              ))}
-            </select>
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Để trống nếu đăng nhập quản trị"
+            />
             <p className="admin-field-hint">
-              Chọn nhân viên sản xuất để ẩn thông tin tài chính. Bỏ trống nếu đăng nhập quản trị.
+              Nhân viên dùng tài khoản cá nhân. Để trống tên đăng nhập và chỉ nhập mật khẩu quản trị để đăng nhập toàn quyền.
             </p>
           </div>
           <div className="admin-field">
             <label className="admin-label" htmlFor="admin-password">
-              Mật khẩu admin
+              Mật khẩu
             </label>
             <input
               id="admin-password"

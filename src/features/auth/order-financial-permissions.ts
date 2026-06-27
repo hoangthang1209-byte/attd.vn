@@ -1,42 +1,17 @@
-import type { EmployeeRole } from "@prisma/client";
+/**
+ * Backward-compatible re-exports — prefer @/features/auth/admin-permissions and admin-session.types.
+ */
+import type { AdminSessionUser } from "@/features/auth/admin-session.types";
+import { can, canViewOrderFinancials as canViewFinancials } from "@/features/auth/admin-permissions";
 
-/** Admin session identity used for financial visibility checks. */
-export type AdminSessionUser = {
-  authenticated: boolean;
-  employeeId: string | null;
-  /** `null` = trusted full-access login (no employee selected). */
-  role: EmployeeRole | null;
-};
+export type { AdminSessionUser };
+export {
+  ORDER_FINANCIAL_DENIED_MESSAGE,
+  FINANCIAL_ROUTE_DENIED_MESSAGE,
+  DATA_ACCESS_DENIED_MESSAGE,
+} from "@/features/auth/admin-session.types";
 
-export const ORDER_FINANCIAL_DENIED_MESSAGE =
-  "Bạn không có quyền xem thông tin tài chính của đơn hàng.";
-
-export const FINANCIAL_ROUTE_DENIED_MESSAGE =
-  "Bạn không có quyền truy cập khu vực này.";
-
-const FINANCIAL_VIEW_ROLES = new Set<EmployeeRole>(["ADMIN", "SALES"]);
-
-/** Roles that must never see order financial fields. */
-export const OPERATIONAL_NO_FINANCIAL_ROLES = new Set<EmployeeRole>([
-  "PRODUCTION",
-  "DELIVERY",
-  "OTHER",
-]);
-
-export function canViewOrderFinancials(user: AdminSessionUser): boolean {
-  if (!user.authenticated) return false;
-  if (!user.role) return true;
-  return FINANCIAL_VIEW_ROLES.has(user.role);
-}
-
-export function isProductionStaffUser(user: AdminSessionUser): boolean {
-  return user.authenticated && user.role === "PRODUCTION";
-}
-
-export function isOperationalStaffWithoutFinancials(user: AdminSessionUser): boolean {
-  if (!user.authenticated || !user.role) return false;
-  return OPERATIONAL_NO_FINANCIAL_ROLES.has(user.role);
-}
+export { canViewFinancials as canViewOrderFinancials };
 
 const FINANCIAL_ADMIN_ROUTE_PREFIXES = [
   "/admin/quotes",
@@ -45,10 +20,7 @@ const FINANCIAL_ADMIN_ROUTE_PREFIXES = [
   "/admin/crm/revenue-categories",
 ] as const;
 
-const FINANCIAL_ORDER_CREATE_PREFIXES = [
-  "/admin/orders/new",
-] as const;
-
+const FINANCIAL_ORDER_CREATE_PREFIXES = ["/admin/orders/new"] as const;
 const ORDER_EDIT_PATH = /^\/admin\/orders\/[^/]+\/edit$/;
 
 export function isFinancialAdminRoute(pathname: string): boolean {
@@ -62,16 +34,53 @@ export function isFinancialAdminRoute(pathname: string): boolean {
   return false;
 }
 
-export function canAccessAdminRoute(user: AdminSessionUser, pathname: string): boolean {
-  if (!user.authenticated) return false;
+export function isProductionStaffUser(session: AdminSessionUser): boolean {
+  return session.authenticated && session.roleCode === "PRODUCTION";
+}
+
+export function canAccessAdminRoute(session: AdminSessionUser, pathname: string): boolean {
+  if (!session.authenticated) return false;
   if (!isFinancialAdminRoute(pathname)) return true;
-  return canViewOrderFinancials(user);
+  if (can(session, "orders.update") && pathname.match(ORDER_EDIT_PATH)) return true;
+  if (can(session, "orders.create") && pathname.startsWith("/admin/orders/new")) return true;
+  if (pathname.startsWith("/admin/quotes")) return can(session, "quotes.view");
+  if (pathname.startsWith("/admin/pricing")) return can(session, "pricing.manage");
+  if (pathname.startsWith("/admin/crm/revenue-categories")) return can(session, "revenue_categories.manage");
+  return canViewFinancials(session);
 }
 
 export function canAccessOrderFinancialPdf(
-  user: AdminSessionUser,
+  session: AdminSessionUser,
   docType: "confirmation" | "production" | "delivery",
 ): boolean {
-  if (docType === "production") return user.authenticated;
-  return canViewOrderFinancials(user);
+  if (docType === "production") return can(session, "production.view");
+  return canViewFinancials(session);
+}
+
+export function getRequiredPermissionForAdminRoute(pathname: string): string | null {
+  if (pathname.startsWith("/admin/settings/users")) return "users.manage";
+  if (pathname.startsWith("/admin/settings/roles")) return "roles_permissions.manage";
+  if (pathname.startsWith("/admin/quotes")) return "quotes.view";
+  if (pathname.startsWith("/admin/pricing")) return "pricing.manage";
+  if (pathname.startsWith("/admin/crm/revenue-categories")) return "revenue_categories.manage";
+  if (pathname.startsWith("/admin/crm")) return "crm.view";
+  if (pathname.startsWith("/admin/orders/new")) return "orders.create";
+  if (ORDER_EDIT_PATH.test(pathname)) return "orders.update";
+  if (pathname.startsWith("/admin/orders")) return "orders.view";
+  if (pathname.startsWith("/admin/production")) return "production.view";
+  if (pathname.startsWith("/admin/delivery")) return "delivery.view";
+  if (pathname.startsWith("/admin/warehouse") || pathname.includes("/materials/warehouse")) {
+    return "warehouse.view";
+  }
+  if (pathname.startsWith("/admin/materials") || pathname.startsWith("/admin/purchase-requests")) {
+    return "warehouse.view";
+  }
+  if (pathname.startsWith("/admin/products") || pathname.startsWith("/admin/danh-muc")) {
+    return "products.view";
+  }
+  if (pathname.startsWith("/admin/media")) return "media.view";
+  if (pathname.startsWith("/admin/employees")) return "employees.manage";
+  if (pathname.startsWith("/admin/dashboard")) return "dashboard.view";
+  if (pathname.startsWith("/admin/operations")) return "orders.view";
+  return null;
 }

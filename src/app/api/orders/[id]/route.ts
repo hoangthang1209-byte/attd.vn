@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canViewOrderFinancials } from "@/features/auth/order-financial-permissions";
+import { prisma } from "@/lib/prisma";
+import { canViewOrderFinancials, can } from "@/features/auth/admin-permissions";
+import { canAccessOrderRecord } from "@/features/auth/order-scope";
+import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 import { parseUpdateOrderBody } from "@/features/orders/order-input";
 import { shapeOrderDetailResponse } from "@/features/orders/order-financial-redact";
 import { EmployeeValidationError } from "@/features/employees/employee.service";
@@ -17,11 +20,29 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const session = getAdminSessionFromRequest(req);
   try {
+    const row = await prisma.order.findUnique({
+      where: { id },
+      select: {
+        salesEmployeeId: true,
+        productionOwnerId: true,
+        deliveryOwnerId: true,
+      },
+    });
+    if (!row) {
+      return NextResponse.json({ message: "Không tìm thấy đơn hàng" }, { status: 404 });
+    }
+    if (!canAccessOrderRecord(session, row, "orders.view")) {
+      return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+    }
+
     const order = await getOrderDetail(id);
     if (!order) {
       return NextResponse.json({ message: "Không tìm thấy đơn hàng" }, { status: 404 });
     }
-    const shaped = shapeOrderDetailResponse(order, canViewOrderFinancials(session));
+    const shaped = shapeOrderDetailResponse(
+      order,
+      canViewOrderFinancials(session) && canAccessOrderRecord(session, row, "orders.view_financials"),
+    );
     return NextResponse.json(shaped);
   } catch (err) {
     console.error("[GET /api/orders/[id]]", err);
@@ -34,6 +55,9 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   const session = getAdminSessionFromRequest(req);
   const forbidden = assertFinancialApiAccess(session, "PATCH /api/orders/[id]");
   if (forbidden) return forbidden;
+  if (!can(session, "orders.update")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
 
   let body: unknown;
   try {

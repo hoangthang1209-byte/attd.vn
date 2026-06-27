@@ -8,39 +8,72 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { EmployeeRole } from "@prisma/client";
 
-export type AdminPermissions = {
+export type AdminPermissionFlags = {
   canViewFinancials: boolean;
   canAccessQuotes: boolean;
   canAccessPricing: boolean;
+  canManageUsers: boolean;
+  canManageRoles: boolean;
+  canViewOrders: boolean;
+  canCreateOrders: boolean;
+  canUpdateOrders: boolean;
+  canViewProduction: boolean;
+  canUpdateProduction: boolean;
+  canViewDelivery: boolean;
+  canManageEmployees: boolean;
+  canManageProducts: boolean;
+  canManageCms: boolean;
+  canViewCrm: boolean;
+  canViewDashboard: boolean;
+  canViewWarehouse: boolean;
 };
 
 type AdminPermissionsContextValue = {
   loading: boolean;
+  mode: string;
+  username: string | null;
   employeeId: string | null;
-  role: EmployeeRole | null;
-  permissions: AdminPermissions;
+  roleCode: string | null;
+  permissions: AdminPermissionFlags;
 };
 
-const defaultPermissions: AdminPermissions = {
+const defaultFlags: AdminPermissionFlags = {
   canViewFinancials: true,
   canAccessQuotes: true,
   canAccessPricing: true,
+  canManageUsers: true,
+  canManageRoles: true,
+  canViewOrders: true,
+  canCreateOrders: true,
+  canUpdateOrders: true,
+  canViewProduction: true,
+  canUpdateProduction: true,
+  canViewDelivery: true,
+  canManageEmployees: true,
+  canManageProducts: true,
+  canManageCms: true,
+  canViewCrm: true,
+  canViewDashboard: true,
+  canViewWarehouse: true,
 };
 
 const AdminPermissionsContext = createContext<AdminPermissionsContextValue>({
   loading: true,
+  mode: "owner",
+  username: null,
   employeeId: null,
-  role: null,
-  permissions: defaultPermissions,
+  roleCode: null,
+  permissions: defaultFlags,
 });
 
 export function AdminPermissionsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState("owner");
+  const [username, setUsername] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
-  const [role, setRole] = useState<EmployeeRole | null>(null);
-  const [permissions, setPermissions] = useState<AdminPermissions>(defaultPermissions);
+  const [roleCode, setRoleCode] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState<AdminPermissionFlags>(defaultFlags);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,19 +81,37 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
       .then(async (res) => {
         if (!res.ok) return null;
         return res.json() as Promise<{
+          mode?: string;
+          username?: string | null;
           employeeId?: string | null;
-          role?: EmployeeRole | null;
-          permissions?: Partial<AdminPermissions>;
+          roleCode?: string | null;
+          flags?: Partial<AdminPermissionFlags>;
         }>;
       })
       .then((data) => {
         if (cancelled || !data) return;
+        setMode(data.mode ?? "owner");
+        setUsername(data.username ?? null);
         setEmployeeId(data.employeeId ?? null);
-        setRole(data.role ?? null);
+        setRoleCode(data.roleCode ?? null);
         setPermissions({
-          canViewFinancials: data.permissions?.canViewFinancials ?? true,
-          canAccessQuotes: data.permissions?.canAccessQuotes ?? true,
-          canAccessPricing: data.permissions?.canAccessPricing ?? true,
+          canViewFinancials: data.flags?.canViewFinancials ?? true,
+          canAccessQuotes: data.flags?.canAccessQuotes ?? true,
+          canAccessPricing: data.flags?.canAccessPricing ?? true,
+          canManageUsers: data.flags?.canManageUsers ?? false,
+          canManageRoles: data.flags?.canManageRoles ?? false,
+          canViewOrders: data.flags?.canViewOrders ?? true,
+          canCreateOrders: data.flags?.canCreateOrders ?? true,
+          canUpdateOrders: data.flags?.canUpdateOrders ?? true,
+          canViewProduction: data.flags?.canViewProduction ?? true,
+          canUpdateProduction: data.flags?.canUpdateProduction ?? true,
+          canViewDelivery: data.flags?.canViewDelivery ?? true,
+          canManageEmployees: data.flags?.canManageEmployees ?? true,
+          canManageProducts: data.flags?.canManageProducts ?? true,
+          canManageCms: data.flags?.canManageCms ?? true,
+          canViewCrm: data.flags?.canViewCrm ?? true,
+          canViewDashboard: data.flags?.canViewDashboard ?? true,
+          canViewWarehouse: data.flags?.canViewWarehouse ?? true,
         });
       })
       .finally(() => {
@@ -72,8 +123,8 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
   }, []);
 
   const value = useMemo(
-    () => ({ loading, employeeId, role, permissions }),
-    [loading, employeeId, role, permissions],
+    () => ({ loading, mode, username, employeeId, roleCode, permissions }),
+    [loading, mode, username, employeeId, roleCode, permissions],
   );
 
   return (

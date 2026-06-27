@@ -1,7 +1,12 @@
-import type { AdminSessionUser } from "@/features/auth/order-financial-permissions";
+import type { AdminSessionUser } from "@/features/auth/admin-session.types";
+import { logAdminAuditEvent } from "@/features/auth/admin-audit-log";
 import {
+  can,
   canViewOrderFinancials,
+} from "@/features/auth/admin-permissions";
+import {
   FINANCIAL_ROUTE_DENIED_MESSAGE,
+  getRequiredPermissionForAdminRoute,
   isFinancialAdminRoute,
 } from "@/features/auth/order-financial-permissions";
 
@@ -10,12 +15,12 @@ export function logFinancialAccessDenied(input: {
   route: string;
   action: string;
 }): void {
-  console.warn("[admin-financial-access-denied]", {
+  logAdminAuditEvent({
+    action: input.action === "api_forbidden" ? "forbidden_api" : "forbidden_route",
+    userId: input.user.userId,
     employeeId: input.user.employeeId,
-    role: input.user.role,
     route: input.route,
-    action: input.action,
-    at: new Date().toISOString(),
+    detail: { roleCode: input.user.roleCode },
   });
 }
 
@@ -33,6 +38,14 @@ export function assertFinancialRouteAccess(
   user: AdminSessionUser,
   pathname: string,
 ): boolean {
+  if (!user.authenticated) return false;
+
+  const required = getRequiredPermissionForAdminRoute(pathname);
+  if (required && !can(user, required)) {
+    logFinancialAccessDenied({ user, route: pathname, action: "route_forbidden" });
+    return false;
+  }
+
   if (!isFinancialAdminRoute(pathname)) return true;
   if (canViewOrderFinancials(user)) return true;
   logFinancialAccessDenied({ user, route: pathname, action: "route_forbidden" });

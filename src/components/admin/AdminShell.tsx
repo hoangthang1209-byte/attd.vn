@@ -9,113 +9,129 @@ import AdminScrollRestoration from "@/components/admin/AdminScrollRestoration";
 import { AdminTitleProvider, useAdminTitle } from "@/components/admin/AdminTitleContext";
 import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 
-type NavItem = { href: string; label: string; financial?: boolean };
+type NavItem = { href: string; label: string; visible?: (p: import("@/components/admin/AdminPermissionsContext").AdminPermissionFlags) => boolean };
 
 type NavGroup = {
   label: string | null;
   items: NavItem[];
-  financial?: boolean;
+  visible?: (p: import("@/components/admin/AdminPermissionsContext").AdminPermissionFlags) => boolean;
 };
 
 const NAV_GROUPS: NavGroup[] = [
   {
     label: null,
-    items: [{ href: "/admin/dashboard", label: "Tổng quan" }],
+    items: [{ href: "/admin/dashboard", label: "Tổng quan", visible: (p) => p.canViewDashboard }],
   },
   {
     label: "Sản phẩm",
+    visible: (p) => p.canManageProducts || p.canViewDashboard,
     items: [
-      { href: "/admin/products", label: "Danh sách sản phẩm" },
-      { href: "/admin/products/new", label: "Thêm sản phẩm" },
-      { href: "/admin/danh-muc", label: "Danh mục sản phẩm" },
-      { href: "/admin/attributes", label: "Thuộc tính sản phẩm" },
-      { href: "/admin/products/import", label: "Nhập sản phẩm" },
-      { href: "/admin/media", label: "Thư viện Media" },
+      { href: "/admin/products", label: "Danh sách sản phẩm", visible: (p) => p.canManageProducts },
+      { href: "/admin/products/new", label: "Thêm sản phẩm", visible: (p) => p.canManageProducts },
+      { href: "/admin/danh-muc", label: "Danh mục sản phẩm", visible: (p) => p.canManageProducts },
+      { href: "/admin/attributes", label: "Thuộc tính sản phẩm", visible: (p) => p.canManageProducts },
+      { href: "/admin/products/import", label: "Nhập sản phẩm", visible: (p) => p.canManageProducts },
+      { href: "/admin/media", label: "Thư viện Media", visible: (p) => p.canManageProducts },
     ],
   },
   {
     label: "Knowledge Base",
+    visible: (p) => p.canManageCms,
     items: [
-      { href: "/admin/knowledge-base", label: "Danh sách KB" },
-      { href: "/admin/knowledge-base?import=1", label: "Nhập dữ liệu KB" },
-      { href: "/admin/knowledge-base/context-preview", label: "Xem trước ngữ cảnh AI" },
+      { href: "/admin/knowledge-base", label: "Danh sách KB", visible: (p) => p.canManageCms },
+      { href: "/admin/knowledge-base?import=1", label: "Nhập dữ liệu KB", visible: (p) => p.canManageCms },
+      { href: "/admin/knowledge-base/context-preview", label: "Xem trước ngữ cảnh AI", visible: (p) => p.canManageCms },
     ],
   },
   {
     label: "SEO & Content",
+    visible: (p) => p.canManageCms,
     items: [
-      { href: "/admin/blog", label: "Blog" },
-      { href: "/admin/landing-pages", label: "Landing pages" },
-      { href: "/admin/seo-planning", label: "SEO Planning" },
-      { href: "/admin/seo/brief-generator", label: "SEO Brief Generator" },
-      { href: "/admin/ai-content-factory", label: "AI Content Factory" },
+      { href: "/admin/blog", label: "Blog", visible: (p) => p.canManageCms },
+      { href: "/admin/landing-pages", label: "Landing pages", visible: (p) => p.canManageCms },
+      { href: "/admin/seo-planning", label: "SEO Planning", visible: (p) => p.canManageCms },
+      { href: "/admin/seo/brief-generator", label: "SEO Brief Generator", visible: (p) => p.canManageCms },
+      { href: "/admin/ai-content-factory", label: "AI Content Factory", visible: (p) => p.canManageCms },
     ],
   },
   {
     label: "CRM",
+    visible: (p) => p.canViewCrm,
     items: [
-      { href: "/admin/crm", label: "CRM" },
-      { href: "/admin/crm/leads", label: "Lead" },
-      { href: "/admin/crm/customers", label: "Khách hàng" },
-      { href: "/admin/crm/revenue-categories", label: "Nhóm doanh thu", financial: true },
+      { href: "/admin/crm", label: "CRM", visible: (p) => p.canViewCrm },
+      { href: "/admin/crm/leads", label: "Lead", visible: (p) => p.canViewCrm },
+      { href: "/admin/crm/customers", label: "Khách hàng", visible: (p) => p.canViewCrm },
+      { href: "/admin/crm/revenue-categories", label: "Nhóm doanh thu", visible: (p) => p.canViewFinancials },
     ],
   },
   {
     label: "Báo giá",
-    financial: true,
+    visible: (p) => p.canAccessQuotes,
     items: [
-      { href: "/admin/quotes", label: "Danh sách báo giá", financial: true },
-      { href: "/admin/quotes/new", label: "Tạo báo giá", financial: true },
+      { href: "/admin/quotes", label: "Danh sách báo giá", visible: (p) => p.canAccessQuotes },
+      { href: "/admin/quotes/new", label: "Tạo báo giá", visible: (p) => p.canAccessQuotes },
     ],
   },
   {
     label: "Nguyên phụ liệu",
+    visible: (p) => p.canViewWarehouse,
     items: [
-      { href: "/admin/materials", label: "Vật tư" },
-      { href: "/admin/material-suppliers", label: "Nhà cung cấp NPL" },
-      { href: "/admin/materials/warehouse", label: "Tồn kho vật tư" },
-      { href: "/admin/purchase-requests", label: "Yêu cầu mua hàng" },
+      { href: "/admin/materials", label: "Vật tư", visible: (p) => p.canViewWarehouse },
+      { href: "/admin/material-suppliers", label: "Nhà cung cấp NPL", visible: (p) => p.canViewWarehouse },
+      { href: "/admin/materials/warehouse", label: "Tồn kho vật tư", visible: (p) => p.canViewWarehouse },
+      { href: "/admin/purchase-requests", label: "Yêu cầu mua hàng", visible: (p) => p.canViewWarehouse },
     ],
   },
   {
     label: "Đơn hàng",
+    visible: (p) => p.canViewOrders || p.canViewProduction || p.canViewDelivery,
     items: [
-      { href: "/admin/operations", label: "Tổng quan vận hành" },
-      { href: "/admin/orders", label: "Đơn hàng" },
-      { href: "/admin/production", label: "Sản xuất" },
-      { href: "/admin/delivery", label: "Vận hành giao hàng" },
-      { href: "/admin/employees", label: "Nhân viên" },
-      { href: "/admin/delivery-methods", label: "Hình thức giao hàng" },
-      { href: "/admin/delivery-carriers", label: "Đơn vị vận chuyển" },
+      { href: "/admin/operations", label: "Tổng quan vận hành", visible: (p) => p.canViewOrders },
+      { href: "/admin/orders", label: "Đơn hàng", visible: (p) => p.canViewOrders },
+      { href: "/admin/production", label: "Sản xuất", visible: (p) => p.canViewProduction },
+      { href: "/admin/delivery", label: "Vận hành giao hàng", visible: (p) => p.canViewDelivery },
+      { href: "/admin/employees", label: "Nhân viên", visible: (p) => p.canManageEmployees },
+      { href: "/admin/delivery-methods", label: "Hình thức giao hàng", visible: (p) => p.canViewDelivery },
+      { href: "/admin/delivery-carriers", label: "Đơn vị vận chuyển", visible: (p) => p.canViewDelivery },
     ],
   },
   {
     label: "Tính giá",
-    financial: true,
+    visible: (p) => p.canAccessPricing,
     items: [
-      { href: "/admin/pricing", label: "Tổng quan", financial: true },
-      { href: "/admin/pricing/calculator", label: "Bộ tính giá", financial: true },
-      { href: "/admin/pricing/price-groups", label: "Nhóm giá", financial: true },
-      { href: "/admin/pricing/product-tiers", label: "Bảng giá sản phẩm", financial: true },
-      { href: "/admin/pricing/service-rules", label: "Phí dịch vụ", financial: true },
-      { href: "/admin/pricing/history", label: "Lịch sử tính giá", financial: true },
+      { href: "/admin/pricing", label: "Tổng quan", visible: (p) => p.canAccessPricing },
+      { href: "/admin/pricing/calculator", label: "Bộ tính giá", visible: (p) => p.canAccessPricing },
+      { href: "/admin/pricing/price-groups", label: "Nhóm giá", visible: (p) => p.canAccessPricing },
+      { href: "/admin/pricing/product-tiers", label: "Bảng giá sản phẩm", visible: (p) => p.canAccessPricing },
+      { href: "/admin/pricing/service-rules", label: "Phí dịch vụ", visible: (p) => p.canAccessPricing },
+      { href: "/admin/pricing/history", label: "Lịch sử tính giá", visible: (p) => p.canAccessPricing },
     ],
   },
   {
     label: "Marketing",
+    visible: (p) => p.canManageCms,
     items: [
-      { href: "/admin/client-logos", label: "Logo khách hàng" },
-      { href: "/admin/case-studies", label: "Dự án tiêu biểu" },
+      { href: "/admin/client-logos", label: "Logo khách hàng", visible: (p) => p.canManageCms },
+      { href: "/admin/case-studies", label: "Dự án tiêu biểu", visible: (p) => p.canManageCms },
+    ],
+  },
+  {
+    label: "Quản trị hệ thống",
+    visible: (p) => p.canManageUsers || p.canManageRoles,
+    items: [
+      { href: "/admin/settings/users", label: "Tài khoản đăng nhập", visible: (p) => p.canManageUsers },
+      { href: "/admin/settings/roles", label: "Vai trò & phân quyền", visible: (p) => p.canManageRoles },
     ],
   },
   {
     label: "Cài đặt",
+    visible: (p) => p.canViewDashboard,
     items: [
-      { href: "/admin/settings/company", label: "Thông tin công ty" },
-      { href: "/admin/settings/trust", label: "Chỉ số tin cậy" },
-      { href: "/admin/settings/branding", label: "Nhận diện thương hiệu" },
-      { href: "/admin/settings/homepage", label: "Nội dung trang chủ" },
-      { href: "/admin/demo", label: "🎭 Dữ liệu demo" },
+      { href: "/admin/settings/company", label: "Thông tin công ty", visible: (p) => p.canViewDashboard },
+      { href: "/admin/settings/trust", label: "Chỉ số tin cậy", visible: (p) => p.canViewDashboard },
+      { href: "/admin/settings/branding", label: "Nhận diện thương hiệu", visible: (p) => p.canViewDashboard },
+      { href: "/admin/settings/homepage", label: "Nội dung trang chủ", visible: (p) => p.canViewDashboard },
+      { href: "/admin/demo", label: "🎭 Dữ liệu demo", visible: (p) => p.canViewDashboard },
     ],
   },
 ];
@@ -153,14 +169,10 @@ function AdminShellNav() {
   const visibleGroups = useMemo(() => {
     return NAV_GROUPS.map((group) => ({
       ...group,
-      items: group.items.filter((item) => {
-        if (!permissions.canViewFinancials && (group.financial || item.financial)) {
-          return false;
-        }
-        return true;
-      }),
-    })).filter((group) => group.items.length > 0);
-  }, [permissions.canViewFinancials]);
+      items: group.items.filter((item) => !item.visible || item.visible(permissions)),
+    }))
+      .filter((group) => (!group.visible || group.visible(permissions)) && group.items.length > 0);
+  }, [permissions]);
 
   return (
     <nav className="admin-nav">

@@ -2,11 +2,18 @@ import type { NextRequest } from "next/server";
 import { getAdminSessionSecret } from "@/lib/admin-auth/config";
 import { ADMIN_STAFF_SESSION_COOKIE } from "@/lib/admin-auth/constants";
 import {
+  ADMIN_SESSION_MESSAGE_PREFIX,
+  decodeAdminSessionPayload,
+  isAdminSessionPayloadV2,
+  splitAdminSessionToken,
+  type AdminSessionPayload,
+} from "@/lib/admin-auth/admin-session.shared";
+import {
+  STAFF_SESSION_MESSAGE_PREFIX,
   decodeStaffSessionPayload,
   splitStaffSessionToken,
-  STAFF_SESSION_MESSAGE_PREFIX,
-  type AdminStaffSessionPayload,
 } from "@/lib/admin-auth/staff-session.shared";
+import type { EmployeeRole } from "@prisma/client";
 
 function timingSafeEqualString(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -17,7 +24,7 @@ function timingSafeEqualString(a: string, b: string): boolean {
   return mismatch === 0;
 }
 
-async function signStaffPayloadPartEdge(payloadPart: string, secret: string): Promise<string> {
+async function signPayloadPartEdge(prefix: string, payloadPart: string, secret: string): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -26,34 +33,35 @@ async function signStaffPayloadPartEdge(payloadPart: string, secret: string): Pr
     false,
     ["sign"],
   );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    encoder.encode(`${STAFF_SESSION_MESSAGE_PREFIX}${payloadPart}`),
-  );
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(`${prefix}${payloadPart}`));
   return Array.from(new Uint8Array(signature))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }
 
-export async function verifyStaffSessionTokenEdge(
+export async function verifyAdminSessionPayloadTokenEdge(
   token: string | undefined | null,
-): Promise<AdminStaffSessionPayload | null> {
+): Promise<AdminSessionPayload | { employeeId: string | null; role: EmployeeRole | null } | null> {
   if (!token) return null;
   const secret = getAdminSessionSecret();
   if (!secret) return null;
 
-  const parts = splitStaffSessionToken(token);
-  if (!parts) return null;
+  const v2parts = splitAdminSessionToken(token);
+  if (v2parts) {
+    const expected = await signPayloadPartEdge(ADMIN_SESSION_MESSAGE_PREFIX, v2parts.payloadPart, secret);
+    if (timingSafeEqualString(v2parts.signature, expected)) {
+      const decoded = decodeAdminSessionPayload(v2parts.payloadPart);
+      if (decoded && isAdminSessionPayloadV2(decoded)) return decoded;
+    }
+  }
 
-  const expected = await signStaffPayloadPartEdge(parts.payloadPart, secret);
-  if (!timingSafeEqualString(parts.signature, expected)) return null;
-
-  return decodeStaffSessionPayload(parts.payloadPart);
+  const v1parts = splitStaffSessionToken(token);
+  if (!v1parts) return null;
+  const expectedV1 = await signPayloadPartEdge(STAFF_SESSION_MESSAGE_PREFIX, v1parts.payloadPart, secret);
+  if (!timingSafeEqualString(v1parts.signature, expectedV1)) return null;
+  return decodeStaffSessionPayload(v1parts.payloadPart);
 }
 
-export async function getStaffSessionFromRequestEdge(
-  request: NextRequest,
-): Promise<AdminStaffSessionPayload | null> {
-  return verifyStaffSessionTokenEdge(request.cookies.get(ADMIN_STAFF_SESSION_COOKIE)?.value);
+export async function getAdminSessionPayloadFromRequestEdge(request: NextRequest) {
+  return verifyAdminSessionPayloadTokenEdge(request.cookies.get(ADMIN_STAFF_SESSION_COOKIE)?.value);
 }

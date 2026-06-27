@@ -1781,6 +1781,7 @@ model Employee {
   qcInspections              OrderQcInspection[]       @relation("QcInspector")
   assignedDeliveryExecutions OrderDeliveryExecution[]  @relation("DeliveryExecutionAssignee")
   deliveryAttempts           OrderDeliveryAttempt[]    @relation("DeliveryAttemptBy")
+  adminUser                  AdminUser?
 
   @@index([employeeCode])
   @@index([isActive])
@@ -2497,4 +2498,78 @@ model OrderDeliveryProof {
   @@index([deliveryExecutionId])
   @@index([deliveryAttemptId])
   @@index([mediaAssetId])
+}
+
+enum PermissionScope {
+  NONE
+  OWN
+  ASSIGNED
+  TEAM
+  ALL
+}
+
+model AdminUser {
+  id                String    @id @default(cuid())
+  username          String    @unique
+  passwordHash      String
+  employeeId        String?   @unique
+  roleId            String?
+  isActive          Boolean   @default(true)
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  employee Employee?  @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  role     AdminRole? @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@index([username])
+  @@index([roleId])
+  @@index([isActive])
+}
+
+model AdminRole {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?  @db.Text
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       AdminUser[]
+  permissions AdminRolePermission[]
+
+  @@index([isActive, sortOrder])
+}
+
+model AdminPermission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  module      String
+  action      String
+  name        String
+  description String?  @db.Text
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rolePermissions AdminRolePermission[]
+
+  @@index([module, sortOrder])
+}
+
+model AdminRolePermission {
+  id           String          @id @default(cuid())
+  roleId       String
+  permissionId String
+  scope        PermissionScope @default(ALL)
+
+  role       AdminRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission AdminPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
 }
