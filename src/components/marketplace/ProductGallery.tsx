@@ -11,6 +11,11 @@ import {
 } from "@/lib/productImages";
 import { isValidImageSrc } from "@/lib/imagePaths";
 
+/** Desktop PDP main stage — request enough pixels for ~720px display + retina. */
+const PDP_MAIN_IMAGE_SIZES =
+  "(max-width: 899px) 100vw, (min-width: 1200px) 720px, 58vw";
+const PDP_MAIN_IMAGE_QUALITY = 90;
+
 type Props = {
   images: ProductImageRecord[];
   productName: string;
@@ -168,7 +173,7 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
         <ProductMediaFrame
           alt={productName}
           placeholderLabel={productName}
-          sizes="(max-width: 1024px) 100vw, 42vw"
+          sizes={PDP_MAIN_IMAGE_SIZES}
         />
       </div>
     );
@@ -187,7 +192,7 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
         <ProductMediaFrame
           alt={productName}
           placeholderLabel={productName}
-          sizes="(max-width: 1024px) 100vw, 42vw"
+          sizes={PDP_MAIN_IMAGE_SIZES}
         />
       </div>
     );
@@ -247,6 +252,7 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
             fill
             className="mp-pdp-lightbox-img"
             sizes="100vw"
+            quality={PDP_MAIN_IMAGE_QUALITY}
             priority
           />
         </div>
@@ -278,7 +284,8 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
                 alt={selected.altText ?? mainAlt}
                 fill
                 className="mp-pdp-gallery-main-img"
-                sizes="(max-width: 899px) 100vw, 42vw"
+                sizes={PDP_MAIN_IMAGE_SIZES}
+                quality={PDP_MAIN_IMAGE_QUALITY}
                 priority={selectedIndex === 0}
               />
               <span className="mp-pdp-gallery-zoom-hint" aria-hidden>
