@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { MediaFolder, MediaUsageType } from "@prisma/client";
 import {
   listMediaAssets,
+  listMediaAssetsPage,
+  MEDIA_LIBRARY_PAGE_SIZE,
   uploadMediaAsset,
   uploadProductionFileAsset,
 } from "@/features/media/services/media.service";
@@ -17,6 +19,11 @@ export async function GET(request: Request) {
   const search = searchParams.get("search") ?? undefined;
   const folderParam = searchParams.get("folder");
   const usageParam = searchParams.get("usageType");
+  const cursor = searchParams.get("cursor") ?? undefined;
+  const paginated =
+    searchParams.get("paginated") === "1" || searchParams.has("cursor");
+  const limitParam = searchParams.get("limit");
+  const limit = limitParam ? Number.parseInt(limitParam, 10) : undefined;
 
   let folder: MediaFolder | undefined;
   if (folderParam && VALID_FOLDERS.includes(folderParam as StorageFolderKey)) {
@@ -28,7 +35,18 @@ export async function GET(request: Request) {
     usageType = usageParam as MediaUsageType;
   }
 
-  const assets = await listMediaAssets({ folder, usageType, search });
+  if (paginated) {
+    const page = await listMediaAssetsPage({
+      folder,
+      usageType,
+      search,
+      cursor,
+      limit: Number.isFinite(limit) && limit! > 0 ? limit : MEDIA_LIBRARY_PAGE_SIZE,
+    });
+    return NextResponse.json(page);
+  }
+
+  const assets = await listMediaAssets({ folder, usageType, search, limit });
   return NextResponse.json(assets);
 }
 

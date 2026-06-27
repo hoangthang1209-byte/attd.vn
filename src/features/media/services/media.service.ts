@@ -19,36 +19,86 @@ import {
 } from "@/lib/productionFileValidation";
 import type { ProductionFileType } from "@prisma/client";
 import { deleteR2Object } from "@/features/storage/r2/r2-production-file.service";
+import { MEDIA_LIBRARY_PAGE_SIZE } from "@/components/admin/media/media-library-api";
 
 export { LARGE_IMAGE_WARNING_SIZE };
+export { MEDIA_LIBRARY_PAGE_SIZE };
 
-export async function listMediaAssets(options?: {
+export type MediaAssetListFilters = {
   folder?: MediaFolder;
   usageType?: MediaUsageType;
   search?: string;
-  limit?: number;
-}) {
+};
+
+export type MediaAssetListPage = {
+  items: Awaited<ReturnType<typeof prisma.mediaAsset.findMany>>;
+  nextCursor: string | null;
+  hasMore: boolean;
+  total: number;
+};
+
+function buildMediaAssetWhere(filters: MediaAssetListFilters) {
+  return {
+    ...(filters.folder ? { folder: filters.folder } : {}),
+    ...(filters.usageType ? { usageType: filters.usageType } : {}),
+    ...(filters.search
+      ? {
+          OR: [
+            { filename: { contains: filters.search, mode: "insensitive" as const } },
+            { title: { contains: filters.search, mode: "insensitive" as const } },
+            { originalName: { contains: filters.search, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+}
+
+export async function listMediaAssets(options?: MediaAssetListFilters & { limit?: number }) {
   try {
     return await prisma.mediaAsset.findMany({
-      where: {
-        ...(options?.folder ? { folder: options.folder } : {}),
-        ...(options?.usageType ? { usageType: options.usageType } : {}),
-        ...(options?.search
-          ? {
-              OR: [
-                { filename: { contains: options.search, mode: "insensitive" } },
-                { title: { contains: options.search, mode: "insensitive" } },
-                { originalName: { contains: options.search, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { createdAt: "desc" },
+      where: buildMediaAssetWhere(options ?? {}),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: options?.limit ?? 200,
     });
   } catch (err) {
     console.error("[media.service] listMediaAssets failed:", err);
     return [];
+  }
+}
+
+export async function listMediaAssetsPage(
+  options?: MediaAssetListFilters & {
+    limit?: number;
+    cursor?: string;
+  },
+): Promise<MediaAssetListPage> {
+  const limit = options?.limit ?? MEDIA_LIBRARY_PAGE_SIZE;
+  const where = buildMediaAssetWhere(options ?? {});
+
+  try {
+    const [total, rows] = await Promise.all([
+      prisma.mediaAsset.count({ where }),
+      prisma.mediaAsset.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
+        ...(options?.cursor
+          ? {
+              cursor: { id: options.cursor },
+              skip: 1,
+            }
+          : {}),
+      }),
+    ]);
+
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
+
+    return { items, nextCursor, hasMore, total };
+  } catch (err) {
+    console.error("[media.service] listMediaAssetsPage failed:", err);
+    return { items: [], nextCursor: null, hasMore: false, total: 0 };
   }
 }
 

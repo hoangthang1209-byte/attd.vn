@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 export function revalidatePublicCategoryCache(): void {
   revalidatePath("/", "layout");
   revalidatePath("/san-pham");
+  revalidatePath("/danh-muc-san-pham");
   revalidatePath("/admin/danh-muc");
   revalidatePath("/admin/products/categories");
 }

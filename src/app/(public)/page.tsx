@@ -58,7 +58,7 @@ function PreCategoryEditorialSections({
 }
 
 export default async function HomePage() {
-  const { hero, cms, categories, latestProducts, blogPosts } = await getHomepageData();
+  const { hero, cms, categories, gridChildCategories, gridChildCategoryTotal, showGridCategoryViewAllCta, latestProducts, blogPosts } = await getHomepageData();
 
   return (
     <main className="mp-home mp-home--v271">
@@ -66,7 +66,11 @@ export default async function HomePage() {
 
       <PreCategoryEditorialSections cms={cms} />
 
-      <HomeCategoryGridSection categories={categories} />
+      <HomeCategoryGridSection
+        categories={gridChildCategories}
+        showViewAllCta={showGridCategoryViewAllCta}
+        visibleCategoryCount={gridChildCategoryTotal}
+      />
 
       <HomeProductDiscoverySection products={latestProducts} />
 

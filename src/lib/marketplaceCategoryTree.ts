@@ -103,6 +103,8 @@ export const MARKETPLACE_PARENT_GROUPS: StaticCategoryParent[] = [
   },
 ];
 
+import { publicCategoryHref } from "@/features/categories/public-category-url";
+
 export function catalogCategoryHref(slug: string): string {
-  return `/san-pham?category=${encodeURIComponent(slug)}`;
+  return publicCategoryHref(slug);
 }

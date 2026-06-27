@@ -28,6 +28,8 @@ export type CmsCategoryTreeChild = {
   imageUrl: string | null;
   productCount: number;
   featuredImage: string | null;
+  isActive: boolean;
+  sortOrder: number;
 };
 
 /** Shared parent node — single source of truth for mega menu + catalog filter. */
@@ -39,6 +41,8 @@ export type CmsCategoryTreeNode = {
   imageUrl: string | null;
   productCount: number;
   featuredImage: string | null;
+  isActive: boolean;
+  sortOrder: number;
   children: CmsCategoryTreeChild[];
 };
 
@@ -90,7 +94,9 @@ export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
     return total;
   }
 
-  const roots = byParent.get(null) ?? [];
+  const roots = (byParent.get(null) ?? []).sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"),
+  );
 
   return roots.map((parent) => ({
     id: parent.id,
@@ -100,7 +106,11 @@ export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
     imageUrl: parent.imageUrl,
     featuredImage: parent.products[0]?.featuredImage ?? null,
     productCount: parent._count.products + sumDescendantProductCounts(parent.id),
-    children: (byParent.get(parent.id) ?? []).map((child) => ({
+    isActive: parent.isActive,
+    sortOrder: parent.sortOrder,
+    children: (byParent.get(parent.id) ?? [])
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"))
+      .map((child) => ({
       id: child.id,
       slug: child.slug,
       name: child.name,
@@ -108,6 +118,8 @@ export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
       imageUrl: child.imageUrl,
       productCount: child._count.products,
       featuredImage: child.products[0]?.featuredImage ?? null,
+      isActive: child.isActive,
+      sortOrder: child.sortOrder,
     })),
   }));
 }

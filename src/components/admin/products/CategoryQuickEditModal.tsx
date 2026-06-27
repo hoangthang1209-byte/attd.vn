@@ -18,6 +18,7 @@ import CategoryGeneratedCodeField, {
   type CategoryCodePreviewState,
 } from "@/components/admin/products/CategoryGeneratedCodeField";
 import { fetchCategoryCodePreview } from "@/features/categories/category-code-preview.client";
+import { getCategoryAdminDetailHref } from "@/features/categories/category-admin-routes";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { isIndexableCategoryLanding } from "@/lib/seo/indexable-category-routes";
 import {
@@ -336,7 +337,7 @@ function CategoryQuickEditModalForm({
         {indexableSeoIncomplete && (
           <p className="admin-field-hint admin-publish-quality-legacy-warning">
             Danh mục này cần hoàn thiện nội dung SEO trước khi có thể dùng làm trang đích.{" "}
-            <Link href={`/admin/products/categories?editCategory=${category.id}`}>
+            <Link href={getCategoryAdminDetailHref(category.id)}>
               Mở trình sửa đầy đủ
             </Link>
           </p>

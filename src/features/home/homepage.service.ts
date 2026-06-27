@@ -1,3 +1,4 @@
+import { buildHomepageChildCategoryGrid } from "@/features/home/homepage-category.utils";
 import {
   getCmsCategoryTree,
   type CmsCategoryTreeNode,
@@ -531,10 +532,15 @@ export async function getHomepageData(): Promise<HomepageData> {
     .map(mapParentCategory)
     .filter((category): category is HomepageCategoryItem => category != null);
 
+  const childGrid = buildHomepageChildCategoryGrid(categoryTree);
+
   return {
     hero: cms.hero,
     cms,
     categories,
+    gridChildCategories: childGrid.items,
+    gridChildCategoryTotal: childGrid.totalVisible,
+    showGridCategoryViewAllCta: childGrid.showViewAllCta,
     latestProducts: products.map(mapProduct),
     blogPosts: blogPostsRaw.map(mapBlogPost),
   };

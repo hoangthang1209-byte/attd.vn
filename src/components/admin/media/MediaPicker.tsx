@@ -1,7 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { MediaUsageType } from "@prisma/client";
+import AdminUploadProgress, {
+  type AdminUploadFileItem,
+} from "@/components/admin/feedback/AdminUploadProgress";
+import {
+  buildMediaLibraryApiUrl,
+  MEDIA_LIBRARY_PAGE_SIZE,
+  parseMediaLibraryResponse,
+} from "@/components/admin/media/media-library-api";
+import { useAdminToast } from "@/hooks/useAdminToast";
 import { ALLOWED_IMAGE_EXTENSIONS, inferImageMimeType } from "@/lib/imageValidation";
 import type { StorageFolderKey } from "@/lib/storage/types";
 
@@ -165,35 +174,31 @@ function getLoadFallbackSteps(
   return steps;
 }
 
-function buildMediaApiUrl(step: FetchStep, search?: string): string {
-  const params = new URLSearchParams();
-  if (step.folder) params.set("folder", step.folder);
-  if (step.usageType) params.set("usageType", step.usageType);
-  if (search?.trim()) params.set("search", search.trim());
-  const qs = params.toString();
-  return qs ? `/api/media?${qs}` : "/api/media";
-}
-
-async function fetchMediaFromUrl(apiUrl: string): Promise<AssetRow[]> {
+async function fetchMediaLibraryPage(apiUrl: string): Promise<{
+  assets: AssetRow[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  total: number | null;
+}> {
   const res = await fetch(apiUrl);
   if (!res.ok) {
     throw new Error(`Media API ${res.status} (${apiUrl})`);
   }
   const data: unknown = await res.json();
-  const assets = normalizeAssetList(data);
+  const page = parseMediaLibraryResponse(data);
+  const assets = normalizeAssetList(page.items);
   if (isDev) {
-    console.log("[MediaPicker] fetched", apiUrl, assets.length);
+    console.log("[MediaPicker] fetched", apiUrl, assets.length, {
+      hasMore: page.hasMore,
+      nextCursor: page.nextCursor,
+    });
   }
-  return assets;
-}
-
-async function fetchMediaStep(
-  step: FetchStep,
-  search?: string
-): Promise<{ url: string; assets: AssetRow[] }> {
-  const url = buildMediaApiUrl(step, search);
-  const assets = await fetchMediaFromUrl(url);
-  return { url, assets };
+  return {
+    assets,
+    nextCursor: page.nextCursor,
+    hasMore: page.hasMore,
+    total: page.total,
+  };
 }
 
 async function loadMediaWithFallback(
@@ -204,8 +209,14 @@ async function loadMediaWithFallback(
   const steps = getLoadFallbackSteps(folder, usageType);
 
   for (const step of steps) {
-    const url = buildMediaApiUrl(step, search);
-    const assets = await fetchMediaFromUrl(url);
+    const url = buildMediaLibraryApiUrl({
+      folder: step.folder,
+      usageType: step.usageType,
+      search,
+      paginated: true,
+      limit: MEDIA_LIBRARY_PAGE_SIZE,
+    });
+    const { assets } = await fetchMediaLibraryPage(url);
     if (assets.length > 0) {
       if (isDev) {
         console.log("[MediaPicker] using fallback step:", step.label);
@@ -227,78 +238,166 @@ function fallbackHint(stepLabel: string, pickerFolder: StorageFolderKey): string
   return `Đang hiển thị ảnh từ thư mục ${name} (fallback).`;
 }
 
+type LibraryView = "all" | "folder";
+
+export type MediaPickerLibraryView = LibraryView;
+export const MEDIA_PICKER_DEFAULT_LIBRARY_VIEW: MediaPickerLibraryView = "all";
+
 export default function MediaPicker(props: Props) {
   const { label = "Ảnh", folder = "products", usageType = "auto" } = props;
   const multiple = props.multiple === true;
 
   const [open, setOpen] = useState(false);
+  const [libraryView, setLibraryView] = useState<LibraryView>(MEDIA_PICKER_DEFAULT_LIBRARY_VIEW);
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [fallbackStep, setFallbackStep] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState<AdminUploadFileItem[]>([]);
+  const [lastUploadFile, setLastUploadFile] = useState<File | null>(null);
   const [search, setSearch] = useState("");
   const [uploadWarning, setUploadWarning] = useState<string | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
+  const toast = useAdminToast();
+  const uploading = uploadQueue.some(
+    (f) => f.state === "preparing" || f.state === "uploading" || f.state === "processing",
+  );
 
   const singleValue = !multiple ? (props as SingleProps).value : undefined;
   const resolvedUploadUsage = uploadUsageTypeForFolder(folder, usageType);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const loadAssets = useCallback(async () => {
-    setLoading(true);
+  const refreshAssets = useCallback(
+    async (view: LibraryView, query: string) => {
+      setLoading(true);
+      setLoadError(null);
+      setNextCursor(null);
+      setHasMore(false);
+      setTotalCount(null);
+      try {
+        if (view === "all") {
+          setFallbackStep("all");
+          const apiUrl = buildMediaLibraryApiUrl({ search: query, paginated: true });
+          const page = await fetchMediaLibraryPage(apiUrl);
+          setAssets(page.assets);
+          setNextCursor(page.nextCursor);
+          setHasMore(page.hasMore);
+          setTotalCount(page.total);
+        } else {
+          setFallbackStep(null);
+          const apiUrl = buildMediaLibraryApiUrl({
+            folder,
+            usageType: usageType !== "auto" ? usageType : undefined,
+            search: query,
+            paginated: true,
+          });
+          try {
+            const page = await fetchMediaLibraryPage(apiUrl);
+            if (page.assets.length > 0) {
+              setAssets(page.assets);
+              setNextCursor(page.nextCursor);
+              setHasMore(page.hasMore);
+              setTotalCount(page.total);
+              return;
+            }
+          } catch {
+            // Fall through to legacy folder fallback below.
+          }
+
+          const { assets: list, stepLabel } = await loadMediaWithFallback(
+            folder,
+            usageType,
+            query,
+          );
+          setAssets(list);
+          setNextCursor(null);
+          setHasMore(false);
+          setTotalCount(list.length);
+          setFallbackStep(stepLabel !== "none" && stepLabel !== folder ? stepLabel : null);
+        }
+      } catch (err) {
+        if (isDev) {
+          console.error("[MediaPicker] load failed:", err);
+        }
+        setLoadError("Không tải được thư viện Media");
+        setAssets([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [folder, usageType],
+  );
+
+  const loadMoreAssets = useCallback(async () => {
+    if (!hasMore || !nextCursor || loadingMore || loading) return;
+    setLoadingMore(true);
     setLoadError(null);
-    setFallbackStep(null);
     try {
-      const { assets: list, stepLabel } = await loadMediaWithFallback(
-        folder,
-        usageType,
-        search
-      );
-      setAssets(list);
-      setFallbackStep(stepLabel !== "none" && stepLabel !== folder ? stepLabel : null);
+      const apiUrl =
+        libraryView === "all"
+          ? buildMediaLibraryApiUrl({
+              search,
+              cursor: nextCursor,
+              paginated: true,
+            })
+          : buildMediaLibraryApiUrl({
+              folder,
+              usageType: usageType !== "auto" ? usageType : undefined,
+              search,
+              cursor: nextCursor,
+              paginated: true,
+            });
+      const page = await fetchMediaLibraryPage(apiUrl);
+      setAssets((current) => {
+        const seen = new Set(current.map((asset) => asset.id));
+        const appended = page.assets.filter((asset) => !seen.has(asset.id));
+        return [...current, ...appended];
+      });
+      setNextCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+      if (page.total != null) setTotalCount(page.total);
     } catch (err) {
       if (isDev) {
-        console.error("[MediaPicker] load failed:", err);
+        console.error("[MediaPicker] load more failed:", err);
       }
-      setLoadError("Không tải được thư viện Media");
-      setAssets([]);
+      setLoadError("Không tải thêm được ảnh từ thư viện Media");
     } finally {
-      setLoading(false);
+      setLoadingMore(false);
     }
-  }, [folder, usageType, search]);
-
-  const loadAllLibrary = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    setFallbackStep("all");
-    try {
-      const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
-      const apiUrl = params.toString() ? `/api/media?${params.toString()}` : "/api/media";
-      const list = await fetchMediaFromUrl(apiUrl);
-      setAssets(list);
-    } catch (err) {
-      if (isDev) {
-        console.error("[MediaPicker] load all failed:", err);
-      }
-      setLoadError("Không tải được thư viện Media");
-      setAssets([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [search]);
-
-  useEffect(() => {
-    if (open) void loadAssets();
-  }, [open, loadAssets]);
+  }, [folder, hasMore, libraryView, loading, loadingMore, nextCursor, search, usageType]);
 
   function handleOpen() {
     if (multiple) {
       const sel = (props as MultiProps).selectedUrls ?? [];
       setChecked(new Set(sel));
     }
+    setSearch("");
+    setLibraryView(MEDIA_PICKER_DEFAULT_LIBRARY_VIEW);
+    setNextCursor(null);
+    setHasMore(false);
+    setTotalCount(null);
     setOpen(true);
+    void refreshAssets(MEDIA_PICKER_DEFAULT_LIBRARY_VIEW, "");
+  }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    if (!open) return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      void refreshAssets(libraryView, value);
+    }, 300);
+  }
+
+  function handleLibraryViewChange(view: LibraryView) {
+    setLibraryView(view);
+    if (!open) return;
+    void refreshAssets(view, search);
   }
 
   function handleSingleSelect(asset: AssetRow) {
@@ -314,6 +413,8 @@ export default function MediaPicker(props: Props) {
   }
 
   async function uploadNewImage(file: File) {
+    if (uploading) return;
+
     const mimeType = inferImageMimeType(file.name, file.type);
     if (!mimeType) {
       setUploadWarning("Định dạng không hỗ trợ. Chỉ hỗ trợ JPG, PNG, WebP.");
@@ -329,38 +430,67 @@ export default function MediaPicker(props: Props) {
         : null
     );
 
-    setUploading(true);
+    const id = `${file.name}-${Date.now()}`;
+    setLastUploadFile(file);
+    setUploadQueue([
+      { id, name: file.name, sizeBytes: file.size, state: "preparing", progress: null },
+    ]);
+
     const fd = new FormData();
     fd.append("file", file);
     fd.append("folder", folder);
     fd.append("usageType", resolvedUploadUsage);
+
+    setUploadQueue([
+      { id, name: file.name, sizeBytes: file.size, state: "uploading", progress: null },
+    ]);
+
     try {
       const res = await fetch("/api/media", { method: "POST", body: fd });
       const data: unknown = await res.json();
       const uploadedUrl = extractUploadUrl(data);
 
       if (res.ok && uploadedUrl) {
+        setUploadQueue([
+          { id, name: file.name, sizeBytes: file.size, state: "processing", progress: 90 },
+        ]);
+
         if (!multiple) {
-          if (isDev) {
-            console.log("[MediaPicker] selected", uploadedUrl);
-          }
           (props as SingleProps).onChange(uploadedUrl);
           setOpen(false);
         } else {
           (props as MultiProps).onAdd([uploadedUrl]);
-          await loadAssets();
+          await refreshAssets(libraryView, search);
         }
+
+        setUploadQueue([
+          { id, name: file.name, sizeBytes: file.size, state: "done", progress: 100 },
+        ]);
+        toast.success("Đã tải file lên.");
       } else {
-        const message =
-          data && typeof data === "object" && "message" in data
-            ? String((data as { message?: string }).message)
-            : "Upload thất bại";
-        setUploadWarning(message);
+        setUploadQueue([
+          {
+            id,
+            name: file.name,
+            sizeBytes: file.size,
+            state: "error",
+            errorMessage: "Không thể tải file. Vui lòng thử lại.",
+          },
+        ]);
+        toast.error("Không thể tải file. Vui lòng thử lại.");
       }
     } catch {
-      setUploadWarning("Lỗi kết nối");
+      setUploadQueue([
+        {
+          id,
+          name: file.name,
+          sizeBytes: file.size,
+          state: "error",
+          errorMessage: "Không thể tải file. Vui lòng thử lại.",
+        },
+      ]);
+      toast.error("Không thể tải file. Vui lòng thử lại.");
     }
-    setUploading(false);
   }
 
   function toggleChecked(url: string) {
@@ -377,7 +507,8 @@ export default function MediaPicker(props: Props) {
     setOpen(false);
   }
 
-  const fallbackMessage = fallbackStep ? fallbackHint(fallbackStep, folder) : null;
+  const fallbackMessage =
+    libraryView === "folder" && fallbackStep ? fallbackHint(fallbackStep, folder) : null;
 
   return (
     <>
@@ -460,15 +591,28 @@ export default function MediaPicker(props: Props) {
                 className="admin-input"
                 placeholder="Tìm ảnh…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
               />
-              <button
-                type="button"
-                className="admin-btn admin-btn--secondary admin-btn--xs"
-                onClick={() => void loadAllLibrary()}
-              >
-                Hiển thị toàn bộ thư viện
-              </button>
+              <div className="admin-media-picker-filters" role="tablist" aria-label="Bộ lọc thư viện">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={libraryView === "all"}
+                  className={`admin-btn admin-btn--xs ${libraryView === "all" ? "admin-btn--primary" : "admin-btn--secondary"}`}
+                  onClick={() => handleLibraryViewChange("all")}
+                >
+                  Tất cả thư viện
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={libraryView === "folder"}
+                  className={`admin-btn admin-btn--xs ${libraryView === "folder" ? "admin-btn--primary" : "admin-btn--secondary"}`}
+                  onClick={() => handleLibraryViewChange("folder")}
+                >
+                  {FOLDER_LABELS[folder] ?? folder}
+                </button>
+              </div>
               <label className={`admin-btn admin-btn--secondary ${uploading ? "admin-btn--disabled" : ""}`}>
                 {uploading ? "Đang tải…" : "Tải ảnh mới"}
                 <input
@@ -490,6 +634,17 @@ export default function MediaPicker(props: Props) {
               <p style={{ color: "#d97706", fontSize: 12, marginBottom: 8 }}>{uploadWarning}</p>
             )}
 
+            <AdminUploadProgress
+              files={uploadQueue}
+              onRetry={
+                lastUploadFile
+                  ? () => {
+                      void uploadNewImage(lastUploadFile);
+                    }
+                  : undefined
+              }
+            />
+
             {loading ? (
               <p className="admin-field-hint">Đang tải…</p>
             ) : loadError ? (
@@ -498,14 +653,16 @@ export default function MediaPicker(props: Props) {
                 <button
                   type="button"
                   className="admin-btn admin-btn--secondary admin-btn--xs"
-                  onClick={() => void loadAssets()}
+                  onClick={() => void refreshAssets(libraryView, search)}
                 >
                   Thử lại
                 </button>
               </div>
             ) : assets.length === 0 ? (
               <p className="admin-field-hint">
-                Chưa có ảnh trong thư viện. Hãy tải ảnh mới hoặc kiểm tra /admin/media.
+                {libraryView === "all"
+                  ? "Chưa có ảnh trong thư viện. Hãy tải ảnh mới hoặc kiểm tra /admin/media."
+                  : `Chưa có ảnh trong thư mục ${FOLDER_LABELS[folder] ?? folder}. Thử chọn Tất cả thư viện hoặc tải ảnh mới.`}
               </p>
             ) : (
               <>
@@ -562,6 +719,23 @@ export default function MediaPicker(props: Props) {
                     );
                   })}
                 </div>
+                {totalCount != null && (
+                  <p className="admin-field-hint" style={{ marginTop: 8 }}>
+                    Đang hiển thị {assets.length} / {totalCount} ảnh
+                  </p>
+                )}
+                {hasMore && (
+                  <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      disabled={loadingMore}
+                      onClick={() => void loadMoreAssets()}
+                    >
+                      {loadingMore ? "Đang tải thêm…" : "Tải thêm"}
+                    </button>
+                  </div>
+                )}
               </>
             )}
 

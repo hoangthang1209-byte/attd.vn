@@ -3,6 +3,7 @@ import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import { Package } from "lucide-react";
 import { isValidImageSrc } from "@/lib/imagePaths";
+import { publicCategoryHref } from "@/features/categories/public-category-url";
 
 type CategoryCardProps = {
   name: string;
@@ -13,6 +14,8 @@ type CategoryCardProps = {
   imageUrl?: string | null;
   count?: number;
   description?: string;
+  /** Muted parent label for child category cards. */
+  parentName?: string | null;
   /** Visual style: grid = homepage, marketplace = image-first minimal, compact = legacy icon */
   variant?: "grid" | "marketplace" | "compact";
   ctaLabel?: string;
@@ -37,13 +40,14 @@ export default function CategoryCard({
   imageUrl,
   count,
   description,
+  parentName,
   variant = "compact",
   ctaLabel = "Xem nguồn hàng",
 }: CategoryCardProps) {
   const hasImage = imageUrl && isValidImageSrc(imageUrl);
   const gradient = CATEGORY_GRADIENTS[slug] ?? "linear-gradient(135deg, #374151 0%, #111827 100%)";
 
-  const cardHref = href ?? `/${slug}`;
+  const cardHref = href ?? publicCategoryHref(slug);
 
   if (variant === "grid" || variant === "marketplace") {
     const countLabel =
@@ -70,6 +74,9 @@ export default function CategoryCard({
         </div>
         <div className="market-cat-card-body market-cat-card-body--minimal">
           <h3 className="market-cat-card-name">{name}</h3>
+          {parentName && (
+            <p className="market-cat-card-parent">Thuộc: {parentName}</p>
+          )}
           {countLabel && <p className="market-cat-card-count-label">{countLabel}</p>}
         </div>
       </Link>
@@ -77,7 +84,7 @@ export default function CategoryCard({
   }
 
   return (
-    <Link href={`/${slug}`} className="category-card">
+    <Link href={publicCategoryHref(slug)} className="category-card">
       <div className="category-card-icon" aria-hidden>
         <Icon size={26} strokeWidth={1.65} />
       </div>

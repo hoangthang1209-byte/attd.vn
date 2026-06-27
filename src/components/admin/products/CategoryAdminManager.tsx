@@ -23,6 +23,8 @@ import CategoryGeneratedCodeField, {
   emptyCategoryCodePreview,
   type CategoryCodePreviewState,
 } from "@/components/admin/products/CategoryGeneratedCodeField";
+import { getCategoryAdminDetailHref } from "@/features/categories/category-admin-routes";
+import { publicCategoryHref } from "@/features/categories/public-category-url";
 import { fetchCategoryCodePreview } from "@/features/categories/category-code-preview.client";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import PublishQualityChecklist from "@/components/admin/products/PublishQualityChecklist";
@@ -701,7 +703,13 @@ export default function CategoryAdminManager() {
                             Sửa nhanh
                           </button>
                           <Link
-                            href={`/${cat.slug}`}
+                            href={getCategoryAdminDetailHref(cat.id)}
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                          >
+                            Chi tiết
+                          </Link>
+                          <Link
+                            href={publicCategoryHref(cat.slug)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="admin-btn admin-btn--secondary admin-btn--xs"

@@ -61,3 +61,12 @@ export function trackQuoteClick(source: string): void {
 export function trackDealerRegistration(source: string): void {
   callGtag("event", "dealer_registration_click", { source });
 }
+
+/** Fired when the homepage “Xem tất cả danh mục” CTA is clicked. */
+export function trackHomepageViewAllCategoriesClick(params: {
+  visible_category_count: number;
+  homepage_category_limit: number;
+  destination_path: string;
+}): void {
+  callGtag("event", "homepage_view_all_categories_click", params);
+}

@@ -76,6 +76,8 @@ export type HomepageCategoryItem = {
   href: string;
   imageUrl: string | null;
   productCount: number | null;
+  /** Parent label for child category cards on the homepage grid. */
+  parentName?: string | null;
 };
 
 /** Serializable homepage product row — latest public catalog items. */
@@ -108,7 +110,12 @@ export type HomepageBlogPostItem = {
 export type HomepageData = {
   hero: HomepageHeroConfig;
   cms: HomepageCmsConfig;
+  /** Root categories for hero discovery rail — unchanged from CMS parents. */
   categories: HomepageCategoryItem[];
+  /** Child categories for the homepage grid below the hero. */
+  gridChildCategories: HomepageCategoryItem[];
+  gridChildCategoryTotal: number;
+  showGridCategoryViewAllCta: boolean;
   latestProducts: HomepageProductItem[];
   blogPosts: HomepageBlogPostItem[];
 };
