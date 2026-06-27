@@ -10,11 +10,14 @@ import {
   type ProductImageRecord,
 } from "@/lib/productImages";
 import { isValidImageSrc } from "@/lib/imagePaths";
-
-/** Desktop PDP main stage — request enough pixels for ~720px display + retina. */
-const PDP_MAIN_IMAGE_SIZES =
-  "(max-width: 899px) 100vw, (min-width: 1200px) 720px, 58vw";
-const PDP_MAIN_IMAGE_QUALITY = 90;
+import {
+  getPdpMainImageUrl,
+  getPdpZoomImageUrl,
+  PDP_MAIN_IMAGE_QUALITY,
+  PDP_MAIN_IMAGE_SIZES,
+  PDP_ZOOM_IMAGE_QUALITY,
+  PDP_ZOOM_IMAGE_SIZES,
+} from "@/lib/pdpImageUrls";
 
 type Props = {
   images: ProductImageRecord[];
@@ -73,6 +76,21 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
 
     return 0;
   }, [manualPick, galleryKey, gallery, selectedImageUrl, clampIndex]);
+
+  const selectedSrc = useMemo(() => {
+    if (total === 0) return null;
+    const image = gallery[selectedIndex] ?? gallery[0];
+    return image?.imageUrl ?? null;
+  }, [total, gallery, selectedIndex]);
+
+  const mainImageSrc = useMemo(
+    () => (selectedSrc ? getPdpMainImageUrl(selectedSrc) : null),
+    [selectedSrc],
+  );
+  const zoomImageSrc = useMemo(
+    () => (selectedSrc ? getPdpZoomImageUrl(selectedSrc) : null),
+    [selectedSrc],
+  );
 
   const goTo = useCallback(
     (index: number, { loop = true }: { loop?: boolean } = {}) => {
@@ -179,14 +197,7 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
     );
   }
 
-  const selected = gallery[selectedIndex] ?? gallery[0];
-  const selectedSrc = selected?.imageUrl;
-  const mainAlt =
-    total > 1 ? `${productName} — ảnh ${selectedIndex + 1}` : productName;
-  const canGoPrev = selectedIndex > 0;
-  const canGoNext = selectedIndex < total - 1;
-
-  if (!selectedSrc) {
+  if (!selectedSrc || !mainImageSrc || !zoomImageSrc) {
     return (
       <div className="mp-pdp-gallery mp-pdp-gallery--empty" aria-label="Ảnh sản phẩm">
         <ProductMediaFrame
@@ -197,6 +208,12 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
       </div>
     );
   }
+
+  const selected = gallery[selectedIndex] ?? gallery[0];
+  const mainAlt =
+    total > 1 ? `${productName} — ảnh ${selectedIndex + 1}` : productName;
+  const canGoPrev = selectedIndex > 0;
+  const canGoNext = selectedIndex < total - 1;
 
   const lightbox =
     lightboxOpen &&
@@ -246,14 +263,13 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
 
         <div className="mp-pdp-lightbox-img-wrap">
           <Image
-            key={`lb-${selectedSrc}`}
-            src={selectedSrc}
+            key={`lb-${zoomImageSrc}`}
+            src={zoomImageSrc}
             alt={selected.altText ?? mainAlt}
             fill
             className="mp-pdp-lightbox-img"
-            sizes="100vw"
-            quality={PDP_MAIN_IMAGE_QUALITY}
-            priority
+            sizes={PDP_ZOOM_IMAGE_SIZES}
+            quality={PDP_ZOOM_IMAGE_QUALITY}
           />
         </div>
 
@@ -279,8 +295,8 @@ export default function ProductGallery({ images, productName, selectedImageUrl }
               aria-describedby={total > 1 ? `pdp-gallery-thumb-${selectedIndex}` : undefined}
             >
               <Image
-                key={selectedSrc}
-                src={selectedSrc}
+                key={mainImageSrc}
+                src={mainImageSrc}
                 alt={selected.altText ?? mainAlt}
                 fill
                 className="mp-pdp-gallery-main-img"
