@@ -46,7 +46,7 @@ export default function ProductMediaFrame({
             src={imageUrl}
             alt={alt}
             fill
-            className="product-media-frame__img"
+            className="product-media-frame__img product-media-frame__img--primary"
             sizes={sizes}
             priority={priority}
           />
