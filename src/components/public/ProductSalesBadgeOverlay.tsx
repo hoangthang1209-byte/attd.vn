@@ -1,4 +1,4 @@
-import { Factory, Flame, Layers, Printer, Sparkles } from "lucide-react";
+import { Boxes, Factory, Flame, Palette, Sparkles } from "lucide-react";
 import type { PublicProductSalesBadge, ProductSalesBadgeIcon } from "@/features/products/product-sales-badges";
 
 type Props = {
@@ -11,9 +11,9 @@ function BadgeIcon({ icon }: { icon?: ProductSalesBadgeIcon }) {
   const stroke = 2;
   switch (icon) {
     case "moq":
-      return <Layers size={size} strokeWidth={stroke} aria-hidden="true" />;
+      return <Boxes size={size} strokeWidth={stroke} aria-hidden="true" />;
     case "print":
-      return <Printer size={size} strokeWidth={stroke} aria-hidden="true" />;
+      return <Palette size={size} strokeWidth={stroke} aria-hidden="true" />;
     case "factory":
       return <Factory size={size} strokeWidth={stroke} aria-hidden="true" />;
     case "flame":
