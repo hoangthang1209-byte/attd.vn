@@ -17,6 +17,7 @@ type ProductCardProps = {
   skuCount?: number;
   category?: string;
   imageUrl?: string | null;
+  hoverImageUrl?: string | null;
   moq?: number | null;
   leadTime?: string | null;
   stockStatus?: string;
@@ -44,6 +45,7 @@ export default function ProductCard({
   leadTime,
   category,
   imageUrl,
+  hoverImageUrl,
   stockStatus,
   stockLabel,
   compact = false,
@@ -74,6 +76,7 @@ export default function ProductCard({
           <Link href={productHref} className="product-card-media-link">
             <ProductMediaFrame
               imageUrl={imageUrl}
+              hoverImageUrl={hoverImageUrl}
               alt={name}
               placeholderLabel={productCode ?? undefined}
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"

@@ -40,6 +40,7 @@ export default function HomeProductDiscoverySection({ products }: Props) {
                 name={product.name}
                 category={product.categoryName ?? undefined}
                 imageUrl={product.imageUrl}
+                hoverImageUrl={product.hoverImageUrl}
                 moq={product.minimumOrderQuantity}
                 leadTime={product.productionLeadTime}
                 stockStatus={stockStatus}

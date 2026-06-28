@@ -24,7 +24,7 @@ import {
   getCategoryHeroImage,
   getCategoryGalleryImages,
 } from "@/lib/categoryImages";
-import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
+import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
 import { isValidImageSrc } from "@/lib/imagePaths";
 
 type PageProps = {
@@ -178,6 +178,7 @@ export default async function CategoryPage({ params }: PageProps) {
                   skuCount={product.variants.length}
                   category={cat.name}
                   imageUrl={getPrimaryProductImageFromProduct(product)}
+                  hoverImageUrl={getProductCardHoverImageFromProduct(product)}
                   moq={product.defaultMoq}
                   leadTime={product.leadTime}
                   supportsPrinting={product.supportsPrinting}

@@ -272,9 +272,8 @@ export async function getCategoryBySlug(slug: string) {
           supportsPrinting: true, supportsEmbroidery: true, supportsOem: true,
           variants: { select: { id: true, stockStatus: true } },
           images: {
-            select: { imageUrl: true, altText: true },
+            select: { imageUrl: true, altText: true, sortOrder: true },
             orderBy: { sortOrder: "asc" },
-            take: 1,
           },
         },
         orderBy: { createdAt: "desc" },

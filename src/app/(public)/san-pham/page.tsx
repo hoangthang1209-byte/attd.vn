@@ -15,7 +15,7 @@ import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import { SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { buildCatalogMetadata } from "@/lib/seo/indexation-policy";
-import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
+import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
 import { buildClearFiltersUrl } from "@/lib/catalog-filter-url";
 
 export const revalidate = 3600;
@@ -192,6 +192,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                         skuCount={product.variants.length}
                         category={product.category.name}
                         imageUrl={getPrimaryProductImageFromProduct(product)}
+                        hoverImageUrl={getProductCardHoverImageFromProduct(product)}
                         moq={product.defaultMoq}
                         leadTime={product.leadTime}
                         stockStatus={stock ?? undefined}

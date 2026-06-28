@@ -210,9 +210,8 @@ export async function getProductsForPublicListing(params: {
       include: {
         category: true,
         images: {
-          select: { imageUrl: true, altText: true },
+          select: { imageUrl: true, altText: true, sortOrder: true },
           orderBy: { sortOrder: "asc" },
-          take: 1,
         },
         variants: { select: { id: true, stockStatus: true, colorName: true, sizeName: true } },
       },
@@ -254,9 +253,8 @@ const PUBLIC_PRODUCT_CARD_SELECT = {
   category: { select: { name: true, slug: true } },
   variants: { select: { id: true, stockStatus: true } },
   images: {
-    select: { imageUrl: true, altText: true },
+    select: { imageUrl: true, altText: true, sortOrder: true },
     orderBy: { sortOrder: "asc" as const },
-    take: 1,
   },
 };
 

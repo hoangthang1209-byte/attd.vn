@@ -193,6 +193,9 @@ export default function ProductImageManager({ productId, images }: Props) {
 
       <div style={{ marginTop: 32 }}>
         <h3 className="admin-subtitle">Hình ảnh ({images.length})</h3>
+        <p className="admin-field-hint" style={{ marginBottom: 12 }}>
+          Ảnh thứ hai sẽ hiển thị khi rê chuột vào card sản phẩm trên desktop.
+        </p>
 
         {actionMessage && (
           <p className="admin-message admin-message--info">{actionMessage}</p>

@@ -1226,6 +1226,9 @@ export default function ProductCatalogForm({
         {/* Gallery */}
         <div className="admin-field">
           <label className="admin-label">Thư viện ảnh (gallery)</label>
+          <p className="admin-field-hint" style={{ marginBottom: 8 }}>
+            Ảnh thứ hai sẽ hiển thị khi rê chuột vào card sản phẩm trên desktop.
+          </p>
           <div className="admin-catalog-gallery-picker">
             <MediaPicker
               multiple={true}

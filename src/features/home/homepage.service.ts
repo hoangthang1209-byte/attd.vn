@@ -7,7 +7,7 @@ import { getProductsForPublicListing } from "@/features/products/services/produc
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
 import { catalogCategoryHref } from "@/lib/marketplaceCategoryTree";
-import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
+import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
 import { isValidImageSrc } from "@/lib/imagePaths";
 import type {
   HomepageBlogPostItem,
@@ -480,6 +480,7 @@ function deriveAvailabilityLabel(variants: PublicListingProduct["variants"]): st
 
 function mapProduct(product: PublicListingProduct): HomepageProductItem {
   const primaryImage = getPrimaryProductImageFromProduct(product);
+  const hoverImage = getProductCardHoverImageFromProduct(product);
   const imageAlt = product.images[0]?.altText?.trim() || product.name;
   return {
     id: product.id,
@@ -489,6 +490,7 @@ function mapProduct(product: PublicListingProduct): HomepageProductItem {
     categoryName: product.category?.name ?? null,
     categorySlug: product.category?.slug ?? null,
     imageUrl: primaryImage && isValidImageSrc(primaryImage) ? primaryImage : null,
+    hoverImageUrl: hoverImage && isValidImageSrc(hoverImage) ? hoverImage : null,
     imageAlt,
     minimumOrderQuantity: product.defaultMoq ?? null,
     productionLeadTime: product.leadTime ?? null,

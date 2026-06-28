@@ -19,7 +19,7 @@ import {
 } from "@/lib/seo";
 import { getCatalogProduct } from "@/lib/productCatalog";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
-import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
+import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -191,6 +191,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     name={related.name}
                     category={product.category?.name ?? ""}
                     imageUrl={getPrimaryProductImageFromProduct(related)}
+                    hoverImageUrl={getProductCardHoverImageFromProduct(related)}
                     moq={related.defaultMoq}
                     leadTime={related.leadTime}
                     compact

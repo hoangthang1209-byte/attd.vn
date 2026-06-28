@@ -4,6 +4,7 @@ import { isValidImageSrc } from "@/lib/imagePaths";
 
 type ProductMediaFrameProps = {
   imageUrl?: string | null;
+  hoverImageUrl?: string | null;
   alt: string;
   placeholderLabel?: string;
   sizes: string;
@@ -18,6 +19,7 @@ type ProductMediaFrameProps = {
  */
 export default function ProductMediaFrame({
   imageUrl,
+  hoverImageUrl,
   alt,
   placeholderLabel,
   sizes,
@@ -26,18 +28,39 @@ export default function ProductMediaFrame({
   placeholderCompact = false,
 }: ProductMediaFrameProps) {
   const hasImage = imageUrl && isValidImageSrc(imageUrl);
+  const hasHover =
+    hasImage &&
+    hoverImageUrl &&
+    isValidImageSrc(hoverImageUrl) &&
+    hoverImageUrl.trim() !== imageUrl.trim();
 
   return (
-    <div className={`product-media-frame${className ? ` ${className}` : ""}`}>
+    <div
+      className={`product-media-frame${hasHover ? " product-media-frame--has-hover" : ""}${
+        className ? ` ${className}` : ""
+      }`}
+    >
       {hasImage ? (
-        <Image
-          src={imageUrl}
-          alt={alt}
-          fill
-          className="product-media-frame__img"
-          sizes={sizes}
-          priority={priority}
-        />
+        <>
+          <Image
+            src={imageUrl}
+            alt={alt}
+            fill
+            className="product-media-frame__img"
+            sizes={sizes}
+            priority={priority}
+          />
+          {hasHover ? (
+            <Image
+              src={hoverImageUrl}
+              alt=""
+              fill
+              aria-hidden="true"
+              className="product-media-frame__img product-media-frame__img--hover"
+              sizes={sizes}
+            />
+          ) : null}
+        </>
       ) : (
         <ImagePlaceholder
           variant="product"

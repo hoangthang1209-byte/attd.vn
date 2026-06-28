@@ -104,6 +104,43 @@ export function getPrimaryProductImageFromProduct(
   return images[0]?.imageUrl ?? null;
 }
 
+/**
+ * Second distinct valid gallery image after the primary — used for desktop card hover.
+ * Returns null when no suitable alternate image exists.
+ */
+export function getProductCardHoverImageUrl(
+  images: ProductImageRecord[],
+  primaryImageUrl?: string | null,
+): string | null {
+  const gallery = getProductGalleryImages(images);
+  const primary =
+    primaryImageUrl && isValidImageSrc(primaryImageUrl)
+      ? primaryImageUrl.trim()
+      : (gallery[0]?.imageUrl ?? null);
+  if (!primary) return null;
+
+  const normalizedPrimary = primary.trim();
+  const primaryIndex = gallery.findIndex(
+    (img) => img.imageUrl.trim() === normalizedPrimary,
+  );
+  const startIndex = primaryIndex >= 0 ? primaryIndex + 1 : 1;
+
+  for (let i = startIndex; i < gallery.length; i++) {
+    const candidate = gallery[i]!.imageUrl.trim();
+    if (candidate !== normalizedPrimary) return candidate;
+  }
+  return null;
+}
+
+/** Hover image URL from unified product image fields with legacy fallback. */
+export function getProductCardHoverImageFromProduct(
+  product: ProductWithNewImages,
+): string | null {
+  const images = buildProductImages(product);
+  const primary = images[0]?.imageUrl ?? null;
+  return getProductCardHoverImageUrl(images, primary);
+}
+
 export type ProductImageStats = {
   total: number;
   withImages: number;

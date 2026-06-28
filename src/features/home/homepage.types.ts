@@ -91,6 +91,7 @@ export type HomepageProductItem = {
   categoryName: string | null;
   categorySlug: string | null;
   imageUrl: string | null;
+  hoverImageUrl: string | null;
   imageAlt: string;
   minimumOrderQuantity: number | null;
   productionLeadTime: string | null;

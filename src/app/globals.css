@@ -1429,6 +1429,19 @@ body:has(.mobile-action-bar) .site-footer {
   box-sizing: border-box;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .product-media-frame--has-hover .product-media-frame__img--hover {
+    opacity: 0;
+    transition: opacity 200ms ease;
+    pointer-events: none;
+  }
+
+  .product-card-media-link:hover .product-media-frame--has-hover .product-media-frame__img--hover,
+  .product-card-media-link:focus-within .product-media-frame--has-hover .product-media-frame__img--hover {
+    opacity: 1;
+  }
+}
+
 .product-card-media .image-placeholder {
   background: #f8fafc;
 }
