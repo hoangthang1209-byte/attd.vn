@@ -5,6 +5,8 @@ import { useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
 import ProductQuoteDialog from "@/components/public/ProductQuoteDialog";
+import ProductSalesBadgeOverlay from "@/components/public/ProductSalesBadgeOverlay";
+import type { PublicProductSalesBadge } from "@/features/products/product-sales-badges";
 import { formatProductCardMoq, isPublicMoq } from "@/lib/formatMoq";
 
 type ProductCardProps = {
@@ -24,6 +26,7 @@ type ProductCardProps = {
   supportsOem?: boolean;
   /** Compact image-first layout for marketplace grids */
   compact?: boolean;
+  salesBadges?: PublicProductSalesBadge[];
 };
 
 const STOCK_COLORS: Record<string, string> = {
@@ -44,6 +47,7 @@ export default function ProductCard({
   stockStatus,
   stockLabel,
   compact = false,
+  salesBadges = [],
 }: ProductCardProps) {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const quoteTriggerRef = useRef<HTMLButtonElement>(null);
@@ -76,6 +80,8 @@ export default function ProductCard({
               placeholderCompact={compact}
             />
           </Link>
+
+          <ProductSalesBadgeOverlay badges={salesBadges} compact={compact} />
 
           {stockLabel && stockStatus !== "IN_STOCK" && (
             <span className="product-card-stock-badge" style={{ background: stockColor }}>

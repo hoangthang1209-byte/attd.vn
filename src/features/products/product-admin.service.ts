@@ -74,6 +74,10 @@ import {
   variantNeedsUpdate,
 } from "@/features/products/product-save-relation-diff";
 import { createProductSaveTimer } from "@/features/products/product-save-timing";
+import {
+  mergeCuratedSalesBadgesIntoMetadata,
+  type ProductCuratedBadgeKey,
+} from "@/features/products/product-sales-badges";
 
 export { createProductSaveTimer } from "@/features/products/product-save-timing";
 
@@ -157,6 +161,7 @@ export type ProductInput = {
   leadTime?: string | null;
   status?: ProductStatus;
   metadata?: Record<string, unknown> | null;
+  curatedSalesBadges?: ProductCuratedBadgeKey[];
   variants?: VariantInput[];
   options?: ProductOptionInput[];
   specifications?: ProductSpecificationInput[];
@@ -886,6 +891,7 @@ function buildProductCreateData(
   systemCode: string,
   status: ProductStatus,
 ): Prisma.ProductCreateInput {
+  const metadata = resolveProductMetadataForSave(input);
   return {
     name: input.name,
     slug,
@@ -912,8 +918,19 @@ function buildProductCreateData(
     gallery: input.gallery ?? [],
     leadTime: input.leadTime ?? null,
     status,
-    ...(input.metadata ? { metadata: input.metadata as Prisma.InputJsonValue } : {}),
+    ...(metadata != null ? { metadata: metadata as Prisma.InputJsonValue } : {}),
   };
+}
+
+function resolveProductMetadataForSave(input: Pick<ProductInput, "metadata" | "curatedSalesBadges">) {
+  if (input.curatedSalesBadges !== undefined) {
+    const merged = mergeCuratedSalesBadgesIntoMetadata(input.metadata ?? null, input.curatedSalesBadges);
+    return Object.keys(merged).length > 0 ? merged : null;
+  }
+  if (input.metadata) {
+    return input.metadata;
+  }
+  return undefined;
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────
@@ -1083,7 +1100,18 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
   if (input.supportsEmbroidery !== undefined) updateData.supportsEmbroidery = input.supportsEmbroidery;
   if (input.supportsOem !== undefined) updateData.supportsOem = input.supportsOem;
   if (input.tags !== undefined) updateData.tags = input.tags;
-  if (input.metadata !== undefined && input.metadata) updateData.metadata = input.metadata as Prisma.InputJsonValue;
+  if (input.curatedSalesBadges !== undefined) {
+    const existingMetadata = await prisma.product.findUnique({
+      where: { id },
+      select: { metadata: true },
+    });
+    updateData.metadata = mergeCuratedSalesBadgesIntoMetadata(
+      existingMetadata?.metadata ?? null,
+      input.curatedSalesBadges,
+    ) as Prisma.InputJsonValue;
+  } else if (input.metadata !== undefined && input.metadata) {
+    updateData.metadata = input.metadata as Prisma.InputJsonValue;
+  }
   if (input.featuredImage !== undefined) updateData.featuredImage = input.featuredImage;
   if (input.gallery !== undefined) updateData.gallery = input.gallery;
   if (input.leadTime !== undefined) updateData.leadTime = input.leadTime;

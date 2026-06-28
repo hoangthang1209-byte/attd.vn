@@ -8327,7 +8327,56 @@ body:has(.mp-pdp--b2b) .floating-contact {
 .product-card { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; text-decoration: none; color: inherit; background: #fff; transition: box-shadow .18s, transform .18s; }
 .product-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
 .product-card-media { position: relative; aspect-ratio: 1/1; background: #f8fafc; overflow: hidden; }
-.product-card-stock-badge { position: absolute; top: 8px; left: 8px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #fff; z-index: 1; }
+.product-card-sales-badges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  pointer-events: none;
+}
+.product-card-sales-badges--compact { top: 6px; left: 6px; gap: 3px; max-width: calc(100% - 12px); }
+.product-card-sales-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2937;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.product-card-sales-badges--compact .product-card-sales-badge {
+  padding: 2px 6px;
+  font-size: 9px;
+  border-radius: 4px;
+}
+.product-card-sales-badge--moq {
+  background: rgba(17, 24, 39, 0.88);
+  border-color: rgba(17, 24, 39, 0.2);
+  color: #f9fafb;
+}
+.product-card-sales-badge-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+.product-card-sales-badge-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.product-card-stock-badge { position: absolute; top: 8px; right: 8px; left: auto; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #fff; z-index: 1; }
 .product-card-body { padding: 16px; display: flex; flex-direction: column; flex: 1; gap: 6px; }
 .product-card-category { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--primary); margin: 0; }
 .product-card-title { font-size: 15px; font-weight: 700; margin: 0; line-height: 1.35; color: #111827; }
@@ -8338,6 +8387,51 @@ body:has(.mp-pdp--b2b) .floating-contact {
 .product-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 12px; border-top: 1px solid #f3f4f6; }
 .product-card-quote-btn { font-size: 13px; font-weight: 600; color: var(--primary); }
 .product-card-link { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 500; color: #374151; }
+
+.admin-catalog-sales-badge-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.admin-catalog-sales-badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+}
+.admin-catalog-sales-badge-chip--selected {
+  border-color: #111827;
+  background: #f9fafb;
+  color: #111827;
+}
+.admin-catalog-sales-badge-chip--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.admin-catalog-sales-badge-chip input { margin: 0; }
+.admin-catalog-sales-badge-preview {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+.admin-catalog-sales-badge-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.admin-catalog-sales-badge-preview-item {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px dashed #d1d5db;
+  background: #f9fafb;
+  font-size: 12px;
+  color: #4b5563;
+}
 
 /* Badges */
 .product-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: .04em; }

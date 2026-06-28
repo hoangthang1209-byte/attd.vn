@@ -1,3 +1,5 @@
+import type { PublicProductSalesBadge } from "@/features/products/product-sales-badges";
+
 /** CMS-editable homepage hero copy and CTAs. */
 export type HomepageHeroConfig = {
   eyebrow: string;
@@ -93,6 +95,7 @@ export type HomepageProductItem = {
   minimumOrderQuantity: number | null;
   productionLeadTime: string | null;
   availabilityLabel: string | null;
+  salesBadges: PublicProductSalesBadge[];
 };
 
 /** Serializable homepage blog teaser row. */

@@ -4,6 +4,7 @@ import {
   type CmsCategoryTreeNode,
 } from "@/features/categories/services/category.service";
 import { getProductsForPublicListing } from "@/features/products/services/product.service";
+import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
 import { catalogCategoryHref } from "@/lib/marketplaceCategoryTree";
 import { getPrimaryProductImageFromProduct } from "@/lib/productImages";
@@ -492,6 +493,7 @@ function mapProduct(product: PublicListingProduct): HomepageProductItem {
     minimumOrderQuantity: product.defaultMoq ?? null,
     productionLeadTime: product.leadTime ?? null,
     availabilityLabel: deriveAvailabilityLabel(product.variants),
+    salesBadges: mapPublicProductCardSalesBadges(product),
   };
 }
 

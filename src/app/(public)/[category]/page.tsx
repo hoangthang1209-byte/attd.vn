@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/public/ProductCard";
+import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import InternalLinkBlock from "@/components/public/InternalLinkBlock";
 import TrustBlock from "@/components/public/TrustBlock";
 import EmptyState from "@/components/public/EmptyState";
@@ -178,6 +179,7 @@ export default async function CategoryPage({ params }: PageProps) {
                   supportsPrinting={product.supportsPrinting}
                   supportsEmbroidery={product.supportsEmbroidery}
                   supportsOem={product.supportsOem}
+                  salesBadges={mapPublicProductCardSalesBadges(product)}
                 />
               ))}
             </div>

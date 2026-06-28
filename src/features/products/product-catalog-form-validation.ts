@@ -101,7 +101,7 @@ export function resolveTabForField(
   if (field.startsWith("options") || field.startsWith("variants") || field === "variants") {
     return "variants";
   }
-  if (field.startsWith("gallery") || field === "featuredImage") return "media";
+  if (field.startsWith("gallery") || field === "featuredImage" || field === "curatedSalesBadges") return "media";
   if (field.startsWith("attributeAssignments") && context?.form) {
     return resolveAssignmentErrorTab(field, context.form, context.sharedAttributes ?? []);
   }

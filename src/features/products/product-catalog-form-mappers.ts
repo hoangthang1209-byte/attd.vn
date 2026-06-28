@@ -1,5 +1,9 @@
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
 import type { BulkVariantResult } from "@/features/products/product-variant-bulk.service";
+import {
+  parseCuratedSalesBadgeKeysFromMetadata,
+  type ProductCuratedBadgeKey,
+} from "@/features/products/product-sales-badges";
 
 export type MatrixVariantFormRow = {
   id?: string;
@@ -128,6 +132,7 @@ export type ProductAdminEditInitialData = {
   variants: MatrixVariantFormRow[];
   seoTitle: string;
   seoDescription: string;
+  curatedSalesBadges: ProductCuratedBadgeKey[];
 };
 
 function joinStringArray(value: unknown): string {
@@ -258,6 +263,7 @@ type BuildProductAdminEditInitialDataInput = {
   variants: AdminProductVariant[];
   seoTitle: string | null;
   seoDescription: string | null;
+  metadata?: unknown;
 };
 
 export function mapAttributeAssignmentsToFormRows(
@@ -320,5 +326,6 @@ export function buildProductAdminEditInitialData(
     variants: mapVariantsToFormRows(product.variants ?? []),
     seoTitle: product.seoTitle ?? "",
     seoDescription: product.seoDescription ?? "",
+    curatedSalesBadges: parseCuratedSalesBadgeKeysFromMetadata(product.metadata),
   };
 }

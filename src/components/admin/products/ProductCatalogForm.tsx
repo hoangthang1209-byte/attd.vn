@@ -45,6 +45,12 @@ import {
   type ProductFormErrorDescriptor,
 } from "@/features/products/product-form-error-descriptors";
 import { normalizeProductFormFieldErrors } from "@/features/products/product-form-row-error-keys";
+import {
+  resolveAutomaticSalesBadgePreviews,
+  PRODUCT_CURATED_BADGE_LABELS,
+  PRODUCT_CURATED_BADGE_KEYS,
+  type ProductCuratedBadgeKey,
+} from "@/features/products/product-sales-badges";
 import { validateProductCategorySelection } from "@/features/categories/category-cascade-utils";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import {
@@ -93,6 +99,7 @@ type ProductFormData = {
   customizations: ProductCustomizationFormRow[];
   options: OptionGroupFormRow[];
   variants: MatrixVariantFormRow[];
+  curatedSalesBadges: ProductCuratedBadgeKey[];
 };
 
 const FORM_TABS = [
@@ -165,6 +172,7 @@ export default function ProductCatalogForm({
     customizations: initialData?.customizations ?? [],
     options: initialData?.options ?? [],
     variants: initialData?.variants ?? [],
+    curatedSalesBadges: initialData?.curatedSalesBadges ?? [],
   });
   const [saving, setSaving] = useState(false);
   const [bulkOpInProgress, setBulkOpInProgress] = useState(false);
@@ -478,6 +486,36 @@ export default function ProductCatalogForm({
     return Number.isFinite(n) ? n : undefined;
   }
 
+  const automaticSalesBadgePreview = useMemo(
+    () =>
+      resolveAutomaticSalesBadgePreviews({
+        defaultMoq: parseNumberField(form.defaultMoq) ?? null,
+        supportsPrinting: form.supportsPrinting,
+        supportsOem: form.supportsOem,
+      }),
+    [form.defaultMoq, form.supportsPrinting, form.supportsOem],
+  );
+
+  const curatedBadgeLimitReached = form.curatedSalesBadges.length >= 2;
+
+  function toggleCuratedSalesBadge(key: ProductCuratedBadgeKey) {
+    setForm((prev) => {
+      const selected = prev.curatedSalesBadges.includes(key);
+      if (selected) {
+        return {
+          ...prev,
+          curatedSalesBadges: prev.curatedSalesBadges.filter((item) => item !== key),
+        };
+      }
+      if (prev.curatedSalesBadges.length >= 2) return prev;
+      return {
+        ...prev,
+        curatedSalesBadges: [...prev.curatedSalesBadges, key],
+      };
+    });
+    clearFieldErrorKey("curatedSalesBadges");
+  }
+
   function buildPayload() {
     return {
       name: form.name.trim(),
@@ -506,6 +544,7 @@ export default function ProductCatalogForm({
       supportsOem: form.supportsOem,
       tags: form.tags.split(",").map((s) => s.trim()).filter(Boolean),
       status: form.status,
+      curatedSalesBadges: form.curatedSalesBadges,
       featuredImage: form.featuredImage.trim() || undefined,
       gallery: form.gallery.map((url) => url.trim()).filter(Boolean),
       specifications: form.specifications
@@ -1131,6 +1170,57 @@ export default function ProductCatalogForm({
           {fieldErrors.featuredImage && (
             <p className="admin-field-error" role="alert">{fieldErrors.featuredImage}</p>
           )}
+        </div>
+
+        <div className="admin-field" data-field="curatedSalesBadges">
+          <label className="admin-label">Nhãn bán hàng trên ảnh đại diện</label>
+          <p className="admin-field-hint">
+            Các nhãn này sẽ hiển thị trên ảnh sản phẩm ở danh sách công khai.
+          </p>
+          <div className="admin-catalog-sales-badge-chips">
+            {PRODUCT_CURATED_BADGE_KEYS.map((key) => {
+              const selected = form.curatedSalesBadges.includes(key);
+              const disabled = !selected && curatedBadgeLimitReached;
+              return (
+                <label
+                  key={key}
+                  className={`admin-catalog-sales-badge-chip${selected ? " admin-catalog-sales-badge-chip--selected" : ""}${disabled ? " admin-catalog-sales-badge-chip--disabled" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    disabled={disabled}
+                    onChange={() => toggleCuratedSalesBadge(key)}
+                  />
+                  {PRODUCT_CURATED_BADGE_LABELS[key]}
+                </label>
+              );
+            })}
+          </div>
+          <p className="admin-field-hint" style={{ marginTop: 6 }}>
+            Đã chọn {form.curatedSalesBadges.length}/2
+          </p>
+          {fieldErrors.curatedSalesBadges && (
+            <p className="admin-field-error" role="alert">{fieldErrors.curatedSalesBadges}</p>
+          )}
+
+          <div className="admin-catalog-sales-badge-preview">
+            <p className="admin-label" style={{ marginBottom: 6 }}>Nhãn tự động dự kiến</p>
+            <p className="admin-field-hint" style={{ marginBottom: 8 }}>
+              Dựa trên dữ liệu sản phẩm (MOQ, in logo, OEM). Không thể nhập thủ công tại đây.
+            </p>
+            {automaticSalesBadgePreview.length > 0 ? (
+              <div className="admin-catalog-sales-badge-preview-list">
+                {automaticSalesBadgePreview.map((badge) => (
+                  <span key={badge.key} className="admin-catalog-sales-badge-preview-item">
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="admin-field-hint">Chưa có nhãn tự động từ dữ liệu hiện tại.</p>
+            )}
+          </div>
         </div>
 
         {/* Gallery */}

@@ -6,6 +6,7 @@ import {
   resolveCatalogCategoryContext,
 } from "@/features/categories/services/category.service";
 import ProductCard from "@/components/public/ProductCard";
+import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import CatalogFilterToolbar from "@/components/marketplace/CatalogFilterToolbar";
 import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
 import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
@@ -198,6 +199,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                         supportsPrinting={product.supportsPrinting}
                         supportsEmbroidery={product.supportsEmbroidery}
                         supportsOem={product.supportsOem}
+                        salesBadges={mapPublicProductCardSalesBadges(product)}
                       />
                     );
                   })}

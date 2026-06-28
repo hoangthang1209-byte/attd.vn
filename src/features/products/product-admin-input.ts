@@ -2,6 +2,10 @@ import type { ProductStatus, StockStatus, VariantStatus } from "@prisma/client";
 import type { ProductInput, VariantInput } from "@/features/products/product-admin.service";
 import { isValidProductImageUrl, PRODUCT_IMAGE_URL_ERROR } from "@/features/products/product-image-url";
 import {
+  validateCuratedSalesBadgeKeys,
+  type ProductCuratedBadgeKey,
+} from "@/features/products/product-sales-badges";
+import {
   SeoPublishQualityGateError,
   formatSeoPublishQualityGateApiError,
 } from "@/lib/seo/publish-quality-gate";
@@ -262,6 +266,16 @@ export function parseProductInput(
     variants = raw.variants.map((variant, index) => parseVariant(variant, index));
   }
 
+  let curatedSalesBadges: ProductCuratedBadgeKey[] | undefined;
+  if (raw.curatedSalesBadges !== undefined) {
+    const validated = validateCuratedSalesBadgeKeys(raw.curatedSalesBadges);
+    if ("error" in validated) {
+      fieldErrors.curatedSalesBadges = validated.error;
+    } else {
+      curatedSalesBadges = validated.keys;
+    }
+  }
+
   if (Object.keys(fieldErrors).length > 0) {
     throw new ProductAdminValidationError(
       mode === "create"
@@ -300,6 +314,7 @@ export function parseProductInput(
   if (raw.metadata !== undefined && raw.metadata && typeof raw.metadata === "object") {
     input.metadata = raw.metadata as Record<string, unknown>;
   }
+  if (curatedSalesBadges !== undefined) input.curatedSalesBadges = curatedSalesBadges;
   if (variants !== undefined) input.variants = variants;
 
   if (Array.isArray(raw.options)) {

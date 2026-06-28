@@ -45,6 +45,7 @@ export default function HomeProductDiscoverySection({ products }: Props) {
                 stockStatus={stockStatus}
                 stockLabel={stockLabel}
                 compact
+                salesBadges={product.salesBadges}
               />
             );
           })}

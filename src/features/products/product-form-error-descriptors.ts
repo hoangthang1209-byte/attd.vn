@@ -63,6 +63,7 @@ const FIELD_LABELS: Record<string, string> = {
   defaultMoq: "MOQ",
   leadTime: "Lead time",
   featuredImage: "Ảnh đại diện",
+  curatedSalesBadges: "Nhãn bán hàng",
   shortDescription: "Mô tả ngắn",
   description: "Mô tả",
   tags: "Tags",
@@ -250,10 +251,10 @@ function resolveDescriptorMeta(
     };
   }
 
-  if (fieldKey.startsWith("gallery") || fieldKey === "featuredImage") {
+  if (fieldKey.startsWith("gallery") || fieldKey === "featuredImage" || fieldKey === "curatedSalesBadges") {
     return {
       tab: "media",
-      section: fieldKey.startsWith("gallery") ? "Thư viện ảnh" : "Ảnh đại diện",
+      section: fieldKey === "curatedSalesBadges" ? "Nhãn bán hàng trên ảnh đại diện" : fieldKey.startsWith("gallery") ? "Thư viện ảnh" : "Ảnh đại diện",
       focusTarget: fieldKey,
       field: fieldKey.split(".").pop() ?? fieldKey,
       severity: "field",

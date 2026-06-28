@@ -250,6 +250,7 @@ const PUBLIC_PRODUCT_CARD_SELECT = {
   supportsPrinting: true,
   supportsEmbroidery: true,
   supportsOem: true,
+  metadata: true,
   category: { select: { name: true, slug: true } },
   variants: { select: { id: true, stockStatus: true } },
   images: {
@@ -258,6 +259,8 @@ const PUBLIC_PRODUCT_CARD_SELECT = {
     take: 1,
   },
 };
+
+export { PUBLIC_PRODUCT_CARD_SELECT };
 
 /** Returns up to `limit` active products in the same category, excluding the given product. */
 export async function getRelatedProducts(
