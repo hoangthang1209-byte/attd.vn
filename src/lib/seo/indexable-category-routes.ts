@@ -23,6 +23,7 @@ export const INDEXABLE_CATEGORY_LANDING_SLUGS = new Set([
  */
 export const RESERVED_STATIC_PUBLIC_SLUGS = new Set([
   "san-pham",
+  "danh-muc-san-pham",
   "blog",
   "q",
   "quote-link",
@@ -54,6 +55,7 @@ export const RESERVED_STATIC_PUBLIC_SLUGS = new Set([
 export const INDEXABLE_STATIC_COMMERCIAL_PATHS = [
   "/",
   "/san-pham",
+  "/danh-muc-san-pham",
   "/blog",
   "/nguon-hang",
   "/oem",
@@ -90,6 +92,11 @@ export function isIndexableCategoryLanding(slug: string | null | undefined): boo
 
 export function isReservedStaticPublicSlug(slug: string): boolean {
   return RESERVED_STATIC_PUBLIC_SLUGS.has(normalizeCategorySlug(slug));
+}
+
+/** Prevents `[category]` from shadowing dedicated static public pages. */
+export function isBlockedDynamicCategorySegment(slug: string): boolean {
+  return isReservedStaticPublicSlug(slug);
 }
 
 export function resolveCatalogCategoryCanonicalPath(categorySlug: string | null): string | null {

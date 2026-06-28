@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { trackHomepageViewAllCategoriesClick } from "@/lib/analytics";
 import {
   HOMEPAGE_CATEGORY_CARD_LIMIT,
@@ -25,14 +26,15 @@ export default function HomeCategoryViewAllCta({ visibleCategoryCount }: Props) 
   }
 
   return (
-    <p className="home-category-grid__view-all">
+    <div className="home-category-grid__cta-row">
       <Link
         href={PUBLIC_ALL_CATEGORIES_PATH}
-        className="home-category-grid__view-all-link"
+        className="btn-secondary home-category-grid__cta"
         onClick={handleClick}
       >
         Xem tất cả danh mục
+        <ArrowRight size={16} strokeWidth={2} aria-hidden="true" />
       </Link>
-    </p>
+    </div>
   );
 }

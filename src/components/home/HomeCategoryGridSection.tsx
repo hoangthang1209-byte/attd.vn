@@ -1,4 +1,3 @@
-import Link from "next/link";
 import CategoryCard from "@/components/public/CategoryCard";
 import HomeCategoryViewAllCta from "@/components/home/HomeCategoryViewAllCta";
 import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
@@ -32,17 +31,6 @@ export default function HomeCategoryGridSection({
               variant="marketplace"
             />
           ))}
-          <Link href="/oem" className="market-cat-card market-cat-card--marketplace">
-            <div className="market-cat-card-img">
-              <div
-                className="market-cat-card-gradient"
-                style={{ background: "linear-gradient(145deg, #374151, #111827)" }}
-              />
-            </div>
-            <div className="market-cat-card-body market-cat-card-body--minimal">
-              <h3 className="market-cat-card-name">OEM / Private Label</h3>
-            </div>
-          </Link>
         </div>
         {showViewAllCta && (
           <HomeCategoryViewAllCta visibleCategoryCount={visibleCategoryCount} />

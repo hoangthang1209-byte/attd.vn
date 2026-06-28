@@ -24,8 +24,13 @@ function resolveChildImageUrl(child: Pick<HomepageChildCategorySource, "imageUrl
 }
 
 export function isPublicHomepageChildCategory(child: HomepageChildCategorySource): boolean {
-  if (child.isActive === false) return false;
-  return child.productCount > 0;
+  return child.isActive !== false;
+}
+
+/** Product-count line for public category cards (homepage + hierarchy page). */
+export function formatPublicCategoryProductCountLabel(productCount: number): string | undefined {
+  if (productCount > 0) return `${productCount}+ lựa chọn`;
+  return "Đang cập nhật sản phẩm";
 }
 
 export function compareHomepageChildCategories(

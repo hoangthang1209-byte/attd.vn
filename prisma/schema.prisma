@@ -36,6 +36,8 @@ model Category {
   children       Category[]  @relation("CategoryTree")
   products       Product[]
   orderItems     OrderItem[]
+  patterns       Pattern[]
+  measurementTemplates MeasurementTemplate[]
 }
 
 model Product {
@@ -81,6 +83,8 @@ model Product {
   specifications            ProductSpecification[]
   customizationCapabilities ProductCustomizationCapability[]
   attributeAssignments      ProductAttributeAssignment[]
+  patterns                  Pattern[]
+  techPacks                 TechPack[]
 
   @@index([categoryId])
   @@index([status])
@@ -153,6 +157,7 @@ model ProductVariant {
   orderItems           OrderItem[]
   materialRequirements ProductMaterialRequirement[]
   optionValues         ProductVariantOptionValue[]
+  techPacks            TechPack[]
 
   @@index([productId])
   @@index([stockStatus])
@@ -357,6 +362,7 @@ model Customer {
   pricingCalculations  PricingCalculation[]
   quotes               Quote[]
   orders               Order[]
+  techPacks            TechPack[]
 
   @@index([code])
   @@index([name])
@@ -1547,6 +1553,7 @@ model QuoteItem {
   variant                  ProductVariant?         @relation(fields: [variantId], references: [id], onDelete: SetNull)
   designMediaAsset         MediaAsset?             @relation(fields: [designMediaAssetId], references: [id], onDelete: SetNull)
   revenueCategory          RevenueCategory?        @relation(fields: [revenueCategoryId], references: [id], onDelete: SetNull)
+  techPacks                TechPack[]
 
   @@index([quoteId])
   @@index([productId])
@@ -1870,6 +1877,7 @@ model OrderItem {
   qcInspections          OrderQcInspection[]
   materialRequirements   OrderItemMaterialRequirement[]
   deliveryExecutionItems OrderDeliveryExecutionItem[]
+  techPacks              TechPack[]
 
   @@index([orderId])
   @@index([productId])
@@ -2572,4 +2580,526 @@ model AdminRolePermission {
 
   @@unique([roleId, permissionId])
   @@index([permissionId])
+}
+// Sprint 27.0.0 – 28.0.3: Tech Pack, Pattern Library, Production Master Data
+
+enum TechPackStatus {
+  DRAFT
+  RELEASED
+  SUPERSEDED
+}
+
+enum TechPackAssetType {
+  FLAT_SKETCH_FRONT
+  FLAT_SKETCH_BACK
+  LOGO_PLACEMENT
+  PRINT_PLACEMENT
+  EMBROIDERY_PLACEMENT
+  CONSTRUCTION_CALLOUT
+  MEASUREMENT_DIAGRAM
+  ARTWORK_REFERENCE
+  OTHER
+}
+
+enum TechPackAssetFileType {
+  IMAGE
+  PDF
+  AI
+  PSD
+  CDR
+  EPS
+  PLT
+  DXF
+  ZIP
+  OTHER
+}
+
+enum PatternStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+enum PatternFileType {
+  PLT
+  DXF
+  PDF
+  AI
+  ZIP
+  IMAGE
+  OTHER
+}
+
+enum TechPackBomCategory {
+  MAIN_FABRIC
+  RIB
+  COLLAR
+  CUFF
+  NECK_LABEL
+  CARE_LABEL
+  HANG_TAG
+  POLY_BAG
+  CARTON
+  THREAD
+  BUTTON
+  ZIPPER
+  DRAWCORD
+  ELASTIC
+  ACCESSORY
+  OTHER
+}
+
+enum ArtworkPlacementType {
+  PRINT
+  EMBROIDERY
+  LABEL
+  PATCH
+  HEAT_TRANSFER
+  SUBLIMATION
+  OTHER
+}
+
+enum TechPackReleaseAction {
+  CREATED
+  UPDATED
+  RELEASED
+  SUPERSEDED
+  NEW_VERSION
+  SELECT_PATTERN
+  COPY_TEMPLATE
+}
+
+enum ProductionMaterialCategory {
+  MAIN_FABRIC
+  RIB
+  LINING
+  INTERLINING
+  MESH
+  ACCESSORY
+  OTHER
+}
+
+enum ProductionTrimCategory {
+  BUTTON
+  ZIPPER
+  LABEL
+  THREAD
+  ELASTIC
+  DRAWCORD
+  TAPE
+  ACCESSORY
+  OTHER
+}
+
+enum PrintMethodCategory {
+  SCREEN_PRINT
+  DTG
+  DTF
+  EMBROIDERY
+  HEAT_TRANSFER
+  SUBLIMATION
+  PATCH
+  OTHER
+}
+
+model TechPack {
+  id                     String         @id @default(cuid())
+  code                   String         @unique
+  orderItemId            String?
+  quoteItemId            String?
+  customerId             String?
+  productId              String?
+  productVariantId       String?
+  patternId              String?
+  version                Int            @default(1)
+  status                 TechPackStatus @default(DRAFT)
+  title                  String?
+  customerNameSnapshot   String?
+  orderCodeSnapshot      String?
+  orderItemCodeSnapshot  String?
+  productNameSnapshot    String?
+  productSkuSnapshot     String?
+  colorSnapshot          String?
+  sizeSnapshot           String?
+  quantitySnapshot       Int?
+  sourceType             String?
+  processingMethod       String?
+  bomNotes               String?        @db.Text
+  trimsNotes             String?        @db.Text
+  printMethodNotes       String?        @db.Text
+  embroideryNotes        String?        @db.Text
+  deadline               DateTime?
+  qcNotes                String?        @db.Text
+  productionNotes        String?        @db.Text
+  internalNotes          String?        @db.Text
+  patternCodeSnapshot    String?
+  patternVersionSnapshot String?
+  patternExceptionReason String?        @db.Text
+  releasedAt             DateTime?
+  releasedBy             String?
+  supersededById         String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  orderItem         OrderItem?                @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  quoteItem         QuoteItem?                @relation(fields: [quoteItemId], references: [id], onDelete: SetNull)
+  customer          Customer?                 @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  product           Product?                  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productVariant    ProductVariant?           @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  pattern           Pattern?                  @relation(fields: [patternId], references: [id], onDelete: SetNull)
+  supersededBy      TechPack?                 @relation("TechPackSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes        TechPack[]                @relation("TechPackSupersession")
+  assets            TechPackAsset[]
+  measurements      TechPackMeasurement[]
+  bomItems          TechPackBomItem[]
+  artworkPlacements TechPackArtworkPlacement[]
+  releaseHistory    TechPackReleaseHistory[]
+
+  @@index([orderItemId])
+  @@index([quoteItemId])
+  @@index([customerId])
+  @@index([productId])
+  @@index([productVariantId])
+  @@index([patternId])
+  @@index([status])
+  @@index([deadline])
+}
+
+model TechPackAsset {
+  id                 String                @id @default(cuid())
+  techPackId         String
+  type               TechPackAssetType
+  title              String?
+  description        String?               @db.Text
+  cloudinaryPublicId String?
+  previewUrl         String?
+  r2ObjectKey        String?
+  originalFileName   String?
+  mimeType           String?
+  fileType           TechPackAssetFileType @default(OTHER)
+  sortOrder          Int                   @default(0)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  techPack           TechPack                   @relation(fields: [techPackId], references: [id], onDelete: Cascade)
+  artworkPlacements  TechPackArtworkPlacement[]
+
+  @@index([techPackId])
+  @@index([type])
+}
+
+model TechPackMeasurement {
+  id             String   @id @default(cuid())
+  techPackId     String
+  pointOfMeasure String
+  description    String?
+  baseSize       String?
+  tolerance      String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  techPack TechPack                   @relation(fields: [techPackId], references: [id], onDelete: Cascade)
+  values   TechPackMeasurementValue[]
+
+  @@index([techPackId])
+}
+
+model TechPackMeasurementValue {
+  id            String   @id @default(cuid())
+  measurementId String
+  size          String
+  value         String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  measurement TechPackMeasurement @relation(fields: [measurementId], references: [id], onDelete: Cascade)
+
+  @@unique([measurementId, size])
+  @@index([measurementId])
+}
+
+model Pattern {
+  id                         String                      @id @default(cuid())
+  code                       String                      @unique
+  name                       String
+  version                    Int                         @default(1)
+  productCategoryId          String?
+  productId                  String?
+  baseSize                   String?
+  sizeRange                  String?
+  gradingRule                String?                     @db.Text
+  status                     PatternStatus               @default(DRAFT)
+  productionMaterialCategory ProductionMaterialCategory?
+  notes                      String?                     @db.Text
+  createdBy                  String?
+  approvedBy                 String?
+  approvedAt                 DateTime?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+
+  productCategory Category?            @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
+  product         Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
+  files           PatternFile[]
+  measurements    PatternMeasurement[]
+  techPacks       TechPack[]
+
+  @@index([productCategoryId])
+  @@index([productId])
+  @@index([status])
+}
+
+model PatternFile {
+  id                 String          @id @default(cuid())
+  patternId          String
+  type               PatternFileType
+  title              String?
+  description        String?         @db.Text
+  r2ObjectKey        String?
+  cloudinaryPublicId String?
+  previewUrl         String?
+  originalFileName   String?
+  mimeType           String?
+  sortOrder          Int             @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  pattern Pattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+
+  @@index([patternId])
+}
+
+model PatternMeasurement {
+  id             String   @id @default(cuid())
+  patternId      String
+  pointOfMeasure String
+  description    String?
+  baseSize       String?
+  tolerance      String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  pattern Pattern                   @relation(fields: [patternId], references: [id], onDelete: Cascade)
+  values  PatternMeasurementValue[]
+
+  @@index([patternId])
+}
+
+model PatternMeasurementValue {
+  id            String   @id @default(cuid())
+  measurementId String
+  size          String
+  value         String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  measurement PatternMeasurement @relation(fields: [measurementId], references: [id], onDelete: Cascade)
+
+  @@unique([measurementId, size])
+  @@index([measurementId])
+}
+
+model TechPackBomItem {
+  id            String              @id @default(cuid())
+  techPackId    String
+  sortOrder     Int                 @default(0)
+  category      TechPackBomCategory @default(OTHER)
+  itemName      String
+  specification String?
+  color         String?
+  supplier      String?
+  unit          String?
+  consumption   String?
+  wastePercent  String?
+  notes         String?             @db.Text
+  materialId    String?
+  trimId        String?
+  supplierId    String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  techPack    TechPack            @relation(fields: [techPackId], references: [id], onDelete: Cascade)
+  material    ProductionMaterial? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  trim        ProductionTrim?     @relation(fields: [trimId], references: [id], onDelete: SetNull)
+  supplierRef ProductionSupplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([techPackId])
+  @@index([sortOrder])
+  @@index([materialId])
+  @@index([trimId])
+  @@index([supplierId])
+}
+
+model TechPackArtworkPlacement {
+  id               String               @id @default(cuid())
+  techPackId       String
+  artworkAssetId   String?
+  placementType    ArtworkPlacementType @default(OTHER)
+  title            String?
+  bodyPart         String?
+  width            String?
+  height           String?
+  measurementUnit  String?
+  printMethod      String?
+  printMethodId    String?
+  embroideryMethod String?
+  inkColors        String?
+  threadColors     String?
+  notes            String?              @db.Text
+  sortOrder        Int                  @default(0)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  techPack       TechPack        @relation(fields: [techPackId], references: [id], onDelete: Cascade)
+  artworkAsset   TechPackAsset?  @relation(fields: [artworkAssetId], references: [id], onDelete: SetNull)
+  printMethodRef PrintMethod?    @relation(fields: [printMethodId], references: [id], onDelete: SetNull)
+
+  @@index([techPackId])
+  @@index([artworkAssetId])
+  @@index([printMethodId])
+}
+
+model TechPackReleaseHistory {
+  id           String                @id @default(cuid())
+  techPackId   String
+  version      Int
+  action       TechPackReleaseAction
+  actorId      String?
+  actorName    String?
+  snapshotJson Json?
+  createdAt    DateTime              @default(now())
+
+  techPack TechPack @relation(fields: [techPackId], references: [id], onDelete: Cascade)
+
+  @@index([techPackId])
+  @@index([createdAt])
+}
+
+model MeasurementTemplate {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  name              String
+  productCategoryId String?
+  baseSize          String?
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  productCategory Category?                 @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
+  items           MeasurementTemplateItem[]
+
+  @@index([productCategoryId])
+}
+
+model MeasurementTemplateItem {
+  id             String   @id @default(cuid())
+  templateId     String
+  pointOfMeasure String
+  description    String?
+  tolerance      String?
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  template MeasurementTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  values   MeasurementTemplateValue[]
+
+  @@index([templateId])
+}
+
+model MeasurementTemplateValue {
+  id            String   @id @default(cuid())
+  measurementId String
+  size          String
+  value         String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  measurement MeasurementTemplateItem @relation(fields: [measurementId], references: [id], onDelete: Cascade)
+
+  @@unique([measurementId, size])
+  @@index([measurementId])
+}
+
+model ProductionSupplier {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  contact   String?
+  email     String?
+  phone     String?
+  address   String?  @db.Text
+  notes     String?  @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  materials ProductionMaterial[]
+  trims     ProductionTrim[]
+  bomItems  TechPackBomItem[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model ProductionMaterial {
+  id           String                     @id @default(cuid())
+  code         String                     @unique
+  name         String
+  category     ProductionMaterialCategory @default(OTHER)
+  composition  String?
+  gsm          String?
+  width        String?
+  supplierId   String?
+  defaultColor String?
+  notes        String?                    @db.Text
+  isActive     Boolean                    @default(true)
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  supplier  ProductionSupplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  bomItems  TechPackBomItem[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([category])
+  @@index([supplierId])
+}
+
+model ProductionTrim {
+  id         String                 @id @default(cuid())
+  code       String                 @unique
+  name       String
+  category   ProductionTrimCategory @default(OTHER)
+  supplierId String?
+  notes      String?                @db.Text
+  isActive   Boolean                @default(true)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  supplier ProductionSupplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  bomItems TechPackBomItem[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([category])
+  @@index([supplierId])
+}
+
+model PrintMethod {
+  id          String              @id @default(cuid())
+  code        String              @unique
+  name        String
+  category    PrintMethodCategory @default(OTHER)
+  description String?             @db.Text
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  artworkPlacements TechPackArtworkPlacement[]
+
+  @@index([code])
+  @@index([isActive])
+  @@index([category])
 }

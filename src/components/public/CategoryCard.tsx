@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { Package } from "lucide-react";
 import { isValidImageSrc } from "@/lib/imagePaths";
 import { publicCategoryHref } from "@/features/categories/public-category-url";
+import { formatPublicCategoryProductCountLabel } from "@/features/home/homepage-category.utils";
 
 type CategoryCardProps = {
   name: string;
@@ -51,7 +52,8 @@ export default function CategoryCard({
 
   if (variant === "grid" || variant === "marketplace") {
     const countLabel =
-      count != null && count > 0 ? `${count}+ lựa chọn` : undefined;
+      count != null ? formatPublicCategoryProductCountLabel(count) : undefined;
+    const countLabelIsPending = count === 0;
 
     return (
       <Link href={cardHref} className="market-cat-card market-cat-card--marketplace">
@@ -77,7 +79,15 @@ export default function CategoryCard({
           {parentName && (
             <p className="market-cat-card-parent">Thuộc: {parentName}</p>
           )}
-          {countLabel && <p className="market-cat-card-count-label">{countLabel}</p>}
+          {countLabel && (
+            <p
+              className={`market-cat-card-count-label${
+                countLabelIsPending ? " market-cat-card-count-label--pending" : ""
+              }`}
+            >
+              {countLabel}
+            </p>
+          )}
         </div>
       </Link>
     );

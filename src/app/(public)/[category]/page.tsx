@@ -19,6 +19,7 @@ import {
   buildOgImages,
 } from "@/lib/seo";
 import { applyCategoryLandingIndexation } from "@/lib/seo/indexation-policy";
+import { isBlockedDynamicCategorySegment } from "@/lib/seo/indexable-category-routes";
 import {
   getCategoryHeroImage,
   getCategoryGalleryImages,
@@ -32,6 +33,7 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { category } = await params;
+  if (isBlockedDynamicCategorySegment(category)) return {};
   const [cat, content] = await Promise.all([
     getCategoryBySlug(category),
     loadCollectionContent(category),
@@ -70,6 +72,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CategoryPage({ params }: PageProps) {
   const { category } = await params;
+  if (isBlockedDynamicCategorySegment(category)) notFound();
+
   const [cat, content] = await Promise.all([
     getCategoryBySlug(category),
     loadCollectionContent(category),

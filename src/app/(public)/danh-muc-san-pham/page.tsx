@@ -1,22 +1,22 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import Image from "next/image";
+import CategoryCard from "@/components/public/CategoryCard";
 import { getCmsCategoryTree } from "@/features/categories/services/category.service";
 import { buildPublicCategoryHierarchy } from "@/features/categories/public-category-hierarchy.utils";
+import { PUBLIC_ALL_CATEGORIES_PATH } from "@/features/home/homepage-category.constants";
 import { canonicalUrl, buildOgImages } from "@/lib/seo";
-import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
 
 export const revalidate = 3600;
 
+const PAGE_DESCRIPTION =
+  "Khám phá danh mục sản phẩm đồng phục, áo trơn, phụ kiện, quà tặng và giải pháp nguồn hàng cho doanh nghiệp.";
+
 export const metadata: Metadata = {
   title: "Danh mục sản phẩm | ATTD",
-  description:
-    "Khám phá toàn bộ danh mục nguồn hàng B2B của ATTD — áo thun, áo polo, phụ kiện và quà tặng doanh nghiệp.",
-  alternates: { canonical: canonicalUrl("/danh-muc-san-pham") },
+  description: PAGE_DESCRIPTION,
+  alternates: { canonical: canonicalUrl(PUBLIC_ALL_CATEGORIES_PATH) },
   openGraph: {
     title: "Danh mục sản phẩm | ATTD",
-    description:
-      "Khám phá toàn bộ danh mục nguồn hàng B2B của ATTD — áo thun, áo polo, phụ kiện và quà tặng doanh nghiệp.",
+    description: PAGE_DESCRIPTION,
     images: buildOgImages(),
   },
 };
@@ -28,47 +28,32 @@ export default async function ProductCategoriesPage() {
   return (
     <main className="mp-page mp-page--categories">
       <div className="container">
-        <MarketplaceSectionHeader
-          title="Danh mục sản phẩm"
-          description="Duyệt nguồn hàng B2B theo nhóm danh mục và danh mục con."
-        />
+        <header className="mp-category-index-header">
+          <p className="mp-category-index-eyebrow">DANH MỤC SẢN PHẨM</p>
+          <h1 className="mp-category-index-title">Danh mục sản phẩm</h1>
+          <p className="mp-category-index-desc">{PAGE_DESCRIPTION}</p>
+        </header>
 
         {sections.length === 0 ? (
           <p className="mp-empty-state">Chưa có danh mục hiển thị công khai.</p>
         ) : (
-          <div className="mp-category-hierarchy">
+          <div className="mp-category-index">
             {sections.map((section) => (
-              <section key={section.id} className="mp-category-hierarchy__section">
-                <h2 className="mp-category-hierarchy__parent">{section.name}</h2>
-                <ul className="mp-category-hierarchy__grid">
+              <section key={section.id} className="mp-category-index-section">
+                <h2 className="mp-category-index-parent">{section.name}</h2>
+                <div className="mp-category-grid mp-category-grid--marketplace">
                   {section.children.map((child) => (
-                    <li key={child.id}>
-                      <Link href={child.href} className="mp-category-hierarchy__card">
-                        <div className="mp-category-hierarchy__card-img">
-                          {child.imageUrl ? (
-                            <Image
-                              src={child.imageUrl}
-                              alt={child.name}
-                              fill
-                              className="mp-category-hierarchy__card-photo"
-                              sizes="(max-width: 640px) 50vw, 200px"
-                            />
-                          ) : (
-                            <div className="mp-category-hierarchy__card-fallback" aria-hidden />
-                          )}
-                        </div>
-                        <div className="mp-category-hierarchy__card-body">
-                          <h3 className="mp-category-hierarchy__card-name">{child.name}</h3>
-                          {child.productCount > 0 && (
-                            <p className="mp-category-hierarchy__card-meta">
-                              {child.productCount}+ lựa chọn
-                            </p>
-                          )}
-                        </div>
-                      </Link>
-                    </li>
+                    <CategoryCard
+                      key={child.id}
+                      name={child.name}
+                      slug={child.slug}
+                      href={child.href}
+                      imageUrl={child.imageUrl}
+                      count={child.productCount}
+                      variant="marketplace"
+                    />
                   ))}
-                </ul>
+                </div>
               </section>
             ))}
           </div>

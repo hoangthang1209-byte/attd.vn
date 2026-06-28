@@ -8,6 +8,7 @@ import {
 
 const FOOTER_PRODUCTS = [
   { href: "/san-pham", label: "Tất cả sản phẩm" },
+  { href: "/danh-muc-san-pham", label: "Danh mục sản phẩm" },
   { href: "/ao-thun-tron", label: "Áo thun" },
   { href: "/ao-polo-tron", label: "Polo" },
   { href: "/non", label: "Nón" },

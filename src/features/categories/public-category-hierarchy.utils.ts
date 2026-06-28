@@ -57,6 +57,10 @@ export function buildPublicCategoryHierarchy(
             sortOrder: child.sortOrder,
           }),
         )
+        .sort(
+          (a, b) =>
+            a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"),
+        )
         .map((child) => ({
           id: child.id,
           name: child.name,

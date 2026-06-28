@@ -8,7 +8,9 @@ import AdminUploadProgress, {
 import {
   buildMediaLibraryApiUrl,
   MEDIA_LIBRARY_PAGE_SIZE,
+  MEDIA_PICKER_DEFAULT_LIBRARY_VIEW,
   parseMediaLibraryResponse,
+  type MediaPickerLibraryView,
 } from "@/components/admin/media/media-library-api";
 import { useAdminToast } from "@/hooks/useAdminToast";
 import { ALLOWED_IMAGE_EXTENSIONS, inferImageMimeType } from "@/lib/imageValidation";
@@ -238,10 +240,10 @@ function fallbackHint(stepLabel: string, pickerFolder: StorageFolderKey): string
   return `Đang hiển thị ảnh từ thư mục ${name} (fallback).`;
 }
 
-type LibraryView = "all" | "folder";
+type LibraryView = MediaPickerLibraryView;
 
-export type MediaPickerLibraryView = LibraryView;
-export const MEDIA_PICKER_DEFAULT_LIBRARY_VIEW: MediaPickerLibraryView = "all";
+export type { MediaPickerLibraryView };
+export { MEDIA_PICKER_DEFAULT_LIBRARY_VIEW };
 
 export default function MediaPicker(props: Props) {
   const { label = "Ảnh", folder = "products", usageType = "auto" } = props;

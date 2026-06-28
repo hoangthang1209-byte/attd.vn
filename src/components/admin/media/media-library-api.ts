@@ -1,6 +1,9 @@
 import type { StorageFolderKey } from "@/lib/storage/types";
 import type { MediaUsageType } from "@prisma/client";
 
+export type MediaPickerLibraryView = "all" | "folder";
+export const MEDIA_PICKER_DEFAULT_LIBRARY_VIEW: MediaPickerLibraryView = "all";
+
 export const MEDIA_LIBRARY_PAGE_SIZE = 100;
 
 export type MediaLibraryQuery = {
