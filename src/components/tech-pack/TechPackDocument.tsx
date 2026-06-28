@@ -78,6 +78,21 @@ function bomMasterCodes(row: {
   return parts.join(" · ");
 }
 
+function sizeRank(size: string): number {
+  const normalized = size.trim().toUpperCase();
+  const known = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
+  const index = known.indexOf(normalized);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function sortSizeColumns(sizes: string[]): string[] {
+  return [...sizes].sort((a, b) => {
+    const rankDiff = sizeRank(a) - sizeRank(b);
+    if (rankDiff !== 0) return rankDiff;
+    return a.localeCompare(b, "vi", { numeric: true, sensitivity: "base" });
+  });
+}
+
 export default function TechPackDocument({ pack }: Props) {
   const patternCode = pack.patternCodeSnapshot ?? pack.pattern?.code;
   const patternVersion = pack.patternVersionSnapshot ?? (pack.pattern ? String(pack.pattern.version) : null);
@@ -86,9 +101,9 @@ export default function TechPackDocument({ pack }: Props) {
   const bomItems = pack.bomItems ?? [];
   const placements = pack.artworkPlacements ?? [];
 
-  const sizeColumns = Array.from(
-    new Set(pack.measurements.flatMap((m) => m.values.map((v) => v.size))),
-  ).sort();
+  const sizeColumns = sortSizeColumns(
+    Array.from(new Set(pack.measurements.flatMap((m) => m.values.map((v) => v.size)))),
+  );
 
   return (
     <div className="tech-pack-document-root">
@@ -330,10 +345,9 @@ export default function TechPackDocument({ pack }: Props) {
           <table className="tp-table tp-table--measure">
             <thead>
               <tr>
-                <th>Điểm đo</th>
+                <th>POM</th>
                 <th>Mô tả</th>
-                <th>Base</th>
-                <th>Tol.</th>
+                <th>Tolerance</th>
                 {sizeColumns.map((size) => (
                   <th key={size}>{size}</th>
                 ))}
@@ -346,7 +360,6 @@ export default function TechPackDocument({ pack }: Props) {
                   <tr key={m.id}>
                     <td>{m.pointOfMeasure}</td>
                     <td>{m.description ?? "—"}</td>
-                    <td>{m.baseSize ?? "—"}</td>
                     <td>{m.tolerance ?? "—"}</td>
                     {sizeColumns.map((size) => (
                       <td key={size}>{valueMap.get(size) ?? "—"}</td>

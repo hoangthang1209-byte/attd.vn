@@ -19,6 +19,7 @@ import {
   PRODUCTION_MATERIAL_CATEGORY_LABELS,
 } from "@/features/production-master/production-master-labels";
 import MeasurementTemplateApplyButton from "@/components/admin/tech-pack/MeasurementTemplateApplyButton";
+import TechPackMeasurementEditor from "@/components/admin/tech-pack/TechPackMeasurementEditor";
 import CopyFromTechPackButton from "@/components/admin/patterns/CopyFromTechPackButton";
 import { isPreviewableFile } from "@/features/tech-pack/tech-pack-file-validation";
 
@@ -313,30 +314,12 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       </SectionCard>
 
       <SectionCard title="Bảng đo">
-        {pattern.measurements.length === 0 ? (
-          <p className="admin-muted">Chưa có điểm đo. Chỉnh sửa trên Tech Pack sau khi chọn rập.</p>
-        ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Điểm đo</th>
-                <th>Mô tả</th>
-                <th>Base size</th>
-                <th>Tolerance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pattern.measurements.map((m) => (
-                <tr key={m.id}>
-                  <td>{m.pointOfMeasure}</td>
-                  <td>{m.description ?? "—"}</td>
-                  <td>{m.baseSize ?? "—"}</td>
-                  <td>{m.tolerance ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <TechPackMeasurementEditor
+          measurements={pattern.measurements}
+          readOnly={readOnly}
+          emptyText="Chưa có điểm đo. Áp dụng mẫu thông số hoặc sao chép từ Tech Pack."
+          onSave={(rows) => void saveField({ measurements: rows })}
+        />
       </SectionCard>
     </AdminPageShell>
   );

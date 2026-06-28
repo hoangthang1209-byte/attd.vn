@@ -77,10 +77,10 @@ export function getRequiredPermissionForAdminRoute(pathname: string): string | n
   if (pathname.startsWith("/admin/orders/new")) return "orders.create";
   if (ORDER_EDIT_PATH.test(pathname)) return "orders.update";
   if (pathname.startsWith("/admin/orders")) return "orders.view";
-  if (pathname.startsWith("/admin/production")) return "production.view";
   if (PRODUCTION_ADMIN_ROUTE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return "production.view";
   }
+  if (pathname.startsWith("/admin/production")) return "production.view";
   if (pathname.startsWith("/admin/delivery")) return "delivery.view";
   if (pathname.startsWith("/admin/warehouse") || pathname.includes("/materials/warehouse")) {
     return "warehouse.view";

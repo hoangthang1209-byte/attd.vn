@@ -8,15 +8,7 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/admin/AdminUi";
-
-type TemplateItem = {
-  clientKey: string;
-  pointOfMeasure: string;
-  description: string;
-  tolerance: string;
-  valuesText: string;
-  sortOrder: number;
-};
+import TechPackMeasurementEditor from "@/components/admin/tech-pack/TechPackMeasurementEditor";
 
 type TemplateDetail = {
   id: string;
@@ -36,32 +28,8 @@ type TemplateDetail = {
   }>;
 };
 
-function toItems(items: TemplateDetail["items"]): TemplateItem[] {
-  return items.map((item) => ({
-    clientKey: item.id,
-    pointOfMeasure: item.pointOfMeasure,
-    description: item.description ?? "",
-    tolerance: item.tolerance ?? "",
-    valuesText: item.values.map((v) => `${v.size}:${v.value}`).join(", "),
-    sortOrder: item.sortOrder,
-  }));
-}
-
-function parseValues(text: string) {
-  return text
-    .split(/[,;]/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const [size, ...rest] = part.split(":");
-      return { size: size.trim(), value: rest.join(":").trim() };
-    })
-    .filter((v) => v.size && v.value);
-}
-
 export default function MeasurementTemplateDetailManager({ templateId }: { templateId: string }) {
   const [template, setTemplate] = useState<TemplateDetail | null>(null);
-  const [items, setItems] = useState<TemplateItem[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,7 +47,6 @@ export default function MeasurementTemplateDetailManager({ templateId }: { templ
       const catData = (await catRes.json()) as Array<{ id: string; name: string }>;
       if (!tplRes.ok) throw new Error(data.message ?? "Không thể tải mẫu");
       setTemplate(data);
-      setItems(toItems(data.items));
       setCategories(Array.isArray(catData) ? catData : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
@@ -104,20 +71,6 @@ export default function MeasurementTemplateDetailManager({ templateId }: { templ
     if (!res.ok) setError(data.message ?? "Không thể lưu");
     else void load();
     setSaving(false);
-  }
-
-  async function saveItems(nextItems: TemplateItem[]) {
-    await save({
-      items: nextItems
-        .filter((r) => r.pointOfMeasure.trim())
-        .map((r, index) => ({
-          pointOfMeasure: r.pointOfMeasure.trim(),
-          description: r.description.trim() || null,
-          tolerance: r.tolerance.trim() || null,
-          sortOrder: index,
-          values: parseValues(r.valuesText),
-        })),
-    });
   }
 
   async function duplicate() {
@@ -195,110 +148,22 @@ export default function MeasurementTemplateDetailManager({ templateId }: { templ
       </SectionCard>
 
       <SectionCard title="Bảng điểm đo">
-        <button
-          type="button"
-          className="admin-btn admin-btn--primary admin-btn--xs"
-          style={{ marginBottom: 8 }}
-          onClick={() => {
-            const next = [
-              ...items,
-              {
-                clientKey: `new-${Date.now()}`,
-                pointOfMeasure: "",
-                description: "",
-                tolerance: "",
-                valuesText: "",
-                sortOrder: items.length,
-              },
-            ];
-            setItems(next);
-          }}
-        >
-          Thêm điểm đo
-        </button>
-        {items.length === 0 ? (
-          <p className="admin-muted">Chưa có điểm đo trong mẫu.</p>
-        ) : (
-          <table className="admin-table admin-table--compact">
-            <thead>
-              <tr>
-                <th>Điểm đo</th>
-                <th>Mô tả</th>
-                <th>Tolerance</th>
-                <th>Giá trị size</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.clientKey}>
-                  <td>
-                    <input
-                      className="admin-input admin-input--sm"
-                      value={row.pointOfMeasure}
-                      onChange={(e) =>
-                        setItems((prev) =>
-                          prev.map((r) => (r.clientKey === row.clientKey ? { ...r, pointOfMeasure: e.target.value } : r)),
-                        )
-                      }
-                      onBlur={() => void saveItems(items)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="admin-input admin-input--sm"
-                      value={row.description}
-                      onChange={(e) =>
-                        setItems((prev) =>
-                          prev.map((r) => (r.clientKey === row.clientKey ? { ...r, description: e.target.value } : r)),
-                        )
-                      }
-                      onBlur={() => void saveItems(items)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="admin-input admin-input--sm"
-                      value={row.tolerance}
-                      onChange={(e) =>
-                        setItems((prev) =>
-                          prev.map((r) => (r.clientKey === row.clientKey ? { ...r, tolerance: e.target.value } : r)),
-                        )
-                      }
-                      onBlur={() => void saveItems(items)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="admin-input admin-input--sm"
-                      value={row.valuesText}
-                      placeholder="S:50, M:52"
-                      onChange={(e) =>
-                        setItems((prev) =>
-                          prev.map((r) => (r.clientKey === row.clientKey ? { ...r, valuesText: e.target.value } : r)),
-                        )
-                      }
-                      onBlur={() => void saveItems(items)}
-                    />
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn--xs admin-btn--danger"
-                      onClick={() => {
-                        const next = items.filter((r) => r.clientKey !== row.clientKey);
-                        setItems(next);
-                        void saveItems(next);
-                      }}
-                    >
-                      Xóa
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <TechPackMeasurementEditor
+          measurements={template.items.map((item) => ({ ...item, baseSize: template.baseSize }))}
+          showBaseSize={false}
+          emptyText="Chưa có điểm đo trong mẫu."
+          onSave={(rows) =>
+            void save({
+              items: rows.map((row) => ({
+                pointOfMeasure: row.pointOfMeasure,
+                description: row.description,
+                tolerance: row.tolerance,
+                sortOrder: row.sortOrder,
+                values: row.values,
+              })),
+            })
+          }
+        />
       </SectionCard>
     </AdminPageShell>
   );
