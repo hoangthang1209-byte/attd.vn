@@ -57,6 +57,16 @@ export function canAccessOrderFinancialPdf(
   return canViewFinancials(session);
 }
 
+const PRODUCTION_ADMIN_ROUTE_PREFIXES = [
+  "/admin/tech-pack",
+  "/admin/rap",
+  "/admin/trims",
+  "/admin/production-materials",
+  "/admin/production-suppliers",
+  "/admin/print-methods",
+  "/admin/measurement-template",
+] as const;
+
 export function getRequiredPermissionForAdminRoute(pathname: string): string | null {
   if (pathname.startsWith("/admin/settings/users")) return "users.manage";
   if (pathname.startsWith("/admin/settings/roles")) return "roles_permissions.manage";
@@ -68,6 +78,9 @@ export function getRequiredPermissionForAdminRoute(pathname: string): string | n
   if (ORDER_EDIT_PATH.test(pathname)) return "orders.update";
   if (pathname.startsWith("/admin/orders")) return "orders.view";
   if (pathname.startsWith("/admin/production")) return "production.view";
+  if (PRODUCTION_ADMIN_ROUTE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return "production.view";
+  }
   if (pathname.startsWith("/admin/delivery")) return "delivery.view";
   if (pathname.startsWith("/admin/warehouse") || pathname.includes("/materials/warehouse")) {
     return "warehouse.view";

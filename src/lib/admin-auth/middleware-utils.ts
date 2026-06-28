@@ -29,6 +29,20 @@ const PROTECTED_MUTATION_PREFIXES = [
   "/api/materials/",
   "/api/purchase-requests",
   "/api/purchase-requests/",
+  "/api/tech-packs",
+  "/api/tech-packs/",
+  "/api/patterns",
+  "/api/patterns/",
+  "/api/production-materials",
+  "/api/production-materials/",
+  "/api/production-trims",
+  "/api/production-trims/",
+  "/api/production-suppliers",
+  "/api/production-suppliers/",
+  "/api/print-methods",
+  "/api/print-methods/",
+  "/api/measurement-templates",
+  "/api/measurement-templates/",
 ] as const;
 
 const PROTECTED_READ_PREFIXES = [
@@ -51,6 +65,20 @@ const PROTECTED_READ_PREFIXES = [
   "/api/materials/",
   "/api/purchase-requests",
   "/api/purchase-requests/",
+  "/api/tech-packs",
+  "/api/tech-packs/",
+  "/api/patterns",
+  "/api/patterns/",
+  "/api/production-materials",
+  "/api/production-materials/",
+  "/api/production-trims",
+  "/api/production-trims/",
+  "/api/production-suppliers",
+  "/api/production-suppliers/",
+  "/api/print-methods",
+  "/api/print-methods/",
+  "/api/measurement-templates",
+  "/api/measurement-templates/",
 ] as const;
 
 function isMediaApiPath(pathname: string): boolean {
