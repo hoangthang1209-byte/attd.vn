@@ -10,27 +10,81 @@ import HomeCategoryGridSection from "@/components/home/HomeCategoryGridSection";
 import HomeProductDiscoverySection from "@/components/home/HomeProductDiscoverySection";
 import HomeBlogTeaserSection from "@/components/home/HomeBlogTeaserSection";
 import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  BarChart3,
+  Database,
+  Handshake,
+  Layers3,
+  PackageCheck,
+  PenTool,
+  Truck,
+  type LucideIcon,
+} from "lucide-react";
 import { buildHomepageMetadata } from "@/lib/seo/indexation-policy";
 
 export const revalidate = 3600;
 
 export const metadata: Metadata = buildHomepageMetadata();
 
-const WHY_ATTD = [
-  "Danh mục dễ bán cho đại lý",
-  "Số lượng tối thiểu rõ ràng",
-  "Hỗ trợ in/thêu/OEM",
-  "Dữ liệu sản phẩm đầy đủ",
-  "Hỗ trợ đại lý & agency",
-  "Giao hàng toàn quốc",
+const WHY_ATTD: Array<{
+  title: string;
+  description: string;
+  Icon: LucideIcon;
+}> = [
+  {
+    title: "Danh mục sản phẩm đầy đủ",
+    description: "Hàng may mặc trơn, đồng phục, quà tặng và nhóm OEM cho nhiều kịch bản B2B.",
+    Icon: Layers3,
+  },
+  {
+    title: "Số lượng tối thiểu rõ ràng",
+    description: "Tư vấn MOQ theo sản phẩm, tồn kho và nhu cầu triển khai thực tế.",
+    Icon: BarChart3,
+  },
+  {
+    title: "Hỗ trợ in/thêu/OEM",
+    description: "Đi cùng đại lý, agency và doanh nghiệp từ lựa chọn mẫu đến hoàn thiện thương hiệu.",
+    Icon: PenTool,
+  },
+  {
+    title: "Hỗ trợ đại lý & agency",
+    description: "Nguồn hàng, dữ liệu sản phẩm và tư vấn báo giá cho đội bán hàng chuyên nghiệp.",
+    Icon: Handshake,
+  },
+  {
+    title: "Giao hàng toàn quốc",
+    description: "Phù hợp đơn hàng sự kiện, đồng phục nhân sự và chương trình quà tặng nhiều điểm giao.",
+    Icon: Truck,
+  },
+  {
+    title: "Dữ liệu sản phẩm đầy đủ",
+    description: "Thông tin sản phẩm, hình ảnh, chất liệu và tùy chọn được trình bày rõ để dễ lấy nguồn.",
+    Icon: Database,
+  },
 ];
 
 const SOURCING_STEPS = [
-  "Chọn sản phẩm hoặc gửi yêu cầu",
-  "Kiểm tra tồn kho & MOQ",
-  "Tư vấn in/thêu/OEM",
-  "Chốt báo giá",
-  "Giao hàng / sản xuất",
+  {
+    title: "Chọn sản phẩm hoặc gửi yêu cầu",
+    description: "Duyệt danh mục có sẵn hoặc mô tả nhu cầu nguồn hàng riêng.",
+  },
+  {
+    title: "Kiểm tra tồn kho & MOQ",
+    description: "ATTD rà soát khả năng cung ứng, số lượng tối thiểu và thời gian phù hợp.",
+  },
+  {
+    title: "Tư vấn in/thêu/OEM",
+    description: "Đề xuất phương án logo, nhãn, đóng gói hoặc sản xuất riêng khi cần.",
+  },
+  {
+    title: "Chốt báo giá",
+    description: "Báo giá theo số lượng, cấu hình sản phẩm và yêu cầu hoàn thiện.",
+  },
+  {
+    title: "Giao hàng / sản xuất",
+    description: "Triển khai giao hàng hoặc sản xuất theo tiến độ đã thống nhất.",
+  },
 ];
 
 function PreCategoryEditorialSections({
@@ -78,25 +132,55 @@ export default async function HomePage() {
 
       <MarketplaceRFQStrip />
 
-      <section className="mp-section mp-section--tight">
+      <section className="mp-section mp-section--tight home-b2b-benefits">
         <div className="container">
-          <MarketplaceSectionHeader title="Vì sao chọn nguồn hàng B2B từ ATTD?" />
-          <ul className="mp-why-list">
-            {WHY_ATTD.map((item) => (
-              <li key={item} className="mp-why-list-item">{item}</li>
-            ))}
-          </ul>
+          <div className="home-b2b-benefits__layout">
+            <div className="home-b2b-benefits__intro">
+              <p className="home-b2b-benefits__eyebrow">Nền tảng nguồn hàng B2B</p>
+              <h2 className="home-b2b-benefits__title">
+                Vì sao chọn nguồn hàng B2B từ ATTD?
+              </h2>
+              <p className="home-b2b-benefits__description">
+                ATTD giúp đại lý, agency, xưởng in và doanh nghiệp lấy nguồn hàng
+                đồng phục, hàng may mặc trơn và quà tặng theo cách rõ ràng, có thể mở rộng.
+              </p>
+              <Link href="/lien-he" className="btn-primary home-b2b-benefits__cta">
+                Tư vấn nguồn hàng
+              </Link>
+            </div>
+
+            <div className="home-b2b-benefits__cards">
+              {WHY_ATTD.map(({ title, description, Icon }) => (
+                <article key={title} className="home-b2b-benefits__card">
+                  <span className="home-b2b-benefits__icon" aria-hidden>
+                    <Icon size={18} />
+                  </span>
+                  <h3 className="home-b2b-benefits__card-title">{title}</h3>
+                  <p className="home-b2b-benefits__card-desc">{description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="mp-section mp-section--alt mp-section--tight">
+      <section className="mp-section mp-section--alt mp-section--tight home-sourcing-flow">
         <div className="container">
-          <MarketplaceSectionHeader title="Quy trình lấy nguồn hàng" />
-          <ol className="mp-process-list">
+          <MarketplaceSectionHeader
+            title="Quy trình lấy nguồn hàng"
+            description="Một luồng làm việc rõ ràng để đội mua hàng, đại lý và agency dễ kiểm soát yêu cầu, báo giá và tiến độ."
+          />
+          <ol className="home-sourcing-flow__list">
             {SOURCING_STEPS.map((step, i) => (
-              <li key={step} className="mp-process-list-item">
-                <span className="mp-process-list-num">{i + 1}</span>
-                {step}
+              <li key={step.title} className="home-sourcing-flow__item">
+                <span className="home-sourcing-flow__num">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="home-sourcing-flow__icon" aria-hidden>
+                  <PackageCheck size={18} />
+                </span>
+                <h3 className="home-sourcing-flow__title">{step.title}</h3>
+                <p className="home-sourcing-flow__desc">{step.description}</p>
               </li>
             ))}
           </ol>

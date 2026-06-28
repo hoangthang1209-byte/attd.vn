@@ -2260,7 +2260,8 @@ body:has(.mobile-action-bar) .site-footer {
 
 @media (max-width: 767px) {
   .floating-contact {
-    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+    right: 14px;
   }
 }
 
@@ -11238,6 +11239,248 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 /* Blog minimal */
 .mp-blog-card-body--minimal { padding: 12px; }
 .mp-blog-card-body--minimal .mp-blog-card-title { font-size: 14px; }
+
+/* Homepage B2B lower sections */
+.home-b2b-benefits {
+  background:
+    radial-gradient(circle at 10% 10%, rgba(220, 38, 38, 0.08), transparent 34%),
+    #fff;
+}
+.home-b2b-benefits__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.34fr);
+  gap: 28px;
+  align-items: stretch;
+}
+.home-b2b-benefits__intro {
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 24px;
+  padding: clamp(24px, 4vw, 36px);
+  background: linear-gradient(145deg, #111827 0%, #182235 60%, #2b1114 100%);
+  color: #fff;
+  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.14);
+}
+.home-b2b-benefits__eyebrow {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.66);
+}
+.home-b2b-benefits__title {
+  margin: 0 0 14px;
+  max-width: 480px;
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 850;
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+.home-b2b-benefits__description {
+  margin: 0 0 24px;
+  max-width: 520px;
+  font-size: 15px;
+  line-height: 1.72;
+  color: rgba(255, 255, 255, 0.74);
+}
+.home-b2b-benefits__cta {
+  width: fit-content;
+}
+.home-b2b-benefits__cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.home-b2b-benefits__card {
+  min-height: 178px;
+  padding: 18px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
+}
+.home-b2b-benefits__icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: #fef2f2;
+  color: var(--primary);
+}
+.home-b2b-benefits__card-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #111827;
+}
+.home-b2b-benefits__card-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.62;
+  color: #6b7280;
+}
+.home-sourcing-flow__list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.home-sourcing-flow__item {
+  position: relative;
+  min-height: 210px;
+  padding: 18px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(17, 24, 39, 0.05);
+}
+.home-sourcing-flow__item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 36px;
+  left: calc(100% - 4px);
+  width: 20px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.28), rgba(17, 24, 39, 0.08));
+  z-index: 1;
+}
+.home-sourcing-flow__num {
+  display: block;
+  margin-bottom: 18px;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .12em;
+  color: var(--primary);
+}
+.home-sourcing-flow__icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+}
+.home-sourcing-flow__title {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.36;
+  color: #111827;
+}
+.home-sourcing-flow__desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.62;
+  color: #6b7280;
+}
+.mp-blog-card-body--minimal {
+  padding: 16px;
+  gap: 8px;
+}
+.mp-blog-card-body--minimal .mp-blog-card-title {
+  font-size: 16px;
+  line-height: 1.38;
+}
+.mp-blog-card-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+.mp-blog-card-link {
+  margin-top: auto;
+  font-size: 13px;
+  font-weight: 750;
+  color: #111827;
+}
+.mp-blog-card:hover .mp-blog-card-link {
+  color: var(--primary);
+}
+.mp-final-cta {
+  position: relative;
+  overflow: hidden;
+  padding: 80px 0;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(220, 38, 38, 0.24), transparent 30%),
+    radial-gradient(circle at 86% 28%, rgba(255, 255, 255, 0.1), transparent 28%),
+    linear-gradient(135deg, #0f172a 0%, #111827 48%, #220f13 100%);
+}
+.mp-final-cta-inner {
+  max-width: 760px;
+}
+.mp-final-cta-eyebrow {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.58);
+}
+.mp-final-cta-trust {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+.mp-final-cta-trust-item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+@media (max-width: 1100px) {
+  .home-b2b-benefits__layout {
+    grid-template-columns: 1fr;
+  }
+  .home-sourcing-flow__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-sourcing-flow__item:not(:last-child)::after {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-b2b-benefits__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .home-b2b-benefits__intro,
+  .home-b2b-benefits__card,
+  .home-sourcing-flow__item {
+    border-radius: 16px;
+  }
+  .home-b2b-benefits__cards,
+  .home-sourcing-flow__list {
+    grid-template-columns: 1fr;
+  }
+  .home-sourcing-flow__item {
+    min-height: 0;
+  }
+  .mp-final-cta {
+    padding: 58px 0;
+  }
+}
 
 /* Product detail — larger gallery */
 .mp-product-detail-gallery .product-gallery-main { min-height: 360px; }

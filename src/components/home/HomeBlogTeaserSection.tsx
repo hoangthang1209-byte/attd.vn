@@ -17,6 +17,7 @@ export default function HomeBlogTeaserSection({ posts }: Props) {
       <div className="container">
         <MarketplaceSectionHeader
           title="Kiến thức nguồn hàng B2B"
+          description="Các ghi chú thực tế giúp đội mua hàng, đại lý và agency chọn sản phẩm, MOQ và phương án hoàn thiện phù hợp."
           actionHref="/blog"
           actionLabel="Xem tất cả"
         />
@@ -39,7 +40,12 @@ export default function HomeBlogTeaserSection({ posts }: Props) {
                 )}
               </div>
               <div className="mp-blog-card-body mp-blog-card-body--minimal">
+                <span className="mp-blog-card-kicker">Cẩm nang nguồn hàng</span>
                 <h3 className="mp-blog-card-title">{post.title}</h3>
+                {post.excerpt && (
+                  <p className="mp-blog-card-excerpt">{post.excerpt}</p>
+                )}
+                <span className="mp-blog-card-link">Đọc thêm</span>
               </div>
             </Link>
           ))}
