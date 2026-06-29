@@ -65,6 +65,13 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "Dealer Portal",
+    visible: (p) => p.canViewCrm,
+    items: [
+      { href: "/admin/dealer", label: "Dealer Portal", visible: (p) => p.canViewCrm },
+    ],
+  },
+  {
     label: "Báo giá",
     visible: (p) => p.canAccessQuotes,
     items: [

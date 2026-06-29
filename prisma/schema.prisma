@@ -363,6 +363,7 @@ model Customer {
   quotes               Quote[]
   orders               Order[]
   techPacks            TechPack[]
+  dealerCompanies      DealerCompany[]
 
   @@index([code])
   @@index([name])
@@ -494,6 +495,127 @@ model DealerLead {
   salesNote      String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
+}
+
+enum DealerCompanyType {
+  DEALER
+  AGENCY
+  PRINTING_COMPANY
+  EVENT_COMPANY
+  CORPORATE_BUYER
+  OEM_CLIENT
+  OTHER
+}
+
+enum DealerCompanyStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum DealerLevel {
+  STANDARD
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+enum DealerUserRole {
+  OWNER
+  MANAGER
+  SALES
+  PURCHASING
+  VIEWER
+}
+
+enum DealerUserStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+enum DealerActivityType {
+  CREATED
+  UPDATED
+  APPROVED
+  REJECTED
+  USER_ADDED
+  CRM_LINKED
+  PRICE_GROUP_ASSIGNED
+  NOTE_ADDED
+}
+
+model DealerCompany {
+  id              String              @id @default(cuid())
+  code            String              @unique
+  name            String
+  legalName       String?
+  taxCode         String?
+  email           String?
+  phone           String?
+  website         String?
+  address         String?
+  city            String?
+  country         String              @default("Vietnam")
+  type            DealerCompanyType   @default(DEALER)
+  status          DealerCompanyStatus @default(PENDING)
+  level           DealerLevel         @default(STANDARD)
+  customerId      String?
+  priceGroupId    String?
+  approvedAt      DateTime?
+  approvedBy      String?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  notes           String?             @db.Text
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  customer        Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  priceGroup      PriceGroup?         @relation(fields: [priceGroupId], references: [id], onDelete: SetNull)
+  users           DealerUser[]
+  activities      DealerActivity[]
+
+  @@index([status])
+  @@index([type])
+  @@index([level])
+  @@index([customerId])
+  @@index([priceGroupId])
+  @@index([code])
+  @@index([name])
+}
+
+model DealerUser {
+  id              String           @id @default(cuid())
+  dealerCompanyId String
+  name            String
+  email           String           @unique
+  phone           String?
+  role            DealerUserRole   @default(VIEWER)
+  status          DealerUserStatus @default(INVITED)
+  lastLoginAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  dealerCompany   DealerCompany    @relation(fields: [dealerCompanyId], references: [id], onDelete: Cascade)
+  activities      DealerActivity[]
+
+  @@index([dealerCompanyId])
+  @@index([status])
+}
+
+model DealerActivity {
+  id              String             @id @default(cuid())
+  dealerCompanyId String
+  dealerUserId    String?
+  type            DealerActivityType
+  title           String
+  description     String?
+  metadata        Json?
+  createdAt       DateTime           @default(now())
+  dealerCompany   DealerCompany      @relation(fields: [dealerCompanyId], references: [id], onDelete: Cascade)
+  dealerUser      DealerUser?        @relation(fields: [dealerUserId], references: [id], onDelete: SetNull)
+
+  @@index([dealerCompanyId, createdAt])
 }
 
 model Post {
@@ -1247,6 +1369,7 @@ model PriceGroup {
   servicePriceRules   ServicePriceRule[]
   pricingCalculations PricingCalculation[]
   quotes              Quote[]
+  dealerCompanies     DealerCompany[]
 
   @@index([code])
   @@index([isActive])
