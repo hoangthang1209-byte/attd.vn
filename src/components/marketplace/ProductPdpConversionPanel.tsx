@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, Handshake } from "lucide-react";
 import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
 import { CTA } from "@/lib/ctaConfig";
 
@@ -31,9 +30,9 @@ export default function ProductPdpConversionPanel({
       <div className="mp-pdp-conversion-card">
         <div className="mp-pdp-conversion-head">
           <p className="mp-pdp-conversion-kicker">Báo giá B2B</p>
-          <h2 className="mp-pdp-conversion-title">Nhận báo giá sản phẩm</h2>
+          <h2 className="mp-pdp-conversion-title">Yêu cầu báo giá</h2>
           <p className="mp-pdp-conversion-lead">
-            Gửi nhu cầu để ATTD tư vấn phương án nguồn hàng, MOQ và thời gian triển khai phù hợp.
+            Gửi số lượng, logo và thời gian cần hàng để ATTD tư vấn phương án phù hợp.
           </p>
         </div>
 
@@ -80,14 +79,12 @@ export default function ProductPdpConversionPanel({
             className="btn-primary mp-pdp-conversion-btn mp-pdp-conversion-btn--primary"
             onClick={onRequestQuote}
           >
-            <FileText size={18} aria-hidden />
             Yêu cầu báo giá
           </button>
           <Link
             href={CTA.primary.href}
-            className="btn-secondary mp-pdp-conversion-btn mp-pdp-conversion-btn--secondary"
+            className="mp-pdp-conversion-dealer-link"
           >
-            <Handshake size={18} aria-hidden />
             Đăng ký làm đại lý
           </Link>
         </div>

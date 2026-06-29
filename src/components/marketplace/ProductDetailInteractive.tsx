@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, cloneElement, isValidElement, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import ProductGallery from "@/components/marketplace/ProductGallery";
 import ProductDynamicOptionSelector from "@/components/marketplace/ProductDynamicOptionSelector";
@@ -37,6 +37,12 @@ const STOCK_COLORS: Record<string, string> = {
   IN_STOCK: "#16a34a",
   LOW_STOCK: "#d97706",
   OUT_OF_STOCK: "#dc2626",
+};
+
+type CapabilityItem = {
+  key: string;
+  title: string;
+  description: string;
 };
 
 type Props = {
@@ -153,6 +159,72 @@ export default function ProductDetailInteractive({
     ? STOCK_COLORS[selectedVariant.stockStatus] ?? "#16a34a"
     : "#16a34a";
 
+  const variantSummary = useMemo(() => {
+    if (!variants.length) return null;
+    const colorValues = new Set<string>();
+    const sizeValues = new Set<string>();
+    for (const variant of variants) {
+      if (variant.colorName) colorValues.add(variant.colorName);
+      if (variant.sizeName) sizeValues.add(variant.sizeName);
+    }
+    return [
+      `${variants.length} biến thể`,
+      colorValues.size > 0 ? `${colorValues.size} màu` : null,
+      sizeValues.size > 0 ? `${sizeValues.size} size` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }, [variants]);
+
+  const capabilityItems = useMemo<CapabilityItem[]>(() => {
+    const items: CapabilityItem[] = [];
+    if (product.supportsPrinting) {
+      items.push({
+        key: "printing",
+        title: "In logo",
+        description: "Tư vấn kỹ thuật in phù hợp chất liệu và số lượng.",
+      });
+    }
+    if (product.supportsEmbroidery) {
+      items.push({
+        key: "embroidery",
+        title: "Thêu logo",
+        description: "Phù hợp đồng phục cần độ bền và cảm giác cao cấp.",
+      });
+    }
+    if (product.supportsOem) {
+      items.push({
+        key: "oem",
+        title: "OEM/private label",
+        description: "Hỗ trợ phát triển sản phẩm theo nhận diện thương hiệu.",
+      });
+    }
+    items.push({
+      key: "tiered-quote",
+      title: "Báo giá theo số lượng",
+      description: "Báo giá theo MOQ, tiến độ và yêu cầu hoàn thiện.",
+    });
+    return items.slice(0, 4);
+  }, [product.supportsEmbroidery, product.supportsOem, product.supportsPrinting]);
+
+  const descriptionContentBlocks = useMemo(() => {
+    if (!displayContent) return [];
+
+    const blockKeys = displayContent
+      .split("\n\n")
+      .map((block) => block.trim())
+      .filter(Boolean)
+      .map((block, index) => `${index}-${block.slice(0, 80)}`);
+
+    return formatPdpDescriptionContent(displayContent).map((node, index) => {
+      const key = blockKeys[index] ?? `description-block-${index}`;
+      if (isValidElement(node)) {
+        return cloneElement(node, { key });
+      }
+      return <Fragment key={key}>{node}</Fragment>;
+    });
+  }, [displayContent]);
+
   const handleOptionSelect = useCallback((groupSlug: string, valueLabel: string) => {
     setSelection((prev) => ({ ...prev, [groupSlug]: valueLabel }));
   }, []);
@@ -200,11 +272,6 @@ export default function ProductDetailInteractive({
                     productName={displayName}
                     selectedImageUrl={displayImageUrl}
                   />
-                  {specifications.length > 0 && (
-                    <div className="mp-pdp-spec-below-gallery">
-                      <ProductSpecificationsSection rows={specifications} preview />
-                    </div>
-                  )}
                 </div>
 
                 <div className="product-detail-center">
@@ -236,34 +303,27 @@ export default function ProductDetailInteractive({
                         <span className="mp-pdp-core-fact-value">{effectiveLeadTime}</span>
                       </div>
                     )}
-                    {stockLabel && (
-                      <div className="mp-pdp-core-fact">
-                        <span className="mp-pdp-core-fact-label">Tình trạng</span>
-                        <span className="mp-pdp-core-fact-value" style={{ color: stockColor }}>
-                          {stockLabel}
-                        </span>
-                      </div>
-                    )}
-                    {product.supportsOem && (
-                      <div className="mp-pdp-core-fact">
-                        <span className="mp-pdp-core-fact-label">OEM</span>
-                        <span className="mp-pdp-core-fact-value">Hỗ trợ private label</span>
-                      </div>
-                    )}
                   </div>
 
-                  {customizations.length > 0 && (
-                    <div className="mp-pdp-capability-chips" aria-label="Khả năng tùy chỉnh">
-                      {customizations.map((item) => (
-                        <span key={item.id} className="mp-pdp-capability-chip">
-                          {item.label}
-                        </span>
+                  {capabilityItems.length > 0 && (
+                    <div className="mp-pdp-capability-block" aria-label="Khả năng B2B">
+                      {capabilityItems.map((item) => (
+                        <div key={item.key} className="mp-pdp-capability-item">
+                          <strong>{item.title}</strong>
+                          <span>{item.description}</span>
+                        </div>
                       ))}
                     </div>
                   )}
 
                   {showVariantSelector && (
                     <div className="mp-pdp-options-card product-detail-options">
+                      <div className="mp-pdp-options-head">
+                        <h2 className="mp-pdp-options-title">Tùy chọn sản phẩm</h2>
+                        {variantSummary && (
+                          <p className="mp-pdp-options-summary">{variantSummary}</p>
+                        )}
+                      </div>
                       <ProductDynamicOptionSelector
                         optionGroups={optionGroups}
                         variants={variants}
@@ -310,7 +370,7 @@ export default function ProductDetailInteractive({
                         )}
                         {displayContent && (
                           <div className="mp-pdp-desc-body">
-                            {formatPdpDescriptionContent(displayContent)}
+                            {descriptionContentBlocks}
                           </div>
                         )}
                       </div>
