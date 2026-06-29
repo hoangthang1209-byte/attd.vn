@@ -32,7 +32,7 @@ const PHOTOS = {
   fabric: "photo-1558171814-43c9227729af",
   bandana: "photo-1601925260368-ae2f83cf8b7f",
   giftBox: "photo-1513885535751-8b9238bd345a",
-  giftSet: "photo-1617634667039-8e39691f5465",
+  giftSet: "photo-1513885535751-8b9238bd345a",
   warehouse: "photo-1586528116311-ad8dd3c8310d",
   workshop: "photo-1565043589221-1a6fd0e4a83c",
   uniform: "photo-1620799140408-edc7defb1710",

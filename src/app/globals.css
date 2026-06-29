@@ -19589,6 +19589,388 @@ select.admin-input:focus {
   color: #92400e;
 }
 
+/* ─── Public UX polish — quiet global alignment pass ─────────────────────── */
+
+:root {
+  --public-card-radius: 18px;
+  --public-control-radius: 14px;
+  --public-soft-border: rgba(17, 24, 39, 0.08);
+  --public-soft-shadow: 0 10px 30px rgba(17, 24, 39, 0.055);
+  --public-hover-shadow: 0 16px 42px rgba(17, 24, 39, 0.09);
+  --public-focus-ring: 0 0 0 3px rgba(220, 38, 38, 0.16);
+}
+
+.public-main {
+  background: #fff;
+}
+
+.public-main .section {
+  padding-block: clamp(56px, 8vw, 96px);
+}
+
+.public-main .section-compact {
+  padding-block: clamp(44px, 6vw, 68px);
+}
+
+.public-main .section-alt,
+.public-main .section[style*="background: #f9fafb"],
+.public-main .section[style*="background:#f9fafb"] {
+  background: #f8fafc !important;
+  border-color: var(--public-soft-border) !important;
+}
+
+.public-main .container {
+  min-width: 0;
+}
+
+@media (min-width: 1280px) {
+  .public-main .container,
+  .mp-header .container,
+  .site-footer .container {
+    padding-inline: 28px;
+  }
+}
+
+.public-main .section-title {
+  max-width: 780px;
+  margin-bottom: 14px;
+  font-weight: 820;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+}
+
+.public-main .section-description {
+  max-width: 680px;
+  color: #5f6875;
+  line-height: 1.72;
+}
+
+.public-main .section-title + .section-description {
+  margin-top: -2px;
+}
+
+.public-main .section-description--center {
+  margin-bottom: clamp(28px, 4vw, 44px);
+}
+
+.public-main .card,
+.public-main .premium-card,
+.public-main .premium-card-static,
+.public-main .lead-form,
+.public-main .lead-form-success {
+  border-color: var(--public-soft-border);
+  border-radius: var(--public-card-radius);
+  box-shadow: 0 1px 0 rgba(17, 24, 39, 0.025);
+}
+
+.public-main .card {
+  padding: clamp(18px, 2.4vw, 26px);
+}
+
+.public-main a.card,
+.public-main .premium-card,
+.public-main .product-card,
+.public-main .market-cat-card,
+.public-main .mp-blog-card {
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .public-main a.card:hover,
+  .public-main .premium-card:hover,
+  .public-main .product-card:hover,
+  .public-main .market-cat-card:hover,
+  .public-main .mp-blog-card:hover {
+    border-color: rgba(17, 24, 39, 0.12);
+    box-shadow: var(--public-hover-shadow);
+    transform: translateY(-2px);
+  }
+}
+
+.public-main .landing-benefit-card {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.public-main .landing-benefit-marker {
+  width: fit-content;
+  margin-bottom: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #fef2f2;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+
+.public-main .landing-benefit-title,
+.public-main .card h3 {
+  letter-spacing: -0.018em;
+}
+
+.public-main .landing-benefit-desc,
+.public-main .card p {
+  color: #5f6875;
+}
+
+.public-main .btn-primary,
+.public-main .btn-secondary,
+.public-main .btn-tertiary,
+.mp-header .btn-primary,
+.mp-header .btn-secondary,
+.site-footer .btn-primary,
+.site-footer .btn-secondary {
+  min-height: 46px;
+  border-radius: var(--public-control-radius);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.public-main .btn-secondary,
+.site-footer .btn-secondary,
+.mp-header .btn-secondary {
+  border-color: rgba(17, 24, 39, 0.1);
+  color: #18202d;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .public-main .btn-primary:hover,
+  .public-main .btn-secondary:hover,
+  .site-footer .btn-primary:hover,
+  .site-footer .btn-secondary:hover,
+  .mp-header .btn-primary:hover,
+  .mp-header .btn-secondary:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.public-main :where(a, button, input, select, textarea):focus-visible,
+.mp-header :where(a, button, input, select, textarea):focus-visible,
+.site-footer :where(a, button, input, select, textarea):focus-visible,
+.mobile-action-bar :where(a, button):focus-visible,
+.floating-contact :where(a, button):focus-visible {
+  outline: 2px solid rgba(220, 38, 38, 0.72);
+  outline-offset: 3px;
+  box-shadow: var(--public-focus-ring);
+}
+
+.public-main .form-label {
+  color: #374151;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.public-main .form-input {
+  min-height: 46px;
+  border-color: rgba(17, 24, 39, 0.1);
+  border-radius: 13px;
+  background: #fff;
+  color: #111827;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.public-main .form-input::placeholder {
+  color: #9aa3af;
+}
+
+.public-main .form-input:hover:not(:disabled) {
+  border-color: rgba(17, 24, 39, 0.18);
+}
+
+.public-main .form-input:focus {
+  border-color: rgba(220, 38, 38, 0.55);
+  box-shadow: var(--public-focus-ring);
+}
+
+.public-main .form-textarea {
+  min-height: 118px;
+  line-height: 1.6;
+}
+
+.public-main .lead-form-title {
+  letter-spacing: -0.035em;
+}
+
+.public-main .lead-form-submit {
+  width: 100%;
+}
+
+.public-main .product-card,
+.public-main .product-card--catalog,
+.public-main .market-cat-card--marketplace,
+.public-main .mp-blog-card {
+  border-color: var(--public-soft-border);
+  border-radius: var(--public-card-radius);
+  box-shadow: 0 2px 14px rgba(17, 24, 39, 0.045);
+}
+
+.public-main .product-card-title,
+.public-main .market-cat-card-name,
+.public-main .mp-blog-card-title {
+  letter-spacing: -0.02em;
+}
+
+.public-main .product-card-category,
+.public-main .market-cat-card-count-label,
+.public-main .mp-blog-card-kicker {
+  letter-spacing: 0.075em;
+}
+
+.public-main .product-media-frame,
+.public-main .product-card-media,
+.public-main .market-cat-card-img,
+.public-main .mp-blog-card-img,
+.public-main .landing-hero-visual,
+.public-main .landing-hero-image-wrap {
+  background-color: #f8fafc;
+}
+
+.public-main .empty-state,
+.public-main .mp-catalog-empty {
+  border-color: var(--public-soft-border);
+  border-radius: var(--public-card-radius);
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(17, 24, 39, 0.025);
+}
+
+.mp-header--v271 {
+  border-bottom-color: rgba(17, 24, 39, 0.08);
+}
+
+.mp-header--v271.mp-header--scrolled {
+  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
+}
+
+.mp-header-primary-nav-link {
+  border-radius: 999px;
+}
+
+.site-footer--premium {
+  margin-top: 0;
+  border-top-color: rgba(17, 24, 39, 0.08);
+  background: #0f172a;
+}
+
+.site-footer--premium .site-footer-heading {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.site-footer--premium .site-footer-link,
+.site-footer--premium .site-footer-text,
+.site-footer--premium .site-footer-bottom {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.site-footer--premium .site-footer-link:hover {
+  color: #fff;
+}
+
+.site-footer--premium .site-footer-tagline {
+  color: #fff;
+}
+
+.site-footer--premium .site-footer-bottom {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.floating-contact {
+  right: max(18px, env(safe-area-inset-right));
+}
+
+.floating-contact-btn {
+  border-color: rgba(17, 24, 39, 0.1);
+  box-shadow: 0 12px 30px rgba(17, 24, 39, 0.12);
+}
+
+.floating-contact-label {
+  font-weight: 700;
+}
+
+@media (max-width: 899px) {
+  .public-main .section {
+    padding-block: 52px;
+  }
+
+  .public-main .section-title {
+    letter-spacing: -0.036em;
+  }
+
+  .public-main .card {
+    border-radius: 16px;
+  }
+
+  .public-main .hero-cta-row,
+  .public-main .landing-hero-ctas,
+  .public-main .mp-final-cta-btns,
+  .public-main .footer-cta-btns {
+    align-items: center;
+  }
+}
+
+@media (max-width: 639px) {
+  .public-main .section {
+    padding-block: 44px;
+  }
+
+  .public-main .section-description {
+    font-size: 15px;
+  }
+
+  .public-main .lead-form,
+  .public-main .lead-form-success {
+    padding: 20px;
+  }
+
+  .public-main .btn-primary,
+  .public-main .btn-secondary,
+  .public-main .btn-tertiary {
+    width: 100%;
+  }
+
+  .public-main .hero-cta-row,
+  .public-main .landing-hero-ctas,
+  .public-main .mp-final-cta-btns,
+  .public-main .footer-cta-btns {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mobile-action-bar-btn,
+  .pdp-mobile-action-bar__btn {
+    min-height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-main *,
+  .mp-header *,
+  .site-footer *,
+  .floating-contact *,
+  .mobile-action-bar * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
 .order-variant-matrix-editor {
   margin-top: 12px;
   padding-top: 12px;
