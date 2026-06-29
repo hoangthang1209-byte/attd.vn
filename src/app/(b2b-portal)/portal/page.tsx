@@ -3,6 +3,11 @@ import PortalActionCard from "@/components/portal/PortalActionCard";
 import PortalEmptyState from "@/components/portal/PortalEmptyState";
 import PortalStatusBadge, { PortalLevelBadge } from "@/components/portal/PortalStatusBadge";
 import { DEALER_ACTIVITY_TYPE_LABELS } from "@/features/dealer/labels";
+import { DEALER_RFQ_STATUS_LABELS } from "@/features/dealer/dealer-rfq.types";
+import {
+  getDealerRFQSummary,
+  listDealerRFQsForCompany,
+} from "@/features/dealer/services/dealer-rfq.service";
 import { getDealerPortalContext } from "@/lib/dealer-auth/get-dealer-portal-context";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +86,12 @@ export default async function PortalWorkspacePage() {
     );
   }
 
+  const summary = await getDealerRFQSummary(ctx.companyId);
+  const { rfqs: activeRfqs } = await listDealerRFQsForCompany(ctx.companyId, { limit: 5 });
+  const inProgressRfqs = activeRfqs.filter((r) =>
+    ["SUBMITTED", "REVIEWING", "NEED_MORE_INFO", "PRICING"].includes(r.status),
+  );
+
   return (
     <div className="portal-page">
       <p className="portal-eyebrow">Xin chào, {ctx.userName}</p>
@@ -94,6 +105,25 @@ export default async function PortalWorkspacePage() {
           Nhóm giá: {ctx.priceGroupName}
         </p>
       )}
+
+      <div className="portal-grid" style={{ marginTop: 24, marginBottom: 8 }}>
+        <Link href="/portal/rfq?status=SUBMITTED" className="portal-action-card">
+          <h3 className="portal-action-card__title">RFQ mới</h3>
+          <p className="portal-action-card__desc"><strong>{summary.submitted}</strong> đã gửi</p>
+        </Link>
+        <Link href="/portal/rfq" className="portal-action-card">
+          <h3 className="portal-action-card__title">Đang xử lý</h3>
+          <p className="portal-action-card__desc"><strong>{summary.inProgress}</strong> RFQ</p>
+        </Link>
+        <Link href="/portal/rfq?status=QUOTED" className="portal-action-card">
+          <h3 className="portal-action-card__title">Đã báo giá</h3>
+          <p className="portal-action-card__desc"><strong>{summary.quoted}</strong> RFQ</p>
+        </Link>
+        <Link href="/portal/rfq?status=NEED_MORE_INFO" className="portal-action-card">
+          <h3 className="portal-action-card__title">Cần bổ sung</h3>
+          <p className="portal-action-card__desc"><strong>{summary.needInfo}</strong> RFQ</p>
+        </Link>
+      </div>
 
       <h2 className="portal-hero-question">Bạn muốn làm gì hôm nay?</h2>
       <div className="portal-grid">
@@ -110,10 +140,30 @@ export default async function PortalWorkspacePage() {
 
       <section className="portal-section">
         <h2>Việc đang xử lý</h2>
-        <PortalEmptyState
-          title="Chưa có việc đang xử lý"
-          description="RFQ và báo giá sẽ hiển thị tại đây khi bạn bắt đầu gửi yêu cầu."
-        />
+        {inProgressRfqs.length === 0 ? (
+          <PortalEmptyState
+            title="Chưa có việc đang xử lý"
+            description="RFQ và báo giá sẽ hiển thị tại đây khi bạn bắt đầu gửi yêu cầu."
+          />
+        ) : (
+          <ul className="portal-activity-list">
+            {inProgressRfqs.map((rfq) => (
+              <li key={rfq.id} className="portal-activity-item">
+                <div>
+                  <Link href={`/portal/rfq/${rfq.id}`} style={{ fontWeight: 600, color: "#171717" }}>
+                    {rfq.code} — {rfq.title}
+                  </Link>
+                  <div style={{ color: "#737373", marginTop: 2 }}>
+                    {DEALER_RFQ_STATUS_LABELS[rfq.status]}
+                  </div>
+                </div>
+                <time dateTime={rfq.updatedAt}>
+                  {new Date(rfq.updatedAt).toLocaleDateString("vi-VN")}
+                </time>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="portal-section">
