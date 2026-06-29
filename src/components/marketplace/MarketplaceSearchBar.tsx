@@ -1,7 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState, type RefObject } from "react";
+import {
+  FormEvent,
+  KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { Search } from "lucide-react";
 
 type MarketplaceSearchBarProps = {
@@ -47,6 +54,12 @@ export default function MarketplaceSearchBar({
     router.push(q ? `/san-pham?q=${encodeURIComponent(q)}` : "/san-pham");
   }
 
+  function handleInputKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    e.currentTarget.form?.requestSubmit();
+  }
+
   const isMobileHeader = variant === "mobile-header";
 
   return (
@@ -71,6 +84,7 @@ export default function MarketplaceSearchBar({
         name="q"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={handleInputKeyDown}
         placeholder={placeholder}
         className="mp-search-input"
         aria-label="Tìm sản phẩm nguồn hàng"

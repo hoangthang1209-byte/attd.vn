@@ -9,8 +9,8 @@ import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import CatalogFilterToolbar from "@/components/marketplace/CatalogFilterToolbar";
 import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
-import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
 import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
+import CatalogSourcingBadges from "@/components/marketplace/CatalogSourcingBadges";
 import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import { SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/seo";
@@ -111,11 +111,20 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
       <section className="mp-catalog-hero">
         <div className="container">
-          <MarketplaceSectionHeader
-            title={pageTitle}
-            description={pageDescription}
-          />
-          <MarketplaceSearchBar defaultValue={q ?? ""} size="large" />
+          <div className="mp-catalog-hero-card">
+            <div className="mp-catalog-hero-copy">
+              <p className="mp-catalog-eyebrow">Catalog nguồn hàng B2B</p>
+              <h1 className="mp-catalog-title">{pageTitle}</h1>
+              <p className="mp-catalog-desc">{pageDescription}</p>
+              <CatalogSourcingBadges />
+            </div>
+            <div className="mp-catalog-hero-search">
+              <MarketplaceSearchBar defaultValue={q ?? ""} size="large" />
+              <p className="mp-catalog-search-hint">
+                Tìm theo sản phẩm, mã hàng, chất liệu hoặc nhóm quà tặng doanh nghiệp.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -123,25 +132,29 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
         <div className="container">
           <div className="mp-catalog-layout mp-catalog-layout--compact">
             <div className="mp-catalog-main">
-              <CatalogFilterToolbar
-                categoryTree={categoryTree}
-                filters={{
-                  category,
-                  q,
-                  inStock: filters.inStock,
-                  print: filters.print,
-                  embroidery: filters.embroidery,
-                  oem: filters.oem,
-                  material,
-                }}
-                categoryLabel={categoryContext?.name ?? null}
-              />
-
-              <p className="mp-catalog-count">
-                {total > 0
-                  ? `${total} sản phẩm${q ? ` cho "${q}"` : ""}${categoryContext ? ` · ${categoryContext.name}` : ""}`
-                  : "Không tìm thấy sản phẩm"}
-              </p>
+              <div className="mp-catalog-results-bar">
+                <div>
+                  <p className="mp-catalog-results-kicker">Danh sách nguồn hàng</p>
+                  <p className="mp-catalog-count">
+                    {total > 0
+                      ? `${total} sản phẩm${q ? ` cho "${q}"` : ""}${categoryContext ? ` · ${categoryContext.name}` : ""}`
+                      : "Không tìm thấy sản phẩm"}
+                  </p>
+                </div>
+                <CatalogFilterToolbar
+                  categoryTree={categoryTree}
+                  filters={{
+                    category,
+                    q,
+                    inStock: filters.inStock,
+                    print: filters.print,
+                    embroidery: filters.embroidery,
+                    oem: filters.oem,
+                    material,
+                  }}
+                  categoryLabel={categoryContext?.name ?? null}
+                />
+              </div>
 
               {products.length === 0 ? (
                 <div className="mp-catalog-empty">
@@ -171,7 +184,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                   )}
                 </div>
               ) : (
-                <div className="mp-product-grid">
+                <div className="mp-product-grid mp-product-grid--catalog">
                   {products.map((product) => {
                     const stockStatuses = product.variants.map((v) => v.stockStatus);
                     const stock = stockStatuses.includes("IN_STOCK")
@@ -200,6 +213,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                         supportsPrinting={product.supportsPrinting}
                         supportsEmbroidery={product.supportsEmbroidery}
                         supportsOem={product.supportsOem}
+                        variant="catalog"
                         salesBadges={mapPublicProductCardSalesBadges(product)}
                       />
                     );

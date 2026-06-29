@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
+import CatalogSourcingBadges from "@/components/marketplace/CatalogSourcingBadges";
 import InternalLinkBlock from "@/components/public/InternalLinkBlock";
 import TrustBlock from "@/components/public/TrustBlock";
 import EmptyState from "@/components/public/EmptyState";
@@ -29,6 +30,12 @@ import { isValidImageSrc } from "@/lib/imagePaths";
 
 type PageProps = {
   params: Promise<{ category: string }>;
+};
+
+const STOCK_LABELS: Record<string, string> = {
+  IN_STOCK: "Còn hàng",
+  LOW_STOCK: "Sắp hết",
+  OUT_OF_STOCK: "Hết hàng",
 };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -114,79 +121,115 @@ export default async function CategoryPage({ params }: PageProps) {
       <Breadcrumb items={[{ name: cat.name }]} />
 
       {/* ── Category Hero ──────────────────────────────────────────────── */}
-      <section className="section-compact category-hero-section">
+      <section className="mp-category-listing-hero">
         <div className="container">
-          {heroImage && isValidImageSrc(heroImage) && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={heroImage}
-              alt={cat.name}
-              className="category-hero-img"
-            />
-          )}
+          <div className="mp-category-listing-hero__card">
+            <div className="mp-category-listing-hero__copy">
+              <p className="mp-catalog-eyebrow">Danh mục nguồn hàng B2B</p>
+              <h1 className="mp-catalog-title">{cat.name}</h1>
 
-          {galleryImages.length > 0 && (
-            <div className="category-gallery-grid">
-              {galleryImages.map((src) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={src}
-                  src={src}
-                  alt={`${cat.name} — gallery`}
-                  className="category-gallery-item"
-                />
-              ))}
+              <p className="mp-catalog-desc">
+                {content?.shortIntro ??
+                  cat.description ??
+                  `Nguồn hàng ${cat.name.toLowerCase()} dành cho đại lý, xưởng in và doanh nghiệp.`}
+              </p>
+
+              <CatalogSourcingBadges />
             </div>
-          )}
 
-          <h1 className="section-title" style={{ marginBottom: 16 }}>
-            {cat.name}
-          </h1>
+            {(heroImage && isValidImageSrc(heroImage)) || galleryImages.length > 0 ? (
+              <div className="mp-category-listing-hero__media">
+                {heroImage && isValidImageSrc(heroImage) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={heroImage}
+                    alt={cat.name}
+                    className="category-hero-img"
+                  />
+                )}
 
-          <p
-            className="section-description"
-            style={{ marginBottom: 32, maxWidth: 720 }}
-          >
-            {content?.shortIntro ??
-              cat.description ??
-              `Nguồn hàng ${cat.name.toLowerCase()} dành cho đại lý, xưởng in và doanh nghiệp.`}
-          </p>
+                {galleryImages.length > 0 && (
+                  <div className="category-gallery-grid">
+                    {galleryImages.map((src) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={src}
+                        src={src}
+                        alt={`${cat.name} — gallery`}
+                        className="category-gallery-item"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mp-category-listing-hero__media mp-category-listing-hero__media--empty" aria-hidden>
+                <span>ATTD</span>
+                <small>Nguồn hàng B2B</small>
+              </div>
+            )}
+          </div>
 
-          <TrustBlock variant="strip" />
+          <div className="mp-category-listing-trust">
+            <TrustBlock variant="strip" />
+          </div>
+
+          <div className="mp-category-listing-section-header">
+            <div>
+              <p className="mp-catalog-results-kicker">Sản phẩm trong danh mục</p>
+              <h2 className="mp-category-listing-section-title">
+                {cat.products.length > 0
+                  ? `${cat.products.length} sản phẩm ${cat.name}`
+                  : `Nguồn hàng ${cat.name}`}
+              </h2>
+            </div>
+            <p className="mp-category-listing-section-desc">
+              Chọn mẫu phù hợp, gửi số lượng/logo để ATTD tư vấn MOQ, tồn kho và báo giá B2B.
+            </p>
+          </div>
 
           {cat.products.length === 0 ? (
-            <EmptyState
-              title="Chưa có sản phẩm trong danh mục này"
-              description="Liên hệ ATTD để được tư vấn nguồn hàng và báo giá theo nhu cầu."
-            />
+            <div className="mp-catalog-empty">
+              <EmptyState
+                title="Chưa có sản phẩm trong danh mục này"
+                description="Liên hệ ATTD để được tư vấn nguồn hàng thay thế, MOQ và báo giá theo nhu cầu."
+              />
+            </div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                gap: 24,
-              }}
-              className="hp-product-grid"
-            >
-              {cat.products.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  id={product.id}
-                  slug={product.slug}
-                  name={product.name}
-                  productCode={product.productCode}
-                  skuCount={product.variants.length}
-                  category={cat.name}
-                  imageUrl={getPrimaryProductImageFromProduct(product)}
-                  hoverImageUrl={getProductCardHoverImageFromProduct(product)}
-                  moq={product.defaultMoq}
-                  leadTime={product.leadTime}
-                  supportsPrinting={product.supportsPrinting}
-                  supportsEmbroidery={product.supportsEmbroidery}
-                  supportsOem={product.supportsOem}
-                  salesBadges={mapPublicProductCardSalesBadges(product)}
-                />
-              ))}
+            <div className="mp-product-grid mp-product-grid--catalog">
+              {cat.products.map((product) => {
+                const stockStatuses = product.variants.map((variant) => variant.stockStatus);
+                const stock = stockStatuses.includes("IN_STOCK")
+                  ? "IN_STOCK"
+                  : stockStatuses.includes("LOW_STOCK")
+                    ? "LOW_STOCK"
+                    : stockStatuses.length > 0
+                      ? "OUT_OF_STOCK"
+                      : null;
+
+                return (
+                  <ProductCard
+                    key={product.id}
+                    id={product.id}
+                    slug={product.slug}
+                    name={product.name}
+                    productCode={product.productCode}
+                    skuCount={product.variants.length}
+                    category={cat.name}
+                    imageUrl={getPrimaryProductImageFromProduct(product)}
+                    hoverImageUrl={getProductCardHoverImageFromProduct(product)}
+                    moq={product.defaultMoq}
+                    leadTime={product.leadTime}
+                    stockStatus={stock ?? undefined}
+                    stockLabel={stock ? STOCK_LABELS[stock] : undefined}
+                    supportsPrinting={product.supportsPrinting}
+                    supportsEmbroidery={product.supportsEmbroidery}
+                    supportsOem={product.supportsOem}
+                    variant="catalog"
+                    salesBadges={mapPublicProductCardSalesBadges(product)}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
