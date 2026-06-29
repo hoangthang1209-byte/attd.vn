@@ -55,4 +55,5 @@ export const DEALER_ACTIVITY_TYPE_LABELS: Record<DealerActivityType, string> = {
   CRM_LINKED: "Liên kết CRM",
   PRICE_GROUP_ASSIGNED: "Gán nhóm giá",
   NOTE_ADDED: "Ghi chú",
+  LOGIN: "Đăng nhập",
 };

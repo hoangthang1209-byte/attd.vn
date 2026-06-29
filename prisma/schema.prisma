@@ -545,6 +545,7 @@ enum DealerActivityType {
   CRM_LINKED
   PRICE_GROUP_ASSIGNED
   NOTE_ADDED
+  LOGIN
 }
 
 model DealerCompany {
@@ -586,18 +587,22 @@ model DealerCompany {
 }
 
 model DealerUser {
-  id              String           @id @default(cuid())
-  dealerCompanyId String
-  name            String
-  email           String           @unique
-  phone           String?
-  role            DealerUserRole   @default(VIEWER)
-  status          DealerUserStatus @default(INVITED)
-  lastLoginAt     DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  dealerCompany   DealerCompany    @relation(fields: [dealerCompanyId], references: [id], onDelete: Cascade)
-  activities      DealerActivity[]
+  id                   String           @id @default(cuid())
+  dealerCompanyId      String
+  name                 String
+  email                String           @unique
+  phone                String?
+  role                 DealerUserRole   @default(VIEWER)
+  status               DealerUserStatus @default(INVITED)
+  passwordHash         String?
+  passwordSetAt        DateTime?
+  invitedAt            DateTime?
+  loginDisabledReason  String?
+  lastLoginAt          DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  dealerCompany        DealerCompany    @relation(fields: [dealerCompanyId], references: [id], onDelete: Cascade)
+  activities           DealerActivity[]
 
   @@index([dealerCompanyId])
   @@index([status])

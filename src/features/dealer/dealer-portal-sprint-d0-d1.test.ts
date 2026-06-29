@@ -59,10 +59,10 @@ describe("dealer-portal-sprint-d0-d1", () => {
     }
   });
 
-  it("ships dealer portal workspace routes", () => {
-    assert.match(readRepoFile("src/app/(dealer-portal)/dealer/page.tsx"), /Cổng đại lý/);
-    assert.match(readRepoFile("src/app/(dealer-portal)/dealer/rfq/page.tsx"), /Yêu cầu báo giá B2B/);
-    assert.match(readRepoFile("src/app/(dealer-portal)/dealer/quotes/page.tsx"), /Báo giá của đại lý/);
-    assert.match(readRepoFile("src/app/(dealer-portal)/dealer/resources/page.tsx"), /Tài nguyên đại lý/);
+  it("ships dealer portal workspace routes at /portal", () => {
+    assert.match(readRepoFile("src/app/(b2b-portal)/portal/page.tsx"), /Cổng làm việc B2B|Bạn muốn làm gì hôm nay/);
+    assert.match(readRepoFile("src/app/(b2b-portal)/portal/rfq/page.tsx"), /Gửi yêu cầu báo giá B2B/);
+    assert.match(readRepoFile("src/app/(b2b-portal)/portal/quotes/page.tsx"), /Báo giá của bạn/);
+    assert.match(readRepoFile("src/app/(b2b-portal)/portal/resources/page.tsx"), /Tài nguyên đại lý/);
   });
 });

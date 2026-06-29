@@ -1,0 +1,4 @@
+export {
+  B2B_PORTAL_SESSION_COOKIE as DEALER_SESSION_COOKIE,
+  B2B_PORTAL_SESSION_MAX_AGE_SECONDS as DEALER_SESSION_MAX_AGE_SECONDS,
+} from "@/features/dealer/auth/dealer-session";

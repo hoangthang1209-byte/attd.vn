@@ -38,6 +38,41 @@ const nextConfig: NextConfig = {
         destination: "/admin/:path*",
         permanent: true,
       },
+      {
+        source: "/dealer",
+        destination: "/portal",
+        permanent: false,
+      },
+      {
+        source: "/dealer/login",
+        destination: "/portal/login",
+        permanent: false,
+      },
+      {
+        source: "/dealer/rfq",
+        destination: "/portal/rfq",
+        permanent: false,
+      },
+      {
+        source: "/dealer/rfq/:path*",
+        destination: "/portal/rfq/:path*",
+        permanent: false,
+      },
+      {
+        source: "/dealer/quotes",
+        destination: "/portal/quotes",
+        permanent: false,
+      },
+      {
+        source: "/dealer/resources",
+        destination: "/portal/resources",
+        permanent: false,
+      },
+      {
+        source: "/dealer/:path*",
+        destination: "/portal/:path*",
+        permanent: false,
+      },
     ];
   },
 };

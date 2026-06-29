@@ -51,6 +51,8 @@ export default function DealerCompanyDetailView({ companyId }: DealerCompanyDeta
   const [rejectReason, setRejectReason] = useState("");
   const [selectedPriceGroupId, setSelectedPriceGroupId] = useState("");
   const [userForm, setUserForm] = useState({ name: "", email: "", phone: "", role: "VIEWER" });
+  const [passwordUserId, setPasswordUserId] = useState<string | null>(null);
+  const [tempPassword, setTempPassword] = useState("");
 
   const loadCompany = useCallback(async () => {
     setLoading(true);
@@ -319,6 +321,58 @@ export default function DealerCompanyDetailView({ companyId }: DealerCompanyDeta
             <button type="submit" className="admin-btn admin-btn--primary">Thêm người dùng</button>
           </form>
 
+          <p className="admin-hint" style={{ marginTop: 12, fontSize: 13, color: "#64748b" }}>
+            Mật khẩu tạm thời dùng để đại lý đăng nhập lần đầu. Có thể đổi sau ở Portal.
+          </p>
+
+          {passwordUserId && (
+            <form
+              className="admin-form admin-card"
+              style={{ marginTop: 12 }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void runAction(
+                  `/api/dealer/users/${passwordUserId}/set-password`,
+                  "POST",
+                  { password: tempPassword },
+                  "Đã đặt mật khẩu tạm thời.",
+                ).then(() => {
+                  setPasswordUserId(null);
+                  setTempPassword("");
+                  void loadUsers();
+                });
+              }}
+            >
+              <h3>Đặt mật khẩu tạm thời</h3>
+              <label className="admin-field">
+                <span>Mật khẩu (tối thiểu 8 ký tự)</span>
+                <input
+                  type="password"
+                  className="admin-input"
+                  value={tempPassword}
+                  onChange={(e) => setTempPassword(e.target.value)}
+                  minLength={8}
+                  required
+                />
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="submit" className="admin-btn admin-btn--primary">
+                  Lưu mật khẩu
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn"
+                  onClick={() => {
+                    setPasswordUserId(null);
+                    setTempPassword("");
+                  }}
+                >
+                  Hủy
+                </button>
+              </div>
+            </form>
+          )}
+
           <div className="admin-table-wrap" style={{ marginTop: 16 }}>
             <table className="admin-table">
               <thead>
@@ -342,18 +396,30 @@ export default function DealerCompanyDetailView({ companyId }: DealerCompanyDeta
                       <td><DealerUserStatusBadge status={user.status} /></td>
                       <td>
                         {user.status !== "DISABLED" && (
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--sm"
-                            onClick={() =>
-                              void fetch(`/api/dealer/users/${user.id}/disable`, { method: "POST" }).then(() => {
-                                void loadUsers();
-                                void loadActivities();
-                              })
-                            }
-                          >
-                            Vô hiệu
-                          </button>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--sm"
+                              onClick={() => {
+                                setPasswordUserId(user.id);
+                                setTempPassword("");
+                              }}
+                            >
+                              Đặt MK
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--sm"
+                              onClick={() =>
+                                void fetch(`/api/dealer/users/${user.id}/disable`, { method: "POST" }).then(() => {
+                                  void loadUsers();
+                                  void loadActivities();
+                                })
+                              }
+                            >
+                              Vô hiệu
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
