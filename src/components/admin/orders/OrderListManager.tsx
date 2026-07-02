@@ -1,218 +1,437 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { OrderStatus } from "@prisma/client";
-import OrderListQuickStatus from "@/components/admin/orders/OrderListQuickStatus";
-import {
-  AdminLoadingState,
-  AdminPageShell,
-  DataToolbar,
-  EmptyState,
-  PageHeader,
-} from "@/components/admin/AdminUi";
-import { formatOrderCurrency, formatOrderDate } from "@/features/orders/order-format";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
+import AdminErrorRecovery from "@/components/admin/feedback/AdminErrorRecovery";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
+import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { formatOrderDate } from "@/features/orders/order-format";
 import {
   ORDER_PAYMENT_STATE_LABELS,
   ORDER_STATUS_LABELS,
   type OrderPaymentStateFilter,
 } from "@/features/orders/order-labels";
-import type { OrderListRecord } from "@/features/orders/order.types";
-import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
+import type {
+  OrderListDashboardResponse,
+  OrderListDashboardRow,
+  OrderListKpiKey,
+  OrderListQuickFilter,
+} from "@/features/orders/order-list-dashboard.types";
+import { useAdminListQuery } from "@/hooks/useAdminListQuery";
+
+function useListFilters() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const filters = useMemo(
+    () => ({
+      search: searchParams.get("search") ?? "",
+      status: (searchParams.get("status") as OrderStatus | null) ?? "",
+      paymentState: (searchParams.get("paymentState") as OrderPaymentStateFilter | null) ?? "",
+      quickFilter: (searchParams.get("quickFilter") as OrderListQuickFilter | null) ?? "all",
+      kpi: (searchParams.get("kpi") as OrderListKpiKey | null) ?? "",
+      mine: searchParams.get("mine") === "1",
+      page: Number(searchParams.get("page") ?? "1") || 1,
+    }),
+    [searchParams],
+  );
+
+  const update = useCallback(
+    (next: Partial<typeof filters>) => {
+      const params = new URLSearchParams(searchParams.toString());
+      const merged = { ...filters, ...next };
+      for (const [key, value] of Object.entries(merged)) {
+        if (key === "page" && (!value || value === 1)) {
+          params.delete("page");
+          continue;
+        }
+        if (!value || value === "all" || value === "") params.delete(key);
+        else params.set(key, String(value));
+      }
+      if (next.kpi !== undefined || next.quickFilter !== undefined) {
+        if (next.kpi) {
+          params.delete("quickFilter");
+        }
+        if (next.quickFilter && next.quickFilter !== "all") {
+          params.delete("kpi");
+        }
+      }
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [filters, pathname, router, searchParams],
+  );
+
+  return { filters, update };
+}
+
+function buildQueryString(filters: ReturnType<typeof useListFilters>["filters"]) {
+  const params = new URLSearchParams();
+  if (filters.search.trim()) params.set("search", filters.search.trim());
+  if (filters.status) params.set("status", filters.status);
+  if (filters.paymentState) params.set("paymentState", filters.paymentState);
+  if (filters.quickFilter && filters.quickFilter !== "all") {
+    params.set("quickFilter", filters.quickFilter);
+  }
+  if (filters.kpi) params.set("kpi", filters.kpi);
+  if (filters.mine) params.set("mine", "1");
+  if (filters.page > 1) params.set("page", String(filters.page));
+  return params.toString();
+}
+
+function buildDetailHref(orderId: string, qs: string) {
+  const params = new URLSearchParams();
+  params.set("from", "list");
+  if (qs) params.set("qs", qs);
+  return `/admin/orders/${orderId}?${params.toString()}`;
+}
+
+function kpiToneClass(tone: string) {
+  return `order-ops-kpi order-ops-kpi--${tone}`;
+}
+
+function progressToneClass(tone: OrderListDashboardRow["progressTone"]) {
+  return `order-ops-badge order-ops-badge--${tone}`;
+}
+
+function deadlineToneClass(tone: OrderListDashboardRow["deliveryDeadlineTone"]) {
+  return `order-ops-deadline order-ops-deadline--${tone}`;
+}
 
 export default function OrderListManager() {
-  const router = useRouter();
   const { permissions } = useAdminPermissions();
-  const canViewFinancials = permissions.canViewFinancials;
-  const [orders, setOrders] = useState<OrderListRecord[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<OrderStatus | "">("");
-  const [paymentState, setPaymentState] = useState<OrderPaymentStateFilter | "">("");
+  const { filters, update } = useListFilters();
+  const [searchInput, setSearchInput] = useState(filters.search);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
-      if (status) params.set("status", status);
-      if (paymentState) params.set("paymentState", paymentState);
-      const res = await fetch(`/api/orders?${params}`);
-      const data = await res.json() as {
-        orders?: OrderListRecord[];
-        total?: number;
-        message?: string;
-        permissions?: { canViewFinancials?: boolean };
-      };
-      if (!res.ok) throw new Error(data.message ?? "Không thể tải đơn hàng");
-      setOrders(data.orders ?? []);
-      setTotal(data.total ?? 0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
-    } finally {
-      setLoading(false);
-    }
-  }, [search, status, paymentState]);
+  useEffect(() => {
+    setSearchInput(filters.search);
+  }, [filters.search]);
 
-  useEffect(() => { void load(); }, [load]);
-
-  function buildDetailHref(orderId: string) {
-    const filter = new URLSearchParams();
-    if (search.trim()) filter.set("search", search.trim());
-    if (status) filter.set("status", status);
-    if (paymentState) filter.set("paymentState", paymentState);
-    const qs = filter.toString();
-    const params = new URLSearchParams();
-    params.set("from", "list");
-    if (qs) params.set("qs", qs);
-    return `/admin/orders/${orderId}?${params.toString()}`;
-  }
-
-  function handleOrderUpdated(orderId: string, updated: OrderListRecord) {
-    setOrders((prev) => {
-      if (status && updated.status !== status) {
-        return prev.filter((o) => o.id !== orderId);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (searchInput !== filters.search) {
+        update({ search: searchInput, page: 1 });
       }
-      return prev.map((o) => (o.id === orderId ? updated : o));
-    });
-    if (status && updated.status !== status) {
-      setTotal((t) => Math.max(0, t - 1));
-    }
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [filters.search, searchInput, update]);
+
+  const queryString = buildQueryString(filters);
+  const query = useAdminListQuery<OrderListDashboardResponse>(
+    `orders-dashboard:${queryString}`,
+    `/api/orders/dashboard?${queryString}`,
+  );
+
+  const data = query.data;
+  const orders = data?.orders ?? [];
+  const summary = data?.summary;
+  const total = data?.total ?? 0;
+  const pageSize = data?.pageSize ?? 50;
+  const page = data?.page ?? 1;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const canViewFinancials = data?.permissions.canViewFinancials ?? permissions.canViewFinancials;
+  const canCreateOrders = data?.permissions.canCreateOrders ?? permissions.canCreateOrders;
+  const canViewCrm = permissions.canViewCrm;
+
+  const activeQuick =
+    filters.kpi ? null : filters.mine ? "mine" : filters.quickFilter || "all";
+
+  if (query.loading && !query.data) {
+    return <AdminPageSkeleton message="Đang tải danh sách đơn hàng…" />;
   }
 
   return (
-    <AdminPageShell>
-      <PageHeader
-        description={canViewFinancials
-          ? "Quản lý trạng thái vận hành, thanh toán và tiến độ đơn hàng."
-          : "Quản lý trạng thái vận hành và tiến độ đơn hàng."}
-        meta={<span>Tổng: {total} đơn hàng</span>}
-        actions={
-          canViewFinancials ? (
-            <>
-              <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
-                Tạo đơn nhanh
-              </Link>
-              <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
-                Tạo đơn hàng
-              </Link>
-            </>
-          ) : undefined
-        }
-      />
+    <div className="order-ops-dashboard">
+      <header className="order-ops-header">
+        <div>
+          <h1 className="order-ops-header__title">Đơn hàng</h1>
+          <p className="order-ops-header__subtitle">
+            Quản lý trạng thái vận hành, thanh toán và tiến độ đơn hàng
+          </p>
+        </div>
+        {canCreateOrders && (
+          <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
+            + Tạo đơn hàng
+          </Link>
+        )}
+      </header>
 
-      <form onSubmit={(e) => { e.preventDefault(); void load(); }}>
-        <DataToolbar>
-          <input
-            className="admin-input admin-data-toolbar__search"
-            placeholder="Tìm mã đơn, báo giá, khách hàng..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value as OrderStatus | "")}>
-            <option value="">Tất cả trạng thái</option>
-            {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((s) => (
-              <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
-            ))}
-          </select>
-          {canViewFinancials && (
-            <select
-              className="admin-input"
-              value={paymentState}
-              onChange={(e) => setPaymentState(e.target.value as OrderPaymentStateFilter | "")}
+      {summary && (
+        <div className="order-ops-kpi-grid">
+          {summary.kpis.map((kpi) => (
+            <button
+              key={kpi.key}
+              type="button"
+              className={`${kpiToneClass(kpi.tone)}${filters.kpi === kpi.key ? " is-active" : ""}`}
+              onClick={() =>
+                update({
+                  kpi: filters.kpi === kpi.key ? "" : kpi.key,
+                  quickFilter: "all",
+                  mine: false,
+                  page: 1,
+                })
+              }
             >
-              <option value="">Tất cả thanh toán</option>
-              {(Object.keys(ORDER_PAYMENT_STATE_LABELS) as OrderPaymentStateFilter[]).map((s) => (
-                <option key={s} value={s}>{ORDER_PAYMENT_STATE_LABELS[s]}</option>
-              ))}
-            </select>
-          )}
-          <button type="submit" className="admin-btn admin-btn--secondary">Tìm</button>
-        </DataToolbar>
-      </form>
-
-      {error && <p className="admin-error">{error}</p>}
-      {loading ? <AdminLoadingState label="Đang tải danh sách đơn hàng…" /> : orders.length === 0 ? (
-        <EmptyState
-          title="Chưa có đơn hàng phù hợp"
-          description="Hãy tạo đơn hàng mới hoặc điều chỉnh bộ lọc hiện tại."
-          action={
-            canViewFinancials ? (
-              <>
-                <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
-                  Tạo đơn nhanh
-                </Link>
-                <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
-                  Tạo đơn hàng
-                </Link>
-              </>
-            ) : undefined
-          }
-        />
-      ) : (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Mã đơn hàng</th>
-                <th>Báo giá nguồn</th>
-                <th>Khách hàng</th>
-                <th>Trạng thái</th>
-                {canViewFinancials && (
-                  <>
-                    <th>Tổng giá trị</th>
-                    <th>Đã thanh toán</th>
-                    <th>Còn phải thu</th>
-                  </>
-                )}
-                <th>Ngày tạo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((o) => (
-                <tr key={o.id}>
-                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                    <code>{o.orderNo}</code>
-                  </td>
-                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                    {o.sourceQuoteNo ?? "—"}
-                  </td>
-                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                    {o.customerCompanyName ?? o.contactName ?? "—"}
-                  </td>
-                  <td className="order-list-status-col" onClick={(e) => e.stopPropagation()}>
-                    <OrderListQuickStatus
-                      order={o}
-                      detailHref={buildDetailHref(o.id)}
-                      onUpdated={handleOrderUpdated}
-                    />
-                  </td>
-                  {canViewFinancials && (
-                    <>
-                      <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                        {formatOrderCurrency(o.totalAmount)}
-                      </td>
-                      <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                        {formatOrderCurrency(o.paidAmount)}
-                      </td>
-                      <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                        {formatOrderCurrency(o.outstandingAmount)}
-                      </td>
-                    </>
-                  )}
-                  <td style={{ cursor: "pointer" }} onClick={() => router.push(buildDetailHref(o.id))}>
-                    {formatOrderDate(o.createdAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              <span className="order-ops-kpi__count">{kpi.count}</span>
+              <span className="order-ops-kpi__label">{kpi.label}</span>
+              <span className="order-ops-kpi__hint">Đơn hàng</span>
+            </button>
+          ))}
         </div>
       )}
-    </AdminPageShell>
+
+      <div className="order-ops-toolbar">
+        <input
+          className="admin-input order-ops-toolbar__search"
+          placeholder="Tìm theo mã đơn, khách hàng, sản phẩm…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
+        <select
+          className="admin-input order-ops-toolbar__select"
+          value={filters.status}
+          onChange={(e) => update({ status: e.target.value as OrderStatus | "", page: 1 })}
+        >
+          <option value="">Trạng thái</option>
+          {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((s) => (
+            <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
+          ))}
+        </select>
+        {canViewFinancials && (
+          <select
+            className="admin-input order-ops-toolbar__select"
+            value={filters.paymentState}
+            onChange={(e) =>
+              update({ paymentState: e.target.value as OrderPaymentStateFilter | "", page: 1 })
+            }
+          >
+            <option value="">Thanh toán</option>
+            {(Object.keys(ORDER_PAYMENT_STATE_LABELS) as OrderPaymentStateFilter[]).map((s) => (
+              <option key={s} value={s}>{ORDER_PAYMENT_STATE_LABELS[s]}</option>
+            ))}
+          </select>
+        )}
+        <AdminLoadingButton
+          type="button"
+          className={`order-ops-toolbar__mine${filters.mine ? " is-active" : ""}`}
+          variant={filters.mine ? "primary" : "secondary"}
+          size="small"
+          onClick={() =>
+            update({
+              mine: !filters.mine,
+              kpi: "",
+              quickFilter: "all",
+              page: 1,
+            })
+          }
+        >
+          Việc của tôi
+        </AdminLoadingButton>
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          onClick={() => setAdvancedOpen((v) => !v)}
+        >
+          Bộ lọc
+        </button>
+        {query.refreshing && <AdminInlineLoader message="Đang lọc dữ liệu…" />}
+      </div>
+
+      {advancedOpen && (
+        <div className="order-ops-advanced">
+          <p className="admin-field-hint">
+            Dùng thẻ KPI hoặc chip nhanh bên dưới để lọc theo tình trạng vận hành.
+          </p>
+        </div>
+      )}
+
+      {summary && (
+        <div className="order-ops-chips">
+          {summary.quickFilters.map((chip) => {
+            const isActive =
+              chip.key === "mine"
+                ? filters.mine
+                : chip.key === activeQuick && !filters.kpi;
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                className={`order-ops-chip${isActive ? " is-active" : ""}`}
+                onClick={() => {
+                  if (chip.key === "mine") {
+                    update({ mine: !filters.mine, kpi: "", quickFilter: "all", page: 1 });
+                    return;
+                  }
+                  update({
+                    quickFilter: chip.key,
+                    kpi: "",
+                    mine: false,
+                    page: 1,
+                  });
+                }}
+              >
+                {chip.label}
+                {chip.count != null && (
+                  <span className="order-ops-chip__count">{chip.count}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {query.error && (
+        <AdminErrorRecovery
+          message="Không thể tải danh sách đơn hàng. Vui lòng thử lại."
+          onRetry={() => void query.reload()}
+        />
+      )}
+
+      {!query.error && orders.length === 0 && !query.loading && (
+        <div className="order-ops-empty">
+          <p>
+            {filters.search || filters.status || filters.kpi || filters.quickFilter !== "all" || filters.mine
+              ? "Không tìm thấy đơn hàng phù hợp."
+              : "Chưa có đơn hàng."}
+          </p>
+        </div>
+      )}
+
+      {orders.length > 0 && (
+        <>
+          <div className="order-ops-table-wrap">
+            {query.refreshing && <div className="order-ops-table-overlay"><AdminInlineLoader message="Đang tìm kiếm…" /></div>}
+            <table className="admin-table order-ops-table">
+              <thead>
+                <tr>
+                  <th>Mã đơn hàng</th>
+                  <th>Khách hàng</th>
+                  <th>Sản phẩm / Số lượng</th>
+                  <th>Deadline giao</th>
+                  <th>Tiến độ</th>
+                  <th>Người phụ trách</th>
+                  <th>Giao hàng</th>
+                  <th>Cảnh báo</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <Link href={buildDetailHref(row.id, queryString)} className="order-ops-order-link">
+                        {row.orderNo}
+                      </Link>
+                      <div className="order-ops-sub">Tạo: {formatOrderDate(row.createdAt)}</div>
+                    </td>
+                    <td>
+                      {row.customerId && canViewCrm ? (
+                        <Link href={`/admin/crm/customers/${row.customerId}`} className="order-ops-customer-link">
+                          {row.customerCompanyName ?? row.contactName ?? "—"}
+                        </Link>
+                      ) : (
+                        row.customerCompanyName ?? row.contactName ?? "—"
+                      )}
+                    </td>
+                    <td>
+                      <div className="order-ops-products">
+                        {row.productThumbnails.map((url) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={url} src={url} alt="" className="order-ops-product-thumb" />
+                        ))}
+                        <div>
+                          <div>{row.productCount} sản phẩm</div>
+                          <div className="order-ops-sub">
+                            {row.totalQuantity.toLocaleString("vi-VN")}
+                            {row.quantityUnit ? ` ${row.quantityUnit}` : " cái"}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div>{row.deliveryExpectedAt ? formatOrderDate(row.deliveryExpectedAt) : "—"}</div>
+                      <div className={deadlineToneClass(row.deliveryDeadlineTone)}>
+                        {row.deliveryDeadlineRelative}
+                      </div>
+                    </td>
+                    <td>
+                      {row.progressPercent != null && (
+                        <div className="order-ops-progress">
+                          <div
+                            className="order-ops-progress__bar"
+                            style={{ width: `${row.progressPercent}%` }}
+                          />
+                        </div>
+                      )}
+                      <span className={progressToneClass(row.progressTone)}>{row.progressLabel}</span>
+                    </td>
+                    <td>
+                      <div>{row.ownerName ?? "—"}</div>
+                      {row.ownerRole && <div className="order-ops-sub">{row.ownerRole}</div>}
+                    </td>
+                    <td>
+                      <div>{row.deliveryMethodLabel ?? "—"}</div>
+                      <div className="order-ops-sub">{row.deliveryStateLabel}</div>
+                    </td>
+                    <td>
+                      {row.warnings.length === 0 ? (
+                        <span className="order-ops-muted">—</span>
+                      ) : (
+                        <div className="order-ops-warnings">
+                          {row.warnings.map((w) => (
+                            <span key={w} className="order-ops-warning-tag">{w}</span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <Link
+                        href={buildDetailHref(row.id, queryString)}
+                        className="admin-btn admin-btn--primary admin-btn--xs"
+                      >
+                        Chi tiết
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <footer className="order-ops-pagination">
+            <span className="order-ops-sub">
+              Trang {page}/{totalPages} · {total.toLocaleString("vi-VN")} đơn
+            </span>
+            <div className="order-ops-pagination__actions">
+              <AdminLoadingButton
+                type="button"
+                variant="secondary"
+                size="small"
+                disabled={page <= 1 || query.refreshing}
+                pending={query.refreshing}
+                onClick={() => update({ page: page - 1 })}
+              >
+                Trước
+              </AdminLoadingButton>
+              <AdminLoadingButton
+                type="button"
+                variant="secondary"
+                size="small"
+                disabled={page >= totalPages || query.refreshing}
+                pending={query.refreshing}
+                onClick={() => update({ page: page + 1 })}
+              >
+                Sau
+              </AdminLoadingButton>
+            </div>
+          </footer>
+        </>
+      )}
+    </div>
   );
 }
