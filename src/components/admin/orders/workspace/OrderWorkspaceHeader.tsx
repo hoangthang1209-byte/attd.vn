@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { OrderStatus } from "@prisma/client";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
@@ -46,21 +46,52 @@ export default function OrderWorkspaceHeader({
 }: Props) {
   const readiness = deriveProductionReadinessIndicator(order, bundle);
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const moreTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const closeMore = useCallback(() => {
+    setMoreOpen(false);
+    moreTriggerRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closeMore();
+    }
+    function onPointerDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (moreRef.current?.contains(target)) return;
+      closeMore();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [moreOpen, closeMore]);
 
   return (
     <header className="order-workspace-header">
       <div className="order-workspace-header__main">
-        <div className="order-workspace-header__title-row">
-          <h1 className="order-workspace-header__code">{order.orderNo}</h1>
+        <div className="order-workspace-header__status-row">
+          <span className="order-workspace-header__code">{order.orderNo}</span>
           <OrderStatusBadge status={order.status} />
-          <span className={`order-workspace-readiness order-workspace-readiness--${readiness.tone}`}>
+          <span
+            className={`order-workspace-prod-readiness order-workspace-prod-readiness--${readiness.tone}`}
+            title="Tình trạng sẵn sàng sản xuất"
+          >
             {readiness.label}
           </span>
         </div>
         <div className="order-workspace-header__meta">
           <span>Deadline giao: {order.deliveryExpectedAt ? formatOrderDate(order.deliveryExpectedAt) : "—"}</span>
+          <span>·</span>
           <span>Tạo: {formatOrderDateTime(order.createdAt)}</span>
+          <span>·</span>
           <span>Nguồn: {orderSourceLabel(order)}</span>
+          <span>·</span>
           <span>Phụ trách: {order.salesName ?? order.productionOwnerName ?? "—"}</span>
         </div>
       </div>
@@ -70,23 +101,31 @@ export default function OrderWorkspaceHeader({
             Chỉnh sửa
           </Link>
         )}
-        {canViewFinancials && order.quote && (
-          <Link href={`/admin/quotes/${order.quote.id}`} className="admin-btn admin-btn--secondary admin-btn--small">
-            Báo giá nguồn
-          </Link>
-        )}
         <OrderDocumentActions order={order} />
-        <div className="order-workspace-header__more">
+        <div className="order-workspace-header__more" ref={moreRef}>
           <button
+            ref={moreTriggerRef}
             type="button"
             className="admin-btn admin-btn--secondary admin-btn--small"
             disabled={busy}
+            aria-haspopup="menu"
+            aria-expanded={moreOpen}
             onClick={() => setMoreOpen((v) => !v)}
           >
             Thao tác ▾
           </button>
           {moreOpen && (
-            <div className="order-workspace-header__menu">
+            <div className="order-workspace-header__menu" role="menu">
+              {canViewFinancials && order.quote && (
+                <Link
+                  href={`/admin/quotes/${order.quote.id}`}
+                  className="order-workspace-header__menu-item"
+                  role="menuitem"
+                  onClick={() => closeMore()}
+                >
+                  Báo giá nguồn
+                </Link>
+              )}
               {transitions
                 .filter((s) => s !== "CANCELLED")
                 .map((status) => {
@@ -96,10 +135,11 @@ export default function OrderWorkspaceHeader({
                     <button
                       key={status}
                       type="button"
+                      role="menuitem"
                       className="order-workspace-header__menu-item"
                       disabled={busy}
                       onClick={() => {
-                        setMoreOpen(false);
+                        closeMore();
                         onRequestStatusChange(status);
                       }}
                     >
@@ -110,10 +150,11 @@ export default function OrderWorkspaceHeader({
               {transitions.includes("CANCELLED") && (
                 <button
                   type="button"
+                  role="menuitem"
                   className="order-workspace-header__menu-item order-workspace-header__menu-item--danger"
                   disabled={busy}
                   onClick={() => {
-                    setMoreOpen(false);
+                    closeMore();
                     onOpenCancel();
                   }}
                 >
@@ -124,10 +165,11 @@ export default function OrderWorkspaceHeader({
                 <button
                   key={`correction-${status}`}
                   type="button"
+                  role="menuitem"
                   className="order-workspace-header__menu-item"
                   disabled={busy}
                   onClick={() => {
-                    setMoreOpen(false);
+                    closeMore();
                     onOpenCorrection(status);
                   }}
                 >

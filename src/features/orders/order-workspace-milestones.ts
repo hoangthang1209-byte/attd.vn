@@ -85,27 +85,28 @@ export function deriveProductionReadinessIndicator(
   bundle: ProductionExecutionBundle | null,
 ): { label: string; tone: "ok" | "active" | "warn" | "muted" } {
   if (order.status === "CANCELLED") {
-    return { label: "Đã hủy", tone: "muted" };
+    return { label: "Sản xuất: —", tone: "muted" };
   }
   if (!bundle || bundle.items.length === 0) {
-    if (order.status === "CONFIRMED") return { label: "Chờ sản xuất", tone: "warn" };
-    return { label: "Chưa có dữ liệu SX", tone: "muted" };
+    if (order.status === "CONFIRMED" || order.status === "NEW") {
+      return { label: "Sản xuất: Chưa sẵn sàng", tone: "muted" };
+    }
+    return { label: "Sản xuất: Chưa sẵn sàng", tone: "muted" };
   }
   const state = bundle.orderReadiness.state;
   switch (state) {
     case "MISSING_DOCS":
-      return { label: "Thiếu tài liệu", tone: "warn" };
+      return { label: "Sản xuất: Có cảnh báo", tone: "warn" };
     case "AWAITING_PRODUCTION":
-      return { label: "Chuẩn bị SX", tone: "warn" };
+      return { label: "Sản xuất: Chuẩn bị", tone: "warn" };
     case "IN_PRODUCTION":
-      return { label: "Đang sản xuất", tone: "active" };
     case "AWAITING_QC":
-      return { label: "Chờ QC", tone: "active" };
+      return { label: "Sản xuất: Chuẩn bị", tone: "active" };
     case "READY_TO_SHIP":
-      return { label: "Sẵn sàng giao", tone: "ok" };
+      return { label: "Sản xuất: Đủ điều kiện", tone: "ok" };
     case "NEEDS_ATTENTION":
-      return { label: "Có vấn đề", tone: "warn" };
+      return { label: "Sản xuất: Có cảnh báo", tone: "warn" };
     default:
-      return { label: bundle.orderReadiness.stateLabel, tone: "muted" };
+      return { label: `Sản xuất: ${bundle.orderReadiness.stateLabel}`, tone: "muted" };
   }
 }

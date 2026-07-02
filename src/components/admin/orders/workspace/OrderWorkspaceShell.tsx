@@ -90,7 +90,6 @@ export default function OrderWorkspaceShell(props: OrderWorkspaceShellProps) {
   const {
     orderId,
     order,
-    listBackHref,
     busy,
     canEditOrder,
     canRecordPayment,
@@ -162,10 +161,12 @@ export default function OrderWorkspaceShell(props: OrderWorkspaceShellProps) {
       <nav className="order-workspace-breadcrumb" aria-label="Breadcrumb">
         <Link href="/admin/orders">Đơn hàng</Link>
         <span aria-hidden>›</span>
-        <Link href={listBackHref}>Chi tiết đơn hàng</Link>
+        <span>Chi tiết đơn hàng</span>
         <span aria-hidden>›</span>
         <span>{order.orderNo}</span>
       </nav>
+
+      <h1 className="order-workspace-page-title">Chi tiết đơn hàng</h1>
 
       <OrderWorkspaceHeader
         order={order}

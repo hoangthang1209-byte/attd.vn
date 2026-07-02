@@ -57,7 +57,7 @@ export default function OrderProductionSummaryPanel({
       </div>
       {roleCode !== "DELIVERY" && (
         <Link href={productionModuleHref(orderNo, roleCode)} className="admin-btn admin-btn--primary admin-btn--small order-workspace-prod-summary__cta">
-          Mở module sản xuất
+          Mở quản lý sản xuất
         </Link>
       )}
     </aside>

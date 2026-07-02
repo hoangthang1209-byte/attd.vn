@@ -21,13 +21,11 @@ type Props = {
   onNavigateTab: (tab: OrderWorkspaceTab) => void;
 };
 
-function deliverySummary(order: OrderDetailRecord): string {
-  const date = order.deliveryExpectedAt ? formatOrderDate(order.deliveryExpectedAt) : "—";
-  let status = "Chờ giao";
-  if (order.deliveredAt || order.status === "COMPLETED") status = "Đã giao";
-  else if (order.shippedAt || order.status === "SHIPPED") status = "Đang giao";
-  else if (order.status === "READY_TO_SHIP") status = "Chờ giao";
-  return `${date} · ${status}`;
+function deliveryStatusShort(order: OrderDetailRecord): string {
+  if (order.deliveredAt || order.status === "COMPLETED") return "Đã giao";
+  if (order.shippedAt || order.status === "SHIPPED") return "Đang giao";
+  if (order.status === "READY_TO_SHIP") return "Chờ giao";
+  return "Chờ giao";
 }
 
 function defaultOpenSections(
@@ -63,20 +61,24 @@ export default function OrderWorkspaceLowerSections({
   onNavigateTab,
 }: Props) {
   const storageKey = orderWorkspaceSectionStorageKey(orderId);
-  const defaults = useMemo(
+  const roleDefaults = useMemo(
     () => defaultOpenSections(order, roleCode, canViewFinancials),
     [canViewFinancials, order, roleCode],
   );
-  const [open, setOpen] = useState<Partial<Record<SectionKey, boolean>>>(defaults);
+  const [open, setOpen] = useState<Partial<Record<SectionKey, boolean>>>({});
 
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(storageKey);
-      if (raw) setOpen({ ...defaults, ...JSON.parse(raw) as Partial<Record<SectionKey, boolean>> });
+      if (raw) {
+        setOpen(JSON.parse(raw) as Partial<Record<SectionKey, boolean>>);
+        return;
+      }
     } catch {
       /* ignore */
     }
-  }, [defaults, storageKey]);
+    setOpen(roleDefaults);
+  }, [roleDefaults, storageKey]);
 
   function toggle(key: SectionKey) {
     setOpen((prev) => {
@@ -95,27 +97,34 @@ export default function OrderWorkspaceLowerSections({
       ? `Còn phải thu ${formatOrderCurrency(order.financials.outstandingAmount, order.currency)}`
       : null;
 
+  const activityCount = (order.activities ?? []).length;
+
   return (
-    <div className="order-workspace-lower-grid">
-      <details className="order-workspace-lower-card" open={open.delivery}>
+    <div className="order-workspace-lower-list">
+      <details className="order-workspace-lower-row" open={Boolean(open.delivery)}>
         <summary onClick={(e) => { e.preventDefault(); toggle("delivery"); }}>
-          Lịch giao hàng: {deliverySummary(order)}
+          <span className="order-workspace-lower-row__label">Lịch giao hàng</span>
+          <span className="order-workspace-lower-row__value">{deliveryStatusShort(order)}</span>
         </summary>
-        <div className="order-workspace-lower-card__body">
-          <p>{order.deliveryMethodName ?? order.deliveryMethod ?? "—"}</p>
-          <p className="admin-field-hint">{order.deliveryOwnerName ?? "—"}</p>
-          <p className="admin-field-hint">{orderCarrierDisplay(order) ?? "—"}</p>
+        <div className="order-workspace-lower-row__body">
+          <p>
+            {order.deliveryExpectedAt ? formatOrderDate(order.deliveryExpectedAt) : "—"}
+            {" · "}
+            {order.deliveryMethodName ?? order.deliveryMethod ?? "—"}
+          </p>
+          <p className="admin-field-hint">{order.deliveryOwnerName ?? "—"} · {orderCarrierDisplay(order) ?? "—"}</p>
           <button type="button" className="order-workspace-summary-card__link" onClick={() => onNavigateTab("delivery")}>
             Mở tab giao hàng
           </button>
         </div>
       </details>
 
-      <details className="order-workspace-lower-card" open={open.documents}>
+      <details className="order-workspace-lower-row" open={Boolean(open.documents)}>
         <summary onClick={(e) => { e.preventDefault(); toggle("documents"); }}>
-          Tài liệu đơn hàng: {productionFileCount} file
+          <span className="order-workspace-lower-row__label">Tài liệu đơn hàng</span>
+          <span className="order-workspace-lower-row__value">{productionFileCount} file</span>
         </summary>
-        <div className="order-workspace-lower-card__body">
+        <div className="order-workspace-lower-row__body">
           <p className="admin-field-hint">Tài liệu sản xuất được quản lý trong module sản xuất.</p>
           <Link
             href={`/admin/production?search=${encodeURIComponent(order.orderNo)}`}
@@ -126,30 +135,36 @@ export default function OrderWorkspaceLowerSections({
         </div>
       </details>
 
-      <details className="order-workspace-lower-card" open={open.activity}>
+      <details className="order-workspace-lower-row" open={Boolean(open.activity)}>
         <summary onClick={(e) => { e.preventDefault(); toggle("activity"); }}>
-          Lịch sử hoạt động: {(order.activities ?? []).length} cập nhật
+          <span className="order-workspace-lower-row__label">Lịch sử hoạt động</span>
+          <span className="order-workspace-lower-row__value">{activityCount} cập nhật</span>
         </summary>
-        <div className="order-workspace-lower-card__body">
-          <ul className="order-activity-timeline">
-            {(order.activities ?? []).slice(0, 5).map((activity) => (
-              <li key={activity.id}>
-                <strong>{activity.title}</strong>
-                <span className="admin-field-hint"> · {formatOrderDateTime(activity.createdAt)}</span>
-              </li>
-            ))}
-          </ul>
+        <div className="order-workspace-lower-row__body">
+          {(order.activities ?? []).length === 0 ? (
+            <p className="admin-field-hint">Chưa có hoạt động.</p>
+          ) : (
+            <ul className="order-activity-timeline">
+              {(order.activities ?? []).slice(0, 5).map((activity) => (
+                <li key={activity.id}>
+                  <strong>{activity.title}</strong>
+                  <span className="admin-field-hint"> · {formatOrderDateTime(activity.createdAt)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <button type="button" className="order-workspace-summary-card__link" onClick={() => onNavigateTab("activity")}>
             Xem tất cả
           </button>
         </div>
       </details>
 
-      <details className="order-workspace-lower-card" open={open.notes}>
+      <details className="order-workspace-lower-row" open={Boolean(open.notes)}>
         <summary onClick={(e) => { e.preventDefault(); toggle("notes"); }}>
-          Ghi chú nội bộ: {order.internalNote ? "Có" : "Không"}
+          <span className="order-workspace-lower-row__label">Ghi chú nội bộ</span>
+          <span className="order-workspace-lower-row__value">{order.internalNote ? "Có" : "Không có"}</span>
         </summary>
-        <div className="order-workspace-lower-card__body">
+        <div className="order-workspace-lower-row__body">
           {order.internalNote ? (
             <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.internalNote}</pre>
           ) : (
@@ -162,11 +177,12 @@ export default function OrderWorkspaceLowerSections({
       </details>
 
       {canViewFinancials && paymentSummary && (
-        <details className="order-workspace-lower-card" open={open.payment}>
+        <details className="order-workspace-lower-row" open={Boolean(open.payment)}>
           <summary onClick={(e) => { e.preventDefault(); toggle("payment"); }}>
-            Thanh toán: {paymentSummary}
+            <span className="order-workspace-lower-row__label">Thanh toán</span>
+            <span className="order-workspace-lower-row__value">{paymentSummary}</span>
           </summary>
-          <div className="order-workspace-lower-card__body">
+          <div className="order-workspace-lower-row__body">
             <p>Đã nhận: {formatOrderCurrency(order.financials.paidAmount, order.currency)}</p>
             <button type="button" className="order-workspace-summary-card__link" onClick={() => onNavigateTab("payment")}>
               Xem thanh toán
