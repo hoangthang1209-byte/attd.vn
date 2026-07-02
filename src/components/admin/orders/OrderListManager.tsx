@@ -21,7 +21,27 @@ import type {
   OrderListKpiKey,
   OrderListQuickFilter,
 } from "@/features/orders/order-list-dashboard.types";
+import { SlidersHorizontal } from "lucide-react";
 import { useAdminListQuery } from "@/hooks/useAdminListQuery";
+
+function kpiDisplayLabel(label: string, key: OrderListKpiKey): string {
+  if (key === "at_risk") return "Nguy cơ trễ";
+  return label;
+}
+
+function WarningDisplay({ warnings }: { warnings: string[] }) {
+  if (warnings.length === 0) return <span className="order-ops-muted">—</span>;
+  const shown = warnings.slice(0, 2);
+  const extra = warnings.length - 2;
+  return (
+    <div className="order-ops-warnings">
+      {shown.map((w) => (
+        <span key={w} className="order-ops-warning-tag">{w}</span>
+      ))}
+      {extra > 0 && <span className="order-ops-warning-more">+{extra}</span>}
+    </div>
+  );
+}
 
 function useListFilters() {
   const searchParams = useSearchParams();
@@ -177,113 +197,102 @@ export default function OrderListManager() {
                 })
               }
             >
+              <span className="order-ops-kpi__label">{kpiDisplayLabel(kpi.label, kpi.key)}</span>
               <span className="order-ops-kpi__count">{kpi.count}</span>
-              <span className="order-ops-kpi__label">{kpi.label}</span>
-              <span className="order-ops-kpi__hint">Đơn hàng</span>
             </button>
           ))}
         </div>
       )}
 
-      <div className="order-ops-toolbar">
-        <input
-          className="admin-input order-ops-toolbar__search"
-          placeholder="Tìm theo mã đơn, khách hàng, sản phẩm…"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-        />
-        <select
-          className="admin-input order-ops-toolbar__select"
-          value={filters.status}
-          onChange={(e) => update({ status: e.target.value as OrderStatus | "", page: 1 })}
-        >
-          <option value="">Trạng thái</option>
-          {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((s) => (
-            <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
-          ))}
-        </select>
-        {canViewFinancials && (
+      <div className="order-ops-controls">
+        <div className="order-ops-toolbar">
+          <input
+            className="admin-input order-ops-toolbar__search"
+            placeholder="Tìm theo mã đơn, khách hàng, sản phẩm…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
           <select
             className="admin-input order-ops-toolbar__select"
-            value={filters.paymentState}
-            onChange={(e) =>
-              update({ paymentState: e.target.value as OrderPaymentStateFilter | "", page: 1 })
-            }
+            value={filters.status}
+            onChange={(e) => update({ status: e.target.value as OrderStatus | "", page: 1 })}
           >
-            <option value="">Thanh toán</option>
-            {(Object.keys(ORDER_PAYMENT_STATE_LABELS) as OrderPaymentStateFilter[]).map((s) => (
-              <option key={s} value={s}>{ORDER_PAYMENT_STATE_LABELS[s]}</option>
+            <option value="">Trạng thái</option>
+            {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((s) => (
+              <option key={s} value={s}>{ORDER_STATUS_LABELS[s]}</option>
             ))}
           </select>
-        )}
-        <AdminLoadingButton
-          type="button"
-          className={`order-ops-toolbar__mine${filters.mine ? " is-active" : ""}`}
-          variant={filters.mine ? "primary" : "secondary"}
-          size="small"
-          onClick={() =>
-            update({
-              mine: !filters.mine,
-              kpi: "",
-              quickFilter: "all",
-              page: 1,
-            })
-          }
-        >
-          Việc của tôi
-        </AdminLoadingButton>
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary admin-btn--small"
-          onClick={() => setAdvancedOpen((v) => !v)}
-        >
-          Bộ lọc
-        </button>
-        {query.refreshing && <AdminInlineLoader message="Đang lọc dữ liệu…" />}
-      </div>
+          {canViewFinancials && (
+            <select
+              className="admin-input order-ops-toolbar__select order-ops-toolbar__select--payment"
+              value={filters.paymentState}
+              onChange={(e) =>
+                update({ paymentState: e.target.value as OrderPaymentStateFilter | "", page: 1 })
+              }
+            >
+              <option value="">Thanh toán</option>
+              {(Object.keys(ORDER_PAYMENT_STATE_LABELS) as OrderPaymentStateFilter[]).map((s) => (
+                <option key={s} value={s}>{ORDER_PAYMENT_STATE_LABELS[s]}</option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            className={`admin-btn admin-btn--secondary admin-btn--small order-ops-toolbar__filter${advancedOpen ? " is-active" : ""}`}
+            onClick={() => setAdvancedOpen((v) => !v)}
+            aria-expanded={advancedOpen}
+          >
+            <SlidersHorizontal size={14} aria-hidden />
+            <span>Bộ lọc</span>
+          </button>
+          {query.refreshing && (
+            <span className="order-ops-toolbar__refresh">
+              <AdminInlineLoader message="Đang lọc…" />
+            </span>
+          )}
+        </div>
 
-      {advancedOpen && (
-        <div className="order-ops-advanced">
-          <p className="admin-field-hint">
-            Dùng thẻ KPI hoặc chip nhanh bên dưới để lọc theo tình trạng vận hành.
+        {advancedOpen && (
+          <p className="order-ops-controls__hint admin-field-hint">
+            Dùng thẻ KPI hoặc chip nhanh để lọc theo tình trạng vận hành.
           </p>
-        </div>
-      )}
+        )}
 
-      {summary && (
-        <div className="order-ops-chips">
-          {summary.quickFilters.map((chip) => {
-            const isActive =
-              chip.key === "mine"
-                ? filters.mine
-                : chip.key === activeQuick && !filters.kpi;
-            return (
-              <button
-                key={chip.key}
-                type="button"
-                className={`order-ops-chip${isActive ? " is-active" : ""}`}
-                onClick={() => {
-                  if (chip.key === "mine") {
-                    update({ mine: !filters.mine, kpi: "", quickFilter: "all", page: 1 });
-                    return;
-                  }
-                  update({
-                    quickFilter: chip.key,
-                    kpi: "",
-                    mine: false,
-                    page: 1,
-                  });
-                }}
-              >
-                {chip.label}
-                {chip.count != null && (
-                  <span className="order-ops-chip__count">{chip.count}</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+        {summary && (
+          <div className="order-ops-chips">
+            {summary.quickFilters.map((chip) => {
+              const isActive =
+                chip.key === "mine"
+                  ? filters.mine
+                  : chip.key === activeQuick && !filters.kpi;
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  className={`order-ops-chip${isActive ? " is-active" : ""}`}
+                  onClick={() => {
+                    if (chip.key === "mine") {
+                      update({ mine: !filters.mine, kpi: "", quickFilter: "all", page: 1 });
+                      return;
+                    }
+                    update({
+                      quickFilter: chip.key,
+                      kpi: "",
+                      mine: false,
+                      page: 1,
+                    });
+                  }}
+                >
+                  {chip.label}
+                  {chip.count != null && (
+                    <span className="order-ops-chip__count">{chip.count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {query.error && (
         <AdminErrorRecovery
@@ -329,13 +338,15 @@ export default function OrderListManager() {
                       </Link>
                       <div className="order-ops-sub">Tạo: {formatOrderDate(row.createdAt)}</div>
                     </td>
-                    <td>
+                    <td className="order-ops-cell-customer">
                       {row.customerId && canViewCrm ? (
                         <Link href={`/admin/crm/customers/${row.customerId}`} className="order-ops-customer-link">
                           {row.customerCompanyName ?? row.contactName ?? "—"}
                         </Link>
                       ) : (
-                        row.customerCompanyName ?? row.contactName ?? "—"
+                        <span className="order-ops-customer-name">
+                          {row.customerCompanyName ?? row.contactName ?? "—"}
+                        </span>
                       )}
                     </td>
                     <td>
@@ -345,8 +356,8 @@ export default function OrderListManager() {
                           <img key={url} src={url} alt="" className="order-ops-product-thumb" />
                         ))}
                         <div>
-                          <div>{row.productCount} sản phẩm</div>
-                          <div className="order-ops-sub">
+                          <div className="order-ops-product-count">{row.productCount} sản phẩm</div>
+                          <div className="order-ops-product-qty">
                             {row.totalQuantity.toLocaleString("vi-VN")}
                             {row.quantityUnit ? ` ${row.quantityUnit}` : " cái"}
                           </div>
@@ -354,47 +365,43 @@ export default function OrderListManager() {
                       </div>
                     </td>
                     <td>
-                      <div>{row.deliveryExpectedAt ? formatOrderDate(row.deliveryExpectedAt) : "—"}</div>
+                      <div className="order-ops-deadline-date">
+                        {row.deliveryExpectedAt ? formatOrderDate(row.deliveryExpectedAt) : "—"}
+                      </div>
                       <div className={deadlineToneClass(row.deliveryDeadlineTone)}>
                         {row.deliveryDeadlineRelative}
                       </div>
                     </td>
                     <td>
                       {row.progressPercent != null && (
-                        <div className="order-ops-progress">
+                        <div className="order-ops-progress" title={`${row.progressPercent}%`}>
                           <div
                             className="order-ops-progress__bar"
                             style={{ width: `${row.progressPercent}%` }}
                           />
                         </div>
                       )}
-                      <span className={progressToneClass(row.progressTone)}>{row.progressLabel}</span>
+                      <span className={`${progressToneClass(row.progressTone)} order-ops-progress-badge`}>
+                        {row.progressLabel}
+                      </span>
                     </td>
                     <td>
-                      <div>{row.ownerName ?? "—"}</div>
+                      <div className="order-ops-owner-name">{row.ownerName ?? "—"}</div>
                       {row.ownerRole && <div className="order-ops-sub">{row.ownerRole}</div>}
                     </td>
                     <td>
-                      <div>{row.deliveryMethodLabel ?? "—"}</div>
+                      <div className="order-ops-delivery-method">{row.deliveryMethodLabel ?? "—"}</div>
                       <div className="order-ops-sub">{row.deliveryStateLabel}</div>
                     </td>
                     <td>
-                      {row.warnings.length === 0 ? (
-                        <span className="order-ops-muted">—</span>
-                      ) : (
-                        <div className="order-ops-warnings">
-                          {row.warnings.map((w) => (
-                            <span key={w} className="order-ops-warning-tag">{w}</span>
-                          ))}
-                        </div>
-                      )}
+                      <WarningDisplay warnings={row.warnings} />
                     </td>
-                    <td>
+                    <td className="order-ops-cell-action">
                       <Link
                         href={buildDetailHref(row.id, queryString)}
-                        className="admin-btn admin-btn--primary admin-btn--xs"
+                        className="order-ops-row-link"
                       >
-                        Chi tiết
+                        Mở
                       </Link>
                     </td>
                   </tr>
@@ -403,32 +410,34 @@ export default function OrderListManager() {
             </table>
           </div>
 
-          <footer className="order-ops-pagination">
-            <span className="order-ops-sub">
+          <footer className={`order-ops-pagination${totalPages <= 1 ? " order-ops-pagination--single" : ""}`}>
+            <span className="order-ops-pagination__meta">
               Trang {page}/{totalPages} · {total.toLocaleString("vi-VN")} đơn
             </span>
-            <div className="order-ops-pagination__actions">
-              <AdminLoadingButton
-                type="button"
-                variant="secondary"
-                size="small"
-                disabled={page <= 1 || query.refreshing}
-                pending={query.refreshing}
-                onClick={() => update({ page: page - 1 })}
-              >
-                Trước
-              </AdminLoadingButton>
-              <AdminLoadingButton
-                type="button"
-                variant="secondary"
-                size="small"
-                disabled={page >= totalPages || query.refreshing}
-                pending={query.refreshing}
-                onClick={() => update({ page: page + 1 })}
-              >
-                Sau
-              </AdminLoadingButton>
-            </div>
+            {totalPages > 1 && (
+              <div className="order-ops-pagination__actions">
+                <AdminLoadingButton
+                  type="button"
+                  variant="secondary"
+                  size="small"
+                  disabled={page <= 1 || query.refreshing}
+                  pending={query.refreshing}
+                  onClick={() => update({ page: page - 1 })}
+                >
+                  Trước
+                </AdminLoadingButton>
+                <AdminLoadingButton
+                  type="button"
+                  variant="secondary"
+                  size="small"
+                  disabled={page >= totalPages || query.refreshing}
+                  pending={query.refreshing}
+                  onClick={() => update({ page: page + 1 })}
+                >
+                  Sau
+                </AdminLoadingButton>
+              </div>
+            )}
           </footer>
         </>
       )}
