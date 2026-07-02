@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { OrderPaymentMethod, OrderPaymentType, OrderStatus } from "@prisma/client";
-import AdminBackLink from "@/components/admin/AdminBackLink";
-import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
+import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
+import OrderWorkspaceShell from "@/components/admin/orders/workspace/OrderWorkspaceShell";
+import type { OrderDetailRecord } from "@/features/orders/order.types";
+import type { EmployeeRecord } from "@/features/employees/employee.service";
 import {
-  formatOrderCurrency,
-  formatOrderDate,
   formatOrderDateTime,
   toDateTimeLocalValue,
 } from "@/features/orders/order-format";
@@ -16,37 +16,21 @@ import {
   getAllowedOrderStatusTransitions,
   getOrderStatusCorrectionTargets,
   isOrderEditable,
-  orderCarrierDisplay,
-  orderStatusActionLabel,
-  orderStatusCorrectionLabel,
 } from "@/features/orders/order-status";
-import type { DeliveryCarrierRecord } from "@/features/delivery/delivery-carrier.service";
-import ProductionOwnerSelect from "@/components/admin/orders/ProductionOwnerSelect";
-import DeliveryCarrierSelect from "@/components/admin/orders/DeliveryCarrierSelect";
-import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
 import {
   ORDER_PAYMENT_METHOD_LABELS,
-  ORDER_PAYMENT_STATE_LABELS,
-  ORDER_PAYMENT_STATUS_LABELS,
   ORDER_PAYMENT_TYPE_LABELS,
   ORDER_STATUS_LABELS,
 } from "@/features/orders/order-labels";
-import type { OrderDetailRecord } from "@/features/orders/order.types";
-import type { EmployeeRecord } from "@/features/employees/employee.service";
+import type { DeliveryCarrierRecord } from "@/features/delivery/delivery-carrier.service";
 import type { DeliveryMethodRecord } from "@/features/delivery/delivery-method.service";
 import { toDateInputValue } from "@/features/quotes/format";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
-import OrderDocumentActions from "@/components/admin/orders/OrderDocumentActions";
-import OrderProductionPackSection from "@/components/admin/orders/OrderProductionPackSection";
-import OrderProductionExecutionSection from "@/components/admin/orders/OrderProductionExecutionSection";
-import OrderOrderedProductsSection from "@/components/admin/orders/OrderOrderedProductsSection";
-import OrderDeliveryExecutionSection from "@/components/admin/orders/OrderDeliveryExecutionSection";
 import type { ProductionReadinessResult } from "@/features/orders/production-readiness.service";
 import type { HandoverReadinessResult } from "@/features/orders/handover-readiness.service";
 import type { CompletionReadinessResult } from "@/features/orders/delivery-fulfillment.service";
 import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
-import { ORDER_FINANCIAL_DENIED_MESSAGE } from "@/features/auth/order-financial-permissions";
 
 type Props = { id: string };
 
@@ -70,10 +54,6 @@ function syncDeliveryFields(order: OrderDetailRecord) {
     deliveryExpectedAt: order.deliveryExpectedAt ? toDateInputValue(order.deliveryExpectedAt) : "",
     deliveryNote: order.deliveryNote ?? "",
   };
-}
-
-function deliveryMethodDisplay(order: OrderDetailRecord): string {
-  return order.deliveryMethodName ?? order.deliveryMethod ?? "—";
 }
 
 export default function OrderDetailView({ id }: Props) {
@@ -575,7 +555,7 @@ export default function OrderDetailView({ id }: Props) {
     await saveDeliveryInternal();
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminPageSkeleton message="Đang tải đơn hàng…" />;
   if (error || !order) {
     return (
       <div className="admin-empty-state admin-empty-state--error">
@@ -594,410 +574,47 @@ export default function OrderDetailView({ id }: Props) {
 
   return (
     <div className="admin-panel">
-      <AdminBackLink href={listBackHref} />
-
-      <div className="admin-section-header">
-        <div>
-          <p className="admin-crm-detail-code">{order.orderNo}</p>
-          <h2>Đơn hàng {order.sourceQuoteNo ? `từ ${order.sourceQuoteNo}` : ""}</h2>
-          <OrderStatusBadge status={order.status} />
-          <p className="admin-field-hint">
-            Tạo lúc {formatOrderDateTime(order.createdAt)}
-            {order.sourceQuoteNo && (
-              <> · Báo giá nguồn: {canViewFinancials && order.quote
-                ? <Link href={`/admin/quotes/${order.quote.id}`}>{order.sourceQuoteNo}</Link>
-                : order.sourceQuoteNo}
-              </>
-            )}
-            {order.customer && (
-              <> · Khách hàng: <Link href={`/admin/crm/customers/${order.customer.id}`}>{order.customer.name}</Link></>
-            )}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {canEditOrder && (
-            <Link href={`/admin/orders/${id}/edit`} className="admin-btn admin-btn--secondary">
-              Chỉnh sửa đơn hàng
-            </Link>
-          )}
-        </div>
-      </div>
-
-      <OrderDocumentActions order={order} />
-
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>Cập nhật trạng thái</legend>
-        <p className="admin-field-hint" style={{ marginBottom: 12 }}>
-          Trạng thái hiện tại: <strong>{ORDER_STATUS_LABELS[order.status]}</strong>
-        </p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {transitions.filter((s) => s !== "CANCELLED").map((status) => {
-            const label = orderStatusActionLabel(status);
-            if (!label) return null;
-            return (
-              <button
-                key={status}
-                type="button"
-                className="admin-btn admin-btn--primary"
-                disabled={busy}
-                onClick={() => void requestStatusChange(status)}
-              >
-                {label}
-              </button>
-            );
-          })}
-          {transitions.includes("CANCELLED") && (
-            <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} onClick={() => setCancelOpen(true)}>
-              Hủy đơn
-            </button>
-          )}
-          {correctionTargets.map((status) => (
-            <button
-              key={`correction-${status}`}
-              type="button"
-              className="admin-btn admin-btn--secondary admin-btn--small"
-              disabled={busy}
-              onClick={() => {
-                setCorrectionStatus(status);
-                setCorrectionReason("");
-                setCorrectionOpen(true);
-              }}
-            >
-              {orderStatusCorrectionLabel(status)}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="admin-catalog-kpi-bar">
-        {canViewFinancials && order.financials ? (
-          <>
-            <div className="admin-catalog-kpi">
-              <strong>{formatOrderCurrency(order.financials.totalAmount, order.currency)}</strong>
-              <span>Tổng giá trị</span>
-            </div>
-            <div className="admin-catalog-kpi admin-catalog-kpi--ok">
-              <strong>{formatOrderCurrency(order.financials.paidAmount, order.currency)}</strong>
-              <span>Đã thanh toán</span>
-            </div>
-            <div className="admin-catalog-kpi">
-              <strong>{formatOrderCurrency(order.financials.outstandingAmount, order.currency)}</strong>
-              <span>Còn phải thu</span>
-            </div>
-            <div className="admin-catalog-kpi">
-              <strong>{ORDER_PAYMENT_STATE_LABELS[order.financials.paymentState]}</strong>
-              <span>Trạng thái thanh toán</span>
-            </div>
-            {order.financials.overpaidAmount > 0 && (
-              <div className="admin-catalog-kpi">
-                <strong>{formatOrderCurrency(order.financials.overpaidAmount, order.currency)}</strong>
-                <span>Thanh toán vượt</span>
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="admin-field-hint admin-message admin-message--info" style={{ margin: 0 }}>
-            {ORDER_FINANCIAL_DENIED_MESSAGE}
-          </p>
-        )}
-      </div>
-
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>Thông tin đơn hàng</legend>
-        <div className="quote-form__party-grid">
-          <div className="quote-form__party-col">
-            <h4 className="admin-subtitle">Khách hàng</h4>
-            <p>{order.customerCompanyName ?? "—"}</p>
-            {order.customerCode && <p className="admin-field-hint">Mã: {order.customerCode}</p>}
-            {canViewFinancials && order.customerTaxCode && <p className="admin-field-hint">MST: {order.customerTaxCode}</p>}
-            {order.customerAddress && <p className="admin-field-hint">{order.customerAddress}</p>}
-            {order.contactName && <p className="admin-field-hint">Liên hệ: {order.contactName}{order.contactTitle ? ` · ${order.contactTitle}` : ""}</p>}
-            {order.contactPhone && <p className="admin-field-hint">SĐT: {order.contactPhone}</p>}
-            {order.contactEmail && <p className="admin-field-hint">Email: {order.contactEmail}</p>}
-          </div>
-          <div className="quote-form__party-col">
-            <h4 className="admin-subtitle">Chi tiết đơn</h4>
-            <p className="admin-field-hint">Ngày đơn: {formatOrderDate(order.orderDate)}</p>
-            {order.sourceQuoteDate && <p className="admin-field-hint">Ngày báo giá: {formatOrderDate(order.sourceQuoteDate)}</p>}
-            {order.salesName && <p className="admin-field-hint">Tư vấn: {order.salesName}{order.salesTitle ? ` · ${order.salesTitle}` : ""}</p>}
-            <p className="admin-field-hint">Trạng thái: <strong>{ORDER_STATUS_LABELS[order.status]}</strong></p>
-            {order.productionStartedAt && <p className="admin-field-hint">Ngày bắt đầu sản xuất: {formatOrderDateTime(order.productionStartedAt)}</p>}
-            {order.readyToShipAt && <p className="admin-field-hint">Ngày sẵn sàng giao: {formatOrderDateTime(order.readyToShipAt)}</p>}
-            {canViewFinancials && order.sampleFee != null && order.sampleFee > 0 && (
-              <p className="admin-field-hint">Phí mẫu: {formatOrderCurrency(order.sampleFee, order.currency)}</p>
-            )}
-            {order.sampleLeadTime && <p className="admin-field-hint">Thời gian làm mẫu: {order.sampleLeadTime}</p>}
-            {order.sampleRefundCondition && (
-              <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.sampleRefundCondition}</pre>
-            )}
-          </div>
-        </div>
-        {canEditOrder ? (
-          <form onSubmit={(e) => void saveProduction(e)} style={{ marginTop: 12 }}>
-            <h4 className="admin-subtitle">Phân công sản xuất</h4>
-            <div className="admin-catalog-variant-fields">
-              <div className="admin-field">
-                <label className="admin-label">Người phụ trách sản xuất</label>
-                <ProductionOwnerSelect
-                  value={productionFields.productionOwnerId}
-                  onChange={(productionOwnerId) =>
-                    setProductionFields((f) => ({ ...f, productionOwnerId }))
-                  }
-                  employees={productionEmployees}
-                  onEmployeesChange={setProductionEmployees}
-                  legacyOwnerName={
-                    !order.productionOwnerId && order.productionOwnerName
-                      ? order.productionOwnerName
-                      : null
-                  }
-                  disabled={busy}
-                  onEmployeeCreated={(employee) => {
-                    void saveProductionInternal({ productionOwnerId: employee.id });
-                  }}
-                />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Hạn hoàn thành dự kiến</label>
-                <input
-                  className="admin-input"
-                  type="date"
-                  value={productionFields.productionDueDate}
-                  onChange={(e) => setProductionFields((f) => ({ ...f, productionDueDate: e.target.value }))}
-                />
-              </div>
-              <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-                <label className="admin-label">Ghi chú sản xuất</label>
-                <textarea
-                  className="admin-textarea"
-                  rows={3}
-                  value={productionFields.productionNote}
-                  onChange={(e) => setProductionFields((f) => ({ ...f, productionNote: e.target.value }))}
-                />
-              </div>
-            </div>
-            <button type="submit" className="admin-btn admin-btn--primary admin-btn--small" disabled={busy}>
-              Lưu thông tin sản xuất
-            </button>
-          </form>
-        ) : (
-          <div style={{ marginTop: 12 }}>
-            <p className="admin-field-hint">Phụ trách SX: {order.productionOwnerName ?? "—"}</p>
-            <p className="admin-field-hint">Hạn hoàn thành: {order.productionDueDate ? formatOrderDate(order.productionDueDate) : "—"}</p>
-            {order.productionNote && <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.productionNote}</pre>}
-          </div>
-        )}
-      </fieldset>
-
-      {order.terms && (
-        <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-          <legend>Điều khoản đơn hàng</legend>
-          <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.terms}</pre>
-        </fieldset>
-      )}
-
-      <OrderOrderedProductsSection order={order} canViewFinancials={canViewFinancials} />
-
-      <OrderProductionPackSection orderId={id} order={order} onOrderChange={setOrder} />
-      <OrderProductionExecutionSection orderId={id} order={order} />
-
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>Giao hàng</legend>
-        {showDeliveryForm && canEditOrder ? (
-          <form onSubmit={(e) => void saveDelivery(e)}>
-            <div className="admin-catalog-variant-fields">
-              <div className="admin-field">
-                <label className="admin-label">Hình thức giao hàng</label>
-                <select
-                  className="admin-input"
-                  value={deliveryFields.deliveryMethodId}
-                  onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryMethodId: e.target.value }))}
-                >
-                  <option value="">— Chọn hình thức —</option>
-                  {deliveryMethods.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                  {order.deliveryMethodId &&
-                    !deliveryMethods.some((m) => m.id === order.deliveryMethodId) &&
-                    deliveryMethodDisplay(order) !== "—" && (
-                      <option value={order.deliveryMethodId}>
-                        {deliveryMethodDisplay(order)} (lưu trước)
-                      </option>
-                    )}
-                </select>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Người phụ trách giao hàng</label>
-                <AdminSearchableSelect
-                  value={deliveryFields.deliveryOwnerId}
-                  onChange={(deliveryOwnerId) =>
-                    setDeliveryFields((fields) => ({ ...fields, deliveryOwnerId }))
-                  }
-                  options={[
-                    ...employees.map((employee) => ({
-                      value: employee.id,
-                      label: employee.fullName,
-                      sublabel: employee.employeeCode,
-                    })),
-                    ...(order.deliveryOwnerId &&
-                    !employees.some((employee) => employee.id === order.deliveryOwnerId) &&
-                    order.deliveryOwnerName
-                      ? [{
-                          value: order.deliveryOwnerId,
-                          label: order.deliveryOwnerName,
-                          sublabel: "Dữ liệu đã lưu",
-                        }]
-                      : []),
-                  ]}
-                  placeholder="— Chọn nhân viên —"
-                  searchPlaceholder="Tìm nhân viên phụ trách…"
-                  emptyMessage="Chưa có nhân viên đang hoạt động."
-                />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Đơn vị vận chuyển</label>
-                <DeliveryCarrierSelect
-                  value={deliveryFields.deliveryCarrierId}
-                  onChange={(deliveryCarrierId) =>
-                    setDeliveryFields((f) => ({ ...f, deliveryCarrierId }))
-                  }
-                  carriers={carriers}
-                  onCarriersChange={setCarriers}
-                  legacyCarrierName={
-                    !order.deliveryCarrierId ? orderCarrierDisplay(order) : null
-                  }
-                  disabled={busy}
-                  onCarrierCreated={(carrier) => {
-                    void saveDeliveryInternal({ deliveryCarrierId: carrier.id });
-                  }}
-                />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Mã vận đơn</label>
-                <input className="admin-input" value={deliveryFields.deliveryTrackingCode} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryTrackingCode: e.target.value }))} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Người nhận *</label>
-                <input className="admin-input" required value={deliveryFields.deliveryRecipientName} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryRecipientName: e.target.value }))} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Số điện thoại người nhận *</label>
-                <input className="admin-input" required value={deliveryFields.deliveryRecipientPhone} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryRecipientPhone: e.target.value }))} />
-              </div>
-              <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-                <label className="admin-label">Địa chỉ giao hàng *</label>
-                <textarea className="admin-textarea" rows={2} required value={deliveryFields.deliveryAddress} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryAddress: e.target.value }))} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Dự kiến giao</label>
-                <input className="admin-input" type="date" value={deliveryFields.deliveryExpectedAt} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryExpectedAt: e.target.value }))} />
-              </div>
-              <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-                <label className="admin-label">Ghi chú giao hàng</label>
-                <textarea className="admin-textarea" rows={2} value={deliveryFields.deliveryNote} onChange={(e) => setDeliveryFields((f) => ({ ...f, deliveryNote: e.target.value }))} />
-              </div>
-            </div>
-            <button type="submit" className="admin-btn admin-btn--primary admin-btn--small" disabled={busy}>
-              Lưu thông tin giao hàng
-            </button>
-          </form>
-        ) : (
-          <>
-            <p className="admin-field-hint">Hình thức: {deliveryMethodDisplay(order)}</p>
-            {order.deliveryOwnerName && (
-              <p className="admin-field-hint">Phụ trách giao: {order.deliveryOwnerName}</p>
-            )}
-            <p className="admin-field-hint">Đơn vị vận chuyển: {orderCarrierDisplay(order) ?? "—"}</p>
-            <p className="admin-field-hint">Mã vận đơn: {order.deliveryTrackingCode ?? "—"}</p>
-            <p className="admin-field-hint">Người nhận: {order.deliveryRecipientName ?? "—"}</p>
-            <p className="admin-field-hint">SĐT: {order.deliveryRecipientPhone ?? "—"}</p>
-            <p className="admin-field-hint">Địa chỉ: {order.deliveryAddress ?? "—"}</p>
-            <p className="admin-field-hint">Dự kiến giao: {order.deliveryExpectedAt ? formatOrderDate(order.deliveryExpectedAt) : "—"}</p>
-            <p className="admin-field-hint">Ngày bàn giao vận chuyển: {order.shippedAt ? formatOrderDateTime(order.shippedAt) : "—"}</p>
-            {order.deliveryNote && <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.deliveryNote}</pre>}
-          </>
-        )}
-      </fieldset>
-
-      <OrderDeliveryExecutionSection
+      <OrderWorkspaceShell
         orderId={id}
         order={order}
-        refreshKey={deliveryRefreshKey}
-        onRequestShip={() => setDeliveryRefreshKey((k) => k + 1)}
+        listBackHref={listBackHref}
+        busy={busy}
+        canEditOrder={canEditOrder}
+        canRecordPayment={canRecordPayment}
+        showDeliveryForm={showDeliveryForm}
+        transitions={transitions}
+        correctionTargets={correctionTargets}
+        productionFields={productionFields}
+        deliveryFields={deliveryFields}
+        productionEmployees={productionEmployees}
+        employees={employees}
+        deliveryMethods={deliveryMethods}
+        carriers={carriers}
+        deliveryRefreshKey={deliveryRefreshKey}
+        onProductionFieldsChange={setProductionFields}
+        onProductionEmployeesChange={setProductionEmployees}
+        onDeliveryFieldsChange={setDeliveryFields}
+        onCarriersChange={setCarriers}
+        onSaveProduction={(e) => void saveProduction(e)}
+        onSaveDelivery={(e) => void saveDelivery(e)}
+        onProductionEmployeeCreated={(employee) => {
+          void saveProductionInternal({ productionOwnerId: employee.id });
+        }}
+        onCarrierCreated={(carrier) => {
+          void saveDeliveryInternal({ deliveryCarrierId: carrier.id });
+        }}
+        onDeliveryRefresh={() => setDeliveryRefreshKey((k) => k + 1)}
+        onRequestStatusChange={(status) => void requestStatusChange(status)}
+        onOpenCancel={() => setCancelOpen(true)}
+        onOpenCorrection={(status) => {
+          setCorrectionStatus(status);
+          setCorrectionReason("");
+          setCorrectionOpen(true);
+        }}
+        onOpenRecordPayment={() => setPaymentOpen(true)}
+        onOpenEditPayment={openEditPayment}
+        onOpenVoidPayment={openVoidPayment}
       />
-
-
-      {canViewFinancials && (
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>Thanh toán</legend>
-        {canRecordPayment && (
-          <button type="button" className="admin-btn admin-btn--primary admin-btn--small" style={{ marginBottom: 12 }} onClick={() => setPaymentOpen(true)}>
-            Ghi nhận thanh toán
-          </button>
-        )}
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Ngày</th>
-                <th>Loại</th>
-                <th>Phương thức</th>
-                <th>Mã tham chiếu</th>
-                <th>Ghi chú</th>
-                <th>Số tiền</th>
-                <th>Trạng thái</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {(order.payments ?? []).length === 0 ? (
-                <tr><td colSpan={8}>Chưa có ghi nhận thanh toán</td></tr>
-              ) : (order.payments ?? []).map((p) => (
-                <tr key={p.id}>
-                  <td>{formatOrderDateTime(p.paidAt)}</td>
-                  <td>{ORDER_PAYMENT_TYPE_LABELS[p.type]}</td>
-                  <td>{ORDER_PAYMENT_METHOD_LABELS[p.method]}</td>
-                  <td>{p.referenceCode ?? "—"}</td>
-                  <td>{p.note ?? "—"}</td>
-                  <td>{formatOrderCurrency(p.amount, order.currency)}</td>
-                  <td>{ORDER_PAYMENT_STATUS_LABELS[p.status]}</td>
-                  <td>
-                    {p.status === "CONFIRMED" && canRecordPayment ? (
-                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" disabled={busy} onClick={() => openEditPayment(p.id)}>
-                          Chỉnh sửa
-                        </button>
-                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" disabled={busy} onClick={() => openVoidPayment(p.id)}>
-                          Hủy ghi nhận
-                        </button>
-                      </div>
-                    ) : p.status === "VOID" ? (
-                      <span className="admin-field-hint">Đã hủy</span>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </fieldset>
-      )}
-
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>Lịch sử / hoạt động</legend>
-        {order.activities.length === 0 ? (
-          <p className="admin-field-hint">Chưa có hoạt động</p>
-        ) : (
-          <ul className="order-activity-timeline">
-            {order.activities.map((activity) => (
-              <li key={activity.id}>
-                <strong>{activity.title}</strong>
-                <span className="admin-field-hint"> · {formatOrderDateTime(activity.createdAt)}</span>
-                {activity.detail && <p className="admin-field-hint">{activity.detail}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </fieldset>
 
       {cancelOpen && (
         <div className="quote-quick-contact-modal">
