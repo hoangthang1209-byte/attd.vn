@@ -27,6 +27,7 @@ export type AdminPermissionFlags = {
   canViewCrm: boolean;
   canViewDashboard: boolean;
   canViewWarehouse: boolean;
+  canViewReports: boolean;
 };
 
 type AdminPermissionsContextValue = {
@@ -56,6 +57,7 @@ const defaultFlags: AdminPermissionFlags = {
   canViewCrm: true,
   canViewDashboard: true,
   canViewWarehouse: true,
+  canViewReports: true,
 };
 
 const AdminPermissionsContext = createContext<AdminPermissionsContextValue>({
@@ -112,6 +114,7 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
           canViewCrm: data.flags?.canViewCrm ?? true,
           canViewDashboard: data.flags?.canViewDashboard ?? true,
           canViewWarehouse: data.flags?.canViewWarehouse ?? true,
+          canViewReports: data.flags?.canViewReports ?? true,
         });
       })
       .finally(() => {

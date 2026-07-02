@@ -1,7 +1,7 @@
 import { categoryDemoImages } from "@/features/demo/demo-image-map";
 import { isValidImageSrc } from "@/lib/imagePaths";
 import {
-  getCmsCategoryTree,
+  getPublicCmsCategoryTree,
   type CmsCategoryTreeChild,
   type CmsCategoryTreeNode,
 } from "@/features/categories/services/category.service";
@@ -118,13 +118,13 @@ function buildTreeFromStaticGroups(): MarketplaceCategoryTreeNode[] {
 
 /**
  * Marketplace category tree for mega menu + mobile nav.
- * Delegates to getCmsCategoryTree() — same source as `/san-pham` filter sidebar.
+ * Delegates to getPublicCmsCategoryTree() — same source as `/san-pham` filter sidebar.
  * Static B2B groups only when the database has no categories at all.
  */
 export async function getMarketplaceCategoryTree(): Promise<
   MarketplaceCategoryTreeNode[]
 > {
-  const cmsTree = await getCmsCategoryTree();
+  const cmsTree = await getPublicCmsCategoryTree();
 
   if (cmsTree.length === 0) {
     if (process.env.NODE_ENV !== "production") {
@@ -139,4 +139,4 @@ export async function getMarketplaceCategoryTree(): Promise<
 }
 
 // Re-export for convenience — single entry point name used across the app.
-export { getCmsCategoryTree };
+export { getPublicCmsCategoryTree as getCmsCategoryTree };

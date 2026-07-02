@@ -117,14 +117,36 @@ export default function ProductCatalogDashboard() {
     setSeeding(false);
   }
 
-  async function deleteProduct(id: string, name: string) {
-    if (!confirm(`Xóa sản phẩm "${name}"?`)) return;
-    await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+  async function archiveProduct(id: string, name: string) {
+    const confirmed = confirm(
+      "Lưu trữ sản phẩm?\n\nSản phẩm sẽ bị ẩn khỏi website nhưng dữ liệu lịch sử vẫn được giữ lại.",
+    );
+    if (!confirmed) return;
+    const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      alert("Không thể lưu trữ sản phẩm.");
+      return;
+    }
+    alert("Đã lưu trữ sản phẩm");
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
       return next;
     });
+    void fetchProducts();
+  }
+
+  async function restoreProduct(id: string) {
+    const res = await fetch(`/api/admin/products/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "restore", status: "DRAFT" }),
+    });
+    if (!res.ok) {
+      alert("Không thể khôi phục sản phẩm.");
+      return;
+    }
+    alert("Đã khôi phục sản phẩm ở trạng thái nháp.");
     void fetchProducts();
   }
 
@@ -355,13 +377,23 @@ export default function ProductCatalogDashboard() {
                             Xem
                           </button>
                         )}
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--secondary admin-btn--xs"
-                          onClick={() => void deleteProduct(p.id, p.name)}
-                        >
-                          Xóa
-                        </button>
+                        {p.status === "ARCHIVED" ? (
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                            onClick={() => void restoreProduct(p.id)}
+                          >
+                            Khôi phục
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                            onClick={() => void archiveProduct(p.id, p.name)}
+                          >
+                            Lưu trữ
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

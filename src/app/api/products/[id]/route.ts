@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ProductStatus } from "@prisma/client";
 import {
-  deleteProductAdmin,
+  archiveProductAdmin,
   updateProductAdmin,
 } from "@/features/products/product-admin.service";
 import { productMutationErrorResponse } from "@/features/products/product-mutation-api";
@@ -89,13 +89,13 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    await deleteProductAdmin(id);
-    return NextResponse.json({ success: true });
+    await archiveProductAdmin(id);
+    return NextResponse.json({ success: true, message: "Đã lưu trữ sản phẩm" });
   } catch (err) {
     if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2025") {
       return NextResponse.json({ message: "Sản phẩm không tồn tại" }, { status: 404 });
     }
     console.error("[api/products/[id]] DELETE failed:", err);
-    return NextResponse.json({ message: "Xóa sản phẩm thất bại" }, { status: 500 });
+    return NextResponse.json({ message: "Lưu trữ sản phẩm thất bại" }, { status: 500 });
   }
 }

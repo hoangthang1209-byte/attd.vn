@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  archiveProductAdmin,
+  restoreProductAdmin,
   getProductAdminById,
   updateProductAdmin,
-  deleteProductAdmin,
 } from "@/features/products/product-admin.service";
 import {
   formatProductAdminApiError,
@@ -53,10 +54,45 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
-    await deleteProductAdmin(id);
-    return NextResponse.json({ ok: true });
+    const archived = await archiveProductAdmin(id);
+    return NextResponse.json({ ok: true, product: archived, message: "Đã lưu trữ sản phẩm" });
   } catch (err) {
     logProductAdminError("delete", err);
+    const formatted = formatProductAdminApiError(err);
+    return NextResponse.json({ ...formatted, message: formatted.error }, { status: formatted.status });
+  }
+}
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, message: "Invalid JSON" }, { status: 400 });
+  }
+
+  const action = body && typeof body === "object" && "action" in body ? String((body as { action?: string }).action) : "";
+  if (action !== "restore") {
+    return NextResponse.json({ message: "Hành động không hợp lệ." }, { status: 400 });
+  }
+
+  try {
+    const statusRaw =
+      body && typeof body === "object" && "status" in body
+        ? String((body as { status?: string }).status ?? "DRAFT")
+        : "DRAFT";
+    const restored = await restoreProductAdmin(
+      id,
+      statusRaw as "ACTIVE" | "DRAFT" | "INACTIVE" | "ARCHIVED",
+    );
+    return NextResponse.json({
+      ok: true,
+      product: restored,
+      message: "Đã khôi phục sản phẩm ở trạng thái nháp.",
+    });
+  } catch (err) {
+    logProductAdminError("update", err);
     const formatted = formatProductAdminApiError(err);
     return NextResponse.json({ ...formatted, message: formatted.error }, { status: formatted.status });
   }

@@ -59,8 +59,9 @@ const NAV_GROUPS: NavGroup[] = [
     visible: (p) => p.canViewCrm,
     items: [
       { href: "/admin/crm", label: "CRM", visible: (p) => p.canViewCrm },
-      { href: "/admin/crm/leads", label: "Lead", visible: (p) => p.canViewCrm },
+      { href: "/admin/crm/leads", label: "Leads", visible: (p) => p.canViewCrm },
       { href: "/admin/crm/customers", label: "Khách hàng", visible: (p) => p.canViewCrm },
+      { href: "/admin/crm/reports", label: "Báo cáo CRM", visible: (p) => p.canViewReports },
       { href: "/admin/crm/revenue-categories", label: "Nhóm doanh thu", visible: (p) => p.canViewFinancials },
     ],
   },

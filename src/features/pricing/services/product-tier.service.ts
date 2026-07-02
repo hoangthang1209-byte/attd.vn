@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { ProductPriceTierRecord } from "@/features/pricing/types";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
+import { TIER_VARIANT_OWNERSHIP_ERROR } from "@/features/products/product-foundation-validation";
 
 function mapTier(row: {
   id: string;
@@ -55,6 +56,21 @@ function validateTierQuantities(minQuantity: number, maxQuantity: number | null)
   }
 }
 
+export async function assertVariantBelongsToProduct(
+  productId: string,
+  variantId: string | null | undefined,
+  db: Pick<typeof prisma, "productVariant"> = prisma,
+): Promise<void> {
+  if (!variantId) return;
+  const variant = await db.productVariant.findFirst({
+    where: { id: variantId, productId },
+    select: { id: true },
+  });
+  if (!variant) {
+    throw new PricingValidationError(TIER_VARIANT_OWNERSHIP_ERROR);
+  }
+}
+
 export async function listProductPriceTiers(params?: {
   productId?: string;
   priceGroupId?: string;
@@ -101,6 +117,7 @@ export async function createProductPriceTier(input: {
   if (!input.priceGroupId) throw new PricingValidationError("Nhóm giá là bắt buộc.");
   if (input.unitPrice < 0) throw new PricingValidationError("Đơn giá phải >= 0.");
   validateTierQuantities(input.minQuantity, input.maxQuantity ?? null);
+  await assertVariantBelongsToProduct(input.productId, input.variantId ?? null);
 
   const row = await prisma.productPriceTier.create({
     data: {
@@ -149,6 +166,9 @@ export async function updateProductPriceTier(
   if (input.unitPrice !== undefined && input.unitPrice < 0) {
     throw new PricingValidationError("Đơn giá phải >= 0.");
   }
+
+  const nextVariantId = input.variantId !== undefined ? (input.variantId || null) : existing.variantId;
+  await assertVariantBelongsToProduct(existing.productId, nextVariantId);
 
   const row = await prisma.productPriceTier.update({
     where: { id },

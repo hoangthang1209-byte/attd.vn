@@ -61,17 +61,23 @@ export default function ContactForm() {
         <div className="lead-form-success-icon" aria-hidden>
           ✓
         </div>
-        <h2 className="lead-form-success-title">Đã nhận yêu cầu!</h2>
+        <h2 className="lead-form-success-title">ATTD đã nhận yêu cầu</h2>
         <p className="lead-form-success-text">
-          Chúng tôi sẽ phản hồi trong vòng 24 giờ làm việc.
+          Cảm ơn bạn. Đội ngũ ATTD sẽ xem thông tin và phản hồi trong giờ làm việc.
         </p>
       </div>
     );
   }
 
   return (
-    <form className="lead-form" onSubmit={handleSubmit} noValidate>
-      <h2 className="lead-form-title">{CTA.secondary.label}</h2>
+    <form className="lead-form public-lead-form public-lead-form--contact" onSubmit={handleSubmit} noValidate>
+      <div className="public-lead-form__header">
+        <p className="public-lead-form__eyebrow">Yêu cầu tư vấn</p>
+        <h2 className="lead-form-title">{CTA.secondary.label}</h2>
+        <p className="public-lead-form__description">
+          Chỉ cần để lại thông tin liên hệ và nhu cầu chính. ATTD sẽ hỏi thêm chi tiết nếu cần báo giá chính xác hơn.
+        </p>
+      </div>
 
       <div className="form-group">
         <label htmlFor="name" className="form-label">
@@ -83,6 +89,7 @@ export default function ContactForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="form-input"
+          placeholder="Nguyễn Văn A"
           required
           autoComplete="name"
         />
@@ -99,6 +106,7 @@ export default function ContactForm() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className="form-input"
+            placeholder="Số điện thoại/Zalo"
             required
             autoComplete="tel"
           />
@@ -114,6 +122,7 @@ export default function ContactForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="form-input"
+            placeholder="Không bắt buộc"
             autoComplete="email"
           />
         </div>
@@ -129,6 +138,7 @@ export default function ContactForm() {
           value={company}
           onChange={(e) => setCompany(e.target.value)}
           className="form-input"
+          placeholder="Không bắt buộc"
         />
       </div>
 
@@ -144,6 +154,9 @@ export default function ContactForm() {
           placeholder="Ví dụ: Báo giá áo thun trơn 500 cái, nhiều màu và size. Cần giao trong 2 tuần..."
           className="form-input form-textarea"
         />
+        <div className="form-hint">
+          Gợi ý: sản phẩm, số lượng, logo/in thêu, thời gian cần hàng.
+        </div>
       </div>
 
       {formStatus === "error" && (
@@ -157,8 +170,14 @@ export default function ContactForm() {
         className="btn-primary lead-form-submit"
         disabled={formStatus === "loading"}
       >
-        {formStatus === "loading" ? "Đang gửi..." : "Gửi yêu cầu"}
+        {formStatus === "loading" ? "Đang gửi yêu cầu..." : "Gửi yêu cầu báo giá"}
       </button>
+
+      <ul className="public-lead-form__reassurance" aria-label="Cam kết khi gửi thông tin">
+        <li>Không spam</li>
+        <li>Chỉ dùng để tư vấn nguồn hàng</li>
+        <li>Phản hồi trong giờ làm việc</li>
+      </ul>
     </form>
   );
 }

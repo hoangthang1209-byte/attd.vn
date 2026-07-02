@@ -6,8 +6,6 @@ import type {
   ProductImportPreviewRow,
   ProductImportExecuteResult,
 } from "@/features/products/product-import-types";
-import { normalizeCategoryName, validateImportRow, validateRawFieldValues } from "@/features/products/product-import-utils";
-import { getSuggestedFix } from "@/features/products/product-import-feedback";
 import {
   generateSku,
   ensureUniqueSku,
@@ -21,6 +19,17 @@ import {
   isProductCodeTaken,
   type CategoryCodeCounter,
 } from "@/features/products/product-sku-utils";
+import {
+  ensureCategoryForImportExecution,
+  validateCategoryForImportPreview,
+  findExistingCategoryForImport,
+} from "@/features/products/product-import-category";
+import {
+  normalizeVariantStockFields,
+  validateVariantPriceFields,
+} from "@/features/products/product-foundation-validation";
+import { normalizeCategoryName, validateImportRow, validateRawFieldValues } from "@/features/products/product-import-utils";
+import { getSuggestedFix } from "@/features/products/product-import-feedback";
 
 function toSlug(text: string): string {
   const viMap: Record<string, string> = {
@@ -137,21 +146,19 @@ export async function previewProductImport(
     const normalizedCategory = normalizeCategoryName(row.category);
     const catData = categoryMap.get(normalizedCategory.toLowerCase()) ?? null;
 
-    if (!catData && !options.autoCreateCategories) {
-      errors.push({
-        field: "category",
-        message: `Danh mục "${normalizedCategory}" chưa tồn tại.`,
-        severity: "error",
-        suggestedFix: getSuggestedFix({ field: "category", message: "" }),
-      });
-    }
-
-    if (catData && !catData.prefix) {
-      errors.push({
-        field: "category",
-        message: CATEGORY_SKU_CODE_MISSING_ERROR,
-        severity: "error",
-      });
+    if (normalizedCategory) {
+      errors.push(
+        ...validateCategoryForImportPreview(
+          normalizedCategory,
+          catData
+            ? { id: catData.id, name: catData.name, slug: "", skuCode: catData.skuCode }
+            : null,
+          options.autoCreateCategories,
+        ).map((error) => ({
+          ...error,
+          suggestedFix: error.field === "category" ? getSuggestedFix({ field: "category", message: "" }) : undefined,
+        })),
+      );
     }
 
     if (catData?.prefix && row.productCode?.trim()) {
@@ -273,33 +280,26 @@ export async function executeProductImport(
     const key = name.toLowerCase().trim();
     if (categoryMetaCache.has(key)) return categoryMetaCache.get(key)!;
 
-    let cat = await prisma.category.findFirst({
-      where: { name: { equals: name, mode: "insensitive" } },
-      select: { id: true, name: true, skuCode: true },
-    });
-
-    if (!cat && options.autoCreateCategories) {
-      const slug = toSlug(name);
-      cat = await prisma.category.upsert({
-        where: { slug },
-        create: { name, slug },
-        update: {},
-        select: { id: true, name: true, skuCode: true },
-      });
-      result.createdCategories++;
+    const existing = await findExistingCategoryForImport(name);
+    try {
+      const cat = existing
+        ? existing
+        : await ensureCategoryForImportExecution(name, options.autoCreateCategories);
+      if (!existing) {
+        result.createdCategories++;
+      }
+      const meta: CategoryMeta = {
+        id: cat.id,
+        name: cat.name,
+        skuCode: cat.skuCode,
+        prefix: cat.skuCode?.trim() ? requireCategorySkuCode(cat.skuCode) : undefined,
+      };
+      categoryMetaCache.set(key, meta);
+      categoryCache.set(key, cat.id);
+      return meta;
+    } catch {
+      return null;
     }
-
-    if (!cat) return null;
-
-    const meta: CategoryMeta = {
-      id: cat.id,
-      name: cat.name,
-      skuCode: cat.skuCode,
-      prefix: cat.skuCode?.trim() ? requireCategorySkuCode(cat.skuCode) : undefined,
-    };
-    categoryMetaCache.set(key, meta);
-    categoryCache.set(key, cat.id);
-    return meta;
   }
 
   async function resolveGroupProductCode(
@@ -434,6 +434,15 @@ export async function executeProductImport(
         if (existing && row.finalAction !== "update") {
           result.duplicateRows++;
         } else if (existing && row.finalAction === "update") {
+          validateVariantPriceFields({
+            wholesalePrice: row.wholesalePrice,
+            dealerPrice: row.dealerPrice,
+            costPrice: row.costPrice,
+          });
+          const stock = normalizeVariantStockFields(
+            row.stockQty ?? 0,
+            (row.stockStatus as "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "PREORDER" | undefined) ?? undefined,
+          );
           await prisma.productVariant.update({
             where: { sku: baseSku },
             data: {
@@ -442,12 +451,21 @@ export async function executeProductImport(
               sizeName: row.sizeName,
               wholesalePrice: row.wholesalePrice,
               dealerPrice: row.dealerPrice,
-              stockQty: row.stockQty ?? 0,
-              stockStatus: (row.stockStatus ?? "IN_STOCK") as "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "PREORDER",
+              stockQty: stock.stockQty,
+              stockStatus: stock.stockStatus,
             },
           });
           result.updatedVariants++;
         } else {
+          validateVariantPriceFields({
+            wholesalePrice: row.wholesalePrice,
+            dealerPrice: row.dealerPrice,
+            costPrice: row.costPrice,
+          });
+          const stock = normalizeVariantStockFields(
+            row.stockQty ?? 0,
+            (row.stockStatus as "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "PREORDER" | undefined) ?? undefined,
+          );
           const sku = await ensureUniqueSku(baseSku);
           await prisma.productVariant.create({
             data: {
@@ -461,8 +479,8 @@ export async function executeProductImport(
               wholesalePrice: row.wholesalePrice,
               dealerPrice: row.dealerPrice,
               costPrice: row.costPrice,
-              stockQty: row.stockQty ?? 0,
-              stockStatus: (row.stockStatus ?? "IN_STOCK") as "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK" | "PREORDER",
+              stockQty: stock.stockQty,
+              stockStatus: stock.stockStatus,
               weight: row.weight,
               internalNote: row.internalNote,
             },

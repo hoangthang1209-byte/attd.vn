@@ -20234,6 +20234,197 @@ select.admin-input:focus {
   }
 }
 
+/* ─── Public contact / RFQ form polish ───────────────────────────────────── */
+
+.contact-page-v2__section {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(220, 38, 38, 0.06), transparent 28%),
+    linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+}
+
+.contact-page-v2__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1fr);
+  gap: clamp(32px, 6vw, 72px);
+  align-items: start;
+}
+
+.contact-page-v2__eyebrow,
+.public-lead-form__eyebrow {
+  margin: 0 0 12px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.contact-page-v2__title {
+  margin: 0 0 16px;
+  max-width: 640px;
+  color: #111827;
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 820;
+  letter-spacing: -0.045em;
+  line-height: 1.06;
+}
+
+.contact-page-v2__lead {
+  margin: 0 0 32px;
+  max-width: 620px;
+  color: #5f6875;
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.contact-page-v2__cards {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.contact-page-v2__card {
+  padding: clamp(18px, 2.4vw, 24px) !important;
+}
+
+.contact-page-v2__card h3 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 760;
+  letter-spacing: -0.015em;
+}
+
+.contact-page-v2__card p,
+.contact-page-v2__dealer-link,
+.contact-page-v2__note p {
+  margin: 0;
+  color: #5f6875;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.contact-page-v2__note {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.contact-page-v2__dealer-link a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.public-lead-form {
+  position: relative;
+}
+
+.public-lead-form__header {
+  margin-bottom: 26px;
+}
+
+.public-lead-form__header .lead-form-title {
+  margin-bottom: 10px;
+}
+
+.public-lead-form__description {
+  margin: 0;
+  color: #5f6875;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.public-lead-form__reassurance,
+.product-quote-dialog__reassurance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.public-lead-form__reassurance li,
+.product-quote-dialog__reassurance li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.public-lead-form__reassurance li::before,
+.product-quote-dialog__reassurance li::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.8);
+  flex: 0 0 auto;
+}
+
+.dealer-landing-form-section .public-lead-form__description,
+.dealer-landing-form-section .public-lead-form__reassurance li {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.product-quote-dialog__intro {
+  margin: 0;
+  color: #5f6875;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.product-quote-dialog__reassurance {
+  margin-top: 6px;
+}
+
+.product-quote-dialog__success {
+  align-items: flex-start;
+  padding: 10px 0 2px;
+}
+
+.product-quote-dialog__success .lead-form-success-icon {
+  margin: 0 0 2px;
+}
+
+.product-quote-dialog__success h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 900px) {
+  .contact-page-v2__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 639px) {
+  .contact-page-v2__lead {
+    font-size: 15px;
+  }
+
+  .public-lead-form__header {
+    margin-bottom: 22px;
+  }
+
+  .public-lead-form__reassurance,
+  .product-quote-dialog__reassurance {
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .product-quote-dialog__intro {
+    font-size: 13px;
+  }
+}
+
 .order-variant-matrix-editor {
   margin-top: 12px;
   padding-top: 12px;

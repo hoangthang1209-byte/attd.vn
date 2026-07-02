@@ -7,6 +7,7 @@ import {
   hasProtectedVariantDependencies,
 } from "@/features/products/product-variant-lifecycle.service";
 import { ensureUniqueSku, isSkuTaken } from "@/features/products/product-sku-utils";
+import { normalizeVariantStockFields } from "@/features/products/product-foundation-validation";
 
 export type BulkOperationType =
   | "archive"
@@ -429,10 +430,14 @@ async function bulkStock(
     if (stock.mode === "set") nextQty = Math.floor(stock.quantity);
     if (stock.mode === "increase") nextQty = variant.stockQty + Math.floor(stock.quantity);
     if (stock.mode === "decrease") nextQty = Math.max(0, variant.stockQty - Math.floor(stock.quantity));
+    const normalized = normalizeVariantStockFields(
+      nextQty,
+      stock.stockStatus ?? variant.stockStatus,
+    );
     return {
       id: variant.id,
-      stockQty: nextQty,
-      stockStatus: stock.stockStatus ?? variant.stockStatus,
+      stockQty: normalized.stockQty,
+      stockStatus: normalized.stockStatus,
     };
   });
 
@@ -455,7 +460,7 @@ async function bulkStock(
         where: { id: item.id },
         data: {
           stockQty: item.stockQty,
-          ...(stock.stockStatus ? { stockStatus: stock.stockStatus } : {}),
+          stockStatus: item.stockStatus,
         },
       });
     }

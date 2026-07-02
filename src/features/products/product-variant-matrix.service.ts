@@ -1,4 +1,5 @@
 import type { VariantStatus } from "@prisma/client";
+import { normalizeVariantStockFields } from "@/features/products/product-foundation-validation";
 import { prisma } from "@/lib/prisma";
 import type { DbClient } from "@/features/products/product-relation-ownership";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
@@ -215,6 +216,7 @@ export async function generateVariantMatrix(
       }
 
       try {
+        const stock = normalizeVariantStockFields(0);
         const variant = await tx.productVariant.create({
           data: {
             productId,
@@ -225,8 +227,8 @@ export async function generateVariantMatrix(
             sizeName: legacy.sizeName ?? null,
             dimensions: legacy.dimensions ?? null,
             capacity: legacy.capacity ?? null,
-            stockQty: 0,
-            stockStatus: "IN_STOCK",
+            stockQty: stock.stockQty,
+            stockStatus: stock.stockStatus,
             variantStatus: "ACTIVE" satisfies VariantStatus,
           },
         });

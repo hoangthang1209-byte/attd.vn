@@ -1,6 +1,6 @@
 import { buildHomepageChildCategoryGrid } from "@/features/home/homepage-category.utils";
 import {
-  getCmsCategoryTree,
+  getPublicCmsCategoryTree,
   type CmsCategoryTreeNode,
 } from "@/features/categories/services/category.service";
 import { getProductsForPublicListing } from "@/features/products/services/product.service";
@@ -458,7 +458,7 @@ function resolveCategoryImageUrl(parent: CmsCategoryTreeNode): string | null {
 }
 
 function mapParentCategory(parent: CmsCategoryTreeNode): HomepageCategoryItem | null {
-  if (parent.productCount <= 0) return null;
+  if (parent.productCount <= 0 || parent.isActive === false) return null;
   return {
     id: parent.id,
     name: parent.name,
@@ -527,7 +527,7 @@ export async function getHomepageData(): Promise<HomepageData> {
   const [{ products }, categoryTree, { posts: blogPostsRaw }, cms] =
     await Promise.all([
       getProductsForPublicListing({ page: 1, perPage: 12 }),
-      getCmsCategoryTree(),
+      getPublicCmsCategoryTree(),
       getPublishedBlogPosts(1, 3),
       getHomepageCmsConfig(),
     ]);

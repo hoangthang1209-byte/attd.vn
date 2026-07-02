@@ -225,7 +225,13 @@ export default function ProductQuoteDialog({
 
         {formStatus === "success" ? (
           <div className="product-quote-dialog__success">
-            <p>ATTD đã nhận yêu cầu. Chúng tôi sẽ liên hệ với bạn sớm.</p>
+            <div className="lead-form-success-icon" aria-hidden>
+              ✓
+            </div>
+            <h3>ATTD đã nhận yêu cầu báo giá</h3>
+            <p>
+              Cảm ơn bạn. Đội ngũ ATTD sẽ xem sản phẩm, số lượng và liên hệ lại trong giờ làm việc.
+            </p>
             <button type="button" className="btn-secondary" onClick={handleClose}>
               Đóng
             </button>
@@ -233,6 +239,10 @@ export default function ProductQuoteDialog({
         ) : (
           <>
             <div className="product-quote-dialog__body">
+              <p className="product-quote-dialog__intro">
+                Để lại thông tin ngắn gọn, ATTD sẽ tư vấn MOQ, thời gian sản xuất và phương án logo nếu cần.
+              </p>
+
               <div className="product-quote-dialog__product">
                 <div className="product-quote-dialog__product-media">
                   {hasImage ? (
@@ -279,6 +289,7 @@ export default function ProductQuoteDialog({
                     className="form-input"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    placeholder="Người nhận báo giá"
                     autoComplete="name"
                     required
                   />
@@ -294,6 +305,7 @@ export default function ProductQuoteDialog({
                     className="form-input"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Số điện thoại/Zalo"
                     autoComplete="tel"
                     required
                   />
@@ -309,6 +321,7 @@ export default function ProductQuoteDialog({
                     className="form-input"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
+                    placeholder="Không bắt buộc"
                     autoComplete="organization"
                   />
                 </div>
@@ -323,7 +336,7 @@ export default function ProductQuoteDialog({
                     className="form-input"
                     value={expectedQty}
                     onChange={(e) => setExpectedQty(e.target.value)}
-                    placeholder="VD: 100, 500..."
+                    placeholder="VD: 100, 500, 1.000..."
                   />
                 </div>
 
@@ -337,7 +350,11 @@ export default function ProductQuoteDialog({
                     rows={3}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
+                    placeholder="Ví dụ: cần in logo ngực trái, phối size, giao trong 2 tuần..."
                   />
+                  <div className="form-hint">
+                    Nếu chưa rõ số lượng hoặc kỹ thuật in/thêu, bạn có thể để trống.
+                  </div>
                 </div>
 
                 {formStatus === "error" && errorMessage && (
@@ -363,9 +380,15 @@ export default function ProductQuoteDialog({
                     className="btn-primary"
                     disabled={formStatus === "loading"}
                   >
-                    {formStatus === "loading" ? "Đang gửi…" : "Gửi yêu cầu báo giá"}
+                    {formStatus === "loading" ? "Đang gửi yêu cầu…" : "Yêu cầu báo giá"}
                   </button>
                 </div>
+
+                <ul className="product-quote-dialog__reassurance" aria-label="Cam kết khi gửi yêu cầu">
+                  <li>Không spam</li>
+                  <li>Chỉ dùng để tư vấn báo giá</li>
+                  <li>Phản hồi trong giờ làm việc</li>
+                </ul>
               </form>
             </div>
 
@@ -381,7 +404,7 @@ export default function ProductQuoteDialog({
                 className="btn-primary product-quote-dialog__sticky-submit"
                 disabled={formStatus === "loading"}
               >
-                {formStatus === "loading" ? "Đang gửi…" : "Gửi yêu cầu báo giá"}
+                {formStatus === "loading" ? "Đang gửi yêu cầu…" : "Yêu cầu báo giá"}
               </button>
             </div>
           </>

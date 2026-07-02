@@ -29,102 +29,40 @@ const CONTEXT_CARDS = [
 
 export default function LienHePage() {
   return (
-    <main>
-      <section className="section">
+    <main className="contact-page-v2">
+      <section className="section contact-page-v2__section">
         <div className="container">
-          <div
-            className="grid grid-cols-1 lg:grid-cols-2"
-            style={{ gap: "64px", alignItems: "start" }}
-          >
+          <div className="contact-page-v2__grid">
             {/* Left: Context */}
             <div>
-              <div
-                style={{
-                  display: "inline-block",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "var(--primary)",
-                  background: "#fff0f0",
-                  padding: "4px 12px",
-                  borderRadius: "20px",
-                  marginBottom: "16px",
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
-                }}
-              >
+              <div className="contact-page-v2__eyebrow">
                 Liên hệ B2B
               </div>
 
-              <h1
-                style={{
-                  fontSize: "40px",
-                  fontWeight: 700,
-                  lineHeight: 1.2,
-                  margin: "0 0 16px",
-                }}
-              >
-                Liên hệ báo giá
-              </h1>
+              <h1 className="contact-page-v2__title">Liên hệ báo giá</h1>
 
-              <p
-                style={{
-                  fontSize: "17px",
-                  color: "#6b7280",
-                  lineHeight: 1.7,
-                  margin: "0 0 32px",
-                }}
-              >
+              <p className="contact-page-v2__lead">
                 Dành cho đại lý, xưởng in, doanh nghiệp cần nguồn hàng đồng
                 phục và quà tặng số lượng lớn. Chúng tôi sẽ phản hồi trong
                 vòng 24 giờ làm việc.
               </p>
 
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "16px",
-                  marginBottom: "32px",
-                }}
-              >
+              <div className="contact-page-v2__cards">
                 {CONTEXT_CARDS.map((card) => (
-                  <div
-                    key={card.title}
-                    className="card"
-                    style={{ padding: "20px" }}
-                  >
-                    <h3
-                      style={{
-                        margin: "0 0 8px",
-                        fontSize: "15px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {card.title}
-                    </h3>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: "14px",
-                        color: "#6b7280",
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      {card.description}
-                    </p>
+                  <div key={card.title} className="card contact-page-v2__card">
+                    <h3>{card.title}</h3>
+                    <p>{card.description}</p>
                   </div>
                 ))}
               </div>
 
-              <p style={{ fontSize: "14px", color: "#6b7280" }}>
+              <div className="contact-page-v2__note">
+                <p>Thông tin gửi qua form chỉ dùng để ATTD tư vấn nguồn hàng và báo giá phù hợp.</p>
+              </div>
+
+              <p className="contact-page-v2__dealer-link">
                 Muốn trở thành đại lý chính thức?{" "}
-                <Link
-                  href="/dai-ly"
-                  style={{
-                    color: "var(--primary)",
-                    fontWeight: 500,
-                  }}
-                >
+                <Link href="/dai-ly">
                   Đăng ký đại lý →
                 </Link>
               </p>

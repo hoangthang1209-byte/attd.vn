@@ -1,5 +1,10 @@
 import type { ProductStatus, StockStatus, VariantStatus } from "@prisma/client";
 import type { ProductInput, VariantInput } from "@/features/products/product-admin.service";
+import {
+  assertValidStockQty,
+  assertStockStatusCompatibleWithQty,
+  validateVariantPriceFields,
+} from "@/features/products/product-foundation-validation";
 import { isValidProductImageUrl, PRODUCT_IMAGE_URL_ERROR } from "@/features/products/product-image-url";
 import {
   validateCuratedSalesBadgeKeys,
@@ -193,6 +198,26 @@ function parseVariant(raw: unknown, index: number): VariantInput {
       "Không thể lưu sản phẩm. Vui lòng kiểm tra các trường được đánh dấu.",
       fieldErrors,
     );
+  }
+
+  try {
+    validateVariantPriceFields({
+      wholesalePrice,
+      dealerPrice,
+      costPrice,
+      prefix,
+    });
+    if (stockQty !== undefined && stockQty !== null) {
+      assertValidStockQty(stockQty, `${prefix}.stockQty`);
+    }
+    if (stockQty !== undefined && stockQty !== null && stockStatus) {
+      assertStockStatusCompatibleWithQty(stockQty, stockStatus, `${prefix}.stockStatus`);
+    }
+  } catch (error) {
+    if (error instanceof ProductAdminValidationError) {
+      throw error;
+    }
+    throw error;
   }
 
   return {

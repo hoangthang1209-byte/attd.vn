@@ -183,7 +183,13 @@ export default async function DaiLyPage() {
             <DealerLeadForm
               source="DEALER_FORM"
               title="Thông tin đăng ký"
+              description="ATTD cần vài thông tin cơ bản để tư vấn cách hợp tác và nguồn hàng phù hợp."
               submitLabel="Gửi đăng ký đại lý"
+              reassuranceItems={[
+                "Không spam",
+                "ATTD phản hồi trong giờ làm việc",
+                "Thông tin chỉ dùng để tư vấn hợp tác",
+              ]}
             />
           </div>
         </div>

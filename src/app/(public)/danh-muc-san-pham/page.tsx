@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import CategoryCard from "@/components/public/CategoryCard";
-import { getCmsCategoryTree } from "@/features/categories/services/category.service";
+import { getPublicCmsCategoryTree } from "@/features/categories/services/category.service";
 import { buildPublicCategoryHierarchy } from "@/features/categories/public-category-hierarchy.utils";
 import { PUBLIC_ALL_CATEGORIES_PATH } from "@/features/home/homepage-category.constants";
 import { canonicalUrl, buildOgImages } from "@/lib/seo";
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ProductCategoriesPage() {
-  const tree = await getCmsCategoryTree();
+  const tree = await getPublicCmsCategoryTree();
   const sections = buildPublicCategoryHierarchy(tree);
 
   return (

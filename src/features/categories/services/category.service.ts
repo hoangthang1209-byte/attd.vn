@@ -1,5 +1,11 @@
 import { unstable_noStore as noStore } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { sumDescendantProductCountsSafe } from "@/features/categories/category-product-count.utils";
+import {
+  filterPubliclyActiveCategoryTree,
+  isCategoryPubliclyAccessibleBySlug,
+  loadCategoryVisibilityNodes,
+} from "@/features/categories/category-public-visibility";
 
 export async function getCategories() {
   return prisma.category.findMany({
@@ -87,11 +93,14 @@ export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
   }
 
   function sumDescendantProductCounts(categoryId: string): number {
-    let total = 0;
-    for (const child of byParent.get(categoryId) ?? []) {
-      total += child._count.products + sumDescendantProductCounts(child.id);
+    const byParentCounts = new Map<string, Array<{ id: string; directProductCount: number }>>();
+    for (const category of categories) {
+      if (!category.parentId) continue;
+      const siblings = byParentCounts.get(category.parentId) ?? [];
+      siblings.push({ id: category.id, directProductCount: category._count.products });
+      byParentCounts.set(category.parentId, siblings);
     }
-    return total;
+    return sumDescendantProductCountsSafe(categoryId, byParentCounts);
   }
 
   const roots = (byParent.get(null) ?? []).sort(
@@ -122,6 +131,14 @@ export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
       sortOrder: child.sortOrder,
     })),
   }));
+}
+
+export async function getPublicCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
+  const [tree, visibilityNodes] = await Promise.all([
+    getCmsCategoryTree(),
+    loadCategoryVisibilityNodes(),
+  ]);
+  return filterPubliclyActiveCategoryTree(tree, visibilityNodes);
 }
 
 export type CatalogCategoryFilterChild = {
@@ -158,7 +175,7 @@ export type CatalogCategoryContext = {
 export async function getCategoryTreeForCatalogFilter(): Promise<
   CatalogCategoryFilterNode[]
 > {
-  const tree = await getCmsCategoryTree();
+  const tree = await getPublicCmsCategoryTree();
   return tree.map((parent) => ({
     id: parent.id,
     slug: parent.slug,
@@ -175,6 +192,9 @@ export async function getCategoryTreeForCatalogFilter(): Promise<
 
 /** Collect category id + all descendant ids for catalog filtering. */
 export async function getCategoryFilterIdsBySlug(slug: string): Promise<string[]> {
+  const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
+  if (!accessible) return [];
+
   const [target, all] = await Promise.all([
     prisma.category.findUnique({
       where: { slug },
@@ -216,6 +236,9 @@ export async function getCategoryFilterIdsBySlug(slug: string): Promise<string[]
 export async function resolveCatalogCategoryContext(
   slug: string,
 ): Promise<CatalogCategoryContext | null> {
+  const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
+  if (!accessible) return null;
+
   const category = await prisma.category.findUnique({
     where: { slug },
     select: {
@@ -260,6 +283,9 @@ export async function resolveCatalogCategoryContext(
 }
 
 export async function getCategoryBySlug(slug: string) {
+  const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
+  if (!accessible) return null;
+
   return prisma.category.findUnique({
     where: { slug },
     include: {

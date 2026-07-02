@@ -37,6 +37,15 @@ import {
 } from "@/features/products/product-sku-utils";
 import { previewProductImport, executeProductImport } from "@/features/products/product-import-service";
 import { normalizeOptionName } from "@/features/products/product-variant-matrix.utils";
+import {
+  findExistingCategoryForImport,
+  validateCategoryForImportPreview,
+  ensureCategoryForImportExecution,
+} from "@/features/products/product-import-category";
+import {
+  normalizeVariantStockFields,
+  validateVariantPriceFields,
+} from "@/features/products/product-foundation-validation";
 
 function buildPreviewSummary(rows: ProductImportPreviewRow[]): ProductImportPreviewSummary {
   const warnings = rows.reduce((sum, r) => sum + (r.warningCount ?? 0), 0);
@@ -94,35 +103,6 @@ function toSlug(text: string): string {
     .trim()
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
-}
-
-async function resolveCategoryId(
-  categoryRef: string,
-  autoCreate: boolean,
-): Promise<{ id: string; skuCode: string | null } | null> {
-  const normalized = normalizeCategoryName(categoryRef);
-  let cat = await prisma.category.findFirst({
-    where: {
-      OR: [
-        { name: { equals: normalized, mode: "insensitive" } },
-        { slug: { equals: normalized, mode: "insensitive" } },
-        { skuCode: { equals: normalized, mode: "insensitive" } },
-      ],
-    },
-    select: { id: true, skuCode: true },
-  });
-
-  if (!cat && autoCreate) {
-    const slug = toSlug(normalized);
-    cat = await prisma.category.upsert({
-      where: { slug },
-      create: { name: normalized, slug },
-      update: {},
-      select: { id: true, skuCode: true },
-    });
-  }
-
-  return cat;
 }
 
 function splitTags(value?: string): string[] | undefined {
@@ -195,15 +175,15 @@ export async function previewProductImportV2(
           else finalAction = "copy";
         } else {
           const catRef = row.category;
-          const cat = catRef ? await resolveCategoryId(catRef, options.autoCreateCategories) : null;
-          if (!cat && catRef) {
-            errors.push({
-              field: "category",
-              message: `Danh mục "${normalizeCategoryName(catRef)}" chưa tồn tại.`,
-              severity: "error",
-            });
-          } else if (cat && !cat.skuCode?.trim()) {
-            errors.push({ field: "category", message: CATEGORY_SKU_CODE_MISSING_ERROR, severity: "error" });
+          if (catRef) {
+            const existingCategory = await findExistingCategoryForImport(catRef);
+            errors.push(
+              ...validateCategoryForImportPreview(
+                catRef,
+                existingCategory,
+                options.autoCreateCategories,
+              ),
+            );
           }
           finalAction = "create";
         }
@@ -575,8 +555,7 @@ async function executeProductRow(
     return;
   }
 
-  const cat = await resolveCategoryId(row.category, options.autoCreateCategories);
-  if (!cat) throw new Error(`Không tìm được danh mục "${row.category}".`);
+  const cat = await ensureCategoryForImportExecution(row.category, options.autoCreateCategories);
   if (!cat.skuCode?.trim()) throw new Error(CATEGORY_SKU_CODE_MISSING_ERROR);
 
   const prefix = requireCategorySkuCode(cat.skuCode);
@@ -653,8 +632,18 @@ async function executeVariantRow(
   if (row.finalAction === "update" && row.matchedVariantId) {
     const present = row._presentFields ?? {};
     const data: Prisma.ProductVariantUpdateInput = {};
-    if (present.stockQty) data.stockQty = row.stockQty ?? 0;
-    if (present.stockStatus && row.stockStatus) data.stockStatus = row.stockStatus as StockStatus;
+    if (present.stockQty) {
+      const stock = normalizeVariantStockFields(row.stockQty ?? 0, row.stockStatus as StockStatus | undefined);
+      data.stockQty = stock.stockQty;
+      data.stockStatus = stock.stockStatus;
+    } else if (present.stockStatus && row.stockStatus) {
+      const current = await prisma.productVariant.findUnique({
+        where: { id: row.matchedVariantId },
+        select: { stockQty: true },
+      });
+      const stock = normalizeVariantStockFields(current?.stockQty ?? 0, row.stockStatus as StockStatus);
+      data.stockStatus = stock.stockStatus;
+    }
     if (present.moqOverride) data.moqOverride = row.moqOverride ?? null;
     if (present.leadTimeOverride) {
       data.leadTimeOverride =
@@ -662,6 +651,12 @@ async function executeVariantRow(
     }
     if (present.imageUrl) {
       data.imageUrl = row.imageUrl === IMPORT_CLEAR_TOKEN ? null : row.imageUrl ?? null;
+    }
+    if (present.wholesalePrice || present.dealerPrice) {
+      validateVariantPriceFields({
+        wholesalePrice: present.wholesalePrice ? row.wholesalePrice : undefined,
+        dealerPrice: present.dealerPrice ? row.dealerPrice : undefined,
+      });
     }
     if (present.wholesalePrice) data.wholesalePrice = row.wholesalePrice ?? null;
     if (present.dealerPrice) data.dealerPrice = row.dealerPrice ?? null;
@@ -685,6 +680,10 @@ async function executeVariantRow(
   }
 
   const sku = row.sku?.trim() ? await ensureUniqueSku(row.sku.trim()) : await ensureUniqueSku(baseSku);
+  const stock = normalizeVariantStockFields(
+    row.stockQty ?? 0,
+    (row.stockStatus as StockStatus | undefined) ?? undefined,
+  );
   const created = await prisma.productVariant.create({
     data: {
       productId,
@@ -695,8 +694,8 @@ async function executeVariantRow(
       sizeName: row.sizeName,
       dimensions: row.dimensions,
       capacity: row.capacity,
-      stockQty: row.stockQty ?? 0,
-      stockStatus: (row.stockStatus ?? "IN_STOCK") as StockStatus,
+      stockQty: stock.stockQty,
+      stockStatus: stock.stockStatus,
       moqOverride: row.moqOverride ?? null,
       leadTimeOverride: row.leadTimeOverride === IMPORT_CLEAR_TOKEN ? null : row.leadTimeOverride ?? null,
       imageUrl: row.imageUrl === IMPORT_CLEAR_TOKEN ? null : row.imageUrl ?? null,

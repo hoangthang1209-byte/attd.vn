@@ -37,7 +37,7 @@ function dedup(entries: MetadataRoute.Sitemap): MetadataRoute.Sitemap {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [categories, products, blogPosts, legacyPosts] = await Promise.all([
     prisma.category.findMany({
-      where: { slug: { not: "" } },
+      where: { slug: { not: "" }, isActive: true },
       select: { slug: true, updatedAt: true },
       orderBy: { updatedAt: "desc" },
     }),

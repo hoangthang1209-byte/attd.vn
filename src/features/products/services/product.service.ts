@@ -11,6 +11,7 @@ import {
   normalizeLegacyProductRow,
   PRODUCT_DETAIL_LEGACY_SELECT,
 } from "@/features/products/product-detail-compat";
+import { PUBLIC_IN_STOCK_VARIANT_FILTER } from "@/features/products/product-foundation-validation";
 
 const PRODUCT_DETAIL_INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
@@ -199,7 +200,7 @@ export async function getProductsForPublicListing(params: {
     }),
     ...(inStock && {
       variants: {
-        some: { stockStatus: { in: ["IN_STOCK", "LOW_STOCK"] } },
+        some: PUBLIC_IN_STOCK_VARIANT_FILTER,
       },
     }),
   };

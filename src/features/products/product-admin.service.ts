@@ -28,6 +28,11 @@ import {
 import { shouldGenerateCategoryCodeOnSave } from "@/features/categories/category-admin-code-policy";
 import { generateProductSystemCode } from "@/features/products/product-system-code";
 import {
+  normalizeVariantStockFields,
+  validateVariantPriceFields,
+} from "@/features/products/product-foundation-validation";
+import { revalidatePublicProductCache } from "@/features/products/revalidate-public-product-cache";
+import {
   PRODUCT_CMS_INCLUDE,
   syncProductCmsData,
   resolveOptionValueRefsFromLoadedOptions,
@@ -773,6 +778,19 @@ async function writeProductDependentRelations(
         if (existingVariant && !variantNeedsUpdate(v, existingVariant)) {
           continue;
         }
+        validateVariantPriceFields({
+          wholesalePrice: v.wholesalePrice,
+          dealerPrice: v.dealerPrice,
+          costPrice: v.costPrice,
+          prefix: `variants.byId.${v.id}`,
+        });
+        const stockFields =
+          v.stockQty !== undefined || v.stockStatus !== undefined
+            ? normalizeVariantStockFields(
+                v.stockQty ?? existingVariant?.stockQty ?? 0,
+                v.stockStatus ?? (existingVariant?.stockStatus as StockStatus | undefined),
+              )
+            : null;
         variantUpdates.push(
           (async () => {
             try {
@@ -794,8 +812,8 @@ async function writeProductDependentRelations(
                 dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
                 costPrice: v.costPrice != null ? v.costPrice : undefined,
                 ...(v.priceTiers ? { priceTiers: v.priceTiers as Prisma.InputJsonValue } : {}),
-                stockQty: v.stockQty,
-                stockStatus: v.stockStatus,
+                stockQty: stockFields?.stockQty ?? v.stockQty,
+                stockStatus: stockFields?.stockStatus ?? v.stockStatus,
                 weight: v.weight != null ? v.weight : undefined,
                 imageUrl:
                   v.imageUrl !== undefined ? (v.imageUrl?.trim() ? v.imageUrl.trim() : null) : undefined,
@@ -817,6 +835,13 @@ async function writeProductDependentRelations(
         v.sku?.trim() ||
         options.preparedVariantSkus?.get(v) ||
         (await buildVariantSku(v, productCode, db));
+      validateVariantPriceFields({
+        wholesalePrice: v.wholesalePrice,
+        dealerPrice: v.dealerPrice,
+        costPrice: v.costPrice,
+        prefix: v.clientKey ? `variants.byClientKey.${v.clientKey}` : "variants",
+      });
+      const stock = normalizeVariantStockFields(v.stockQty ?? 0, v.stockStatus);
       try {
         const created = await db.productVariant.create({
           data: {
@@ -835,8 +860,8 @@ async function writeProductDependentRelations(
             dealerPrice: v.dealerPrice != null ? v.dealerPrice : undefined,
             costPrice: v.costPrice != null ? v.costPrice : undefined,
             ...(v.priceTiers ? { priceTiers: v.priceTiers as Prisma.InputJsonValue } : {}),
-            stockQty: v.stockQty ?? 0,
-            stockStatus: v.stockStatus ?? "IN_STOCK",
+            stockQty: stock.stockQty,
+            stockStatus: stock.stockStatus,
             weight: v.weight != null ? v.weight : undefined,
             imageUrl: v.imageUrl?.trim() ? v.imageUrl.trim() : null,
             internalNote: v.internalNote,
@@ -1002,7 +1027,17 @@ export async function createProductAdmin(input: ProductInput) {
       await tx.product.update({ where: { id: product.id }, data: { status: "ACTIVE" } });
       return product.id;
     });
-    return await getProductAdminById(productId);
+    const created = await getProductAdminById(productId);
+    if (!created) {
+      throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+    }
+    await revalidatePublicProductCache({
+      productId,
+      slug: created.slug,
+      categoryId: created.categoryId,
+      affectsHomepage: true,
+    });
+    return created;
   }
 
   const product = await runProductSaveTransaction(async (tx) => {
@@ -1022,7 +1057,17 @@ export async function createProductAdmin(input: ProductInput) {
     return created;
   });
 
-  return await getProductAdminById(product.id);
+  const created = await getProductAdminById(product.id);
+  if (!created) {
+    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+  }
+  await revalidatePublicProductCache({
+    productId: created.id,
+    slug: created.slug,
+    categoryId: created.categoryId,
+    affectsHomepage: created.status === "ACTIVE",
+  });
+  return created;
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────
@@ -1212,13 +1257,76 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
 
   const result = await timer.measure("response_reload", () => getProductAdminById(id));
   timer.flush();
+  if (!result) {
+    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+  }
+  await revalidatePublicProductCache({
+    productId: id,
+    slug: result.slug,
+    categoryId: result.categoryId,
+    affectsHomepage:
+      result.status === "ACTIVE" ||
+      existingStatus.status === "ACTIVE" ||
+      nextStatus === "ACTIVE",
+  });
   return result;
 }
 
+export async function archiveProductAdmin(id: string) {
+  const product = await prisma.product.findUnique({
+    where: { id },
+    select: { id: true, slug: true, categoryId: true, status: true },
+  });
+  if (!product) {
+    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+  }
+
+  if (product.status !== "ARCHIVED") {
+    await prisma.product.update({
+      where: { id },
+      data: { status: "ARCHIVED" },
+    });
+  }
+
+  await revalidatePublicProductCache({
+    productId: id,
+    slug: product.slug,
+    categoryId: product.categoryId,
+    affectsHomepage: product.status === "ACTIVE",
+  });
+
+  return getProductAdminById(id);
+}
+
+export async function restoreProductAdmin(id: string, status: ProductStatus = "DRAFT") {
+  const product = await prisma.product.findUnique({
+    where: { id },
+    select: { id: true, slug: true, categoryId: true, status: true },
+  });
+  if (!product) {
+    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+  }
+
+  if (product.status === "ARCHIVED") {
+    await prisma.product.update({
+      where: { id },
+      data: { status },
+    });
+  }
+
+  await revalidatePublicProductCache({
+    productId: id,
+    slug: product.slug,
+    categoryId: product.categoryId,
+    affectsHomepage: status === "ACTIVE",
+  });
+
+  return getProductAdminById(id);
+}
+
+/** @deprecated Normal admin flows must use archiveProductAdmin instead of hard delete. */
 export async function deleteProductAdmin(id: string) {
-  await prisma.productVariant.deleteMany({ where: { productId: id } });
-  await prisma.productImage.deleteMany({ where: { productId: id } });
-  await prisma.product.delete({ where: { id } });
+  return archiveProductAdmin(id);
 }
 
 // ─── Categories ───────────────────────────────────────────────────────────────

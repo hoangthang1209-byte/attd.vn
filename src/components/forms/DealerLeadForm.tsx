@@ -27,12 +27,16 @@ interface DealerLeadFormProps {
   source: string;
   title?: string;
   submitLabel?: string;
+  description?: string;
+  reassuranceItems?: string[];
 }
 
 export default function DealerLeadForm({
   source,
   title = CTA.secondary.label,
   submitLabel = CTA.secondary.label,
+  description,
+  reassuranceItems,
 }: DealerLeadFormProps) {
   const [contactName, setContactName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -111,17 +115,23 @@ export default function DealerLeadForm({
         <div className="lead-form-success-icon" aria-hidden>
           ✓
         </div>
-        <h2 className="lead-form-success-title">Đã gửi thành công!</h2>
+        <h2 className="lead-form-success-title">ATTD đã nhận thông tin</h2>
         <p className="lead-form-success-text">
-          Cảm ơn bạn. ATTD sẽ liên hệ trong thời gian sớm nhất.
+          Cảm ơn bạn. Đội ngũ ATTD sẽ xem nhu cầu và liên hệ lại trong giờ làm việc.
         </p>
       </div>
     );
   }
 
   return (
-    <form className="lead-form" onSubmit={handleSubmit} noValidate>
-      <h2 className="lead-form-title">{title}</h2>
+    <form className="lead-form public-lead-form" onSubmit={handleSubmit} noValidate>
+      <div className="public-lead-form__header">
+        <p className="public-lead-form__eyebrow">Thông tin liên hệ</p>
+        <h2 className="lead-form-title">{title}</h2>
+        {description && (
+          <p className="public-lead-form__description">{description}</p>
+        )}
+      </div>
 
       <div className="form-group">
         <label htmlFor={`companyName-${source}`} className="form-label">
@@ -132,8 +142,9 @@ export default function DealerLeadForm({
           type="text"
           value={companyName}
           onChange={(e) => setCompanyName(e.target.value)}
-          placeholder="Không bắt buộc"
+          placeholder="Ví dụ: ATTD Agency"
           className="form-input"
+          autoComplete="organization"
         />
       </div>
 
@@ -147,6 +158,7 @@ export default function DealerLeadForm({
           value={contactName}
           onChange={(e) => setContactName(e.target.value)}
           className="form-input"
+          placeholder="Người phụ trách"
           required
           autoComplete="name"
         />
@@ -163,6 +175,7 @@ export default function DealerLeadForm({
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className="form-input"
+            placeholder="Số điện thoại/Zalo"
             required
             autoComplete="tel"
           />
@@ -212,10 +225,12 @@ export default function DealerLeadForm({
           onChange={(e) => setMessage(e.target.value)}
           rows={4}
           maxLength={2000}
-          placeholder="Ví dụ: Cần báo giá áo thun trơn số lượng lớn, hỏi về OEM Private Label..."
+          placeholder="Ví dụ: Cần nguồn áo thun/polo cho khách doanh nghiệp, muốn hỏi giá đại lý hoặc OEM..."
           className="form-input form-textarea"
         />
-        <div className="form-hint">{message.length} / 2000</div>
+        <div className="form-hint">
+          Gợi ý: nhóm sản phẩm, số lượng thường đặt, khu vực, mô hình kinh doanh. {message.length} / 2000
+        </div>
       </div>
 
       {formStatus === "error" && (
@@ -229,8 +244,16 @@ export default function DealerLeadForm({
         className="btn-primary lead-form-submit"
         disabled={formStatus === "loading"}
       >
-        {formStatus === "loading" ? "Đang gửi..." : submitLabel}
+        {formStatus === "loading" ? "Đang gửi thông tin..." : submitLabel}
       </button>
+
+      {reassuranceItems && reassuranceItems.length > 0 && (
+        <ul className="public-lead-form__reassurance" aria-label="Cam kết khi gửi thông tin">
+          {reassuranceItems.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      )}
     </form>
   );
 }

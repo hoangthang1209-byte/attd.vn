@@ -14,6 +14,7 @@ import {
   hasStructuredAndLegacyConflict,
   parseStructuredOptionValues,
 } from "@/features/products/product-import-options-parser";
+import { ZERO_STOCK_IN_STOCK_ERROR } from "@/features/products/product-foundation-validation";
 import { parseProductAttributesField } from "@/features/products/product-attribute-assignment.utils";
 import {
   generateSku,
@@ -351,7 +352,17 @@ export function validateImportRow(
     errors.push(validationError("defaultMoq", "MOQ phải >= 1."));
   }
   if (row.stockQty !== undefined && row.stockQty < 0) {
-    errors.push(validationError("stockQty", "Số lượng tồn không được âm."));
+    errors.push(validationError("stockQty", "Tồn kho không được âm."));
+  }
+  if (row.stockQty !== undefined && !Number.isInteger(row.stockQty)) {
+    errors.push(validationError("stockQty", "Tồn kho phải là số nguyên hợp lệ."));
+  }
+  if (
+    row.stockQty === 0 &&
+    row.stockStatus &&
+    ["IN_STOCK", "LOW_STOCK"].includes(row.stockStatus.toUpperCase())
+  ) {
+    errors.push(validationError("stockStatus", ZERO_STOCK_IN_STOCK_ERROR));
   }
   if (row.wholesalePrice !== undefined && row.wholesalePrice < 0) {
     errors.push(validationError("wholesalePrice", "Giá sỉ không hợp lệ."));

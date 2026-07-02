@@ -37,6 +37,7 @@ export async function GET() {
       canViewCrm: can(session, "crm.view"),
       canViewDashboard: can(session, "dashboard.view"),
       canViewWarehouse: can(session, "warehouse.view"),
+      canViewReports: can(session, "reports.view"),
     },
   });
 }
