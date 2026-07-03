@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import B2BTrustSignals from "@/components/public/B2BTrustSignals";
 import ContactForm from "@/components/public/ContactForm";
 import { buildContactMetadata } from "@/lib/seo/indexation-policy";
 
@@ -25,6 +26,12 @@ const CONTEXT_CARDS = [
     description:
       "Đồng phục và quà tặng doanh nghiệp theo số lượng. Tư vấn mẫu và chất liệu phù hợp.",
   },
+];
+
+const CONTACT_TRUST = [
+  "Tư vấn theo nhu cầu",
+  "Bảo mật thông tin",
+  "Phản hồi trong giờ làm việc",
 ];
 
 export default function LienHePage() {
@@ -58,6 +65,12 @@ export default function LienHePage() {
 
               <div className="contact-page-v2__note">
                 <p>Thông tin gửi qua form chỉ dùng để ATTD tư vấn nguồn hàng và báo giá phù hợp.</p>
+                <B2BTrustSignals
+                  items={CONTACT_TRUST}
+                  variant="inline"
+                  ariaLabel="Cam kết khi liên hệ"
+                  className="contact-page-v2__trust"
+                />
               </div>
 
               <p className="contact-page-v2__dealer-link">

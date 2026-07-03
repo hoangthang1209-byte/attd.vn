@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
+import B2BTrustSignals from "@/components/public/B2BTrustSignals";
 import LandingHeroVisual from "@/components/public/LandingHeroVisual";
 import { canonicalUrl } from "@/lib/seo";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
@@ -78,6 +79,18 @@ const WORKFLOW = [
     title: "Gửi yêu cầu báo giá",
     description: "Đại lý gửi sản phẩm, số lượng, logo hoặc yêu cầu OEM để nhận tư vấn nguồn hàng.",
   },
+];
+
+const DEALER_PANEL_TRUST = [
+  "Tư vấn theo mô hình kinh doanh",
+  "Thông tin dùng để tư vấn hợp tác",
+  "Phản hồi trong giờ làm việc",
+];
+
+const DEALER_FORM_TRUST = [
+  "Không spam",
+  "Phản hồi trong giờ làm việc",
+  "Thông tin chỉ dùng để tư vấn hợp tác",
 ];
 
 export default async function DaiLyPage() {
@@ -170,11 +183,12 @@ export default async function DaiLyPage() {
               <p>
                 Gửi thông tin để ATTD tư vấn cách lấy nguồn hàng phù hợp với mô hình kinh doanh của bạn.
               </p>
-              <ul>
-                <li>Không spam</li>
-                <li>Tư vấn theo mô hình kinh doanh</li>
-                <li>Phản hồi trong giờ làm việc</li>
-              </ul>
+              <B2BTrustSignals
+                items={DEALER_PANEL_TRUST}
+                variant="stack"
+                ariaLabel="Niềm tin khi đăng ký đại lý"
+                className="dealer-final-panel__trust"
+              />
               <Link href="/lien-he" className="btn-secondary">
                 Trao đổi với ATTD
               </Link>
@@ -185,11 +199,7 @@ export default async function DaiLyPage() {
               title="Thông tin đăng ký"
               description="ATTD cần vài thông tin cơ bản để tư vấn cách hợp tác và nguồn hàng phù hợp."
               submitLabel="Gửi đăng ký đại lý"
-              reassuranceItems={[
-                "Không spam",
-                "ATTD phản hồi trong giờ làm việc",
-                "Thông tin chỉ dùng để tư vấn hợp tác",
-              ]}
+              reassuranceItems={DEALER_FORM_TRUST}
             />
           </div>
         </div>

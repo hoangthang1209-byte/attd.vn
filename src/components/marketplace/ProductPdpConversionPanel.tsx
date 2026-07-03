@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
 import { CTA } from "@/lib/ctaConfig";
+import B2BTrustSignals from "@/components/public/B2BTrustSignals";
 
 type Props = {
   productName: string;
@@ -14,6 +15,12 @@ type Props = {
   stockColor?: string;
   onRequestQuote: () => void;
 };
+
+const PDP_CONVERSION_TRUST = [
+  "Báo giá theo số lượng",
+  "Tư vấn theo nhu cầu",
+  "Phản hồi trong giờ làm việc",
+];
 
 export default function ProductPdpConversionPanel({
   productName,
@@ -88,6 +95,13 @@ export default function ProductPdpConversionPanel({
             Đăng ký làm đại lý
           </Link>
         </div>
+
+        <B2BTrustSignals
+          items={PDP_CONVERSION_TRUST}
+          variant="stack"
+          ariaLabel="Cam kết khi yêu cầu báo giá"
+          className="mp-pdp-conversion-trust"
+        />
       </div>
     </aside>
   );

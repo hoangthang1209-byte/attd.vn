@@ -1,9 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import B2BTrustSignals from "@/components/public/B2BTrustSignals";
 import { CTA } from "@/lib/ctaConfig";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
+
+const CONTACT_FORM_TRUST = [
+  "Không spam",
+  "Chỉ dùng để tư vấn nguồn hàng",
+  "Phản hồi trong giờ làm việc",
+];
 
 export default function ContactForm() {
   const [name, setName] = useState("");
@@ -173,11 +180,12 @@ export default function ContactForm() {
         {formStatus === "loading" ? "Đang gửi yêu cầu..." : "Gửi yêu cầu báo giá"}
       </button>
 
-      <ul className="public-lead-form__reassurance" aria-label="Cam kết khi gửi thông tin">
-        <li>Không spam</li>
-        <li>Chỉ dùng để tư vấn nguồn hàng</li>
-        <li>Phản hồi trong giờ làm việc</li>
-      </ul>
+      <B2BTrustSignals
+        items={CONTACT_FORM_TRUST}
+        variant="inline"
+        ariaLabel="Cam kết khi gửi thông tin"
+        className="public-lead-form__reassurance"
+      />
     </form>
   );
 }

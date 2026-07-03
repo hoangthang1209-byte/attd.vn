@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import B2BTrustSignals from "@/components/public/B2BTrustSignals";
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
 import type { ProductQuoteContext } from "@/components/public/product-quote.types";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
@@ -17,6 +18,12 @@ type Props = {
   product: ProductQuoteContext;
   restoreFocusRef?: React.RefObject<HTMLButtonElement | null>;
 };
+
+const PRODUCT_QUOTE_TRUST = [
+  "Không spam",
+  "Chỉ dùng để tư vấn báo giá",
+  "Phản hồi trong giờ làm việc",
+];
 
 function buildProductMessage(payload: {
   product: ProductQuoteContext;
@@ -384,11 +391,12 @@ export default function ProductQuoteDialog({
                   </button>
                 </div>
 
-                <ul className="product-quote-dialog__reassurance" aria-label="Cam kết khi gửi yêu cầu">
-                  <li>Không spam</li>
-                  <li>Chỉ dùng để tư vấn báo giá</li>
-                  <li>Phản hồi trong giờ làm việc</li>
-                </ul>
+                <B2BTrustSignals
+                  items={PRODUCT_QUOTE_TRUST}
+                  variant="inline"
+                  ariaLabel="Cam kết khi gửi yêu cầu"
+                  className="product-quote-dialog__reassurance"
+                />
               </form>
             </div>
 

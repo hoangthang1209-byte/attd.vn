@@ -21597,6 +21597,109 @@ body:has(.mp-header--v271) {
   }
 }
 
+/* B2B Trust System V1 — quiet public trust signals */
+.b2b-trust-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.b2b-trust-signals--stack {
+  display: grid;
+  gap: 9px;
+}
+
+.b2b-trust-signals__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.b2b-trust-signals__item::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.82);
+  flex: 0 0 auto;
+}
+
+.mp-pdp-conversion-trust {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.mp-pdp-conversion-trust .b2b-trust-signals__item {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.dealer-final-panel .b2b-trust-signals {
+  margin: 28px 0;
+}
+
+.dealer-final-panel .b2b-trust-signals__item,
+.dealer-landing-form-section .b2b-trust-signals__item {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.dealer-final-panel .b2b-trust-signals__item {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.dealer-final-panel .b2b-trust-signals__item::before,
+.dealer-landing-form-section .b2b-trust-signals__item::before {
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
+}
+
+.contact-page-v2__trust {
+  margin-top: 14px;
+}
+
+.contact-page-v2__trust .b2b-trust-signals__item {
+  color: #5f6875;
+  font-weight: 650;
+}
+
+.blog-article-cta__trust {
+  margin-top: 16px;
+}
+
+.blog-article-cta__trust .b2b-trust-signals__item {
+  color: #5f6875;
+  font-weight: 650;
+}
+
+.mp-category-final-cta__card .b2b-trust-signals__item {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.mp-category-final-cta__card .b2b-trust-signals__item::before {
+  background: var(--primary);
+}
+
+@media (max-width: 639px) {
+  .b2b-trust-signals {
+    gap: 7px 12px;
+  }
+
+  .public-lead-form__reassurance,
+  .product-quote-dialog__reassurance {
+    flex-direction: column;
+  }
+}
+
 .order-variant-matrix-editor {
   margin-top: 12px;
   padding-top: 12px;
