@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generatePatternCode } from "@/features/patterns/pattern-code";
+import type { PatternMeasurementInput } from "@/features/patterns/pattern-update-input";
 
 export class PatternValidationError extends Error {
   constructor(message: string) {
@@ -92,6 +93,93 @@ export async function createPattern(input: {
   });
 }
 
+function buildPatternUpdateData(
+  input: Partial<{
+    name: string;
+    version: number;
+    productCategoryId: string | null;
+    productId: string | null;
+    baseSize: string | null;
+    sizeRange: string | null;
+    gradingRule: string | null;
+    productionMaterialCategory: ProductionMaterialCategory | null;
+    notes: string | null;
+  }>,
+): Prisma.PatternUncheckedUpdateInput {
+  const data: Prisma.PatternUncheckedUpdateInput = {};
+
+  if (input.name !== undefined) {
+    const name = input.name.trim();
+    if (!name) throw new PatternValidationError("Tên rập không được để trống.");
+    data.name = name;
+  }
+  if (input.version !== undefined) data.version = input.version;
+  if (input.productCategoryId !== undefined) data.productCategoryId = input.productCategoryId;
+  if (input.productId !== undefined) data.productId = input.productId;
+  if (input.baseSize !== undefined) data.baseSize = input.baseSize?.trim() || null;
+  if (input.sizeRange !== undefined) data.sizeRange = input.sizeRange?.trim() || null;
+  if (input.gradingRule !== undefined) data.gradingRule = input.gradingRule?.trim() || null;
+  if (input.productionMaterialCategory !== undefined) {
+    data.productionMaterialCategory = input.productionMaterialCategory;
+  }
+  if (input.notes !== undefined) data.notes = input.notes?.trim() || null;
+
+  return data;
+}
+
+function mapPatternPrismaError(err: unknown): PatternValidationError | null {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return null;
+  if (err.code === "P2003") {
+    return new PatternValidationError("Danh mục hoặc sản phẩm liên kết không hợp lệ.");
+  }
+  if (err.code === "P2002") {
+    return new PatternValidationError("Không thể lưu vì dữ liệu rập đã thay đổi. Vui lòng tải lại và thử lại.");
+  }
+  return null;
+}
+
+async function replacePatternMeasurements(
+  tx: Prisma.TransactionClient,
+  patternId: string,
+  measurements: PatternMeasurementInput[],
+) {
+  await tx.patternMeasurementValue.deleteMany({
+    where: { measurement: { patternId } },
+  });
+  await tx.patternMeasurement.deleteMany({ where: { patternId } });
+
+  for (const [index, row] of measurements.entries()) {
+    const pom = row.pointOfMeasure.trim();
+    if (!pom) continue;
+
+    const measurement = await tx.patternMeasurement.create({
+      data: {
+        patternId,
+        pointOfMeasure: pom,
+        description: row.description?.trim() || null,
+        baseSize: row.baseSize?.trim() || null,
+        tolerance: row.tolerance?.trim() || null,
+        sortOrder: row.sortOrder ?? index,
+      },
+    });
+
+    const seenSizes = new Set<string>();
+    for (const val of row.values) {
+      const size = val.size.trim();
+      const value = val.value.trim();
+      if (!size || !value || seenSizes.has(size)) continue;
+      seenSizes.add(size);
+      await tx.patternMeasurementValue.create({
+        data: {
+          measurementId: measurement.id,
+          size,
+          value,
+        },
+      });
+    }
+  }
+}
+
 export async function updatePattern(
   id: string,
   input: Partial<{
@@ -104,15 +192,7 @@ export async function updatePattern(
     gradingRule: string | null;
     productionMaterialCategory: ProductionMaterialCategory | null;
     notes: string | null;
-    measurements: Array<{
-      id?: string;
-      pointOfMeasure: string;
-      description?: string | null;
-      baseSize?: string | null;
-      tolerance?: string | null;
-      sortOrder?: number;
-      values?: Array<{ size: string; value: string }>;
-    }>;
+    measurements: PatternMeasurementInput[];
   }>,
 ) {
   const existing = await prisma.pattern.findUnique({ where: { id } });
@@ -122,56 +202,33 @@ export async function updatePattern(
     throw new PatternValidationError("Rập đã lưu trữ, không thể chỉnh sửa.");
   }
 
-  return prisma.$transaction(async (tx) => {
-    await tx.pattern.update({
-      where: { id },
-      data: {
-        name: input.name?.trim() ?? undefined,
-        version: input.version ?? undefined,
-        productCategoryId: input.productCategoryId,
-        productId: input.productId,
-        baseSize: input.baseSize,
-        sizeRange: input.sizeRange,
-        gradingRule: input.gradingRule,
-        productionMaterialCategory: input.productionMaterialCategory as never,
-        notes: input.notes,
-      },
-    });
+  const metadataPatch = buildPatternUpdateData(input);
+  const hasMetadataPatch = Object.keys(metadataPatch).length > 0;
 
-    if (input.measurements) {
-      await tx.patternMeasurementValue.deleteMany({
-        where: { measurement: { patternId: id } },
-      });
-      await tx.patternMeasurement.deleteMany({ where: { patternId: id } });
+  if (!hasMetadataPatch && input.measurements === undefined) {
+    throw new PatternValidationError("Không có dữ liệu để cập nhật.");
+  }
 
-      for (const [index, row] of input.measurements.entries()) {
-        const pom = row.pointOfMeasure?.trim();
-        if (!pom) continue;
-        const measurement = await tx.patternMeasurement.create({
-          data: {
-            patternId: id,
-            pointOfMeasure: pom,
-            description: row.description?.trim() || null,
-            baseSize: row.baseSize?.trim() || null,
-            tolerance: row.tolerance?.trim() || null,
-            sortOrder: row.sortOrder ?? index,
-          },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      if (hasMetadataPatch) {
+        await tx.pattern.update({
+          where: { id },
+          data: metadataPatch,
         });
-        for (const val of row.values ?? []) {
-          if (!val.size?.trim() || !val.value?.trim()) continue;
-          await tx.patternMeasurementValue.create({
-            data: {
-              measurementId: measurement.id,
-              size: val.size.trim(),
-              value: val.value.trim(),
-            },
-          });
-        }
       }
-    }
 
-    return tx.pattern.findUniqueOrThrow({ where: { id }, include: PATTERN_INCLUDE });
-  });
+      if (input.measurements !== undefined) {
+        await replacePatternMeasurements(tx, id, input.measurements);
+      }
+
+      return tx.pattern.findUniqueOrThrow({ where: { id }, include: PATTERN_INCLUDE });
+    });
+  } catch (err) {
+    const mapped = mapPatternPrismaError(err);
+    if (mapped) throw mapped;
+    throw err;
+  }
 }
 
 export async function approvePattern(id: string, approvedBy?: string | null) {

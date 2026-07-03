@@ -10,6 +10,7 @@ import {
 } from "@/components/admin/AdminUi";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import type { PatternStatus } from "@prisma/client";
+import { patternAdminDetailPath } from "@/features/patterns/pattern-admin-routes";
 
 type PatternRow = {
   id: string;
@@ -70,7 +71,7 @@ export default function PatternListManager() {
     }
     setCreating(false);
     setNewName("");
-    if (data.id) window.location.href = `/admin/rap/${data.id}`;
+    if (data.id) window.location.href = patternAdminDetailPath(data.id);
     else void load();
   }
 
@@ -139,7 +140,7 @@ export default function PatternListManager() {
                   <td>{row.createdBy ?? "—"}</td>
                   <td>{row.approvedBy ?? "—"}</td>
                   <td>
-                    <Link href={`/admin/rap/${row.id}`} className="admin-link">
+                    <Link href={patternAdminDetailPath(row.id)} className="admin-link">
                       Chi tiết
                     </Link>
                   </td>

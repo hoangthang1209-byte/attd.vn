@@ -1,14 +1,9 @@
-import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import PatternDetailManager from "@/components/admin/patterns/PatternDetailManager";
+import { redirect } from "next/navigation";
+import { patternAdminDetailPath } from "@/features/patterns/pattern-admin-routes";
 
 type PageProps = { params: Promise<{ id: string }> };
 
-export default async function PatternDetailPage({ params }: PageProps) {
+export default async function PatternLegacyDetailPage({ params }: PageProps) {
   const { id } = await params;
-  return (
-    <>
-      <AdminPageTitle title="Chi tiết rập" />
-      <PatternDetailManager patternId={id} />
-    </>
-  );
+  redirect(patternAdminDetailPath(id));
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AdminLoadingState,
@@ -22,6 +22,11 @@ import MeasurementTemplateApplyButton from "@/components/admin/tech-pack/Measure
 import TechPackMeasurementEditor from "@/components/admin/tech-pack/TechPackMeasurementEditor";
 import CopyFromTechPackButton from "@/components/admin/patterns/CopyFromTechPackButton";
 import { isPreviewableFile } from "@/features/tech-pack/tech-pack-file-validation";
+import {
+  PATTERN_ADMIN_LIST_PATH,
+} from "@/features/patterns/pattern-admin-routes";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type PatternFile = {
   id: string;
@@ -58,11 +63,13 @@ type PatternDetail = {
 };
 
 export default function PatternDetailManager({ patternId }: { patternId: string }) {
+  const mutate = useAdminMutation();
+  const saveBusyRef = useRef(false);
   const [pattern, setPattern] = useState<PatternDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [formRevision, setFormRevision] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,17 +96,29 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   }, [load]);
 
   async function saveField(patch: Record<string, unknown>) {
-    if (!pattern || pattern.status === "ARCHIVED") return;
-    setSaving(true);
-    const res = await fetch(`/api/patterns/${patternId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
+    if (!pattern || pattern.status === "ARCHIVED" || saveBusyRef.current) return;
+
+    saveBusyRef.current = true;
+    await mutate({
+      loadingMessage: "Đang cập nhật rập…",
+      successMessage: "Đã cập nhật rập.",
+      errorFallback: "Không thể cập nhật rập. Vui lòng thử lại.",
+      action: async () => {
+        const res = await fetch(`/api/patterns/${patternId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        return parseAdminJsonResponse(res, (body) => body as PatternDetail);
+      },
+      onSuccess: () => {
+        setError(null);
+        setFormRevision((value) => value + 1);
+        void load();
+      },
+      onError: (message) => setError(message),
     });
-    const data = (await res.json()) as { message?: string };
-    if (!res.ok) setError(data.message ?? "Không thể lưu");
-    else void load();
-    setSaving(false);
+    saveBusyRef.current = false;
   }
 
   async function approve() {
@@ -142,7 +161,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         meta={<PatternStatusBadge status={pattern.status} />}
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/admin/rap" className="admin-btn">
+            <Link href={PATTERN_ADMIN_LIST_PATH} className="admin-btn">
               Quay lại
             </Link>
             {!readOnly && (
@@ -169,9 +188,8 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       />
 
       {error && <p className="admin-error">{error}</p>}
-      {saving && <p className="admin-muted">Đang lưu...</p>}
 
-      <SectionCard title="Thông tin rập">
+      <SectionCard title="Thông tin rập" key={`${pattern.id}-${formRevision}-info`}>
         <div className="admin-form-grid">
           <label className="admin-field">
             <span>Tên rập</span>
@@ -190,7 +208,8 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
               defaultValue={pattern.version}
               disabled={readOnly}
               onBlur={(e) => {
-                const v = Number(e.target.value);
+                const v = Number.parseInt(e.target.value, 10);
+                if (!Number.isFinite(v) || v < 1) return;
                 if (v !== pattern.version) void saveField({ version: v });
               }}
             />

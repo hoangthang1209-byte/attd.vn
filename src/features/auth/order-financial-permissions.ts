@@ -59,6 +59,8 @@ export function canAccessOrderFinancialPdf(
 
 const PRODUCTION_ADMIN_ROUTE_PREFIXES = [
   "/admin/tech-pack",
+  "/admin/pattern",
+  "/admin/patterns",
   "/admin/rap",
   "/admin/trims",
   "/admin/production-materials",

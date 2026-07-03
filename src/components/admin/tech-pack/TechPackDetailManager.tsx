@@ -21,6 +21,7 @@ import {
   getOrderItemProcessingMethodLabel,
   getOrderItemSupplySourceLabel,
 } from "@/features/orders/order-item-classification";
+import { patternAdminDetailPath } from "@/features/patterns/pattern-admin-routes";
 import TechPackBomEditor from "@/components/admin/tech-pack/TechPackBomEditor";
 import TechPackArtworkPlacementsEditor from "@/components/admin/tech-pack/TechPackArtworkPlacementsEditor";
 import TechPackReleaseChecklist from "@/components/admin/tech-pack/TechPackReleaseChecklist";
@@ -462,7 +463,11 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
             {pack.pattern ? (
               <dl className="admin-dl">
                 <dt>Mã rập</dt>
-                <dd>{pack.pattern.code}</dd>
+                <dd>
+                  <Link href={patternAdminDetailPath(pack.pattern.id)} className="admin-link">
+                    {pack.pattern.code}
+                  </Link>
+                </dd>
                 <dt>Version</dt>
                 <dd>{pack.pattern.version}</dd>
                 <dt>Base size</dt>

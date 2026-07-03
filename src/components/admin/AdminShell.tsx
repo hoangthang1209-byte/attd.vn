@@ -120,7 +120,7 @@ const NAV_GROUPS: NavGroup[] = [
     visible: (p) => p.canViewProduction,
     items: [
       { href: "/admin/tech-pack", label: "Tech Pack", visible: (p) => p.canViewProduction },
-      { href: "/admin/rap", label: "Thư viện rập", visible: (p) => p.canViewProduction },
+      { href: "/admin/pattern", label: "Thư viện rập", visible: (p) => p.canViewProduction },
       { href: "/admin/measurement-template", label: "Mẫu thông số", visible: (p) => p.canViewProduction },
       { href: "/admin/production-materials", label: "Vật liệu sản xuất", visible: (p) => p.canViewProduction },
       { href: "/admin/trims", label: "Phụ liệu sản xuất", visible: (p) => p.canViewProduction },
