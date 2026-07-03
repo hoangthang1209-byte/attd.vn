@@ -120,6 +120,15 @@ export default async function BlogDetailPage({ params }: PageProps) {
         <section className="section blog-article-section">
           <div className="container blog-article-container">
             <header className="blog-article-header">
+              {categories.length > 0 && (
+                <Link
+                  href={`/blog/danh-muc/${categories[0].category.slug}`}
+                  className="blog-article-category"
+                >
+                  {categories[0].category.name}
+                </Link>
+              )}
+
               <div className="blog-article-meta">
                 <time dateTime={publishedAt.toISOString()}>{formatDate(publishedAt)}</time>
                 <span className="blog-article-meta-sep">•</span>
@@ -136,7 +145,13 @@ export default async function BlogDetailPage({ params }: PageProps) {
               )}
             </header>
 
-            <div className="blog-article-layout">
+            <div
+              className={
+                processed.headings.length > 0
+                  ? "blog-article-layout"
+                  : "blog-article-layout blog-article-layout--no-toc"
+              }
+            >
               <BlogTableOfContents headings={processed.headings} />
 
               <div className="blog-article-body">

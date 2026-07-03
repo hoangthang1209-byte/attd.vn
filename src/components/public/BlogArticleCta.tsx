@@ -7,14 +7,14 @@ export default function BlogArticleCta() {
         <div className="blog-article-cta-inner">
           <div>
             <h2 className="blog-article-cta-title">
-              Cần nguồn hàng cho nội dung này?
+              Cần tư vấn nguồn hàng?
             </h2>
             <p className="blog-article-cta-desc">
-              Liên hệ ATTD để được tư vấn sản phẩm, số lượng tối thiểu và báo giá sỉ theo số lượng.
+              Gửi nhu cầu sản phẩm, số lượng và logo. ATTD sẽ tư vấn phương án sourcing phù hợp cho doanh nghiệp hoặc đại lý.
             </p>
           </div>
           <Link href="/lien-he" className="btn-primary">
-            Liên hệ ATTD
+            Gửi yêu cầu báo giá
           </Link>
         </div>
       </div>

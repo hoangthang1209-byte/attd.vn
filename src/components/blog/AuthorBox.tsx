@@ -4,19 +4,13 @@ export default function AuthorBox() {
   return (
     <aside className="blog-author-box">
       <div className="blog-author-box-inner">
-        <p className="blog-author-box-label">Tác giả</p>
-        <h3 className="blog-author-box-name">ATTD Editorial Team</h3>
+        <p className="blog-author-box-label">Biên tập bởi</p>
+        <h3 className="blog-author-box-name">Đội ngũ ATTD</h3>
         <p className="blog-author-box-bio">
-          Chuyên chia sẻ kiến thức về:
+          Nội dung được biên soạn từ kinh nghiệm tư vấn nguồn hàng đồng phục, quà tặng doanh nghiệp và OEM/private label cho khách B2B.
         </p>
-        <ul className="blog-author-box-topics">
-          <li>nguồn hàng</li>
-          <li>OEM</li>
-          <li>đồng phục</li>
-          <li>quà tặng doanh nghiệp</li>
-        </ul>
-        <Link href="/gioi-thieu" className="blog-author-box-link">
-          Tìm hiểu thêm về ATTD →
+        <Link href="/lien-he" className="blog-author-box-link">
+          Trao đổi với ATTD →
         </Link>
       </div>
     </aside>

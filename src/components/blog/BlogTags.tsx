@@ -10,7 +10,7 @@ export default function BlogTags({ tags }: BlogTagsProps) {
 
   return (
     <section className="blog-tags">
-      <h2 className="blog-tags-title">Tags</h2>
+      <h2 className="blog-tags-title">Chủ đề liên quan</h2>
       <div className="blog-tags-list">
         {tags.map((tag) => (
           <Link
