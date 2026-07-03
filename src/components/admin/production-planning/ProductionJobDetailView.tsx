@@ -9,6 +9,7 @@ import ProductionJobOperationalStrip from "@/components/admin/production-plannin
 import ProductionJobOverviewTab from "@/components/admin/production-planning/ProductionJobOverviewTab";
 import ProductionJobPlanTab from "@/components/admin/production-planning/ProductionJobPlanTab";
 import ProductionJobHistoryTab from "@/components/admin/production-planning/ProductionJobHistoryTab";
+import ProductionJobTechPackPanel from "@/components/admin/production-planning/ProductionJobTechPackPanel";
 import ProductionJobPageSkeleton from "@/components/admin/production-planning/ProductionJobPageSkeleton";
 import AdminErrorRecovery from "@/components/admin/feedback/AdminErrorRecovery";
 import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
@@ -200,6 +201,11 @@ export default function ProductionJobDetailView({ orderItemId }: Props) {
 
         {mountedTabs.has("documents") && (
           <div hidden={tab !== "documents"}>
+            <ProductionJobTechPackPanel
+              orderItemId={orderItemId}
+              jobCode={plan.jobCode}
+              canManage={canManagePlan}
+            />
             <OrderProductionPackSection
               orderId={plan.orderId}
               order={order}

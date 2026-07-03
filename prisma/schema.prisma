@@ -2581,6 +2581,7 @@ model ProductionPlan {
   updatedAt           DateTime               @updatedAt
   orderItem           OrderItem              @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   productionOwner     Employee?              @relation("ProductionPlanOwner", fields: [productionOwnerId], references: [id], onDelete: SetNull)
+  techPacks           TechPack[]
 
   @@index([productionOwnerId])
   @@index([status])
@@ -3033,6 +3034,15 @@ model TechPack {
   patternCodeSnapshot    String?
   patternVersionSnapshot String?
   patternExceptionReason String?        @db.Text
+  productionPlanId       String?
+  jobCodeSnapshot        String?
+  internalDeadlineSnapshot DateTime?
+  deliveryDeadlineSnapshot DateTime?
+  productionOwnerNameSnapshot String?
+  workshopNameSnapshot   String?
+  constructionNote     String?        @db.Text
+  fitNote                String?        @db.Text
+  generalNote            String?        @db.Text
   releasedAt             DateTime?
   releasedBy             String?
   supersededById         String?
@@ -3045,6 +3055,7 @@ model TechPack {
   product           Product?                  @relation(fields: [productId], references: [id], onDelete: SetNull)
   productVariant    ProductVariant?           @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
   pattern           Pattern?                  @relation(fields: [patternId], references: [id], onDelete: SetNull)
+  productionPlan    ProductionPlan?           @relation(fields: [productionPlanId], references: [id], onDelete: SetNull)
   supersededBy      TechPack?                 @relation("TechPackSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
   supersedes        TechPack[]                @relation("TechPackSupersession")
   assets            TechPackAsset[]
@@ -3059,6 +3070,7 @@ model TechPack {
   @@index([productId])
   @@index([productVariantId])
   @@index([patternId])
+  @@index([productionPlanId])
   @@index([status])
   @@index([deadline])
 }

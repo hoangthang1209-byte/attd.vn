@@ -104,25 +104,53 @@ async function populateFromOrderItem(orderItemId: string) {
     include: {
       order: {
         select: {
+          id: true,
           orderNo: true,
           customerId: true,
           customerNameSnapshot: true,
           productionDueDate: true,
+          deliveryExpectedAt: true,
         },
       },
       variant: { select: { id: true, sku: true, sizeName: true } },
+      productionPlan: {
+        include: {
+          productionOwner: { select: { fullName: true } },
+        },
+      },
     },
   });
   if (!item) throw new TechPackValidationError("Không tìm thấy hạng mục đơn hàng.");
 
+  const plan = item.productionPlan;
+  const jobCode =
+    plan?.planCode ??
+    (await (async () => {
+      const siblings = await prisma.orderItem.findMany({
+        where: { orderId: item.orderId },
+        select: { id: true },
+        orderBy: { sortOrder: "asc" },
+      });
+      const idx = siblings.findIndex((s) => s.id === orderItemId);
+      const { buildProductionJobCode } = await import(
+        "@/features/production-planning/production-job-eligibility"
+      );
+      return buildProductionJobCode(item.order.orderNo, Math.max(0, idx));
+    })());
+
+  const internalDeadline =
+    plan?.internalDeadlineAt ?? item.order.productionDueDate ?? item.order.deliveryExpectedAt;
+
   return {
     orderItemId,
+    productionPlanId: plan?.id ?? null,
     customerId: item.order.customerId,
     productId: item.productId,
     productVariantId: item.variantId,
     customerNameSnapshot: item.order.customerNameSnapshot,
     orderCodeSnapshot: item.order.orderNo,
-    orderItemCodeSnapshot: item.id.slice(-8).toUpperCase(),
+    orderItemCodeSnapshot: jobCode,
+    jobCodeSnapshot: jobCode,
     productNameSnapshot: item.productNameSnapshot,
     productSkuSnapshot: item.skuSnapshot,
     colorSnapshot: item.colorSnapshot,
@@ -130,7 +158,11 @@ async function populateFromOrderItem(orderItemId: string) {
     quantitySnapshot: item.quantity,
     sourceType: item.supplySource ? String(item.supplySource) : null,
     processingMethod: item.processingMethod ? String(item.processingMethod) : null,
-    deadline: item.order.productionDueDate,
+    deadline: internalDeadline,
+    internalDeadlineSnapshot: internalDeadline,
+    deliveryDeadlineSnapshot: item.order.deliveryExpectedAt,
+    productionOwnerNameSnapshot: plan?.productionOwner?.fullName ?? null,
+    workshopNameSnapshot: plan?.productionTeamName ?? null,
     title: item.productNameSnapshot,
   };
 }
@@ -176,7 +208,16 @@ async function populateFromQuoteItem(quoteItemId: string) {
 }
 
 function pickLatestTechPack(
-  packs: Array<{ id: string; version: number; code: string; createdAt: Date }>,
+  packs: Array<{
+    id: string;
+    version: number;
+    code: string;
+    createdAt: Date;
+    status?: string;
+    patternCodeSnapshot?: string | null;
+    patternId?: string | null;
+    patternExceptionReason?: string | null;
+  }>,
 ): TechPackItemLink | null {
   if (packs.length === 0) return null;
   const sorted = [...packs].sort((a, b) => {
@@ -188,6 +229,11 @@ function pickLatestTechPack(
     latestTechPackId: latest.id,
     latestTechPackVersion: latest.version,
     latestTechPackCode: latest.code,
+    latestTechPackStatus: latest.status,
+    patternCodeSnapshot: latest.patternCodeSnapshot ?? null,
+    hasPattern: Boolean(
+      latest.patternId || latest.patternCodeSnapshot?.trim() || latest.patternExceptionReason?.trim(),
+    ),
   };
 }
 
@@ -199,7 +245,17 @@ export async function getTechPackLinksForOrderItems(
 
   const packs = await prisma.techPack.findMany({
     where: { orderItemId: { in: orderItemIds } },
-    select: { id: true, orderItemId: true, version: true, code: true, createdAt: true },
+    select: {
+      id: true,
+      orderItemId: true,
+      version: true,
+      code: true,
+      createdAt: true,
+      status: true,
+      patternCodeSnapshot: true,
+      patternId: true,
+      patternExceptionReason: true,
+    },
   });
 
   const byItem = new Map<string, typeof packs>();
@@ -370,6 +426,8 @@ export async function listTechPacks(input?: {
   orderItemId?: string;
   quoteItemId?: string;
   search?: string;
+  quickFilter?: import("@/features/tech-pack/tech-pack-completeness").TechPackListQuickFilter;
+  ownerEmployeeId?: string;
   limit?: number;
 }) {
   const where: Prisma.TechPackWhereInput = {};
@@ -378,6 +436,9 @@ export async function listTechPacks(input?: {
   if (input?.productId) where.productId = input.productId;
   if (input?.orderItemId) where.orderItemId = input.orderItemId;
   if (input?.quoteItemId) where.quoteItemId = input.quoteItemId;
+  if (input?.ownerEmployeeId) {
+    where.productionPlan = { productionOwnerId: input.ownerEmployeeId };
+  }
   if (input?.search?.trim()) {
     const q = input.search.trim();
     where.OR = [
@@ -385,6 +446,9 @@ export async function listTechPacks(input?: {
       { title: { contains: q, mode: "insensitive" } },
       { customerNameSnapshot: { contains: q, mode: "insensitive" } },
       { orderCodeSnapshot: { contains: q, mode: "insensitive" } },
+      { jobCodeSnapshot: { contains: q, mode: "insensitive" } },
+      { patternCodeSnapshot: { contains: q, mode: "insensitive" } },
+      { productNameSnapshot: { contains: q, mode: "insensitive" } },
     ];
   }
 
@@ -392,12 +456,43 @@ export async function listTechPacks(input?: {
     where,
     include: {
       pattern: { select: { id: true, code: true, name: true, version: true, status: true } },
+      assets: { select: { type: true } },
+      _count: { select: { bomItems: true, artworkPlacements: true } },
+      productionPlan: { select: { productionOwner: { select: { fullName: true } } } },
     },
     orderBy: [{ updatedAt: "desc" }],
     take: input?.limit ?? 100,
   });
 
-  return { items };
+  const { computeTechPackCompleteness } = await import("@/features/tech-pack/tech-pack-completeness");
+
+  let rows = items.map((pack) => {
+    const completeness = computeTechPackCompleteness({
+      assets: pack.assets,
+      artworkPlacementCount: pack._count.artworkPlacements,
+      bomItemCount: pack._count.bomItems,
+      patternId: pack.patternId,
+      patternCodeSnapshot: pack.patternCodeSnapshot,
+      patternExceptionReason: pack.patternExceptionReason,
+    });
+    const { assets: _assets, _count, productionPlan, ...rest } = pack;
+    return {
+      ...rest,
+      ownerName:
+        pack.productionOwnerNameSnapshot ??
+        pack.productionPlan?.productionOwner?.fullName ??
+        null,
+      completeness,
+    };
+  });
+
+  if (input?.quickFilter === "missing_pattern") {
+    rows = rows.filter((r) => !r.completeness.hasPattern);
+  } else if (input?.quickFilter === "missing_artwork") {
+    rows = rows.filter((r) => !r.completeness.hasArtwork && !r.completeness.hasTechnicalImage);
+  }
+
+  return { items: rows };
 }
 
 export async function getTechPackDetail(id: string): Promise<TechPackDetail | null> {

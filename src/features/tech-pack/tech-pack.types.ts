@@ -19,4 +19,7 @@ export type TechPackItemLink = {
   latestTechPackId: string;
   latestTechPackVersion: number;
   latestTechPackCode: string;
+  latestTechPackStatus?: string;
+  patternCodeSnapshot?: string | null;
+  hasPattern?: boolean;
 };

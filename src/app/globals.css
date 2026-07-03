@@ -20881,6 +20881,119 @@ body:has(.mp-header--v271) {
   }
 }
 
+/* ─── Mobile UX polish — public surfaces only ─────────────────────────────── */
+
+@media (max-width: 899px) {
+  body:has(.mp-header--v271) {
+    overflow-x: clip;
+  }
+
+  .mp-header--v271 :where(input, select, textarea),
+  .public-main :where(input, select, textarea, .form-input),
+  .product-quote-dialog :where(input, select, textarea, .form-input) {
+    font-size: 16px;
+  }
+
+  .product-card-quote-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+
+  .product-card--catalog .product-card-quote-btn,
+  .product-card--catalog .product-card-link,
+  .mp-catalog-filter-trigger {
+    min-height: 42px;
+  }
+
+  .mp-pdp-gallery-nav {
+    width: 42px;
+    height: 42px;
+  }
+
+  .mp-pdp-chip--selectable {
+    min-width: 42px;
+    min-height: 42px;
+    justify-content: center;
+  }
+
+  .mobile-nav-panel {
+    max-height: 100dvh;
+  }
+
+  .mobile-nav-body {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .blog-article-body,
+  .prose-blog--article {
+    overflow-wrap: anywhere;
+  }
+
+  .prose-blog--article :where(img, video, iframe, table, pre) {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 1024px) {
+  .mp-header--v271 .mp-search-input,
+  .public-main .mp-search--large .mp-search-input,
+  .mp-header--v271 :where(.mp-search-input),
+  .public-main :where(.mp-search-input, input, select, textarea, .form-input),
+  .product-quote-dialog :where(input, select, textarea, .form-input) {
+    font-size: 16px;
+  }
+
+  .product-card-quote-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    touch-action: manipulation;
+  }
+
+  .product-card--catalog .product-card-quote-btn,
+  .product-card--catalog .product-card-link,
+  .mp-catalog-filter-trigger {
+    min-height: 42px;
+  }
+
+  .mp-pdp-gallery-nav {
+    width: 42px;
+    height: 42px;
+  }
+
+  .mp-pdp-chip--selectable {
+    min-width: 42px;
+    min-height: 42px;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 639px) {
+  .floating-contact {
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  body:has(.mobile-action-bar) .floating-contact {
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  }
+
+  body:has(.pdp-mobile-action-bar) .floating-contact {
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .product-quote-dialog {
+    padding-left: max(6px, env(safe-area-inset-left));
+    padding-right: max(6px, env(safe-area-inset-right));
+  }
+
+  .product-quote-dialog__panel {
+    max-height: calc(100dvh - 12px - env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* ─── Dealer landing V2 — public page only ───────────────────────────────── */
 
 .dealer-landing-v2 .landing-hero {
@@ -23450,6 +23563,61 @@ body:has(.mp-header--v271) {
 .prod-job-history__time { color: #64748b; font-size: 12px; }
 .prod-job-history__body p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
 .prod-job-empty { margin: 0; color: #94a3b8; font-size: 13px; }
+
+.prod-job-tech-pack {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.prod-job-tech-pack__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.prod-job-tech-pack__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.prod-job-tech-pack__code { font-weight: 600; font-size: 14px; }
+.prod-job-tech-pack__dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+.prod-job-tech-pack__dl dt { font-size: 11px; color: #94a3b8; }
+.prod-job-tech-pack__dl dd { margin: 0; font-weight: 500; }
+.prod-job-tech-pack__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.prod-job-tech-pack__empty p { margin: 0 0 8px; }
+
+.tech-pack-completeness-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tech-pack-completeness-chips span {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.tech-pack-completeness-chips .is-ok {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+.tech-pack-completeness-chips .is-miss {
+  background: #f8fafc;
+  color: #94a3b8;
+}
 
 .prod-job-skeleton .prod-job-ops-strip--skeleton {
   display: grid;

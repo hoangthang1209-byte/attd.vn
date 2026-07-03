@@ -5,7 +5,20 @@ import {
   listTechPacks,
   TechPackValidationError,
 } from "@/features/tech-pack/tech-pack.service";
+import {
+  techPackStatusForQuickFilter,
+  type TechPackListQuickFilter,
+} from "@/features/tech-pack/tech-pack-completeness";
 import { requireProductionUpdate, requireProductionView } from "@/lib/admin-auth/require-production-api";
+
+const QUICK_FILTERS = new Set<TechPackListQuickFilter>([
+  "all",
+  "draft",
+  "released",
+  "missing_pattern",
+  "missing_artwork",
+  "mine",
+]);
 
 export async function GET(req: NextRequest) {
   const auth = requireProductionView(req);
@@ -13,10 +26,17 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const statusParam = searchParams.get("status");
+  const quickFilterParam = searchParams.get("quickFilter") as TechPackListQuickFilter | null;
+  const quickFilter =
+    quickFilterParam && QUICK_FILTERS.has(quickFilterParam) ? quickFilterParam : "all";
+
+  const statusFromQuick = techPackStatusForQuickFilter(quickFilter);
   const status =
     statusParam && Object.values(TechPackStatus).includes(statusParam as TechPackStatus)
       ? (statusParam as TechPackStatus)
-      : undefined;
+      : statusFromQuick;
+
+  const mine = quickFilter === "mine";
 
   try {
     const result = await listTechPacks({
@@ -26,6 +46,8 @@ export async function GET(req: NextRequest) {
       orderItemId: searchParams.get("orderItemId") ?? undefined,
       quoteItemId: searchParams.get("quoteItemId") ?? undefined,
       search: searchParams.get("search") ?? undefined,
+      quickFilter,
+      ownerEmployeeId: mine ? auth.session.employeeId ?? undefined : undefined,
     });
     return NextResponse.json(result);
   } catch (err) {

@@ -14,6 +14,8 @@ import type { TechPackSourceItem } from "@/features/tech-pack/tech-pack.types";
 import type { TechPackStatus } from "@prisma/client";
 import { formatCrmDateTime } from "@/features/crm/format";
 
+import type { TechPackListQuickFilter } from "@/features/tech-pack/tech-pack-completeness";
+
 type TechPackRow = {
   id: string;
   code: string;
@@ -23,17 +25,36 @@ type TechPackRow = {
   customerNameSnapshot: string | null;
   orderCodeSnapshot: string | null;
   orderItemCodeSnapshot: string | null;
+  jobCodeSnapshot: string | null;
   productNameSnapshot: string | null;
   deadline: string | null;
+  updatedAt: string;
+  ownerName?: string | null;
   pattern?: { code: string; name: string } | null;
   patternCodeSnapshot: string | null;
+  completeness?: {
+    hasTechnicalImage: boolean;
+    hasArtwork: boolean;
+    hasPattern: boolean;
+    hasBomReference: boolean;
+  };
 };
+
+const QUICK_FILTERS: Array<{ key: TechPackListQuickFilter; label: string }> = [
+  { key: "all", label: "Tất cả" },
+  { key: "draft", label: "Nháp" },
+  { key: "released", label: "Đã phát hành" },
+  { key: "missing_pattern", label: "Thiếu rập" },
+  { key: "missing_artwork", label: "Thiếu hình kỹ thuật" },
+  { key: "mine", label: "Việc của tôi" },
+];
 
 export default function TechPackListManager() {
   const [items, setItems] = useState<TechPackRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [quickFilter, setQuickFilter] = useState<TechPackListQuickFilter>("all");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [sourceMode, setSourceMode] = useState<"order-item" | "quote-item">("order-item");
@@ -49,6 +70,7 @@ export default function TechPackListManager() {
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set("status", statusFilter);
+      if (quickFilter !== "all") params.set("quickFilter", quickFilter);
       if (search.trim()) params.set("search", search.trim());
       const res = await fetch(`/api/tech-packs?${params.toString()}`);
       const data = (await res.json()) as { items?: TechPackRow[]; message?: string };
@@ -63,7 +85,7 @@ export default function TechPackListManager() {
 
   useEffect(() => {
     void load();
-  }, [statusFilter]);
+  }, [statusFilter, quickFilter]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -112,11 +134,23 @@ export default function TechPackListManager() {
       <div className="admin-data-toolbar" style={{ gap: 12, display: "flex", flexWrap: "wrap", marginBottom: 16 }}>
         <input
           className="admin-input"
-          placeholder="Tìm mã, khách hàng, đơn hàng..."
+          placeholder="Tìm mã Tech Pack, đơn hàng, sản phẩm, rập…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void load()}
         />
+        <div className="prod-plan-chips" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {QUICK_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              className={`admin-btn admin-btn--small${quickFilter === f.key ? " admin-btn--primary" : ""}`}
+              onClick={() => setQuickFilter(f.key)}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
         <select className="admin-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">Tất cả trạng thái</option>
           <option value="DRAFT">Bản nháp</option>
@@ -139,35 +173,49 @@ export default function TechPackListManager() {
             <thead>
               <tr>
                 <th>Mã Tech Pack</th>
-                <th>Đơn hàng / hạng mục</th>
-                <th>Khách hàng</th>
                 <th>Sản phẩm</th>
-                <th>Version</th>
-                <th>Trạng thái</th>
-                <th>Deadline</th>
+                <th>Đơn hàng</th>
                 <th>Rập</th>
-                <th>Hành động</th>
+                <th>Phiên bản</th>
+                <th>Trạng thái</th>
+                <th>Phụ trách</th>
+                <th>Đủ điều kiện</th>
+                <th>Cập nhật</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {items.map((row) => (
                 <tr key={row.id}>
                   <td>{row.code}</td>
+                  <td>{row.productNameSnapshot ?? row.title ?? "—"}</td>
                   <td>
                     {row.orderCodeSnapshot ?? "—"}
-                    {row.orderItemCodeSnapshot ? ` / ${row.orderItemCodeSnapshot}` : ""}
+                    {(row.jobCodeSnapshot ?? row.orderItemCodeSnapshot) && (
+                      <span className="admin-field-hint">
+                        {" "}
+                        · {row.jobCodeSnapshot ?? row.orderItemCodeSnapshot}
+                      </span>
+                    )}
                   </td>
-                  <td>{row.customerNameSnapshot ?? "—"}</td>
-                  <td>{row.productNameSnapshot ?? row.title ?? "—"}</td>
-                  <td>{row.version}</td>
+                  <td>{row.pattern?.code ?? row.patternCodeSnapshot ?? "—"}</td>
+                  <td>v{row.version}</td>
                   <td>
                     <TechPackStatusBadge status={row.status} />
                   </td>
-                  <td>{row.deadline ? formatCrmDateTime(row.deadline) : "—"}</td>
-                  <td>{row.pattern?.code ?? row.patternCodeSnapshot ?? "—"}</td>
+                  <td>{row.ownerName ?? "—"}</td>
+                  <td>
+                    <div className="tech-pack-completeness-chips">
+                      <span className={row.completeness?.hasTechnicalImage ? "is-ok" : "is-miss"} title="Hình kỹ thuật">HK</span>
+                      <span className={row.completeness?.hasArtwork ? "is-ok" : "is-miss"} title="Artwork">AW</span>
+                      <span className={row.completeness?.hasPattern ? "is-ok" : "is-miss"} title="Rập">Rập</span>
+                      <span className={row.completeness?.hasBomReference ? "is-ok" : "is-miss"} title="BOM">BOM</span>
+                    </div>
+                  </td>
+                  <td>{row.updatedAt ? formatCrmDateTime(row.updatedAt) : "—"}</td>
                   <td>
                     <Link href={`/admin/tech-pack/${row.id}`} className="admin-link">
-                      Chi tiết
+                      Mở
                     </Link>
                   </td>
                 </tr>
