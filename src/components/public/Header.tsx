@@ -73,6 +73,10 @@ export default function Header({
   const categoryAccessRef = useRef<HTMLButtonElement>(null);
 
   const showMobileCategoryTrigger = categoryTree.length > 0;
+  const isNavLinkActive = useCallback(
+    (href: string) => pathname === href || pathname.startsWith(`${href}/`),
+    [pathname],
+  );
 
   useEffect(() => {
     function onScroll() {
@@ -189,11 +193,20 @@ export default function Header({
             </div>
 
             <nav className="mp-header-primary-nav" aria-label="Điều hướng chính">
-              {NAV_PRIMARY_LINKS.map((link) => (
-                <Link key={link.href} href={link.href} className="mp-header-primary-nav-link">
-                  {link.label}
-                </Link>
-              ))}
+              {NAV_PRIMARY_LINKS.map((link) => {
+                const active = isNavLinkActive(link.href);
+
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`mp-header-primary-nav-link${active ? " mp-header-primary-nav-link--active" : ""}`}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
 
             <div className="mp-header-actions">

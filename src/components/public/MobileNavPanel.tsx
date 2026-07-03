@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { X, Phone, MessageCircle } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import AttdLogo from "@/components/public/AttdLogo";
@@ -27,7 +28,12 @@ export default function MobileNavPanel({
   headerLogoUrl,
   companyTagline,
 }: MobileNavPanelProps) {
+  const pathname = usePathname();
   const menuScrollRef = useRef<HTMLElement>(null);
+  const isNavLinkActive = useCallback(
+    (href: string) => pathname === href || pathname.startsWith(`${href}/`),
+    [pathname],
+  );
 
   const handleClose = useCallback(() => {
     onClose();
@@ -87,22 +93,28 @@ export default function MobileNavPanel({
         <nav className="mobile-nav-body" ref={menuScrollRef} aria-label="Mobile navigation">
           <Link
             href="/san-pham"
-            className="mobile-nav-sublink mobile-nav-sublink--primary mobile-nav-sublink--top"
+            className={`mobile-nav-sublink mobile-nav-sublink--primary mobile-nav-sublink--top${isNavLinkActive("/san-pham") ? " mobile-nav-sublink--active" : ""}`}
+            aria-current={isNavLinkActive("/san-pham") ? "page" : undefined}
             onClick={handleClose}
           >
             Xem danh mục sản phẩm
           </Link>
 
-          {NAV_PRIMARY_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="mobile-nav-sublink mobile-nav-sublink--solo"
-              onClick={handleClose}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {NAV_PRIMARY_LINKS.map((link) => {
+            const active = isNavLinkActive(link.href);
+
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`mobile-nav-sublink mobile-nav-sublink--solo${active ? " mobile-nav-sublink--active" : ""}`}
+                aria-current={active ? "page" : undefined}
+                onClick={handleClose}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="mobile-nav-footer">

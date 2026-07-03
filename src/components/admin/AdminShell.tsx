@@ -116,7 +116,7 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "Tech Pack",
+    label: "TECH PACK",
     visible: (p) => p.canViewProduction,
     items: [
       { href: "/admin/tech-pack", label: "Tech Pack", visible: (p) => p.canViewProduction },
