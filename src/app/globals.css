@@ -16426,6 +16426,155 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   gap: 8px;
 }
 
+.tech-pack-pdf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Pattern / Tech Pack measurement table — technical sheet layout */
+.tech-pack-measurement-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tech-pack-measurement-table {
+  --measure-pom-width: 148px;
+  --measure-desc-width: 248px;
+  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+  font-size: 13px;
+}
+
+.tech-pack-measurement-table th,
+.tech-pack-measurement-table td {
+  padding: 5px 6px;
+  vertical-align: middle;
+}
+
+.pattern-measure-col-pom {
+  width: var(--measure-pom-width);
+  min-width: 140px;
+  max-width: 160px;
+}
+
+.pattern-measure-col-desc {
+  width: var(--measure-desc-width);
+  min-width: 220px;
+  max-width: 280px;
+}
+
+.pattern-measure-col-base,
+.pattern-measure-col-tol {
+  width: 110px;
+  min-width: 100px;
+  max-width: 120px;
+}
+
+.pattern-measure-col-size {
+  width: 72px;
+  min-width: 64px;
+  max-width: 84px;
+  text-align: center;
+}
+
+.pattern-measure-col-actions {
+  width: 52px;
+  min-width: 52px;
+  text-align: center;
+}
+
+.tech-pack-measurement-table th.pattern-measure-col-pom,
+.tech-pack-measurement-table td.pattern-measure-col-pom {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+.tech-pack-measurement-table th.pattern-measure-col-pom {
+  z-index: 4;
+  background: #f8fafc;
+}
+
+.tech-pack-measurement-table th.pattern-measure-col-desc,
+.tech-pack-measurement-table td.pattern-measure-col-desc {
+  position: sticky;
+  left: var(--measure-pom-width);
+  z-index: 2;
+  background: #fff;
+  box-shadow: 4px 0 6px -4px rgba(15, 23, 42, 0.12);
+}
+
+.tech-pack-measurement-table th.pattern-measure-col-desc {
+  z-index: 3;
+  background: #f8fafc;
+}
+
+.pattern-measure-col-size__head {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.pattern-measure-col-size__remove {
+  padding: 0 3px !important;
+  min-width: 0;
+  min-height: 18px;
+  line-height: 1;
+  font-size: 12px;
+}
+
+.tech-pack-measurement-table .pattern-measure-input {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.tech-pack-measurement-table .pattern-measure-input--text {
+  width: 100%;
+  padding: 4px 8px;
+  height: 30px;
+  font-size: 12px;
+}
+
+.tech-pack-measurement-table .pattern-measure-input--meta {
+  width: 100%;
+  padding: 4px 6px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.tech-pack-measurement-table .pattern-measure-input--size {
+  width: 100%;
+  max-width: 68px;
+  margin: 0 auto;
+  display: block;
+  padding: 3px 4px;
+  height: 28px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.tech-pack-measurement-table .pattern-measure-col-actions .admin-btn {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .tech-pack-measurement-table th.pattern-measure-col-desc,
+  .tech-pack-measurement-table td.pattern-measure-col-desc {
+    position: static;
+    box-shadow: none;
+  }
+}
+
 .production-sheet-document {
   color: #111827;
   font-family: var(--font-sans-stack);

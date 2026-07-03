@@ -26,6 +26,7 @@ import TechPackArtworkPlacementsEditor from "@/components/admin/tech-pack/TechPa
 import TechPackReleaseChecklist from "@/components/admin/tech-pack/TechPackReleaseChecklist";
 import TechPackReleaseHistoryPanel from "@/components/admin/tech-pack/TechPackReleaseHistoryPanel";
 import TechPackReleaseDiffPanel from "@/components/admin/tech-pack/TechPackReleaseDiffPanel";
+import TechPackPdfActions from "@/components/admin/tech-pack/TechPackPdfActions";
 import MeasurementTemplateApplyButton from "@/components/admin/tech-pack/MeasurementTemplateApplyButton";
 import TechPackMeasurementEditor from "@/components/admin/tech-pack/TechPackMeasurementEditor";
 import type { TechPackBomCategory, ArtworkPlacementType, TechPackAssetType, TechPackStatus } from "@prisma/client";
@@ -260,14 +261,7 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
             <Link href="/admin/tech-pack" className="admin-btn">
               Quay lại
             </Link>
-            <a
-              href={`/api/tech-packs/${techPackId}/pdf`}
-              className="admin-btn"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Xuất PDF
-            </a>
+            <TechPackPdfActions techPackId={techPackId} />
             {pack.status === "DRAFT" && (
               <span className="admin-muted" style={{ fontSize: 12 }}>
                 Dùng checklist bên phải để phát hành
@@ -289,14 +283,7 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
             <button type="button" className="admin-btn admin-btn--primary" onClick={() => void newVersion()}>
               Tạo version mới
             </button>
-            <a
-              href={`/api/tech-packs/${techPackId}/pdf`}
-              className="admin-btn"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Xuất PDF
-            </a>
+            <TechPackPdfActions techPackId={techPackId} />
           </div>
         </div>
       )}

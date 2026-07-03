@@ -70,7 +70,7 @@ export async function generateTechPackHtmlPdf(
     }
 
     await page.waitForSelector(".tech-pack-document-root", { timeout: 30_000 });
-    await page.waitForSelector('[data-tech-pack-pdf-ready="true"]', { timeout: 30_000 });
+    await page.waitForSelector('html[data-tech-pack-pdf-ready="true"]', { timeout: 30_000 });
     await Promise.race([
       page.evaluate(async () => {
         if (document.fonts?.ready) await document.fonts.ready;

@@ -214,23 +214,22 @@ export default function TechPackMeasurementEditor({
       {rows.length === 0 ? (
         <p className="admin-muted">{emptyText}</p>
       ) : (
-        <div className="admin-table-wrap">
-          <table className="admin-table admin-table--compact">
+        <div className="admin-table-wrap tech-pack-measurement-table-wrap">
+          <table className="admin-table admin-table--compact tech-pack-measurement-table">
             <thead>
               <tr>
-                <th>POM</th>
-                <th>Mô tả</th>
-                {showBaseSize && <th>Base size</th>}
-                <th>Tolerance</th>
+                <th className="pattern-measure-col-pom">POM</th>
+                <th className="pattern-measure-col-desc">Mô tả</th>
+                {showBaseSize && <th className="pattern-measure-col-base">Base size</th>}
+                <th className="pattern-measure-col-tol">Tolerance</th>
                 {sizes.map((size) => (
-                  <th key={size} style={{ minWidth: 92, textAlign: "center" }}>
-                    <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+                  <th key={size} className="pattern-measure-col-size">
+                    <span className="pattern-measure-col-size__head">
                       {size}
                       {!readOnly && sizes.length > 1 && (
                         <button
                           type="button"
-                          className="admin-btn admin-btn--xs admin-btn--danger"
-                          style={{ padding: "1px 6px" }}
+                          className="admin-btn admin-btn--xs admin-btn--danger pattern-measure-col-size__remove"
                           onClick={() => removeSize(size)}
                           aria-label={`Xóa size ${size}`}
                         >
@@ -240,50 +239,50 @@ export default function TechPackMeasurementEditor({
                     </span>
                   </th>
                 ))}
-                {!readOnly && <th />}
+                {!readOnly && <th className="pattern-measure-col-actions" aria-label="Thao tác" />}
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.clientKey}>
-                  <td>
+                  <td className="pattern-measure-col-pom">
                     <input
-                      className="admin-input admin-input--sm"
+                      className="admin-input admin-input--sm pattern-measure-input pattern-measure-input--text"
                       value={row.pointOfMeasure}
                       disabled={readOnly}
                       onChange={(e) => updateRow(row.clientKey, { pointOfMeasure: e.target.value })}
                     />
                   </td>
-                  <td>
+                  <td className="pattern-measure-col-desc">
                     <input
-                      className="admin-input admin-input--sm"
+                      className="admin-input admin-input--sm pattern-measure-input pattern-measure-input--text"
                       value={row.description}
                       disabled={readOnly}
                       onChange={(e) => updateRow(row.clientKey, { description: e.target.value })}
                     />
                   </td>
                   {showBaseSize && (
-                    <td>
+                    <td className="pattern-measure-col-base">
                       <input
-                        className="admin-input admin-input--sm"
+                        className="admin-input admin-input--sm pattern-measure-input pattern-measure-input--meta"
                         value={row.baseSize}
                         disabled={readOnly}
                         onChange={(e) => updateRow(row.clientKey, { baseSize: e.target.value })}
                       />
                     </td>
                   )}
-                  <td>
+                  <td className="pattern-measure-col-tol">
                     <input
-                      className="admin-input admin-input--sm"
+                      className="admin-input admin-input--sm pattern-measure-input pattern-measure-input--meta"
                       value={row.tolerance}
                       disabled={readOnly}
                       onChange={(e) => updateRow(row.clientKey, { tolerance: e.target.value })}
                     />
                   </td>
                   {sizes.map((size) => (
-                    <td key={size}>
+                    <td key={size} className="pattern-measure-col-size">
                       <input
-                        className="admin-input admin-input--sm"
+                        className="admin-input admin-input--sm pattern-measure-input pattern-measure-input--size"
                         value={row.values[size] ?? ""}
                         disabled={readOnly}
                         inputMode="decimal"
@@ -293,7 +292,7 @@ export default function TechPackMeasurementEditor({
                     </td>
                   ))}
                   {!readOnly && (
-                    <td>
+                    <td className="pattern-measure-col-actions">
                       <button type="button" className="admin-btn admin-btn--xs admin-btn--danger" onClick={() => deleteRow(row.clientKey)}>
                         Xóa
                       </button>
