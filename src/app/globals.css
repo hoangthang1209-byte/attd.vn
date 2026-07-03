@@ -20146,6 +20146,11 @@ select.admin-input:focus {
 }
 
 /* Header Navigation V2 — public navigation polish */
+html:has(.mp-header--v271),
+body:has(.mp-header--v271) {
+  overflow-x: clip;
+}
+
 .mp-header--v271 {
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: saturate(180%) blur(18px);
