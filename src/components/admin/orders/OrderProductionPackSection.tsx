@@ -51,6 +51,12 @@ type Props = {
   orderId: string;
   order: OrderDetailRecord;
   onOrderChange?: (order: OrderDetailRecord) => void;
+  /** Lock to a single internal tab (production job workspace embed) */
+  embeddedTab?: Tab;
+  /** Focus files/materials on one order item */
+  focusOrderItemId?: string;
+  /** Strip outer fieldset chrome for embedded workspace tabs */
+  embedMode?: boolean;
 };
 
 type Tab = "files" | "materials" | "availability" | "readiness";
@@ -102,10 +108,17 @@ function mergeFileRecord(
   return [...withoutDup, file];
 }
 
-export default function OrderProductionPackSection({ orderId, order }: Props) {
+export default function OrderProductionPackSection({
+  orderId,
+  order,
+  onOrderChange,
+  embeddedTab,
+  focusOrderItemId,
+  embedMode = false,
+}: Props) {
   const mutate = useAdminMutation();
   const { toast } = useAdminAction();
-  const [tab, setTab] = useState<Tab>("files");
+  const [tab, setTab] = useState<Tab>(embeddedTab ?? "files");
   const [files, setFiles] = useState<OrderProductionFileRecord[]>([]);
   const [materials, setMaterials] = useState<MaterialsPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -165,6 +178,10 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (embeddedTab) setTab(embeddedTab);
+  }, [embeddedTab]);
 
   useEffect(() => {
     void fetch("/api/production-files/status")
@@ -499,12 +516,36 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   const activeFiles = files.filter((f) => f.status === "ACTIVE");
   const archivedFiles = files.filter((f) => f.status !== "ACTIVE");
   const orderLevelFiles = activeFiles.filter((f) => !f.orderItemId);
-  const itemFilesByItem = order.items.map((item) => ({
+  const scopedOrderItems = focusOrderItemId
+    ? order.items.filter((item) => item.id === focusOrderItemId)
+    : order.items;
+  const itemFilesByItem = scopedOrderItems.map((item) => ({
     item,
     files: activeFiles.filter((f) => f.orderItemId === item.id),
   }));
+  const focusedItemFiles = focusOrderItemId
+    ? activeFiles.filter((f) => f.orderItemId === focusOrderItemId)
+    : [];
+  const focusedArchivedFiles = focusOrderItemId
+    ? archivedFiles.filter((f) => !f.orderItemId || f.orderItemId === focusOrderItemId)
+    : archivedFiles;
+  const focusedReadiness = focusOrderItemId
+    ? executionBundle?.items.find((i) => i.orderItemId === focusOrderItemId)?.readiness
+    : null;
+  const latestFocusedVersion =
+    focusedItemFiles.length > 0
+      ? Math.max(...focusedItemFiles.map((f) => f.version))
+      : null;
 
   const readiness = materials?.readiness;
+  const materialItems = focusOrderItemId
+    ? materials?.items.filter((row) => row.orderItemId === focusOrderItemId) ?? []
+    : materials?.items ?? [];
+
+  const shellClass = embedMode
+    ? "production-pack-section production-pack-section--embed"
+    : "admin-catalog-fieldset production-pack-section";
+  const ShellTag = embedMode ? "div" : "fieldset";
 
   function renderFileList(list: OrderProductionFileRecord[]) {
     return list.map((file) => (
@@ -663,11 +704,12 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
   ) : null;
 
   return (
-    <fieldset className="admin-catalog-fieldset production-pack-section" id="production-documents" style={{ marginTop: 16 }}>
-      <legend>Tài liệu sản xuất</legend>
+    <ShellTag className={shellClass} id="production-documents" style={{ marginTop: embedMode ? 0 : 16 }}>
+      {!embedMode && <legend>Tài liệu sản xuất</legend>}
 
-      <ProductionSheetActions order={order} />
+      {!embedMode && <ProductionSheetActions order={order} />}
 
+      {!embeddedTab && (
       <div className="production-pack-tabs">
         {(["files", "materials", "availability", "readiness"] as Tab[]).map((t) => (
           <button
@@ -686,6 +728,35 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
           </button>
         ))}
       </div>
+      )}
+
+      {embedMode && embeddedTab === "files" && (
+        <div className="prod-job-pack-summary">
+          <span>{focusedItemFiles.length} file đang dùng</span>
+          {latestFocusedVersion != null && <span>Phiên bản mới nhất: v{latestFocusedVersion}</span>}
+          {focusedReadiness?.state === "MISSING_DOCS" && (
+            <span className="prod-job-pack-summary__warn">Thiếu tài liệu bắt buộc</span>
+          )}
+        </div>
+      )}
+
+      {embedMode && embeddedTab === "materials" && (
+        <div className="prod-job-pack-summary">
+          {materialItems.length === 0 || materialItems.every((r) => r.materials.length === 0) ? (
+            <span>Công việc này không yêu cầu vật tư riêng.</span>
+          ) : (
+            <>
+              {readiness?.isReady && <span>Đủ vật tư</span>}
+              {readiness && !readiness.isReady && readiness.missingMandatory.length > 0 && (
+                <span className="prod-job-pack-summary__warn">Thiếu vật tư</span>
+              )}
+              {readiness && !readiness.isReady && readiness.missingMandatory.length === 0 && (
+                <span className="prod-job-pack-summary__muted">Chờ xác nhận</span>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <p className="admin-field-hint">Đang tải…</p>
@@ -751,16 +822,19 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
             })}
           </section>
 
-          {archivedFiles.length > 0 && (
+          {focusedArchivedFiles.length > 0 && (
             <details style={{ marginTop: 16 }} open={showArchived} onToggle={(e) => setShowArchived(e.currentTarget.open)}>
-              <summary>Lịch sử / file đã lưu trữ ({archivedFiles.length})</summary>
-              {renderFileList(archivedFiles)}
+              <summary>Tài liệu đã lưu trữ ({focusedArchivedFiles.length})</summary>
+              {renderFileList(focusedArchivedFiles)}
             </details>
           )}
         </>
       ) : tab === "materials" ? (
         <>
-          {materials?.items.map((row) => (
+          {materialItems.length === 0 ? (
+            <p className="admin-field-hint">Công việc này không yêu cầu vật tư riêng.</p>
+          ) : (
+          materialItems.map((row) => (
             <div key={row.orderItemId} style={{ marginBottom: 20 }}>
               <h4 className="admin-subtitle">
                 {[row.productNameSnapshot, row.variantNameSnapshot].filter(Boolean).join(" · ")}
@@ -815,9 +889,10 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
                 </div>
               )}
             </div>
-          ))}
+          ))
+          )}
 
-          {materials?.summary && materials.summary.length > 0 && (
+          {materials?.summary && !embedMode && materials.summary.length > 0 && (
             <>
               <h4 className="admin-subtitle">Tổng hợp nguyên phụ liệu đơn hàng</h4>
               <div className="admin-table-wrap">
@@ -1020,6 +1095,6 @@ export default function OrderProductionPackSection({ orderId, order }: Props) {
           </div>
         </div>
       )}
-    </fieldset>
+    </ShellTag>
   );
 }

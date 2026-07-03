@@ -1,123 +1,156 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import OrderItemExecutionCard from "@/components/admin/orders/OrderItemExecutionCard";
 import OrderProductionPackSection from "@/components/admin/orders/OrderProductionPackSection";
-import OrderItemReadinessBadge from "@/components/admin/orders/OrderItemReadinessBadge";
 import ProductionPlanEditor from "@/components/admin/production-planning/ProductionPlanEditor";
+import ProductionJobHeader from "@/components/admin/production-planning/ProductionJobHeader";
+import ProductionJobOperationalStrip from "@/components/admin/production-planning/ProductionJobOperationalStrip";
+import ProductionJobOverviewTab from "@/components/admin/production-planning/ProductionJobOverviewTab";
+import ProductionJobPlanTab from "@/components/admin/production-planning/ProductionJobPlanTab";
+import ProductionJobHistoryTab from "@/components/admin/production-planning/ProductionJobHistoryTab";
+import ProductionJobPageSkeleton from "@/components/admin/production-planning/ProductionJobPageSkeleton";
 import AdminErrorRecovery from "@/components/admin/feedback/AdminErrorRecovery";
-import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
-import { formatOrderDate } from "@/features/orders/order-format";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 import type { ProductionPlanDetail } from "@/features/production-planning/production-plan.types";
-import { PRODUCTION_PLAN_PRIORITY_LABELS, PRODUCTION_PLAN_STATUS_LABELS } from "@/features/production-planning/production-plan-labels";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import type { ProductionExecutionBundle } from "@/features/orders/production-execution.service";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
-import { ORDER_ITEM_READINESS_LABELS, type OrderItemReadinessState } from "@/features/orders/order-item-readiness";
-
-type TabKey = "overview" | "plan" | "production" | "documents" | "materials" | "qc" | "history";
+import {
+  getDefaultProductionJobTab,
+  isProductionJobTabKey,
+  PRODUCTION_JOB_TABS,
+  productionJobTabStorageKey,
+  type ProductionJobTabKey,
+} from "@/components/admin/production-planning/production-job-workspace";
 
 type Props = { orderItemId: string };
 
 export default function ProductionJobDetailView({ orderItemId }: Props) {
+  const { roleCode } = useAdminPermissions();
   const [plan, setPlan] = useState<ProductionPlanDetail | null>(null);
   const [order, setOrder] = useState<OrderDetailRecord | null>(null);
   const [bundle, setBundle] = useState<ProductionExecutionBundle | null>(null);
   const [employees, setEmployees] = useState<EmployeeRecord[]>([]);
-  const [tab, setTab] = useState<TabKey>("overview");
+  const [tab, setTab] = useState<ProductionJobTabKey | null>(null);
+  const [mountedTabs, setMountedTabs] = useState<Set<ProductionJobTabKey>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+
+  const storageKey = productionJobTabStorageKey(orderItemId);
+
+  const loadPlan = useCallback(async () => {
+    const planRes = await fetch(`/api/production/plans/${orderItemId}`);
+    const planBody = await planRes.json();
+    if (!planRes.ok) throw new Error(planBody.message ?? "Không tìm thấy công việc");
+    const planData = planBody.plan as ProductionPlanDetail;
+    setPlan(planData);
+    return planData;
+  }, [orderItemId]);
+
+  const loadBundle = useCallback(async (orderId: string) => {
+    const bundleRes = await fetch(`/api/orders/${orderId}/production-execution`);
+    const bundleBody = await bundleRes.json();
+    if (!bundleRes.ok) throw new Error(bundleBody.message ?? "Không tải được tiến độ sản xuất");
+    setBundle(bundleBody.bundle as ProductionExecutionBundle);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const planRes = await fetch(`/api/production/plans/${orderItemId}`);
-      const planBody = await planRes.json();
-      if (!planRes.ok) throw new Error(planBody.message ?? "Không tìm thấy công việc");
-      const planData = planBody.plan as ProductionPlanDetail;
-      setPlan(planData);
-
-      const [orderRes, bundleRes, empRes] = await Promise.all([
+      const planData = await loadPlan();
+      const [orderRes, empRes] = await Promise.all([
         fetch(`/api/orders/${planData.orderId}`),
-        fetch(`/api/orders/${planData.orderId}/production-execution`),
         fetch("/api/employees?active=1&role=PRODUCTION&limit=200"),
       ]);
       const orderBody = await orderRes.json();
-      const bundleBody = await bundleRes.json();
       const empBody = await empRes.json();
       if (!orderRes.ok) throw new Error(orderBody.message ?? "Không tải được đơn hàng");
       setOrder(orderBody.order as OrderDetailRecord);
-      setBundle(bundleBody.bundle as ProductionExecutionBundle);
       setEmployees(empBody.employees ?? []);
+      await loadBundle(planData.orderId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
+      setError(err instanceof Error ? err.message : "Không thể tải công việc sản xuất. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
-  }, [orderItemId]);
+  }, [loadPlan, loadBundle]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (loading) return <AdminPageSkeleton message="Đang tải công việc sản xuất…" />;
-  if (error || !plan || !order) {
-    return <AdminErrorRecovery message={error ?? "Không tìm thấy công việc"} onRetry={() => void load()} />;
+  useEffect(() => {
+    if (!plan || tab !== null) return;
+    const saved = sessionStorage.getItem(storageKey);
+    if (saved && isProductionJobTabKey(saved)) {
+      setTab(saved);
+    } else {
+      setTab(getDefaultProductionJobTab({ roleCode, plan }));
+    }
+  }, [plan, roleCode, storageKey, tab]);
+
+  useEffect(() => {
+    if (tab === null) return;
+    sessionStorage.setItem(storageKey, tab);
+    setMountedTabs((prev) => {
+      if (prev.has(tab)) return prev;
+      const next = new Set(prev);
+      next.add(tab);
+      return next;
+    });
+  }, [tab, storageKey]);
+
+  const refreshExecution = useCallback(async () => {
+    if (!plan) return;
+    try {
+      await Promise.all([loadPlan(), loadBundle(plan.orderId)]);
+    } catch {
+      // keep current UI; user can retry from tab
+    }
+  }, [plan, loadPlan, loadBundle]);
+
+  if (loading) return <ProductionJobPageSkeleton />;
+  if (error || !plan || !order || tab === null) {
+    return (
+      <AdminErrorRecovery
+        message={error ?? "Không thể tải công việc sản xuất. Vui lòng thử lại."}
+        onRetry={() => void load()}
+      />
+    );
   }
 
   const itemBundle = bundle?.items.find((i) => i.orderItemId === orderItemId) ?? null;
-  const readinessState = (plan.readinessLabel as OrderItemReadinessState) ?? "AWAITING_PRODUCTION";
-  const readinessLabel = ORDER_ITEM_READINESS_LABELS[readinessState] ?? plan.readinessLabel;
+  const canManagePlan = plan.canEditPlan;
 
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: "overview", label: "Tổng quan" },
-    { key: "plan", label: "Kế hoạch" },
-    { key: "production", label: "Sản xuất" },
-    { key: "documents", label: "Tài liệu" },
-    { key: "materials", label: "Vật tư" },
-    { key: "qc", label: "QC" },
-    { key: "history", label: "Lịch sử" },
-  ];
+  function openTab(next: ProductionJobTabKey) {
+    setTab(next);
+  }
 
   return (
     <div className="prod-job">
-      <nav className="prod-job__breadcrumb">
-        <Link href="/admin/production">Sản xuất</Link>
-        <span> / </span>
-        <Link href="/admin/production/plan">Kế hoạch</Link>
-        <span> / </span>
-        <span>{plan.jobCode}</span>
-      </nav>
+      <ProductionJobHeader
+        plan={plan}
+        canManagePlan={canManagePlan}
+        onEditPlan={() => setEditorOpen(true)}
+        onAssign={() => setEditorOpen(true)}
+      />
 
-      <header className="prod-job__header">
-        <div>
-          <h1 className="prod-job__title">{plan.jobCode}</h1>
-          <p className="prod-job__product">{plan.productName}</p>
-          <div className="prod-job__meta">
-            <Link href={`/admin/orders/${plan.orderId}`}>{plan.orderNo}</Link>
-            <span>· Giao: {plan.deliveryDeadline ? formatOrderDate(plan.deliveryDeadline) : "—"}</span>
-            <span>· Hạn SX: {plan.internalDeadline ? formatOrderDate(plan.internalDeadline) : "Chưa có hạn nội bộ"}</span>
-          </div>
-        </div>
-        <div className="prod-job__badges">
-          <span className={`prod-plan-status prod-plan-status--${plan.status.toLowerCase()}`}>
-            {PRODUCTION_PLAN_STATUS_LABELS[plan.status]}
-          </span>
-          <span className="prod-plan-priority">{PRODUCTION_PLAN_PRIORITY_LABELS[plan.priority]}</span>
-          {plan.risks.map((r) => (
-            <span key={r} className={`prod-plan-risk prod-plan-risk--${plan.riskTone}`}>{r}</span>
-          ))}
-        </div>
-      </header>
+      <ProductionJobOperationalStrip
+        plan={plan}
+        itemBundle={itemBundle}
+        onNavigate={openTab}
+      />
 
-      <div className="prod-job__tabs">
-        {tabs.map((t) => (
+      <div className="prod-job__tabs prod-job-tabs" role="tablist" aria-label="Công việc sản xuất">
+        {PRODUCTION_JOB_TABS.map((t) => (
           <button
             key={t.key}
             type="button"
+            role="tab"
+            aria-selected={tab === t.key}
             className={tab === t.key ? "is-active" : ""}
             onClick={() => setTab(t.key)}
           >
@@ -126,84 +159,98 @@ export default function ProductionJobDetailView({ orderItemId }: Props) {
         ))}
       </div>
 
-      <div className="prod-job__content">
-        {tab === "overview" && (
-          <div className="prod-job__overview">
-            <dl className="prod-job__dl">
-              <div><dt>Số lượng</dt><dd>{plan.quantity.toLocaleString("vi-VN")} {plan.quantityUnit}</dd></div>
-              <div><dt>Quy cách</dt><dd>{plan.colorSpec ?? "—"}</dd></div>
-              <div><dt>Nguồn hàng</dt><dd>{plan.supplySourceLabel}</dd></div>
-              <div><dt>Gia công</dt><dd>{plan.processingMethodLabel}</dd></div>
-              <div><dt>Người phụ trách</dt><dd>{plan.ownerName ?? "Chưa phân công"}</dd></div>
-              <div><dt>Tiến độ</dt><dd>{plan.progressPercent != null ? `${plan.progressPercent}%` : "—"}</dd></div>
-              <div><dt>Sẵn sàng</dt><dd><OrderItemReadinessBadge state={readinessState} label={readinessLabel} /></dd></div>
-            </dl>
-            {plan.warnings.length > 0 && (
-              <div className="prod-job__warnings">
-                <h3>Cảnh báo</h3>
-                <ul>{plan.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
-              </div>
-            )}
-            {plan.canEditPlan && (
-              <button type="button" className="admin-btn admin-btn--primary admin-btn--small" onClick={() => setEditorOpen(true)}>
-                {plan.planId ? "Chỉnh sửa kế hoạch" : "Lập kế hoạch"}
-              </button>
-            )}
+      <div className="prod-job__content" role="tabpanel">
+        {mountedTabs.has("overview") && (
+          <div hidden={tab !== "overview"}>
+            <ProductionJobOverviewTab
+              plan={plan}
+              itemBundle={itemBundle}
+              canEditPlan={canManagePlan}
+              onOpenTab={openTab}
+              onEditPlan={() => setEditorOpen(true)}
+            />
           </div>
         )}
 
-        {tab === "plan" && (
-          <div className="prod-job__plan">
-            <dl className="prod-job__dl">
-              <div><dt>Bắt đầu dự kiến</dt><dd>{plan.plannedStartAt ? formatOrderDate(plan.plannedStartAt) : "—"}</dd></div>
-              <div><dt>Kết thúc dự kiến</dt><dd>{plan.plannedEndAt ? formatOrderDate(plan.plannedEndAt) : "—"}</dd></div>
-              <div><dt>Xưởng / tổ</dt><dd>{plan.workshopName ?? "—"}</dd></div>
-              <div><dt>Lead time</dt><dd>{plan.estimatedLeadDays != null ? `${plan.estimatedLeadDays} ngày` : "—"}</dd></div>
-              <div><dt>Ghi chú kế hoạch</dt><dd>{plan.planningNote ?? "—"}</dd></div>
-              <div><dt>Ghi chú rủi ro</dt><dd>{plan.riskNote ?? "—"}</dd></div>
-            </dl>
-            {plan.canEditPlan && (
-              <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setEditorOpen(true)}>
-                Chỉnh sửa kế hoạch
-              </button>
-            )}
+        {mountedTabs.has("plan") && (
+          <div hidden={tab !== "plan"}>
+            <ProductionJobPlanTab
+              plan={plan}
+              canEditPlan={canManagePlan}
+              onEditPlan={() => setEditorOpen(true)}
+            />
           </div>
         )}
 
-        {tab === "production" && itemBundle && (
-          <OrderItemExecutionCard
-            orderId={plan.orderId}
-            item={itemBundle}
-            expanded
-            onToggle={() => {}}
-            employees={employees}
-            productionOwnerName={plan.ownerName}
-            onUpdated={() => void load()}
-            isLegacySharedData={bundle?.isLegacy}
-          />
+        {mountedTabs.has("production") && itemBundle && (
+          <div hidden={tab !== "production"}>
+            <OrderItemExecutionCard
+              orderId={plan.orderId}
+              item={itemBundle}
+              expanded
+              onToggle={() => {}}
+              employees={employees}
+              productionOwnerName={plan.ownerName}
+              onUpdated={() => void refreshExecution()}
+              isLegacySharedData={bundle?.isLegacy}
+              variant="workspace-stages"
+            />
+          </div>
         )}
 
-        {(tab === "documents" || tab === "materials") && (
-          <OrderProductionPackSection orderId={plan.orderId} order={order} />
+        {mountedTabs.has("documents") && (
+          <div hidden={tab !== "documents"}>
+            <OrderProductionPackSection
+              orderId={plan.orderId}
+              order={order}
+              embeddedTab="files"
+              focusOrderItemId={orderItemId}
+              embedMode
+            />
+          </div>
         )}
 
-        {tab === "qc" && itemBundle && (
-          <OrderItemExecutionCard
-            orderId={plan.orderId}
-            item={itemBundle}
-            expanded
-            onToggle={() => {}}
-            employees={employees}
-            productionOwnerName={plan.ownerName}
-            onUpdated={() => void load()}
-            isLegacySharedData={bundle?.isLegacy}
-          />
+        {mountedTabs.has("materials") && (
+          <div hidden={tab !== "materials"}>
+            <OrderProductionPackSection
+              orderId={plan.orderId}
+              order={order}
+              embeddedTab="materials"
+              focusOrderItemId={orderItemId}
+              embedMode
+            />
+          </div>
         )}
 
-        {tab === "history" && (
-          <p className="prod-plan-muted">
-            Lịch sử thay đổi kế hoạch, công đoạn và QC sẽ hiển thị khi dữ liệu hoạt động có sẵn.
-          </p>
+        {mountedTabs.has("qc") && itemBundle && (
+          <div hidden={tab !== "qc"}>
+            <div className="prod-job-qc-summary">
+              <span className={`prod-job-qc-summary__state prod-job-qc-summary__state--${plan.qcStatus}`}>
+                {plan.qcStatusLabel}
+              </span>
+            </div>
+            <OrderItemExecutionCard
+              orderId={plan.orderId}
+              item={itemBundle}
+              expanded
+              onToggle={() => {}}
+              employees={employees}
+              productionOwnerName={plan.ownerName}
+              onUpdated={() => void refreshExecution()}
+              isLegacySharedData={bundle?.isLegacy}
+              variant="workspace-qc"
+            />
+          </div>
+        )}
+
+        {mountedTabs.has("history") && (
+          <div hidden={tab !== "history"}>
+            <ProductionJobHistoryTab
+              orderId={plan.orderId}
+              orderItemId={orderItemId}
+              itemBundle={itemBundle}
+            />
+          </div>
         )}
       </div>
 
@@ -214,7 +261,7 @@ export default function ProductionJobDetailView({ orderItemId }: Props) {
         onClose={() => setEditorOpen(false)}
         onSaved={(p) => {
           setPlan(p);
-          void load();
+          void loadPlan();
         }}
       />
     </div>

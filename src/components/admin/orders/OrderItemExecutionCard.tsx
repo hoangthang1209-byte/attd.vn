@@ -34,7 +34,17 @@ type Props = {
   productionOwnerName: string | null;
   onUpdated: () => void;
   isLegacySharedData?: boolean;
+  /** Presentation-only: split stages/QC for production job workspace tabs */
+  variant?: "default" | "workspace-stages" | "workspace-qc";
 };
+
+function findActiveStageId(stages: ProductionStageRecord[]): string | null {
+  const inProgress = stages.find((s) => s.status === "IN_PROGRESS");
+  if (inProgress) return inProgress.id;
+  const next = stages.find((s) => s.status === "NOT_STARTED" || s.status === "BLOCKED");
+  if (next) return next.id;
+  return stages[0]?.id ?? null;
+}
 
 function isImageMime(mime: string): boolean {
   return mime.startsWith("image/");
@@ -49,6 +59,7 @@ export default function OrderItemExecutionCard({
   productionOwnerName,
   onUpdated,
   isLegacySharedData,
+  variant = "default",
 }: Props) {
   const mutate = useAdminMutation();
   const [editStage, setEditStage] = useState<ProductionStageRecord | null>(null);
@@ -237,79 +248,188 @@ export default function OrderItemExecutionCard({
   }
 
   const qc = item.qc;
+  const isWorkspace = variant !== "default";
+  const showStages = variant !== "workspace-qc";
+  const showQc = variant !== "workspace-stages";
+  const showHeader = variant === "default";
+  const isExpanded = isWorkspace ? true : expanded;
+  const activeStageId = findActiveStageId(item.stages);
+  const hasQcIssue =
+    qc?.status === "REWORK_REQUIRED" ||
+    Number(qc?.reworkQuantity ?? 0) > 0 ||
+    Number(qc?.defectQuantity ?? 0) > 0;
+
+  function renderStagesTable() {
+    return (
+      <div className="admin-table-wrap">
+        <table className="admin-table admin-table--compact">
+          <thead>
+            <tr>
+              <th>Công đoạn</th>
+              <th>Trạng thái</th>
+              <th>Người phụ trách</th>
+              <th>Bắt đầu</th>
+              <th>Hoàn thành</th>
+              <th>SL HT</th>
+              <th>Đạt</th>
+              <th>Lỗi</th>
+              <th>Làm lại</th>
+              <th>Hủy</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {item.stages.length === 0 ? (
+              <tr>
+                <td colSpan={11}>Chưa có công đoạn sản xuất cho sản phẩm này.</td>
+              </tr>
+            ) : (
+              item.stages.map((stage) => (
+                <tr key={stage.id}>
+                  <td>{stage.stageTypeLabel}</td>
+                  <td>{stage.statusLabel}</td>
+                  <td>{stage.assignedEmployeeName ?? "—"}</td>
+                  <td>{stage.startedAt ? formatOrderDateTime(stage.startedAt) : "—"}</td>
+                  <td>{stage.completedAt ? formatOrderDateTime(stage.completedAt) : "—"}</td>
+                  <td>{stage.completedQuantity}</td>
+                  <td>{stage.passedQuantity}</td>
+                  <td>{stage.defectQuantity}</td>
+                  <td>{stage.reworkQuantity}</td>
+                  <td>{stage.scrapQuantity}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--small"
+                      onClick={() => openStageEditor(stage)}
+                    >
+                      Cập nhật
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  function renderWorkspaceStages() {
+    if (item.stages.length === 0) {
+      return <p className="admin-field-hint">Chưa có công đoạn sản xuất cho sản phẩm này.</p>;
+    }
+
+    return (
+      <div className="prod-job-stages">
+        {hasQcIssue && (
+          <p className="prod-job-stages__qc-warn" role="status">
+            Có vấn đề QC liên quan — kiểm tra tab QC.
+          </p>
+        )}
+        {item.stages.map((stage) => {
+          const isDone = stage.status === "COMPLETED" || stage.status === "SKIPPED";
+          const isActive = stage.id === activeStageId && !isDone;
+          const isUpcoming = !isDone && !isActive;
+
+          if (isDone) {
+            return (
+              <div key={stage.id} className="prod-job-stage prod-job-stage--done">
+                <span className="prod-job-stage__name">{stage.stageTypeLabel}</span>
+                <span className="prod-job-stage__status">{stage.statusLabel}</span>
+                <span className="prod-job-stage__meta">
+                  {stage.completedAt ? formatOrderDateTime(stage.completedAt) : "—"}
+                  {stage.assignedEmployeeName ? ` · ${stage.assignedEmployeeName}` : ""}
+                </span>
+              </div>
+            );
+          }
+
+          if (isActive) {
+            return (
+              <div key={stage.id} className="prod-job-stage prod-job-stage--active">
+                <div className="prod-job-stage__head">
+                  <strong>{stage.stageTypeLabel}</strong>
+                  <span className="prod-job-stage__status">{stage.statusLabel}</span>
+                </div>
+                <dl className="prod-job-stage__details">
+                  <div>
+                    <dt>Phụ trách</dt>
+                    <dd>{stage.assignedEmployeeName ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>SL kế hoạch</dt>
+                    <dd>{stage.plannedQuantity ?? item.quantity}</dd>
+                  </div>
+                  <div>
+                    <dt>SL hoàn thành</dt>
+                    <dd>{stage.completedQuantity}</dd>
+                  </div>
+                  <div>
+                    <dt>Bắt đầu</dt>
+                    <dd>{stage.startedAt ? formatOrderDateTime(stage.startedAt) : "—"}</dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--primary admin-btn--small"
+                  onClick={() => openStageEditor(stage)}
+                >
+                  Cập nhật công đoạn
+                </button>
+              </div>
+            );
+          }
+
+          return (
+            <div key={stage.id} className="prod-job-stage prod-job-stage--upcoming">
+              <span className="prod-job-stage__name">{stage.stageTypeLabel}</span>
+              <span className="prod-job-stage__status">{stage.statusLabel}</span>
+              {isUpcoming && stage.assignedEmployeeName && (
+                <span className="prod-job-stage__meta">{stage.assignedEmployeeName}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
-    <article className={`order-item-execution-card${expanded ? " is-expanded" : ""}`}>
-      <header className="order-item-execution-card__header">
-        <button type="button" className="order-item-execution-card__toggle" onClick={onToggle}>
-          <span className="order-item-execution-card__title">{heading}</span>
-          <OrderItemReadinessBadge state={item.readiness.state} label={item.readiness.stateLabel} />
-        </button>
-        <div className="order-item-execution-card__meta">
-          {productionOwnerName && (
-            <span className="admin-field-hint">Phụ trách SX: {productionOwnerName}</span>
-          )}
-          {isLegacySharedData && (
-            <span className="admin-field-hint order-item-execution-card__legacy-hint">
-              Dùng dữ liệu công đoạn/QC cấp đơn hàng (legacy)
-            </span>
-          )}
-        </div>
-      </header>
-
-      {expanded && (
-        <div className="order-item-execution-card__body">
-          <div className="admin-table-wrap">
-            <table className="admin-table admin-table--compact">
-              <thead>
-                <tr>
-                  <th>Công đoạn</th>
-                  <th>Trạng thái</th>
-                  <th>Người phụ trách</th>
-                  <th>Bắt đầu</th>
-                  <th>Hoàn thành</th>
-                  <th>SL HT</th>
-                  <th>Đạt</th>
-                  <th>Lỗi</th>
-                  <th>Làm lại</th>
-                  <th>Hủy</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {item.stages.length === 0 ? (
-                  <tr>
-                    <td colSpan={11}>Chưa có công đoạn sản xuất cho sản phẩm này.</td>
-                  </tr>
-                ) : (
-                  item.stages.map((stage) => (
-                    <tr key={stage.id}>
-                      <td>{stage.stageTypeLabel}</td>
-                      <td>{stage.statusLabel}</td>
-                      <td>{stage.assignedEmployeeName ?? "—"}</td>
-                      <td>{stage.startedAt ? formatOrderDateTime(stage.startedAt) : "—"}</td>
-                      <td>{stage.completedAt ? formatOrderDateTime(stage.completedAt) : "—"}</td>
-                      <td>{stage.completedQuantity}</td>
-                      <td>{stage.passedQuantity}</td>
-                      <td>{stage.defectQuantity}</td>
-                      <td>{stage.reworkQuantity}</td>
-                      <td>{stage.scrapQuantity}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--secondary admin-btn--small"
-                          onClick={() => openStageEditor(stage)}
-                        >
-                          Cập nhật
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+    <article
+      className={`order-item-execution-card${isExpanded ? " is-expanded" : ""}${
+        isWorkspace ? " order-item-execution-card--workspace" : ""
+      }`}
+    >
+      {showHeader && (
+        <header className="order-item-execution-card__header">
+          <button type="button" className="order-item-execution-card__toggle" onClick={onToggle}>
+            <span className="order-item-execution-card__title">{heading}</span>
+            <OrderItemReadinessBadge state={item.readiness.state} label={item.readiness.stateLabel} />
+          </button>
+          <div className="order-item-execution-card__meta">
+            {productionOwnerName && (
+              <span className="admin-field-hint">Phụ trách SX: {productionOwnerName}</span>
+            )}
+            {isLegacySharedData && (
+              <span className="admin-field-hint order-item-execution-card__legacy-hint">
+                Dùng dữ liệu công đoạn/QC cấp đơn hàng (legacy)
+              </span>
+            )}
           </div>
+        </header>
+      )}
 
+      {isWorkspace && isLegacySharedData && (
+        <p className="admin-field-hint order-item-execution-card__legacy-hint">
+          Dùng dữ liệu công đoạn/QC cấp đơn hàng (legacy)
+        </p>
+      )}
+
+      {isExpanded && (
+        <div className="order-item-execution-card__body">
+          {showStages && (variant === "workspace-stages" ? renderWorkspaceStages() : renderStagesTable())}
+
+          {showQc && (
           <section className="order-item-execution-card__qc">
             <h4 className="admin-subtitle">Kiểm tra chất lượng</h4>
             {!qc ? (
@@ -400,6 +520,7 @@ export default function OrderItemExecutionCard({
               </div>
             )}
           </section>
+          )}
         </div>
       )}
 
