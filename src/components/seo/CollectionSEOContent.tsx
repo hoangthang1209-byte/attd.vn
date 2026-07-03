@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { FaqItem } from "@/components/seo/FaqSchema";
-import { CTA } from "@/lib/ctaConfig";
 
 export interface ContentBenefit {
   title: string;
@@ -73,12 +72,11 @@ export default function CollectionSEOContent({
   return (
     <>
       {/* ── Introduction ─────────────────────────────────────────────────────── */}
-      <section
-        style={{ ...sectionStyle, background: "#f9fafb", borderTop: "1px solid #e5e7eb" }}
-      >
+      <section className="collection-seo-section collection-seo-section--intro">
         <div style={containerStyle}>
-          <h2 style={h2Style}>Về {title}</h2>
+          <h2 className="collection-seo-title" style={h2Style}>Về {title}</h2>
           <div
+            className="collection-seo-prose"
             style={{
               fontSize: "15px",
               lineHeight: "1.8",
@@ -91,14 +89,14 @@ export default function CollectionSEOContent({
 
       {/* ── Benefits ─────────────────────────────────────────────────────────── */}
       {benefits.length > 0 && (
-        <section style={sectionStyle}>
+        <section className="collection-seo-section">
           <div style={containerStyle}>
-            <h2 style={h2Style}>Tại sao chọn nguồn hàng từ ATTD?</h2>
-            <div style={gridStyle}>
+            <h2 className="collection-seo-title" style={h2Style}>Tại sao chọn nguồn hàng từ ATTD?</h2>
+            <div className="collection-seo-grid" style={gridStyle}>
               {benefits.map((b, i) => (
-                <article key={i} style={cardStyle}>
-                  <h3 style={cardTitleStyle}>{b.title}</h3>
-                  <p style={cardDescStyle}>{b.description}</p>
+                <article key={i} className="collection-seo-card" style={cardStyle}>
+                  <h3 className="collection-seo-card__title" style={cardTitleStyle}>{b.title}</h3>
+                  <p className="collection-seo-card__desc" style={cardDescStyle}>{b.description}</p>
                 </article>
               ))}
             </div>
@@ -108,14 +106,14 @@ export default function CollectionSEOContent({
 
       {/* ── Applications ─────────────────────────────────────────────────────── */}
       {applications.length > 0 && (
-        <section style={{ ...sectionStyle, background: "#f9fafb" }}>
+        <section className="collection-seo-section collection-seo-section--muted">
           <div style={containerStyle}>
-            <h2 style={h2Style}>Ứng dụng phổ biến</h2>
-            <div style={gridStyle}>
+            <h2 className="collection-seo-title" style={h2Style}>Ứng dụng phổ biến</h2>
+            <div className="collection-seo-grid" style={gridStyle}>
               {applications.map((a, i) => (
-                <article key={i} style={cardStyle}>
-                  <h3 style={cardTitleStyle}>{a.title}</h3>
-                  <p style={cardDescStyle}>{a.description}</p>
+                <article key={i} className="collection-seo-card" style={cardStyle}>
+                  <h3 className="collection-seo-card__title" style={cardTitleStyle}>{a.title}</h3>
+                  <p className="collection-seo-card__desc" style={cardDescStyle}>{a.description}</p>
                 </article>
               ))}
             </div>
@@ -125,13 +123,14 @@ export default function CollectionSEOContent({
 
       {/* ── FAQ ──────────────────────────────────────────────────────────────── */}
       {faq.length > 0 && (
-        <section style={sectionStyle}>
+        <section className="collection-seo-section">
           <div style={containerStyle}>
-            <h2 style={h2Style}>Câu hỏi thường gặp</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <h2 className="collection-seo-title" style={h2Style}>Câu hỏi thường gặp</h2>
+            <div className="collection-seo-faq-list" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {faq.map((item, i) => (
                 <details
                   key={i}
+                  className="collection-seo-faq"
                   style={{
                     border: "1px solid #e5e7eb",
                     borderRadius: "10px",
@@ -181,9 +180,10 @@ export default function CollectionSEOContent({
 
       {/* ── CTA ──────────────────────────────────────────────────────────────── */}
       <section
+        className="collection-seo-cta"
         style={{
           ...sectionStyle,
-          background: "linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%)",
+          background: "linear-gradient(135deg, #101827 0%, #1b2638 100%)",
           color: "#fff",
         }}
       >
@@ -216,46 +216,30 @@ export default function CollectionSEOContent({
             {ctaDescription}
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
+          <div className="collection-seo-cta__actions">
             <Link
-              href={CTA.primary.href}
+              href="/lien-he"
+              className="collection-seo-cta__button"
               style={{
                 display: "inline-block",
                 padding: "13px 28px",
                 background: "#fff",
-                color: "#1d4ed8",
+                color: "#111827",
                 borderRadius: "8px",
                 fontWeight: 700,
                 fontSize: "15px",
                 textDecoration: "none",
               }}
             >
-              {CTA.primary.label}
-            </Link>
-            <Link
-              href={CTA.secondary.href}
-              style={{
-                display: "inline-block",
-                padding: "13px 28px",
-                background: "rgba(255,255,255,0.15)",
-                color: "#fff",
-                border: "1px solid rgba(255,255,255,0.4)",
-                borderRadius: "8px",
-                fontWeight: 700,
-                fontSize: "15px",
-                textDecoration: "none",
-              }}
-            >
-              {CTA.secondary.label}
+              Gửi yêu cầu báo giá
             </Link>
           </div>
+
+          <ul className="collection-seo-cta__reassurance" aria-label="Cam kết khi gửi yêu cầu">
+            <li>Tư vấn theo số lượng</li>
+            <li>Phản hồi trong giờ làm việc</li>
+            <li>Không spam</li>
+          </ul>
 
           {/* Internal links */}
           <p

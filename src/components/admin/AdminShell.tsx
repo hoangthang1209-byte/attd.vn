@@ -93,15 +93,26 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Đơn hàng",
-    visible: (p) => p.canViewOrders || p.canViewProduction || p.canViewDelivery,
+    visible: (p) => p.canViewOrders || p.canViewDelivery,
     items: [
       { href: "/admin/operations", label: "Tổng quan vận hành", visible: (p) => p.canViewOrders },
       { href: "/admin/orders", label: "Đơn hàng", visible: (p) => p.canViewOrders },
-      { href: "/admin/production", label: "Sản xuất", visible: (p) => p.canViewProduction },
       { href: "/admin/delivery", label: "Vận hành giao hàng", visible: (p) => p.canViewDelivery },
       { href: "/admin/employees", label: "Nhân viên", visible: (p) => p.canManageEmployees },
       { href: "/admin/delivery-methods", label: "Hình thức giao hàng", visible: (p) => p.canViewDelivery },
       { href: "/admin/delivery-carriers", label: "Đơn vị vận chuyển", visible: (p) => p.canViewDelivery },
+    ],
+  },
+  {
+    label: "Sản xuất",
+    visible: (p) => p.canViewProduction,
+    items: [
+      { href: "/admin/production", label: "Tổng quan sản xuất", visible: (p) => p.canViewProduction },
+      { href: "/admin/production/plan", label: "Kế hoạch sản xuất", visible: (p) => p.canViewProduction },
+      { href: "/admin/production/jobs", label: "Công việc sản xuất", visible: (p) => p.canViewProduction },
+      { href: "/admin/production/board", label: "Bảng tiến độ", visible: (p) => p.canViewProduction },
+      { href: "/admin/production/plan?quickFilter=awaiting_qc", label: "QC", visible: (p) => p.canViewProduction },
+      { href: "/admin/production/plan?quickFilter=missing_docs", label: "Tài liệu sản xuất", visible: (p) => p.canViewProduction },
     ],
   },
   {

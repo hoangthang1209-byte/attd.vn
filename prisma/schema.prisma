@@ -2036,6 +2036,7 @@ model Employee {
   assignedDeliveryExecutions OrderDeliveryExecution[]  @relation("DeliveryExecutionAssignee")
   deliveryAttempts           OrderDeliveryAttempt[]    @relation("DeliveryAttemptBy")
   adminUser                  AdminUser?
+  productionPlans            ProductionPlan[]          @relation("ProductionPlanOwner")
 
   @@index([employeeCode])
   @@index([isActive])
@@ -2125,6 +2126,7 @@ model OrderItem {
   materialRequirements   OrderItemMaterialRequirement[]
   deliveryExecutionItems OrderDeliveryExecutionItem[]
   techPacks              TechPack[]
+  productionPlan         ProductionPlan?
 
   @@index([orderId])
   @@index([productId])
@@ -2538,6 +2540,54 @@ enum QcEvidenceType {
   PACKING
   FINAL_PRODUCT
   OTHER
+}
+
+enum ProductionPlanStatus {
+  NOT_PLANNED
+  WAITING_DOCUMENTS
+  WAITING_MATERIALS
+  READY_TO_START
+  IN_PROGRESS
+  WAITING_QC
+  REWORK
+  COMPLETED
+  ON_HOLD
+}
+
+enum ProductionPlanPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model ProductionPlan {
+  id                  String                 @id @default(cuid())
+  orderItemId         String                 @unique
+  planCode            String
+  status              ProductionPlanStatus   @default(NOT_PLANNED)
+  priority            ProductionPlanPriority @default(NORMAL)
+  plannedStartAt      DateTime?
+  plannedEndAt        DateTime?
+  actualStartAt       DateTime?
+  actualEndAt         DateTime?
+  internalDeadlineAt  DateTime?
+  productionOwnerId   String?
+  productionTeamName  String?
+  estimatedLeadDays   Int?
+  planningNote        String?                @db.Text
+  riskNote            String?                @db.Text
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  orderItem           OrderItem              @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  productionOwner     Employee?              @relation("ProductionPlanOwner", fields: [productionOwnerId], references: [id], onDelete: SetNull)
+
+  @@index([productionOwnerId])
+  @@index([status])
+  @@index([priority])
+  @@index([plannedStartAt])
+  @@index([plannedEndAt])
+  @@index([internalDeadlineAt])
 }
 
 model OrderProductionStage {

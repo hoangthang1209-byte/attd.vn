@@ -1,11 +1,5 @@
-import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import ProductionBoardManager from "@/components/admin/operations/ProductionBoardManager";
+import ProductionDashboardManager from "@/components/admin/production-planning/ProductionDashboardManager";
 
-export default function ProductionBoardPage() {
-  return (
-    <>
-      <AdminPageTitle title={"Sản xuất"} />
-      <ProductionBoardManager />
-    </>
-  );
+export default function ProductionDashboardPage() {
+  return <ProductionDashboardManager />;
 }

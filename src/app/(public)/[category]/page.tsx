@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import CatalogSourcingBadges from "@/components/marketplace/CatalogSourcingBadges";
 import InternalLinkBlock from "@/components/public/InternalLinkBlock";
-import TrustBlock from "@/components/public/TrustBlock";
 import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
@@ -37,6 +37,126 @@ const STOCK_LABELS: Record<string, string> = {
   LOW_STOCK: "Sắp hết",
   OUT_OF_STOCK: "Hết hàng",
 };
+
+const CATEGORY_CONTEXT_POINTS = [
+  "MOQ rõ ràng",
+  "Hỗ trợ in/thêu/OEM",
+  "Báo giá theo số lượng",
+  "Giao hàng toàn quốc",
+];
+
+const CATEGORY_FINAL_REASSURANCE = [
+  "Tư vấn theo số lượng",
+  "Phản hồi trong giờ làm việc",
+  "Không spam",
+];
+
+function getCategoryUseCases(categoryName: string) {
+  const normalized = categoryName.toLocaleLowerCase("vi-VN");
+
+  if (normalized.includes("polo")) {
+    return [
+      {
+        title: "Đồng phục văn phòng",
+        description: "Dáng cổ bẻ gọn gàng cho đội ngũ bán hàng, chăm sóc khách hàng và nhân sự văn phòng.",
+      },
+      {
+        title: "Hàng trơn cho xưởng in",
+        description: "Nguồn polo trơn ổn định để in/thêu logo theo đơn doanh nghiệp.",
+      },
+      {
+        title: "Sự kiện & activation",
+        description: "Phù hợp cho đội ngũ triển khai, roadshow và sự kiện thương hiệu cần hình ảnh đồng nhất.",
+      },
+      {
+        title: "OEM/private label",
+        description: "Tư vấn chất liệu, màu sắc và quy cách khi cần phát triển dòng polo riêng.",
+      },
+    ];
+  }
+
+  if (normalized.includes("nón") || normalized.includes("non")) {
+    return [
+      {
+        title: "Quà tặng sự kiện",
+        description: "Nón đồng bộ cho hội nghị, activation, team building và chiến dịch ngoài trời.",
+      },
+      {
+        title: "Đồng phục triển khai",
+        description: "Phù hợp cho đội bán hàng, PG/PB, nhân sự giao nhận và nhóm vận hành.",
+      },
+      {
+        title: "Hàng trơn cho xưởng in",
+        description: "Nguồn nón cơ bản để thêu logo, in chuyển nhiệt hoặc gắn nhãn theo yêu cầu.",
+      },
+      {
+        title: "Bộ quà tặng doanh nghiệp",
+        description: "Kết hợp cùng áo, tote hoặc bình giữ nhiệt để tạo set quà tặng đồng bộ.",
+      },
+    ];
+  }
+
+  if (normalized.includes("tote") || normalized.includes("túi")) {
+    return [
+      {
+        title: "Quà tặng hội nghị",
+        description: "Tote bag dùng cho sự kiện, onboarding, hội thảo và chương trình khách hàng thân thiết.",
+      },
+      {
+        title: "Bao bì thương hiệu",
+        description: "Túi vải tối giản để in logo, phối bộ quà tặng hoặc đóng gói sản phẩm.",
+      },
+      {
+        title: "Hàng trơn cho agency",
+        description: "Nguồn tote trơn dễ tùy biến cho agency, event company và xưởng in.",
+      },
+      {
+        title: "OEM/private label",
+        description: "Tư vấn kích thước, chất liệu và quy cách khi cần phát triển mẫu riêng.",
+      },
+    ];
+  }
+
+  if (normalized.includes("bình") || normalized.includes("giữ nhiệt")) {
+    return [
+      {
+        title: "Quà tặng doanh nghiệp",
+        description: "Bình giữ nhiệt cho khách hàng, nhân sự, hội nghị và chương trình tri ân.",
+      },
+      {
+        title: "Bộ quà tặng cao cấp",
+        description: "Kết hợp cùng áo, tote hoặc hộp quà để tạo set quà tặng thương hiệu.",
+      },
+      {
+        title: "Logo doanh nghiệp",
+        description: "Tư vấn phương án khắc/in logo phù hợp ngân sách và số lượng.",
+      },
+      {
+        title: "Đơn số lượng lớn",
+        description: "Hỗ trợ báo giá theo số lượng, thời gian giao hàng và phương án đóng gói.",
+      },
+    ];
+  }
+
+  return [
+    {
+      title: "Đồng phục doanh nghiệp",
+      description: "Nguồn hàng phù hợp cho đội ngũ nhân sự, sự kiện nội bộ và chương trình thương hiệu.",
+    },
+    {
+      title: "Hàng trơn cho xưởng in",
+      description: "Dễ tùy biến logo, màu sắc và size cho xưởng in, agency và đơn vị sự kiện.",
+    },
+    {
+      title: "Quà tặng sự kiện",
+      description: "Tư vấn phối sản phẩm theo ngân sách, số lượng và thời gian cần hàng.",
+    },
+    {
+      title: "OEM/private label",
+      description: "Hỗ trợ phát triển sản phẩm theo yêu cầu khi cần nguồn hàng riêng cho thương hiệu.",
+    },
+  ];
+}
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { category } = await params;
@@ -135,6 +255,15 @@ export default async function CategoryPage({ params }: PageProps) {
               </p>
 
               <CatalogSourcingBadges />
+
+              <div className="mp-category-hero-actions" aria-label="Hành động danh mục">
+                <Link href="/lien-he" className="btn-primary">
+                  Yêu cầu báo giá
+                </Link>
+                <a href="#category-products" className="btn-secondary">
+                  Xem sản phẩm
+                </a>
+              </div>
             </div>
 
             {(heroImage && isValidImageSrc(heroImage)) || galleryImages.length > 0 ? (
@@ -171,10 +300,14 @@ export default async function CategoryPage({ params }: PageProps) {
           </div>
 
           <div className="mp-category-listing-trust">
-            <TrustBlock variant="strip" />
+            <div className="mp-category-context-strip" aria-label="Cam kết nguồn hàng">
+              {CATEGORY_CONTEXT_POINTS.map((point) => (
+                <span key={point}>{point}</span>
+              ))}
+            </div>
           </div>
 
-          <div className="mp-category-listing-section-header">
+          <div id="category-products" className="mp-category-listing-section-header">
             <div>
               <p className="mp-catalog-results-kicker">Sản phẩm trong danh mục</p>
               <h2 className="mp-category-listing-section-title">
@@ -191,9 +324,12 @@ export default async function CategoryPage({ params }: PageProps) {
           {cat.products.length === 0 ? (
             <div className="mp-catalog-empty">
               <EmptyState
-                title="Chưa có sản phẩm trong danh mục này"
-                description="Liên hệ ATTD để được tư vấn nguồn hàng thay thế, MOQ và báo giá theo nhu cầu."
+                title="ATTD có thể tư vấn nguồn hàng phù hợp"
+                description="Gửi số lượng, chất liệu và ngân sách dự kiến để ATTD đề xuất sản phẩm thay thế, MOQ và báo giá B2B."
               />
+              <Link href="/lien-he" className="btn-primary mp-catalog-empty-cta">
+                Gửi yêu cầu báo giá
+              </Link>
             </div>
           ) : (
             <div className="mp-product-grid mp-product-grid--catalog">
@@ -232,6 +368,23 @@ export default async function CategoryPage({ params }: PageProps) {
               })}
             </div>
           )}
+
+          <section className="mp-category-use-cases" aria-labelledby="category-use-cases-title">
+            <div className="mp-category-use-cases__header">
+              <p className="mp-catalog-results-kicker">Ứng dụng B2B</p>
+              <h2 id="category-use-cases-title" className="mp-category-listing-section-title">
+                {cat.name} thường được dùng cho
+              </h2>
+            </div>
+            <div className="mp-category-use-case-grid">
+              {getCategoryUseCases(cat.name).map((item) => (
+                <article key={item.title} className="mp-category-use-case-card">
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </article>
+              ))}
+            </div>
+          </section>
         </div>
       </section>
 
@@ -265,36 +418,45 @@ export default async function CategoryPage({ params }: PageProps) {
         </>
       ) : (
         /* Fallback for categories without static content */
-        <section className="section-alt section-compact">
-          <div className="container" style={{ maxWidth: 800 }}>
-            <h2
-              style={{
-                fontSize: 20,
-                fontWeight: 700,
-                marginBottom: 20,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Về danh mục {cat.name}
-            </h2>
+        <section className="section-alt section-compact mp-category-fallback-content">
+          <div className="container">
+            <div className="mp-category-fallback-content__card">
+              <p className="mp-catalog-results-kicker">Thông tin danh mục</p>
+              <h2>Về danh mục {cat.name}</h2>
 
-            {cat.description ? (
-              <p
-                style={{
-                  fontSize: "15px",
-                  lineHeight: "1.75",
-                  color: "#374151",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                {cat.description}
-              </p>
-            ) : (
-              <EmptyState
-                title="Dữ liệu danh mục đang được cập nhật"
-                description="Liên hệ ATTD để nhận tư vấn nguồn hàng và báo giá cho danh mục này."
-              />
-            )}
+              {cat.description ? (
+                <p>{cat.description}</p>
+              ) : (
+                <EmptyState
+                  title="Dữ liệu danh mục đang được cập nhật"
+                  description="Liên hệ ATTD để nhận tư vấn nguồn hàng và báo giá cho danh mục này."
+                />
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {!content && (
+        <section className="mp-category-final-cta" aria-labelledby="category-final-cta-title">
+          <div className="container">
+            <div className="mp-category-final-cta__card">
+              <div>
+                <p className="mp-catalog-results-kicker">Bắt đầu nguồn hàng</p>
+                <h2 id="category-final-cta-title">Cần báo giá {cat.name} cho doanh nghiệp?</h2>
+                <p>
+                  Gửi nhu cầu số lượng, logo và thời gian cần hàng. ATTD sẽ tư vấn phương án phù hợp thay vì ép bạn chọn mẫu ngay.
+                </p>
+                <ul aria-label="Cam kết khi gửi yêu cầu">
+                  {CATEGORY_FINAL_REASSURANCE.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <Link href="/lien-he" className="btn-primary">
+                Gửi yêu cầu báo giá
+              </Link>
+            </div>
           </div>
         </section>
       )}
