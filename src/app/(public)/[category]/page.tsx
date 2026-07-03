@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import CatalogSourcingBadges from "@/components/marketplace/CatalogSourcingBadges";
-import B2BTrustSignals from "@/components/public/B2BTrustSignals";
 import InternalLinkBlock from "@/components/public/InternalLinkBlock";
 import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
@@ -38,12 +37,6 @@ const STOCK_LABELS: Record<string, string> = {
   LOW_STOCK: "Sắp hết",
   OUT_OF_STOCK: "Hết hàng",
 };
-
-const CATEGORY_FINAL_REASSURANCE = [
-  "Tư vấn theo số lượng",
-  "Phản hồi trong giờ làm việc",
-  "Không spam",
-];
 
 function getCategoryUseCases(categoryName: string) {
   const normalized = categoryName.toLocaleLowerCase("vi-VN");
@@ -433,11 +426,6 @@ export default async function CategoryPage({ params }: PageProps) {
                 <p>
                   Gửi nhu cầu số lượng, logo và thời gian cần hàng. ATTD sẽ tư vấn phương án phù hợp thay vì ép bạn chọn mẫu ngay.
                 </p>
-                <B2BTrustSignals
-                  items={CATEGORY_FINAL_REASSURANCE}
-                  variant="inline"
-                  ariaLabel="Cam kết khi gửi yêu cầu"
-                />
               </div>
               <Link href="/lien-he" className="btn-primary">
                 Gửi yêu cầu báo giá

@@ -25,7 +25,7 @@ import { isPreviewableFile } from "@/features/tech-pack/tech-pack-file-validatio
 import {
   PATTERN_ADMIN_LIST_PATH,
 } from "@/features/patterns/pattern-admin-routes";
-import { useAdminMutation } from "@/hooks/useAdminAction";
+import { useAdminAction, useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type PatternFile = {
@@ -64,10 +64,13 @@ type PatternDetail = {
 
 export default function PatternDetailManager({ patternId }: { patternId: string }) {
   const mutate = useAdminMutation();
+  const adminAction = useAdminAction();
   const saveBusyRef = useRef(false);
   const [pattern, setPattern] = useState<PatternDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [measurementFieldErrors, setMeasurementFieldErrors] = useState<Record<string, string>>({});
+  const [measurementSaving, setMeasurementSaving] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [formRevision, setFormRevision] = useState(0);
 
@@ -119,6 +122,71 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       onError: (message) => setError(message),
     });
     saveBusyRef.current = false;
+  }
+
+  async function saveMeasurements(rows: Array<{
+    pointOfMeasure: string;
+    description: string | null;
+    baseSize: string | null;
+    tolerance: string | null;
+    sortOrder?: number;
+    values: Array<{ size: string; value: string }>;
+  }>) {
+    if (!pattern || pattern.status === "ARCHIVED" || saveBusyRef.current) return;
+
+    const patch = { measurements: rows };
+    if (process.env.NODE_ENV === "development") {
+      console.info("[pattern.measurements.save.request]", { patternId, measurements: rows });
+    }
+
+    saveBusyRef.current = true;
+    setMeasurementSaving(true);
+    setMeasurementFieldErrors({});
+    adminAction.loading.show("Đang lưu bảng đo…");
+    try {
+      const res = await fetch(`/api/patterns/${patternId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+        fieldErrors?: Record<string, string>;
+      } & PatternDetail;
+
+      adminAction.loading.hide();
+      if (!res.ok) {
+        const fieldErrors =
+          body.fieldErrors && typeof body.fieldErrors === "object" ? body.fieldErrors : {};
+        setMeasurementFieldErrors(fieldErrors);
+        const firstFieldError = Object.values(fieldErrors).find(Boolean);
+        const message =
+          firstFieldError ??
+          body.error ??
+          body.message ??
+          "Không thể lưu bảng đo. Vui lòng thử lại.";
+        adminAction.toast.error(message);
+        setError(message);
+        return;
+      }
+
+      setPattern(body);
+      setError(null);
+      setMeasurementFieldErrors({});
+      adminAction.toast.success("Đã lưu bảng đo.");
+    } catch (err) {
+      adminAction.loading.hide();
+      const message = "Không thể lưu bảng đo. Vui lòng thử lại.";
+      adminAction.toast.error(message);
+      setError(message);
+      if (process.env.NODE_ENV === "development") {
+        console.error("[pattern.measurements.save]", err);
+      }
+    } finally {
+      setMeasurementSaving(false);
+      saveBusyRef.current = false;
+    }
   }
 
   async function approve() {
@@ -337,7 +405,9 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
           measurements={pattern.measurements}
           readOnly={readOnly}
           emptyText="Chưa có điểm đo. Áp dụng mẫu thông số hoặc sao chép từ Tech Pack."
-          onSave={(rows) => void saveField({ measurements: rows })}
+          saving={measurementSaving}
+          fieldErrors={measurementFieldErrors}
+          onSave={(rows) => void saveMeasurements(rows)}
         />
       </SectionCard>
     </AdminPageShell>

@@ -68,7 +68,9 @@ type Props = {
     tolerance: string | null;
     sortOrder?: number;
     values: Array<{ size: string; value: string }>;
-  }>) => void;
+  }>) => void | Promise<void>;
+  saving?: boolean;
+  fieldErrors?: Record<string, string>;
 };
 
 export default function TechPackMeasurementEditor({
@@ -77,6 +79,8 @@ export default function TechPackMeasurementEditor({
   showBaseSize = true,
   emptyText = "Chưa có điểm đo. Áp dụng mẫu thông số hoặc chọn rập.",
   onSave,
+  saving,
+  fieldErrors,
 }: Props) {
   const [rows, setRows] = useState<MeasurementRow[]>(() => toRows(measurements));
   const [sizes, setSizes] = useState<string[]>(() => getInitialSizes(measurements));
@@ -155,12 +159,12 @@ export default function TechPackMeasurementEditor({
   }
 
   const canSave = useMemo(
-    () => !readOnly && rows.some((row) => row.pointOfMeasure.trim()),
-    [readOnly, rows],
+    () => !readOnly && !saving && rows.some((row) => row.pointOfMeasure.trim()),
+    [readOnly, rows, saving],
   );
 
   function commit() {
-    onSave(
+    void onSave(
       rows
         .filter((r) => r.pointOfMeasure.trim())
         .map((r, index) => ({
@@ -207,8 +211,15 @@ export default function TechPackMeasurementEditor({
             Thêm size
           </button>
           <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={!canSave} onClick={commit}>
-            Lưu bảng
+            {saving ? "Đang lưu bảng đo…" : "Lưu bảng"}
           </button>
+        </div>
+      )}
+      {fieldErrors && Object.keys(fieldErrors).length > 0 && (
+        <div className="admin-error" style={{ marginBottom: 12 }}>
+          {Object.entries(fieldErrors).map(([field, message]) => (
+            <div key={field}>{message}</div>
+          ))}
         </div>
       )}
       {rows.length === 0 ? (

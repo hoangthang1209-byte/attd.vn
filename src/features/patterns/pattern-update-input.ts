@@ -26,6 +26,8 @@ export type PatternUpdateInput = {
 const PRODUCTION_MATERIAL_CATEGORY_VALUES = new Set<string>(
   Object.values(ProductionMaterialCategory),
 );
+const INVALID_NUMBER_MESSAGE = "Giá trị phải là số hợp lệ.";
+const DUPLICATE_MESSAGE = "Bảng đo có cột size hoặc điểm đo bị trùng.";
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
@@ -60,28 +62,75 @@ function parseProductionMaterialCategory(
   return value as ProductionMaterialCategory;
 }
 
+function normalizeMeasurementNumber(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.includes(",") && !trimmed.includes(".") ? trimmed.replace(",", ".") : trimmed;
+  if (!/^-?(?:\d+|\d*\.\d+)$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return null;
+  return normalized;
+}
+
 function parseMeasurements(value: unknown): PatternMeasurementInput[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) {
-    throw new PatternValidationError("Dữ liệu bảng đo không hợp lệ.");
+    throw new PatternValidationError("Dữ liệu bảng đo không hợp lệ.", undefined, "VALIDATION");
   }
 
-  return value
+  const fieldErrors: Record<string, string> = {};
+  const seenPoms = new Set<string>();
+  const measurements = value
     .map((row, index) => {
       if (!row || typeof row !== "object") {
-        throw new PatternValidationError("Dữ liệu bảng đo không hợp lệ.");
+        throw new PatternValidationError("Dữ liệu bảng đo không hợp lệ.", undefined, "VALIDATION");
       }
       const record = row as Record<string, unknown>;
       const pointOfMeasure = String(record.pointOfMeasure ?? "").trim();
+      const normalizedPom = pointOfMeasure.toLocaleLowerCase("vi");
+      if (pointOfMeasure) {
+        if (seenPoms.has(normalizedPom)) {
+          fieldErrors[`measurements.${index}.pointOfMeasure`] = DUPLICATE_MESSAGE;
+        }
+        seenPoms.add(normalizedPom);
+      }
 
+      const seenSizes = new Set<string>();
       const values = Array.isArray(record.values)
-        ? (record.values as Array<Record<string, unknown>>)
-            .map((entry) => ({
-              size: String(entry.size ?? "").trim(),
-              value: String(entry.value ?? "").trim(),
-            }))
-            .filter((entry) => entry.size && entry.value)
+        ? (record.values as unknown[]).flatMap((entry) => {
+            const valueRecord = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+            const rawSize = String(valueRecord.size ?? "").trim();
+            const size = rawSize.toUpperCase();
+            const rawValue = String(valueRecord.value ?? "").trim();
+            if (!size || !rawValue) return [];
+
+            const fieldKey = `measurements.${index}.values.${size}`;
+            if (seenSizes.has(size)) {
+              fieldErrors[fieldKey] = DUPLICATE_MESSAGE;
+              return [];
+            }
+            seenSizes.add(size);
+
+            const normalizedValue = normalizeMeasurementNumber(rawValue);
+            if (normalizedValue === null) {
+              fieldErrors[fieldKey] = INVALID_NUMBER_MESSAGE;
+              return [];
+            }
+
+            return [{ size, value: normalizedValue }];
+          })
         : [];
+
+      const tolerance =
+        record.tolerance === null
+          ? null
+          : typeof record.tolerance === "string"
+            ? record.tolerance.trim()
+            : null;
+      const normalizedTolerance = tolerance ? normalizeMeasurementNumber(tolerance) : null;
+      if (tolerance && normalizedTolerance === null) {
+        fieldErrors[`measurements.${index}.tolerance`] = INVALID_NUMBER_MESSAGE;
+      }
 
       return {
         pointOfMeasure,
@@ -97,17 +146,18 @@ function parseMeasurements(value: unknown): PatternMeasurementInput[] | undefine
             : typeof record.baseSize === "string"
               ? record.baseSize
               : null,
-        tolerance:
-          record.tolerance === null
-            ? null
-            : typeof record.tolerance === "string"
-              ? record.tolerance
-              : null,
+        tolerance: normalizedTolerance,
         sortOrder: typeof record.sortOrder === "number" ? record.sortOrder : index,
         values,
       };
     })
     .filter((row) => row.pointOfMeasure);
+
+  if (Object.keys(fieldErrors).length > 0) {
+    throw new PatternValidationError("Dữ liệu bảng đo không hợp lệ.", fieldErrors, "VALIDATION");
+  }
+
+  return measurements;
 }
 
 export function parsePatternUpdateBody(body: unknown): PatternUpdateInput {

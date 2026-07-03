@@ -1,16 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import B2BTrustSignals from "@/components/public/B2BTrustSignals";
+import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
 import { CTA } from "@/lib/ctaConfig";
+import { TRUST_REASSURANCE_PRIVACY } from "@/lib/b2b-trust-v2-copy";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
-
-const CONTACT_FORM_TRUST = [
-  "Không spam",
-  "Chỉ dùng để tư vấn nguồn hàng",
-  "Phản hồi trong giờ làm việc",
-];
 
 export default function ContactForm() {
   const [name, setName] = useState("");
@@ -180,12 +175,9 @@ export default function ContactForm() {
         {formStatus === "loading" ? "Đang gửi yêu cầu..." : "Gửi yêu cầu báo giá"}
       </button>
 
-      <B2BTrustSignals
-        items={CONTACT_FORM_TRUST}
-        variant="inline"
-        ariaLabel="Cam kết khi gửi thông tin"
-        className="public-lead-form__reassurance"
-      />
+      <TrustReassuranceLine className="public-lead-form__reassurance">
+        {TRUST_REASSURANCE_PRIVACY}
+      </TrustReassuranceLine>
     </form>
   );
 }

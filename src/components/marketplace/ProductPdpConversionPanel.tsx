@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
 import { CTA } from "@/lib/ctaConfig";
-import B2BTrustSignals from "@/components/public/B2BTrustSignals";
+import EvidenceGrid from "@/components/public/trust/EvidenceGrid";
+import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
+import { PDP_CONVERSION_POINTS, PDP_EVIDENCE_ITEMS } from "@/lib/b2b-trust-v2-copy";
 
 type Props = {
   productName: string;
@@ -15,12 +17,6 @@ type Props = {
   stockColor?: string;
   onRequestQuote: () => void;
 };
-
-const PDP_CONVERSION_TRUST = [
-  "Báo giá theo số lượng",
-  "Tư vấn theo nhu cầu",
-  "Phản hồi trong giờ làm việc",
-];
 
 export default function ProductPdpConversionPanel({
   productName,
@@ -96,11 +92,17 @@ export default function ProductPdpConversionPanel({
           </Link>
         </div>
 
-        <B2BTrustSignals
-          items={PDP_CONVERSION_TRUST}
-          variant="stack"
-          ariaLabel="Cam kết khi yêu cầu báo giá"
+        <ProcessTrustBlock
+          steps={PDP_CONVERSION_POINTS}
+          ordered={false}
+          variant="compact"
           className="mp-pdp-conversion-trust"
+        />
+
+        <EvidenceGrid
+          title="Quy trình hỗ trợ đơn hàng"
+          items={PDP_EVIDENCE_ITEMS}
+          className="mp-pdp-conversion-evidence"
         />
       </div>
     </aside>

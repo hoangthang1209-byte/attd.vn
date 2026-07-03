@@ -10,7 +10,11 @@ import { generatePatternCode } from "@/features/patterns/pattern-code";
 import type { PatternMeasurementInput } from "@/features/patterns/pattern-update-input";
 
 export class PatternValidationError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public readonly fieldErrors?: Record<string, string>,
+    public readonly code?: "VALIDATION" | "CONFLICT" | "NOT_FOUND" | "PERMISSION",
+  ) {
     super(message);
     this.name = "PatternValidationError";
   }
@@ -129,11 +133,32 @@ function buildPatternUpdateData(
 
 function mapPatternPrismaError(err: unknown): PatternValidationError | null {
   if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return null;
+  if (process.env.NODE_ENV === "development") {
+    console.error("[pattern.prisma.error]", {
+      code: err.code,
+      modelName: err.meta?.modelName,
+      target: err.meta?.target,
+    });
+  }
   if (err.code === "P2003") {
     return new PatternValidationError("Danh mục hoặc sản phẩm liên kết không hợp lệ.");
   }
   if (err.code === "P2002") {
-    return new PatternValidationError("Không thể lưu vì dữ liệu rập đã thay đổi. Vui lòng tải lại và thử lại.");
+    return new PatternValidationError(
+      "Bảng đo có cột size hoặc điểm đo bị trùng.",
+      undefined,
+      "CONFLICT",
+    );
+  }
+  if (err.code === "P2025") {
+    return new PatternValidationError("Không tìm thấy dữ liệu rập cần cập nhật.", undefined, "NOT_FOUND");
+  }
+  if (err.code === "P2014") {
+    return new PatternValidationError(
+      "Không thể lưu bảng đo vì dữ liệu liên kết không hợp lệ.",
+      undefined,
+      "CONFLICT",
+    );
   }
   return null;
 }

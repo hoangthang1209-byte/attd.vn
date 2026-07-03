@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import B2BTrustSignals from "@/components/public/B2BTrustSignals";
 import ContactForm from "@/components/public/ContactForm";
+import EvidenceGrid from "@/components/public/trust/EvidenceGrid";
+import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
+import {
+  CONTACT_EVIDENCE_ITEMS,
+  CONTACT_PROCESS_STEPS,
+  TRUST_REASSURANCE_PRIVACY,
+} from "@/lib/b2b-trust-v2-copy";
 import { buildContactMetadata } from "@/lib/seo/indexation-policy";
 
 export const metadata: Metadata = buildContactMetadata({
@@ -26,12 +32,6 @@ const CONTEXT_CARDS = [
     description:
       "Đồng phục và quà tặng doanh nghiệp theo số lượng. Tư vấn mẫu và chất liệu phù hợp.",
   },
-];
-
-const CONTACT_TRUST = [
-  "Tư vấn theo nhu cầu",
-  "Bảo mật thông tin",
-  "Phản hồi trong giờ làm việc",
 ];
 
 export default function LienHePage() {
@@ -63,15 +63,18 @@ export default function LienHePage() {
                 ))}
               </div>
 
-              <div className="contact-page-v2__note">
-                <p>Thông tin gửi qua form chỉ dùng để ATTD tư vấn nguồn hàng và báo giá phù hợp.</p>
-                <B2BTrustSignals
-                  items={CONTACT_TRUST}
-                  variant="inline"
-                  ariaLabel="Cam kết khi liên hệ"
-                  className="contact-page-v2__trust"
-                />
-              </div>
+              <ProcessTrustBlock
+                title="Sau khi gửi yêu cầu"
+                steps={CONTACT_PROCESS_STEPS}
+                reassurance={TRUST_REASSURANCE_PRIVACY}
+                className="contact-page-v2__process"
+              />
+
+              <EvidenceGrid
+                title="ATTD xử lý yêu cầu như thế nào"
+                items={CONTACT_EVIDENCE_ITEMS}
+                className="contact-page-v2__evidence"
+              />
 
               <p className="contact-page-v2__dealer-link">
                 Muốn trở thành đại lý chính thức?{" "}

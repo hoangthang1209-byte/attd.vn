@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
 import { trackGenerateLead } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
 import { CTA } from "@/lib/ctaConfig";
@@ -29,6 +30,7 @@ interface DealerLeadFormProps {
   submitLabel?: string;
   description?: string;
   reassuranceItems?: string[];
+  reassuranceText?: string;
 }
 
 export default function DealerLeadForm({
@@ -37,6 +39,7 @@ export default function DealerLeadForm({
   submitLabel = CTA.secondary.label,
   description,
   reassuranceItems,
+  reassuranceText,
 }: DealerLeadFormProps) {
   const [contactName, setContactName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -247,13 +250,17 @@ export default function DealerLeadForm({
         {formStatus === "loading" ? "Đang gửi thông tin..." : submitLabel}
       </button>
 
-      {reassuranceItems && reassuranceItems.length > 0 && (
+      {reassuranceText ? (
+        <TrustReassuranceLine className="public-lead-form__reassurance">
+          {reassuranceText}
+        </TrustReassuranceLine>
+      ) : reassuranceItems && reassuranceItems.length > 0 ? (
         <ul className="public-lead-form__reassurance" aria-label="Cam kết khi gửi thông tin">
           {reassuranceItems.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
-      )}
+      ) : null}
     </form>
   );
 }

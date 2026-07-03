@@ -4,7 +4,12 @@ import Image from "next/image";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import B2BTrustSignals from "@/components/public/B2BTrustSignals";
+import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
+import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
+import {
+  PDP_QUOTE_PROCESS_STEPS,
+  TRUST_REASSURANCE_PRIVACY,
+} from "@/lib/b2b-trust-v2-copy";
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
 import type { ProductQuoteContext } from "@/components/public/product-quote.types";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
@@ -18,12 +23,6 @@ type Props = {
   product: ProductQuoteContext;
   restoreFocusRef?: React.RefObject<HTMLButtonElement | null>;
 };
-
-const PRODUCT_QUOTE_TRUST = [
-  "Không spam",
-  "Chỉ dùng để tư vấn báo giá",
-  "Phản hồi trong giờ làm việc",
-];
 
 function buildProductMessage(payload: {
   product: ProductQuoteContext;
@@ -391,12 +390,15 @@ export default function ProductQuoteDialog({
                   </button>
                 </div>
 
-                <B2BTrustSignals
-                  items={PRODUCT_QUOTE_TRUST}
-                  variant="inline"
-                  ariaLabel="Cam kết khi gửi yêu cầu"
-                  className="product-quote-dialog__reassurance"
+                <ProcessTrustBlock
+                  title="Sau khi gửi yêu cầu"
+                  steps={PDP_QUOTE_PROCESS_STEPS}
+                  variant="compact"
+                  className="product-quote-dialog__process"
                 />
+                <TrustReassuranceLine className="product-quote-dialog__reassurance">
+                  {TRUST_REASSURANCE_PRIVACY}
+                </TrustReassuranceLine>
               </form>
             </div>
 
