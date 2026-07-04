@@ -163,25 +163,30 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                       categoryContext
                         ? `Chưa có sản phẩm trong danh mục "${categoryContext.name}"`
                         : q
-                          ? `Không tìm thấy sản phẩm cho "${q}"`
+                          ? "Không tìm thấy sản phẩm phù hợp"
                           : "Chưa tìm thấy sản phẩm phù hợp"
                     }
                     description={
                       categoryContext
                         ? "Thử chọn danh mục khác hoặc xóa bộ lọc để xem thêm sản phẩm."
-                        : "Thử điều chỉnh bộ lọc hoặc gửi yêu cầu để ATTD gợi ý nguồn hàng phù hợp."
+                        : q
+                          ? `ATTD chưa có kết quả hiển thị cho "${q}". Gửi yêu cầu để đội ngũ tư vấn nguồn hàng phù hợp hơn.`
+                          : "Thử điều chỉnh bộ lọc hoặc gửi yêu cầu để ATTD gợi ý nguồn hàng phù hợp."
                     }
                   />
-                  {(category || filters.inStock || filters.print || filters.embroidery || filters.oem || material) && (
-                    <Link href={buildClearFiltersUrl(q)} className="btn-secondary mp-catalog-empty-cta">
-                      Xóa bộ lọc
-                    </Link>
-                  )}
-                  {categoryContext && (
+                  <div className="mp-catalog-empty-actions">
+                    {(category || filters.inStock || filters.print || filters.embroidery || filters.oem || material) && (
+                      <Link href={buildClearFiltersUrl(q)} className="btn-secondary mp-catalog-empty-cta">
+                        Xóa bộ lọc
+                      </Link>
+                    )}
                     <Link href="/lien-he" className="btn-primary mp-catalog-empty-cta">
-                      Liên hệ báo giá
+                      Gửi yêu cầu nguồn hàng
                     </Link>
-                  )}
+                    <Link href="/dai-ly" className="btn-secondary mp-catalog-empty-cta">
+                      Đăng ký đại lý
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <div className="mp-product-grid mp-product-grid--catalog">
