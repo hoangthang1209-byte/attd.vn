@@ -1,5 +1,6 @@
 import type { EvidenceItem } from "@/lib/b2b-trust-v2.types";
 import EvidenceCard from "@/components/public/trust/EvidenceCard";
+import { isValidImageSrc } from "@/lib/imagePaths";
 
 type Props = {
   title?: string;
@@ -9,9 +10,8 @@ type Props = {
 };
 
 export default function EvidenceGrid({ title, description, items, className }: Props) {
-  if (items.length === 0) return null;
-
-  const hasMissingImages = items.some((item) => !item.imageUrl);
+  const visibleItems = items.filter((item) => item.imageUrl && isValidImageSrc(item.imageUrl));
+  if (visibleItems.length === 0) return null;
 
   return (
     <section
@@ -21,15 +21,10 @@ export default function EvidenceGrid({ title, description, items, className }: P
       {title ? <h3 className="trust-evidence-grid__title">{title}</h3> : null}
       {description ? <p className="trust-evidence-grid__desc">{description}</p> : null}
       <div className="trust-evidence-grid__items">
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <EvidenceCard key={`${item.category}-${item.title}`} item={item} />
         ))}
       </div>
-      {hasMissingImages ? (
-        <p className="trust-evidence-grid__footnote">
-          ATTD sẽ bổ sung hình ảnh kho, sản xuất và QC từ dữ liệu thực tế.
-        </p>
-      ) : null}
     </section>
   );
 }

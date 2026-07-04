@@ -2,14 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import LandingHeroVisual from "@/components/public/LandingHeroVisual";
-import CapabilityTrustBlock from "@/components/public/trust/CapabilityTrustBlock";
-import EvidenceGrid from "@/components/public/trust/EvidenceGrid";
-import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
-import {
-  DEALER_EVIDENCE_ITEMS,
-  DEALER_PARTNERSHIP_STEPS,
-  TRUST_REASSURANCE_DEALER_PRIVACY,
-} from "@/lib/b2b-trust-v2-copy";
+import ManufacturingEvidenceGrid from "@/components/public/manufacturing/ManufacturingEvidenceGrid";
+import { TRUST_REASSURANCE_DEALER_PRIVACY } from "@/lib/b2b-trust-v2-copy";
+import { getManufacturingEvidenceForSurfaceAsync } from "@/lib/manufacturing-library.server";
 import { canonicalUrl } from "@/lib/seo";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
 import { getLandingDemoImage } from "@/features/demo/demo-image-map";
@@ -88,15 +83,12 @@ const WORKFLOW = [
   },
 ];
 
-const DEALER_CAPABILITIES = [
-  "In logo",
-  "Thêu logo",
-  "OEM / Private Label",
-  "Đóng gói theo thương hiệu",
-];
-
 export default async function DaiLyPage() {
   const landing = await resolveBespokeLanding("dai-ly");
+  const dealerEvidence = await getManufacturingEvidenceForSurfaceAsync("dealer", {
+    limit: 3,
+    requireMedia: true,
+  });
 
   return (
     <main className="dealer-landing-v2">
@@ -154,7 +146,7 @@ export default async function DaiLyPage() {
         </div>
       </section>
 
-      <section className="section dealer-landing-section">
+      <section id="dealer-workflow" className="section dealer-landing-section">
         <div className="container">
           <div className="dealer-landing-section-header dealer-landing-section-header--center">
             <p className="dealer-landing-eyebrow">Quy trình hợp tác</p>
@@ -176,19 +168,12 @@ export default async function DaiLyPage() {
         </div>
       </section>
 
-      <section className="section section-alt dealer-landing-section">
-        <div className="container">
-          <EvidenceGrid
-            title="Năng lực hỗ trợ đại lý"
-            items={DEALER_EVIDENCE_ITEMS}
-            className="dealer-landing-evidence"
-          />
-          <CapabilityTrustBlock
-            items={DEALER_CAPABILITIES}
-            className="dealer-landing-capability"
-          />
-        </div>
-      </section>
+      <ManufacturingEvidenceGrid
+        title="Minh chứng năng lực ATTD"
+        description="Hình ảnh thực tế về kho, quy trình và kiểm tra chất lượng sẽ chỉ hiển thị khi ATTD có dữ liệu thật."
+        items={dealerEvidence}
+        className="dealer-landing-manufacturing"
+      />
 
       <section id="dealer-form" className="section dealer-landing-section dealer-landing-form-section">
         <div className="container">
@@ -199,12 +184,9 @@ export default async function DaiLyPage() {
               <p>
                 Gửi thông tin để ATTD tư vấn cách lấy nguồn hàng phù hợp với mô hình kinh doanh của bạn.
               </p>
-              <ProcessTrustBlock
-                title="Quy trình hợp tác đại lý"
-                steps={DEALER_PARTNERSHIP_STEPS}
-                reassurance={TRUST_REASSURANCE_DEALER_PRIVACY}
-                className="dealer-final-panel__process"
-              />
+              <p className="dealer-final-panel__workflow-link">
+                <Link href="#dealer-workflow">Xem quy trình hợp tác</Link>
+              </p>
               <Link href="/lien-he" className="btn-secondary">
                 Trao đổi với ATTD
               </Link>

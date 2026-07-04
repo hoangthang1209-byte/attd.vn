@@ -25,8 +25,12 @@ import { isPreviewableFile } from "@/features/tech-pack/tech-pack-file-validatio
 import {
   PATTERN_ADMIN_LIST_PATH,
 } from "@/features/patterns/pattern-admin-routes";
-import { useAdminAction, useAdminMutation } from "@/hooks/useAdminAction";
-import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import {
+  adminApiFetch,
+  parseAdminJsonResponse,
+  resolveAdminMutationErrorMessage,
+} from "@/lib/admin/adminMutation";
 
 type PatternFile = {
   id: string;
@@ -64,7 +68,6 @@ type PatternDetail = {
 
 export default function PatternDetailManager({ patternId }: { patternId: string }) {
   const mutate = useAdminMutation();
-  const adminAction = useAdminAction();
   const saveBusyRef = useRef(false);
   const [pattern, setPattern] = useState<PatternDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,8 +82,8 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     setError(null);
     try {
       const [patRes, catRes] = await Promise.all([
-        fetch(`/api/patterns/${patternId}`),
-        fetch("/api/categories"),
+        adminApiFetch(`/api/patterns/${patternId}`),
+        adminApiFetch("/api/categories"),
       ]);
       const data = (await patRes.json()) as PatternDetail & { message?: string };
       const catData = (await catRes.json()) as Array<{ id: string; name: string }>;
@@ -107,7 +110,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       successMessage: "Đã cập nhật rập.",
       errorFallback: "Không thể cập nhật rập. Vui lòng thử lại.",
       action: async () => {
-        const res = await fetch(`/api/patterns/${patternId}`, {
+        const res = await adminApiFetch(`/api/patterns/${patternId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
@@ -142,51 +145,45 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     saveBusyRef.current = true;
     setMeasurementSaving(true);
     setMeasurementFieldErrors({});
-    adminAction.loading.show("Đang lưu bảng đo…");
-    try {
-      const res = await fetch(`/api/patterns/${patternId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        message?: string;
-        fieldErrors?: Record<string, string>;
-      } & PatternDetail;
+    await mutate({
+      loadingMessage: "Đang lưu bảng đo…",
+      successMessage: "Đã lưu bảng đo.",
+      errorFallback: "Không thể lưu bảng đo. Vui lòng thử lại.",
+      action: async () => {
+        const res = await adminApiFetch(`/api/patterns/${patternId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+          fieldErrors?: Record<string, string>;
+        } & PatternDetail;
 
-      adminAction.loading.hide();
-      if (!res.ok) {
-        const fieldErrors =
-          body.fieldErrors && typeof body.fieldErrors === "object" ? body.fieldErrors : {};
-        setMeasurementFieldErrors(fieldErrors);
-        const firstFieldError = Object.values(fieldErrors).find(Boolean);
-        const message =
-          firstFieldError ??
-          body.error ??
-          body.message ??
-          "Không thể lưu bảng đo. Vui lòng thử lại.";
-        adminAction.toast.error(message);
-        setError(message);
-        return;
-      }
+        if (!res.ok) {
+          const fieldErrors =
+            body.fieldErrors && typeof body.fieldErrors === "object" ? body.fieldErrors : {};
+          setMeasurementFieldErrors(fieldErrors);
+          const firstFieldError = Object.values(fieldErrors).find(Boolean);
+          const message =
+            firstFieldError ??
+            resolveAdminMutationErrorMessage(res, body as Record<string, unknown>) ??
+            "Không thể lưu bảng đo. Vui lòng thử lại.";
+          return { ok: false as const, message };
+        }
 
-      setPattern(body);
-      setError(null);
-      setMeasurementFieldErrors({});
-      adminAction.toast.success("Đã lưu bảng đo.");
-    } catch (err) {
-      adminAction.loading.hide();
-      const message = "Không thể lưu bảng đo. Vui lòng thử lại.";
-      adminAction.toast.error(message);
-      setError(message);
-      if (process.env.NODE_ENV === "development") {
-        console.error("[pattern.measurements.save]", err);
-      }
-    } finally {
-      setMeasurementSaving(false);
-      saveBusyRef.current = false;
-    }
+        return { ok: true as const, data: body };
+      },
+      onSuccess: (body) => {
+        setPattern(body);
+        setError(null);
+        setMeasurementFieldErrors({});
+      },
+      onError: (message) => setError(message),
+    });
+    setMeasurementSaving(false);
+    saveBusyRef.current = false;
   }
 
   async function approve() {

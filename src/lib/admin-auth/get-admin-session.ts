@@ -15,6 +15,7 @@ import {
   getAdminSessionPayloadFromRequest,
 } from "@/lib/admin-auth/staff-session-node";
 import { isAdminSessionPayloadV2 } from "@/lib/admin-auth/admin-session.shared";
+import { isAdminRequestAuthenticated } from "@/lib/admin-auth/resolve-admin-session-auth";
 
 function payloadToSession(
   authenticated: boolean,
@@ -58,14 +59,15 @@ function payloadToSession(
 }
 
 export async function getAdminSessionFromCookies(): Promise<AdminSessionUser> {
-  const token = await getSessionTokenFromCookies();
-  const authenticated = verifyAdminSessionCookie(token);
-  const payload = authenticated ? await getAdminSessionPayloadFromCookies() : null;
-  return payloadToSession(authenticated, payload);
+  const ownerGateValid = verifyAdminSessionCookie(await getSessionTokenFromCookies());
+  const payload = await getAdminSessionPayloadFromCookies();
+  const authenticated = isAdminRequestAuthenticated({ ownerGateValid, staffPayload: payload });
+  return payloadToSession(authenticated, authenticated ? payload : null);
 }
 
 export function getAdminSessionFromRequest(request: NextRequest): AdminSessionUser {
-  const authenticated = verifyAdminSessionCookie(getSessionTokenFromRequest(request));
-  const payload = authenticated ? getAdminSessionPayloadFromRequest(request) : null;
-  return payloadToSession(authenticated, payload);
+  const ownerGateValid = verifyAdminSessionCookie(getSessionTokenFromRequest(request));
+  const payload = getAdminSessionPayloadFromRequest(request);
+  const authenticated = isAdminRequestAuthenticated({ ownerGateValid, staffPayload: payload });
+  return payloadToSession(authenticated, authenticated ? payload : null);
 }

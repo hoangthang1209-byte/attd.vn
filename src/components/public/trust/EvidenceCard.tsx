@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import type { EvidenceItem } from "@/lib/b2b-trust-v2.types";
 import { isValidImageSrc } from "@/lib/imagePaths";
-import EvidencePlaceholder from "@/components/public/trust/EvidencePlaceholder";
 
 type Props = {
   item: EvidenceItem;
@@ -10,20 +9,24 @@ type Props = {
 
 export default function EvidenceCard({ item }: Props) {
   const hasImage = Boolean(item.imageUrl && isValidImageSrc(item.imageUrl));
+  if (!hasImage) return null;
+
+  const cardClass = [
+    "trust-evidence-card",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   const body = (
     <>
       <div className="trust-evidence-card__media">
-        {hasImage ? (
-          <Image
-            src={item.imageUrl!}
-            alt={item.alt ?? item.title}
-            width={320}
-            height={200}
-            className="trust-evidence-card__image"
-          />
-        ) : (
-          <EvidencePlaceholder />
-        )}
+        <Image
+          src={item.imageUrl!}
+          alt={item.alt ?? item.title}
+          width={320}
+          height={200}
+          className="trust-evidence-card__image"
+        />
       </div>
       <div className="trust-evidence-card__body">
         <span className="trust-evidence-card__category">{item.category}</span>
@@ -37,11 +40,11 @@ export default function EvidenceCard({ item }: Props) {
 
   if (item.href) {
     return (
-      <Link href={item.href} className="trust-evidence-card trust-evidence-card--link">
+      <Link href={item.href} className={`${cardClass} trust-evidence-card--link`}>
         {body}
       </Link>
     );
   }
 
-  return <article className="trust-evidence-card">{body}</article>;
+  return <article className={cardClass}>{body}</article>;
 }

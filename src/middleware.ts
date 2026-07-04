@@ -77,7 +77,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (shouldProtectApiRoute(request) && !authenticated) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { message: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." },
+      { status: 401 },
+    );
   }
 
   if (shouldProtectApiRoute(request) && authenticated && isFinancialApiRoute(pathname)) {

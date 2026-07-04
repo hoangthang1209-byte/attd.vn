@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
 import { CTA } from "@/lib/ctaConfig";
-import EvidenceGrid from "@/components/public/trust/EvidenceGrid";
+import ManufacturingEvidenceStrip from "@/components/public/manufacturing/ManufacturingEvidenceStrip";
 import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
-import { PDP_CONVERSION_POINTS, PDP_EVIDENCE_ITEMS } from "@/lib/b2b-trust-v2-copy";
+import { PDP_CONVERSION_POINTS } from "@/lib/b2b-trust-v2-copy";
+import { getManufacturingEvidenceForSurface } from "@/lib/manufacturing-library.config";
+import type { ManufacturingEvidenceItem } from "@/lib/manufacturing-library.types";
 
 type Props = {
   productName: string;
@@ -16,6 +18,7 @@ type Props = {
   stockLabel?: string | null;
   stockColor?: string;
   onRequestQuote: () => void;
+  manufacturingEvidenceItems?: readonly ManufacturingEvidenceItem[];
 };
 
 export default function ProductPdpConversionPanel({
@@ -27,7 +30,12 @@ export default function ProductPdpConversionPanel({
   stockLabel,
   stockColor = "#16a34a",
   onRequestQuote,
+  manufacturingEvidenceItems,
 }: Props) {
+  const pdpEvidence =
+    manufacturingEvidenceItems ??
+    getManufacturingEvidenceForSurface("pdp", { limit: 2 });
+
   return (
     <aside className="product-detail-right mp-pdp-conversion-aside" aria-label="Yêu cầu báo giá">
       <div className="mp-pdp-conversion-card">
@@ -99,10 +107,10 @@ export default function ProductPdpConversionPanel({
           className="mp-pdp-conversion-trust"
         />
 
-        <EvidenceGrid
-          title="Quy trình hỗ trợ đơn hàng"
-          items={PDP_EVIDENCE_ITEMS}
-          className="mp-pdp-conversion-evidence"
+        <ManufacturingEvidenceStrip
+          title="Minh chứng quy trình"
+          items={pdpEvidence}
+          className="mp-pdp-manufacturing-evidence"
         />
       </div>
     </aside>

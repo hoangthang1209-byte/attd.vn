@@ -117,6 +117,16 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "Thư viện sản xuất",
+    visible: (p) => p.canManageManufacturingLibrary,
+    items: [
+      { href: "/admin/manufacturing-library", label: "Tài sản sản xuất", visible: (p) => p.canManageManufacturingLibrary },
+      { href: "/admin/manufacturing-library/categories", label: "Danh mục", visible: (p) => p.canManageManufacturingLibrary },
+      { href: "/admin/manufacturing-library/display-locations", label: "Vị trí hiển thị", visible: (p) => p.canManageManufacturingLibrary },
+      { href: "/admin/manufacturing-library/workflows", label: "Quy trình", visible: (p) => p.canManageManufacturingLibrary },
+    ],
+  },
+  {
     label: "TECH PACK",
     visible: (p) => p.canViewProduction,
     items: [

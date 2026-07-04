@@ -1,6 +1,8 @@
 import type { useAdminLoading } from "@/components/admin/AdminLoadingProvider";
 
 export const ADMIN_TOAST_ERROR_FALLBACK = "Có lỗi xảy ra. Vui lòng thử lại.";
+export const ADMIN_SESSION_EXPIRED_MESSAGE = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+export const ADMIN_FORBIDDEN_FALLBACK = "Bạn không có quyền thực hiện thao tác này.";
 
 type LoadingApi = Pick<ReturnType<typeof useAdminLoading>, "show" | "hide">;
 
@@ -65,6 +67,35 @@ export async function runAdminMutation<T>(
   }
 }
 
+/** Admin API fetch — always send same-origin session cookies. */
+export function adminApiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  return fetch(input, {
+    credentials: "same-origin",
+    ...init,
+  });
+}
+
+export function resolveAdminMutationErrorMessage(
+  res: Response,
+  body: Record<string, unknown>,
+): string | undefined {
+  if (res.status === 401) {
+    return ADMIN_SESSION_EXPIRED_MESSAGE;
+  }
+  if (res.status === 403) {
+    return (
+      (typeof body.error === "string" && body.error) ||
+      (typeof body.message === "string" && body.message) ||
+      ADMIN_FORBIDDEN_FALLBACK
+    );
+  }
+  return (
+    (typeof body.message === "string" && body.message) ||
+    (typeof body.error === "string" && body.error) ||
+    undefined
+  );
+}
+
 /** Parse a JSON API response into a mutation result. */
 export async function parseAdminJsonResponse<T>(
   res: Response,
@@ -75,17 +106,13 @@ export async function parseAdminJsonResponse<T>(
     body = (await res.json()) as Record<string, unknown>;
   } catch {
     if (!res.ok) {
-      return { ok: false, message: undefined };
+      return { ok: false, message: resolveAdminMutationErrorMessage(res, body) };
     }
     return { ok: false, message: "Phản hồi không hợp lệ từ máy chủ." };
   }
 
   if (!res.ok) {
-    const message =
-      (typeof body.message === "string" && body.message) ||
-      (typeof body.error === "string" && body.error) ||
-      undefined;
-    return { ok: false, message };
+    return { ok: false, message: resolveAdminMutationErrorMessage(res, body) };
   }
   return { ok: true, data: pickData(body) };
 }

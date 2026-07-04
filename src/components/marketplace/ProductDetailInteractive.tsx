@@ -26,6 +26,7 @@ import {
   filterProductGalleryImages,
 } from "@/lib/productImageScope";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
+import type { ManufacturingEvidenceItem } from "@/lib/manufacturing-library.types";
 
 const STOCK_LABELS: Record<string, string> = {
   IN_STOCK: "Còn hàng",
@@ -52,6 +53,7 @@ type Props = {
   displayContent?: string | null;
   showFaqTab?: boolean;
   showRelatedTab?: boolean;
+  manufacturingEvidenceItems?: readonly ManufacturingEvidenceItem[];
 };
 
 export default function ProductDetailInteractive({
@@ -61,6 +63,7 @@ export default function ProductDetailInteractive({
   displayContent,
   showFaqTab = true,
   showRelatedTab = false,
+  manufacturingEvidenceItems,
 }: Props) {
   const optionGroups = product.optionGroups ?? [];
   const variants = product.variants ?? [];
@@ -256,6 +259,7 @@ export default function ProductDetailInteractive({
       stockLabel={stockLabel}
       stockColor={stockColor}
       onRequestQuote={openQuote}
+      manufacturingEvidenceItems={manufacturingEvidenceItems}
     />
   );
 

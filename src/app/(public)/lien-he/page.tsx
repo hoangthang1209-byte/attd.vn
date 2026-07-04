@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ContactForm from "@/components/public/ContactForm";
-import EvidenceGrid from "@/components/public/trust/EvidenceGrid";
 import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
 import {
-  CONTACT_EVIDENCE_ITEMS,
   CONTACT_PROCESS_STEPS,
   TRUST_REASSURANCE_PRIVACY,
 } from "@/lib/b2b-trust-v2-copy";
@@ -68,12 +66,6 @@ export default function LienHePage() {
                 steps={CONTACT_PROCESS_STEPS}
                 reassurance={TRUST_REASSURANCE_PRIVACY}
                 className="contact-page-v2__process"
-              />
-
-              <EvidenceGrid
-                title="ATTD xử lý yêu cầu như thế nào"
-                items={CONTACT_EVIDENCE_ITEMS}
-                className="contact-page-v2__evidence"
               />
 
               <p className="contact-page-v2__dealer-link">

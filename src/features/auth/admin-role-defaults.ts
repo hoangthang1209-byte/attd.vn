@@ -49,6 +49,15 @@ const ALL_CODES = [
   "cms.manage",
   "reports.view",
   "settings.manage",
+  "manufacturingAsset.view",
+  "manufacturingAsset.create",
+  "manufacturingAsset.update",
+  "manufacturingAsset.delete",
+  "manufacturingAsset.publish",
+  "manufacturingAsset.manageRelations",
+  "manufacturingCategory.manage",
+  "manufacturingWorkflow.manage",
+  "manufacturingDisplayLocation.manage",
 ] as const;
 
 function allGrants(scope: PermissionScope = "ALL") {

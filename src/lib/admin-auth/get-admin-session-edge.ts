@@ -9,6 +9,7 @@ import { verifyAdminSessionToken, getAdminSessionSecret, ADMIN_SESSION_MESSAGE }
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth/constants";
 import { getAdminSessionPayloadFromRequestEdge } from "@/lib/admin-auth/staff-session-edge";
 import { isAdminSessionPayloadV2 } from "@/lib/admin-auth/admin-session.shared";
+import { isAdminRequestAuthenticated } from "@/lib/admin-auth/resolve-admin-session-auth";
 
 async function isAuthenticatedEdge(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
@@ -69,7 +70,8 @@ function payloadToSession(
 export async function getAdminSessionFromRequestEdge(
   request: NextRequest,
 ): Promise<AdminSessionUser> {
-  const authenticated = await isAuthenticatedEdge(request);
-  const payload = authenticated ? await getAdminSessionPayloadFromRequestEdge(request) : null;
-  return payloadToSession(authenticated, payload);
+  const ownerGateValid = await isAuthenticatedEdge(request);
+  const payload = await getAdminSessionPayloadFromRequestEdge(request);
+  const authenticated = isAdminRequestAuthenticated({ ownerGateValid, staffPayload: payload });
+  return payloadToSession(authenticated, authenticated ? payload : null);
 }

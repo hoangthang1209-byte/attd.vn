@@ -4,7 +4,8 @@ import {
   getAdminSessionSecret,
   verifyAdminSessionToken,
 } from "@/lib/admin-auth/config";
-import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth/constants";
+import { ADMIN_SESSION_COOKIE, ADMIN_STAFF_SESSION_COOKIE } from "@/lib/admin-auth/constants";
+import { verifyAdminSessionPayloadTokenEdge } from "@/lib/admin-auth/staff-session-edge";
 
 let cachedExpectedToken: string | null | undefined;
 
@@ -35,5 +36,10 @@ async function getExpectedSessionToken(): Promise<string | null> {
 export async function isRequestAdminAuthenticatedEdge(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   const expected = await getExpectedSessionToken();
-  return verifyAdminSessionToken(token, expected);
+  if (verifyAdminSessionToken(token, expected)) return true;
+
+  const staffPayload = await verifyAdminSessionPayloadTokenEdge(
+    request.cookies.get(ADMIN_STAFF_SESSION_COOKIE)?.value,
+  );
+  return staffPayload !== null;
 }

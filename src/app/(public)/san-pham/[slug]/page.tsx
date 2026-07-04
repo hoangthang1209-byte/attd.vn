@@ -20,6 +20,7 @@ import {
 import { getCatalogProduct } from "@/lib/productCatalog";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
 import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
+import { getManufacturingEvidenceForProduct } from "@/lib/manufacturing-library.server";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -81,6 +82,11 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const relatedProducts = product.category?.id
     ? await getRelatedProducts(product.category.id, product.id, 4)
     : [];
+  const manufacturingEvidenceItems = await getManufacturingEvidenceForProduct({
+    productId: product.id,
+    categoryId: product.category?.id,
+    limit: 2,
+  });
 
   const productJsonLd = {
     "@context": "https://schema.org",
@@ -161,6 +167,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
         displayShortDescription={displayShortDescription}
         displayContent={displayContent}
         showRelatedTab={relatedProducts.length > 0}
+        manufacturingEvidenceItems={manufacturingEvidenceItems}
       />
 
       <section className="mp-section mp-pdp-section mp-pdp-section--alt" id="mp-pdp-faq">

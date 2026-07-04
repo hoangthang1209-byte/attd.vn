@@ -38,6 +38,7 @@ export async function GET() {
       canViewDashboard: can(session, "dashboard.view"),
       canViewWarehouse: can(session, "warehouse.view"),
       canViewReports: can(session, "reports.view"),
+      canManageManufacturingLibrary: can(session, "manufacturingAsset.view"),
     },
   });
 }

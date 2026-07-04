@@ -1,0 +1,44 @@
+import { NextResponse } from "next/server";
+import { can } from "@/features/auth/admin-permissions";
+import { getAdminSessionFromCookies } from "@/lib/admin-auth/get-admin-session";
+import {
+  deleteManufacturingDisplayLocationAdmin,
+  saveManufacturingDisplayLocationAdmin,
+  ManufacturingAdminValidationError,
+  type ManufacturingDisplayLocationAdminInput,
+} from "@/features/manufacturing-library/manufacturing-admin.service";
+
+function forbidden() {
+  return NextResponse.json({ message: "Không có quyền truy cập" }, { status: 403 });
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await getAdminSessionFromCookies();
+  if (!can(session, "manufacturingDisplayLocation.manage")) return forbidden();
+  const { id } = await params;
+  try {
+    const displayLocation = await saveManufacturingDisplayLocationAdmin(
+      (await request.json()) as ManufacturingDisplayLocationAdminInput,
+      id,
+    );
+    return NextResponse.json({ displayLocation });
+  } catch (error) {
+    const status = error instanceof ManufacturingAdminValidationError ? error.status : 500;
+    const message = error instanceof Error ? error.message : "Không thể lưu vị trí";
+    return NextResponse.json({ message }, { status });
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await getAdminSessionFromCookies();
+  if (!can(session, "manufacturingDisplayLocation.manage")) return forbidden();
+  const { id } = await params;
+  const displayLocation = await deleteManufacturingDisplayLocationAdmin(id);
+  return NextResponse.json({ displayLocation });
+}

@@ -8,7 +8,8 @@ import {
   verifyAdminPassword as verifyPassword,
   verifyAdminSessionToken,
 } from "@/lib/admin-auth/config";
-import { ADMIN_SESSION_COOKIE } from "@/lib/admin-auth/constants";
+import { ADMIN_SESSION_COOKIE, ADMIN_STAFF_SESSION_COOKIE } from "@/lib/admin-auth/constants";
+import { verifyAdminSessionPayloadToken } from "@/lib/admin-auth/staff-session-node";
 
 export function createAdminSessionToken(): string | null {
   const secret = getAdminSessionSecret();
@@ -35,7 +36,8 @@ export async function getSessionTokenFromCookies(): Promise<string | undefined> 
 }
 
 export function isRequestAdminAuthenticated(request: NextRequest): boolean {
-  return verifyAdminSessionCookie(getSessionTokenFromRequest(request));
+  if (verifyAdminSessionCookie(getSessionTokenFromRequest(request))) return true;
+  return verifyAdminSessionPayloadToken(request.cookies.get(ADMIN_STAFF_SESSION_COOKIE)?.value) !== null;
 }
 
 export async function isCookieAdminAuthenticated(): Promise<boolean> {
