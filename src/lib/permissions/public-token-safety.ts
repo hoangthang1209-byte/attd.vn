@@ -6,7 +6,12 @@ import {
 
 export { PUBLIC_TOKEN_FORBIDDEN_FIELDS };
 
-const FORBIDDEN_FIELD_SET = new Set<string>(PUBLIC_TOKEN_FORBIDDEN_FIELDS);
+const FORBIDDEN_FIELD_SET = new Set<string>(
+  PUBLIC_TOKEN_FORBIDDEN_FIELDS.map((field) => field.toLowerCase()),
+);
+const FORBIDDEN_FIELD_CANONICAL = new Map<string, string>(
+  PUBLIC_TOKEN_FORBIDDEN_FIELDS.map((field) => [field.toLowerCase(), field]),
+);
 
 export function containsForbiddenPublicTokenField(value: unknown): boolean {
   return assertPublicTokenSafePayload(value).ok === false;
@@ -37,8 +42,9 @@ function collectForbiddenFields(
   seen: WeakSet<object>,
 ): void {
   if (!value || typeof value !== "object") {
-    if (typeof value === "string" && isForbiddenField(value)) {
-      forbiddenFields.add(value);
+    if (typeof value === "string") {
+      const canonicalField = getForbiddenField(value);
+      if (canonicalField) forbiddenFields.add(canonicalField);
     }
     return;
   }
@@ -52,11 +58,14 @@ function collectForbiddenFields(
   }
 
   for (const [key, childValue] of Object.entries(value)) {
-    if (isForbiddenField(key)) forbiddenFields.add(key);
+    const canonicalField = getForbiddenField(key);
+    if (canonicalField) forbiddenFields.add(canonicalField);
     collectForbiddenFields(childValue, forbiddenFields, seen);
   }
 }
 
-function isForbiddenField(field: string): field is PublicTokenForbiddenField {
-  return FORBIDDEN_FIELD_SET.has(field);
+function getForbiddenField(field: string): PublicTokenForbiddenField | null {
+  const normalized = field.toLowerCase();
+  if (!FORBIDDEN_FIELD_SET.has(normalized)) return null;
+  return (FORBIDDEN_FIELD_CANONICAL.get(normalized) ?? field) as PublicTokenForbiddenField;
 }

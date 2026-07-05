@@ -14,6 +14,7 @@ import { resolveQuoteCompanyProfile } from "@/features/quotes/quote-company-prof
 import { resolveQuoteDocumentBaseUrl } from "@/features/quotes/pdf/quote-pdf-url";
 import { getBrandingSettings, getCompanySettings } from "@/features/settings/services/settings.service";
 import { isCookieAdminAuthenticated } from "@/lib/admin-auth/session-node";
+import { assertPublicTokenSafePayload } from "@/lib/permissions/public-token-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,17 @@ export default async function OrderDocumentPage({ params, searchParams }: Props)
   const company = resolveQuoteCompanyProfile(companySettings);
   const logoUrl = branding.headerLogoUrl ?? branding.footerLogoUrl;
   const document = formatOrderDocument(order, docType);
+  if (pdfAccess) {
+    const safety = assertPublicTokenSafePayload(document);
+    if (!safety.ok) {
+      console.error("[OrderDocumentPage] unsafe public order document payload", {
+        orderNo,
+        docType,
+        forbiddenFields: safety.forbiddenFields,
+      });
+      notFound();
+    }
+  }
   const mediaBaseUrl =
     variant === "pdf" || variant === "print"
       ? resolveOrderDocumentBaseUrl(requestHeaders)

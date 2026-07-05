@@ -9,6 +9,10 @@ import {
 import { parseQuotePdfDisposition } from "@/features/quotes/pdf/quote-pdf-disposition";
 import { getBrandingSettings, getCompanySettings } from "@/features/settings/services/settings.service";
 import { resolveQuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
+import {
+  assertPublicTokenSafePayload,
+  createPublicTokenForbiddenFieldResponse,
+} from "@/lib/permissions/public-token-safety";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +36,15 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
     if (!pdfData) {
       return quoteNotFoundResponse();
+    }
+
+    const safety = assertPublicTokenSafePayload(pdfData);
+    if (!safety.ok) {
+      console.error("[GET /api/quotes/public/[token]/pdf] unsafe public quote PDF data", {
+        token,
+        forbiddenFields: safety.forbiddenFields,
+      });
+      return createPublicTokenForbiddenFieldResponse(safety.forbiddenFields);
     }
 
     const disposition = parseQuotePdfDisposition(

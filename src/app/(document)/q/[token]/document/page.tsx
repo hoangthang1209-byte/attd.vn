@@ -7,6 +7,7 @@ import { getPublicQuoteByToken } from "@/features/quotes/quote.service";
 import { getBrandingSettings, getCompanySettings } from "@/features/settings/services/settings.service";
 import { resolveQuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
 import { resolveQuoteDocumentBaseUrl } from "@/features/quotes/pdf/quote-pdf-url";
+import { assertPublicTokenSafePayload } from "@/lib/permissions/public-token-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,15 @@ export default async function QuoteDocumentPage({ params, searchParams }: Props)
   ]);
 
   if (!quote) notFound();
+
+  const safety = assertPublicTokenSafePayload(quote);
+  if (!safety.ok) {
+    console.error("[QuoteDocumentPage] unsafe public quote document payload", {
+      token,
+      forbiddenFields: safety.forbiddenFields,
+    });
+    notFound();
+  }
 
   const company = resolveQuoteCompanyProfile(companySettings);
   const logoUrl = branding.headerLogoUrl ?? branding.footerLogoUrl;

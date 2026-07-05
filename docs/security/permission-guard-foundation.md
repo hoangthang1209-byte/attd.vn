@@ -101,3 +101,11 @@ Future hardening sprints should:
 3. Map platform/action pairs to concrete permission codes.
 4. Add elevated handling for export, download, delete, approve, publish, release, and private-file routes.
 5. Add public-token minimization tests before applying public-token safety to quote/order/tech-pack documents.
+
+## CTO-5 Public-Token Data-Minimization Tests
+
+CTO-5 added `npm run security:public-token` and applied `assertPublicTokenSafePayload` to the public quote JSON/PDF/document surfaces plus order PDF-token document rendering.
+
+The guard is intentionally data-object based. It scans public payload keys before JSON responses or document rendering and does not inspect final HTML or PDF binaries.
+
+Tech-pack public PDF output is documented as deferred because it needs a dedicated public serializer before internal tech-pack fields can be removed safely.
