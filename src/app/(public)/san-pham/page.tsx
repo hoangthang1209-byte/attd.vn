@@ -137,9 +137,12 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                   <p className="mp-catalog-results-kicker">Danh sách nguồn hàng</p>
                   <p className="mp-catalog-count">
                     {total > 0
-                      ? `${total} sản phẩm${q ? ` cho "${q}"` : ""}${categoryContext ? ` · ${categoryContext.name}` : ""}`
+                      ? `${total} sản phẩm phù hợp${categoryContext ? ` · ${categoryContext.name}` : ""}`
                       : "Không tìm thấy sản phẩm"}
                   </p>
+                  {total > 0 && q ? (
+                    <p className="mp-catalog-query-context">Từ khóa: “{q}”</p>
+                  ) : null}
                 </div>
                 <CatalogFilterToolbar
                   categoryTree={categoryTree}

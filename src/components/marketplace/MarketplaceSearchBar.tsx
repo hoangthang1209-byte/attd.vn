@@ -11,7 +11,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { Search } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 
 const SEARCH_SUGGESTIONS = [
   { label: "Áo thun trơn", query: "áo thun trơn" },
@@ -41,7 +41,7 @@ type MarketplaceSearchBarProps = {
 };
 
 export default function MarketplaceSearchBar({
-  placeholder = "Tìm áo thun, polo, nón, tote, bình giữ nhiệt...",
+  placeholder = "Tìm áo, nón, quà tặng...",
   defaultValue = "",
   size = "default",
   variant = "default",
@@ -207,7 +207,8 @@ export default function MarketplaceSearchBar({
                 className="mp-search-discovery__link"
                 onClick={handleShortcutNavigate}
               >
-                {item.label}
+                <span>{item.label}</span>
+                <ChevronRight size={14} aria-hidden />
               </Link>
             ))}
           </div>
