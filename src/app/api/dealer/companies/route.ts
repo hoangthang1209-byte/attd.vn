@@ -5,6 +5,7 @@ import type {
   DealerLevel,
 } from "@prisma/client";
 import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import {
   dealerApiError,
   parseOptionalString,
@@ -53,8 +54,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authError = await requireAdminApiFromCookies();
-  if (authError) return authError;
+  const permission = await requireAdminPermission({
+    platform: "dealer",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   let body: unknown;
   try {

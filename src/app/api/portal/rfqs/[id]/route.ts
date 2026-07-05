@@ -10,6 +10,7 @@ import {
   updateDealerRFQ,
 } from "@/features/dealer/services/dealer-rfq.service";
 import { requireApprovedDealerPortalFromCookies } from "@/lib/dealer-auth/require-dealer-portal";
+import { requireDealerPermission } from "@/lib/permissions/require-dealer-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -48,8 +49,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
-  const auth = await requireApprovedDealerPortalFromCookies();
-  if ("error" in auth) return auth.error;
+  const permission = await requireDealerPermission({
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   const { id } = await params;
   let body: unknown;
@@ -99,7 +103,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
         note: raw.note !== undefined ? parseOptionalString(raw.note) : undefined,
         items: parseItems(raw.items),
       },
-      { dealerCompanyId: auth.session.companyId },
+      { dealerCompanyId: permission.session.companyId },
     );
     return NextResponse.json({ rfq });
   } catch (err) {

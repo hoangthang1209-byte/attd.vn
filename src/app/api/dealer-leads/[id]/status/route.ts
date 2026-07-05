@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import { Prisma } from "@prisma/client";
 import type { LeadPipelineStatus } from "@prisma/client";
 
@@ -23,6 +24,13 @@ export async function PATCH(
   req: NextRequest,
   { params }: RouteParams
 ): Promise<NextResponse> {
+  const permission = await requireAdminPermission({
+    platform: "dealer",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
 
   let body: unknown;

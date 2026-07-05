@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import { dealerApiError, parseOptionalString } from "@/features/dealer/dealer-api-utils";
 import {
   getDealerRFQById,
@@ -29,8 +30,12 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
-  const authError = await requireAdminApiFromCookies();
-  if (authError) return authError;
+  const permission = await requireAdminPermission({
+    platform: "dealer",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   const { id } = await params;
   let body: unknown;

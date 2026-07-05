@@ -122,6 +122,16 @@ Public quote/order token routes remain governed by public-token safety and were 
 
 Full action-level enforcement remains future work until platform/action pairs are mapped to concrete `AdminPermission` codes.
 
+## CTO-7D Dealer Platform Mutation Hardening
+
+CTO-7D applied `requireAdminPermission()` to admin-side Dealer Platform company, user, RFQ, lead, approval, price-group assignment, password administration, and CRM-link mutation handlers. Admin Dealer mutations now use `platform: "dealer"` with the appropriate `create`, `update`, `delete`, `approve`, or `admin` action.
+
+Dealer portal RFQ create/update/submit mutations use `requireDealerPermission()` and keep dealer company ownership checks by passing the authenticated `permission.session.companyId` into the existing RFQ service calls.
+
+Public dealer intake remains public: `/api/dealers` and the public `POST /api/dealer-leads` capture paths were not converted to admin or dealer guards. Dealer portal login remains public, and logout remains a cookie-clearing auth utility until a session-only guard is introduced that does not require approved company status.
+
+Full admin action-code enforcement and dealer role/action enforcement remain future work until platform/action pairs are mapped to concrete `AdminPermission` codes and dealer portal roles.
+
 ## CTO-5 Pattern
 
 Future hardening sprints should:

@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import { dealerApiError } from "@/features/dealer/dealer-api-utils";
 import { assignDealerRFQ } from "@/features/dealer/services/dealer-rfq.service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: RouteContext) {
-  const authError = await requireAdminApiFromCookies();
-  if (authError) return authError;
+  const permission = await requireAdminPermission({
+    platform: "dealer",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   const { id } = await params;
   let body: unknown;

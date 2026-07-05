@@ -11,6 +11,7 @@ import {
   listDealerRFQsForCompany,
 } from "@/features/dealer/services/dealer-rfq.service";
 import { requireApprovedDealerPortalFromCookies } from "@/lib/dealer-auth/require-dealer-portal";
+import { requireDealerPermission } from "@/lib/permissions/require-dealer-permission";
 
 function parseItems(raw: unknown): DealerRFQItemInput[] | undefined {
   if (!Array.isArray(raw)) return undefined;
@@ -95,8 +96,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await requireApprovedDealerPortalFromCookies();
-  if ("error" in auth) return auth.error;
+  const permission = await requireDealerPermission({
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   let body: unknown;
   try {
@@ -112,8 +116,8 @@ export async function POST(req: NextRequest) {
     const parsed = parseBody(body as Record<string, unknown>);
     const rfq = await createDealerRFQ({
       ...parsed,
-      dealerCompanyId: auth.session.companyId,
-      dealerUserId: auth.session.userId,
+      dealerCompanyId: permission.session.companyId,
+      dealerUserId: permission.session.userId,
     });
     return NextResponse.json({ rfq }, { status: 201 });
   } catch (err) {
