@@ -34,6 +34,8 @@ This system does not apply to public frontend experiences:
 
 Public frontend UX may have its own visual direction. Do not use this CMS design authority to constrain customer-facing marketing, catalog, SEO, or landing experiences.
 
+The CMS Design System does NOT govern public website frontend UX.
+
 ## Core Principle
 
 ATTD CMS is an operational system: fast, calm, clear, and consistent.
