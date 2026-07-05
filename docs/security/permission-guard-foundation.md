@@ -142,6 +142,16 @@ Admin auth login/logout utilities remain public auth endpoints. Existing `canMan
 
 Full action-level enforcement remains future work until platform/action pairs are mapped to concrete `AdminPermission` codes.
 
+## CTO-7F Manufacturing / Tech Pack Mutation Hardening
+
+CTO-7F applied `requireAdminPermission()` to Manufacturing Platform material, supplier, production master data, purchase request, production plan, production file upload, print method, and Manufacturing Library admin mutation handlers. Manufacturing create/update/delete/approve/admin/export mutations now use `platform: "manufacturing"` with the matching action.
+
+Tech Pack Platform tech pack, pattern, measurement template, BOM, asset, publish/release, and admin PDF mutation handlers now use `platform: "tech-pack"` with the matching `create`, `update`, `delete`, `approve`, or `export` action. Existing `requireProductionView` / `requireProductionUpdate` and Manufacturing Library `can(manufacturingAsset.*)` checks remain after the guard.
+
+Public Tech Pack token document routes hardened in CTO-6 were not converted to admin guards. Order-scoped production/QC/material mutations already guarded in CTO-7C Commercial were not duplicated.
+
+Full action-level enforcement remains future work until platform/action pairs are mapped to concrete `AdminPermission` codes.
+
 ## CTO-5 Pattern
 
 Future hardening sprints should:

@@ -5,6 +5,7 @@ import {
   MeasurementTemplateValidationError,
 } from "@/features/measurement-template/measurement-template.service";
 import { requireProductionUpdate, requireProductionView } from "@/lib/admin-auth/require-production-api";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
   const auth = requireProductionView(req);
@@ -24,6 +25,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "tech-pack",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const auth = requireProductionUpdate(req);
   if (auth.error) return auth.error;
   try {

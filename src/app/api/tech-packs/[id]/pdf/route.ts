@@ -7,6 +7,7 @@ import {
   parseTechPackPdfDisposition,
 } from "@/features/tech-pack/pdf/tech-pack-pdf-route";
 import { requireProductionView } from "@/lib/admin-auth/require-production-api";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,14 @@ export const dynamic = "force-dynamic";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "tech-pack",
+    action: "export",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const auth = requireProductionView(req);
   if (auth.error) return auth.error;
 

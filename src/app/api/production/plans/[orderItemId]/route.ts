@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireProductionView } from "@/lib/admin-auth/require-production-api";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import {
   getProductionPlanDetail,
   upsertProductionPlan,
@@ -25,6 +26,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const { session, error } = requireProductionView(req);
   if (error) return error;
 

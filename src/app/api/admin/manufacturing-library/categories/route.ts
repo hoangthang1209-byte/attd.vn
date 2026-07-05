@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { can } from "@/features/auth/admin-permissions";
 import { getAdminSessionFromCookies } from "@/lib/admin-auth/get-admin-session";
 import { prisma } from "@/lib/prisma";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import {
   saveManufacturingCategoryAdmin,
   ManufacturingAdminValidationError,
@@ -23,6 +24,14 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "create",
+    request: request,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const session = await getAdminSessionFromCookies();
   if (!can(session, "manufacturingCategory.manage")) return forbidden();
   try {

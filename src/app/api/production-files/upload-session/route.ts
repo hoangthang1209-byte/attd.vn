@@ -7,6 +7,7 @@ import {
 } from "@/features/storage/r2/r2-production-file.service";
 import { isR2Configured } from "@/features/storage/r2/r2-client";
 import { ERROR_R2_NOT_CONFIGURED } from "@/features/storage/file-classification";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,14 @@ function parseProductionFileType(value: unknown): ProductionFileType | null {
 }
 
 export async function POST(request: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "create",
+    request: request,
+  });
+  if (!permission.ok) return permission.response;
+
+
   if (!isR2Configured()) {
     return NextResponse.json(
       { message: ERROR_R2_NOT_CONFIGURED, r2Unavailable: true },

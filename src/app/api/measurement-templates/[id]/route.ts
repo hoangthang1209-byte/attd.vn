@@ -5,6 +5,7 @@ import {
   MeasurementTemplateValidationError,
 } from "@/features/measurement-template/measurement-template.service";
 import { requireProductionUpdate, requireProductionView } from "@/lib/admin-auth/require-production-api";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -18,6 +19,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "tech-pack",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const auth = requireProductionUpdate(req);
   if (auth.error) return auth.error;
   const { id } = await context.params;

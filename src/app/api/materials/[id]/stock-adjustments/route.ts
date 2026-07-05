@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { applyStockAdjustment } from "@/features/materials/warehouse.service";
 import { MaterialValidationError } from "@/features/materials/material-decimal";
 import type { MaterialStockAdjustmentType } from "@prisma/client";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const ADJUSTMENT_TYPES: MaterialStockAdjustmentType[] = [
   "OPENING_BALANCE",
@@ -14,6 +15,14 @@ const ADJUSTMENT_TYPES: MaterialStockAdjustmentType[] = [
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const { id } = await ctx.params;
   let body: unknown;
   try {

@@ -4,11 +4,20 @@ import {
   TechPackValidationError,
 } from "@/features/tech-pack/tech-pack.service";
 import { requireProductionUpdate } from "@/lib/admin-auth/require-production-api";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 /** Sprint 26.3.21 alias for release */
 export async function POST(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "tech-pack",
+    action: "approve",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const auth = requireProductionUpdate(req);
   if (auth.error) return auth.error;
 

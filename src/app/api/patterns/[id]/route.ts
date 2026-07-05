@@ -8,6 +8,7 @@ import {
 import { parsePatternUpdateBody } from "@/features/patterns/pattern-update-input";
 import { requireProductionUpdate, requireProductionView } from "@/lib/admin-auth/require-production-api";
 import type { AdminSessionUser } from "@/features/auth/admin-session.types";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 type PatternMeasurementErrorCode =
@@ -171,6 +172,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "tech-pack",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const traceId = createTraceId();
   let measurementDiagnostics = inspectMeasurementPayload(null);
   const auth = requireProductionUpdate(req);

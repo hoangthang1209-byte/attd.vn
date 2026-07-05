@@ -6,10 +6,19 @@ import {
   updatePatternFile,
 } from "@/features/patterns/pattern.service";
 import { requireProductionUpdate } from "@/lib/admin-auth/require-production-api";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string; fileId: string }> };
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "tech-pack",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const auth = requireProductionUpdate(req);
   if (auth.error) return auth.error;
 
@@ -48,6 +57,14 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 }
 
 export async function DELETE(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "tech-pack",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const auth = requireProductionUpdate(req);
   if (auth.error) return auth.error;
 

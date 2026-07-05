@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import {
   completeR2ProductionUpload,
   R2ProductionFileError,
@@ -7,6 +8,14 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "update",
+    request: request,
+  });
+  if (!permission.ok) return permission.response;
+
+
   let body: unknown;
   try {
     body = await request.json();

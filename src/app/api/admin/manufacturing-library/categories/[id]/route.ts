@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { can } from "@/features/auth/admin-permissions";
 import { getAdminSessionFromCookies } from "@/lib/admin-auth/get-admin-session";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import {
   deleteManufacturingCategoryAdmin,
   saveManufacturingCategoryAdmin,
@@ -16,6 +17,14 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "update",
+    request: request,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const session = await getAdminSessionFromCookies();
   if (!can(session, "manufacturingCategory.manage")) return forbidden();
   const { id } = await params;
@@ -33,9 +42,17 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "delete",
+    request: request,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const session = await getAdminSessionFromCookies();
   if (!can(session, "manufacturingCategory.manage")) return forbidden();
   const { id } = await params;

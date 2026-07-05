@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { MaterialValidationError } from "@/features/materials/material-decimal";
 import { transitionPurchaseRequestStatus } from "@/features/materials/purchase-request.service";
 import type { PurchaseRequestStatus } from "@prisma/client";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const STATUSES: PurchaseRequestStatus[] = [
   "DRAFT",
@@ -15,6 +16,14 @@ const STATUSES: PurchaseRequestStatus[] = [
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const { id } = await ctx.params;
   let body: unknown;
   try {

@@ -5,6 +5,7 @@ import {
   listPurchaseRequests,
 } from "@/features/materials/purchase-request.service";
 import type { PurchaseRequestStatus } from "@prisma/client";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const STATUSES: PurchaseRequestStatus[] = [
   "DRAFT",
@@ -34,6 +35,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   let body: unknown;
   try {
     body = await req.json();

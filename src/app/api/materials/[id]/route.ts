@@ -7,6 +7,7 @@ import {
 } from "@/features/materials/material.service";
 import { MaterialValidationError } from "@/features/materials/material-decimal";
 import { isMaterialType } from "@/features/materials/material-type";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -20,6 +21,14 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const { id } = await ctx.params;
   let body: unknown;
   try {

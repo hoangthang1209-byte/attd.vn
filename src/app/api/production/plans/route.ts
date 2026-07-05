@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ProductionPlanPriority, ProductionPlanStatus } from "@prisma/client";
 import { requireProductionView } from "@/lib/admin-auth/require-production-api";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import {
   listProductionPlans,
   upsertProductionPlan,
@@ -64,6 +65,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const { session, error } = requireProductionView(req);
   if (error) return error;
 

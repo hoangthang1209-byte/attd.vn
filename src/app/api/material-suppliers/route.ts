@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MaterialValidationError } from "@/features/materials/material-decimal";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import {
   createMaterialSupplier,
   listMaterialSuppliers,
@@ -20,6 +21,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   let body: unknown;
   try {
     body = await req.json();

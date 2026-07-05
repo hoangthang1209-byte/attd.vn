@@ -4,10 +4,19 @@ import {
   MeasurementTemplateValidationError,
 } from "@/features/measurement-template/measurement-template.service";
 import { requireProductionUpdate } from "@/lib/admin-auth/require-production-api";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "tech-pack",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const auth = requireProductionUpdate(req);
   if (auth.error) return auth.error;
   const { id } = await context.params;

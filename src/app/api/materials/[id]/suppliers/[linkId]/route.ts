@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MaterialValidationError } from "@/features/materials/material-decimal";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import {
   deleteMaterialSupplierLink,
   updateMaterialSupplierLink,
@@ -8,6 +9,14 @@ import {
 type RouteContext = { params: Promise<{ id: string; linkId: string }> };
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const { id, linkId } = await ctx.params;
   let body: unknown;
   try {
@@ -46,7 +55,15 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+export async function DELETE(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+
   const { id, linkId } = await ctx.params;
   try {
     await deleteMaterialSupplierLink(id, linkId);
