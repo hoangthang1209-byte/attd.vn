@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
 import {
   EXPORT_FORMATS,
   EXPORT_SCOPE_TYPES,
@@ -13,6 +12,7 @@ import {
   ProductAdminValidationError,
 } from "@/features/products/product-admin-input";
 import type { ProductListParams } from "@/features/products/product-admin.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function parseExportOptions(body: Record<string, unknown>): ProductExportOptions {
   const scope = String(body.scope ?? "");
@@ -57,8 +57,12 @@ function parseExportOptions(body: Record<string, unknown>): ProductExportOptions
 }
 
 export async function POST(req: NextRequest) {
-  const authError = await requireAdminApiFromCookies();
-  if (authError) return authError;
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "export",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   let body: Record<string, unknown>;
   try {

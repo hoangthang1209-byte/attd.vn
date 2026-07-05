@@ -11,6 +11,7 @@ import {
   formatSeoPublishQualityGateApiError,
 } from "@/lib/seo/publish-quality-gate";
 import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-public-category-cache";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -52,6 +53,13 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 }
 
 export async function PUT(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await ctx.params;
   let body: unknown;
   try {
@@ -88,7 +96,14 @@ export async function PUT(req: NextRequest, ctx: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+export async function DELETE(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await ctx.params;
   try {
     const result = await deleteProductCategory(id);

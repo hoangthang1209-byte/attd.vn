@@ -10,6 +10,7 @@ import {
   parseProductInput,
   ProductAdminValidationError,
 } from "@/features/products/product-admin-input";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function logProductAdminError(action: "update" | "delete", err: unknown) {
   const message = err instanceof Error ? err.message : String(err);
@@ -28,6 +29,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   let body: unknown;
   try {
@@ -51,7 +59,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   try {
     const archived = await archiveProductAdmin(id);
@@ -64,6 +79,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   let body: unknown;
   try {

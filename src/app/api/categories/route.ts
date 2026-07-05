@@ -4,6 +4,7 @@ import { createProductCategory } from "@/features/products/product-admin.service
 import { categoryMutationErrorResponse } from "@/features/products/product-mutation-api";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-public-category-cache";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET() {
   const categories = await prisma.category.findMany({
@@ -14,6 +15,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "create",
+    request,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await request.json();

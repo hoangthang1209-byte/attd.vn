@@ -5,7 +5,6 @@ import {
   previewProductImportV2,
 } from "@/features/products/product-import-v2.service";
 import type { ProductImportOptions, ProductImportRow } from "@/features/products/product-import-types";
-import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
 import {
   createProductImportJob,
   tryStoreImportOriginalFile,
@@ -14,6 +13,7 @@ import {
   prismaErrorDetail,
 } from "@/features/products/product-import-job-service";
 import { prisma } from "@/lib/prisma";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function buildSummary(rows: Awaited<ReturnType<typeof previewProductImport>>, options?: ProductImportOptions) {
   if (options?.importMode) {
@@ -241,8 +241,12 @@ async function runPreview(input: ParsedPreviewInput) {
 }
 
 export async function POST(req: NextRequest) {
-  const authError = await requireAdminApiFromCookies();
-  if (authError) return authError;
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   const contentType = req.headers.get("content-type") ?? "";
 

@@ -6,6 +6,7 @@ import {
 } from "@/features/products/product-admin.service";
 import { productMutationErrorResponse } from "@/features/products/product-mutation-api";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const VALID_STATUSES = ["ACTIVE", "DRAFT", "INACTIVE", "ARCHIVED"] as const;
 
@@ -17,6 +18,13 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "update",
+    request,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
 
   let body: Record<string, unknown>;
@@ -83,9 +91,16 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "delete",
+    request,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
 
   try {

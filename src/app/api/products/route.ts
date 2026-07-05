@@ -4,6 +4,7 @@ import { createProductAdmin } from "@/features/products/product-admin.service";
 import { productMutationErrorResponse } from "@/features/products/product-mutation-api";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 import type { ProductStatus } from "@prisma/client";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET() {
   const products = await prisma.product.findMany({
@@ -20,6 +21,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "create",
+    request,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();

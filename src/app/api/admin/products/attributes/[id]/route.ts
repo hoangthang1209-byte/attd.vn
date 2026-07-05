@@ -4,8 +4,16 @@ import {
   updateAttributeOption,
   deleteAttributeOption,
 } from "@/features/products/product-attribute.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ message: "Invalid JSON" }, { status: 400 }); }
@@ -24,7 +32,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   try {
     await deleteAttributeOption(id);

@@ -3,6 +3,7 @@ import {
   deleteProductImportJob,
   getProductImportJob,
 } from "@/features/products/product-import-job-service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(
   _req: NextRequest,
@@ -28,9 +29,16 @@ export async function GET(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   try {
     const job = await getProductImportJob(id);

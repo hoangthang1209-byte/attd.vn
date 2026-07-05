@@ -10,7 +10,7 @@ import {
   type BulkOperationType,
   type BulkVariantInput,
 } from "@/features/products/product-variant-bulk.service";
-import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const VALID_OPERATIONS = new Set<BulkOperationType>([
   "archive",
@@ -145,13 +145,12 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const authError = await requireAdminApiFromCookies();
-  if (authError) {
-    return NextResponse.json(
-      { message: "Bạn không có quyền thực hiện thao tác này." },
-      { status: 401 },
-    );
-  }
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   const { id: productId } = await params;
   let body: Record<string, unknown>;

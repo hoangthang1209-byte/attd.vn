@@ -92,6 +92,20 @@ Do not apply this broadly until public-token route tests are in place, especiall
 
 Both pilots preserve the existing authorized business behavior and only normalize permission failures.
 
+## CTO-7A Product Platform Mutation Hardening
+
+CTO-7A applied `requireAdminPermission()` to Product Platform mutation handlers across admin Product APIs and legacy Product write routes. The sprint guarded 31 `POST`, `PATCH`, `PUT`, and `DELETE` handlers after inspecting 29 Product route files.
+
+Applied Product action mapping:
+
+- create/category/variant/color/size/attribute/import preview/import parse mutations: `platform: "product"`, `action: "create"`
+- update/stock/material/category/attribute mutations: `platform: "product"`, `action: "update"`
+- archive/delete/delete-job mutations: `platform: "product"`, `action: "delete"`
+- export mutation: `platform: "product"`, `action: "export"`
+- starter, seed, and import execution mutations: `platform: "product"`, `action: "admin"`
+
+CTO-7A intentionally did not guard Product GET routes. Product import downloads/templates and body-aware bulk variant action mapping remain deferred for a later read/export and concrete-permission enforcement sprint.
+
 ## CTO-5 Pattern
 
 Future hardening sprints should:

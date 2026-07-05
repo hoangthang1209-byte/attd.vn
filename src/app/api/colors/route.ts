@@ -5,6 +5,7 @@ import {
   listColors,
   updateColor,
 } from "@/features/colors/color.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -21,6 +22,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -48,6 +56,13 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();

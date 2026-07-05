@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { importProductStarterData } from "@/features/products/product-starter-data";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function POST() {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "admin",
+  });
+  if (!permission.ok) return permission.response;
+
   try {
     const result = await importProductStarterData();
     return NextResponse.json({

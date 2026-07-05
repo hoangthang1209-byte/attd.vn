@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET() {
   const variants = await prisma.productVariant.findMany({
@@ -17,6 +18,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "create",
+    request,
+  });
+  if (!permission.ok) return permission.response;
+
   const body = await request.json();
 
   const variant = await prisma.productVariant.create({

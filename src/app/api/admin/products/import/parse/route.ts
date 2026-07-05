@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
 import {
   PRODUCT_IMPORT_MODES,
   type ProductImportMode,
 } from "@/features/products/product-import-constants";
 import { parseImportFileBuffer } from "@/features/products/product-import-parser";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function POST(req: NextRequest) {
-  const authError = await requireAdminApiFromCookies();
-  if (authError) return authError;
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   try {
     const form = await req.formData();

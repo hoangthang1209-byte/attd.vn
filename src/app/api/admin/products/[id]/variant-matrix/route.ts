@@ -7,6 +7,7 @@ import {
   generateVariantMatrix,
   previewVariantMatrixGeneration,
 } from "@/features/products/product-variant-matrix.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(
   _req: NextRequest,
@@ -26,6 +27,13 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   let body: { confirmLarge?: boolean } = {};
   try {

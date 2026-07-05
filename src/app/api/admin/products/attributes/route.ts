@@ -4,6 +4,7 @@ import {
   listAttributeOptions,
   createAttributeOption,
 } from "@/features/products/product-attribute.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const VALID_TYPES: ProductAttributeType[] = ["COLOR", "SIZE", "MATERIAL", "FORM", "FIT", "DIMENSION", "CAPACITY", "UNIT"];
 
@@ -18,6 +19,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ message: "Invalid JSON" }, { status: 400 }); }
   const raw = body as Record<string, unknown>;

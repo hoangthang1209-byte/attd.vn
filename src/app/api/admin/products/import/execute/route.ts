@@ -3,15 +3,19 @@ import { executeProductImport } from "@/features/products/product-import-service
 import { executeProductImportV2 } from "@/features/products/product-import-v2.service";
 import type { ProductImportOptions, ProductImportPreviewRow } from "@/features/products/product-import-types";
 import { prisma } from "@/lib/prisma";
-import { requireAdminApiFromCookies } from "@/lib/admin-auth/require-admin";
 import {
   createProductImportJob,
   markImportJobFailed,
 } from "@/features/products/product-import-job-service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function POST(req: NextRequest) {
-  const authError = await requireAdminApiFromCookies();
-  if (authError) return authError;
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "admin",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
 
   let body: unknown;
   try {

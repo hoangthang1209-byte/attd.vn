@@ -9,6 +9,7 @@ import {
   parseProductInput,
   ProductAdminValidationError,
 } from "@/features/products/product-admin-input";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function logProductAdminError(action: "create" | "update", err: unknown) {
   const message = err instanceof Error ? err.message : String(err);
@@ -43,6 +44,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();
