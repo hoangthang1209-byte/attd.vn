@@ -19356,7 +19356,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   }
 
   .pdp-mobile-action-bar {
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, .8fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.75fr) minmax(0, 0.75fr);
   }
 }
 
