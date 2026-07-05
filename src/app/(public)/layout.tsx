@@ -3,6 +3,7 @@ import Footer from "@/components/public/Footer";
 import MobileActionBar from "@/components/public/MobileActionBar";
 import FloatingContactWidget from "@/components/public/FloatingContactWidget";
 import NavigationProgress from "@/components/public/NavigationProgress";
+import OrganizationSchema from "@/components/seo/OrganizationSchema";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
 import { getMarketplaceCategoryTree } from "@/features/categories/marketplace-category-tree";
 
@@ -21,6 +22,7 @@ export default async function PublicLayout({
 
   return (
     <>
+      <OrganizationSchema />
       <NavigationProgress />
       <Header
         headerLogoUrl={branding.headerLogoUrl}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
 import { CTA } from "@/lib/ctaConfig";
 import ManufacturingEvidenceStrip from "@/components/public/manufacturing/ManufacturingEvidenceStrip";
+import PublicContactChannels from "@/components/public/PublicContactChannels";
 import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
 import { PDP_CONVERSION_POINTS } from "@/lib/b2b-trust-v2-copy";
 import { getManufacturingEvidenceForSurface } from "@/lib/manufacturing-library.config";
@@ -106,6 +107,8 @@ export default function ProductPdpConversionPanel({
           variant="compact"
           className="mp-pdp-conversion-trust"
         />
+
+        <PublicContactChannels compact className="mp-pdp-conversion-contact" />
 
         <ManufacturingEvidenceStrip
           title="Minh chứng quy trình"

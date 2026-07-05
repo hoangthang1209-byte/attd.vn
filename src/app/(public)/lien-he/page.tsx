@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ContactForm from "@/components/public/ContactForm";
+import PublicContactChannels from "@/components/public/PublicContactChannels";
+import CompanyContactCard from "@/components/public/company/CompanyContactCard";
 import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
 import {
   CONTACT_PROCESS_STEPS,
   TRUST_REASSURANCE_PRIVACY,
 } from "@/lib/b2b-trust-v2-copy";
 import { buildContactMetadata } from "@/lib/seo/indexation-policy";
+import { getCompanySettings } from "@/features/settings/services/settings.service";
 
 export const metadata: Metadata = buildContactMetadata({
   title: "Liên hệ báo giá | ATTD",
@@ -32,7 +35,9 @@ const CONTEXT_CARDS = [
   },
 ];
 
-export default function LienHePage() {
+export default async function LienHePage() {
+  const company = await getCompanySettings();
+
   return (
     <main className="contact-page-v2">
       <section className="section contact-page-v2__section">
@@ -67,6 +72,10 @@ export default function LienHePage() {
                 reassurance={TRUST_REASSURANCE_PRIVACY}
                 className="contact-page-v2__process"
               />
+
+              <PublicContactChannels className="contact-page-v2__channels" />
+
+              <CompanyContactCard company={company} className="contact-page-v2__company-card" />
 
               <p className="contact-page-v2__dealer-link">
                 Muốn trở thành đại lý chính thức?{" "}

@@ -245,3 +245,12 @@ export function buildContactMetadata(base: Metadata = {}): Metadata {
     robots: ROBOTS_INDEX_FOLLOW,
   };
 }
+
+/** Company about page metadata overlay — canonical `/gioi-thieu`, indexable. */
+export function buildAboutMetadata(base: Metadata = {}): Metadata {
+  return {
+    ...base,
+    alternates: { canonical: absoluteUrl("/gioi-thieu") },
+    robots: ROBOTS_INDEX_FOLLOW,
+  };
+}

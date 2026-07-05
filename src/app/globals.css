@@ -22233,6 +22233,90 @@ body:has(.mp-header--v271) {
   margin-top: 20px;
 }
 
+.contact-page-v2__channels {
+  margin-top: 20px;
+}
+
+.public-contact-channels {
+  margin-top: 16px;
+}
+
+.public-contact-channels__label {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.public-contact-channels__items {
+  display: grid;
+  gap: 8px;
+}
+
+.public-contact-channels__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+}
+
+.public-contact-channels__item-title {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.public-contact-channels__item-value {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.public-contact-channels__hours {
+  margin: 10px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.public-contact-channels--compact .public-contact-channels__items {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.public-contact-channels--compact .public-contact-channels__item {
+  padding: 8px;
+  text-align: center;
+}
+
+.public-contact-channels--compact .public-contact-channels__item-value {
+  font-size: 12px;
+}
+
+.mp-pdp-conversion-contact {
+  margin-top: 12px;
+}
+
+@media (min-width: 640px) {
+  .public-contact-channels__items {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .public-contact-channels--compact .public-contact-channels__items {
+    grid-template-columns: 1fr;
+  }
+}
+
 .dealer-final-panel__workflow-link {
   margin: 0 0 16px;
   font-size: 13px;
@@ -24754,4 +24838,453 @@ body:has(.mp-header--v271) {
   .prod-plan-kpi-grid--5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .prod-dash__sections { grid-template-columns: 1fr; }
   .prod-plan-drawer { width: 100%; }
+}
+/* ── Revenue-2 Company Trust System ───────────────────────────────────────── */
+
+.company-facts {
+  padding: 48px 0;
+  background: #fafafa;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.company-facts--compact {
+  padding: 40px 0;
+}
+
+.company-facts__header {
+  max-width: 720px;
+  margin-bottom: 28px;
+}
+
+.company-facts__eyebrow,
+.company-intro__eyebrow,
+.company-about-hero__eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.company-facts__title,
+.company-intro__title,
+.company-about-hero__title {
+  margin: 0 0 12px;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+  line-height: 1.2;
+  color: var(--foreground);
+}
+
+.company-facts__description,
+.company-intro__lead,
+.company-about-hero__lead {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.65;
+  color: #4b5563;
+}
+
+.company-facts__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.company-facts__card {
+  padding: 20px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.company-facts__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: #fef2f2;
+  color: var(--primary);
+}
+
+.company-facts__card-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.company-facts__card-desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.company-intro {
+  padding: 56px 0;
+}
+
+.company-intro__layout {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.company-intro__tagline {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.company-intro__highlights {
+  margin: 0;
+  padding: 24px;
+  list-style: none;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border);
+  background: #fafafa;
+  display: grid;
+  gap: 12px;
+}
+
+.company-intro__highlights li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #374151;
+}
+
+.company-intro__highlights li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.company-timeline {
+  padding: 56px 0;
+  background: #fff;
+}
+
+.company-timeline__header,
+.why-choose-attd__header,
+.company-capability-section__header {
+  max-width: 720px;
+  margin-bottom: 28px;
+}
+
+.company-timeline__title,
+.why-choose-attd__title,
+.company-capability-section__title,
+.company-about-contact__title {
+  margin: 0 0 10px;
+  font-size: clamp(1.4rem, 2.2vw, 1.85rem);
+}
+
+.company-timeline__description,
+.why-choose-attd__description,
+.company-capability-section__description,
+.company-about-contact__description {
+  margin: 0;
+  color: #6b7280;
+  line-height: 1.65;
+}
+
+.company-timeline__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.company-timeline__item {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 16px;
+  padding: 20px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: #fafafa;
+}
+
+.company-timeline__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.company-timeline__year {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.company-timeline__item-title {
+  margin: 0 0 6px;
+  font-size: 17px;
+}
+
+.company-timeline__item-desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.why-choose-attd {
+  padding: 56px 0;
+  background: #fafafa;
+}
+
+.why-choose-attd__grid,
+.company-capability-section__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.why-choose-attd__card,
+.company-capability-section__card {
+  padding: 20px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.why-choose-attd__card-title,
+.company-capability-section__card h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.why-choose-attd__card-desc,
+.company-capability-section__card p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.company-contact-card {
+  padding: 24px;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.company-contact-card__title {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.company-contact-card__list {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.company-contact-card__row {
+  display: grid;
+  gap: 4px;
+}
+
+.company-contact-card__row dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.company-contact-card__row dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #374151;
+}
+
+.company-contact-card__row a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.company-contact-card__row a:hover {
+  text-decoration: underline;
+}
+
+.company-contact-card__links {
+  margin: 16px 0 0;
+  font-size: 14px;
+}
+
+.company-contact-card__links a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.company-contact-card__links a:hover {
+  text-decoration: underline;
+}
+
+.testimonial-section__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.testimonial-card {
+  margin: 0;
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.testimonial-card__quote {
+  margin: 0 0 16px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: #374151;
+}
+
+.testimonial-card__meta {
+  display: grid;
+  gap: 2px;
+}
+
+.testimonial-card__author {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.testimonial-card__role,
+.testimonial-card__company {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.customer-logo-strip--inline {
+  padding: 24px 0;
+  background: transparent;
+  border: 0;
+}
+
+.customer-logo-strip__label {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.company-about-page {
+  background: #fff;
+}
+
+.company-about-hero {
+  padding: 64px 0 48px;
+  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+}
+
+.company-about-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.company-capability-section {
+  padding-top: 0;
+}
+
+.company-about-contact__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.site-footer-mst {
+  font-weight: 600;
+  color: #374151;
+}
+
+.home-company-facts {
+  margin-top: 0;
+}
+
+.contact-page-v2__company-card {
+  margin-top: 20px;
+}
+
+@media (max-width: 1024px) {
+  .company-facts__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .company-intro__layout,
+  .company-about-contact__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .why-choose-attd__grid,
+  .company-capability-section__grid,
+  .testimonial-section__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .company-facts,
+  .company-facts--compact,
+  .company-intro,
+  .company-timeline,
+  .why-choose-attd {
+    padding: 40px 0;
+  }
+
+  .company-facts__grid,
+  .why-choose-attd__grid,
+  .company-capability-section__grid,
+  .testimonial-section__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .company-timeline__item {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .company-timeline__marker {
+    width: 44px;
+    height: 44px;
+  }
 }

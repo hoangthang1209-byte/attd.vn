@@ -5,6 +5,8 @@ import {
   getCompanySettings,
   getBrandingSettings,
 } from "@/features/settings/services/settings.service";
+import { buildGoogleMapsSearchUrl } from "@/lib/company-trust";
+import { hasCompanyField } from "@/lib/companyInfo";
 
 const FOOTER_PRODUCTS = [
   { href: "/san-pham", label: "Tất cả sản phẩm" },
@@ -25,7 +27,8 @@ const FOOTER_SOURCING = [
   { href: "/kho-ao-thun-tron", label: "Kho áo thun trơn" },
 ];
 
-const FOOTER_DEALER = [
+const FOOTER_COMPANY = [
+  { href: "/gioi-thieu", label: "Giới thiệu công ty" },
   { href: "/dai-ly", label: "Đăng ký đại lý" },
   { href: "/chinh-sach-dai-ly", label: "Chính sách đại lý" },
   { href: "/lien-he", label: "Liên hệ báo giá" },
@@ -43,6 +46,10 @@ export default async function Footer() {
     getCompanySettings(),
     getBrandingSettings(),
   ]);
+
+  const mapsUrl = hasCompanyField(company.address)
+    ? buildGoogleMapsSearchUrl(company.address)
+    : null;
 
   return (
     <>
@@ -62,6 +69,9 @@ export default async function Footer() {
                   {company.workingHours}
                 </p>
               )}
+              {hasCompanyField(company.taxCode) ? (
+                <p className="site-footer-text site-footer-mst">MST: {company.taxCode}</p>
+              ) : null}
             </div>
 
             <div className="site-footer-col">
@@ -87,9 +97,9 @@ export default async function Footer() {
             </div>
 
             <div className="site-footer-col">
-              <p className="site-footer-heading">Hỗ trợ đại lý</p>
+              <p className="site-footer-heading">Công ty</p>
               <div className="site-footer-links">
-                {FOOTER_DEALER.map((link) => (
+                {FOOTER_COMPANY.map((link) => (
                   <Link key={link.href} href={link.href} className="site-footer-link">
                     {link.label}
                   </Link>
@@ -125,9 +135,19 @@ export default async function Footer() {
                 <a href={`mailto:${company.email}`} className="site-footer-link">
                   {company.email}
                 </a>
-                {company.address && (
+                {company.address ? (
                   <span className="site-footer-link">{company.address}</span>
-                )}
+                ) : null}
+                {mapsUrl ? (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="site-footer-link"
+                  >
+                    Xem trên Google Maps
+                  </a>
+                ) : null}
               </div>
             </div>
           </div>

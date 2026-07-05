@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { SITE_NAME, SITE_URL } from "@/lib/seo";
+import { SITE_URL } from "@/lib/seo";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
 import { buildFaviconMetadata } from "@/lib/branding/favicon-metadata";
 import GoogleAnalytics from "@/components/analytics/GoogleAnalytics";
@@ -33,22 +33,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const orgJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  name: SITE_NAME,
-  url: SITE_URL,
-  telephone: "+84934337667",
-  contactPoint: {
-    "@type": "ContactPoint",
-    telephone: "+84934337667",
-    contactType: "customer service",
-    areaServed: "VN",
-    availableLanguage: "Vietnamese",
-  },
-  sameAs: ["https://zalo.me/0934337667"],
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -57,10 +41,6 @@ export default function RootLayout({
   return (
     <html lang="vi" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
-        />
         <GoogleAnalytics />
         <AttributionTracker />
         {children}
