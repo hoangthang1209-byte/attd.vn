@@ -98,6 +98,13 @@ export type ManufacturingWorkflowAdminInput = {
   }>;
 };
 
+export type ManufacturingAssetAdminSort =
+  | "updated-desc"
+  | "published-desc"
+  | "priority-asc"
+  | "priority-desc"
+  | "title-asc";
+
 export class ManufacturingAdminValidationError extends Error {
   readonly status = 400;
 
@@ -167,6 +174,7 @@ function parseJsonLike(value: unknown, fieldName: string): unknown {
 }
 
 function tagsFromInput(input: ManufacturingAssetAdminInput["tags"]) {
+  const seen = new Set<string>();
   return (input ?? [])
     .map((tag) => {
       const name = cleanString(tag.name);
@@ -175,7 +183,30 @@ function tagsFromInput(input: ManufacturingAssetAdminInput["tags"]) {
     })
     .filter((tag): tag is { name: string; slug: string; description: string | null } =>
       Boolean(tag),
-    );
+    )
+    .filter((tag) => {
+      if (seen.has(tag.slug)) return false;
+      seen.add(tag.slug);
+      return true;
+    });
+}
+
+function manufacturingAssetOrderBy(
+  sort?: ManufacturingAssetAdminSort | "",
+): Prisma.ManufacturingAssetOrderByWithRelationInput[] {
+  if (sort === "published-desc") {
+    return [{ publishedAt: "desc" }, { priority: "asc" }, { updatedAt: "desc" }];
+  }
+  if (sort === "priority-asc") {
+    return [{ priority: "asc" }, { updatedAt: "desc" }];
+  }
+  if (sort === "priority-desc") {
+    return [{ priority: "desc" }, { updatedAt: "desc" }];
+  }
+  if (sort === "title-asc") {
+    return [{ title: "asc" }, { updatedAt: "desc" }];
+  }
+  return [{ updatedAt: "desc" }, { priority: "asc" }, { publishedAt: "desc" }];
 }
 
 export async function listManufacturingAssetsAdmin(filters: {
@@ -185,6 +216,7 @@ export async function listManufacturingAssetsAdmin(filters: {
   visibility?: ManufacturingVisibility | "";
   featured?: "true" | "false" | "";
   displayLocationId?: string;
+  sort?: ManufacturingAssetAdminSort | "";
   page?: number;
   pageSize?: number;
 }) {
@@ -214,7 +246,7 @@ export async function listManufacturingAssetsAdmin(filters: {
     prisma.manufacturingAsset.findMany({
       where,
       include: assetInclude,
-      orderBy: [{ updatedAt: "desc" }, { priority: "asc" }, { publishedAt: "desc" }],
+      orderBy: manufacturingAssetOrderBy(filters.sort),
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -277,7 +309,7 @@ export async function saveManufacturingAssetAdmin(
 
   const duplicate = await prisma.manufacturingAsset.findUnique({ where: { slug } });
   if (duplicate && duplicate.id !== id) {
-    throw new ManufacturingAdminValidationError("Slug đã tồn tại");
+    throw new ManufacturingAdminValidationError("Slug này đã tồn tại. Hãy dùng slug khác.");
   }
 
   const data = {

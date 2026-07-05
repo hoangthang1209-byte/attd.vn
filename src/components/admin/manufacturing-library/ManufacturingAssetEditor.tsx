@@ -76,6 +76,16 @@ function slugify(value: string): string {
     .replace(/^-|-$/g, "");
 }
 
+function dedupeTags(rows: TagRow[]): TagRow[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const slug = slugify(row.slug || row.name);
+    if (!slug || seen.has(slug)) return false;
+    seen.add(slug);
+    return true;
+  });
+}
+
 export default function ManufacturingAssetEditor({ asset, lookups }: Props) {
   const router = useRouter();
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -178,7 +188,7 @@ export default function ManufacturingAssetEditor({ asset, lookups }: Props) {
       metadata,
       media,
       displayLocations: displayRows,
-      tags,
+      tags: dedupeTags(tags),
       relations,
       workflows,
     };

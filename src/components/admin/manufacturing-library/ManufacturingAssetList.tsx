@@ -31,8 +31,23 @@ const VISIBILITY_LABEL: Record<string, string> = {
   INTERNAL: "Nội bộ",
 };
 
+const SORT_LABEL: Record<string, string> = {
+  "updated-desc": "Cập nhật mới nhất",
+  "published-desc": "Xuất bản mới nhất",
+  "priority-asc": "Ưu tiên tăng dần",
+  "priority-desc": "Ưu tiên giảm dần",
+  "title-asc": "Tiêu đề A-Z",
+};
+
 function formatDate(value: string | Date) {
   return new Date(value).toLocaleString("vi-VN");
+}
+
+function badgeClass(value: string) {
+  if (value === "PUBLISHED" || value === "PUBLIC") return "admin-badge admin-badge--success";
+  if (value === "DRAFT" || value === "INTERNAL") return "admin-badge admin-badge--muted";
+  if (value === "ARCHIVED") return "admin-badge admin-badge--warning";
+  return "admin-badge admin-badge--info";
 }
 
 export default function ManufacturingAssetList({
@@ -124,6 +139,13 @@ export default function ManufacturingAssetList({
               </option>
             ))}
           </select>
+          <select className="admin-input" name="sort" defaultValue={filters.sort ?? "updated-desc"}>
+            {Object.entries(SORT_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="admin-form-actions">
           <button type="submit" className="btn-secondary">
@@ -169,9 +191,23 @@ export default function ManufacturingAssetList({
                     <code>{asset.slug}</code>
                   </td>
                   <td>{asset.category?.name ?? "Chưa chọn"}</td>
-                  <td>{STATUS_LABEL[asset.status] ?? asset.status}</td>
-                  <td>{VISIBILITY_LABEL[asset.visibility] ?? asset.visibility}</td>
-                  <td>{asset.featured ? "Có" : "Không"}</td>
+                  <td>
+                    <span className={badgeClass(asset.status)}>
+                      {STATUS_LABEL[asset.status] ?? asset.status}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={badgeClass(asset.visibility)}>
+                      {VISIBILITY_LABEL[asset.visibility] ?? asset.visibility}
+                    </span>
+                  </td>
+                  <td>
+                    {asset.featured ? (
+                      <span className="admin-badge admin-badge--info">Nổi bật</span>
+                    ) : (
+                      <span className="admin-badge admin-badge--muted">Không</span>
+                    )}
+                  </td>
                   <td>
                     {asset.displayLocations
                       .map((item) => item.displayLocation.name)

@@ -35,7 +35,9 @@ export type ManufacturingEvidenceItem = {
   category: ManufacturingEvidenceCategory;
   imageUrl?: string;
   videoUrl?: string;
+  videoPosterUrl?: string;
   alt: string;
+  categoryName?: string;
   tags: readonly string[];
   applicableSurfaces: readonly ManufacturingEvidenceSurface[];
   relatedProductTypes?: readonly string[];

@@ -25,13 +25,17 @@ export async function ManufacturingHomepageSection({
   className,
 }: SectionProps) {
   const items = await getItems("homepage", limit);
+  if (items.length === 0) return null;
+
   return (
-    <ManufacturingEvidenceGrid
-      title={title}
-      description={description}
-      items={items}
-      className={className}
-    />
+    <section
+      className={["mp-section", "mp-section--tight", className].filter(Boolean).join(" ")}
+      aria-label={title}
+    >
+      <div className="container">
+        <ManufacturingEvidenceGrid title={title} description={description} items={items} />
+      </div>
+    </section>
   );
 }
 

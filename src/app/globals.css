@@ -784,10 +784,10 @@ button {
   left: 0;
   right: 0;
   z-index: 150;
+  box-sizing: border-box;
   background: #ffffff;
   border-top: 1px solid var(--border);
-  padding: 10px 16px;
-  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0));
+  padding: 8px max(12px, env(safe-area-inset-right, 0)) max(8px, env(safe-area-inset-bottom, 0)) max(12px, env(safe-area-inset-left, 0));
   gap: 10px;
   box-shadow: 0 -4px 16px rgba(17, 24, 39, 0.08);
 }
@@ -825,7 +825,7 @@ body:has(.mobile-action-bar) .site-footer {
 }
 
 .mobile-action-bar-btn--zalo {
-  background: var(--primary);
+  background: #0068ff;
   color: #ffffff;
 }
 
@@ -9864,8 +9864,7 @@ body:has(.mp-pdp--b2b) .floating-contact {
   }
 
   .mobile-action-bar {
-    padding: 6px 12px;
-    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0));
+    padding: 6px max(10px, env(safe-area-inset-right, 0)) max(6px, env(safe-area-inset-bottom, 0)) max(10px, env(safe-area-inset-left, 0));
     gap: 8px;
   }
 
@@ -13229,10 +13228,11 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   right: 0;
   bottom: 0;
   z-index: 60;
+  box-sizing: border-box;
   display: none;
   grid-template-columns: 1fr 1fr;
   gap: 0;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  padding: 8px max(12px, env(safe-area-inset-right, 0)) max(8px, env(safe-area-inset-bottom, 0)) max(12px, env(safe-area-inset-left, 0));
   background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid var(--border);
   box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
@@ -22248,16 +22248,26 @@ body:has(.mp-header--v271) {
 .manufacturing-evidence-card {
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 20px;
+  border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 16px 36px rgba(15, 23, 42, 0.06);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.manufacturing-evidence-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(37, 99, 235, 0.18);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.1);
 }
 
 .manufacturing-evidence-card--compact {
   display: grid;
   grid-template-columns: 84px 1fr;
   align-items: center;
-  border-radius: 16px;
+  border-radius: 8px;
   box-shadow: none;
 }
 
@@ -22265,7 +22275,7 @@ body:has(.mp-header--v271) {
   position: relative;
   aspect-ratio: 4 / 3;
   overflow: hidden;
-  background: #f8fafc;
+  background: #f1f5f9;
 }
 
 .manufacturing-evidence-card--compact .manufacturing-evidence-card__media {
@@ -22280,6 +22290,21 @@ body:has(.mp-header--v271) {
   object-fit: cover;
 }
 
+.manufacturing-evidence-card__video-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .manufacturing-evidence-card__body {
   padding: 14px;
 }
@@ -22288,12 +22313,47 @@ body:has(.mp-header--v271) {
   padding: 10px 12px;
 }
 
+.manufacturing-evidence-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.manufacturing-evidence-card__category,
+.manufacturing-evidence-card__featured {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.manufacturing-evidence-card__category {
+  background: #eff6ff;
+  color: #1d4ed8;
+  text-transform: capitalize;
+}
+
+.manufacturing-evidence-card__featured {
+  background: #ecfdf5;
+  color: #047857;
+}
+
 .manufacturing-evidence-card__title {
   margin: 0;
   color: #0f172a;
   font-size: 14px;
   font-weight: 750;
   line-height: 1.35;
+  display: -webkit-box;
+  min-height: calc(1.35em * 2);
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .manufacturing-evidence-card__desc {
@@ -22301,6 +22361,18 @@ body:has(.mp-header--v271) {
   color: #64748b;
   font-size: 13px;
   line-height: 1.55;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.manufacturing-evidence-card--compact .manufacturing-evidence-card__meta {
+  margin-bottom: 5px;
+}
+
+.manufacturing-evidence-card--compact .manufacturing-evidence-card__title {
+  min-height: auto;
 }
 
 .dealer-landing-manufacturing {
@@ -22352,13 +22424,26 @@ body:has(.mp-header--v271) {
 }
 
 .manufacturing-workflow-timeline__step {
+  position: relative;
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 12px;
   align-items: start;
 }
 
+.manufacturing-workflow-timeline__step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 42px;
+  bottom: -10px;
+  left: 18px;
+  width: 1px;
+  background: #e2e8f0;
+}
+
 .manufacturing-workflow-timeline__marker {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   width: 36px;
@@ -22368,6 +22453,7 @@ body:has(.mp-header--v271) {
   color: #475569;
   font-size: 12px;
   font-weight: 800;
+  background: #ffffff;
 }
 
 .manufacturing-workflow-timeline__body {

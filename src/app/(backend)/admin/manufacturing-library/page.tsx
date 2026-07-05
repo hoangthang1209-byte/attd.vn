@@ -6,6 +6,7 @@ import type {
 import ManufacturingAssetList from "@/components/admin/manufacturing-library/ManufacturingAssetList";
 import { requireAdminPermissionPage } from "@/lib/admin-auth/require-admin-permission";
 import {
+  type ManufacturingAssetAdminSort,
   listManufacturingAssetsAdmin,
   listManufacturingLookupsAdmin,
 } from "@/features/manufacturing-library/manufacturing-admin.service";
@@ -32,6 +33,7 @@ export default async function ManufacturingLibraryAdminPage({ searchParams }: Pa
     visibility: first(params.visibility),
     featured: first(params.featured),
     displayLocationId: first(params.displayLocationId),
+    sort: first(params.sort) || "updated-desc",
     page: first(params.page) || "1",
   };
   const [list, lookups] = await Promise.all([
@@ -42,6 +44,7 @@ export default async function ManufacturingLibraryAdminPage({ searchParams }: Pa
       visibility: filters.visibility as ManufacturingVisibility | "",
       featured: filters.featured as "true" | "false" | "",
       displayLocationId: filters.displayLocationId,
+      sort: filters.sort as ManufacturingAssetAdminSort,
       page: Number(filters.page),
       pageSize: 25,
     }),

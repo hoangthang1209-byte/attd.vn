@@ -86,6 +86,11 @@ export function mapManufacturingAssetToFrontend(
   );
   const imageUrl = imageMedia?.mediaAsset.url;
   const videoUrl = videoMedia?.mediaAsset.url;
+  const alt = imageMedia?.altText
+    ?? imageMedia?.mediaAsset.altText
+    ?? videoMedia?.altText
+    ?? videoMedia?.mediaAsset.altText
+    ?? asset.title;
 
   return {
     id: asset.id,
@@ -97,7 +102,8 @@ export function mapManufacturingAssetToFrontend(
     categoryName: asset.category?.name,
     imageUrl,
     videoUrl,
-    alt: imageMedia?.altText ?? imageMedia?.mediaAsset.altText ?? asset.title,
+    videoPosterUrl: videoUrl && imageUrl ? imageUrl : undefined,
+    alt,
     tags: asset.tags.map(({ tag }) => tag.slug || tag.name),
     applicableSurfaces: [],
     priority: asset.priority,

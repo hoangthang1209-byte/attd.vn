@@ -9,6 +9,7 @@ import MarketplaceFinalCta from "@/components/marketplace/MarketplaceFinalCta";
 import HomeCategoryGridSection from "@/components/home/HomeCategoryGridSection";
 import HomeProductDiscoverySection from "@/components/home/HomeProductDiscoverySection";
 import HomeBlogTeaserSection from "@/components/home/HomeBlogTeaserSection";
+import { ManufacturingHomepageSection } from "@/components/public/manufacturing/ManufacturingPublicSections";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -119,6 +120,13 @@ export default async function HomePage() {
       <HomeHeroSection hero={hero} categories={categories} />
 
       <PreCategoryEditorialSections cms={cms} />
+
+      <ManufacturingHomepageSection
+        title="Thực tế sản xuất"
+        description="Hình ảnh và quy trình sản xuất thực tế tại ATTD."
+        limit={6}
+        className="home-manufacturing-evidence"
+      />
 
       <HomeCategoryGridSection
         categories={gridChildCategories}
