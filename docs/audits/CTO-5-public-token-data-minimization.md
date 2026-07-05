@@ -87,10 +87,10 @@ The dependency-free Node script mirrors the shared forbidden-field list and veri
 ## Known Risks
 
 - Public-token helper tests are focused unit checks, not full route integration tests.
-- Tech-pack PDF public-token output still needs a dedicated public serializer.
+- CTO-6 added a Tech Pack public serializer and applied the public-token guard to the Tech Pack document/PDF rendering surface. Route-level rendered-output tests are still recommended.
 - Public quote JSON and PDF safety assertions depend on the existing quote public formatter remaining in the data path.
 - Existing build warnings about deprecated `middleware` convention and Turbopack/NFT tracing are unchanged.
 
 ## Next Recommended Sprint
 
-CTO-6 should add route-level tests that call public token handlers directly with fixture payloads and should introduce a dedicated tech-pack public PDF DTO that excludes internal notes, internal deadlines, staff-only identifiers, and production-only metadata.
+The next public-token sprint should add route-level tests that call public token handlers directly with fixture payloads and verify rendered Tech Pack HTML/PDF inputs omit internal labels and values.

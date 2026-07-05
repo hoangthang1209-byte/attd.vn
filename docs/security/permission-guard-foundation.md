@@ -109,3 +109,11 @@ CTO-5 added `npm run security:public-token` and applied `assertPublicTokenSafePa
 The guard is intentionally data-object based. It scans public payload keys before JSON responses or document rendering and does not inspect final HTML or PDF binaries.
 
 Tech-pack public PDF output is documented as deferred because it needs a dedicated public serializer before internal tech-pack fields can be removed safely.
+
+## CTO-6 Tech Pack Public Serializer Hardening
+
+CTO-6 added `src/features/tech-pack/public-tech-pack.serializer.ts` and applies it before rendering `/tech-pack/:id/document?mode=pdf&pdfToken=...`.
+
+The serializer preserves the existing PDF DTO shape for visual compatibility but removes public-unsafe values such as internal production owner/workshop/deadline fields, internal/QC/production notes, released-by staff identifiers, supplier display values, supplier master-code fragments, and asset notes.
+
+The Tech Pack document page now runs `assertPublicTokenSafePayload` against the sanitized DTO before rendering. The admin PDF endpoint renders that same token document, so the generated PDF path uses the sanitized payload as well.

@@ -165,4 +165,78 @@ expectSafe(
   "allowed public fields",
 );
 
+expectSafe(
+  {
+    code: "TP-001",
+    title: "Tech Pack ao thun",
+    version: 1,
+    general: {
+      productName: "Ao thun oversize",
+      productSku: "TEE-001",
+      color: "Den",
+      quantity: "500",
+      deliveryDeadline: "2026-08-01",
+      fitNote: "Regular fit",
+    },
+    notes: {
+      bom: "Vat lieu da duyet",
+      print: "In lua 2 mau",
+      embroidery: null,
+    },
+    bomRows: [
+      {
+        itemName: "Vai cotton",
+        specification: "220gsm",
+        unit: "kg",
+        consumption: "0.3",
+      },
+    ],
+    measurements: [
+      {
+        pointOfMeasure: "Chest",
+        values: { M: "52", L: "54" },
+      },
+    ],
+  },
+  "safe public tech-pack payload",
+);
+
+expectUnsafe(
+  {
+    code: "TP-002",
+    notes: {
+      internalNote: "Chi danh cho san xuat noi bo",
+    },
+  },
+  ["internalNote"],
+  "tech-pack nested internal note",
+);
+
+expectUnsafe(
+  {
+    code: "TP-003",
+    bomRows: [
+      {
+        itemName: "Vai cotton",
+        supplier: "NCC noi bo",
+        costEstimate: 50000,
+        marginAmount: 12000,
+      },
+    ],
+  },
+  ["costEstimate", "marginAmount"],
+  "tech-pack BOM cost fields",
+);
+
+expectUnsafe(
+  {
+    code: "TP-004",
+    metadata: {
+      source: "admin",
+    },
+  },
+  ["metadata"],
+  "tech-pack metadata field",
+);
+
 console.log("Public token safety checks passed.");

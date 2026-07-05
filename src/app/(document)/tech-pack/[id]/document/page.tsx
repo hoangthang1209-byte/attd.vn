@@ -6,6 +6,8 @@ import { getTechPackDetail } from "@/features/tech-pack/tech-pack.service";
 import { verifyTechPackPdfToken } from "@/features/tech-pack/pdf/tech-pack-pdf-token";
 import { buildTechPackPdfDto } from "@/features/tech-pack/pdf/tech-pack-pdf.service";
 import { resolveTechPackDocumentBaseUrl } from "@/features/tech-pack/pdf/tech-pack-pdf-url";
+import { serializePublicTechPackForDocument } from "@/features/tech-pack/public-tech-pack.serializer";
+import { assertPublicTokenSafePayload } from "@/lib/permissions/public-token-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +29,18 @@ export default async function TechPackDocumentPage({ params, searchParams }: Pag
 
   const requestHeaders = await headers();
   const baseUrl = resolveTechPackDocumentBaseUrl(requestHeaders);
-  const dto = await buildTechPackPdfDto(pack, baseUrl);
+  const dto = serializePublicTechPackForDocument(
+    await buildTechPackPdfDto(pack, baseUrl),
+  );
+
+  const safety = assertPublicTokenSafePayload(dto);
+  if (!safety.ok) {
+    console.error("[TechPackDocumentPage] unsafe public tech-pack document payload", {
+      id,
+      forbiddenFields: safety.forbiddenFields,
+    });
+    notFound();
+  }
 
   return (
     <>
