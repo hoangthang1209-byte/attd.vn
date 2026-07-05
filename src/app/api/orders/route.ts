@@ -14,6 +14,7 @@ import {
   listOrders,
   OrderValidationError,
 } from "@/features/orders/order.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
   const session = getAdminSessionFromRequest(req);
@@ -49,6 +50,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const session = getAdminSessionFromRequest(req);
   const forbidden = assertFinancialApiAccess(session, "POST /api/orders");
   if (forbidden) return forbidden;

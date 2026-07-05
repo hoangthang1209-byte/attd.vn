@@ -7,10 +7,18 @@ import {
 } from "@/features/orders/order.service";
 import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { assertFinancialApiAccess } from "@/lib/admin-auth/financial-access";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await context.params;
   const session = getAdminSessionFromRequest(req);
   const forbidden = assertFinancialApiAccess(session, "POST /api/orders/[id]/payments");

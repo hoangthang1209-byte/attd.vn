@@ -2,10 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateProductPriceTier } from "@/features/pricing/services/product-tier.service";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 import { parseMoneyInput, parseOptionalInt } from "@/features/pricing/parse-money";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await context.params;
   let body: unknown;
   try {

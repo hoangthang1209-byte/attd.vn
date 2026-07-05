@@ -1,12 +1,20 @@
 import type { QuoteStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { QuoteValidationError, updateQuoteStatus } from "@/features/quotes/quote.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 const VALID: QuoteStatus[] = ["DRAFT", "SENT", "VIEWED", "ACCEPTED", "REJECTED", "EXPIRED", "CANCELLED"];
 
 export async function POST(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await context.params;
   let body: unknown;
   try {

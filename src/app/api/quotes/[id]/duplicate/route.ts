@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { duplicateQuote, QuoteValidationError } from "@/features/quotes/quote.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function POST(_req: Request, context: RouteContext) {
+export async function POST(req: Request, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await context.params;
   try {
     const quote = await duplicateQuote(id);

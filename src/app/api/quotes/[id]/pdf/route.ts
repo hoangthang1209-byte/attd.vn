@@ -10,6 +10,7 @@ import { parseQuotePdfDisposition } from "@/features/quotes/pdf/quote-pdf-dispos
 import { getBrandingSettings, getCompanySettings } from "@/features/settings/services/settings.service";
 import { ensureQuotePublicToken } from "@/features/quotes/quote-pdf-token";
 import { resolveQuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,13 @@ export const dynamic = "force-dynamic";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "export",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await ctx.params;
   const route = "GET /api/quotes/[id]/pdf";
 

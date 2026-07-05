@@ -5,6 +5,7 @@ import {
   updateDeliveryExecution,
 } from "@/features/orders/delivery-execution.service";
 import { ProductionExecutionValidationError } from "@/features/orders/production-quantity";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string; executionId: string }> };
 
@@ -23,6 +24,13 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id, executionId } = await context.params;
   let body: unknown;
   try {

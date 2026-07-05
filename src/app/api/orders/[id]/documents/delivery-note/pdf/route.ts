@@ -7,6 +7,7 @@ import {
   parseOrderPdfDisposition,
 } from "@/features/orders/pdf/order-pdf-disposition";
 import { mergePdfNoindexHeaders } from "@/lib/seo/indexation-policy";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,13 @@ export const dynamic = "force-dynamic";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "export",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await ctx.params;
   const executionId = req.nextUrl.searchParams.get("executionId");
   if (!executionId) {

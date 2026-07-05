@@ -5,6 +5,7 @@ import {
   updateOrderProductionFile,
 } from "@/features/orders/production-pack.service";
 import { PRODUCTION_FILE_TYPES } from "@/features/orders/production-pack-labels";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string; fileId: string }> };
 
@@ -15,6 +16,13 @@ function parseOptionalString(value: unknown): string | null | undefined {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id, fileId } = await context.params;
   let body: unknown;
   try {
@@ -55,7 +63,14 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, context: RouteContext) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id, fileId } = await context.params;
   try {
     const { deleteOrderProductionFile } = await import("@/features/orders/production-pack.service");

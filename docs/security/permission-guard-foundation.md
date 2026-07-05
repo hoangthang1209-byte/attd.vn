@@ -114,6 +114,14 @@ Public lead capture remains public: `/api/leads` was not guarded, and the public
 
 Full action-level enforcement remains future work until platform/action pairs are mapped to concrete `AdminPermission` codes.
 
+## CTO-7C Commercial Platform Mutation Hardening
+
+CTO-7C applied `requireAdminPermission()` to Commercial Platform quote, pricing, order, payment, production handoff, QC, and delivery-execution mutation handlers. Commercial create/update/delete mutations now use `platform: "commercial"` with the matching `create`, `update`, or `delete` action. Admin quote/order PDF routes use `action: "export"`, while payment void and handover override use `action: "admin"`.
+
+Public quote/order token routes remain governed by public-token safety and were not converted to admin guards. This includes `/api/quotes/public/:token`, `/api/quotes/public/:token/pdf`, `/q/:token`, `/q/:token/document`, and `/o/:orderNo/:docType`.
+
+Full action-level enforcement remains future work until platform/action pairs are mapped to concrete `AdminPermission` codes.
+
 ## CTO-5 Pattern
 
 Future hardening sprints should:

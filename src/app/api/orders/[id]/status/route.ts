@@ -7,10 +7,18 @@ import {
 import { HandoverValidationError, ShippedValidationError, CompletionValidationError } from "@/features/orders/production-quantity";
 import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { jsonOrderDetailResponse } from "@/lib/admin-auth/order-api-response";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await context.params;
   let body: unknown;
   try {

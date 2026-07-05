@@ -4,6 +4,7 @@ import {
   updateProductionStage,
 } from "@/features/orders/production-stage.service";
 import { ProductionExecutionValidationError } from "@/features/orders/production-quantity";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string; stageId: string }> };
 
@@ -22,6 +23,13 @@ function parseOptionalString(value: unknown): string | null | undefined {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id, stageId } = await context.params;
   let body: unknown;
   try {

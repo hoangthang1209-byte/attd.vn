@@ -7,6 +7,7 @@ import {
 } from "@/features/orders/production-pack.service";
 import { MATERIAL_TYPES } from "@/features/orders/production-pack-labels";
 import { listOrderMaterials } from "@/features/orders/production-pack.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string; materialId: string }> };
 
@@ -18,6 +19,13 @@ function parseMaterialType(value: unknown): MaterialType {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id, materialId } = await context.params;
   let body: unknown;
   try {
@@ -57,7 +65,14 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, context: RouteContext) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id, materialId } = await context.params;
   try {
     await deleteOrderMaterial(id, materialId);

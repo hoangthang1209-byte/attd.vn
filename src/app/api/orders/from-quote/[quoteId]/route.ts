@@ -3,10 +3,18 @@ import {
   convertQuoteToOrder,
   OrderConversionError,
 } from "@/features/orders/order-conversion.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ quoteId: string }> };
 
-export async function POST(_req: NextRequest, context: RouteContext) {
+export async function POST(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { quoteId } = await context.params;
   try {
     const order = await convertQuoteToOrder(quoteId);

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateServicePriceRule } from "@/features/pricing/services/service-rule.service";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 import { parseMoneyInput, parseOptionalInt } from "@/features/pricing/parse-money";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -12,6 +13,13 @@ const SERVICE_TYPES: PricingServiceType[] = [
 const CALC_TYPES: PricingCalculationType[] = ["PER_ITEM", "PER_ORDER", "PER_POSITION", "MANUAL"];
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await context.params;
   let body: unknown;
   try {

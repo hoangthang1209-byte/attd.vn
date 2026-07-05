@@ -2,10 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseDeliveryAttemptBody } from "@/features/orders/delivery-execution-input";
 import { updateDeliveryAttempt } from "@/features/orders/delivery-execution.service";
 import { ProductionExecutionValidationError } from "@/features/orders/production-quantity";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string; executionId: string; attemptId: string }> };
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id, executionId, attemptId } = await context.params;
   let body: unknown;
   try {

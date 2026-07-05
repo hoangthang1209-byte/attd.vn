@@ -5,6 +5,7 @@ import {
   updateQcEvidence,
 } from "@/features/orders/qc-inspection.service";
 import { ProductionExecutionValidationError } from "@/features/orders/production-quantity";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string; evidenceId: string }> };
 
@@ -23,6 +24,13 @@ function parseOptionalString(value: unknown): string | null | undefined {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id, evidenceId } = await context.params;
   let body: unknown;
   try {
@@ -56,7 +64,14 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, context: RouteContext) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id, evidenceId } = await context.params;
   try {
     await deleteQcEvidence(id, evidenceId);

@@ -5,6 +5,7 @@ import {
   parseOrderPdfDisposition,
 } from "@/features/orders/production-sheet/production-sheet-pdf-route";
 import { getOrderDetail } from "@/features/orders/order.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +13,13 @@ export const dynamic = "force-dynamic";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "export",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await ctx.params;
   const route = "GET /api/orders/[id]/documents/production-sheet/pdf";
 

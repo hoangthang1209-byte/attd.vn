@@ -6,6 +6,7 @@ import {
 } from "@/features/pricing/services/pricing-calculation.service";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 import { parseCalculateBody } from "@/features/pricing/pricing-calculate-input";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -29,6 +30,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();

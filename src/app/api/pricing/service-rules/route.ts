@@ -6,6 +6,7 @@ import {
 } from "@/features/pricing/services/service-rule.service";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 import { parseMoneyInput, parseOptionalInt } from "@/features/pricing/parse-money";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const SERVICE_TYPES: PricingServiceType[] = [
   "PRINT_DTF", "PRINT_SILK", "EMBROIDERY", "OEM", "PACKAGING", "DESIGN", "SETUP", "SHIPPING", "OTHER",
@@ -33,6 +34,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();

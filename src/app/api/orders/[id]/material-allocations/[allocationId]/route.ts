@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MaterialValidationError } from "@/features/materials/material-decimal";
 import { releaseMaterialAllocation } from "@/features/materials/allocation.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string; allocationId: string }> };
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id: orderId, allocationId } = await ctx.params;
   let body: unknown;
   try {

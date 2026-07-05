@@ -4,6 +4,7 @@ import {
   HandoverValidationError,
   ProductionExecutionValidationError,
 } from "@/features/orders/production-quantity";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -14,6 +15,13 @@ function parseOptionalString(value: unknown): string | null | undefined {
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "admin",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await context.params;
   let body: unknown;
   try {
