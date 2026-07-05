@@ -9,6 +9,7 @@ import {
 import { logAdminAuditEvent } from "@/features/auth/admin-audit-log";
 import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { FINANCIAL_ROUTE_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -24,6 +25,13 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "operations",
+    action: "admin",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const session = getAdminSessionFromRequest(req);
   if (!canManageRolesPermissions(session)) {
     return NextResponse.json({ message: FINANCIAL_ROUTE_DENIED_MESSAGE }, { status: 403 });

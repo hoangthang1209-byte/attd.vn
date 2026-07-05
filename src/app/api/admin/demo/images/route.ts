@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { updateDemoImages } from "@/features/demo/demo-image-service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const permission = await requireAdminPermission({
+    platform: "operations",
+    action: "admin",
+    request,
+  });
+  if (!permission.ok) return permission.response;
+
   try {
     const summary = await updateDemoImages();
     return NextResponse.json({ ok: true, summary });

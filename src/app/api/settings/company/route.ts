@@ -4,6 +4,7 @@ import {
   getCompanySettings,
   upsertCompanySettings,
 } from "@/features/settings/services/settings.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET() {
   const settings = await getCompanySettings();
@@ -11,6 +12,13 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const permission = await requireAdminPermission({
+    platform: "operations",
+    action: "update",
+    request,
+  });
+  if (!permission.ok) return permission.response;
+
   try {
     const body = await request.json();
 

@@ -7,6 +7,7 @@ import {
 } from "@/features/admin-users/admin-user.service";
 import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { FINANCIAL_ROUTE_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
   const session = getAdminSessionFromRequest(req);
@@ -18,6 +19,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "operations",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const session = getAdminSessionFromRequest(req);
   if (!canManageUsers(session)) {
     return NextResponse.json({ message: FINANCIAL_ROUTE_DENIED_MESSAGE }, { status: 403 });

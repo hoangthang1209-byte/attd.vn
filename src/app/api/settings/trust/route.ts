@@ -4,6 +4,7 @@ import {
   getTrustMetricsSettings,
   upsertTrustMetricsSettings,
 } from "@/features/settings/services/settings.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function parseNullableInt(value: unknown): number | null {
   if (value === null || value === "" || value === undefined) return null;
@@ -17,6 +18,13 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const permission = await requireAdminPermission({
+    platform: "operations",
+    action: "update",
+    request,
+  });
+  if (!permission.ok) return permission.response;
+
   try {
     const body = await request.json();
 

@@ -132,6 +132,16 @@ Public dealer intake remains public: `/api/dealers` and the public `POST /api/de
 
 Full admin action-code enforcement and dealer role/action enforcement remain future work until platform/action pairs are mapped to concrete `AdminPermission` codes and dealer portal roles.
 
+## CTO-7E Operations Platform Mutation Hardening
+
+CTO-7E applied `requireAdminPermission()` to Operations Platform admin user, role, employee, company/branding/trust settings, and demo bootstrap mutation handlers. Operations create/update/delete/admin mutations now use `platform: "operations"` with the matching `create`, `update`, `delete`, or `admin` action.
+
+Public settings and branding reads remain public where required for the public frontend: `GET /api/settings/branding`, `GET /api/settings/company`, `GET /api/settings/trust`, and related read endpoints were not converted to admin guards. Homepage CMS mutations under `/api/settings/homepage` were intentionally deferred to CTO-7F Content Platform hardening.
+
+Admin auth login/logout utilities remain public auth endpoints. Existing `canManageUsers` and `canManageRolesPermissions` checks remain in place after the guard for authenticated authorization behavior.
+
+Full action-level enforcement remains future work until platform/action pairs are mapped to concrete `AdminPermission` codes.
+
 ## CTO-5 Pattern
 
 Future hardening sprints should:

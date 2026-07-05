@@ -6,6 +6,7 @@ import {
   isBrandingTableReady,
   getBrandingSettings,
 } from "@/features/settings/services/settings.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function isValidWebsiteUrl(value: string): boolean {
   const trimmed = value.trim();
@@ -71,6 +72,13 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const permission = await requireAdminPermission({
+    platform: "operations",
+    action: "update",
+    request,
+  });
+  if (!permission.ok) return permission.response;
+
   try {
     const tableReady = await isBrandingTableReady();
     if (!tableReady) {

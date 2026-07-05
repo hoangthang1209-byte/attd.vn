@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { seedDemoContent, deleteDemoContent } from "@/features/demo/demo-content-service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "operations",
+    action: "admin",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   try {
     const body = await req.json().catch(() => ({})) as { groups?: string[] };
     const groups = Array.isArray(body.groups) && body.groups.length > 0
@@ -15,7 +23,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function DELETE(_req: NextRequest) {
+export async function DELETE(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "operations",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   try {
     const result = await deleteDemoContent();
     return NextResponse.json({ ok: true, ...result });
