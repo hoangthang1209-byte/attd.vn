@@ -19,7 +19,13 @@ export type AdminMutationContext = {
 
 type MutationResult<T> =
   | { ok: true; data: T }
-  | { ok: false; message?: string };
+  | {
+      ok: false;
+      message?: string;
+      code?: string;
+      traceId?: string;
+      fieldErrors?: Record<string, string>;
+    };
 
 export type RunAdminMutationOptions<T> = {
   loadingMessage: string;
@@ -90,10 +96,22 @@ export function resolveAdminMutationErrorMessage(
     );
   }
   return (
-    (typeof body.message === "string" && body.message) ||
     (typeof body.error === "string" && body.error) ||
+    (typeof body.message === "string" && body.message) ||
     undefined
   );
+}
+
+function readApiErrorDetails(body: Record<string, unknown>) {
+  const fieldErrors =
+    body.fieldErrors && typeof body.fieldErrors === "object" && !Array.isArray(body.fieldErrors)
+      ? (body.fieldErrors as Record<string, string>)
+      : undefined;
+  return {
+    code: typeof body.code === "string" ? body.code : undefined,
+    traceId: typeof body.traceId === "string" ? body.traceId : undefined,
+    fieldErrors,
+  };
 }
 
 /** Parse a JSON API response into a mutation result. */
@@ -112,7 +130,11 @@ export async function parseAdminJsonResponse<T>(
   }
 
   if (!res.ok) {
-    return { ok: false, message: resolveAdminMutationErrorMessage(res, body) };
+    return {
+      ok: false,
+      message: resolveAdminMutationErrorMessage(res, body),
+      ...readApiErrorDetails(body),
+    };
   }
   return { ok: true, data: pickData(body) };
 }

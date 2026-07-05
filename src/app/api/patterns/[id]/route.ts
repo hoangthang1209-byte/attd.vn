@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   getPatternDetail,
   PatternValidationError,
@@ -6,8 +7,151 @@ import {
 } from "@/features/patterns/pattern.service";
 import { parsePatternUpdateBody } from "@/features/patterns/pattern-update-input";
 import { requireProductionUpdate, requireProductionView } from "@/lib/admin-auth/require-production-api";
+import type { AdminSessionUser } from "@/features/auth/admin-session.types";
 
 type RouteContext = { params: Promise<{ id: string }> };
+type PatternMeasurementErrorCode =
+  | "AUTH_SESSION_MISSING"
+  | "PATTERN_UPDATE_FORBIDDEN"
+  | "PATTERN_NOT_FOUND"
+  | "PATTERN_MEASUREMENT_INVALID"
+  | "PATTERN_MEASUREMENT_DUPLICATE_SIZE"
+  | "PATTERN_MEASUREMENT_DUPLICATE_POM"
+  | "PATTERN_MEASUREMENT_DB_CONFLICT"
+  | "PATTERN_MEASUREMENT_SAVE_FAILED";
+
+type PatternApiErrorBody = {
+  error: string;
+  code: PatternMeasurementErrorCode;
+  traceId: string;
+  fieldErrors: Record<string, string>;
+  message: string;
+};
+
+function createTraceId(): string {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+function jsonError(
+  status: number,
+  error: string,
+  code: PatternMeasurementErrorCode,
+  traceId: string,
+  fieldErrors: Record<string, string> = {},
+) {
+  return NextResponse.json(
+    { error, message: error, code, traceId, fieldErrors } satisfies PatternApiErrorBody,
+    { status, headers: { "x-attd-trace-id": traceId } },
+  );
+}
+
+function getSessionLabel(session: AdminSessionUser | undefined): "owner" | "admin-user" | "legacy-staff" | "none" {
+  if (!session?.authenticated) return "none";
+  if (session.mode === "owner") return "owner";
+  if (session.mode === "legacy") return "legacy-staff";
+  return "admin-user";
+}
+
+function inspectMeasurementPayload(body: unknown) {
+  const rows = Array.isArray((body as { measurements?: unknown } | null)?.measurements)
+    ? ((body as { measurements: unknown[] }).measurements)
+    : [];
+  const sizes = new Set<string>();
+  const duplicateSizes = new Set<string>();
+  const duplicatePoms = new Set<string>();
+  const seenPoms = new Set<string>();
+
+  for (const row of rows) {
+    const record = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+    const pom = String(record.pointOfMeasure ?? "").trim().toLocaleLowerCase("vi");
+    if (pom) {
+      if (seenPoms.has(pom)) duplicatePoms.add(pom);
+      seenPoms.add(pom);
+    }
+
+    const seenRowSizes = new Set<string>();
+    const values = Array.isArray(record.values) ? record.values : [];
+    for (const entry of values) {
+      const valueRecord = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+      const size = String(valueRecord.size ?? "").trim().toUpperCase();
+      if (!size) continue;
+      sizes.add(size);
+      if (seenRowSizes.has(size)) duplicateSizes.add(size);
+      seenRowSizes.add(size);
+    }
+  }
+
+  return {
+    rowCount: rows.length,
+    sizeCount: sizes.size,
+    duplicateSizeCount: duplicateSizes.size,
+    duplicatePomCount: duplicatePoms.size,
+  };
+}
+
+function classifyValidationError(err: PatternValidationError, isMeasurementUpdate: boolean): PatternMeasurementErrorCode {
+  if (err.code === "NOT_FOUND") return "PATTERN_NOT_FOUND";
+  if (err.code === "PERMISSION") return "PATTERN_UPDATE_FORBIDDEN";
+  if (err.code === "CONFLICT") return "PATTERN_MEASUREMENT_DB_CONFLICT";
+  if (!isMeasurementUpdate) return "PATTERN_MEASUREMENT_INVALID";
+
+  const fieldKeys = Object.keys(err.fieldErrors ?? {});
+  if (fieldKeys.some((key) => key.includes(".pointOfMeasure"))) return "PATTERN_MEASUREMENT_DUPLICATE_POM";
+  if (fieldKeys.some((key) => key.includes(".values."))) {
+    const hasOnlyDuplicateMessages = Object.values(err.fieldErrors ?? {}).every((message) =>
+      message.includes("trùng"),
+    );
+    if (hasOnlyDuplicateMessages) return "PATTERN_MEASUREMENT_DUPLICATE_SIZE";
+  }
+  return "PATTERN_MEASUREMENT_INVALID";
+}
+
+function statusForPatternError(err: PatternValidationError): number {
+  if (err.code === "NOT_FOUND") return 404;
+  if (err.code === "PERMISSION") return 403;
+  if (err.code === "CONFLICT") return 409;
+  return 400;
+}
+
+function safeMessageForCode(code: PatternMeasurementErrorCode, fallback?: string): string {
+  if (code === "AUTH_SESSION_MISSING") return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+  if (code === "PATTERN_UPDATE_FORBIDDEN") return "Bạn không có quyền cập nhật rập này.";
+  if (code === "PATTERN_NOT_FOUND") return "Không tìm thấy rập.";
+  if (code === "PATTERN_MEASUREMENT_DB_CONFLICT") {
+    return "Không thể lưu bảng đo do dữ liệu đang xung đột. Vui lòng tải lại và thử lại.";
+  }
+  if (code === "PATTERN_MEASUREMENT_SAVE_FAILED") return fallback ?? "Không thể lưu bảng đo.";
+  return fallback ?? "Dữ liệu bảng đo không hợp lệ.";
+}
+
+function getPrismaCode(err: unknown): string | undefined {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) return err.code;
+  return undefined;
+}
+
+function logMeasurementSaveFailure(input: {
+  traceId: string;
+  patternId: string;
+  session: AdminSessionUser | undefined;
+  status: number;
+  payload: ReturnType<typeof inspectMeasurementPayload>;
+  prismaCode?: string;
+  classification: PatternMeasurementErrorCode;
+}) {
+  console.error("[pattern.measurements.save.failed]", {
+    traceId: input.traceId,
+    route: "PATCH /api/patterns/[id]",
+    patternId: input.patternId,
+    sessionType: getSessionLabel(input.session),
+    status: input.status,
+    normalizedRowCount: input.payload.rowCount,
+    normalizedSizeCount: input.payload.sizeCount,
+    duplicateSizeCheck: input.payload.duplicateSizeCount > 0 ? "duplicate" : "ok",
+    duplicatePomCheck: input.payload.duplicatePomCount > 0 ? "duplicate" : "ok",
+    prismaCode: input.prismaCode,
+    classification: input.classification,
+  });
+}
 
 export async function GET(req: NextRequest, context: RouteContext) {
   const auth = requireProductionView(req);
@@ -27,18 +171,22 @@ export async function GET(req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
+  const traceId = createTraceId();
+  let measurementDiagnostics = inspectMeasurementPayload(null);
   const auth = requireProductionUpdate(req);
   if (auth.error) {
-    if (auth.error.status === 403) {
-      return NextResponse.json(
-        {
-          error: "Bạn không có quyền cập nhật rập này.",
-          message: "Bạn không có quyền cập nhật rập này.",
-        },
-        { status: 403 },
-      );
-    }
-    return auth.error;
+    const status = auth.error.status;
+    const code = status === 403 ? "PATTERN_UPDATE_FORBIDDEN" : "AUTH_SESSION_MISSING";
+    const { id } = await context.params;
+    logMeasurementSaveFailure({
+      traceId,
+      patternId: id,
+      session: auth.session,
+      status,
+      payload: measurementDiagnostics,
+      classification: code,
+    });
+    return jsonError(status, safeMessageForCode(code), code, traceId);
   }
 
   const { id } = await context.params;
@@ -46,15 +194,21 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: "Dữ liệu không hợp lệ.", message: "Dữ liệu không hợp lệ." },
-      { status: 400 },
-    );
+    logMeasurementSaveFailure({
+      traceId,
+      patternId: id,
+      session: auth.session,
+      status: 400,
+      payload: measurementDiagnostics,
+      classification: "PATTERN_MEASUREMENT_INVALID",
+    });
+    return jsonError(400, "Dữ liệu không hợp lệ.", "PATTERN_MEASUREMENT_INVALID", traceId);
   }
   const isMeasurementUpdate =
     body !== null &&
     typeof body === "object" &&
     Object.prototype.hasOwnProperty.call(body, "measurements");
+  measurementDiagnostics = inspectMeasurementPayload(body);
 
   try {
     const input = parsePatternUpdateBody(body);
@@ -86,31 +240,42 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
           fieldErrors: err.fieldErrors,
         });
       }
-      const status =
-        err.code === "NOT_FOUND" ? 404 : err.code === "PERMISSION" ? 403 : err.code === "CONFLICT" ? 409 : 400;
-      const response =
-        isMeasurementUpdate || err.fieldErrors
-          ? {
-              error: err.message,
-              message: err.message,
-              ...(err.fieldErrors ? { fieldErrors: err.fieldErrors } : {}),
-            }
-          : { message: err.message };
-      return NextResponse.json(response, { status });
+      const status = statusForPatternError(err);
+      const code = classifyValidationError(err, isMeasurementUpdate);
+      logMeasurementSaveFailure({
+        traceId,
+        patternId: id,
+        session: auth.session,
+        status,
+        payload: measurementDiagnostics,
+        classification: code,
+      });
+      return jsonError(status, safeMessageForCode(code, err.message), code, traceId, err.fieldErrors ?? {});
     }
-    console.error("[PATCH /api/patterns/[id]]", err);
+    const prismaCode = getPrismaCode(err);
     if (isMeasurementUpdate) {
-      return NextResponse.json(
-        {
-          error: "Không thể lưu bảng đo. Vui lòng thử lại.",
-          message: "Không thể lưu bảng đo. Vui lòng thử lại.",
-        },
-        { status: 500 },
+      logMeasurementSaveFailure({
+        traceId,
+        patternId: id,
+        session: auth.session,
+        status: 500,
+        payload: measurementDiagnostics,
+        prismaCode,
+        classification: "PATTERN_MEASUREMENT_SAVE_FAILED",
+      });
+      return jsonError(
+        500,
+        `Không thể lưu bảng đo. Mã tra cứu: ${traceId}`,
+        "PATTERN_MEASUREMENT_SAVE_FAILED",
+        traceId,
       );
     }
-    return NextResponse.json(
-      { message: "Không thể cập nhật rập. Vui lòng thử lại." },
-      { status: 500 },
+    console.error("[PATCH /api/patterns/[id]]", { traceId, err });
+    return jsonError(
+      500,
+      `Không thể cập nhật rập. Mã tra cứu: ${traceId}`,
+      "PATTERN_MEASUREMENT_SAVE_FAILED",
+      traceId,
     );
   }
 }

@@ -71,6 +71,7 @@ type Props = {
   }>) => void | Promise<void>;
   saving?: boolean;
   fieldErrors?: Record<string, string>;
+  errorDetail?: { code?: string; traceId?: string; message?: string } | null;
 };
 
 export default function TechPackMeasurementEditor({
@@ -81,6 +82,7 @@ export default function TechPackMeasurementEditor({
   onSave,
   saving,
   fieldErrors,
+  errorDetail,
 }: Props) {
   const [rows, setRows] = useState<MeasurementRow[]>(() => toRows(measurements));
   const [sizes, setSizes] = useState<string[]>(() => getInitialSizes(measurements));
@@ -214,6 +216,16 @@ export default function TechPackMeasurementEditor({
             {saving ? "Đang lưu bảng đo…" : "Lưu bảng"}
           </button>
         </div>
+      )}
+      {errorDetail && (errorDetail.code || errorDetail.traceId) && (
+        <details className="admin-muted" style={{ marginBottom: 12, fontSize: 12 }}>
+          <summary>{errorDetail.message ?? "Không thể lưu bảng đo."}</summary>
+          <div style={{ marginTop: 4 }}>
+            {errorDetail.code && <>Mã lỗi: {errorDetail.code}</>}
+            {errorDetail.code && errorDetail.traceId && " · "}
+            {errorDetail.traceId && <>Mã tra cứu: {errorDetail.traceId}</>}
+          </div>
+        </details>
       )}
       {fieldErrors && Object.keys(fieldErrors).length > 0 && (
         <div className="admin-error" style={{ marginBottom: 12 }}>

@@ -168,10 +168,18 @@ async function replacePatternMeasurements(
   patternId: string,
   measurements: PatternMeasurementInput[],
 ) {
-  await tx.patternMeasurementValue.deleteMany({
-    where: { measurement: { patternId } },
+  const existingMeasurements = await tx.patternMeasurement.findMany({
+    where: { patternId },
+    select: { id: true },
   });
-  await tx.patternMeasurement.deleteMany({ where: { patternId } });
+  const existingMeasurementIds = existingMeasurements.map((measurement) => measurement.id);
+
+  if (existingMeasurementIds.length > 0) {
+    await tx.patternMeasurementValue.deleteMany({
+      where: { measurementId: { in: existingMeasurementIds } },
+    });
+    await tx.patternMeasurement.deleteMany({ where: { id: { in: existingMeasurementIds } } });
+  }
 
   for (const [index, row] of measurements.entries()) {
     const pom = row.pointOfMeasure.trim();

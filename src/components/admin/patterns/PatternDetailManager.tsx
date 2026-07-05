@@ -73,6 +73,11 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [measurementFieldErrors, setMeasurementFieldErrors] = useState<Record<string, string>>({});
+  const [measurementErrorDetail, setMeasurementErrorDetail] = useState<{
+    code?: string;
+    traceId?: string;
+    message?: string;
+  } | null>(null);
   const [measurementSaving, setMeasurementSaving] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [formRevision, setFormRevision] = useState(0);
@@ -145,6 +150,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     saveBusyRef.current = true;
     setMeasurementSaving(true);
     setMeasurementFieldErrors({});
+    setMeasurementErrorDetail(null);
     await mutate({
       loadingMessage: "Đang lưu bảng đo…",
       successMessage: "Đã lưu bảng đo.",
@@ -158,6 +164,8 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         const body = (await res.json().catch(() => ({}))) as {
           error?: string;
           message?: string;
+          code?: string;
+          traceId?: string;
           fieldErrors?: Record<string, string>;
         } & PatternDetail;
 
@@ -165,11 +173,16 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
           const fieldErrors =
             body.fieldErrors && typeof body.fieldErrors === "object" ? body.fieldErrors : {};
           setMeasurementFieldErrors(fieldErrors);
-          const firstFieldError = Object.values(fieldErrors).find(Boolean);
+          const serverMessage = typeof body.error === "string" ? body.error : body.message;
           const message =
-            firstFieldError ??
+            serverMessage ??
             resolveAdminMutationErrorMessage(res, body as Record<string, unknown>) ??
             "Không thể lưu bảng đo. Vui lòng thử lại.";
+          setMeasurementErrorDetail({
+            code: typeof body.code === "string" ? body.code : undefined,
+            traceId: typeof body.traceId === "string" ? body.traceId : undefined,
+            message,
+          });
           return { ok: false as const, message };
         }
 
@@ -179,6 +192,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         setPattern(body);
         setError(null);
         setMeasurementFieldErrors({});
+        setMeasurementErrorDetail(null);
       },
       onError: (message) => setError(message),
     });
@@ -404,6 +418,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
           emptyText="Chưa có điểm đo. Áp dụng mẫu thông số hoặc sao chép từ Tech Pack."
           saving={measurementSaving}
           fieldErrors={measurementFieldErrors}
+          errorDetail={measurementErrorDetail}
           onSave={(rows) => void saveMeasurements(rows)}
         />
       </SectionCard>

@@ -23,6 +23,19 @@ describe("resolveAdminMutationErrorMessage", () => {
     assert.equal(message, "Bạn không có quyền cập nhật rập này.");
   });
 
+  it("prefers the safe error field over generic message fallback", () => {
+    const message = resolveAdminMutationErrorMessage(
+      new Response(null, { status: 500 }),
+      {
+        error: "Không thể lưu bảng đo. Mã tra cứu: ABC123",
+        message: "Internal Server Error",
+        code: "PATTERN_MEASUREMENT_SAVE_FAILED",
+        traceId: "ABC123",
+      },
+    );
+    assert.equal(message, "Không thể lưu bảng đo. Mã tra cứu: ABC123");
+  });
+
   it("falls back for 403 without body copy", () => {
     const message = resolveAdminMutationErrorMessage(new Response(null, { status: 403 }), {});
     assert.equal(message, ADMIN_FORBIDDEN_FALLBACK);

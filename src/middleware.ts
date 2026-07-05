@@ -14,6 +14,18 @@ import { can } from "@/features/auth/admin-permissions";
 import { FINANCIAL_ROUTE_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 import { parseQuotePublicLinkSegment } from "@/features/quotes/quote-public-link.shared";
 
+function createTraceId(): string {
+  return Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+function apiAuthError(message: string, code: string, status: number) {
+  const traceId = createTraceId();
+  return NextResponse.json(
+    { error: message, message, code, traceId, fieldErrors: {} },
+    { status, headers: { "x-attd-trace-id": traceId } },
+  );
+}
+
 function tryQuotePublicLinkRewrite(request: NextRequest): NextResponse | null {
   const { pathname } = request.nextUrl;
   if (!pathname.startsWith("/") || pathname.includes("/", 1)) return null;
@@ -77,9 +89,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (shouldProtectApiRoute(request) && !authenticated) {
-    return NextResponse.json(
-      { message: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." },
-      { status: 401 },
+    return apiAuthError(
+      "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+      "AUTH_SESSION_MISSING",
+      401,
     );
   }
 
@@ -88,7 +101,8 @@ export async function middleware(request: NextRequest) {
     const required = requiredPermissionForFinancialApi(pathname);
     if (required && !can(session, required)) {
       logFinancialAccessDenied({ user: session, route: pathname, action: "api_forbidden" });
-      return NextResponse.json({ message: FINANCIAL_ROUTE_DENIED_MESSAGE }, { status: 403 });
+      const code = pathname.startsWith("/api/patterns") ? "PATTERN_UPDATE_FORBIDDEN" : "API_FORBIDDEN";
+      return apiAuthError(FINANCIAL_ROUTE_DENIED_MESSAGE, code, 403);
     }
   }
 
