@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addCrmLeadNote, getCrmLeadById } from "@/features/crm/services/crm-lead.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await context.params;
 
   const lead = await getCrmLeadById(id);

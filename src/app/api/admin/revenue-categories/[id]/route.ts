@@ -4,11 +4,19 @@ import {
   RevenueCategoryError,
   updateRevenueCategory,
 } from "@/features/revenue-categories/revenue-category.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   try {
     const body = (await req.json()) as Record<string, unknown>;
@@ -32,9 +40,16 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   try {
     await deleteRevenueCategory(id);

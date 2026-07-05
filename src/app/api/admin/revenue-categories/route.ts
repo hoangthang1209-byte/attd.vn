@@ -4,6 +4,7 @@ import {
   listRevenueCategories,
   RevenueCategoryError,
 } from "@/features/revenue-categories/revenue-category.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
   try {
@@ -29,6 +30,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   try {
     const body = (await req.json()) as Record<string, unknown>;
     const created = await createRevenueCategory({

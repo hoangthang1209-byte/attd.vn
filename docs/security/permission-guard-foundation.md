@@ -106,6 +106,14 @@ Applied Product action mapping:
 
 CTO-7A intentionally did not guard Product GET routes. Product import downloads/templates and body-aware bulk variant action mapping remain deferred for a later read/export and concrete-permission enforcement sprint.
 
+## CTO-7B CRM Platform Mutation Hardening
+
+CTO-7B applied `requireAdminPermission()` to CRM Platform mutation handlers and CRM high-risk admin-adjacent mutations identified in CTO-3. CRM create/update/delete mutations now use `platform: "crm"` with the matching `create`, `update`, or `delete` action. CRM report export handlers use `action: "export"`, and the WhatsApp assistant analysis endpoint uses `action: "admin"`.
+
+Public lead capture remains public: `/api/leads` was not guarded, and the public-style branch of `/api/crm/leads` remains unguarded while the explicit `adminMode` branch now requires `crm/create`.
+
+Full action-level enforcement remains future work until platform/action pairs are mapped to concrete `AdminPermission` codes.
+
 ## CTO-5 Pattern
 
 Future hardening sprints should:

@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createContact, setPrimaryContact } from "@/features/crm/services/crm-customer.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -43,6 +51,13 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();

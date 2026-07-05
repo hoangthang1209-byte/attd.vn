@@ -2,12 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import type { CRMActivityType } from "@prisma/client";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
 import { CRM_ACTIVITY_TYPES } from "@/features/crm/types";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function isValidActivityType(value: string): value is CRMActivityType {
   return CRM_ACTIVITY_TYPES.includes(value as CRMActivityType);
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();

@@ -6,6 +6,7 @@ import {
   isValidCustomerType,
   listCustomers,
 } from "@/features/crm/services/crm-customer.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function parseOptionalString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
@@ -39,6 +40,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();

@@ -4,6 +4,7 @@ import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { parseCrmReportFilters } from "@/features/crm/services/crm-reporting-utils";
 import { assertCanViewReports } from "@/features/crm/services/crm-reporting-scope";
 import { getLeadSourceReport, serializeReportForCsv } from "@/features/crm/services/crm-reporting.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function buildRows(report: Awaited<ReturnType<typeof getLeadSourceReport>>) {
   return report.rows.map((row) => ({
@@ -20,6 +21,13 @@ function buildRows(report: Awaited<ReturnType<typeof getLeadSourceReport>>) {
 }
 
 export async function GET(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "export",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const session = getAdminSessionFromRequest(req);
   try {
     assertCanViewReports(session);

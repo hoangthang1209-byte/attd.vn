@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createContact } from "@/features/crm/services/crm-customer.service";
 import { listCustomerContacts } from "@/features/crm/services/crm-contact.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -11,6 +12,13 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 }
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id: customerId } = await ctx.params;
   let body: unknown;
   try {

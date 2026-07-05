@@ -4,12 +4,20 @@ import {
   WHATSAPP_ASSISTANT_MAX_CHAT_LENGTH,
   type WhatsAppAssistantInput,
 } from "@/features/crm/whatsapp-assistant/types";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 function readString(raw: Record<string, unknown>, key: string): string {
   return typeof raw[key] === "string" ? raw[key].trim() : "";
 }
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "admin",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();

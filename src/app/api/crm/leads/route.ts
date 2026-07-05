@@ -11,6 +11,7 @@ import {
   listCrmLeads,
 } from "@/features/crm/services/crm-lead.service";
 import type { CreateProductInterestInput } from "@/features/crm/types";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -114,6 +115,13 @@ export async function POST(req: NextRequest) {
   const source = typeof raw.source === "string" ? raw.source : "WEBSITE";
 
   if (adminMode) {
+    const permission = await requireAdminPermission({
+      platform: "crm",
+      action: "create",
+      request: req,
+    });
+    if (!permission.ok) return permission.response;
+
     if (!contactName && !companyName && !phone && !email && !fullName) {
       return NextResponse.json(
         { message: "Vui lòng nhập ít nhất một trong: tên liên hệ, công ty, SĐT hoặc email" },

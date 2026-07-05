@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCRMProductInterest } from "@/features/crm/services/crm-product-interest.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   let body: unknown;
   try {
     body = await req.json();

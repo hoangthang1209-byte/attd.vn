@@ -3,10 +3,18 @@ import {
   deleteContact,
   updateContact,
 } from "@/features/crm/services/crm-contact.service";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string; contactId: string }> };
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id: customerId, contactId } = await ctx.params;
   let body: unknown;
   try {
@@ -46,7 +54,14 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+export async function DELETE(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "crm",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id: customerId, contactId } = await ctx.params;
   try {
     await deleteContact(customerId, contactId);
