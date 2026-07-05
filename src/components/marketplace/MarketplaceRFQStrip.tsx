@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 export default function MarketplaceRFQStrip() {
   return (
     <section className="mp-rfq">
@@ -43,9 +41,9 @@ export default function MarketplaceRFQStrip() {
                 />
               </label>
             </div>
-            <Link href="/lien-he" className="btn-primary mp-rfq-submit">
+            <button type="submit" className="btn-primary mp-rfq-submit">
               Gửi yêu cầu báo giá
-            </Link>
+            </button>
           </form>
         </div>
       </div>

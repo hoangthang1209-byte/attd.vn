@@ -324,10 +324,10 @@ describe("public all-categories hierarchy", () => {
 });
 
 describe("canonical public category URLs", () => {
-  it("uses the same catalog filter URL across category surfaces", () => {
+  it("uses indexable landing URLs for approved commercial categories", () => {
     const slug = "ao-thun-tron";
     const href = publicCategoryHref(slug);
-    assert.equal(href, "/san-pham?category=ao-thun-tron");
+    assert.equal(href, "/ao-thun-tron");
 
     const grid = buildHomepageChildCategoryGrid(buildTree());
     assert.ok(grid.items.every((item) => item.href === publicCategoryHref(item.slug)));
@@ -338,6 +338,10 @@ describe("canonical public category URLs", () => {
         section.children.every((child) => child.href === publicCategoryHref(child.slug)),
       ),
     );
+  });
+
+  it("falls back to catalog filter URLs for non-indexable categories", () => {
+    assert.equal(publicCategoryHref("ao-thun-cvc"), "/san-pham?category=ao-thun-cvc");
   });
 });
 

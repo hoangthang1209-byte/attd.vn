@@ -1,13 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
 import { CTA } from "@/lib/ctaConfig";
 import { TRUST_REASSURANCE_PRIVACY } from "@/lib/b2b-trust-v2-copy";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 
+function buildPrefillMessage(params: {
+  productGroup?: string | null;
+  quantity?: string | null;
+  region?: string | null;
+}): string {
+  const lines: string[] = [];
+  if (params.productGroup?.trim()) lines.push(`Nhóm sản phẩm: ${params.productGroup.trim()}`);
+  if (params.quantity?.trim()) lines.push(`Số lượng dự kiến: ${params.quantity.trim()}`);
+  if (params.region?.trim()) lines.push(`Khu vực giao hàng: ${params.region.trim()}`);
+  return lines.join("\n");
+}
+
 export default function ContactForm() {
+  const searchParams = useSearchParams();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -15,6 +29,15 @@ export default function ContactForm() {
   const [message, setMessage] = useState("");
   const [formStatus, setFormStatus] = useState<FormStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    const prefill = buildPrefillMessage({
+      productGroup: searchParams.get("product_group"),
+      quantity: searchParams.get("quantity"),
+      region: searchParams.get("region"),
+    });
+    if (prefill) setMessage(prefill);
+  }, [searchParams]);
 
   function validate(): string | null {
     if (!name.trim()) return "Vui lòng nhập họ tên.";

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import ContactForm from "@/components/public/ContactForm";
 import PublicContactChannels from "@/components/public/PublicContactChannels";
 import CompanyContactCard from "@/components/public/company/CompanyContactCard";
@@ -87,7 +88,9 @@ export default async function LienHePage() {
 
             {/* Right: Form */}
             <div>
-              <ContactForm />
+              <Suspense fallback={<div className="lead-form public-lead-form public-lead-form--contact" aria-busy="true" />}>
+                <ContactForm />
+              </Suspense>
             </div>
           </div>
         </div>

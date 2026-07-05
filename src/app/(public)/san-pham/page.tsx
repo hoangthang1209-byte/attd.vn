@@ -17,6 +17,7 @@ import { SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { buildCatalogMetadata } from "@/lib/seo/indexation-policy";
 import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
 import { buildClearFiltersUrl } from "@/lib/catalog-filter-url";
+import { publicCategoryHref } from "@/features/categories/public-category-url";
 
 export const revalidate = 3600;
 
@@ -100,7 +101,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
   const breadcrumbItems = [
     { name: "Sản phẩm", href: "/san-pham" },
     ...(categoryContext?.parentName && categoryContext.parentSlug
-      ? [{ name: categoryContext.parentName, href: `/san-pham?category=${categoryContext.parentSlug}` }]
+      ? [{ name: categoryContext.parentName, href: publicCategoryHref(categoryContext.parentSlug) }]
       : []),
     ...(categoryContext ? [{ name: categoryContext.name }] : []),
   ];
