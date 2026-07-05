@@ -4,6 +4,8 @@ Date: 2026-07-05
 Status: Completed audit
 Scope: Documentation, permission matrix, and lightweight constant registry only
 
+CTO-4 introduced guard foundations. Route-by-route enforcement will be done in CTO-5 hardening sprints.
+
 ## Summary
 
 This audit inspected admin auth, dealer portal auth, public-token routes, and all API route handlers under `src/app/api/**/route.ts` for mutation methods. It did not refactor business logic, rename routes, rename Prisma models, redesign UI, or touch the pre-existing unstaged quote/manufacturing-evidence implementation work.

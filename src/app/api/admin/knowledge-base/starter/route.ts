@@ -1,7 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { importKnowledgeBaseStarterData } from "@/features/knowledge-base/knowledge-base-starter-data";
+import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "ai",
+    action: "create",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   try {
     const result = await importKnowledgeBaseStarterData();
     return NextResponse.json({
