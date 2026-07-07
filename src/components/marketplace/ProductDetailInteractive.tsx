@@ -27,6 +27,7 @@ import {
 } from "@/lib/productImageScope";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
 import type { ManufacturingEvidenceItem } from "@/lib/manufacturing-library.types";
+import ManufacturingGallery from "@/components/public/manufacturing/ManufacturingGallery";
 
 const STOCK_LABELS: Record<string, string> = {
   IN_STOCK: "Còn hàng",
@@ -45,6 +46,22 @@ type CapabilityItem = {
   title: string;
   description: string;
 };
+
+function buildSelectedOptionEntries(
+  optionGroups: PublicProductDetail["optionGroups"],
+  selection: OptionSelectionState,
+) {
+  return optionGroups
+    .map((group) => {
+      const value = selection[group.slug];
+      if (!value) return null;
+      return {
+        label: group.name,
+        value,
+      };
+    })
+    .filter((entry): entry is { label: string; value: string } => Boolean(entry));
+}
 
 type Props = {
   product: PublicProductDetail;
@@ -179,6 +196,14 @@ export default function ProductDetailInteractive({
       .join(" · ");
   }, [variants]);
 
+  const selectedOptionEntries = useMemo(
+    () => buildSelectedOptionEntries(optionGroups, selection),
+    [optionGroups, selection],
+  );
+  const selectedOptionSummary = selectedOptionEntries.length
+    ? selectedOptionEntries.map((entry) => `${entry.label}: ${entry.value}`).join(" · ")
+    : null;
+
   const capabilityItems = useMemo<CapabilityItem[]>(() => {
     const items: CapabilityItem[] = [];
     if (product.supportsPrinting) {
@@ -246,6 +271,7 @@ export default function ProductDetailInteractive({
     variantId: quoteVariantId,
     variantLabel: selectedVariant?.id === quoteVariantId ? selectedVariant?.label ?? null : null,
     variantSku: selectedVariant?.id === quoteVariantId ? selectedVariant?.sku ?? null : null,
+    optionSummary: selectedOptionSummary,
     optionSelections: selectedVariant?.optionSelections ?? selection,
   };
 
@@ -258,6 +284,7 @@ export default function ProductDetailInteractive({
       leadTime={effectiveLeadTime}
       stockLabel={stockLabel}
       stockColor={stockColor}
+      optionSummary={selectedOptionSummary}
       onRequestQuote={openQuote}
       manufacturingEvidenceItems={manufacturingEvidenceItems}
     />
@@ -335,6 +362,25 @@ export default function ProductDetailInteractive({
                         onSelect={handleOptionSelect}
                         allowedImageUrls={productImageUrls}
                       />
+                      <div
+                        className={[
+                          "mp-pdp-option-quote-feedback",
+                          selectedOptionSummary ? "mp-pdp-option-quote-feedback--selected" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        role="status"
+                        aria-live="polite"
+                      >
+                        {selectedOptionSummary ? (
+                          <>
+                            <span>Đã thêm vào yêu cầu báo giá</span>
+                            <strong>Đang chọn: {selectedOptionSummary}</strong>
+                          </>
+                        ) : (
+                          <span>Chọn màu/size để ATTD tư vấn báo giá chính xác hơn.</span>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -383,6 +429,13 @@ export default function ProductDetailInteractive({
                 )}
 
                 <ProductCustomizationsSection items={customizations} onRequestQuote={openQuote} />
+
+                <ManufacturingGallery
+                  title="Quy trình sản xuất"
+                  items={manufacturingEvidenceItems ?? []}
+                  layout="mosaic"
+                  className="mp-pdp-section mp-pdp-factory-gallery"
+                />
               </div>
             </div>
 

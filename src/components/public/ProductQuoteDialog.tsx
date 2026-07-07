@@ -24,6 +24,25 @@ type Props = {
   restoreFocusRef?: React.RefObject<HTMLButtonElement | null>;
 };
 
+function formatOptionKey(key: string): string {
+  const normalized = key.toLowerCase();
+  if (normalized.includes("mau") || normalized.includes("color")) return "Màu";
+  if (normalized.includes("size") || normalized.includes("kich-co")) return "Size";
+  return key
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatOptionSelectionSummary(
+  optionSelections?: Record<string, string | null>,
+): string | null {
+  if (!optionSelections) return null;
+  const options = Object.entries(optionSelections)
+    .filter(([, value]) => Boolean(value))
+    .map(([key, value]) => `${formatOptionKey(key)}: ${value}`);
+  return options.length ? options.join(" · ") : null;
+}
+
 function buildProductMessage(payload: {
   product: ProductQuoteContext;
   productUrl: string;
@@ -39,7 +58,9 @@ function buildProductMessage(payload: {
   if (product.category?.trim()) lines.push(`Danh mục: ${product.category.trim()}`);
   if (product.variantLabel?.trim()) lines.push(`Biến thể: ${product.variantLabel.trim()}`);
   if (product.variantSku?.trim()) lines.push(`SKU: ${product.variantSku.trim()}`);
-  if (product.optionSelections) {
+  if (product.optionSummary?.trim()) {
+    lines.push(`Tùy chọn: ${product.optionSummary.trim()}`);
+  } else if (product.optionSelections) {
     const options = Object.entries(product.optionSelections)
       .filter(([, value]) => value)
       .map(([key, value]) => `${key}: ${value}`);
@@ -196,6 +217,8 @@ export default function ProductQuoteDialog({
   const moqText = isPublicMoq(product.moq) ? formatPdpMoqText(product.moq) : null;
   const hasImage = Boolean(product.imageUrl && isValidImageSrc(product.imageUrl));
   const variantLabel = product.variantLabel?.trim() || null;
+  const optionSummary =
+    product.optionSummary?.trim() || formatOptionSelectionSummary(product.optionSelections);
 
   return createPortal(
     <div className="product-quote-dialog" role="presentation">
@@ -272,6 +295,11 @@ export default function ProductQuoteDialog({
                   <p className="product-quote-dialog__product-name">{product.name}</p>
                   {variantLabel && (
                     <p className="product-quote-dialog__product-variant">{variantLabel}</p>
+                  )}
+                  {optionSummary && (
+                    <p className="product-quote-dialog__product-options">
+                      Lựa chọn: {optionSummary}
+                    </p>
                   )}
                   {moqText && (
                     <p className="product-quote-dialog__product-moq">{moqText}</p>

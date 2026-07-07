@@ -18,6 +18,7 @@ type Props = {
   leadTime?: string | null;
   stockLabel?: string | null;
   stockColor?: string;
+  optionSummary?: string | null;
   onRequestQuote: () => void;
   manufacturingEvidenceItems?: readonly ManufacturingEvidenceItem[];
 };
@@ -30,6 +31,7 @@ export default function ProductPdpConversionPanel({
   leadTime,
   stockLabel,
   stockColor = "#16a34a",
+  optionSummary,
   onRequestQuote,
   manufacturingEvidenceItems,
 }: Props) {
@@ -63,6 +65,12 @@ export default function ProductPdpConversionPanel({
             <div className="mp-pdp-conversion-fact">
               <dt>Mã / SKU</dt>
               <dd>{productCode}</dd>
+            </div>
+          )}
+          {optionSummary && (
+            <div className="mp-pdp-conversion-fact mp-pdp-conversion-fact--selected-options">
+              <dt>Đang chọn</dt>
+              <dd>{optionSummary}</dd>
             </div>
           )}
           {isPublicMoq(moq) && (
@@ -111,9 +119,9 @@ export default function ProductPdpConversionPanel({
         <PublicContactChannels compact className="mp-pdp-conversion-contact" />
 
         <ManufacturingEvidenceStrip
-          title="Minh chứng quy trình"
+          title="Tại ATTD"
           items={pdpEvidence}
-          className="mp-pdp-manufacturing-evidence"
+          className="mp-pdp-manufacturing-gallery"
         />
       </div>
     </aside>

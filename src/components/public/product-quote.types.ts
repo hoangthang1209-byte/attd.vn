@@ -9,6 +9,7 @@ export type ProductQuoteContext = {
   variantId?: string | null;
   variantLabel?: string | null;
   variantSku?: string | null;
+  optionSummary?: string | null;
   optionSelections?: Record<string, string | null>;
 };
 
