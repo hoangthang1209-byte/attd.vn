@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatPricingCurrency, formatPricingPercent } from "@/features/pricing/format";
+import { COSTING_TEMPLATES } from "@/features/pricing/costing-templates";
 import type {
   CostingCalculatorResult,
   CostingComponentInput,
@@ -15,6 +16,15 @@ type LeadOption = { id: string; fullName: string; companyName: string | null; co
 type CustomerOption = { id: string; name: string; code: string };
 type ContactOption = { id: string; fullName: string };
 type PriceGroupOption = { id: string; name: string; isDefault: boolean; isActive: boolean };
+type CostingQuantityBreakResult = {
+  quantity: number;
+  totalCostPerUnit: number;
+  suggestedSellingPricePerUnit: number;
+  revenueBeforeVat: number;
+  grossProfit: number;
+  actualMarginRate: number;
+  finalQuotePrice: number;
+};
 
 type ComponentRow = {
   label: string;
@@ -78,6 +88,7 @@ export default function CostingCalculator() {
   const [overheadRate, setOverheadRate] = useState("0");
   const [targetMarginRate, setTargetMarginRate] = useState("35");
   const [vatRate, setVatRate] = useState("0");
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState(COSTING_TEMPLATES[0]?.key ?? "");
   const [leadId, setLeadId] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [contactId, setContactId] = useState("");
@@ -85,8 +96,11 @@ export default function CostingCalculator() {
   const [internalNote, setInternalNote] = useState("");
 
   const [result, setResult] = useState<CostingCalculatorResult | null>(null);
+  const [quantityTiers, setQuantityTiers] = useState("30, 50, 100, 300, 500, 1000");
+  const [quantityBreaks, setQuantityBreaks] = useState<CostingQuantityBreakResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadingBreaks, setLoadingBreaks] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const derivedFabricCost = useMemo(() => {
@@ -95,6 +109,11 @@ export default function CostingCalculator() {
     if (price <= 0 || consumption <= 0) return null;
     return price / consumption;
   }, [fabricPrice, fabricConsumption]);
+
+  const selectedTemplate = useMemo(
+    () => COSTING_TEMPLATES.find((template) => template.key === selectedTemplateKey) ?? null,
+    [selectedTemplateKey],
+  );
 
   useEffect(() => {
     void Promise.all([
@@ -182,6 +201,7 @@ export default function CostingCalculator() {
       if (!res.ok) throw new Error(data.message ?? "Không thể xử lý bộ tính giá");
       if (mode === "calculate") {
         setResult(data.result ?? null);
+        setQuantityBreaks([]);
       } else if (mode === "createQuote" && data.saved?.quoteId) {
         router.push(`/admin/quotes/${data.saved.quoteId}`);
       } else if (data.saved?.calculationId) {
@@ -199,6 +219,47 @@ export default function CostingCalculator() {
     setComponents((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
+  function applyTemplate() {
+    if (!selectedTemplate) return;
+    setUnit(selectedTemplate.defaultUnit);
+    setMaterialName(selectedTemplate.defaultMaterialName);
+    setFabricPrice(String(selectedTemplate.defaultFabricPrice));
+    setFabricConsumption(String(selectedTemplate.defaultFabricConsumption));
+    setRibCostPerUnit(String(selectedTemplate.defaultRibCostPerUnit));
+    setOverheadRate(String(selectedTemplate.defaultOverheadRate));
+    setTargetMarginRate(String(selectedTemplate.defaultTargetMarginRate));
+    setVatRate(String(selectedTemplate.defaultVatRate));
+    setComponents(
+      selectedTemplate.defaultComponents.map((component) => ({
+        label: component.label,
+        type: component.type,
+        unitCost: component.unitCost != null ? String(component.unitCost) : "",
+        totalCost: component.totalCost != null ? String(component.totalCost) : "",
+        quantityFactor: component.quantityFactor != null ? String(component.quantityFactor) : "1",
+        note: component.note ?? "",
+      })),
+    );
+  }
+
+  async function postQuantityBreaks() {
+    setLoadingBreaks(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/pricing/costing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...buildPayload("quantityBreaks"), quantityTiers }),
+      });
+      const data = await res.json() as { breaks?: CostingQuantityBreakResult[]; message?: string };
+      if (!res.ok) throw new Error(data.message ?? "Không thể tính bảng giá theo số lượng");
+      setQuantityBreaks(data.breaks ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi tính bảng giá theo số lượng");
+    } finally {
+      setLoadingBreaks(false);
+    }
+  }
+
   return (
     <div className="admin-panel">
       <div className="admin-empty-state" style={{ alignItems: "flex-start", marginBottom: 20 }}>
@@ -211,6 +272,35 @@ export default function CostingCalculator() {
       </div>
 
       {error && <p className="admin-error">{error}</p>}
+
+      <fieldset className="admin-catalog-fieldset">
+        <legend>Mẫu costing nhanh</legend>
+        <div className="admin-seo-brief-form-grid">
+          <div className="admin-field">
+            <label className="admin-label">Mẫu chi phí</label>
+            <select className="admin-input" value={selectedTemplateKey} onChange={(e) => setSelectedTemplateKey(e.target.value)}>
+              {COSTING_TEMPLATES.map((template) => (
+                <option key={template.key} value={template.key}>{template.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Mô tả mẫu</label>
+            <p style={{ margin: "8px 0 0" }}>{selectedTemplate?.description ?? "Chọn mẫu để áp dụng nhanh các giá trị mặc định."}</p>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Hành động</label>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary"
+              onClick={applyTemplate}
+              disabled={!selectedTemplate}
+            >
+              Áp dụng mẫu
+            </button>
+          </div>
+        </div>
+      </fieldset>
 
       <fieldset className="admin-catalog-fieldset">
         <legend>Sản phẩm / khách hàng</legend>
@@ -383,6 +473,64 @@ export default function CostingCalculator() {
           Tạo báo giá nháp
         </button>
       </div>
+
+      <fieldset className="admin-catalog-fieldset">
+        <legend>Bảng giá theo số lượng</legend>
+        <div className="admin-seo-brief-form-grid">
+          <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
+            <label className="admin-label">Các mốc số lượng (phân tách bằng dấu phẩy)</label>
+            <input
+              className="admin-input"
+              value={quantityTiers}
+              onChange={(e) => setQuantityTiers(e.target.value)}
+              placeholder="30, 50, 100, 300, 500, 1000"
+            />
+          </div>
+          <div className="admin-field">
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary"
+              onClick={() => void postQuantityBreaks()}
+              disabled={loading || saving || loadingBreaks}
+            >
+              {loadingBreaks ? "Đang tính bảng giá…" : "Tính bảng giá"}
+            </button>
+          </div>
+        </div>
+        <p style={{ marginTop: 10 }}>
+          Bảng giá được tính theo dữ liệu tại thời điểm bấm nút.
+        </p>
+        {quantityBreaks.length > 0 && (
+          <div className="admin-table-wrap" style={{ marginTop: 12 }}>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Số lượng</th>
+                  <th>Total cost / đơn vị</th>
+                  <th>Giá bán / đơn vị</th>
+                  <th>Doanh thu trước VAT</th>
+                  <th>Lợi nhuận gộp</th>
+                  <th>Margin %</th>
+                  <th>Giá báo cuối</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quantityBreaks.map((item) => (
+                  <tr key={item.quantity}>
+                    <td>{item.quantity.toLocaleString("vi-VN")}</td>
+                    <td>{formatPricingCurrency(item.totalCostPerUnit)}</td>
+                    <td>{formatPricingCurrency(item.suggestedSellingPricePerUnit)}</td>
+                    <td>{formatPricingCurrency(item.revenueBeforeVat)}</td>
+                    <td>{formatPricingCurrency(item.grossProfit)}</td>
+                    <td>{formatPricingPercent(item.actualMarginRate)}</td>
+                    <td>{formatPricingCurrency(item.finalQuotePrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </fieldset>
 
       {result && (
         <fieldset className="admin-catalog-fieldset">

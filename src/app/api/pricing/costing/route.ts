@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   calculateCosting,
+  calculateCostingQuantityBreaks,
   saveCostingCalculation,
 } from "@/features/pricing/services/costing-calculator.service";
 import type {
@@ -88,6 +89,25 @@ function parseCostingBody(raw: Record<string, unknown>): CostingCalculatorInput 
   };
 }
 
+function parseQuantityTiers(value: unknown): number[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => asNumber(item))
+      .filter((item): item is number => item != null && Number.isFinite(item))
+      .map((item) => Math.max(1, Math.round(item)));
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value
+      .split(",")
+      .map((item) => asNumber(item.trim()))
+      .filter((item): item is number => item != null && Number.isFinite(item))
+      .map((item) => Math.max(1, Math.round(item)));
+  }
+
+  return [];
+}
+
 export async function POST(req: NextRequest) {
   const permission = await requireAdminPermission({
     platform: "commercial",
@@ -115,6 +135,15 @@ export async function POST(req: NextRequest) {
     if (mode === "save" || mode === "createQuote") {
       const saved = await saveCostingCalculation({ ...input, createQuote: mode === "createQuote" || input.createQuote });
       return NextResponse.json({ saved }, { status: 201 });
+    }
+
+    if (mode === "quantityBreaks") {
+      const tiers = parseQuantityTiers(raw.quantityTiers);
+      if (tiers.length === 0) {
+        return NextResponse.json({ message: "Vui lòng nhập danh sách số lượng hợp lệ." }, { status: 400 });
+      }
+      const breaks = await calculateCostingQuantityBreaks(input, tiers);
+      return NextResponse.json({ breaks });
     }
 
     const result = await calculateCosting(input);

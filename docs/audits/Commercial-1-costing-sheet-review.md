@@ -210,3 +210,11 @@ Saving should create a `PricingCalculation` and one quote-ready `PricingCalculat
 ## Commercial-1 implementation status
 
 Implemented as an MVP under the existing Pricing module to avoid duplicating ERP-level pricing logic. The calculator supports flexible extra cost components so ATTD can price apparel, bags, hats, tumblers, bandanas, gift sets, OEM and commercial items from the same sales workflow.
+
+## Commercial-2 acceleration note
+
+Commercial-2 adds static cost templates (no database model) as a non-ERP acceleration layer so Sales can apply predefined costing defaults per product group, then edit fields and extra cost rows as needed before calculation/save/quote.
+
+## Commercial-3 acceleration note
+
+Commercial-3 adds quantity break pricing as a non-ERP acceleration layer by recalculating the same costing input across selected quantity tiers, helping Sales generate multi-quantity quote tables quickly without changing the core pricing/quote flow.

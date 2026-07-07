@@ -11,6 +11,16 @@ import type {
   CostingSaveResult,
 } from "@/features/pricing/costing-types";
 
+export type CostingQuantityBreakResult = {
+  quantity: number;
+  totalCostPerUnit: number;
+  suggestedSellingPricePerUnit: number;
+  revenueBeforeVat: number;
+  grossProfit: number;
+  actualMarginRate: number;
+  finalQuotePrice: number;
+};
+
 const PROCESS_COMPONENT_TYPES: CostingComponentType[] = [
   "CUTTING",
   "SEWING",
@@ -225,6 +235,34 @@ export async function calculateCosting(input: CostingCalculatorInput): Promise<C
     components,
     warnings: [...new Set(warnings)],
   };
+}
+
+export async function calculateCostingQuantityBreaks(
+  input: CostingCalculatorInput,
+  tiers: number[],
+): Promise<CostingQuantityBreakResult[]> {
+  const normalizedTiers = [...new Set(
+    tiers
+      .map((tier) => Math.round(positive(tier)))
+      .filter((tier) => tier > 0),
+  )].sort((a, b) => a - b);
+
+  const breakResults = await Promise.all(
+    normalizedTiers.map(async (tier) => {
+      const result = await calculateCosting({ ...input, quantity: tier });
+      return {
+        quantity: result.quantity,
+        totalCostPerUnit: result.totalCostPerUnit,
+        suggestedSellingPricePerUnit: result.suggestedSellingPricePerUnit,
+        revenueBeforeVat: result.revenueBeforeVat,
+        grossProfit: result.grossProfit,
+        actualMarginRate: result.actualMarginRate,
+        finalQuotePrice: result.finalQuotePrice,
+      };
+    }),
+  );
+
+  return breakResults;
 }
 
 export async function saveCostingCalculation(input: CostingCalculatorInput): Promise<CostingSaveResult> {
