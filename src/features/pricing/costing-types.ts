@@ -20,6 +20,16 @@ export type CostingComponentInput = {
   note?: string;
 };
 
+export type CostingQuantityBreakResult = {
+  quantity: number;
+  totalCostPerUnit: number;
+  suggestedSellingPricePerUnit: number;
+  revenueBeforeVat: number;
+  grossProfit: number;
+  actualMarginRate: number;
+  finalQuotePrice: number;
+};
+
 export type CostingCalculatorInput = {
   productId?: string;
   variantId?: string;
@@ -42,6 +52,7 @@ export type CostingCalculatorInput = {
   priceGroupId?: string;
   internalNote?: string;
   createQuote?: boolean;
+  quantityBreaks?: CostingQuantityBreakResult[];
 };
 
 export type CostingComponentBreakdown = {

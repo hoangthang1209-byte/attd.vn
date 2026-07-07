@@ -8,18 +8,9 @@ import type {
   CostingComponentBreakdown,
   CostingComponentInput,
   CostingComponentType,
+  CostingQuantityBreakResult,
   CostingSaveResult,
 } from "@/features/pricing/costing-types";
-
-export type CostingQuantityBreakResult = {
-  quantity: number;
-  totalCostPerUnit: number;
-  suggestedSellingPricePerUnit: number;
-  revenueBeforeVat: number;
-  grossProfit: number;
-  actualMarginRate: number;
-  finalQuotePrice: number;
-};
 
 const PROCESS_COMPONENT_TYPES: CostingComponentType[] = [
   "CUTTING",
@@ -267,6 +258,18 @@ export async function calculateCostingQuantityBreaks(
 
 export async function saveCostingCalculation(input: CostingCalculatorInput): Promise<CostingSaveResult> {
   const result = await calculateCosting(input);
+  const quantityBreaks = (input.quantityBreaks ?? [])
+    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
+    .map((item) => ({
+      quantity: Math.round(item.quantity),
+      totalCostPerUnit: roundMoney(positive(item.totalCostPerUnit)),
+      suggestedSellingPricePerUnit: roundMoney(positive(item.suggestedSellingPricePerUnit)),
+      revenueBeforeVat: roundMoney(positive(item.revenueBeforeVat)),
+      grossProfit: roundMoney(positive(item.grossProfit)),
+      actualMarginRate: roundMoney(positive(item.actualMarginRate)),
+      finalQuotePrice: roundMoney(positive(item.finalQuotePrice)),
+    }));
+  const costingSnapshot = { ...result, quantityBreaks };
   const code = await generatePricingCalculationCode();
 
   const calculation = await prisma.$transaction(async (tx) => {
@@ -291,7 +294,7 @@ export async function saveCostingCalculation(input: CostingCalculatorInput): Pro
         manualOverrideReason: null,
         internalNote: input.internalNote?.trim() || null,
         inputSnapshot: { calculator: "costing", ...input } as Prisma.InputJsonValue,
-        resultSnapshot: { calculator: "costing", ...result } as unknown as Prisma.InputJsonValue,
+        resultSnapshot: { calculator: "costing", ...costingSnapshot } as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -314,7 +317,7 @@ export async function saveCostingCalculation(input: CostingCalculatorInput): Pro
         costEstimate: result.totalCost,
         marginAmount: result.grossProfit,
         marginRate: result.actualMarginRate,
-        pricingSnapshot: result as unknown as Prisma.InputJsonValue,
+        pricingSnapshot: costingSnapshot as unknown as Prisma.InputJsonValue,
         manualOverride: false,
         manualUnitPrice: null,
         manualOverrideReason: null,

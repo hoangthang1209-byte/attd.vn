@@ -8,6 +8,7 @@ import type {
   CostingCalculatorInput,
   CostingComponentInput,
   CostingComponentType,
+  CostingQuantityBreakResult,
 } from "@/features/pricing/costing-types";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
@@ -86,7 +87,33 @@ function parseCostingBody(raw: Record<string, unknown>): CostingCalculatorInput 
     priceGroupId: asString(raw.priceGroupId),
     internalNote: asString(raw.internalNote),
     createQuote: asBoolean(raw.createQuote),
+    quantityBreaks: parseQuantityBreaks(raw.quantityBreaks),
   };
+}
+
+function parseQuantityBreaks(value: unknown): CostingQuantityBreakResult[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
+    .map((row) => ({
+      quantity: asNumber(row.quantity),
+      totalCostPerUnit: asNumber(row.totalCostPerUnit),
+      suggestedSellingPricePerUnit: asNumber(row.suggestedSellingPricePerUnit),
+      revenueBeforeVat: asNumber(row.revenueBeforeVat),
+      grossProfit: asNumber(row.grossProfit),
+      actualMarginRate: asNumber(row.actualMarginRate),
+      finalQuotePrice: asNumber(row.finalQuotePrice),
+    }))
+    .filter((row): row is CostingQuantityBreakResult => row.quantity != null)
+    .map((row) => ({
+      quantity: Math.max(1, Math.round(row.quantity)),
+      totalCostPerUnit: row.totalCostPerUnit ?? 0,
+      suggestedSellingPricePerUnit: row.suggestedSellingPricePerUnit ?? 0,
+      revenueBeforeVat: row.revenueBeforeVat ?? 0,
+      grossProfit: row.grossProfit ?? 0,
+      actualMarginRate: row.actualMarginRate ?? 0,
+      finalQuotePrice: row.finalQuotePrice ?? 0,
+    }));
 }
 
 function parseQuantityTiers(value: unknown): number[] {

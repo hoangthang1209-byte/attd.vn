@@ -13,6 +13,7 @@ import {
 import { allocateQuotePublicShortCode } from "@/features/quotes/quote-public-link.service";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
 import { formatPublicQuoteDocument, formatQuotePdfData } from "@/features/quotes/quote-document";
+import { getManufacturingAssetsForQuotePdf } from "@/features/quotes/quote-manufacturing-evidence.service";
 import { validateContactBelongsToCustomer } from "@/features/crm/services/crm-contact.service";
 import {
   getDefaultSalesRepresentative,
@@ -127,6 +128,9 @@ function buildItemCreateData(
     discountAmount: item.discountAmount ?? 0,
     lineSubtotal: item.lineSubtotal,
     lineTotal: item.lineTotal,
+    costEstimate: (item as { costEstimate?: number | null }).costEstimate ?? null,
+    marginAmount: (item as { marginAmount?: number | null }).marginAmount ?? null,
+    marginRate: (item as { marginRate?: number | null }).marginRate ?? null,
     pricingSnapshot: (item.pricingSnapshot ?? null) as Prisma.InputJsonValue,
     manualOverride: item.manualOverride,
     manualUnitPrice: item.manualUnitPrice ?? null,
@@ -413,12 +417,43 @@ export async function createQuoteFromPricingCalculation(
   const calc = await getPricingCalculationDetail(pricingCalculationId);
   if (!calc) throw new QuoteValidationError("Không tìm thấy bản tính giá.");
 
+  const calcResult = (calc.resultSnapshot && typeof calc.resultSnapshot === "object")
+    ? (calc.resultSnapshot as Record<string, unknown>)
+    : null;
+  const calcQuantityBreaks = Array.isArray(calcResult?.quantityBreaks)
+    ? calcResult.quantityBreaks
+    : [];
+
   const items: QuoteItemInput[] = calc.items.map((item, index) => ({
+    pricingSnapshot: item.pricingSnapshot as Record<string, unknown> | null,
     pricingCalculationItemId: item.id,
     productId: item.productId,
     variantId: item.variantId,
     productNameSnapshot: item.productNameSnapshot,
     variantNameSnapshot: item.variantNameSnapshot,
+    description: [
+      (() => {
+        const materialName = (item.pricingSnapshot as { materialName?: unknown } | null)?.materialName;
+        return typeof materialName === "string" && materialName.trim()
+          ? `VL: ${materialName.trim()}`
+          : null;
+      })(),
+      (() => {
+        const gsm = (item.pricingSnapshot as { gsm?: unknown } | null)?.gsm;
+        return typeof gsm === "number" && Number.isFinite(gsm) ? `GSM: ${gsm}` : null;
+      })(),
+      `SL: ${item.quantity.toLocaleString("vi-VN")} ${item.unit}`,
+      (() => {
+        const targetMarginRate = (item.pricingSnapshot as { targetMarginRate?: unknown } | null)?.targetMarginRate;
+        return typeof targetMarginRate === "number" && Number.isFinite(targetMarginRate)
+          ? `Target margin: ${targetMarginRate}%`
+          : null;
+      })(),
+      "Giá từ Costing Calculator",
+    ].filter(Boolean).join(" | "),
+    itemNote: calcQuantityBreaks.length > 0
+      ? "Có bảng giá theo số lượng trong costing snapshot."
+      : null,
     quantity: item.quantity,
     unit: item.unit,
     baseUnitPrice: item.baseUnitPrice,
@@ -428,7 +463,9 @@ export async function createQuoteFromPricingCalculation(
     discountAmount: item.discountAmount,
     manualUnitPrice: item.manualUnitPrice,
     manualOverrideReason: item.manualOverrideReason,
-    pricingSnapshot: item.pricingSnapshot as Record<string, unknown> | null,
+    costEstimate: item.costEstimate,
+    marginAmount: item.marginAmount,
+    marginRate: item.marginRate,
     sortOrder: index,
   }));
 
@@ -705,7 +742,8 @@ export async function getPublicQuoteByToken(token: string, markViewed = true) {
     row.viewedAt = row.viewedAt ?? new Date();
   }
 
-  return formatPublicQuoteDocument(row);
+  const manufacturingEvidence = await getManufacturingAssetsForQuotePdf(row.id);
+  return formatPublicQuoteDocument(row, manufacturingEvidence);
 }
 
 export async function getQuotePdfDataById(
@@ -725,7 +763,8 @@ export async function getQuotePdfDataById(
     },
   });
   if (!row) return null;
-  return formatQuotePdfData(row, company);
+  const manufacturingEvidence = await getManufacturingAssetsForQuotePdf(row.id);
+  return formatQuotePdfData(row, company, manufacturingEvidence);
 }
 
 export async function getQuotePdfDataByToken(
@@ -745,7 +784,8 @@ export async function getQuotePdfDataByToken(
     },
   });
   if (!row) return null;
-  return formatQuotePdfData(row, company);
+  const manufacturingEvidence = await getManufacturingAssetsForQuotePdf(row.id);
+  return formatQuotePdfData(row, company, manufacturingEvidence);
 }
 
 export async function buildQuotePrefill(params: {

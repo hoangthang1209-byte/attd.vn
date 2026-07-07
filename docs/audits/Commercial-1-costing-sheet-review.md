@@ -218,3 +218,7 @@ Commercial-2 adds static cost templates (no database model) as a non-ERP acceler
 ## Commercial-3 acceleration note
 
 Commercial-3 adds quantity break pricing as a non-ERP acceleration layer by recalculating the same costing input across selected quantity tiers, helping Sales generate multi-quantity quote tables quickly without changing the core pricing/quote flow.
+
+## Commercial-4 acceleration note
+
+Commercial-4 integrates Costing -> Quote Draft so quote items carry costing context (material/fabric, margin/overhead/VAT metadata) and preserve quantity breaks in snapshots for internal sales follow-up.

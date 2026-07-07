@@ -8,6 +8,7 @@ import type {
   CostingCalculatorResult,
   CostingComponentInput,
   CostingComponentType,
+  CostingQuantityBreakResult,
 } from "@/features/pricing/costing-types";
 
 type ProductOption = { id: string; name: string; productCode: string | null };
@@ -16,15 +17,6 @@ type LeadOption = { id: string; fullName: string; companyName: string | null; co
 type CustomerOption = { id: string; name: string; code: string };
 type ContactOption = { id: string; fullName: string };
 type PriceGroupOption = { id: string; name: string; isDefault: boolean; isActive: boolean };
-type CostingQuantityBreakResult = {
-  quantity: number;
-  totalCostPerUnit: number;
-  suggestedSellingPricePerUnit: number;
-  revenueBeforeVat: number;
-  grossProfit: number;
-  actualMarginRate: number;
-  finalQuotePrice: number;
-};
 
 type ComponentRow = {
   label: string;
@@ -188,10 +180,14 @@ export default function CostingCalculator() {
     if (mode === "calculate") setLoading(true); else setSaving(true);
     setError(null);
     try {
+      const payload: ReturnType<typeof buildPayload> & { quantityBreaks?: CostingQuantityBreakResult[] } = buildPayload(mode);
+      if (mode === "createQuote") {
+        payload.quantityBreaks = quantityBreaks;
+      }
       const res = await fetch("/api/pricing/costing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload(mode)),
+        body: JSON.stringify(payload),
       });
       const data = await res.json() as {
         result?: CostingCalculatorResult;

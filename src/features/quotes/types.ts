@@ -26,6 +26,9 @@ export type QuoteItemInput = {
   setupFee?: number;
   unitPrice?: number;
   discountAmount?: number;
+  costEstimate?: number | null;
+  marginAmount?: number | null;
+  marginRate?: number | null;
   manualUnitPrice?: number | null;
   manualOverrideReason?: string | null;
   pricingSnapshot?: Record<string, unknown> | null;
@@ -128,6 +131,21 @@ export type PublicQuoteItem = {
   sampleLeadTime: string | null;
 };
 
+export type QuoteManufacturingEvidenceItem = {
+  id: string;
+  title: string;
+  description: string;
+  categoryName: string | null;
+  categorySlug: string | null;
+  visibility: "PUBLIC" | "DEALER_ONLY" | "CUSTOMER_ONLY" | "INTERNAL";
+  featured: boolean;
+  priority: number;
+  imageUrl: string;
+  alt: string;
+  displayLocationKeys: string[];
+  sortOrder: number;
+};
+
 export type PublicQuoteDocument = {
   quoteNo: string;
   status: QuoteStatus;
@@ -175,4 +193,5 @@ export type PublicQuoteDocument = {
   showProductionLeadTime: boolean;
   showSampleFee: boolean;
   showSampleLeadTime: boolean;
+  manufacturingEvidence: QuoteManufacturingEvidenceItem[];
 };

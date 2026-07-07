@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { QuoteStatus } from "@prisma/client";
 import QuoteStatusBadge from "@/components/admin/quotes/QuoteStatusBadge";
+import QuoteManufacturingEvidencePicker from "@/components/admin/quotes/QuoteManufacturingEvidencePicker";
 import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
 import { QuotePartyColumns } from "@/components/quotes/QuoteDocumentSections";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
@@ -72,6 +73,7 @@ type QuoteDetail = {
     productNameSnapshot: string | null;
     variantNameSnapshot: string | null;
     description: string | null;
+    itemNote: string | null;
     quantity: number;
     unit: string;
     unitPrice: number;
@@ -79,7 +81,16 @@ type QuoteDetail = {
     manualOverride: boolean;
     manualUnitPrice: number | null;
     marginAmount: number | null;
+    marginRate: number | null;
+    pricingSnapshot?: Record<string, unknown> | null;
   }>;
+};
+
+type CostingQuantityBreakRow = {
+  quantity: number;
+  suggestedSellingPricePerUnit: number;
+  revenueBeforeVat: number;
+  actualMarginRate: number;
 };
 
 export default function QuoteDetailView({ id }: { id: string }) {
@@ -92,7 +103,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`/api/quotes/${id}`);
     const data = await res.json() as { quote?: QuoteDetail; message?: string };
@@ -103,9 +114,14 @@ export default function QuoteDetailView({ id }: { id: string }) {
       setQuote(data.quote ?? null);
     }
     setLoading(false);
-  }
+  }, [id]);
 
-  useEffect(() => { void load(); }, [id]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   async function updateStatus(status: QuoteStatus) {
     setBusy(true);
@@ -219,6 +235,23 @@ export default function QuoteDetailView({ id }: { id: string }) {
   }).totals;
 
   const url = publicUrl();
+  const costingQuantityBreaks: CostingQuantityBreakRow[] = quote.items
+    .flatMap((item) => {
+      const snapshot = item.pricingSnapshot;
+      if (!snapshot || typeof snapshot !== "object") return [];
+      const breaks = (snapshot as { quantityBreaks?: unknown }).quantityBreaks;
+      if (!Array.isArray(breaks)) return [];
+      return breaks
+        .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
+        .map((row) => ({
+          quantity: typeof row.quantity === "number" ? row.quantity : 0,
+          suggestedSellingPricePerUnit: typeof row.suggestedSellingPricePerUnit === "number" ? row.suggestedSellingPricePerUnit : 0,
+          revenueBeforeVat: typeof row.revenueBeforeVat === "number" ? row.revenueBeforeVat : 0,
+          actualMarginRate: typeof row.actualMarginRate === "number" ? row.actualMarginRate : 0,
+        }))
+        .filter((row) => Number.isFinite(row.quantity) && row.quantity > 0);
+    })
+    .sort((a, b) => a.quantity - b.quantity);
 
   return (
     <div className="admin-panel">
@@ -288,6 +321,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
                   {item.productNameSnapshot}
                   {item.variantNameSnapshot && <span className="admin-field-hint"> · {item.variantNameSnapshot}</span>}
                   {item.description && <div className="admin-field-hint">{item.description}</div>}
+                  {item.itemNote && <div className="admin-field-hint">{item.itemNote}</div>}
                 </td>
                 <td>{item.quantity} {item.unit}</td>
                 <td>{formatQuoteCurrency(item.manualOverride && item.manualUnitPrice != null ? item.manualUnitPrice : item.unitPrice)}</td>
@@ -299,6 +333,36 @@ export default function QuoteDetailView({ id }: { id: string }) {
       </div>
 
       <QuoteTotalsSummary totals={totals} />
+
+      {costingQuantityBreaks.length > 0 && (
+        <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
+          <legend>Bảng giá theo số lượng từ costing</legend>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Số lượng</th>
+                  <th>Giá bán / đơn vị</th>
+                  <th>Tổng trước VAT</th>
+                  <th>Margin %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {costingQuantityBreaks.map((row, index) => (
+                  <tr key={`${row.quantity}-${index}`}>
+                    <td>{row.quantity.toLocaleString("vi-VN")}</td>
+                    <td>{formatQuoteCurrency(row.suggestedSellingPricePerUnit)}</td>
+                    <td>{formatQuoteCurrency(row.revenueBeforeVat)}</td>
+                    <td>{row.actualMarginRate.toFixed(2)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </fieldset>
+      )}
+
+      <QuoteManufacturingEvidencePicker quoteId={id} />
 
       {quote.customerNote && <p className="admin-field-hint" style={{ marginTop: 12 }}><strong>Ghi chú gửi khách:</strong> {quote.customerNote}</p>}
       {quote.internalNote && <p className="admin-field-hint"><strong>Ghi chú nội bộ:</strong> {quote.internalNote}</p>}
