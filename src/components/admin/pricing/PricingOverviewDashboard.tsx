@@ -56,7 +56,8 @@ export default function PricingOverviewDashboard() {
         <h3 className="admin-subtitle">Truy cập nhanh</h3>
       </div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--primary">Bộ tính giá</Link>
+        <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">Costing & báo giá nhanh</Link>
+        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary">Bộ tính giá</Link>
         <Link href="/admin/pricing/price-groups" className="admin-btn admin-btn--secondary">Nhóm giá</Link>
         <Link href="/admin/pricing/product-tiers" className="admin-btn admin-btn--secondary">Bảng giá sản phẩm</Link>
         <Link href="/admin/pricing/service-rules" className="admin-btn admin-btn--secondary">Phí dịch vụ</Link>
@@ -71,7 +72,7 @@ export default function PricingOverviewDashboard() {
       {(stats?.recentCalculations.length ?? 0) === 0 ? (
         <div className="admin-empty-state">
           <p>Chưa có bản tính giá nào.</p>
-          <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--primary">Tạo bản tính giá đầu tiên</Link>
+          <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">Tạo costing đầu tiên</Link>
         </div>
       ) : (
         <div className="admin-table-wrap">
