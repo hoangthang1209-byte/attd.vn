@@ -206,3 +206,7 @@ Add a new costing mode under the existing pricing module:
 - Types: `src/features/pricing/costing-types.ts`.
 
 Saving should create a `PricingCalculation` and one quote-ready `PricingCalculationItem`, with snapshots preserving the full costing breakdown.
+
+## Commercial-1 implementation status
+
+Implemented as an MVP under the existing Pricing module to avoid duplicating ERP-level pricing logic. The calculator supports flexible extra cost components so ATTD can price apparel, bags, hats, tumblers, bandanas, gift sets, OEM and commercial items from the same sales workflow.
