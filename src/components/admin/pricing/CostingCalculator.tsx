@@ -9,6 +9,12 @@ import {
   costLibraryCategoryToComponentType,
   type CostLibraryCategory,
 } from "@/features/pricing/cost-library";
+import {
+  COSTING_BOM_PRESETS,
+  COSTING_BOM_PRESET_CATEGORY_LABELS,
+  type CostingBomPresetCategory,
+  type CostingBomPresetItem,
+} from "@/features/pricing/costing-bom-presets";
 import { COSTING_TEMPLATES } from "@/features/pricing/costing-templates";
 import type {
   CostingCalculatorResult,
@@ -51,6 +57,34 @@ const defaultComponents: ComponentRow[] = [
   { label: "Đóng gói + bao bì, thùng", type: "PACKAGING", unitCost: "1000", totalCost: "", quantityFactor: "1", note: "" },
 ];
 
+const INITIAL_FIELD_DEFAULTS = {
+  unit: "cái",
+  materialName: "65/35",
+  fabricPrice: "135000",
+  fabricConsumption: "3.7",
+  ribCostPerUnit: "4600",
+  overheadRate: "0",
+  targetMarginRate: "35",
+  vatRate: "0",
+} as const;
+
+function isUnsetOrDefault(current: string, defaultValue: string): boolean {
+  const trimmed = current.trim();
+  if (!trimmed) return true;
+  return trimmed === defaultValue;
+}
+
+function bomItemToComponentRow(item: CostingBomPresetItem): ComponentRow {
+  return {
+    label: item.label,
+    type: item.type,
+    unitCost: String(item.unitCost),
+    totalCost: "",
+    quantityFactor: String(item.quantityFactor ?? 1),
+    note: item.note ?? "",
+  };
+}
+
 function toNumber(value: string): number | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
@@ -89,6 +123,8 @@ export default function CostingCalculator() {
   const [selectedTemplateKey, setSelectedTemplateKey] = useState(COSTING_TEMPLATES[0]?.key ?? "");
   const [costLibrarySearch, setCostLibrarySearch] = useState("");
   const [costLibraryCategory, setCostLibraryCategory] = useState<CostLibraryCategory | "ALL">("ALL");
+  const [bomPresetCategory, setBomPresetCategory] = useState<CostingBomPresetCategory | "ALL">("ALL");
+  const [selectedBomPresetKey, setSelectedBomPresetKey] = useState(COSTING_BOM_PRESETS[0]?.key ?? "");
   const [leadId, setLeadId] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [contactId, setContactId] = useState("");
@@ -123,6 +159,18 @@ export default function CostingCalculator() {
       return item.name.toLocaleLowerCase("vi-VN").includes(query);
     });
   }, [costLibraryCategory, costLibrarySearch]);
+
+  const filteredBomPresets = useMemo(() => {
+    return COSTING_BOM_PRESETS.filter((preset) => {
+      if (bomPresetCategory !== "ALL" && preset.category !== bomPresetCategory) return false;
+      return true;
+    });
+  }, [bomPresetCategory]);
+
+  const selectedBomPreset = useMemo(
+    () => COSTING_BOM_PRESETS.find((preset) => preset.key === selectedBomPresetKey) ?? null,
+    [selectedBomPresetKey],
+  );
 
   useEffect(() => {
     void Promise.all([
@@ -245,6 +293,64 @@ export default function CostingCalculator() {
         quantityFactor: String(item.defaultQuantityFactor ?? 1),
         note: item.defaultNote ?? item.description ?? "",
       },
+    ]);
+  }
+
+  function applyBomPreset() {
+    if (!selectedBomPreset) return;
+
+    if (
+      selectedBomPreset.defaultUnit &&
+      isUnsetOrDefault(unit, INITIAL_FIELD_DEFAULTS.unit)
+    ) {
+      setUnit(selectedBomPreset.defaultUnit);
+    }
+    if (
+      selectedBomPreset.defaultMaterialName &&
+      isUnsetOrDefault(materialName, INITIAL_FIELD_DEFAULTS.materialName)
+    ) {
+      setMaterialName(selectedBomPreset.defaultMaterialName);
+    }
+    if (
+      selectedBomPreset.defaultFabricPrice != null &&
+      isUnsetOrDefault(fabricPrice, INITIAL_FIELD_DEFAULTS.fabricPrice)
+    ) {
+      setFabricPrice(String(selectedBomPreset.defaultFabricPrice));
+    }
+    if (
+      selectedBomPreset.defaultFabricConsumption != null &&
+      isUnsetOrDefault(fabricConsumption, INITIAL_FIELD_DEFAULTS.fabricConsumption)
+    ) {
+      setFabricConsumption(String(selectedBomPreset.defaultFabricConsumption));
+    }
+    if (
+      selectedBomPreset.defaultRibCostPerUnit != null &&
+      isUnsetOrDefault(ribCostPerUnit, INITIAL_FIELD_DEFAULTS.ribCostPerUnit)
+    ) {
+      setRibCostPerUnit(String(selectedBomPreset.defaultRibCostPerUnit));
+    }
+    if (
+      selectedBomPreset.defaultOverheadRate != null &&
+      isUnsetOrDefault(overheadRate, INITIAL_FIELD_DEFAULTS.overheadRate)
+    ) {
+      setOverheadRate(String(selectedBomPreset.defaultOverheadRate));
+    }
+    if (
+      selectedBomPreset.defaultTargetMarginRate != null &&
+      isUnsetOrDefault(targetMarginRate, INITIAL_FIELD_DEFAULTS.targetMarginRate)
+    ) {
+      setTargetMarginRate(String(selectedBomPreset.defaultTargetMarginRate));
+    }
+    if (
+      selectedBomPreset.defaultVatRate != null &&
+      isUnsetOrDefault(vatRate, INITIAL_FIELD_DEFAULTS.vatRate)
+    ) {
+      setVatRate(String(selectedBomPreset.defaultVatRate));
+    }
+
+    setComponents((prev) => [
+      ...prev,
+      ...selectedBomPreset.items.map(bomItemToComponentRow),
     ]);
   }
 
@@ -427,6 +533,86 @@ export default function CostingCalculator() {
             <input className="admin-input" type="number" min="0" value={ribCostPerUnit} onChange={(e) => setRibCostPerUnit(e.target.value)} />
           </div>
         </div>
+      </fieldset>
+
+      <fieldset className="admin-catalog-fieldset">
+        <legend>BOM preset</legend>
+        <p style={{ marginTop: 0 }}>
+          BOM preset chỉ giúp tạo nhanh cấu trúc chi phí. Sales vẫn có thể sửa/xóa từng dòng trước khi tính giá.
+        </p>
+        <div className="admin-seo-brief-form-grid">
+          <div className="admin-field">
+            <label className="admin-label">Danh mục</label>
+            <select
+              className="admin-input"
+              value={bomPresetCategory}
+              onChange={(e) => {
+                const nextCategory = e.target.value as CostingBomPresetCategory | "ALL";
+                setBomPresetCategory(nextCategory);
+                const nextPresets = COSTING_BOM_PRESETS.filter((preset) =>
+                  nextCategory === "ALL" ? true : preset.category === nextCategory,
+                );
+                if (!nextPresets.some((preset) => preset.key === selectedBomPresetKey)) {
+                  setSelectedBomPresetKey(nextPresets[0]?.key ?? "");
+                }
+              }}
+            >
+              <option value="ALL">Tất cả</option>
+              {(Object.keys(COSTING_BOM_PRESET_CATEGORY_LABELS) as CostingBomPresetCategory[]).map(
+                (category) => (
+                  <option key={category} value={category}>
+                    {COSTING_BOM_PRESET_CATEGORY_LABELS[category]}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Preset</label>
+            <select
+              className="admin-input"
+              value={selectedBomPresetKey}
+              onChange={(e) => setSelectedBomPresetKey(e.target.value)}
+            >
+              {filteredBomPresets.map((preset) => (
+                <option key={preset.key} value={preset.key}>
+                  {preset.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Mô tả</label>
+            <p style={{ margin: "8px 0 0" }}>
+              {selectedBomPreset?.description ?? "Chọn preset để xem cấu trúc BOM costing."}
+            </p>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Hành động</label>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary"
+              onClick={applyBomPreset}
+              disabled={!selectedBomPreset}
+            >
+              Áp dụng BOM preset
+            </button>
+          </div>
+        </div>
+        {selectedBomPreset && (
+          <div style={{ marginTop: 12 }}>
+            <p className="admin-field-hint" style={{ marginBottom: 8 }}>
+              {selectedBomPreset.items.length} dòng sẽ được thêm vào bảng tính (không ghi đè dòng hiện có).
+            </p>
+            <ul className="admin-field-hint" style={{ margin: 0, paddingLeft: 18 }}>
+              {selectedBomPreset.items.map((item) => (
+                <li key={`${selectedBomPreset.key}-${item.label}`}>
+                  {item.label} · {formatPricingCurrency(item.unitCost)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </fieldset>
 
       <fieldset className="admin-catalog-fieldset">

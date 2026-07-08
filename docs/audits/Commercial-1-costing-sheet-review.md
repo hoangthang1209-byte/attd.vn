@@ -226,3 +226,7 @@ Commercial-4 integrates Costing -> Quote Draft so quote items carry costing cont
 ## Commercial-5 acceleration note
 
 Commercial-5 introduced a reusable Cost Library layer to accelerate sales costing while keeping calculation logic unchanged.
+
+## Commercial-6 acceleration note
+
+Commercial-6 added static Costing BOM Presets to generate realistic quotation BOM structures without introducing ERP BOM/MRP complexity.
