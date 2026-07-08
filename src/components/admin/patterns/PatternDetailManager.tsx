@@ -93,9 +93,9 @@ const UNSAVED_MESSAGE = "Bạn có thay đổi chưa lưu. Rời khỏi trang s�
 function measurementsToDraft(rows: MeasurementRow[]): MeasurementDraftRow {
   return rows.map((row, index) => ({
     pointOfMeasure: row.pointOfMeasure,
-    description: row.description,
-    baseSize: row.baseSize,
-    tolerance: row.tolerance,
+    description: row.description ?? "",
+    baseSize: row.baseSize ?? "",
+    tolerance: row.tolerance ?? "",
     sortOrder: index,
     values: row.values.map((value) => ({ size: value.size, value: value.value })),
   }));
