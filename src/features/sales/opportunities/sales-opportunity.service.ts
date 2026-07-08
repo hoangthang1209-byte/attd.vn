@@ -1,15 +1,23 @@
-import type { Prisma, SalesOpportunityStage } from "@prisma/client";
+import type { Prisma, QuoteStatus, PricingCalculationStatus, SalesOpportunityStage } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { SALES_OPPORTUNITY_STAGE_ORDER } from "@/features/sales/opportunities/labels";
 import { generateSalesOpportunityCode } from "@/features/sales/opportunities/sales-opportunity-code";
 import { SalesOpportunityValidationError } from "@/features/sales/opportunities/sales-opportunity-input";
+import { mapActivityRow } from "@/features/crm/mappers";
 import type {
   CreateSalesOpportunityInput,
   ListSalesOpportunitiesInput,
+  SalesOpportunityCustomerSummary,
+  SalesOpportunityContactSummary,
+  SalesOpportunityLeadSummary,
   SalesOpportunityListRecord,
   SalesOpportunityPipelineResult,
   SalesOpportunityPipelineStats,
+  SalesOpportunityPricingSummary,
+  SalesOpportunityQuoteSummary,
   SalesOpportunityStageStats,
+  SalesOpportunityTimelineEntry,
+  SalesOpportunityWorkspaceResult,
   UpdateSalesOpportunityInput,
 } from "@/features/sales/opportunities/types";
 
@@ -241,6 +249,285 @@ export async function getSalesOpportunityById(id: string): Promise<SalesOpportun
     include: opportunityInclude,
   });
   return row ? mapOpportunity(row) : null;
+}
+
+const workspaceInclude = {
+  lead: {
+    select: {
+      id: true,
+      code: true,
+      fullName: true,
+      companyName: true,
+      company: true,
+      phone: true,
+      email: true,
+    },
+  },
+  customer: {
+    select: { id: true, code: true, name: true, phone: true, email: true },
+  },
+  contact: {
+    select: { id: true, fullName: true, title: true, phone: true, email: true },
+  },
+  quote: {
+    select: {
+      id: true,
+      quoteNo: true,
+      status: true,
+      totalAmount: true,
+      manualOverride: true,
+      manualTotalAmount: true,
+      validUntil: true,
+      createdAt: true,
+    },
+  },
+  pricingCalculation: {
+    select: { id: true, code: true, status: true, totalAmount: true, createdAt: true },
+  },
+} satisfies Prisma.SalesOpportunityInclude;
+
+function mapQuoteSummary(row: {
+  id: string;
+  quoteNo: string;
+  status: QuoteStatus;
+  totalAmount: Prisma.Decimal;
+  manualOverride: boolean;
+  manualTotalAmount: Prisma.Decimal | null;
+  validUntil: Date | null;
+  createdAt: Date;
+}): SalesOpportunityQuoteSummary {
+  const totalAmount = row.manualOverride && row.manualTotalAmount != null
+    ? row.manualTotalAmount.toNumber()
+    : row.totalAmount.toNumber();
+
+  return {
+    id: row.id,
+    quoteNo: row.quoteNo,
+    status: row.status,
+    totalAmount,
+    validUntil: row.validUntil?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function mapPricingSummary(row: {
+  id: string;
+  code: string;
+  status: PricingCalculationStatus;
+  totalAmount: Prisma.Decimal;
+  createdAt: Date;
+}): SalesOpportunityPricingSummary {
+  return {
+    id: row.id,
+    code: row.code,
+    status: row.status,
+    totalAmount: row.totalAmount.toNumber(),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function buildWorkspaceTimeline(
+  opportunity: SalesOpportunityListRecord,
+  activities: SalesOpportunityWorkspaceResult["activities"],
+): SalesOpportunityTimelineEntry[] {
+  const timeline: SalesOpportunityTimelineEntry[] = activities.map((activity) => ({
+    id: activity.id,
+    kind: "activity",
+    createdAt: activity.createdAt,
+    type: activity.type,
+    title: activity.title,
+    content: activity.content,
+    outcome: activity.outcome,
+    nextFollowUpAt: activity.nextFollowUpAt,
+  }));
+
+  timeline.push({
+    id: `opportunity-created-${opportunity.id}`,
+    kind: "opportunity",
+    createdAt: opportunity.createdAt,
+    type: "OPPORTUNITY",
+    title: "Tạo cơ hội bán hàng",
+    content: opportunity.note,
+    outcome: null,
+    nextFollowUpAt: null,
+  });
+
+  if (opportunity.updatedAt !== opportunity.createdAt) {
+    timeline.push({
+      id: `opportunity-updated-${opportunity.id}`,
+      kind: "opportunity",
+      createdAt: opportunity.updatedAt,
+      type: "OPPORTUNITY",
+      title: "Cập nhật cơ hội",
+      content: null,
+      outcome: null,
+      nextFollowUpAt: opportunity.nextFollowUpAt,
+    });
+  }
+
+  if (opportunity.wonAt) {
+    timeline.push({
+      id: `opportunity-won-${opportunity.id}`,
+      kind: "opportunity",
+      createdAt: opportunity.wonAt,
+      type: "OPPORTUNITY",
+      title: "Đánh dấu thắng",
+      content: null,
+      outcome: null,
+      nextFollowUpAt: null,
+    });
+  }
+
+  if (opportunity.lostAt) {
+    timeline.push({
+      id: `opportunity-lost-${opportunity.id}`,
+      kind: "opportunity",
+      createdAt: opportunity.lostAt,
+      type: "OPPORTUNITY",
+      title: "Đánh dấu thua",
+      content: opportunity.lostReason,
+      outcome: null,
+      nextFollowUpAt: null,
+    });
+  }
+
+  return timeline.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
+export async function getSalesOpportunityWorkspace(
+  id: string,
+): Promise<SalesOpportunityWorkspaceResult | null> {
+  const row = await prisma.salesOpportunity.findUnique({
+    where: { id },
+    include: workspaceInclude,
+  });
+  if (!row) return null;
+
+  const opportunity = mapOpportunity(row);
+
+  const lead: SalesOpportunityLeadSummary | null = row.lead
+    ? {
+        id: row.lead.id,
+        code: row.lead.code,
+        fullName: row.lead.fullName,
+        companyName: row.lead.companyName,
+        company: row.lead.company,
+        phone: row.lead.phone,
+        email: row.lead.email,
+      }
+    : null;
+
+  const customer: SalesOpportunityCustomerSummary | null = row.customer
+    ? {
+        id: row.customer.id,
+        code: row.customer.code,
+        name: row.customer.name,
+        phone: row.customer.phone,
+        email: row.customer.email,
+      }
+    : null;
+
+  const contact: SalesOpportunityContactSummary | null = row.contact
+    ? {
+        id: row.contact.id,
+        fullName: row.contact.fullName,
+        title: row.contact.title,
+        phone: row.contact.phone,
+        email: row.contact.email,
+      }
+    : null;
+
+  const quote = row.quote ? mapQuoteSummary(row.quote) : null;
+  const pricingCalculation = row.pricingCalculation
+    ? mapPricingSummary(row.pricingCalculation)
+    : null;
+
+  const relationFilters: Prisma.QuoteWhereInput[] = [];
+  const calculationFilters: Prisma.PricingCalculationWhereInput[] = [];
+  const activityFilters: Prisma.CRMActivityWhereInput[] = [];
+
+  if (row.leadId) {
+    relationFilters.push({ leadId: row.leadId });
+    calculationFilters.push({ leadId: row.leadId });
+    activityFilters.push({ leadId: row.leadId });
+  }
+  if (row.customerId) {
+    relationFilters.push({ customerId: row.customerId });
+    calculationFilters.push({ customerId: row.customerId });
+    activityFilters.push({ customerId: row.customerId });
+  }
+  if (row.contactId) {
+    activityFilters.push({ contactId: row.contactId });
+  }
+
+  const [relatedQuoteRows, relatedCalculationRows, activityRows] = await Promise.all([
+    relationFilters.length > 0
+      ? prisma.quote.findMany({
+          where: { OR: relationFilters },
+          orderBy: { createdAt: "desc" },
+          take: 6,
+          select: {
+            id: true,
+            quoteNo: true,
+            status: true,
+            totalAmount: true,
+            manualOverride: true,
+            manualTotalAmount: true,
+            validUntil: true,
+            createdAt: true,
+          },
+        })
+      : Promise.resolve([]),
+    calculationFilters.length > 0
+      ? prisma.pricingCalculation.findMany({
+          where: { OR: calculationFilters },
+          orderBy: { createdAt: "desc" },
+          take: 6,
+          select: {
+            id: true,
+            code: true,
+            status: true,
+            totalAmount: true,
+            createdAt: true,
+          },
+        })
+      : Promise.resolve([]),
+    activityFilters.length > 0
+      ? prisma.cRMActivity.findMany({
+          where: { OR: activityFilters },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const relatedQuotes = relatedQuoteRows
+    .map(mapQuoteSummary)
+    .filter((item) => item.id !== quote?.id)
+    .slice(0, 5);
+
+  const relatedCalculations = relatedCalculationRows
+    .map(mapPricingSummary)
+    .filter((item) => item.id !== pricingCalculation?.id)
+    .slice(0, 5);
+
+  const activities = activityRows.map(mapActivityRow);
+  const timeline = buildWorkspaceTimeline(opportunity, activities);
+
+  return {
+    opportunity,
+    lead,
+    customer,
+    contact,
+    quote,
+    pricingCalculation,
+    relatedQuotes,
+    relatedCalculations,
+    activities,
+    timeline,
+  };
 }
 
 export async function createSalesOpportunity(

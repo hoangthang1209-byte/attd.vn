@@ -25819,3 +25819,25 @@ body:has(.mp-header--v271) {
 .sales-pipeline-card__meta, .sales-pipeline-card__value, .sales-pipeline-card__followup, .sales-pipeline-card__quote { margin: 0; font-size: 12px; color: #4b5563; }
 .sales-pipeline-card__followup.is-overdue { color: #b45309; font-weight: 600; }
 .sales-pipeline-card__stage { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+
+/* Sales opportunity workspace */
+.sales-opportunity-workspace { display: flex; flex-direction: column; gap: 16px; }
+.sales-opportunity-workspace__header { padding: 14px 16px; }
+.sales-opportunity-workspace__header-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.sales-opportunity-workspace__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 960px) { .sales-opportunity-workspace__grid { grid-template-columns: 1fr; } }
+.sales-opportunity-workspace__column { display: flex; flex-direction: column; gap: 16px; }
+.sales-opportunity-workspace__section-title { margin: 0 0 12px; font-size: 15px; }
+.sales-opportunity-workspace__facts { display: grid; gap: 8px; margin: 0; }
+.sales-opportunity-workspace__facts div { display: grid; grid-template-columns: 120px 1fr; gap: 8px; font-size: 13px; }
+.sales-opportunity-workspace__facts dt { margin: 0; color: #6b7280; }
+.sales-opportunity-workspace__facts dd { margin: 0; }
+.sales-opportunity-workspace__links { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.sales-opportunity-workspace__linked-card { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.sales-opportunity-workspace__related-list ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; }
+.sales-opportunity-workspace__quick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.sales-opportunity-workspace__activity-panel { margin-top: -4px; }
+.sales-opportunity-workspace__timeline { margin-top: 4px; }
+.sales-opportunity-workspace__timeline-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.sales-opportunity-workspace__timeline-item { padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.sales-opportunity-workspace__timeline-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }

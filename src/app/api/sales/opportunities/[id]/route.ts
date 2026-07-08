@@ -4,22 +4,29 @@ import {
   SalesOpportunityValidationError,
 } from "@/features/sales/opportunities/sales-opportunity-input";
 import {
-  getSalesOpportunityById,
+  getSalesOpportunityWorkspace,
   updateSalesOpportunity,
 } from "@/features/sales/opportunities/sales-opportunity.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "commercial",
+    action: "read",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await context.params;
 
   try {
-    const opportunity = await getSalesOpportunityById(id);
-    if (!opportunity) {
+    const workspace = await getSalesOpportunityWorkspace(id);
+    if (!workspace) {
       return NextResponse.json({ message: "Cơ hội không tồn tại" }, { status: 404 });
     }
-    return NextResponse.json({ opportunity });
+    return NextResponse.json(workspace);
   } catch (err) {
     console.error("[GET /api/sales/opportunities/[id]]", err);
     return NextResponse.json({ message: "Không thể tải cơ hội bán hàng" }, { status: 500 });

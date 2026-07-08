@@ -1,7 +1,10 @@
 import type {
+  PricingCalculationStatus,
+  QuoteStatus,
   SalesOpportunityPriority,
   SalesOpportunityStage,
 } from "@prisma/client";
+import type { CrmActivityRecord } from "@/features/crm/types";
 
 export type SalesOpportunityListRecord = {
   id: string;
@@ -80,4 +83,71 @@ export type ListSalesOpportunitiesInput = {
   priority?: SalesOpportunityPriority;
   search?: string;
   limit?: number;
+};
+
+export type SalesOpportunityLeadSummary = {
+  id: string;
+  code: string | null;
+  fullName: string;
+  companyName: string | null;
+  company: string | null;
+  phone: string;
+  email: string | null;
+};
+
+export type SalesOpportunityCustomerSummary = {
+  id: string;
+  code: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+};
+
+export type SalesOpportunityContactSummary = {
+  id: string;
+  fullName: string;
+  title: string | null;
+  phone: string | null;
+  email: string | null;
+};
+
+export type SalesOpportunityQuoteSummary = {
+  id: string;
+  quoteNo: string;
+  status: QuoteStatus;
+  totalAmount: number;
+  validUntil: string | null;
+  createdAt: string;
+};
+
+export type SalesOpportunityPricingSummary = {
+  id: string;
+  code: string;
+  status: PricingCalculationStatus;
+  totalAmount: number;
+  createdAt: string;
+};
+
+export type SalesOpportunityTimelineEntry = {
+  id: string;
+  kind: "activity" | "opportunity";
+  createdAt: string;
+  type: string;
+  title: string;
+  content: string | null;
+  outcome: string | null;
+  nextFollowUpAt: string | null;
+};
+
+export type SalesOpportunityWorkspaceResult = {
+  opportunity: SalesOpportunityListRecord;
+  lead: SalesOpportunityLeadSummary | null;
+  customer: SalesOpportunityCustomerSummary | null;
+  contact: SalesOpportunityContactSummary | null;
+  quote: SalesOpportunityQuoteSummary | null;
+  pricingCalculation: SalesOpportunityPricingSummary | null;
+  relatedQuotes: SalesOpportunityQuoteSummary[];
+  relatedCalculations: SalesOpportunityPricingSummary[];
+  activities: CrmActivityRecord[];
+  timeline: SalesOpportunityTimelineEntry[];
 };

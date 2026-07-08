@@ -393,12 +393,18 @@ export default function SalesOpportunityPipeline() {
                 {(grouped[stage] ?? []).map((opp) => (
                   <article key={opp.id} className="sales-pipeline-card">
                     <div className="sales-pipeline-card__top">
-                      <code>{opp.code}</code>
+                      <Link href={`/admin/sales/opportunity/${opp.id}`} className="admin-link">
+                        <code>{opp.code}</code>
+                      </Link>
                       <span className={SALES_OPPORTUNITY_PRIORITY_BADGE_CLASS[opp.priority]}>
                         {SALES_OPPORTUNITY_PRIORITY_LABELS[opp.priority]}
                       </span>
                     </div>
-                    <h4 className="sales-pipeline-card__title">{opp.title}</h4>
+                    <h4 className="sales-pipeline-card__title">
+                      <Link href={`/admin/sales/opportunity/${opp.id}`} className="admin-link">
+                        {opp.title}
+                      </Link>
+                    </h4>
                     <p className="sales-pipeline-card__meta">
                       {opp.customerLabel || opp.leadLabel || "—"}
                     </p>
@@ -410,9 +416,9 @@ export default function SalesOpportunityPipeline() {
                     <p className={`sales-pipeline-card__followup${opp.isFollowUpOverdue ? " is-overdue" : ""}`}>
                       Follow-up: {opp.nextFollowUpAt ? formatQuoteDate(opp.nextFollowUpAt) : "—"}
                     </p>
-                    {opp.quoteNo && (
+                    {opp.quoteNo && opp.quoteId && (
                       <p className="sales-pipeline-card__quote">
-                        <Link href={`/admin/quotes`} className="admin-link">
+                        <Link href={`/admin/quotes/${opp.quoteId}`} className="admin-link">
                           BG: {opp.quoteNo}
                         </Link>
                       </p>
