@@ -34,38 +34,65 @@ function dedup(entries: MetadataRoute.Sitemap): MetadataRoute.Sitemap {
     });
 }
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [categories, products, blogPosts, legacyPosts] = await Promise.all([
-    prisma.category.findMany({
-      where: { slug: { not: "" }, isActive: true },
-      select: { slug: true, updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-    }),
-    prisma.product.findMany({
-      where: { status: "ACTIVE", slug: { not: "" } },
-      select: { slug: true, updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-    }),
-    prisma.blogPost.findMany({
-      where: { status: "PUBLISHED", slug: { not: "" } },
-      select: { slug: true, updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-    }),
-    prisma.post.findMany({
-      where: { status: "PUBLISHED", slug: { not: "" } },
-      select: { slug: true, updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-    }),
-  ]);
-
-  const posts = blogPosts.length > 0 ? blogPosts : legacyPosts;
-
-  const staticRoutes: MetadataRoute.Sitemap = INDEXABLE_STATIC_COMMERCIAL_PATHS.map((path) => ({
+/** Build static commercial routes for sitemap (always available without DB). */
+function buildStaticSitemapRoutes(): MetadataRoute.Sitemap {
+  return INDEXABLE_STATIC_COMMERCIAL_PATHS.map((path) => ({
     url: path === "/" ? SITE_URL : `${SITE_URL}${path}`,
     lastModified: new Date(),
     changeFrequency: path === "/" || path === "/san-pham" ? ("weekly" as const) : ("monthly" as const),
     priority: path === "/" ? 1.0 : path === "/san-pham" ? 0.9 : 0.7,
   }));
+}
+
+type DynamicSitemapData = {
+  categories: Array<{ slug: string; updatedAt: Date }>;
+  products: Array<{ slug: string; updatedAt: Date }>;
+  posts: Array<{ slug: string; updatedAt: Date }>;
+};
+
+/** Load DB-backed sitemap entries; fall back to static-only when DB is unavailable. */
+async function loadDynamicSitemapData(): Promise<DynamicSitemapData> {
+  try {
+    const [categories, products, blogPosts, legacyPosts] = await Promise.all([
+      prisma.category.findMany({
+        where: { slug: { not: "" }, isActive: true },
+        select: { slug: true, updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.product.findMany({
+        where: { status: "ACTIVE", slug: { not: "" } },
+        select: { slug: true, updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.blogPost.findMany({
+        where: { status: "PUBLISHED", slug: { not: "" } },
+        select: { slug: true, updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.post.findMany({
+        where: { status: "PUBLISHED", slug: { not: "" } },
+        select: { slug: true, updatedAt: true },
+        orderBy: { updatedAt: "desc" },
+      }),
+    ]);
+
+    return {
+      categories,
+      products,
+      posts: blogPosts.length > 0 ? blogPosts : legacyPosts,
+    };
+  } catch (error) {
+    console.warn(
+      "[sitemap] Database unavailable during sitemap generation; serving static routes only.",
+      error,
+    );
+    return { categories: [], products: [], posts: [] };
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const staticRoutes = buildStaticSitemapRoutes();
+  const { categories, products, posts } = await loadDynamicSitemapData();
 
   const categoryRoutes: MetadataRoute.Sitemap = categories
     .filter((cat) => {
