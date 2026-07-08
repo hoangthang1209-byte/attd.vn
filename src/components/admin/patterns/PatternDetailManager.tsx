@@ -90,14 +90,37 @@ type SaveStatus = "saved" | "dirty" | "saving" | "error";
 
 const UNSAVED_MESSAGE = "Bạn có thay đổi chưa lưu. Rời khỏi trang sẽ mất các thay đổi này.";
 
+function measurementSizeRank(size: string): number {
+  const normalized = size.trim().toUpperCase();
+  const known = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
+  const index = known.indexOf(normalized);
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function sortMeasurementSizes(sizes: string[]): string[] {
+  return [...sizes].sort((a, b) => {
+    const rankDiff = measurementSizeRank(a) - measurementSizeRank(b);
+    if (rankDiff !== 0) return rankDiff;
+    return a.localeCompare(b, "vi", { numeric: true, sensitivity: "base" });
+  });
+}
+
 function measurementsToDraft(rows: MeasurementRow[]): MeasurementDraftRow {
+  const sizes = sortMeasurementSizes(
+    Array.from(new Set(rows.flatMap((row) => row.values.map((value) => value.size.trim()).filter(Boolean)))),
+  );
   return rows.map((row, index) => ({
     pointOfMeasure: row.pointOfMeasure,
     description: row.description ?? "",
     baseSize: row.baseSize ?? "",
     tolerance: row.tolerance ?? "",
     sortOrder: index,
-    values: row.values.map((value) => ({ size: value.size, value: value.value })),
+    values: sizes
+      .map((size) => {
+        const value = row.values.find((item) => item.size.trim() === size)?.value.trim() ?? "";
+        return { size, value };
+      })
+      .filter((value) => value.value),
   }));
 }
 
