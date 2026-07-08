@@ -5,12 +5,11 @@ import Link from "next/link";
 import {
   AdminLoadingState,
   AdminPageShell,
-  PageHeader,
-  SectionCard,
 } from "@/components/admin/AdminUi";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import PrivateFileUploadZone from "@/components/admin/tech-pack/PrivateFileUploadZone";
 import {
+  PATTERN_STATUS_LABELS,
   PRIVATE_FILE_HINT,
 } from "@/features/tech-pack/tech-pack-labels";
 import type { PatternFileType, PatternStatus, ProductionMaterialCategory } from "@prisma/client";
@@ -38,6 +37,8 @@ type PatternFile = {
   previewUrl: string | null;
   originalFileName: string | null;
   r2ObjectKey: string | null;
+  mimeType?: string | null;
+  createdAt?: string;
 };
 
 type MeasurementRow = {
@@ -60,9 +61,23 @@ type PatternDetail = {
   productionMaterialCategory: ProductionMaterialCategory | null;
   status: PatternStatus;
   notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
   productCategory?: { id: string; name: string } | null;
+  product?: { id: string; name: string; productCode: string | null } | null;
+  _count?: { techPacks: number };
   files: PatternFile[];
   measurements: MeasurementRow[];
+};
+
+type HistoryEvent = {
+  id: string;
+  label: string;
+  at: string;
+  detail?: string | null;
 };
 
 type MeasurementDraftRow = Array<{
@@ -142,6 +157,78 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function formatPatternDateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function buildPatternHistory(pattern: PatternDetail): HistoryEvent[] {
+  const events: HistoryEvent[] = [
+    {
+      id: "created",
+      label: "Tạo rập",
+      at: pattern.createdAt,
+      detail: pattern.createdBy,
+    },
+  ];
+
+  if (pattern.status === "DRAFT") {
+    events.push({
+      id: "draft",
+      label: "Bản nháp",
+      at: pattern.updatedAt,
+    });
+  }
+
+  if (pattern.approvedAt) {
+    events.push({
+      id: "approved",
+      label: "Đã duyệt",
+      at: pattern.approvedAt,
+      detail: pattern.approvedBy,
+    });
+  }
+
+  if (pattern.status === "ARCHIVED") {
+    events.push({
+      id: "archived",
+      label: "Lưu trữ",
+      at: pattern.updatedAt,
+    });
+  }
+
+  events.push({
+    id: "updated",
+    label: "Cập nhật gần nhất",
+    at: pattern.updatedAt,
+  });
+
+  return events.sort(
+    (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+  );
+}
+
+function deriveSizeChips(measurements: MeasurementDraftRow, baseSize: string): string[] {
+  const fromRows = sortMeasurementSizes(
+    Array.from(
+      new Set(
+        measurements.flatMap((row) =>
+          row.values.map((value) => value.size.trim()).filter(Boolean),
+        ),
+      ),
+    ),
+  );
+  if (fromRows.length > 0) return fromRows;
+  if (baseSize.trim()) return [baseSize.trim()];
+  return [];
+}
+
 export default function PatternDetailManager({ patternId }: { patternId: string }) {
   const mutate = useAdminMutation();
   const saveBusyRef = useRef(false);
@@ -156,7 +243,6 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   } | null>(null);
   const [measurementSaving, setMeasurementSaving] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [formRevision, setFormRevision] = useState(0);
   const [draft, setDraft] = useState<PatternDraft | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
@@ -296,7 +382,6 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         setError(null);
         setMeasurementFieldErrors({});
         setMeasurementErrorDetail(null);
-        setFormRevision((value) => value + 1);
       },
       onError: (message) => {
         setSaveStatus("error");
@@ -372,243 +457,438 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   if (!pattern || !draft) return <p className="admin-error">{error ?? "Không tìm thấy rập"}</p>;
 
   const readOnly = pattern.status === "ARCHIVED";
+  const historyEvents = buildPatternHistory(pattern);
+  const sizeChips = deriveSizeChips(draft.measurements, draft.baseSize);
+  const measurementRowCount = draft.measurements.filter((row) => row.pointOfMeasure.trim()).length;
+  const techPackCount = pattern._count?.techPacks ?? 0;
 
   return (
     <AdminPageShell>
-      <PageHeader
-        title={`${pattern.code} — ${pattern.name}`}
-        meta={<PatternStatusBadge status={pattern.status} />}
-        actions={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span className={`admin-status-badge admin-status-badge--${saveStatusTone()}`}>
-              {saveStatusLabel()}
-            </span>
-            <Link
-              href={PATTERN_ADMIN_LIST_PATH}
-              className="admin-btn"
-              onClick={(e) => {
-                if (!confirmLeaveIfDirty()) e.preventDefault();
-              }}
+      <div className="pattern-workspace">
+        <header className="pattern-workspace__header">
+          <nav className="pattern-workspace__breadcrumb" aria-label="Breadcrumb">
+            <Link href={PATTERN_ADMIN_LIST_PATH} onClick={(e) => {
+              if (!confirmLeaveIfDirty()) e.preventDefault();
+            }}
             >
-              Quay lại
+              Thư viện Pattern
             </Link>
-            {!readOnly && (
-              <button
-                type="button"
-                className="admin-btn admin-btn--primary"
-                disabled={!isDirty || saveStatus === "saving"}
-                onClick={() => void savePatternDraft()}
+            <span aria-hidden="true">›</span>
+            <span>{pattern.code}</span>
+          </nav>
+
+          <div className="pattern-workspace__header-main">
+            <div className="pattern-workspace__title-block">
+              <h1 className="pattern-workspace__title">
+                {pattern.code} — {draft.name || pattern.name}
+              </h1>
+              <div className="pattern-workspace__badges">
+                <PatternStatusBadge status={pattern.status} />
+                <span className="pattern-workspace__badge pattern-workspace__badge--version">
+                  v{draft.version || pattern.version}
+                </span>
+                <span className={`admin-status-badge admin-status-badge--${saveStatusTone()}`}>
+                  {saveStatusLabel()}
+                </span>
+              </div>
+            </div>
+
+            <div className="pattern-workspace__actions">
+              <Link
+                href={PATTERN_ADMIN_LIST_PATH}
+                className="admin-btn"
+                onClick={(e) => {
+                  if (!confirmLeaveIfDirty()) e.preventDefault();
+                }}
               >
-                Lưu
-              </button>
-            )}
-            {pattern.status === "DRAFT" && (
-              <button type="button" className="admin-btn admin-btn--primary" onClick={() => void approve()}>
-                Đã duyệt
-              </button>
-            )}
-            {pattern.status !== "ARCHIVED" && (
-              <button type="button" className="admin-btn" onClick={() => void archive()}>
-                Lưu trữ
-              </button>
-            )}
+                Quay lại
+              </Link>
+              {pattern.status === "DRAFT" && (
+                <button type="button" className="admin-btn" onClick={() => void approve()}>
+                  Đã duyệt
+                </button>
+              )}
+              {pattern.status !== "ARCHIVED" && (
+                <button type="button" className="admin-btn" onClick={() => void archive()}>
+                  Lưu trữ
+                </button>
+              )}
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--primary"
+                  disabled={!isDirty || saveStatus === "saving"}
+                  onClick={() => void savePatternDraft()}
+                >
+                  {saveStatus === "saving" ? "Đang lưu…" : "Lưu"}
+                </button>
+              )}
+            </div>
           </div>
-        }
-      />
+        </header>
 
-      {error && <p className="admin-error">{error}</p>}
+        {error && <p className="admin-error">{error}</p>}
 
-      <SectionCard title="Thông tin rập" key={`${pattern.id}-${formRevision}-info`}>
-        <div className="admin-form-grid">
-          <label className="admin-field">
-            <span>Tên rập</span>
-            <input
-              className="admin-input"
-              value={draft.name}
-              disabled={readOnly}
-              onChange={(e) => updateDraft({ name: e.target.value })}
-            />
-          </label>
-          <label className="admin-field">
-            <span>Version</span>
-            <input
-              className="admin-input"
-              type="number"
-              value={draft.version}
-              disabled={readOnly}
-              onChange={(e) => updateDraft({ version: e.target.value })}
-            />
-          </label>
-          <label className="admin-field">
-            <span>Nhóm sản phẩm</span>
-            <select
-              className="admin-select"
-              value={draft.productCategoryId}
-              disabled={readOnly}
-              onChange={(e) => updateDraft({ productCategoryId: e.target.value })}
-            >
-              <option value="">—</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="admin-field">
-            <span>Danh mục vật liệu SX</span>
-            <select
-              className="admin-select"
-              value={draft.productionMaterialCategory}
-              disabled={readOnly}
-              onChange={(e) => updateDraft({ productionMaterialCategory: e.target.value })}
-            >
-              <option value="">— Không chọn —</option>
-              {PRODUCTION_MATERIAL_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {PRODUCTION_MATERIAL_CATEGORY_LABELS[c]}
-                </option>
-              ))}
-            </select>
-            <p className="admin-muted" style={{ marginTop: 4, fontSize: 12 }}>
-              Nhóm chất liệu này sẽ được dùng để gợi ý nguyên liệu trong BOM Tech Pack.
-            </p>
-          </label>
-          <label className="admin-field">
-            <span>Base size</span>
-            <input
-              className="admin-input"
-              value={draft.baseSize}
-              disabled={readOnly}
-              onChange={(e) => updateDraft({ baseSize: e.target.value })}
-            />
-          </label>
-          <label className="admin-field">
-            <span>Size range</span>
-            <input
-              className="admin-input"
-              value={draft.sizeRange}
-              disabled={readOnly}
-              onChange={(e) => updateDraft({ sizeRange: e.target.value })}
-            />
-          </label>
-          <label className="admin-field admin-field--full">
-            <span>Grading rule</span>
-            <textarea
-              className="admin-textarea"
-              value={draft.gradingRule}
-              disabled={readOnly}
-              rows={3}
-              onChange={(e) => updateDraft({ gradingRule: e.target.value })}
-            />
-          </label>
-          <label className="admin-field admin-field--full">
-            <span>Ghi chú</span>
-            <textarea
-              className="admin-textarea"
-              value={draft.notes}
-              disabled={readOnly}
-              rows={3}
-              onChange={(e) => updateDraft({ notes: e.target.value })}
-            />
-          </label>
-        </div>
-      </SectionCard>
+        <div className="pattern-workspace__layout">
+          <div className="pattern-workspace__main">
+            <section className="pattern-workspace__panel admin-panel">
+              <h2 className="pattern-workspace__panel-title">Thông tin rập</h2>
+              <div className="pattern-workspace__info-grid admin-form-grid">
+                <label className="admin-field">
+                  <span className="admin-field__label">Tên rập</span>
+                  <input
+                    className="admin-input"
+                    value={draft.name}
+                    disabled={readOnly}
+                    onChange={(e) => updateDraft({ name: e.target.value })}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Mã rập</span>
+                  <input className="admin-input" value={pattern.code} disabled readOnly />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Version</span>
+                  <input
+                    className="admin-input"
+                    type="number"
+                    value={draft.version}
+                    disabled={readOnly}
+                    onChange={(e) => updateDraft({ version: e.target.value })}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Nhóm sản phẩm</span>
+                  <input
+                    className="admin-input"
+                    value={pattern.product?.name ?? "—"}
+                    disabled
+                    readOnly
+                  />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Danh mục sản phẩm</span>
+                  <select
+                    className="admin-select"
+                    value={draft.productCategoryId}
+                    disabled={readOnly}
+                    onChange={(e) => updateDraft({ productCategoryId: e.target.value })}
+                  >
+                    <option value="">—</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Danh mục vật liệu SX</span>
+                  <select
+                    className="admin-select"
+                    value={draft.productionMaterialCategory}
+                    disabled={readOnly}
+                    onChange={(e) => updateDraft({ productionMaterialCategory: e.target.value })}
+                  >
+                    <option value="">— Không chọn —</option>
+                    {PRODUCTION_MATERIAL_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {PRODUCTION_MATERIAL_CATEGORY_LABELS[c]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Base size</span>
+                  <input
+                    className="admin-input"
+                    value={draft.baseSize}
+                    disabled={readOnly}
+                    onChange={(e) => updateDraft({ baseSize: e.target.value })}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Size range</span>
+                  <input
+                    className="admin-input"
+                    value={draft.sizeRange}
+                    disabled={readOnly}
+                    onChange={(e) => updateDraft({ sizeRange: e.target.value })}
+                  />
+                </label>
+                <label className="admin-field admin-field--full">
+                  <span className="admin-field__label">Grading rule</span>
+                  <textarea
+                    className="admin-textarea"
+                    value={draft.gradingRule}
+                    disabled={readOnly}
+                    rows={2}
+                    onChange={(e) => updateDraft({ gradingRule: e.target.value })}
+                  />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Trạng thái</span>
+                  <input
+                    className="admin-input"
+                    value={PATTERN_STATUS_LABELS[pattern.status]}
+                    disabled
+                    readOnly
+                  />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Ngày tạo</span>
+                  <input
+                    className="admin-input"
+                    value={formatPatternDateTime(pattern.createdAt)}
+                    disabled
+                    readOnly
+                  />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Người tạo</span>
+                  <input className="admin-input" value={pattern.createdBy ?? "—"} disabled readOnly />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Cập nhật gần nhất</span>
+                  <input
+                    className="admin-input"
+                    value={formatPatternDateTime(pattern.updatedAt)}
+                    disabled
+                    readOnly
+                  />
+                </label>
+                <label className="admin-field">
+                  <span className="admin-field__label">Người duyệt</span>
+                  <input className="admin-input" value={pattern.approvedBy ?? "—"} disabled readOnly />
+                </label>
+                <label className="admin-field admin-field--full">
+                  <span className="admin-field__label">Ghi chú</span>
+                  <textarea
+                    className="admin-textarea"
+                    value={draft.notes}
+                    disabled={readOnly}
+                    rows={3}
+                    onChange={(e) => updateDraft({ notes: e.target.value })}
+                  />
+                </label>
+              </div>
+            </section>
 
-      <SectionCard title="File rập">
-        {!readOnly && (
-          <PrivateFileUploadZone
-            label={uploading ? "Đang tải file..." : "Kéo thả hoặc chọn file để tải lên"}
-            onUpload={uploadFile}
-          />
-        )}
-        {pattern.files.length === 0 ? (
-          <p className="admin-muted">Chưa có file.</p>
-        ) : (
-          <div className="admin-file-grid">
-            {pattern.files.map((file) => (
-              <div key={file.id} className="admin-file-card">
-                {file.previewUrl && isPreviewableFile(file.type) ? (
-                  file.type === "PDF" ? (
-                    <a href={`/api/patterns/${patternId}/files/${file.id}/open`} target="_blank" rel="noreferrer" className="admin-link">
-                      PDF xem nhanh
-                    </a>
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={file.previewUrl} alt={file.title ?? file.originalFileName ?? "preview"} />
-                  )
-                ) : (
-                  <div className="admin-file-card__placeholder">
-                    <strong>{file.originalFileName ?? file.type}</strong>
+            <section className="pattern-workspace__panel pattern-workspace__panel--measurements admin-panel">
+              <div className="pattern-workspace__panel-head">
+                <h2 className="pattern-workspace__panel-title">Bảng thông số</h2>
+                {!readOnly && (
+                  <div className="pattern-workspace__panel-actions">
+                    <MeasurementTemplateApplyButton
+                      applyUrl={`/api/patterns/${patternId}/apply-measurement-template`}
+                      onApplied={() => void load()}
+                    />
+                    <CopyFromTechPackButton patternId={patternId} onCopied={() => void load()} />
                   </div>
                 )}
-                <div className="admin-file-card__meta">
-                  <div className="admin-file-card__type">{file.type}</div>
-                  <div>{file.originalFileName ?? file.title ?? "—"}</div>
-                  {file.r2ObjectKey && <div>{PRIVATE_FILE_HINT}</div>}
-                </div>
-                <div className="admin-file-card__actions">
-                  <a className="admin-btn admin-btn--xs" href={`/api/patterns/${patternId}/files/${file.id}/open`} target="_blank" rel="noreferrer">
-                    Xem
-                  </a>
-                  <a className="admin-btn admin-btn--xs" href={`/api/patterns/${patternId}/files/${file.id}/download`}>
-                    Tải xuống
-                  </a>
-                  {!readOnly && (
-                    <>
-                      <input
-                        ref={(el) => {
-                          fileInputRefs.current[file.id] = el;
-                        }}
-                        type="file"
-                        hidden
-                        onChange={(e) => {
-                          const nextFile = e.target.files?.[0];
-                          e.target.value = "";
-                          if (nextFile) void replaceFile(file.id, nextFile);
-                        }}
-                      />
-                      <button type="button" className="admin-btn admin-btn--xs" onClick={() => fileInputRefs.current[file.id]?.click()}>
-                        Thay file
-                      </button>
-                      <button type="button" className="admin-btn admin-btn--xs admin-btn--danger" onClick={() => void deleteFile(file.id)}>
-                        Xóa
-                      </button>
-                    </>
-                  )}
-                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </SectionCard>
-
-      <SectionCard
-        title="Bảng đo"
-        actions={
-          !readOnly && (
-            <>
-              <MeasurementTemplateApplyButton
-                applyUrl={`/api/patterns/${patternId}/apply-measurement-template`}
-                onApplied={() => void load()}
+              <TechPackMeasurementEditor
+                measurements={pattern.measurements}
+                readOnly={readOnly}
+                emptyText="Chưa có bảng thông số. Thêm điểm đo hoặc dán bảng từ Excel."
+                saving={measurementSaving}
+                fieldErrors={measurementFieldErrors}
+                errorDetail={measurementErrorDetail}
+                showSaveButton={false}
+                onDraftChange={(rows) => saveMeasurements(rows)}
+                onSave={(rows) => void saveMeasurements(rows)}
               />
-              <CopyFromTechPackButton patternId={patternId} onCopied={() => void load()} />
-            </>
-          )
-        }
-      >
-        <TechPackMeasurementEditor
-          measurements={pattern.measurements}
-          readOnly={readOnly}
-          emptyText="Chưa có bảng đo. Thêm điểm đo hoặc dán bảng từ Excel."
-          saving={measurementSaving}
-          fieldErrors={measurementFieldErrors}
-          errorDetail={measurementErrorDetail}
-          showSaveButton={false}
-          onDraftChange={(rows) => saveMeasurements(rows)}
-          onSave={(rows) => void saveMeasurements(rows)}
-        />
-      </SectionCard>
+            </section>
+          </div>
+
+          <aside className="pattern-workspace__sidebar">
+            <section className="pattern-workspace__panel admin-panel">
+              <h2 className="pattern-workspace__panel-title">File rập</h2>
+              {!readOnly && (
+                <PrivateFileUploadZone
+                  label={uploading ? "Đang tải file..." : "Kéo thả hoặc chọn file để tải lên"}
+                  onUpload={uploadFile}
+                />
+              )}
+              {pattern.files.length === 0 ? (
+                <p className="admin-muted">Chưa có file.</p>
+              ) : (
+                <div className="pattern-workspace__file-list">
+                  {pattern.files.map((file) => (
+                    <article key={file.id} className="pattern-workspace__file-card">
+                      <div className="pattern-workspace__file-card-top">
+                        {file.previewUrl && isPreviewableFile(file.type) ? (
+                          file.type === "PDF" ? (
+                            <span className="pattern-workspace__file-icon">PDF</span>
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={file.previewUrl}
+                              alt={file.title ?? file.originalFileName ?? "preview"}
+                              className="pattern-workspace__file-thumb"
+                            />
+                          )
+                        ) : (
+                          <span className="pattern-workspace__file-icon">{file.type}</span>
+                        )}
+                        <div className="pattern-workspace__file-meta">
+                          <strong>{file.originalFileName ?? file.title ?? "—"}</strong>
+                          <span>{file.type}{file.mimeType ? ` · ${file.mimeType}` : ""}</span>
+                          {file.createdAt ? (
+                            <span>Tải lên {formatPatternDateTime(file.createdAt)}</span>
+                          ) : null}
+                          {file.r2ObjectKey ? <span className="admin-muted">{PRIVATE_FILE_HINT}</span> : null}
+                        </div>
+                      </div>
+                      <div className="pattern-workspace__file-actions">
+                        <a
+                          className="admin-btn admin-btn--xs"
+                          href={`/api/patterns/${patternId}/files/${file.id}/open`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Xem
+                        </a>
+                        <a
+                          className="admin-btn admin-btn--xs"
+                          href={`/api/patterns/${patternId}/files/${file.id}/download`}
+                        >
+                          Tải xuống
+                        </a>
+                        {!readOnly && (
+                          <>
+                            <input
+                              ref={(el) => {
+                                fileInputRefs.current[file.id] = el;
+                              }}
+                              type="file"
+                              hidden
+                              onChange={(e) => {
+                                const nextFile = e.target.files?.[0];
+                                e.target.value = "";
+                                if (nextFile) void replaceFile(file.id, nextFile);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--xs"
+                              onClick={() => fileInputRefs.current[file.id]?.click()}
+                            >
+                              Thay file
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--xs admin-btn--danger"
+                              onClick={() => void deleteFile(file.id)}
+                            >
+                              Xóa
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="pattern-workspace__panel admin-panel">
+              <h2 className="pattern-workspace__panel-title">Lịch sử phiên bản</h2>
+              <ol className="pattern-workspace__history">
+                {historyEvents.map((event) => (
+                  <li key={event.id} className="pattern-workspace__history-item">
+                    <div className="pattern-workspace__history-label">{event.label}</div>
+                    <div className="pattern-workspace__history-time">{formatPatternDateTime(event.at)}</div>
+                    {event.detail ? (
+                      <div className="pattern-workspace__history-detail">{event.detail}</div>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          </aside>
+
+          <div className="pattern-workspace__summary">
+            <article className="pattern-workspace__summary-card admin-panel">
+              <h3>Tổng quan</h3>
+              <ul>
+                <li>{measurementRowCount} điểm đo</li>
+                <li>{sizeChips.length} cột size</li>
+                <li>{pattern.files.length} file rập</li>
+                <li>{techPackCount} Tech Pack liên kết</li>
+              </ul>
+            </article>
+            <article className="pattern-workspace__summary-card admin-panel">
+              <h3>Kích cỡ</h3>
+              {sizeChips.length > 0 ? (
+                <div className="pattern-workspace__size-chips">
+                  {sizeChips.map((size) => (
+                    <span
+                      key={size}
+                      className={[
+                        "pattern-workspace__size-chip",
+                        draft.baseSize.trim().toUpperCase() === size.toUpperCase()
+                          ? "pattern-workspace__size-chip--base"
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {size}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="admin-muted">Chưa có size.</p>
+              )}
+            </article>
+            <article className="pattern-workspace__summary-card admin-panel">
+              <h3>Sử dụng</h3>
+              <p>
+                {techPackCount > 0
+                  ? `Đang dùng trong ${techPackCount} Tech Pack`
+                  : "Chưa liên kết Tech Pack"}
+              </p>
+              {techPackCount > 0 ? (
+                <Link href="/admin/tech-pack" className="admin-link">
+                  Mở danh sách Tech Pack
+                </Link>
+              ) : null}
+            </article>
+            <article className="pattern-workspace__summary-card admin-panel">
+              <h3>Người tạo / cập nhật</h3>
+              <dl className="pattern-workspace__meta-dl">
+                <div>
+                  <dt>Tạo</dt>
+                  <dd>{pattern.createdBy ?? "—"} · {formatPatternDateTime(pattern.createdAt)}</dd>
+                </div>
+                <div>
+                  <dt>Cập nhật</dt>
+                  <dd>{formatPatternDateTime(pattern.updatedAt)}</dd>
+                </div>
+                {pattern.approvedAt ? (
+                  <div>
+                    <dt>Duyệt</dt>
+                    <dd>{pattern.approvedBy ?? "—"} · {formatPatternDateTime(pattern.approvedAt)}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </article>
+            <article className="pattern-workspace__summary-card admin-panel">
+              <h3>Xuất dữ liệu</h3>
+              <div className="pattern-workspace__export-actions">
+                <button type="button" className="admin-btn admin-btn--xs" disabled title="Sắp có">
+                  Xuất Excel
+                </button>
+                <button type="button" className="admin-btn admin-btn--xs" disabled title="Sắp có">
+                  Xuất PDF
+                </button>
+              </div>
+              <p className="admin-muted">Tính năng xuất sẽ bổ sung sau.</p>
+            </article>
+          </div>
+        </div>
+      </div>
     </AdminPageShell>
   );
 }

@@ -350,6 +350,45 @@ export default function TechPackMeasurementEditor({
     });
   }
 
+  function clearTable() {
+    if (!window.confirm("Xóa toàn bộ bảng thông số trên màn hình? Thay đổi chỉ được lưu khi bấm Lưu ở header.")) {
+      return;
+    }
+    setRows([]);
+    setSizes(DEFAULT_SIZE_COLUMNS);
+    setSizeDrafts({});
+    setSizeError(null);
+  }
+
+  async function copyTable() {
+    const resolvedSizes = sizes.map((size) => normalizeSizeLabel(sizeDrafts[size] ?? size));
+    const header = [
+      "POM",
+      "Mô tả",
+      ...(showBaseSize ? ["Base size"] : []),
+      "Tolerance",
+      ...resolvedSizes,
+    ];
+    const lines = [header.join("\t")];
+    for (const row of rows) {
+      if (!row.pointOfMeasure.trim() && !row.description.trim()) continue;
+      lines.push(
+        [
+          row.pointOfMeasure,
+          row.description,
+          ...(showBaseSize ? [row.baseSize] : []),
+          row.tolerance,
+          ...resolvedSizes.map((size) => row.values[size] ?? ""),
+        ].join("\t"),
+      );
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+    } catch {
+      setSizeError("Không thể copy bảng.");
+    }
+  }
+
   if (rows.length === 0 && readOnly) {
     return <p className="admin-muted">Chưa có điểm đo.</p>;
   }
@@ -357,7 +396,7 @@ export default function TechPackMeasurementEditor({
   return (
     <div className="tech-pack-measurement-editor">
       {!readOnly && (
-        <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="tech-pack-measurement-toolbar">
           <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" onClick={addRow}>
             Thêm điểm đo
           </button>
@@ -380,12 +419,19 @@ export default function TechPackMeasurementEditor({
           <button type="button" className="admin-btn admin-btn--xs" onClick={addSize}>
             Thêm size
           </button>
+          <button type="button" className="admin-btn admin-btn--xs" onClick={() => void copyTable()}>
+            Copy bảng
+          </button>
+          <button type="button" className="admin-btn admin-btn--xs" onClick={clearTable}>
+            Xóa bảng
+          </button>
+          <span className="admin-muted tech-pack-measurement-toolbar__hint">Dán từ Excel vào ô bất kỳ</span>
           {showSaveButton && (
             <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={!canSave} onClick={commit}>
               {saving ? "Đang lưu bảng đo…" : "Lưu bảng"}
             </button>
           )}
-          {sizeError && <span className="admin-error" style={{ fontSize: 12 }}>{sizeError}</span>}
+          {sizeError && <span className="admin-error tech-pack-measurement-toolbar__error">{sizeError}</span>}
         </div>
       )}
       {errorDetail && (errorDetail.message || errorDetail.code || errorDetail.traceId) && (
