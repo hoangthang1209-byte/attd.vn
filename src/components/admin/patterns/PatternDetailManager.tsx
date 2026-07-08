@@ -496,7 +496,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
             <div className="pattern-workspace__actions">
               <Link
                 href={PATTERN_ADMIN_LIST_PATH}
-                className="admin-btn"
+                className="admin-btn admin-btn--xs"
                 onClick={(e) => {
                   if (!confirmLeaveIfDirty()) e.preventDefault();
                 }}
@@ -504,19 +504,19 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 Quay lại
               </Link>
               {pattern.status === "DRAFT" && (
-                <button type="button" className="admin-btn" onClick={() => void approve()}>
+                <button type="button" className="admin-btn admin-btn--xs" onClick={() => void approve()}>
                   Đã duyệt
                 </button>
               )}
               {pattern.status !== "ARCHIVED" && (
-                <button type="button" className="admin-btn" onClick={() => void archive()}>
+                <button type="button" className="admin-btn admin-btn--xs" onClick={() => void archive()}>
                   Lưu trữ
                 </button>
               )}
               {!readOnly && (
                 <button
                   type="button"
-                  className="admin-btn admin-btn--primary"
+                  className="admin-btn admin-btn--primary admin-btn--xs"
                   disabled={!isDirty || saveStatus === "saving"}
                   onClick={() => void savePatternDraft()}
                 >
@@ -524,6 +524,40 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 </button>
               )}
             </div>
+          </div>
+
+          <div className="pattern-workspace__summary-chips">
+            <span className="pattern-workspace__chip">
+              <strong>{measurementRowCount}</strong> điểm đo
+            </span>
+            <span className="pattern-workspace__chip">
+              <strong>{sizeChips.length}</strong> size
+            </span>
+            <span className="pattern-workspace__chip">
+              <strong>{pattern.files.length}</strong> file
+            </span>
+            <span className="pattern-workspace__chip">
+              <strong>{techPackCount}</strong> Tech Pack
+            </span>
+            {sizeChips.length > 0 && (
+              <span className="pattern-workspace__chip-sizes">
+                {sizeChips.map((size) => (
+                  <span
+                    key={size}
+                    className={[
+                      "pattern-workspace__size-chip",
+                      draft.baseSize.trim().toUpperCase() === size.toUpperCase()
+                        ? "pattern-workspace__size-chip--base"
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {size}
+                  </span>
+                ))}
+              </span>
+            )}
           </div>
         </header>
 
@@ -731,13 +765,15 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                         ) : (
                           <span className="pattern-workspace__file-icon">{file.type}</span>
                         )}
-                        <div className="pattern-workspace__file-meta">
+                        <div
+                          className="pattern-workspace__file-meta"
+                          title={file.r2ObjectKey ? PRIVATE_FILE_HINT : undefined}
+                        >
                           <strong>{file.originalFileName ?? file.title ?? "—"}</strong>
-                          <span>{file.type}{file.mimeType ? ` · ${file.mimeType}` : ""}</span>
-                          {file.createdAt ? (
-                            <span>Tải lên {formatPatternDateTime(file.createdAt)}</span>
-                          ) : null}
-                          {file.r2ObjectKey ? <span className="admin-muted">{PRIVATE_FILE_HINT}</span> : null}
+                          <span>
+                            {file.type}
+                            {file.createdAt ? ` · ${formatPatternDateTime(file.createdAt)}` : ""}
+                          </span>
                         </div>
                       </div>
                       <div className="pattern-workspace__file-actions">
@@ -752,8 +788,10 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                         <a
                           className="admin-btn admin-btn--xs"
                           href={`/api/patterns/${patternId}/files/${file.id}/download`}
+                          title="Tải xuống"
+                          aria-label="Tải xuống"
                         >
-                          Tải xuống
+                          ↓
                         </a>
                         {!readOnly && (
                           <>
@@ -773,13 +811,15 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                               type="button"
                               className="admin-btn admin-btn--xs"
                               onClick={() => fileInputRefs.current[file.id]?.click()}
+                              title="Thay file"
                             >
-                              Thay file
+                              Thay
                             </button>
                             <button
                               type="button"
                               className="admin-btn admin-btn--xs admin-btn--danger"
                               onClick={() => void deleteFile(file.id)}
+                              title="Xóa"
                             >
                               Xóa
                             </button>
@@ -793,100 +833,41 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
             </section>
 
             <section className="pattern-workspace__panel admin-panel">
-              <h2 className="pattern-workspace__panel-title">Lịch sử phiên bản</h2>
+              <div className="pattern-workspace__panel-head">
+                <h2 className="pattern-workspace__panel-title">Lịch sử phiên bản</h2>
+                {techPackCount > 0 ? (
+                  <Link href="/admin/tech-pack" className="admin-link pattern-workspace__panel-link">
+                    {techPackCount} Tech Pack
+                  </Link>
+                ) : null}
+              </div>
               <ol className="pattern-workspace__history">
                 {historyEvents.map((event) => (
                   <li key={event.id} className="pattern-workspace__history-item">
-                    <div className="pattern-workspace__history-label">{event.label}</div>
-                    <div className="pattern-workspace__history-time">{formatPatternDateTime(event.at)}</div>
+                    <span className="pattern-workspace__history-label">{event.label}</span>
+                    <span className="pattern-workspace__history-time">{formatPatternDateTime(event.at)}</span>
                     {event.detail ? (
-                      <div className="pattern-workspace__history-detail">{event.detail}</div>
+                      <span className="pattern-workspace__history-detail">{event.detail}</span>
                     ) : null}
                   </li>
                 ))}
               </ol>
             </section>
-          </aside>
 
-          <div className="pattern-workspace__summary">
-            <article className="pattern-workspace__summary-card admin-panel">
-              <h3>Tổng quan</h3>
-              <ul>
-                <li>{measurementRowCount} điểm đo</li>
-                <li>{sizeChips.length} cột size</li>
-                <li>{pattern.files.length} file rập</li>
-                <li>{techPackCount} Tech Pack liên kết</li>
-              </ul>
-            </article>
-            <article className="pattern-workspace__summary-card admin-panel">
-              <h3>Kích cỡ</h3>
-              {sizeChips.length > 0 ? (
-                <div className="pattern-workspace__size-chips">
-                  {sizeChips.map((size) => (
-                    <span
-                      key={size}
-                      className={[
-                        "pattern-workspace__size-chip",
-                        draft.baseSize.trim().toUpperCase() === size.toUpperCase()
-                          ? "pattern-workspace__size-chip--base"
-                          : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      {size}
-                    </span>
-                  ))}
+            <section className="pattern-workspace__panel admin-panel">
+              <div className="pattern-workspace__panel-head">
+                <h2 className="pattern-workspace__panel-title">Xuất dữ liệu</h2>
+                <div className="pattern-workspace__panel-actions">
+                  <button type="button" className="admin-btn admin-btn--xs" disabled title="Sắp có">
+                    Excel
+                  </button>
+                  <button type="button" className="admin-btn admin-btn--xs" disabled title="Sắp có">
+                    PDF
+                  </button>
                 </div>
-              ) : (
-                <p className="admin-muted">Chưa có size.</p>
-              )}
-            </article>
-            <article className="pattern-workspace__summary-card admin-panel">
-              <h3>Sử dụng</h3>
-              <p>
-                {techPackCount > 0
-                  ? `Đang dùng trong ${techPackCount} Tech Pack`
-                  : "Chưa liên kết Tech Pack"}
-              </p>
-              {techPackCount > 0 ? (
-                <Link href="/admin/tech-pack" className="admin-link">
-                  Mở danh sách Tech Pack
-                </Link>
-              ) : null}
-            </article>
-            <article className="pattern-workspace__summary-card admin-panel">
-              <h3>Người tạo / cập nhật</h3>
-              <dl className="pattern-workspace__meta-dl">
-                <div>
-                  <dt>Tạo</dt>
-                  <dd>{pattern.createdBy ?? "—"} · {formatPatternDateTime(pattern.createdAt)}</dd>
-                </div>
-                <div>
-                  <dt>Cập nhật</dt>
-                  <dd>{formatPatternDateTime(pattern.updatedAt)}</dd>
-                </div>
-                {pattern.approvedAt ? (
-                  <div>
-                    <dt>Duyệt</dt>
-                    <dd>{pattern.approvedBy ?? "—"} · {formatPatternDateTime(pattern.approvedAt)}</dd>
-                  </div>
-                ) : null}
-              </dl>
-            </article>
-            <article className="pattern-workspace__summary-card admin-panel">
-              <h3>Xuất dữ liệu</h3>
-              <div className="pattern-workspace__export-actions">
-                <button type="button" className="admin-btn admin-btn--xs" disabled title="Sắp có">
-                  Xuất Excel
-                </button>
-                <button type="button" className="admin-btn admin-btn--xs" disabled title="Sắp có">
-                  Xuất PDF
-                </button>
               </div>
-              <p className="admin-muted">Tính năng xuất sẽ bổ sung sau.</p>
-            </article>
-          </div>
+            </section>
+          </aside>
         </div>
       </div>
     </AdminPageShell>
