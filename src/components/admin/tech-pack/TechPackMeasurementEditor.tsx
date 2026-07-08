@@ -86,12 +86,14 @@ export default function TechPackMeasurementEditor({
 }: Props) {
   const [rows, setRows] = useState<MeasurementRow[]>(() => toRows(measurements));
   const [sizes, setSizes] = useState<string[]>(() => getInitialSizes(measurements));
+  const [sizeDrafts, setSizeDrafts] = useState<Record<string, string>>({});
   const [newSize, setNewSize] = useState("");
   const [sizeError, setSizeError] = useState<string | null>(null);
 
   useEffect(() => {
     setRows(toRows(measurements));
     setSizes(getInitialSizes(measurements));
+    setSizeDrafts({});
   }, [measurements]);
 
   function updateRow(key: string, patch: Partial<MeasurementRow>) {
@@ -158,6 +160,11 @@ export default function TechPackMeasurementEditor({
     }
     setSizes((prev) => sortSizes([...prev, trimmed]));
     setRows((prev) => prev.map((row) => ({ ...row, values: { ...row.values, [trimmed]: "" } })));
+    setSizeDrafts((prev) => {
+      const next = { ...prev };
+      delete next[trimmed];
+      return next;
+    });
     setNewSize("");
   }
 
@@ -170,6 +177,12 @@ export default function TechPackMeasurementEditor({
       return;
     }
     setSizes((prev) => sortSizes(prev.map((size) => (size === oldSize ? nextSize : size))));
+    setSizeDrafts((prev) => {
+      const next = { ...prev };
+      delete next[oldSize];
+      delete next[nextSize];
+      return next;
+    });
     setRows((prev) =>
       prev.map((row) => {
         const nextValues = { ...row.values, [nextSize]: row.values[oldSize] ?? "" };
@@ -181,6 +194,11 @@ export default function TechPackMeasurementEditor({
 
   function removeSize(size: string) {
     setSizes((prev) => prev.filter((item) => item !== size));
+    setSizeDrafts((prev) => {
+      const next = { ...prev };
+      delete next[size];
+      return next;
+    });
     setRows((prev) =>
       prev.map((row) => {
         const nextValues = { ...row.values };
@@ -196,6 +214,20 @@ export default function TechPackMeasurementEditor({
   );
 
   function commit() {
+    const resolvedSizes = sizes.map((size) => normalizeSizeLabel(sizeDrafts[size] ?? size));
+    const seenResolvedSizes = new Set<string>();
+    if (
+      resolvedSizes.some((size) => {
+        if (!size || seenResolvedSizes.has(size)) return true;
+        seenResolvedSizes.add(size);
+        return false;
+      })
+    ) {
+      setSizeError("Size này đã tồn tại hoặc không hợp lệ.");
+      return;
+    }
+
+    setSizeError(null);
     void onSave(
       rows
         .filter((r) => r.pointOfMeasure.trim())
@@ -206,7 +238,7 @@ export default function TechPackMeasurementEditor({
           tolerance: r.tolerance.trim() || null,
           sortOrder: index,
           values: sizes
-            .map((size) => ({ size, value: r.values[size]?.trim() ?? "" }))
+            .map((size, sizeIndex) => ({ size: resolvedSizes[sizeIndex], value: r.values[size]?.trim() ?? "" }))
             .filter((v) => v.size && v.value),
         })),
     );
@@ -285,8 +317,11 @@ export default function TechPackMeasurementEditor({
                       ) : (
                         <input
                           className="admin-input admin-input--sm pattern-measure-size-label-input"
-                          defaultValue={size}
+                          value={sizeDrafts[size] ?? size}
                           aria-label={`Sửa size ${size}`}
+                          onChange={(e) =>
+                            setSizeDrafts((prev) => ({ ...prev, [size]: e.target.value }))
+                          }
                           onBlur={(e) => renameSize(size, e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
