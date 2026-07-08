@@ -1,6 +1,7 @@
 import { isIndexableCategoryLanding, normalizeCategorySlug } from "@/lib/seo/indexable-category-routes";
 import { isUsablePublishImageReference } from "@/features/products/product-image-url";
 import { isValidPublishSlug } from "@/lib/slug";
+import { evaluateProductModePublishRequirements } from "@/features/products/product-entry-modes";
 
 export type SeoPublishQualityIssue = {
   field: string;
@@ -138,6 +139,16 @@ export type ProductPublishQualityInput = {
     customValue?: string | null;
   }>;
   options?: Array<{ values?: Array<{ label?: string | null }> }>;
+  productMode?: string | null;
+  pricingMode?: string | null;
+  stockMode?: string | null;
+  defaultMoq?: number | null;
+  leadTime?: string | null;
+  supportsPrinting?: boolean;
+  supportsEmbroidery?: boolean;
+  supportsOem?: boolean;
+  quoteCtaEnabled?: boolean;
+  noVariantConfirmed?: boolean;
 };
 
 export type CategoryPublishQualityInput = {
@@ -267,6 +278,27 @@ export function evaluateProductPublishQuality(
     );
   }
 
+  if (input.productMode) {
+    const hasActiveVariants = (input.variants ?? []).some(
+      (variant) => (variant.variantStatus ?? "ACTIVE") === "ACTIVE",
+    );
+    for (const issue of evaluateProductModePublishRequirements({
+      productMode: input.productMode,
+      pricingMode: input.pricingMode,
+      stockMode: input.stockMode,
+      defaultMoq: input.defaultMoq,
+      leadTime: input.leadTime,
+      supportsPrinting: input.supportsPrinting,
+      supportsEmbroidery: input.supportsEmbroidery,
+      supportsOem: input.supportsOem,
+      quoteCtaEnabled: input.quoteCtaEnabled,
+      hasActiveVariants,
+      noVariantConfirmed: input.noVariantConfirmed,
+    })) {
+      pushIssue(issues, issue.field, issue.label, issue.message);
+    }
+  }
+
   return { valid: issues.length === 0, issues };
 }
 
@@ -365,7 +397,7 @@ export function buildProductPublishChecklist(
 ): PublishChecklistItem[] {
   const result = evaluateProductPublishQuality(input);
   const failed = new Set(result.issues.map((issue) => issue.field));
-  return [
+  const items: PublishChecklistItem[] = [
     { key: "name", label: "Tên sản phẩm hợp lệ", complete: !failed.has("name") },
     { key: "slug", label: "Slug hợp lệ", complete: !failed.has("slug") },
     { key: "categoryId", label: "Đã chọn danh mục", complete: !failed.has("categoryId") },
@@ -379,6 +411,18 @@ export function buildProductPublishChecklist(
       complete: !failed.has("variants"),
     },
   ];
+  const MODE_CHECKLIST_LABELS: Record<string, string> = {
+    pricingMode: "Hình thức giá",
+    stockMode: "Trạng thái tồn kho",
+    defaultMoq: "MOQ",
+    leadTime: "Thời gian sản xuất",
+    customization: "Khả năng tùy chỉnh / báo giá",
+    quoteCta: "Kêu gọi báo giá",
+  };
+  for (const [field, label] of Object.entries(MODE_CHECKLIST_LABELS)) {
+    if (failed.has(field)) items.push({ key: field, label, complete: false });
+  }
+  return items;
 }
 
 export function buildCategoryPublishChecklist(

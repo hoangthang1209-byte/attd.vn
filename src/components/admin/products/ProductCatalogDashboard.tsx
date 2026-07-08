@@ -201,7 +201,12 @@ export default function ProductCatalogDashboard() {
       {/* Actions */}
       <div className="admin-catalog-toolbar">
         <div className="admin-catalog-toolbar-left">
-          <Link href="/admin/products/new" className="admin-btn admin-btn--primary">+ Thêm sản phẩm</Link>
+          <Link href="/admin/products/new/fast" className="admin-btn admin-btn--primary">
+            Tạo nhanh sản phẩm
+          </Link>
+          <Link href="/admin/products/new" className="admin-btn admin-btn--secondary">
+            Tạo nâng cao
+          </Link>
           <Link href="/admin/products/import" className="admin-btn admin-btn--secondary">Nhập sản phẩm</Link>
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setExportOpen(true)}>
             Xuất dữ liệu

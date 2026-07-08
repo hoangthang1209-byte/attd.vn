@@ -483,13 +483,14 @@ describe("public category index route", () => {
 });
 
 describe("footer category index discoverability", () => {
-  it("adds Danh mục sản phẩm to the footer products group", () => {
+  it("adds Danh mục sản phẩm to the footer company links", () => {
     const source = readFileSync(
-      join(process.cwd(), "src/components/public/Footer.tsx"),
+      join(process.cwd(), "src/lib/footer-config.ts"),
       "utf8",
     );
     assert.ok(source.includes('href: "/danh-muc-san-pham"'));
     assert.ok(source.includes('label: "Danh mục sản phẩm"'));
+    assert.ok(source.includes("FOOTER_COMPANY_LINKS"));
   });
 });
 

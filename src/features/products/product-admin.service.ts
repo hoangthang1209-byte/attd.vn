@@ -83,6 +83,7 @@ import {
   mergeCuratedSalesBadgesIntoMetadata,
   type ProductCuratedBadgeKey,
 } from "@/features/products/product-sales-badges";
+import { readProductEntryFromMetadata } from "@/features/products/product-entry-modes";
 
 export { createProductSaveTimer } from "@/features/products/product-save-timing";
 
@@ -260,10 +261,15 @@ async function ensureUniqueSlug(baseSlug: string, excludeId?: string): Promise<s
 
 async function buildVariantSku(
   variantInput: VariantInput,
-  productCode: string,
+  productCode: string | null,
   db: Pick<typeof prisma, "productVariant"> = prisma,
 ): Promise<string> {
   if (variantInput.sku?.trim()) return variantInput.sku.trim();
+  if (!productCode) {
+    throw new ProductAdminValidationError(CATEGORY_SKU_CODE_MISSING_ERROR, {
+      categoryId: CATEGORY_SKU_CODE_MISSING_ERROR,
+    });
+  }
   const base = generateSku({
     productCode,
     colorName: variantInput.colorName,
@@ -277,7 +283,7 @@ async function buildVariantSku(
 
 async function prepareVariantSkusForInput(
   variants: VariantInput[] | undefined,
-  productCode: string,
+  productCode: string | null,
 ): Promise<Map<VariantInput, string>> {
   const prepared = new Map<VariantInput, string>();
   if (!variants?.length) return prepared;
@@ -490,34 +496,66 @@ async function verifyProductRelationInputOwnership(
   }
 }
 
+function enrichPublishQualityWithEntryContext(
+  base: ProductPublishQualityInput,
+  source: {
+    metadata?: unknown;
+    defaultMoq?: number | null;
+    leadTime?: string | null;
+    supportsPrinting?: boolean;
+    supportsEmbroidery?: boolean;
+    supportsOem?: boolean;
+  },
+): ProductPublishQualityInput {
+  const entry = readProductEntryFromMetadata(source.metadata);
+  return {
+    ...base,
+    productMode: entry.mode ?? null,
+    pricingMode: entry.pricingMode ?? null,
+    stockMode: entry.stockMode ?? null,
+    defaultMoq: source.defaultMoq ?? null,
+    leadTime: source.leadTime ?? null,
+    supportsPrinting: source.supportsPrinting ?? false,
+    supportsEmbroidery: source.supportsEmbroidery ?? false,
+    supportsOem: source.supportsOem ?? false,
+    quoteCtaEnabled:
+      Boolean(source.supportsOem) ||
+      entry.pricingMode === "CONTACT_QUOTE" ||
+      entry.mode === "OEM_SOURCING",
+  };
+}
+
 function mapProductInputToPublishQualityInput(
   input: ProductInput,
   slug: string,
 ): ProductPublishQualityInput {
-  return {
-    name: input.name,
-    slug,
-    categoryId: input.categoryId,
-    description: input.description ?? null,
-    seoTitle: input.seoTitle ?? null,
-    seoDescription: input.seoDescription ?? null,
-    featuredImage: input.featuredImage ?? null,
-    gallery: input.gallery ?? [],
-    productImages: input.gallery ?? [],
-    variants: mapCreateInputVariantsToPublishQualityInput(input.variants),
-    specifications: (input.specifications ?? []).map((row) => ({
-      label: row.label,
-      value: row.value,
-    })),
-    attributeAssignments: (input.attributeAssignments ?? []).map((row) => ({
-      attributeId: row.attributeId,
-      attributeValueId: row.attributeValueId ?? null,
-      customValue: row.customValue ?? null,
-    })),
-    options: (input.options ?? []).map((group) => ({
-      values: group.values.map((value) => ({ label: value.label })),
-    })),
-  };
+  return enrichPublishQualityWithEntryContext(
+    {
+      name: input.name,
+      slug,
+      categoryId: input.categoryId,
+      description: input.description ?? null,
+      seoTitle: input.seoTitle ?? null,
+      seoDescription: input.seoDescription ?? null,
+      featuredImage: input.featuredImage ?? null,
+      gallery: input.gallery ?? [],
+      productImages: input.gallery ?? [],
+      variants: mapCreateInputVariantsToPublishQualityInput(input.variants),
+      specifications: (input.specifications ?? []).map((row) => ({
+        label: row.label,
+        value: row.value,
+      })),
+      attributeAssignments: (input.attributeAssignments ?? []).map((row) => ({
+        attributeId: row.attributeId,
+        attributeValueId: row.attributeValueId ?? null,
+        customValue: row.customValue ?? null,
+      })),
+      options: (input.options ?? []).map((group) => ({
+        values: group.values.map((value) => ({ label: value.label })),
+      })),
+    },
+    input,
+  );
 }
 
 async function loadPersistedProductPublishQualitySnapshot(
@@ -533,7 +571,7 @@ async function loadPersistedProductPublishQualitySnapshot(
     throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
   }
 
-  return mapPersistedProductToPublishQualityInput(product);
+  return enrichPublishQualityWithEntryContext(mapPersistedProductToPublishQualityInput(product), product);
 }
 
 async function loadProductPublishQualitySnapshot(
@@ -559,41 +597,60 @@ async function loadProductPublishQualitySnapshot(
         imageUrl: variant.imageUrl,
       }));
 
-  return {
-    name: input.name ?? existing.name,
-    slug: input.slug ?? existing.slug,
-    categoryId: input.categoryId ?? existing.categoryId,
-    description: input.description !== undefined ? input.description ?? null : existing.description,
-    seoTitle: input.seoTitle !== undefined ? input.seoTitle ?? null : existing.seoTitle,
-    seoDescription:
-      input.seoDescription !== undefined ? input.seoDescription ?? null : existing.seoDescription,
-    featuredImage:
-      input.featuredImage !== undefined ? input.featuredImage ?? null : existing.featuredImage,
-    gallery: input.gallery ?? existing.gallery,
-    productImages: existing.images.map((image) => image.imageUrl),
-    variants: mergedVariants,
-    specifications: input.specifications
-      ? input.specifications.map((row) => ({ label: row.label, value: row.value }))
-      : existing.specifications.map((row) => ({ label: row.label, value: row.value })),
-    attributeAssignments: input.attributeAssignments
-      ? input.attributeAssignments.map((row) => ({
-          attributeId: row.attributeId,
-          attributeValueId: row.attributeValueId ?? null,
-          customValue: row.customValue ?? null,
-        }))
-      : existing.attributeAssignments.map((row) => ({
-          attributeId: row.attributeId,
-          attributeValueId: row.attributeValueId,
-          customValue: row.customValue,
-        })),
-    options: input.options
-      ? input.options.map((group) => ({
-          values: group.values?.map((value) => ({ label: value.label })),
-        }))
-      : existing.options.map((group) => ({
-          values: group.values.map((value) => ({ label: value.label })),
-        })),
-  };
+  const mergedMetadata =
+    input.metadata !== undefined && input.metadata !== null
+      ? input.metadata
+      : existing.metadata;
+
+  return enrichPublishQualityWithEntryContext(
+    {
+      name: input.name ?? existing.name,
+      slug: input.slug ?? existing.slug,
+      categoryId: input.categoryId ?? existing.categoryId,
+      description: input.description !== undefined ? input.description ?? null : existing.description,
+      seoTitle: input.seoTitle !== undefined ? input.seoTitle ?? null : existing.seoTitle,
+      seoDescription:
+        input.seoDescription !== undefined ? input.seoDescription ?? null : existing.seoDescription,
+      featuredImage:
+        input.featuredImage !== undefined ? input.featuredImage ?? null : existing.featuredImage,
+      gallery: input.gallery ?? existing.gallery,
+      productImages: existing.images.map((image) => image.imageUrl),
+      variants: mergedVariants,
+      specifications: input.specifications
+        ? input.specifications.map((row) => ({ label: row.label, value: row.value }))
+        : existing.specifications.map((row) => ({ label: row.label, value: row.value })),
+      attributeAssignments: input.attributeAssignments
+        ? input.attributeAssignments.map((row) => ({
+            attributeId: row.attributeId,
+            attributeValueId: row.attributeValueId ?? null,
+            customValue: row.customValue ?? null,
+          }))
+        : existing.attributeAssignments.map((row) => ({
+            attributeId: row.attributeId,
+            attributeValueId: row.attributeValueId,
+            customValue: row.customValue,
+          })),
+      options: input.options
+        ? input.options.map((group) => ({
+            values: group.values?.map((value) => ({ label: value.label })),
+          }))
+        : existing.options.map((group) => ({
+            values: group.values.map((value) => ({ label: value.label })),
+          })),
+    },
+    {
+      metadata: mergedMetadata,
+      defaultMoq: input.defaultMoq !== undefined ? input.defaultMoq : existing.defaultMoq,
+      leadTime: input.leadTime !== undefined ? input.leadTime : existing.leadTime,
+      supportsPrinting:
+        input.supportsPrinting !== undefined ? input.supportsPrinting : existing.supportsPrinting,
+      supportsEmbroidery:
+        input.supportsEmbroidery !== undefined
+          ? input.supportsEmbroidery
+          : existing.supportsEmbroidery,
+      supportsOem: input.supportsOem !== undefined ? input.supportsOem : existing.supportsOem,
+    },
+  );
 }
 
 function categoryInputToPublishQualityInput(data: CategoryAdminInput): CategoryPublishQualityInput {
@@ -715,7 +772,7 @@ async function loadExistingProductRelationState(
 
 async function writeProductDependentRelations(
   productId: string,
-  productCode: string,
+  productCode: string | null,
   input: Pick<
     ProductInput,
     "variants" | "options" | "specifications" | "customizations" | "attributeAssignments"
@@ -911,7 +968,7 @@ async function writeProductDependentRelations(
 
 function buildProductCreateData(
   input: ProductInput,
-  productCode: string,
+  productCode: string | null,
   slug: string,
   systemCode: string,
   status: ProductStatus,
@@ -979,7 +1036,7 @@ export async function createProductAdmin(input: ProductInput) {
     );
   }
 
-  let productCode: string;
+  let productCode: string | null = null;
   try {
     productCode = await ensureUniqueProductCode(
       input.categoryId,
@@ -987,17 +1044,25 @@ export async function createProductAdmin(input: ProductInput) {
     );
   } catch (err) {
     if (err instanceof ProductSkuError) {
-      const fieldErrors: Record<string, string> = {};
-      if (err.message === CATEGORY_SKU_CODE_MISSING_ERROR) {
-        fieldErrors.categoryId = err.message;
-      } else if (input.productCode?.trim()) {
-        fieldErrors.productCode = err.message;
+      const missingCategorySkuCode = err.message === CATEGORY_SKU_CODE_MISSING_ERROR;
+      const canDeferProductCode =
+        missingCategorySkuCode && !isPublishing && !input.productCode?.trim();
+      if (canDeferProductCode) {
+        productCode = null;
       } else {
-        fieldErrors.categoryId = err.message;
+        const fieldErrors: Record<string, string> = {};
+        if (missingCategorySkuCode) {
+          fieldErrors.categoryId = err.message;
+        } else if (input.productCode?.trim()) {
+          fieldErrors.productCode = err.message;
+        } else {
+          fieldErrors.categoryId = err.message;
+        }
+        throw new ProductAdminValidationError(err.message, fieldErrors);
       }
-      throw new ProductAdminValidationError(err.message, fieldErrors);
+    } else {
+      throw err;
     }
-    throw err;
   }
 
   const slug = await ensureUniqueSlug(input.slug ?? toSlug(input.name));

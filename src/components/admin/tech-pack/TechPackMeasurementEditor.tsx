@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ClipboardEvent } from "react";
 
 export type MeasurementRow = {
   clientKey: string;
@@ -72,6 +72,15 @@ type Props = {
   saving?: boolean;
   fieldErrors?: Record<string, string>;
   errorDetail?: { code?: string; traceId?: string; message?: string } | null;
+  showSaveButton?: boolean;
+  onDraftChange?: (rows: Array<{
+    pointOfMeasure: string;
+    description: string | null;
+    baseSize: string | null;
+    tolerance: string | null;
+    sortOrder?: number;
+    values: Array<{ size: string; value: string }>;
+  }>) => void;
 };
 
 export default function TechPackMeasurementEditor({
@@ -83,12 +92,15 @@ export default function TechPackMeasurementEditor({
   saving,
   fieldErrors,
   errorDetail,
+  showSaveButton = true,
+  onDraftChange,
 }: Props) {
   const [rows, setRows] = useState<MeasurementRow[]>(() => toRows(measurements));
   const [sizes, setSizes] = useState<string[]>(() => getInitialSizes(measurements));
   const [sizeDrafts, setSizeDrafts] = useState<Record<string, string>>({});
   const [newSize, setNewSize] = useState("");
   const [sizeError, setSizeError] = useState<string | null>(null);
+  const tableRef = useRef<HTMLTableElement | null>(null);
 
   useEffect(() => {
     setRows(toRows(measurements));
@@ -213,7 +225,7 @@ export default function TechPackMeasurementEditor({
     [readOnly, rows, saving],
   );
 
-  function commit() {
+  function resolveRowsForSave() {
     const resolvedSizes = sizes.map((size) => normalizeSizeLabel(sizeDrafts[size] ?? size));
     const seenResolvedSizes = new Set<string>();
     if (
@@ -224,24 +236,118 @@ export default function TechPackMeasurementEditor({
       })
     ) {
       setSizeError("Size này đã tồn tại hoặc không hợp lệ.");
-      return;
+      return null;
     }
 
     setSizeError(null);
-    void onSave(
-      rows
-        .filter((r) => r.pointOfMeasure.trim())
-        .map((r, index) => ({
-          pointOfMeasure: r.pointOfMeasure.trim(),
-          description: r.description.trim() || null,
-          baseSize: r.baseSize.trim() || null,
-          tolerance: r.tolerance.trim() || null,
-          sortOrder: index,
-          values: sizes
-            .map((size, sizeIndex) => ({ size: resolvedSizes[sizeIndex], value: r.values[size]?.trim() ?? "" }))
-            .filter((v) => v.size && v.value),
-        })),
-    );
+    return rows
+      .filter((r) => r.pointOfMeasure.trim())
+      .map((r, index) => ({
+        pointOfMeasure: r.pointOfMeasure.trim(),
+        description: r.description.trim() || null,
+        baseSize: r.baseSize.trim() || null,
+        tolerance: r.tolerance.trim() || null,
+        sortOrder: index,
+        values: sizes
+          .map((size, sizeIndex) => ({ size: resolvedSizes[sizeIndex], value: r.values[size]?.trim() ?? "" }))
+          .filter((v) => v.size && v.value),
+      }));
+  }
+
+  useEffect(() => {
+    const nextRows = resolveRowsForSave();
+    if (nextRows) onDraftChange?.(nextRows);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, sizes, sizeDrafts]);
+
+  function commit() {
+    const nextRows = resolveRowsForSave();
+    if (nextRows) void onSave(nextRows);
+  }
+
+  function moveFocus(current: HTMLInputElement, rowDelta: number, colDelta: number) {
+    const table = tableRef.current;
+    if (!table) return;
+    const currentCell = current.closest("td, th");
+    const currentRow = current.closest("tr");
+    if (!currentCell || !currentRow) return;
+
+    const cells = Array.from(currentRow.children);
+    const colIndex = cells.indexOf(currentCell);
+    const tableRows = Array.from(table.querySelectorAll("tr"));
+    const rowIndex = tableRows.indexOf(currentRow);
+    const targetRow = tableRows[rowIndex + rowDelta] ?? currentRow;
+    const targetCell = targetRow.children[colIndex + colDelta] ?? targetRow.children[colIndex];
+    const targetInput = targetCell?.querySelector<HTMLInputElement>("input");
+    targetInput?.focus();
+    targetInput?.select();
+  }
+
+  function handleCellKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      moveFocus(e.currentTarget, 1, 0);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      moveFocus(e.currentTarget, 1, 0);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      moveFocus(e.currentTarget, -1, 0);
+    } else if (e.key === "ArrowRight" && e.currentTarget.selectionStart === e.currentTarget.value.length) {
+      moveFocus(e.currentTarget, 0, 1);
+    } else if (e.key === "ArrowLeft" && e.currentTarget.selectionStart === 0) {
+      moveFocus(e.currentTarget, 0, -1);
+    }
+  }
+
+  function parseClipboardRows(text: string) {
+    return text
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => line.split("\t").map((cell) => cell.trim()));
+  }
+
+  function handlePaste(e: ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData("text/plain");
+    if (!text.includes("\t") && !text.includes("\n")) return;
+    e.preventDefault();
+
+    const grid = parseClipboardRows(text);
+    if (grid.length === 0) return;
+
+    const header = grid[0].map((cell) => cell.toLowerCase());
+    const hasHeader = header.some((cell) => ["pom", "mô tả", "mo ta", "base size", "tolerance"].includes(cell));
+    const sourceRows = hasHeader ? grid.slice(1) : grid;
+    const headerSizes = hasHeader
+      ? grid[0]
+          .slice(3)
+          .map(normalizeSizeLabel)
+          .filter(Boolean)
+      : [];
+    const nextSizes = headerSizes.length > 0 ? sortSizes(Array.from(new Set([...sizes, ...headerSizes]))) : sizes;
+
+    setSizes(nextSizes);
+    setRows((prev) => {
+      const pastedRows = sourceRows
+        .filter((row) => row.some(Boolean))
+        .map((row, index) => {
+          const pastedSizes = headerSizes.length > 0 ? headerSizes : nextSizes.slice(0, Math.max(row.length - 4, 0));
+          const values: Record<string, string> = {};
+          pastedSizes.forEach((size, sizeIndex) => {
+            const value = row[(hasHeader ? 3 : 4) + sizeIndex] ?? "";
+            if (value) values[size] = value;
+          });
+          return {
+            clientKey: `paste-${Date.now()}-${index}`,
+            pointOfMeasure: row[0] ?? "",
+            description: row[1] ?? "",
+            baseSize: hasHeader ? "" : row[2] ?? "",
+            tolerance: hasHeader ? row[2] ?? "" : row[3] ?? "",
+            values,
+          };
+        });
+      return [...prev, ...pastedRows];
+    });
   }
 
   if (rows.length === 0 && readOnly) {
@@ -274,9 +380,11 @@ export default function TechPackMeasurementEditor({
           <button type="button" className="admin-btn admin-btn--xs" onClick={addSize}>
             Thêm size
           </button>
-          <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={!canSave} onClick={commit}>
-            {saving ? "Đang lưu bảng đo…" : "Lưu bảng"}
-          </button>
+          {showSaveButton && (
+            <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={!canSave} onClick={commit}>
+              {saving ? "Đang lưu bảng đo…" : "Lưu bảng"}
+            </button>
+          )}
           {sizeError && <span className="admin-error" style={{ fontSize: 12 }}>{sizeError}</span>}
         </div>
       )}
@@ -302,7 +410,7 @@ export default function TechPackMeasurementEditor({
         <p className="admin-muted">{emptyText}</p>
       ) : (
         <div className="admin-table-wrap tech-pack-measurement-table-wrap">
-          <table className="admin-table admin-table--compact tech-pack-measurement-table">
+          <table ref={tableRef} className="admin-table admin-table--compact tech-pack-measurement-table">
             <thead>
               <tr>
                 <th className="pattern-measure-col-pom">POM</th>
@@ -356,6 +464,8 @@ export default function TechPackMeasurementEditor({
                       value={row.pointOfMeasure}
                       disabled={readOnly}
                       onChange={(e) => updateRow(row.clientKey, { pointOfMeasure: e.target.value })}
+                      onKeyDown={handleCellKeyDown}
+                      onPaste={handlePaste}
                     />
                   </td>
                   <td className="pattern-measure-col-desc">
@@ -364,6 +474,8 @@ export default function TechPackMeasurementEditor({
                       value={row.description}
                       disabled={readOnly}
                       onChange={(e) => updateRow(row.clientKey, { description: e.target.value })}
+                      onKeyDown={handleCellKeyDown}
+                      onPaste={handlePaste}
                     />
                   </td>
                   {showBaseSize && (
@@ -373,6 +485,8 @@ export default function TechPackMeasurementEditor({
                         value={row.baseSize}
                         disabled={readOnly}
                         onChange={(e) => updateRow(row.clientKey, { baseSize: e.target.value })}
+                        onKeyDown={handleCellKeyDown}
+                        onPaste={handlePaste}
                       />
                     </td>
                   )}
@@ -382,6 +496,8 @@ export default function TechPackMeasurementEditor({
                       value={row.tolerance}
                       disabled={readOnly}
                       onChange={(e) => updateRow(row.clientKey, { tolerance: e.target.value })}
+                      onKeyDown={handleCellKeyDown}
+                      onPaste={handlePaste}
                     />
                   </td>
                   {sizes.map((size) => (
@@ -392,6 +508,8 @@ export default function TechPackMeasurementEditor({
                         disabled={readOnly}
                         inputMode="decimal"
                         onChange={(e) => updateValue(row.clientKey, size, e.target.value)}
+                        onKeyDown={handleCellKeyDown}
+                        onPaste={handlePaste}
                         aria-label={`${row.pointOfMeasure || "Điểm đo"} ${size}`}
                       />
                     </td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AdminLoadingState,
@@ -66,6 +66,60 @@ type PatternDetail = {
   measurements: MeasurementRow[];
 };
 
+type MeasurementDraftRow = Array<{
+  pointOfMeasure: string;
+  description: string | null;
+  baseSize: string | null;
+  tolerance: string | null;
+  sortOrder?: number;
+  values: Array<{ size: string; value: string }>;
+}>;
+
+type PatternDraft = {
+  name: string;
+  version: string;
+  productCategoryId: string;
+  baseSize: string;
+  sizeRange: string;
+  gradingRule: string;
+  productionMaterialCategory: string;
+  notes: string;
+  measurements: MeasurementDraftRow;
+};
+
+type SaveStatus = "saved" | "dirty" | "saving" | "error";
+
+const UNSAVED_MESSAGE = "Bạn có thay đổi chưa lưu. Rời khỏi trang sẽ mất các thay đổi này.";
+
+function measurementsToDraft(rows: MeasurementRow[]): MeasurementDraftRow {
+  return rows.map((row, index) => ({
+    pointOfMeasure: row.pointOfMeasure,
+    description: row.description,
+    baseSize: row.baseSize,
+    tolerance: row.tolerance,
+    sortOrder: index,
+    values: row.values.map((value) => ({ size: value.size, value: value.value })),
+  }));
+}
+
+function createDraft(pattern: PatternDetail): PatternDraft {
+  return {
+    name: pattern.name,
+    version: String(pattern.version),
+    productCategoryId: pattern.productCategory?.id ?? "",
+    baseSize: pattern.baseSize ?? "",
+    sizeRange: pattern.sizeRange ?? "",
+    gradingRule: pattern.gradingRule ?? "",
+    productionMaterialCategory: pattern.productionMaterialCategory ?? "",
+    notes: pattern.notes ?? "",
+    measurements: measurementsToDraft(pattern.measurements),
+  };
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
 export default function PatternDetailManager({ patternId }: { patternId: string }) {
   const mutate = useAdminMutation();
   const saveBusyRef = useRef(false);
@@ -81,6 +135,11 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   const [measurementSaving, setMeasurementSaving] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [formRevision, setFormRevision] = useState(0);
+  const [draft, setDraft] = useState<PatternDraft | null>(null);
+  const [savedSnapshot, setSavedSnapshot] = useState("");
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,6 +153,10 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       const catData = (await catRes.json()) as Array<{ id: string; name: string }>;
       if (!patRes.ok) throw new Error(data.message ?? "Không thể tải rập");
       setPattern(data);
+      const nextDraft = createDraft(data);
+      setDraft(nextDraft);
+      setSavedSnapshot(stableJson(nextDraft));
+      setSaveStatus("saved");
       setCategories(Array.isArray(catData) ? catData : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
@@ -106,29 +169,119 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     void load();
   }, [load]);
 
-  async function saveField(patch: Record<string, unknown>) {
-    if (!pattern || pattern.status === "ARCHIVED" || saveBusyRef.current) return;
+  const isDirty = useMemo(() => {
+    if (!draft || !savedSnapshot) return false;
+    return stableJson(draft) !== savedSnapshot;
+  }, [draft, savedSnapshot]);
+
+  useEffect(() => {
+    if (saveStatus === "saving" || saveStatus === "error") return;
+    setSaveStatus(isDirty ? "dirty" : "saved");
+  }, [isDirty, saveStatus]);
+
+  useEffect(() => {
+    if (!isDirty || saveStatus === "saving") return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = UNSAVED_MESSAGE;
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty, saveStatus]);
+
+  function confirmLeaveIfDirty() {
+    if (!isDirty || saveStatus === "saving") return true;
+    return window.confirm(UNSAVED_MESSAGE);
+  }
+
+  function updateDraft(patch: Partial<PatternDraft>) {
+    setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
+  function saveStatusLabel() {
+    if (saveStatus === "saving") return "Đang lưu...";
+    if (saveStatus === "error") return "Lưu lỗi";
+    if (isDirty) return "Chưa lưu";
+    return "Đã lưu";
+  }
+
+  function saveStatusTone(): "neutral" | "info" | "success" | "warning" | "danger" {
+    if (saveStatus === "saving") return "info";
+    if (saveStatus === "error") return "danger";
+    if (isDirty) return "warning";
+    return "success";
+  }
+
+  async function savePatternDraft() {
+    if (!pattern || !draft || pattern.status === "ARCHIVED" || saveBusyRef.current) return;
+    const version = Number.parseInt(draft.version, 10);
+    if (!draft.name.trim()) {
+      setError("Tên rập không được để trống.");
+      setSaveStatus("error");
+      return;
+    }
+    if (!Number.isFinite(version) || version < 1) {
+      setError("Version rập phải là số nguyên dương.");
+      setSaveStatus("error");
+      return;
+    }
+
+    const patch = {
+      name: draft.name.trim(),
+      version,
+      productCategoryId: draft.productCategoryId || null,
+      baseSize: draft.baseSize.trim() || null,
+      sizeRange: draft.sizeRange.trim() || null,
+      gradingRule: draft.gradingRule.trim() || null,
+      productionMaterialCategory: draft.productionMaterialCategory || null,
+      notes: draft.notes.trim() || null,
+      measurements: draft.measurements,
+    };
 
     saveBusyRef.current = true;
+    setSaveStatus("saving");
+    setMeasurementSaving(true);
+    setMeasurementFieldErrors({});
+    setMeasurementErrorDetail(null);
     await mutate({
-      loadingMessage: "Đang cập nhật rập…",
-      successMessage: "Đã cập nhật rập.",
-      errorFallback: "Không thể cập nhật rập. Vui lòng thử lại.",
+      loadingMessage: "Đang lưu rập…",
+      successMessage: "Đã lưu rập.",
+      errorFallback: "Không thể lưu rập. Vui lòng thử lại.",
       action: async () => {
         const res = await adminApiFetch(`/api/patterns/${patternId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         });
-        return parseAdminJsonResponse(res, (body) => body as PatternDetail);
+        const result = await parseAdminJsonResponse(res, (body) => body as PatternDetail);
+        if (!result.ok) {
+          const detail = {
+            code: result.code,
+            traceId: result.traceId,
+            message: result.message,
+          };
+          setMeasurementFieldErrors(result.fieldErrors ?? {});
+          setMeasurementErrorDetail(detail);
+        }
+        return result;
       },
-      onSuccess: () => {
+      onSuccess: (body) => {
+        const nextDraft = createDraft(body);
+        setPattern(body);
+        setDraft(nextDraft);
+        setSavedSnapshot(stableJson(nextDraft));
+        setSaveStatus("saved");
         setError(null);
+        setMeasurementFieldErrors({});
+        setMeasurementErrorDetail(null);
         setFormRevision((value) => value + 1);
-        void load();
       },
-      onError: (message) => setError(message),
+      onError: (message) => {
+        setSaveStatus("error");
+        setError(message);
+      },
     });
+    setMeasurementSaving(false);
     saveBusyRef.current = false;
   }
 
@@ -140,64 +293,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     sortOrder?: number;
     values: Array<{ size: string; value: string }>;
   }>) {
-    if (!pattern || pattern.status === "ARCHIVED" || saveBusyRef.current) return;
-
-    const patch = { measurements: rows };
-    if (process.env.NODE_ENV === "development") {
-      console.info("[pattern.measurements.save.request]", { patternId, measurements: rows });
-    }
-
-    saveBusyRef.current = true;
-    setMeasurementSaving(true);
-    setMeasurementFieldErrors({});
-    setMeasurementErrorDetail(null);
-    await mutate({
-      loadingMessage: "Đang lưu bảng đo…",
-      successMessage: "Đã lưu bảng đo.",
-      errorFallback: "Không thể lưu bảng đo. Vui lòng thử lại.",
-      action: async () => {
-        const res = await adminApiFetch(`/api/patterns/${patternId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patch),
-        });
-        const body = (await res.json().catch(() => ({}))) as {
-          error?: string;
-          message?: string;
-          code?: string;
-          traceId?: string;
-          fieldErrors?: Record<string, string>;
-        } & PatternDetail;
-
-        if (!res.ok) {
-          const fieldErrors =
-            body.fieldErrors && typeof body.fieldErrors === "object" ? body.fieldErrors : {};
-          setMeasurementFieldErrors(fieldErrors);
-          const serverMessage = typeof body.error === "string" ? body.error : body.message;
-          const message =
-            serverMessage ??
-            resolveAdminMutationErrorMessage(res, body as Record<string, unknown>) ??
-            "Không thể lưu bảng đo. Vui lòng thử lại.";
-          setMeasurementErrorDetail({
-            code: typeof body.code === "string" ? body.code : undefined,
-            traceId: typeof body.traceId === "string" ? body.traceId : undefined,
-            message,
-          });
-          return { ok: false as const, message };
-        }
-
-        return { ok: true as const, data: body };
-      },
-      onSuccess: (body) => {
-        setPattern(body);
-        setError(null);
-        setMeasurementFieldErrors({});
-        setMeasurementErrorDetail(null);
-      },
-      onError: (message) => setError(message),
-    });
-    setMeasurementSaving(false);
-    saveBusyRef.current = false;
+    updateDraft({ measurements: rows });
   }
 
   async function approve() {
@@ -216,15 +312,32 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
 
   async function uploadFile(file: File): Promise<void> {
     setError(null);
+    setUploading(true);
     const fd = new FormData();
     fd.append("file", file);
     fd.append("type", "OTHER");
     const res = await fetch(`/api/patterns/${patternId}/files`, { method: "POST", body: fd });
-    if (res.ok) void load();
+    setUploading(false);
+    if (res.ok) await load();
     else {
       const data = (await res.json()) as { message?: string };
       setError(data.message ?? "Không thể tải file");
       throw new Error(data.message);
+    }
+  }
+
+  async function replaceFile(fileId: string, file: File) {
+    await uploadFile(file);
+    await deleteFile(fileId, false);
+  }
+
+  async function deleteFile(fileId: string, shouldConfirm = true) {
+    if (shouldConfirm && !window.confirm("Xóa file rập này?")) return;
+    const res = await fetch(`/api/patterns/${patternId}/files/${fileId}`, { method: "DELETE" });
+    if (res.ok) await load();
+    else {
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      setError(data.message ?? "Không thể xóa file rập.");
     }
   }
 

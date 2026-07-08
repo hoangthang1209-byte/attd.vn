@@ -4,6 +4,12 @@ import {
   parseCuratedSalesBadgeKeysFromMetadata,
   type ProductCuratedBadgeKey,
 } from "@/features/products/product-sales-badges";
+import {
+  readProductEntryFromMetadata,
+  type ProductEntryMode,
+  type ProductPricingMode,
+  type ProductStockMode,
+} from "@/features/products/product-entry-modes";
 
 export type MatrixVariantFormRow = {
   id?: string;
@@ -133,6 +139,10 @@ export type ProductAdminEditInitialData = {
   seoTitle: string;
   seoDescription: string;
   curatedSalesBadges: ProductCuratedBadgeKey[];
+  productMode?: ProductEntryMode;
+  productTemplateKey?: string;
+  stockMode?: ProductStockMode;
+  pricingMode?: ProductPricingMode;
 };
 
 function joinStringArray(value: unknown): string {
@@ -327,5 +337,21 @@ export function buildProductAdminEditInitialData(
     seoTitle: product.seoTitle ?? "",
     seoDescription: product.seoDescription ?? "",
     curatedSalesBadges: parseCuratedSalesBadgeKeysFromMetadata(product.metadata),
+    ...mapProductEntryMetaToInitialData(product.metadata),
+  };
+}
+
+function mapProductEntryMetaToInitialData(metadata: unknown): {
+  productMode?: ProductEntryMode;
+  productTemplateKey?: string;
+  stockMode?: ProductStockMode;
+  pricingMode?: ProductPricingMode;
+} {
+  const entry = readProductEntryFromMetadata(metadata);
+  return {
+    productMode: entry.mode,
+    productTemplateKey: entry.templateKey,
+    stockMode: entry.stockMode,
+    pricingMode: entry.pricingMode,
   };
 }
