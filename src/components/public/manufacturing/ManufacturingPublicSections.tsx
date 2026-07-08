@@ -1,9 +1,9 @@
-import ManufacturingEvidenceGrid from "@/components/public/manufacturing/ManufacturingEvidenceGrid";
-import ManufacturingEvidenceStrip from "@/components/public/manufacturing/ManufacturingEvidenceStrip";
+import ManufacturingGallery from "@/components/public/manufacturing/ManufacturingGallery";
 import { getManufacturingAssetsForDisplayLocation } from "@/lib/manufacturing/manufacturing.service";
 
 type SectionProps = {
   title?: string;
+  /** @deprecated Not shown in gallery layout. */
   description?: string;
   limit?: number;
   className?: string;
@@ -19,9 +19,8 @@ async function getItems(locationKey: string, limit: number) {
 }
 
 export async function ManufacturingHomepageSection({
-  title = "Năng lực sản xuất thực tế",
-  description = "Hình ảnh từ kho, xưởng, QC và đóng gói của ATTD.",
-  limit = 3,
+  title = "Góc nhìn từ xưởng",
+  limit = 6,
   className,
 }: SectionProps) {
   const items = await getItems("homepage", limit);
@@ -33,26 +32,30 @@ export async function ManufacturingHomepageSection({
       aria-label={title}
     >
       <div className="container">
-        <ManufacturingEvidenceGrid title={title} description={description} items={items} />
+        <ManufacturingGallery title={title} items={items} layout="mosaic" />
       </div>
     </section>
   );
 }
 
 export async function ManufacturingContactSection({
-  title = "Minh chứng vận hành",
+  title = "Hình ảnh thực tế",
   limit = 3,
   className,
 }: SectionProps) {
   const items = await getItems("contact", limit);
-  return <ManufacturingEvidenceStrip title={title} items={items} className={className} />;
+  return (
+    <ManufacturingGallery title={title} items={items} layout="inline" className={className} />
+  );
 }
 
 export async function ManufacturingRfqSection({
-  title = "Minh chứng quy trình",
+  title = "Quy trình sản xuất",
   limit = 3,
   className,
 }: SectionProps) {
   const items = await getItems("rfq", limit);
-  return <ManufacturingEvidenceStrip title={title} items={items} className={className} />;
+  return (
+    <ManufacturingGallery title={title} items={items} layout="inline" className={className} />
+  );
 }

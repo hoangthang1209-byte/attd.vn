@@ -97,7 +97,10 @@ function mapPublicItem(item: QuoteRow["items"][number]): PublicQuoteItem {
   };
 }
 
-export function formatPublicQuoteDocument(row: QuoteRow): PublicQuoteDocument {
+export function formatPublicQuoteDocument(
+  row: QuoteRow,
+  manufacturingEvidence: PublicQuoteDocument["manufacturingEvidence"] = [],
+): PublicQuoteDocument {
   const items = row.items.map(mapPublicItem);
 
   const showProductionLeadTime = items.some((i) => i.productionLeadTime?.trim());
@@ -168,6 +171,7 @@ export function formatPublicQuoteDocument(row: QuoteRow): PublicQuoteDocument {
     showProductionLeadTime,
     showSampleFee,
     showSampleLeadTime,
+    manufacturingEvidence,
   };
 }
 
@@ -179,10 +183,11 @@ export type QuotePdfData = PublicQuoteDocument & {
 
 export function formatQuotePdfData(
   row: QuoteRow,
-  company?: QuotePdfData["company"]
+  company?: QuotePdfData["company"],
+  manufacturingEvidence: PublicQuoteDocument["manufacturingEvidence"] = [],
 ): QuotePdfData {
   return {
-    ...formatPublicQuoteDocument(row),
+    ...formatPublicQuoteDocument(row, manufacturingEvidence),
     company,
   };
 }
