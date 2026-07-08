@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import TrackedLink from "@/components/analytics/TrackedLink";
 import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
 import { CTA } from "@/lib/ctaConfig";
 import ManufacturingEvidenceStrip from "@/components/public/manufacturing/ManufacturingEvidenceStrip";
@@ -101,12 +101,14 @@ export default function ProductPdpConversionPanel({
           >
             Yêu cầu báo giá
           </button>
-          <Link
+          <TrackedLink
             href={CTA.primary.href}
+            trackEvent="dealer_registration_click"
+            trackSource="pdp_conversion_panel"
             className="mp-pdp-conversion-dealer-link"
           >
             Đăng ký làm đại lý
-          </Link>
+          </TrackedLink>
         </div>
 
         <ProcessTrustBlock
@@ -116,7 +118,7 @@ export default function ProductPdpConversionPanel({
           className="mp-pdp-conversion-trust"
         />
 
-        <PublicContactChannels compact className="mp-pdp-conversion-contact" />
+        <PublicContactChannels compact className="mp-pdp-conversion-contact" source="pdp_conversion_panel" />
 
         <ManufacturingEvidenceStrip
           title="Tại ATTD"

@@ -5,7 +5,9 @@ import { useCallback, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { X, Phone, MessageCircle } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import AttdLogo from "@/components/public/AttdLogo";
+import { trackInferredPublicLinkClick, trackViewCatalog } from "@/lib/analytics";
 import { NAV_PRIMARY_LINKS } from "@/lib/navConfig";
 import {
   getHotlineTel,
@@ -95,7 +97,10 @@ export default function MobileNavPanel({
             href="/san-pham"
             className={`mobile-nav-sublink mobile-nav-sublink--primary mobile-nav-sublink--top${isNavLinkActive("/san-pham") ? " mobile-nav-sublink--active" : ""}`}
             aria-current={isNavLinkActive("/san-pham") ? "page" : undefined}
-            onClick={handleClose}
+            onClick={() => {
+              trackViewCatalog("mobile_nav", "/san-pham");
+              handleClose();
+            }}
           >
             Xem danh mục sản phẩm
           </Link>
@@ -109,7 +114,10 @@ export default function MobileNavPanel({
                 href={link.href}
                 className={`mobile-nav-sublink mobile-nav-sublink--solo${active ? " mobile-nav-sublink--active" : ""}`}
                 aria-current={active ? "page" : undefined}
-                onClick={handleClose}
+                onClick={() => {
+                  trackInferredPublicLinkClick(link.href, "mobile_nav");
+                  handleClose();
+                }}
               >
                 {link.label}
               </Link>
@@ -140,19 +148,26 @@ export default function MobileNavPanel({
           </div>
 
           <div className="mobile-nav-contact">
-            <a href={`tel:${getHotlineTel()}`} className="mobile-nav-contact-link">
+            <TrackedAnchor
+              href={`tel:${getHotlineTel()}`}
+              trackEvent="contact_hotline"
+              trackSource="mobile_nav"
+              className="mobile-nav-contact-link"
+            >
               <Phone size={18} />
               Hotline {getHotlineDisplay()}
-            </a>
-            <a
+            </TrackedAnchor>
+            <TrackedAnchor
               href={getZaloUrl()}
+              trackEvent="contact_zalo"
+              trackSource="mobile_nav"
               target="_blank"
               rel="noopener noreferrer"
               className="mobile-nav-contact-link"
             >
               <MessageCircle size={18} />
               Chat Zalo
-            </a>
+            </TrackedAnchor>
           </div>
         </div>
       </div>

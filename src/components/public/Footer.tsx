@@ -3,6 +3,7 @@ import AttdLogo from "@/components/public/AttdLogo";
 import FooterCtaBand from "@/components/public/FooterCtaBand";
 import FooterLinkSection from "@/components/public/FooterLinkSection";
 import FooterSocialLinks from "@/components/public/FooterSocialLinks";
+import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import {
   getCompanySettings,
   getBrandingSettings,
@@ -67,24 +68,36 @@ export default async function Footer() {
               <p className="site-footer-heading site-footer-heading--static">Liên hệ</p>
               <div className="site-footer-links">
                 {showHotline ? (
-                  <a href={`tel:${company.hotline.raw}`} className="site-footer-link">
+                  <TrackedAnchor
+                    href={`tel:${company.hotline.raw}`}
+                    trackEvent="contact_hotline"
+                    trackSource="footer_contact"
+                    className="site-footer-link"
+                  >
                     Hotline {company.hotline.display}
-                  </a>
+                  </TrackedAnchor>
                 ) : null}
                 {hasCompanyField(company.email) ? (
-                  <a href={`mailto:${company.email}`} className="site-footer-link">
+                  <TrackedAnchor
+                    href={`mailto:${company.email}`}
+                    trackEvent="contact_email"
+                    trackSource="footer_contact"
+                    className="site-footer-link"
+                  >
                     {company.email}
-                  </a>
+                  </TrackedAnchor>
                 ) : null}
                 {zaloUrl ? (
-                  <a
+                  <TrackedAnchor
                     href={zaloUrl}
+                    trackEvent="contact_zalo"
+                    trackSource="footer_contact"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="site-footer-link"
                   >
                     Zalo OA
-                  </a>
+                  </TrackedAnchor>
                 ) : null}
                 {hasCompanyField(company.address) ? (
                   <span className="site-footer-link site-footer-link--text">{company.address}</span>

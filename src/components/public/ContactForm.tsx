@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
+import {
+  trackContactFormSubmitAttempt,
+  trackContactFormSubmitSuccess,
+} from "@/lib/analytics";
 import { CTA } from "@/lib/ctaConfig";
 import { TRUST_REASSURANCE_PRIVACY } from "@/lib/b2b-trust-v2-copy";
 
@@ -57,6 +61,7 @@ export default function ContactForm() {
 
     setFormStatus("loading");
     setErrorMessage("");
+    trackContactFormSubmitAttempt("contact_page");
 
     try {
       const response = await fetch("/api/leads", {
@@ -74,6 +79,7 @@ export default function ContactForm() {
       }
 
       setFormStatus("success");
+      trackContactFormSubmitSuccess("contact_page");
     } catch {
       setErrorMessage("Không thể kết nối. Vui lòng thử lại.");
       setFormStatus("error");

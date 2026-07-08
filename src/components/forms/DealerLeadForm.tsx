@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
-import { trackGenerateLead } from "@/lib/analytics";
+import { trackDealerFormSubmitAttempt, trackGenerateLead } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
 import { CTA } from "@/lib/ctaConfig";
 
@@ -71,6 +71,7 @@ export default function DealerLeadForm({
 
     setFormStatus("loading");
     setErrorMessage("");
+    trackDealerFormSubmitAttempt(source);
 
     try {
       const attribution = getAttribution();

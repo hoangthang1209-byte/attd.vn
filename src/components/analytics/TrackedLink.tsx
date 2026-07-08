@@ -2,15 +2,20 @@
 
 import Link from "next/link";
 import {
-  trackZaloClick,
-  trackQuoteClick,
   trackDealerRegistration,
+  trackInferredPublicLinkClick,
+  trackQuoteClick,
+  trackWholesaleRequestClick,
+  trackZaloClick,
+  type InferredPublicCtaEvent,
 } from "@/lib/analytics";
 
 export type TrackedEvent =
   | "contact_zalo"
   | "contact_quote"
-  | "dealer_registration_click";
+  | "dealer_registration_click"
+  | "wholesale_request_click"
+  | InferredPublicCtaEvent;
 
 interface TrackedLinkProps {
   href: string;
@@ -26,10 +31,31 @@ interface TrackedLinkProps {
   rel?: string;
 }
 
+function fireTrackedEvent(trackEvent: TrackedEvent, trackSource: string, href: string): void {
+  switch (trackEvent) {
+    case "contact_zalo":
+      trackZaloClick(trackSource);
+      break;
+    case "contact_quote":
+      trackQuoteClick(trackSource);
+      break;
+    case "dealer_registration_click":
+      trackDealerRegistration(trackSource);
+      break;
+    case "wholesale_request_click":
+      trackWholesaleRequestClick(trackSource);
+      break;
+    case "view_catalog":
+    case "view_product":
+      trackInferredPublicLinkClick(href, trackSource);
+      break;
+    default:
+      break;
+  }
+}
+
 /**
  * A drop-in replacement for `<Link>` / `<a>` that fires a GA4 event on click.
- * - Internal links (default): rendered as Next.js `<Link>` for prefetching.
- * - External links (`external` prop): rendered as `<a>`.
  */
 export default function TrackedLink({
   href,
@@ -44,17 +70,7 @@ export default function TrackedLink({
   rel,
 }: TrackedLinkProps) {
   function handleClick(): void {
-    switch (trackEvent) {
-      case "contact_zalo":
-        trackZaloClick(trackSource);
-        break;
-      case "contact_quote":
-        trackQuoteClick(trackSource);
-        break;
-      case "dealer_registration_click":
-        trackDealerRegistration(trackSource);
-        break;
-    }
+    fireTrackedEvent(trackEvent, trackSource, href);
     onClick?.();
   }
 
@@ -74,12 +90,7 @@ export default function TrackedLink({
   }
 
   return (
-    <Link
-      href={href}
-      className={className}
-      style={style}
-      onClick={handleClick}
-    >
+    <Link href={href} className={className} style={style} onClick={handleClick}>
       {children}
     </Link>
   );

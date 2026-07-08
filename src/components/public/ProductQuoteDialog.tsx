@@ -13,6 +13,10 @@ import {
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
 import type { ProductQuoteContext } from "@/components/public/product-quote.types";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
+import {
+  trackPdpQuoteSubmitAttempt,
+  trackPdpQuoteSubmitSuccess,
+} from "@/lib/analytics";
 import { isValidImageSrc } from "@/lib/imagePaths";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
@@ -167,6 +171,10 @@ export default function ProductQuoteDialog({
 
     setFormStatus("loading");
     setErrorMessage("");
+    trackPdpQuoteSubmitAttempt({
+      product_id: product.id,
+      product_slug: product.slug,
+    });
 
     const productUrl =
       typeof window !== "undefined"
@@ -206,6 +214,10 @@ export default function ProductQuoteDialog({
       }
 
       setFormStatus("success");
+      trackPdpQuoteSubmitSuccess({
+        product_id: product.id,
+        product_slug: product.slug,
+      });
     } catch {
       setErrorMessage("Không thể kết nối. Vui lòng thử lại.");
       setFormStatus("error");

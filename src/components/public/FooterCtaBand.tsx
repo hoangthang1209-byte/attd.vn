@@ -1,4 +1,7 @@
-import Link from "next/link";
+"use client";
+
+import TrackedLink from "@/components/analytics/TrackedLink";
+import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import type { BrandingSettingsData, CompanyInfoData } from "@/features/settings/services/settings.service";
 import { VERIFIED_EXPERIENCE_YEARS } from "@/lib/company-trust";
 import {
@@ -27,22 +30,34 @@ export default function FooterCtaBand({ company, branding }: Props) {
             </p>
           </div>
           <div className="footer-cta-btns">
-            <Link href="/lien-he" className="btn-primary footer-cta-btn-primary">
+            <TrackedLink
+              href="/lien-he"
+              trackEvent="contact_quote"
+              trackSource="footer_cta_band"
+              className="btn-primary footer-cta-btn-primary"
+            >
               Yêu cầu báo giá
-            </Link>
+            </TrackedLink>
             {showHotline ? (
-              <a href={`tel:${company.hotline.raw}`} className="btn-secondary footer-cta-btn-secondary">
+              <TrackedAnchor
+                href={`tel:${company.hotline.raw}`}
+                trackEvent="contact_hotline"
+                trackSource="footer_cta_band"
+                className="btn-secondary footer-cta-btn-secondary"
+              >
                 Gọi {company.hotline.display}
-              </a>
+              </TrackedAnchor>
             ) : zaloUrl ? (
-              <a
+              <TrackedAnchor
                 href={zaloUrl}
+                trackEvent="contact_zalo"
+                trackSource="footer_cta_band"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary footer-cta-btn-secondary"
               >
                 Chat Zalo
-              </a>
+              </TrackedAnchor>
             ) : null}
           </div>
         </div>

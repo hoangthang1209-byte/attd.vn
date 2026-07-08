@@ -8,6 +8,8 @@ import {
 import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import CatalogFilterToolbar from "@/components/marketplace/CatalogFilterToolbar";
+import CatalogSearchTracking from "@/components/analytics/CatalogSearchTracking";
+import CatalogEmptyActions from "@/components/marketplace/CatalogEmptyActions";
 import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
 import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
 import CatalogSourcingBadges from "@/components/marketplace/CatalogSourcingBadges";
@@ -131,6 +133,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
       <section className="mp-catalog-body">
         <div className="container">
+          <CatalogSearchTracking query={q} resultCount={products.length} />
           <div className="mp-catalog-layout mp-catalog-layout--compact">
             <div className="mp-catalog-main">
               <div className="mp-catalog-results-bar">
@@ -178,19 +181,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                           : "Thử điều chỉnh bộ lọc hoặc gửi yêu cầu để ATTD gợi ý nguồn hàng phù hợp."
                     }
                   />
-                  <div className="mp-catalog-empty-actions">
-                    {(category || filters.inStock || filters.print || filters.embroidery || filters.oem || material) && (
-                      <Link href={buildClearFiltersUrl(q)} className="btn-secondary mp-catalog-empty-cta">
-                        Xóa bộ lọc
-                      </Link>
-                    )}
-                    <Link href="/lien-he" className="btn-primary mp-catalog-empty-cta">
-                      Gửi yêu cầu nguồn hàng
-                    </Link>
-                    <Link href="/dai-ly" className="btn-secondary mp-catalog-empty-cta">
-                      Đăng ký đại lý
-                    </Link>
-                  </div>
+                  <CatalogEmptyActions showClearFilters={Boolean(category || filters.inStock || filters.print || filters.embroidery || filters.oem || material)} clearFiltersHref={buildClearFiltersUrl(q)} />
                 </div>
               ) : (
                 <div className="mp-product-grid mp-product-grid--catalog">

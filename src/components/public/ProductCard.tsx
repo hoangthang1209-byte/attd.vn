@@ -7,6 +7,7 @@ import ProductMediaFrame from "@/components/public/ProductMediaFrame";
 import ProductQuoteDialog from "@/components/public/ProductQuoteDialog";
 import ProductSalesBadgeOverlay from "@/components/public/ProductSalesBadgeOverlay";
 import type { PublicProductSalesBadge } from "@/features/products/product-sales-badges";
+import { trackPdpQuoteClicked, trackViewProduct } from "@/lib/analytics";
 import { formatProductCardMoq, isPublicMoq } from "@/lib/formatMoq";
 
 type ProductCardProps = {
@@ -72,6 +73,11 @@ export default function ProductCard({
   function openQuote(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    trackPdpQuoteClicked({
+      product_id: id,
+      product_slug: slug,
+      source: isCatalog ? "product_card_catalog" : "product_card",
+    });
     setQuoteOpen(true);
   }
 
@@ -157,7 +163,17 @@ export default function ProductCard({
             >
               {isCatalog ? "Yêu cầu báo giá" : "Liên hệ báo giá sỉ"}
             </button>
-            <Link href={productHref} className="product-card-link">
+            <Link
+              href={productHref}
+              className="product-card-link"
+              onClick={() => {
+                trackViewProduct(isCatalog ? "product_card_catalog" : "product_card", {
+                  product_id: id,
+                  product_slug: slug,
+                  destination_path: productHref,
+                });
+              }}
+            >
               Xem chi tiết
               <ArrowRight size={14} strokeWidth={2} aria-hidden="true" />
             </Link>

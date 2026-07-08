@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Phone, MessageCircle, UserPlus } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import BackToTopButton from "@/components/public/BackToTopButton";
 import { CTA } from "@/lib/ctaConfig";
 import { getHotlineTel, getHotlineDisplay, getZaloUrl } from "@/lib/companyInfo";
@@ -33,17 +34,21 @@ export default function FloatingContactWidget() {
           <span className="floating-contact-label">{CTA.primary.label}</span>
         </TrackedLink>
 
-        <a
+        <TrackedAnchor
           href={`tel:${getHotlineTel()}`}
+          trackEvent="contact_hotline"
+          trackSource="floating_widget"
           className="floating-contact-btn floating-contact-btn--call"
           title={`Hotline ${getHotlineDisplay()}`}
         >
           <Phone size={20} aria-hidden />
           <span className="floating-contact-label">Hotline</span>
-        </a>
+        </TrackedAnchor>
 
-        <a
+        <TrackedAnchor
           href={getZaloUrl()}
+          trackEvent="contact_zalo"
+          trackSource="floating_widget"
           target="_blank"
           rel="noopener noreferrer"
           className="floating-contact-btn floating-contact-btn--zalo"
@@ -51,7 +56,7 @@ export default function FloatingContactWidget() {
         >
           <MessageCircle size={20} aria-hidden />
           <span className="floating-contact-label">Zalo</span>
-        </a>
+        </TrackedAnchor>
       </div>
     </div>
   );

@@ -12,6 +12,8 @@ import {
   type RefObject,
 } from "react";
 import { ChevronRight, Search } from "lucide-react";
+import { trackSearchSubmitted, trackSearchSuggestionClicked } from "@/lib/analytics";
+import TrackedLink from "@/components/analytics/TrackedLink";
 
 const SEARCH_SUGGESTIONS = [
   { label: "Áo thun trơn", query: "áo thun trơn" },
@@ -23,9 +25,9 @@ const SEARCH_SUGGESTIONS = [
 ] as const;
 
 const SEARCH_INTENT_SHORTCUTS = [
-  { label: "Tìm nguồn hàng sỉ", href: "/nguon-hang" },
-  { label: "Tư vấn đồng phục", href: "/lien-he" },
-  { label: "Đăng ký đại lý", href: "/dai-ly" },
+  { label: "Tìm nguồn hàng sỉ", href: "/nguon-hang", event: "wholesale_request_click" as const },
+  { label: "Tư vấn đồng phục", href: "/lien-he", event: "contact_quote" as const },
+  { label: "Đăng ký đại lý", href: "/dai-ly", event: "dealer_registration_click" as const },
 ] as const;
 
 type MarketplaceSearchBarProps = {
@@ -74,10 +76,14 @@ export default function MarketplaceSearchBar({
     };
   }, []);
 
+  const isMobileHeader = variant === "mobile-header";
+  const searchSource = isMobileHeader ? "header_mobile" : size === "large" ? "catalog_hero" : "header";
+
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const q = String(formData.get("q") ?? resolvedInputRef.current?.value ?? "").trim();
+    trackSearchSubmitted(q, searchSource);
     resolvedInputRef.current?.blur();
     setPanelOpen(false);
     onSubmitNavigate?.();
@@ -117,7 +123,15 @@ export default function MarketplaceSearchBar({
     onSubmitNavigate?.();
   }
 
-  const isMobileHeader = variant === "mobile-header";
+  function handleSuggestionClick(suggestion: string, queryValue?: string) {
+    trackSearchSuggestionClicked({
+      suggestion,
+      query: queryValue,
+      source: searchSource,
+    });
+    handleShortcutNavigate();
+  }
+
   const showDiscoveryPanel = panelOpen;
 
   return (
@@ -188,7 +202,7 @@ export default function MarketplaceSearchBar({
                   key={item.query}
                   href={`/san-pham?q=${encodeURIComponent(item.query)}`}
                   className="mp-search-discovery__chip"
-                  onClick={handleShortcutNavigate}
+                  onClick={() => handleSuggestionClick(item.label, item.query)}
                 >
                   {item.label}
                 </Link>
@@ -201,15 +215,17 @@ export default function MarketplaceSearchBar({
           <p className="mp-search-discovery__eyebrow">Nhu cầu B2B</p>
           <div className="mp-search-discovery__links">
             {SEARCH_INTENT_SHORTCUTS.map((item) => (
-              <Link
+              <TrackedLink
                 key={item.href}
                 href={item.href}
+                trackEvent={item.event}
+                trackSource={searchSource}
                 className="mp-search-discovery__link"
                 onClick={handleShortcutNavigate}
               >
                 <span>{item.label}</span>
                 <ChevronRight size={14} aria-hidden />
-              </Link>
+              </TrackedLink>
             ))}
           </div>
         </div>

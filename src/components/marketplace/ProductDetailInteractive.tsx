@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, cloneElement, isValidElement, useCallback, useMemo, useState } from "react";
+import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import ProductGallery from "@/components/marketplace/ProductGallery";
 import ProductDynamicOptionSelector from "@/components/marketplace/ProductDynamicOptionSelector";
@@ -28,6 +28,7 @@ import {
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
 import type { ManufacturingEvidenceItem } from "@/lib/manufacturing-library.types";
 import ManufacturingGallery from "@/components/public/manufacturing/ManufacturingGallery";
+import { trackPdpOptionsChanged, trackPdpQuoteClicked } from "@/lib/analytics";
 
 const STOCK_LABELS: Record<string, string> = {
   IN_STOCK: "Còn hàng",
@@ -257,7 +258,38 @@ export default function ProductDetailInteractive({
     setSelection((prev) => ({ ...prev, [groupSlug]: valueLabel }));
   }, []);
 
-  const openQuote = useCallback(() => setQuoteOpen(true), []);
+  const skipInitialOptionsTrackingRef = useRef(true);
+  useEffect(() => {
+    if (skipInitialOptionsTrackingRef.current) {
+      skipInitialOptionsTrackingRef.current = false;
+      return;
+    }
+    const entries = buildSelectedOptionEntries(optionGroups, selection);
+    if (!entries.length) return;
+    trackPdpOptionsChanged({
+      product_id: product.id,
+      product_slug: product.slug,
+      option_summary: entries.map((entry) => `${entry.label}: ${entry.value}`).join(" · "),
+    });
+  }, [selection, optionGroups, product.id, product.slug]);
+
+  const openQuote = useCallback(
+    (source: string) => {
+      trackPdpQuoteClicked({
+        product_id: product.id,
+        product_slug: product.slug,
+        source,
+      });
+      setQuoteOpen(true);
+    },
+    [product.id, product.slug],
+  );
+  const openQuoteFromPanel = useCallback(() => openQuote("pdp_conversion_panel"), [openQuote]);
+  const openQuoteFromMobile = useCallback(() => openQuote("pdp_mobile_bar"), [openQuote]);
+  const openQuoteFromCustomizations = useCallback(
+    () => openQuote("pdp_customizations"),
+    [openQuote],
+  );
   const closeQuote = useCallback(() => setQuoteOpen(false), []);
 
   const quoteContext = {
@@ -285,7 +317,7 @@ export default function ProductDetailInteractive({
       stockLabel={stockLabel}
       stockColor={stockColor}
       optionSummary={selectedOptionSummary}
-      onRequestQuote={openQuote}
+      onRequestQuote={openQuoteFromPanel}
       manufacturingEvidenceItems={manufacturingEvidenceItems}
     />
   );
@@ -428,7 +460,7 @@ export default function ProductDetailInteractive({
                   </section>
                 )}
 
-                <ProductCustomizationsSection items={customizations} onRequestQuote={openQuote} />
+                <ProductCustomizationsSection items={customizations} onRequestQuote={openQuoteFromCustomizations} />
 
                 <ManufacturingGallery
                   title="Quy trình sản xuất"
@@ -444,7 +476,7 @@ export default function ProductDetailInteractive({
         </div>
       </div>
 
-      <ProductPdpMobileBar onRequestQuote={openQuote} />
+      <ProductPdpMobileBar productSlug={product.slug} onRequestQuote={openQuoteFromMobile} />
 
       <ProductQuoteDialog
         open={quoteOpen}
