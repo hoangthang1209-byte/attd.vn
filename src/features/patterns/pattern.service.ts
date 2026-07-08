@@ -163,54 +163,33 @@ function mapPatternPrismaError(err: unknown): PatternValidationError | null {
   return null;
 }
 
-async function replacePatternMeasurements(
-  tx: Prisma.TransactionClient,
+function patternMeasurementCreateInput(
   patternId: string,
-  measurements: PatternMeasurementInput[],
-) {
-  const existingMeasurements = await tx.patternMeasurement.findMany({
-    where: { patternId },
-    select: { id: true },
+  row: PatternMeasurementInput,
+  index: number,
+): Prisma.PatternMeasurementCreateInput | null {
+  const pom = row.pointOfMeasure.trim();
+  if (!pom) return null;
+
+  const seenSizes = new Set<string>();
+  const values = row.values.flatMap((val) => {
+    const size = val.size.trim();
+    const value = val.value.trim();
+    if (!size || !value || seenSizes.has(size)) return [];
+    seenSizes.add(size);
+
+    return { size, value };
   });
-  const existingMeasurementIds = existingMeasurements.map((measurement) => measurement.id);
 
-  if (existingMeasurementIds.length > 0) {
-    await tx.patternMeasurementValue.deleteMany({
-      where: { measurementId: { in: existingMeasurementIds } },
-    });
-    await tx.patternMeasurement.deleteMany({ where: { id: { in: existingMeasurementIds } } });
-  }
-
-  for (const [index, row] of measurements.entries()) {
-    const pom = row.pointOfMeasure.trim();
-    if (!pom) continue;
-
-    const measurement = await tx.patternMeasurement.create({
-      data: {
-        patternId,
-        pointOfMeasure: pom,
-        description: row.description?.trim() || null,
-        baseSize: row.baseSize?.trim() || null,
-        tolerance: row.tolerance?.trim() || null,
-        sortOrder: row.sortOrder ?? index,
-      },
-    });
-
-    const seenSizes = new Set<string>();
-    for (const val of row.values) {
-      const size = val.size.trim();
-      const value = val.value.trim();
-      if (!size || !value || seenSizes.has(size)) continue;
-      seenSizes.add(size);
-      await tx.patternMeasurementValue.create({
-        data: {
-          measurementId: measurement.id,
-          size,
-          value,
-        },
-      });
-    }
-  }
+  return {
+    pattern: { connect: { id: patternId } },
+    pointOfMeasure: pom,
+    description: row.description?.trim() || null,
+    baseSize: row.baseSize?.trim() || null,
+    tolerance: row.tolerance?.trim() || null,
+    sortOrder: row.sortOrder ?? index,
+    values: values.length > 0 ? { create: values } : undefined,
+  };
 }
 
 export async function updatePattern(
@@ -243,20 +222,36 @@ export async function updatePattern(
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
-      if (hasMetadataPatch) {
-        await tx.pattern.update({
+    const operations: Prisma.PrismaPromise<unknown>[] = [];
+
+    if (hasMetadataPatch) {
+      operations.push(
+        prisma.pattern.update({
           where: { id },
           data: metadataPatch,
-        });
-      }
+        }),
+      );
+    }
 
-      if (input.measurements !== undefined) {
-        await replacePatternMeasurements(tx, id, input.measurements);
-      }
+    if (input.measurements !== undefined) {
+      operations.push(
+        prisma.patternMeasurementValue.deleteMany({
+          where: { measurement: { patternId: id } },
+        }),
+        prisma.patternMeasurement.deleteMany({ where: { patternId: id } }),
+      );
 
-      return tx.pattern.findUniqueOrThrow({ where: { id }, include: PATTERN_INCLUDE });
-    });
+      for (const [index, row] of input.measurements.entries()) {
+        const data = patternMeasurementCreateInput(id, row, index);
+        if (!data) continue;
+        operations.push(prisma.patternMeasurement.create({ data }));
+      }
+    }
+
+    operations.push(prisma.pattern.findUniqueOrThrow({ where: { id }, include: PATTERN_INCLUDE }));
+
+    const result = await prisma.$transaction(operations);
+    return result.at(-1) as PatternDetail;
   } catch (err) {
     const mapped = mapPatternPrismaError(err);
     if (mapped) throw mapped;

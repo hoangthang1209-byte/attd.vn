@@ -11,6 +11,8 @@ import type { AdminSessionUser } from "@/features/auth/admin-session.types";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
+export const runtime = "nodejs";
+
 type PatternMeasurementErrorCode =
   | "AUTH_SESSION_MISSING"
   | "PATTERN_UPDATE_FORBIDDEN"
