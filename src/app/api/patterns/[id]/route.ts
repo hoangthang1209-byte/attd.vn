@@ -274,7 +274,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       });
       return jsonError(
         500,
-        `Không thể lưu bảng đo. Mã tra cứu: ${traceId}`,
+        "Không thể lưu bảng đo. Vui lòng kiểm tra dữ liệu và thử lại.",
         "PATTERN_MEASUREMENT_SAVE_FAILED",
         traceId,
       );
@@ -282,7 +282,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     console.error("[PATCH /api/patterns/[id]]", { traceId, err });
     return jsonError(
       500,
-      `Không thể cập nhật rập. Mã tra cứu: ${traceId}`,
+      "Không thể cập nhật rập. Vui lòng thử lại.",
       "PATTERN_MEASUREMENT_SAVE_FAILED",
       traceId,
     );

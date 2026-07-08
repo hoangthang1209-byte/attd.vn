@@ -95,17 +95,10 @@ export const adminNavigationSections: AdminNavigationSection[] = [
       {
         label: "Manufacturing Platform",
         items: [
-          { label: "Thư viện sản xuất", href: "/admin/manufacturing-library", status: "active", requiredPermissions: ["canManageManufacturingLibrary"] },
-          { label: "Vải", href: "/admin/production-materials", status: "active", requiredPermissions: ["canViewProduction"] },
+          { label: "Vật liệu", href: "/admin/production-materials", status: "active", requiredPermissions: ["canViewProduction"] },
           { label: "Phụ liệu", href: "/admin/trims", status: "active", requiredPermissions: ["canViewProduction"] },
           { label: "Nhà cung cấp", href: "/admin/production-suppliers", status: "active", requiredPermissions: ["canViewProduction"] },
-          { label: "In", href: "/admin/print-methods", status: "active", requiredPermissions: ["canViewProduction"] },
-          { label: "Thêu", href: "/admin/print-methods", status: "active", requiredPermissions: ["canViewProduction"] },
-          { label: "Wash", status: "coming-soon", requiredPermissions: ["canViewProduction"] },
-          { label: "QC", href: "/admin/production/plan?quickFilter=awaiting_qc", status: "active", requiredPermissions: ["canViewProduction"] },
-          { label: "Máy móc", status: "coming-soon", requiredPermissions: ["canViewProduction"] },
-          { label: "Quy trình", href: "/admin/manufacturing-library/workflows", status: "active", requiredPermissions: ["canManageManufacturingLibrary"] },
-          { label: "Cost Library", href: "/admin/pricing/service-rules", status: "active", requiredPermissions: ["canAccessPricing"] },
+          { label: "Công nghệ in / thêu", href: "/admin/print-methods", status: "active", requiredPermissions: ["canViewProduction"] },
         ],
       },
       {
@@ -113,11 +106,8 @@ export const adminNavigationSections: AdminNavigationSection[] = [
         requiredPermissions: ["canViewProduction"],
         items: [
           { label: "Tech Pack", href: "/admin/tech-pack", status: "active" },
-          { label: "Pattern / Rập", href: "/admin/pattern", status: "active" },
-          { label: "Measurement", href: "/admin/measurement-template", status: "active" },
-          { label: "BOM", href: "/admin/tech-pack", status: "active" },
-          { label: "Sampling", status: "coming-soon" },
-          { label: "Revision", href: "/admin/tech-pack", status: "active" },
+          { label: "Thư viện rập", href: "/admin/pattern", status: "active" },
+          { label: "Mẫu thông số", href: "/admin/measurement-template", status: "active" },
         ],
       },
     ],

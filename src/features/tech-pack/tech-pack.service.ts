@@ -98,6 +98,20 @@ function assertDraft(status: TechPackStatus) {
   }
 }
 
+async function deleteTechPackMeasurements(tx: Prisma.TransactionClient, techPackId: string) {
+  const existingMeasurements = await tx.techPackMeasurement.findMany({
+    where: { techPackId },
+    select: { id: true },
+  });
+  const existingMeasurementIds = existingMeasurements.map((measurement) => measurement.id);
+  if (existingMeasurementIds.length === 0) return;
+
+  await tx.techPackMeasurementValue.deleteMany({
+    where: { measurementId: { in: existingMeasurementIds } },
+  });
+  await tx.techPackMeasurement.deleteMany({ where: { id: { in: existingMeasurementIds } } });
+}
+
 async function populateFromOrderItem(orderItemId: string) {
   const item = await prisma.orderItem.findUnique({
     where: { id: orderItemId },
@@ -579,10 +593,7 @@ export async function updateTechPack(
     });
 
     if (input.measurements) {
-      await tx.techPackMeasurementValue.deleteMany({
-        where: { measurement: { techPackId: id } },
-      });
-      await tx.techPackMeasurement.deleteMany({ where: { techPackId: id } });
+      await deleteTechPackMeasurements(tx, id);
 
       for (const [index, row] of input.measurements.entries()) {
         const pom = row.pointOfMeasure?.trim();
@@ -712,10 +723,7 @@ export async function selectTechPackPattern(techPackId: string, patternId: strin
       data: { patternId },
     });
 
-    await tx.techPackMeasurementValue.deleteMany({
-      where: { measurement: { techPackId } },
-    });
-    await tx.techPackMeasurement.deleteMany({ where: { techPackId } });
+    await deleteTechPackMeasurements(tx, techPackId);
 
     for (const [index, row] of pattern.measurements.entries()) {
       const measurement = await tx.techPackMeasurement.create({

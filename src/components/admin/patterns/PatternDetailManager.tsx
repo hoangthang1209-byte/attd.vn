@@ -415,7 +415,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         <TechPackMeasurementEditor
           measurements={pattern.measurements}
           readOnly={readOnly}
-          emptyText="Chưa có điểm đo. Áp dụng mẫu thông số hoặc sao chép từ Tech Pack."
+          emptyText="Chưa có thông số đo. Thêm điểm đo hoặc áp dụng mẫu thông số."
           saving={measurementSaving}
           fieldErrors={measurementFieldErrors}
           errorDetail={measurementErrorDetail}

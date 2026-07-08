@@ -78,7 +78,7 @@ export default function TechPackMeasurementEditor({
   measurements,
   readOnly,
   showBaseSize = true,
-  emptyText = "Chưa có điểm đo. Áp dụng mẫu thông số hoặc chọn rập.",
+  emptyText = "Chưa có thông số đo. Thêm điểm đo hoặc áp dụng mẫu thông số.",
   onSave,
   saving,
   fieldErrors,
@@ -87,6 +87,7 @@ export default function TechPackMeasurementEditor({
   const [rows, setRows] = useState<MeasurementRow[]>(() => toRows(measurements));
   const [sizes, setSizes] = useState<string[]>(() => getInitialSizes(measurements));
   const [newSize, setNewSize] = useState("");
+  const [sizeError, setSizeError] = useState<string | null>(null);
 
   useEffect(() => {
     setRows(toRows(measurements));
@@ -108,6 +109,7 @@ export default function TechPackMeasurementEditor({
   }
 
   function addRow() {
+    const values = Object.fromEntries(sizes.map((size) => [size, ""]));
     setRows((prev) => [
       ...prev,
       {
@@ -116,7 +118,7 @@ export default function TechPackMeasurementEditor({
         description: "",
         baseSize: "",
         tolerance: "",
-        values: {},
+        values,
       },
     ]);
   }
@@ -142,11 +144,39 @@ export default function TechPackMeasurementEditor({
     setRows((prev) => prev.filter((r) => r.clientKey !== key));
   }
 
+  function normalizeSizeLabel(value: string) {
+    return value.trim().toUpperCase();
+  }
+
   function addSize() {
-    const trimmed = newSize.trim().toUpperCase();
-    if (!trimmed || sizes.some((size) => size.toUpperCase() === trimmed)) return;
+    const trimmed = normalizeSizeLabel(newSize);
+    setSizeError(null);
+    if (!trimmed) return;
+    if (sizes.some((size) => size.toUpperCase() === trimmed)) {
+      setSizeError("Size này đã tồn tại.");
+      return;
+    }
     setSizes((prev) => sortSizes([...prev, trimmed]));
+    setRows((prev) => prev.map((row) => ({ ...row, values: { ...row.values, [trimmed]: "" } })));
     setNewSize("");
+  }
+
+  function renameSize(oldSize: string, nextValue: string) {
+    const nextSize = normalizeSizeLabel(nextValue);
+    setSizeError(null);
+    if (!nextSize || nextSize === oldSize) return;
+    if (sizes.some((size) => size !== oldSize && size.toUpperCase() === nextSize)) {
+      setSizeError("Size này đã tồn tại.");
+      return;
+    }
+    setSizes((prev) => sortSizes(prev.map((size) => (size === oldSize ? nextSize : size))));
+    setRows((prev) =>
+      prev.map((row) => {
+        const nextValues = { ...row.values, [nextSize]: row.values[oldSize] ?? "" };
+        delete nextValues[oldSize];
+        return { ...row, values: nextValues };
+      }),
+    );
   }
 
   function removeSize(size: string) {
@@ -191,7 +221,7 @@ export default function TechPackMeasurementEditor({
       {!readOnly && (
         <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" onClick={addRow}>
-            Thêm dòng đo
+            Thêm điểm đo
           </button>
           <button type="button" className="admin-btn admin-btn--xs" onClick={addCommonRows}>
             Thêm điểm đo áo
@@ -215,12 +245,14 @@ export default function TechPackMeasurementEditor({
           <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={!canSave} onClick={commit}>
             {saving ? "Đang lưu bảng đo…" : "Lưu bảng"}
           </button>
+          {sizeError && <span className="admin-error" style={{ fontSize: 12 }}>{sizeError}</span>}
         </div>
       )}
-      {errorDetail && (errorDetail.code || errorDetail.traceId) && (
-        <details className="admin-muted" style={{ marginBottom: 12, fontSize: 12 }}>
-          <summary>{errorDetail.message ?? "Không thể lưu bảng đo."}</summary>
+      {errorDetail && (errorDetail.message || errorDetail.code || errorDetail.traceId) && (
+        <details className="admin-error" style={{ marginBottom: 12, fontSize: 12 }} open>
+          <summary>{errorDetail.message ?? "Không thể lưu bảng đo. Vui lòng kiểm tra dữ liệu và thử lại."}</summary>
           <div style={{ marginTop: 4 }}>
+            Chi tiết lỗi:{" "}
             {errorDetail.code && <>Mã lỗi: {errorDetail.code}</>}
             {errorDetail.code && errorDetail.traceId && " · "}
             {errorDetail.traceId && <>Mã tra cứu: {errorDetail.traceId}</>}
@@ -248,7 +280,22 @@ export default function TechPackMeasurementEditor({
                 {sizes.map((size) => (
                   <th key={size} className="pattern-measure-col-size">
                     <span className="pattern-measure-col-size__head">
-                      {size}
+                      {readOnly ? (
+                        size
+                      ) : (
+                        <input
+                          className="admin-input admin-input--sm pattern-measure-size-label-input"
+                          defaultValue={size}
+                          aria-label={`Sửa size ${size}`}
+                          onBlur={(e) => renameSize(size, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              e.currentTarget.blur();
+                            }
+                          }}
+                        />
+                      )}
                       {!readOnly && sizes.length > 1 && (
                         <button
                           type="button"

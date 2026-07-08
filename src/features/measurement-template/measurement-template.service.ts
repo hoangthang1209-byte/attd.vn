@@ -25,6 +25,90 @@ export class MeasurementTemplateValidationError extends Error {
   }
 }
 
+type MeasurementTemplateItemInput = {
+  pointOfMeasure: string;
+  description?: string | null;
+  tolerance?: string | null;
+  sortOrder?: number;
+  values?: Array<{ size: string; value: string }>;
+};
+
+async function replaceMeasurementTemplateItems(
+  tx: Prisma.TransactionClient,
+  templateId: string,
+  items: MeasurementTemplateItemInput[],
+) {
+  const existingItems = await tx.measurementTemplateItem.findMany({
+    where: { templateId },
+    select: { id: true },
+  });
+  const existingItemIds = existingItems.map((item) => item.id);
+
+  if (existingItemIds.length > 0) {
+    await tx.measurementTemplateValue.deleteMany({
+      where: { measurementId: { in: existingItemIds } },
+    });
+    await tx.measurementTemplateItem.deleteMany({ where: { id: { in: existingItemIds } } });
+  }
+
+  for (const [index, row] of items.entries()) {
+    const pom = row.pointOfMeasure?.trim();
+    if (!pom) continue;
+    const measurement = await tx.measurementTemplateItem.create({
+      data: {
+        templateId,
+        pointOfMeasure: pom,
+        description: row.description?.trim() || null,
+        tolerance: row.tolerance?.trim() || null,
+        sortOrder: row.sortOrder ?? index,
+      },
+    });
+
+    const seenSizes = new Set<string>();
+    for (const val of row.values ?? []) {
+      const size = val.size?.trim();
+      const value = val.value?.trim();
+      if (!size || !value || seenSizes.has(size)) continue;
+      seenSizes.add(size);
+      await tx.measurementTemplateValue.create({
+        data: {
+          measurementId: measurement.id,
+          size,
+          value,
+        },
+      });
+    }
+  }
+}
+
+async function deleteTechPackMeasurements(tx: Prisma.TransactionClient, techPackId: string) {
+  const existingMeasurements = await tx.techPackMeasurement.findMany({
+    where: { techPackId },
+    select: { id: true },
+  });
+  const existingMeasurementIds = existingMeasurements.map((measurement) => measurement.id);
+  if (existingMeasurementIds.length === 0) return;
+
+  await tx.techPackMeasurementValue.deleteMany({
+    where: { measurementId: { in: existingMeasurementIds } },
+  });
+  await tx.techPackMeasurement.deleteMany({ where: { id: { in: existingMeasurementIds } } });
+}
+
+async function deletePatternMeasurements(tx: Prisma.TransactionClient, patternId: string) {
+  const existingMeasurements = await tx.patternMeasurement.findMany({
+    where: { patternId },
+    select: { id: true },
+  });
+  const existingMeasurementIds = existingMeasurements.map((measurement) => measurement.id);
+  if (existingMeasurementIds.length === 0) return;
+
+  await tx.patternMeasurementValue.deleteMany({
+    where: { measurementId: { in: existingMeasurementIds } },
+  });
+  await tx.patternMeasurement.deleteMany({ where: { id: { in: existingMeasurementIds } } });
+}
+
 export async function listMeasurementTemplates(input?: {
   search?: string;
   productCategoryId?: string;
@@ -80,13 +164,7 @@ export async function updateMeasurementTemplate(
     productCategoryId: string | null;
     baseSize: string | null;
     notes: string | null;
-    items: Array<{
-      pointOfMeasure: string;
-      description?: string | null;
-      tolerance?: string | null;
-      sortOrder?: number;
-      values?: Array<{ size: string; value: string }>;
-    }>;
+    items: MeasurementTemplateItemInput[];
   }>,
 ) {
   const existing = await prisma.measurementTemplate.findUnique({ where: { id } });
@@ -104,34 +182,7 @@ export async function updateMeasurementTemplate(
     });
 
     if (input.items) {
-      await tx.measurementTemplateValue.deleteMany({
-        where: { measurement: { templateId: id } },
-      });
-      await tx.measurementTemplateItem.deleteMany({ where: { templateId: id } });
-
-      for (const [index, row] of input.items.entries()) {
-        const pom = row.pointOfMeasure?.trim();
-        if (!pom) continue;
-        const measurement = await tx.measurementTemplateItem.create({
-          data: {
-            templateId: id,
-            pointOfMeasure: pom,
-            description: row.description?.trim() || null,
-            tolerance: row.tolerance?.trim() || null,
-            sortOrder: row.sortOrder ?? index,
-          },
-        });
-        for (const val of row.values ?? []) {
-          if (!val.size?.trim() || !val.value?.trim()) continue;
-          await tx.measurementTemplateValue.create({
-            data: {
-              measurementId: measurement.id,
-              size: val.size.trim(),
-              value: val.value.trim(),
-            },
-          });
-        }
-      }
+      await replaceMeasurementTemplateItems(tx, id, input.items);
     }
 
     return tx.measurementTemplate.findUniqueOrThrow({ where: { id }, include: TEMPLATE_INCLUDE });
@@ -191,10 +242,7 @@ async function copyTemplateItemsToMeasurements(
   if (!template) throw new MeasurementTemplateValidationError("Không tìm thấy mẫu thông số.");
 
   if (target.techPackId) {
-    await tx.techPackMeasurementValue.deleteMany({
-      where: { measurement: { techPackId: target.techPackId } },
-    });
-    await tx.techPackMeasurement.deleteMany({ where: { techPackId: target.techPackId } });
+    await deleteTechPackMeasurements(tx, target.techPackId);
     for (const [index, row] of template.items.entries()) {
       const measurement = await tx.techPackMeasurement.create({
         data: {
@@ -215,10 +263,7 @@ async function copyTemplateItemsToMeasurements(
   }
 
   if (target.patternId) {
-    await tx.patternMeasurementValue.deleteMany({
-      where: { measurement: { patternId: target.patternId } },
-    });
-    await tx.patternMeasurement.deleteMany({ where: { patternId: target.patternId } });
+    await deletePatternMeasurements(tx, target.patternId);
     for (const [index, row] of template.items.entries()) {
       const measurement = await tx.patternMeasurement.create({
         data: {
@@ -288,10 +333,7 @@ export async function copyTechPackMeasurementsToPattern(patternId: string, techP
   if (!pack) throw new TechPackValidationError("Không tìm thấy Tech Pack.");
 
   return prisma.$transaction(async (tx) => {
-    await tx.patternMeasurementValue.deleteMany({
-      where: { measurement: { patternId } },
-    });
-    await tx.patternMeasurement.deleteMany({ where: { patternId } });
+    await deletePatternMeasurements(tx, patternId);
     for (const [index, row] of pack.measurements.entries()) {
       const measurement = await tx.patternMeasurement.create({
         data: {

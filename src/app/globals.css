@@ -16545,6 +16545,13 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   vertical-align: middle;
 }
 
+.tech-pack-measurement-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f8fafc;
+}
+
 .pattern-measure-col-pom {
   width: var(--measure-pom-width);
   min-width: 140px;
@@ -16621,6 +16628,15 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   min-height: 18px;
   line-height: 1;
   font-size: 12px;
+}
+
+.pattern-measure-size-label-input {
+  width: 42px;
+  height: 24px;
+  padding: 2px 4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .tech-pack-measurement-table .pattern-measure-input {

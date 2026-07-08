@@ -32,6 +32,8 @@ import MeasurementTemplateApplyButton from "@/components/admin/tech-pack/Measure
 import TechPackMeasurementEditor from "@/components/admin/tech-pack/TechPackMeasurementEditor";
 import type { TechPackBomCategory, ArtworkPlacementType, TechPackAssetType, TechPackStatus } from "@prisma/client";
 import type { OrderItemProcessingMethod, OrderItemSupplySource } from "@prisma/client";
+import { useAdminMutation } from "@/hooks/useAdminAction";
+import { adminApiFetch, parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
 type TabId = "bom" | "construction" | "measurement";
 
@@ -144,11 +146,19 @@ const CONSTRUCTION_TYPES: TechPackAssetType[] = [
 ];
 
 export default function TechPackDetailManager({ techPackId }: { techPackId: string }) {
+  const mutate = useAdminMutation();
   const [pack, setPack] = useState<TechPackDetail | null>(null);
   const [tab, setTab] = useState<TabId>("bom");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPatternId, setSelectedPatternId] = useState("");
+  const [measurementSaving, setMeasurementSaving] = useState(false);
+  const [measurementFieldErrors, setMeasurementFieldErrors] = useState<Record<string, string>>({});
+  const [measurementErrorDetail, setMeasurementErrorDetail] = useState<{
+    code?: string;
+    traceId?: string;
+    message?: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -209,6 +219,42 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
 
   async function save(patch: Record<string, unknown>) {
     if (!pack || readOnly) return;
+    if (Object.prototype.hasOwnProperty.call(patch, "measurements")) {
+      setMeasurementSaving(true);
+      setMeasurementFieldErrors({});
+      setMeasurementErrorDetail(null);
+      await mutate({
+        loadingMessage: "Đang lưu bảng đo…",
+        successMessage: "Đã lưu bảng đo.",
+        errorFallback: "Không thể lưu bảng đo. Vui lòng thử lại.",
+        action: async () => {
+          const res = await adminApiFetch(`/api/tech-packs/${techPackId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+          });
+          const result = await parseAdminJsonResponse(res, (body) => body as TechPackDetail);
+          if (!result.ok) {
+            setMeasurementFieldErrors(result.fieldErrors ?? {});
+            setMeasurementErrorDetail({
+              code: result.code,
+              traceId: result.traceId,
+              message: result.message ?? "Không thể lưu bảng đo. Vui lòng kiểm tra dữ liệu và thử lại.",
+            });
+          }
+          return result;
+        },
+        onSuccess: (data) => {
+          setPack(data);
+          setError(null);
+          setMeasurementFieldErrors({});
+          setMeasurementErrorDetail(null);
+        },
+        onError: (message) => setError(message),
+      });
+      setMeasurementSaving(false);
+      return;
+    }
     const res = await fetch(`/api/tech-packs/${techPackId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -512,6 +558,9 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
             <TechPackMeasurementEditor
               measurements={pack.measurements}
               readOnly={readOnly}
+              saving={measurementSaving}
+              fieldErrors={measurementFieldErrors}
+              errorDetail={measurementErrorDetail}
               onSave={(rows) => void save({ measurements: rows })}
             />
           </SectionCard>
