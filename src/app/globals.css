@@ -25794,3 +25794,28 @@ body:has(.mp-header--v271) {
 .admin-chip { padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; font-size: 12px; cursor: pointer; }
 .admin-chip:hover { border-color: #2563eb; color: #2563eb; }
 .admin-link { color: #2563eb; text-decoration: underline; }
+
+/* Sales opportunity pipeline */
+.sales-pipeline-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+@media (max-width: 960px) { .sales-pipeline-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sales-pipeline-stat { padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; display: flex; flex-direction: column; gap: 4px; }
+.sales-pipeline-stat__label { font-size: 12px; color: #6b7280; }
+.sales-pipeline-stat__alert { color: #b45309; }
+.sales-pipeline-create { margin-bottom: 16px; padding: 14px 16px; }
+.sales-pipeline-create__title { margin: 0 0 12px; font-size: 15px; }
+.sales-pipeline-create__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.sales-pipeline-create__note { grid-column: 1 / -1; }
+.sales-pipeline-create__actions { margin-top: 12px; }
+@media (max-width: 960px) { .sales-pipeline-create__grid { grid-template-columns: 1fr; } }
+.sales-pipeline-board { display: grid; grid-template-columns: repeat(8, minmax(220px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.sales-pipeline-column { min-width: 220px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f8fafc; display: flex; flex-direction: column; max-height: 72vh; }
+.sales-pipeline-column__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; background: #fff; border-radius: 10px 10px 0 0; }
+.sales-pipeline-column__header h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.sales-pipeline-column__header span { font-size: 12px; color: #6b7280; }
+.sales-pipeline-column__cards { padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.sales-pipeline-card { padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; display: flex; flex-direction: column; gap: 6px; }
+.sales-pipeline-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sales-pipeline-card__title { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.35; }
+.sales-pipeline-card__meta, .sales-pipeline-card__value, .sales-pipeline-card__followup, .sales-pipeline-card__quote { margin: 0; font-size: 12px; color: #4b5563; }
+.sales-pipeline-card__followup.is-overdue { color: #b45309; font-weight: 600; }
+.sales-pipeline-card__stage { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }

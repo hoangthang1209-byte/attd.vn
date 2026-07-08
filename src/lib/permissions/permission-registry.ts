@@ -1,6 +1,7 @@
 export const PERMISSION_ACTIONS = [
   "none",
   "view",
+  "read",
   "create",
   "update",
   "delete",

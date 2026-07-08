@@ -287,6 +287,7 @@ model Lead {
   productInterests    CRMProductInterest[]
   pricingCalculations PricingCalculation[]
   quotes              Quote[]
+  salesOpportunities    SalesOpportunity[]
   dealerRfq           DealerRFQ?
 
   @@index([code])
@@ -368,6 +369,7 @@ model Customer {
   techPacks            TechPack[]
   dealerCompanies      DealerCompany[]
   dealerRfqs           DealerRFQ[]
+  salesOpportunities   SalesOpportunity[]
 
   @@index([code])
   @@index([name])
@@ -398,6 +400,7 @@ model Contact {
   pricingCalculations PricingCalculation[]
   quotes              Quote[]
   orders              Order[]
+  salesOpportunities  SalesOpportunity[]
 
   @@index([customerId])
 }
@@ -1809,6 +1812,7 @@ model PricingCalculation {
   items                PricingCalculationItem[]
   quotes               Quote[]
   dealerRfqs           DealerRFQ[]
+  salesOpportunities   SalesOpportunity[]
 
   @@index([code])
   @@index([leadId])
@@ -1874,6 +1878,24 @@ enum QuoteSourceType {
 enum QuotePriceVatType {
   EXCLUDING_VAT
   INCLUDING_VAT
+}
+
+enum SalesOpportunityStage {
+  NEW
+  CONTACTED
+  CONSULTING
+  COSTING
+  QUOTED
+  NEGOTIATING
+  WON
+  LOST
+}
+
+enum SalesOpportunityPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
 }
 
 model SalesRepresentative {
@@ -1970,6 +1992,7 @@ model Quote {
   items                        QuoteItem[]
   order                        Order?
   dealerRfq                    DealerRFQ?
+  salesOpportunities           SalesOpportunity[]
 
   @@index([quoteNo])
   @@index([salesRepresentativeId])
@@ -1981,6 +2004,45 @@ model Quote {
   @@index([contactId])
   @@index([createdAt])
   @@index([validUntil])
+}
+
+model SalesOpportunity {
+  id                   String                   @id @default(cuid())
+  code                 String                   @unique
+  title                String
+  stage                SalesOpportunityStage    @default(NEW)
+  priority             SalesOpportunityPriority @default(NORMAL)
+  leadId               String?
+  customerId           String?
+  contactId            String?
+  quoteId              String?
+  pricingCalculationId String?
+  estimatedValue       Decimal?                 @db.Decimal(12, 2)
+  probability          Int                      @default(30)
+  expectedCloseDate    DateTime?
+  nextFollowUpAt       DateTime?
+  assignedTo           String?
+  source               String?
+  note                 String?                  @db.Text
+  lostReason           String?                  @db.Text
+  wonAt                DateTime?
+  lostAt               DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  lead                 Lead?                    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer             Customer?                @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contact              Contact?                 @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  quote                Quote?                   @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  pricingCalculation   PricingCalculation?      @relation(fields: [pricingCalculationId], references: [id], onDelete: SetNull)
+
+  @@index([stage])
+  @@index([priority])
+  @@index([leadId])
+  @@index([customerId])
+  @@index([quoteId])
+  @@index([nextFollowUpAt])
+  @@index([expectedCloseDate])
+  @@index([createdAt])
 }
 
 model QuoteItem {
