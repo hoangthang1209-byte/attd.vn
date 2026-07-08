@@ -1,4 +1,5 @@
 import type {
+  OrderStatus,
   PricingCalculationStatus,
   QuoteStatus,
   SalesOpportunityPriority,
@@ -128,6 +129,13 @@ export type SalesOpportunityPricingSummary = {
   createdAt: string;
 };
 
+export type SalesOpportunityOrderSummary = {
+  id: string;
+  orderNo: string;
+  status: OrderStatus;
+  createdAt: string;
+};
+
 export type SalesOpportunityTimelineEntry = {
   id: string;
   kind: "activity" | "opportunity";
@@ -146,6 +154,8 @@ export type SalesOpportunityWorkspaceResult = {
   contact: SalesOpportunityContactSummary | null;
   quote: SalesOpportunityQuoteSummary | null;
   pricingCalculation: SalesOpportunityPricingSummary | null;
+  linkedOrder: SalesOpportunityOrderSummary | null;
+  handoverEligible: boolean;
   relatedQuotes: SalesOpportunityQuoteSummary[];
   relatedCalculations: SalesOpportunityPricingSummary[];
   activities: CrmActivityRecord[];

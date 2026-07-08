@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { CRMActivityType, SalesOpportunityPriority, SalesOpportunityStage } from "@prisma/client";
 import {
   AdminLoadingState,
@@ -21,6 +22,7 @@ import type { SalesOpportunityWorkspaceResult } from "@/features/sales/opportuni
 import { getPricingStatusLabel } from "@/features/pricing/labels";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime, toDateInputValue } from "@/features/quotes/format";
 import { getQuoteStatusLabel } from "@/features/quotes/labels";
+import { ORDER_STATUS_LABELS } from "@/features/orders/order-labels";
 
 const WORKSPACE_ACTIVITY_TYPES = CRM_ACTIVITY_TYPES.filter((type): type is CRMActivityType =>
   ["CALL", "ZALO", "EMAIL", "MEETING", "NOTE", "FOLLOW_UP"].includes(type),
@@ -83,12 +85,14 @@ type Props = {
 };
 
 export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
+  const router = useRouter();
   const [workspace, setWorkspace] = useState<SalesOpportunityWorkspaceResult | null>(null);
   const [form, setForm] = useState<WorkspaceFormState | null>(null);
   const [activityForm, setActivityForm] = useState<ActivityFormState>(EMPTY_ACTIVITY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activitySaving, setActivitySaving] = useState(false);
+  const [handoverCreating, setHandoverCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -115,6 +119,10 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
   }, [load]);
 
   const canLogActivity = Boolean(workspace?.lead?.id || workspace?.customer?.id);
+
+  const canCreateHandover = Boolean(
+    workspace?.handoverEligible && workspace.quote && !workspace.linkedOrder,
+  );
 
   const priorityBadgeClass = useMemo(() => {
     if (!form) return "";
@@ -200,6 +208,30 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
     }
   }
 
+  async function handleCreateHandover() {
+    setHandoverCreating(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const res = await fetch(`/api/sales/opportunities/${opportunityId}/handover`, {
+        method: "POST",
+      });
+      const json = await res.json() as { order?: { id: string; orderNo: string }; message?: string };
+      if (!res.ok) throw new Error(json.message ?? "Không thể tạo đơn hàng nháp");
+      if (json.order?.id) {
+        router.push(`/admin/orders/${json.order.id}`);
+        return;
+      }
+      setMessage(`Đã tạo đơn hàng nháp ${json.order?.orderNo ?? ""}.`.trim());
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể tạo đơn hàng nháp");
+    } finally {
+      setHandoverCreating(false);
+    }
+  }
+
   if (loading) {
     return <AdminLoadingState label="Đang tải không gian cơ hội…" />;
   }
@@ -220,7 +252,19 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
     );
   }
 
-  const { opportunity, lead, customer, contact, quote, pricingCalculation, relatedQuotes, relatedCalculations, timeline } = workspace;
+  const {
+    opportunity,
+    lead,
+    customer,
+    contact,
+    quote,
+    pricingCalculation,
+    linkedOrder,
+    handoverEligible,
+    relatedQuotes,
+    relatedCalculations,
+    timeline,
+  } = workspace;
 
   return (
     <AdminPageShell>
@@ -462,6 +506,46 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
                     ))}
                   </ul>
                 </div>
+              )}
+            </section>
+
+            <section className="admin-panel">
+              <h3 className="sales-opportunity-workspace__section-title">Bàn giao sản xuất</h3>
+              {linkedOrder ? (
+                <div className="sales-opportunity-workspace__linked-card">
+                  <p>
+                    <strong>{linkedOrder.orderNo}</strong>
+                    {" · "}
+                    {ORDER_STATUS_LABELS[linkedOrder.status]}
+                  </p>
+                  <p className="admin-field-hint">
+                    Tạo lúc {formatQuoteDateTime(linkedOrder.createdAt)}
+                  </p>
+                  <Link
+                    href={`/admin/orders/${linkedOrder.id}`}
+                    className="admin-btn admin-btn--secondary admin-btn--small"
+                  >
+                    Mở đơn hàng
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <p className="admin-field-hint">
+                    {handoverEligible
+                      ? quote
+                        ? "Cơ hội đủ điều kiện để tạo đơn hàng nháp cho vận hành."
+                        : "Cần liên kết báo giá có dòng sản phẩm trước khi bàn giao."
+                      : "Chỉ tạo đơn hàng nháp khi cơ hội đã thắng hoặc báo giá đã được chấp nhận."}
+                  </p>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--primary admin-btn--small"
+                    disabled={!canCreateHandover || handoverCreating}
+                    onClick={() => void handleCreateHandover()}
+                  >
+                    {handoverCreating ? "Đang tạo…" : "Tạo đơn hàng nháp"}
+                  </button>
+                </>
               )}
             </section>
 

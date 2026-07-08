@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { SALES_OPPORTUNITY_STAGE_ORDER } from "@/features/sales/opportunities/labels";
 import { generateSalesOpportunityCode } from "@/features/sales/opportunities/sales-opportunity-code";
 import { SalesOpportunityValidationError } from "@/features/sales/opportunities/sales-opportunity-input";
+import { isOpportunityHandoverEligible } from "@/features/sales/opportunities/order-handover.service";
 import { mapActivityRow } from "@/features/crm/mappers";
 import type {
   CreateSalesOpportunityInput,
@@ -11,6 +12,7 @@ import type {
   SalesOpportunityContactSummary,
   SalesOpportunityLeadSummary,
   SalesOpportunityListRecord,
+  SalesOpportunityOrderSummary,
   SalesOpportunityPipelineResult,
   SalesOpportunityPipelineStats,
   SalesOpportunityPricingSummary,
@@ -516,6 +518,27 @@ export async function getSalesOpportunityWorkspace(
   const activities = activityRows.map(mapActivityRow);
   const timeline = buildWorkspaceTimeline(opportunity, activities);
 
+  let linkedOrder: SalesOpportunityOrderSummary | null = null;
+  if (row.quoteId) {
+    const orderRow = await prisma.order.findUnique({
+      where: { quoteId: row.quoteId },
+      select: { id: true, orderNo: true, status: true, createdAt: true },
+    });
+    if (orderRow) {
+      linkedOrder = {
+        id: orderRow.id,
+        orderNo: orderRow.orderNo,
+        status: orderRow.status,
+        createdAt: orderRow.createdAt.toISOString(),
+      };
+    }
+  }
+
+  const handoverEligible = isOpportunityHandoverEligible(
+    opportunity.stage,
+    quote?.status,
+  );
+
   return {
     opportunity,
     lead,
@@ -523,6 +546,8 @@ export async function getSalesOpportunityWorkspace(
     contact,
     quote,
     pricingCalculation,
+    linkedOrder,
+    handoverEligible,
     relatedQuotes,
     relatedCalculations,
     activities,

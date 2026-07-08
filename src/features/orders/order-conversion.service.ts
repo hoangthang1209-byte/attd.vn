@@ -155,7 +155,15 @@ function resolveCommercialTotal(quote: {
   return quote.totalAmount;
 }
 
-export async function convertQuoteToOrder(quoteId: string) {
+export type ConvertQuoteToOrderOptions = {
+  /** Allow conversion when quote is not ACCEPTED (e.g. opportunity marked WON). */
+  relaxAcceptedStatus?: boolean;
+};
+
+export async function convertQuoteToOrder(
+  quoteId: string,
+  options?: ConvertQuoteToOrderOptions,
+) {
   const quote = await prisma.quote.findUnique({
     where: { id: quoteId },
     include: {
@@ -200,7 +208,7 @@ export async function convertQuoteToOrder(quoteId: string) {
     return existing;
   }
 
-  if (quote.status !== "ACCEPTED") {
+  if (!options?.relaxAcceptedStatus && quote.status !== "ACCEPTED") {
     throw new OrderConversionError(
       "Chỉ có thể tạo đơn hàng từ báo giá đã được khách đồng ý.",
     );
