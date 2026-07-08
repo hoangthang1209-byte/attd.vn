@@ -29,7 +29,6 @@ import { useAdminMutation } from "@/hooks/useAdminAction";
 import {
   adminApiFetch,
   parseAdminJsonResponse,
-  resolveAdminMutationErrorMessage,
 } from "@/lib/admin/adminMutation";
 
 type PatternFile = {
@@ -175,7 +174,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   }, [draft, savedSnapshot]);
 
   useEffect(() => {
-    if (saveStatus === "saving" || saveStatus === "error") return;
+    if (saveStatus === "saving") return;
     setSaveStatus(isDirty ? "dirty" : "saved");
   }, [isDirty, saveStatus]);
 
@@ -285,7 +284,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     saveBusyRef.current = false;
   }
 
-  async function saveMeasurements(rows: Array<{
+  function saveMeasurements(rows: Array<{
     pointOfMeasure: string;
     description: string | null;
     baseSize: string | null;
@@ -297,6 +296,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   }
 
   async function approve() {
+    if (!confirmLeaveIfDirty()) return;
     const res = await fetch(`/api/patterns/${patternId}/approve`, { method: "POST" });
     if (res.ok) void load();
     else {
@@ -306,6 +306,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   }
 
   async function archive() {
+    if (!confirmLeaveIfDirty()) return;
     const res = await fetch(`/api/patterns/${patternId}/archive`, { method: "POST" });
     if (res.ok) void load();
   }
@@ -316,13 +317,16 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     const fd = new FormData();
     fd.append("file", file);
     fd.append("type", "OTHER");
-    const res = await fetch(`/api/patterns/${patternId}/files`, { method: "POST", body: fd });
-    setUploading(false);
-    if (res.ok) await load();
-    else {
-      const data = (await res.json()) as { message?: string };
-      setError(data.message ?? "Không thể tải file");
-      throw new Error(data.message);
+    try {
+      const res = await fetch(`/api/patterns/${patternId}/files`, { method: "POST", body: fd });
+      if (res.ok) await load();
+      else {
+        const data = (await res.json()) as { message?: string };
+        setError(data.message ?? "Không thể tải file");
+        throw new Error(data.message);
+      }
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -342,7 +346,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   }
 
   if (loading) return <AdminLoadingState label="Đang tải rập..." />;
-  if (!pattern) return <p className="admin-error">{error ?? "Không tìm thấy rập"}</p>;
+  if (!pattern || !draft) return <p className="admin-error">{error ?? "Không tìm thấy rập"}</p>;
 
   const readOnly = pattern.status === "ARCHIVED";
 
@@ -353,17 +357,27 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         meta={<PatternStatusBadge status={pattern.status} />}
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href={PATTERN_ADMIN_LIST_PATH} className="admin-btn">
+            <span className={`admin-status-badge admin-status-badge--${saveStatusTone()}`}>
+              {saveStatusLabel()}
+            </span>
+            <Link
+              href={PATTERN_ADMIN_LIST_PATH}
+              className="admin-btn"
+              onClick={(e) => {
+                if (!confirmLeaveIfDirty()) e.preventDefault();
+              }}
+            >
               Quay lại
             </Link>
             {!readOnly && (
-              <>
-                <MeasurementTemplateApplyButton
-                  applyUrl={`/api/patterns/${patternId}/apply-measurement-template`}
-                  onApplied={() => void load()}
-                />
-                <CopyFromTechPackButton patternId={patternId} onCopied={() => void load()} />
-              </>
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary"
+                disabled={!isDirty || saveStatus === "saving"}
+                onClick={() => void savePatternDraft()}
+              >
+                Lưu
+              </button>
             )}
             {pattern.status === "DRAFT" && (
               <button type="button" className="admin-btn admin-btn--primary" onClick={() => void approve()}>
@@ -387,9 +401,9 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
             <span>Tên rập</span>
             <input
               className="admin-input"
-              defaultValue={pattern.name}
+              value={draft.name}
               disabled={readOnly}
-              onBlur={(e) => e.target.value !== pattern.name && void saveField({ name: e.target.value })}
+              onChange={(e) => updateDraft({ name: e.target.value })}
             />
           </label>
           <label className="admin-field">
@@ -397,22 +411,18 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
             <input
               className="admin-input"
               type="number"
-              defaultValue={pattern.version}
+              value={draft.version}
               disabled={readOnly}
-              onBlur={(e) => {
-                const v = Number.parseInt(e.target.value, 10);
-                if (!Number.isFinite(v) || v < 1) return;
-                if (v !== pattern.version) void saveField({ version: v });
-              }}
+              onChange={(e) => updateDraft({ version: e.target.value })}
             />
           </label>
           <label className="admin-field">
             <span>Nhóm sản phẩm</span>
             <select
               className="admin-select"
-              defaultValue={pattern.productCategory?.id ?? ""}
+              value={draft.productCategoryId}
               disabled={readOnly}
-              onChange={(e) => void saveField({ productCategoryId: e.target.value || null })}
+              onChange={(e) => updateDraft({ productCategoryId: e.target.value })}
             >
               <option value="">—</option>
               {categories.map((c) => (
@@ -426,13 +436,9 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
             <span>Danh mục vật liệu SX</span>
             <select
               className="admin-select"
-              defaultValue={pattern.productionMaterialCategory ?? ""}
+              value={draft.productionMaterialCategory}
               disabled={readOnly}
-              onChange={(e) =>
-                void saveField({
-                  productionMaterialCategory: e.target.value || null,
-                })
-              }
+              onChange={(e) => updateDraft({ productionMaterialCategory: e.target.value })}
             >
               <option value="">— Không chọn —</option>
               {PRODUCTION_MATERIAL_CATEGORIES.map((c) => (
@@ -449,38 +455,38 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
             <span>Base size</span>
             <input
               className="admin-input"
-              defaultValue={pattern.baseSize ?? ""}
+              value={draft.baseSize}
               disabled={readOnly}
-              onBlur={(e) => void saveField({ baseSize: e.target.value || null })}
+              onChange={(e) => updateDraft({ baseSize: e.target.value })}
             />
           </label>
           <label className="admin-field">
             <span>Size range</span>
             <input
               className="admin-input"
-              defaultValue={pattern.sizeRange ?? ""}
+              value={draft.sizeRange}
               disabled={readOnly}
-              onBlur={(e) => void saveField({ sizeRange: e.target.value || null })}
+              onChange={(e) => updateDraft({ sizeRange: e.target.value })}
             />
           </label>
           <label className="admin-field admin-field--full">
             <span>Grading rule</span>
             <textarea
               className="admin-textarea"
-              defaultValue={pattern.gradingRule ?? ""}
+              value={draft.gradingRule}
               disabled={readOnly}
               rows={3}
-              onBlur={(e) => void saveField({ gradingRule: e.target.value || null })}
+              onChange={(e) => updateDraft({ gradingRule: e.target.value })}
             />
           </label>
           <label className="admin-field admin-field--full">
             <span>Ghi chú</span>
             <textarea
               className="admin-textarea"
-              defaultValue={pattern.notes ?? ""}
+              value={draft.notes}
               disabled={readOnly}
               rows={3}
-              onBlur={(e) => void saveField({ notes: e.target.value || null })}
+              onChange={(e) => updateDraft({ notes: e.target.value })}
             />
           </label>
         </div>
@@ -489,7 +495,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       <SectionCard title="File rập">
         {!readOnly && (
           <PrivateFileUploadZone
-            label="Kéo thả hoặc chọn file để tải lên"
+            label={uploading ? "Đang tải file..." : "Kéo thả hoặc chọn file để tải lên"}
             onUpload={uploadFile}
           />
         )}
@@ -501,7 +507,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
               <div key={file.id} className="admin-file-card">
                 {file.previewUrl && isPreviewableFile(file.type) ? (
                   file.type === "PDF" ? (
-                    <a href={file.previewUrl} target="_blank" rel="noreferrer" className="admin-link">
+                    <a href={`/api/patterns/${patternId}/files/${file.id}/open`} target="_blank" rel="noreferrer" className="admin-link">
                       PDF xem nhanh
                     </a>
                   ) : (
@@ -518,20 +524,65 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                   <div>{file.originalFileName ?? file.title ?? "—"}</div>
                   {file.r2ObjectKey && <div>{PRIVATE_FILE_HINT}</div>}
                 </div>
+                <div className="admin-file-card__actions">
+                  <a className="admin-btn admin-btn--xs" href={`/api/patterns/${patternId}/files/${file.id}/open`} target="_blank" rel="noreferrer">
+                    Xem
+                  </a>
+                  <a className="admin-btn admin-btn--xs" href={`/api/patterns/${patternId}/files/${file.id}/download`}>
+                    Tải xuống
+                  </a>
+                  {!readOnly && (
+                    <>
+                      <input
+                        ref={(el) => {
+                          fileInputRefs.current[file.id] = el;
+                        }}
+                        type="file"
+                        hidden
+                        onChange={(e) => {
+                          const nextFile = e.target.files?.[0];
+                          e.target.value = "";
+                          if (nextFile) void replaceFile(file.id, nextFile);
+                        }}
+                      />
+                      <button type="button" className="admin-btn admin-btn--xs" onClick={() => fileInputRefs.current[file.id]?.click()}>
+                        Thay file
+                      </button>
+                      <button type="button" className="admin-btn admin-btn--xs admin-btn--danger" onClick={() => void deleteFile(file.id)}>
+                        Xóa
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
       </SectionCard>
 
-      <SectionCard title="Bảng đo">
+      <SectionCard
+        title="Bảng đo"
+        actions={
+          !readOnly && (
+            <>
+              <MeasurementTemplateApplyButton
+                applyUrl={`/api/patterns/${patternId}/apply-measurement-template`}
+                onApplied={() => void load()}
+              />
+              <CopyFromTechPackButton patternId={patternId} onCopied={() => void load()} />
+            </>
+          )
+        }
+      >
         <TechPackMeasurementEditor
           measurements={pattern.measurements}
           readOnly={readOnly}
-          emptyText="Chưa có thông số đo. Thêm điểm đo hoặc áp dụng mẫu thông số."
+          emptyText="Chưa có bảng đo. Thêm điểm đo hoặc dán bảng từ Excel."
           saving={measurementSaving}
           fieldErrors={measurementFieldErrors}
           errorDetail={measurementErrorDetail}
+          showSaveButton={false}
+          onDraftChange={(rows) => saveMeasurements(rows)}
           onSave={(rows) => void saveMeasurements(rows)}
         />
       </SectionCard>

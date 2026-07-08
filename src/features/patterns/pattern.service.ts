@@ -8,6 +8,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { generatePatternCode } from "@/features/patterns/pattern-code";
 import type { PatternMeasurementInput } from "@/features/patterns/pattern-update-input";
+import { deleteR2Object } from "@/features/storage/r2/r2-production-file.service";
 
 export class PatternValidationError extends Error {
   constructor(
@@ -352,6 +353,9 @@ export async function deletePatternFile(patternId: string, fileId: string) {
   const file = await prisma.patternFile.findFirst({ where: { id: fileId, patternId } });
   if (!file) throw new PatternValidationError("Không tìm thấy file.");
   await prisma.patternFile.delete({ where: { id: fileId } });
+  if (file.r2ObjectKey) {
+    await deleteR2Object(file.r2ObjectKey);
+  }
   return { ok: true };
 }
 

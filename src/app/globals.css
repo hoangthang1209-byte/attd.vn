@@ -16674,6 +16674,39 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   font-size: 11px;
 }
 
+.admin-file-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.admin-file-card__placeholder {
+  display: grid;
+  min-height: 72px;
+  place-items: center;
+  padding: 10px;
+  border: 1px dashed var(--admin-border);
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  text-align: center;
+}
+
+.admin-file-card__meta {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.admin-file-card__type {
+  color: var(--admin-text);
+  font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .tech-pack-measurement-table th.pattern-measure-col-desc,
   .tech-pack-measurement-table td.pattern-measure-col-desc {

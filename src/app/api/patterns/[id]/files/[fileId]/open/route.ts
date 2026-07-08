@@ -11,7 +11,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (auth.error) return auth.error;
 
   const { id, fileId } = await context.params;
-
   const file = await prisma.patternFile.findFirst({
     where: { id: fileId, patternId: id },
     select: { r2ObjectKey: true, originalFileName: true, previewUrl: true, type: true, mimeType: true },
@@ -23,15 +22,16 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
   if (file.r2ObjectKey) {
     try {
+      const inlineAllowed = file.type === "PDF" || file.type === "IMAGE";
       const url = await getR2SignedAccessUrl(file.r2ObjectKey, {
-        disposition: "attachment",
+        disposition: inlineAllowed ? "inline" : "attachment",
         fileName: file.originalFileName ?? "pattern-file",
         mimeType: file.mimeType ?? "application/octet-stream",
       });
       return NextResponse.redirect(url);
     } catch (err) {
-      console.error("[GET /api/patterns/[id]/files/[fileId]/download]", err);
-      return NextResponse.json({ message: "Không thể tải file rập." }, { status: 503 });
+      console.error("[GET /api/patterns/[id]/files/[fileId]/open]", err);
+      return NextResponse.json({ message: "Không thể mở file rập." }, { status: 503 });
     }
   }
 
@@ -39,5 +39,5 @@ export async function GET(req: NextRequest, context: RouteContext) {
     return NextResponse.redirect(file.previewUrl);
   }
 
-  return NextResponse.json({ message: "Không thể tải file rập." }, { status: 404 });
+  return NextResponse.json({ message: "Không thể mở file rập." }, { status: 404 });
 }
