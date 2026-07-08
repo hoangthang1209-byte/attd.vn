@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatPricingCurrency, formatPricingPercent } from "@/features/pricing/format";
+import {
+  COST_LIBRARY,
+  COST_LIBRARY_CATEGORY_LABELS,
+  costLibraryCategoryToComponentType,
+  type CostLibraryCategory,
+} from "@/features/pricing/cost-library";
 import { COSTING_TEMPLATES } from "@/features/pricing/costing-templates";
 import type {
   CostingCalculatorResult,
@@ -81,6 +87,8 @@ export default function CostingCalculator() {
   const [targetMarginRate, setTargetMarginRate] = useState("35");
   const [vatRate, setVatRate] = useState("0");
   const [selectedTemplateKey, setSelectedTemplateKey] = useState(COSTING_TEMPLATES[0]?.key ?? "");
+  const [costLibrarySearch, setCostLibrarySearch] = useState("");
+  const [costLibraryCategory, setCostLibraryCategory] = useState<CostLibraryCategory | "ALL">("ALL");
   const [leadId, setLeadId] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [contactId, setContactId] = useState("");
@@ -106,6 +114,15 @@ export default function CostingCalculator() {
     () => COSTING_TEMPLATES.find((template) => template.key === selectedTemplateKey) ?? null,
     [selectedTemplateKey],
   );
+
+  const filteredCostLibrary = useMemo(() => {
+    const query = costLibrarySearch.trim().toLocaleLowerCase("vi-VN");
+    return COST_LIBRARY.filter((item) => {
+      if (costLibraryCategory !== "ALL" && item.category !== costLibraryCategory) return false;
+      if (!query) return true;
+      return item.name.toLocaleLowerCase("vi-VN").includes(query);
+    });
+  }, [costLibraryCategory, costLibrarySearch]);
 
   useEffect(() => {
     void Promise.all([
@@ -213,6 +230,22 @@ export default function CostingCalculator() {
 
   function updateComponent(index: number, patch: Partial<ComponentRow>) {
     setComponents((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  function appendCostLibraryItem(itemId: string) {
+    const item = COST_LIBRARY.find((entry) => entry.id === itemId);
+    if (!item) return;
+    setComponents((prev) => [
+      ...prev,
+      {
+        label: item.name,
+        type: costLibraryCategoryToComponentType(item.category, item.name),
+        unitCost: String(item.defaultUnitCost),
+        totalCost: "",
+        quantityFactor: String(item.defaultQuantityFactor ?? 1),
+        note: item.defaultNote ?? item.description ?? "",
+      },
+    ]);
   }
 
   function applyTemplate() {
@@ -394,6 +427,72 @@ export default function CostingCalculator() {
             <input className="admin-input" type="number" min="0" value={ribCostPerUnit} onChange={(e) => setRibCostPerUnit(e.target.value)} />
           </div>
         </div>
+      </fieldset>
+
+      <fieldset className="admin-catalog-fieldset">
+        <legend>Thư viện chi phí</legend>
+        <p style={{ marginTop: 0 }}>
+          Chọn chi phí có sẵn để thêm nhanh vào bảng tính. Sales vẫn có thể chỉnh sửa sau khi áp dụng.
+        </p>
+        <div className="admin-seo-brief-form-grid">
+          <div className="admin-field">
+            <label className="admin-label">Danh mục</label>
+            <select
+              className="admin-input"
+              value={costLibraryCategory}
+              onChange={(e) => setCostLibraryCategory(e.target.value as CostLibraryCategory | "ALL")}
+            >
+              <option value="ALL">Tất cả</option>
+              {(Object.keys(COST_LIBRARY_CATEGORY_LABELS) as CostLibraryCategory[]).map((category) => (
+                <option key={category} value={category}>
+                  {COST_LIBRARY_CATEGORY_LABELS[category]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Tìm kiếm</label>
+            <input
+              className="admin-input"
+              value={costLibrarySearch}
+              onChange={(e) => setCostLibrarySearch(e.target.value)}
+              placeholder="Tìm theo tên chi phí..."
+            />
+          </div>
+        </div>
+        {filteredCostLibrary.length === 0 ? (
+          <p className="admin-field-hint" style={{ marginTop: 12 }}>Không tìm thấy chi phí phù hợp.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+            {filteredCostLibrary.map((item) => (
+              <div
+                key={item.id}
+                className="admin-catalog-variant-row"
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}
+              >
+                <div>
+                  <strong>{item.name}</strong>
+                  <p style={{ margin: "4px 0 0", color: "var(--admin-muted, #6b7280)" }}>
+                    {COST_LIBRARY_CATEGORY_LABELS[item.category]}
+                    {" · "}
+                    {formatPricingCurrency(item.defaultUnitCost)} / đơn vị
+                    {item.defaultNote ? ` · ${item.defaultNote}` : ""}
+                  </p>
+                  {item.description && (
+                    <p style={{ margin: "4px 0 0" }}>{item.description}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  onClick={() => appendCostLibraryItem(item.id)}
+                >
+                  + Thêm vào bảng tính
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </fieldset>
 
       <fieldset className="admin-catalog-fieldset">

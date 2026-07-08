@@ -222,3 +222,7 @@ Commercial-3 adds quantity break pricing as a non-ERP acceleration layer by reca
 ## Commercial-4 acceleration note
 
 Commercial-4 integrates Costing -> Quote Draft so quote items carry costing context (material/fabric, margin/overhead/VAT metadata) and preserve quantity breaks in snapshots for internal sales follow-up.
+
+## Commercial-5 acceleration note
+
+Commercial-5 introduced a reusable Cost Library layer to accelerate sales costing while keeping calculation logic unchanged.
