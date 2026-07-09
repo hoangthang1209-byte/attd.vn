@@ -1,4 +1,4 @@
-import { ProductionMaterialCategory } from "@prisma/client";
+import { PatternSourceType, ProductionMaterialCategory } from "@prisma/client";
 import { PatternValidationError } from "@/features/patterns/pattern.service";
 
 export type PatternMeasurementInput = {
@@ -19,6 +19,14 @@ export type PatternUpdateInput = {
   sizeRange?: string | null;
   gradingRule?: string | null;
   productionMaterialCategory?: ProductionMaterialCategory | null;
+  sourceType?: PatternSourceType | null;
+  sourceSupplier?: string | null;
+  sourceSupplierContact?: string | null;
+  sourcePhone?: string | null;
+  sourceEmail?: string | null;
+  customerId?: string | null;
+  customerNameSnapshot?: string | null;
+  sourceNotes?: string | null;
   notes?: string | null;
   measurements?: PatternMeasurementInput[];
 };
@@ -26,6 +34,7 @@ export type PatternUpdateInput = {
 const PRODUCTION_MATERIAL_CATEGORY_VALUES = new Set<string>(
   Object.values(ProductionMaterialCategory),
 );
+const PATTERN_SOURCE_TYPE_VALUES = new Set<string>(Object.values(PatternSourceType));
 const INVALID_NUMBER_MESSAGE = "Giá trị phải là số hợp lệ.";
 const DUPLICATE_MESSAGE = "Bảng đo có cột size hoặc điểm đo bị trùng.";
 
@@ -60,6 +69,18 @@ function parseProductionMaterialCategory(
     throw new PatternValidationError("Danh mục vật liệu sản xuất không hợp lệ.");
   }
   return value as ProductionMaterialCategory;
+}
+
+function parsePatternSourceType(value: unknown): PatternSourceType | null | undefined {
+  if (value === null || value === "") return null;
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !value.trim()) {
+    throw new PatternValidationError("Nguồn rập không hợp lệ.");
+  }
+  if (!PATTERN_SOURCE_TYPE_VALUES.has(value)) {
+    throw new PatternValidationError("Nguồn rập không hợp lệ.");
+  }
+  return value as PatternSourceType;
 }
 
 function normalizeMeasurementNumber(value: string): string | null {
@@ -180,6 +201,14 @@ export function parsePatternUpdateBody(body: unknown): PatternUpdateInput {
     sizeRange: nullableString(raw.sizeRange),
     gradingRule: nullableString(raw.gradingRule),
     productionMaterialCategory: parseProductionMaterialCategory(raw.productionMaterialCategory),
+    sourceType: parsePatternSourceType(raw.sourceType),
+    sourceSupplier: nullableString(raw.sourceSupplier),
+    sourceSupplierContact: nullableString(raw.sourceSupplierContact),
+    sourcePhone: nullableString(raw.sourcePhone),
+    sourceEmail: nullableString(raw.sourceEmail),
+    customerId: nullableString(raw.customerId),
+    customerNameSnapshot: nullableString(raw.customerNameSnapshot),
+    sourceNotes: nullableString(raw.sourceNotes),
     notes: nullableString(raw.notes),
     measurements: parseMeasurements(raw.measurements),
   };

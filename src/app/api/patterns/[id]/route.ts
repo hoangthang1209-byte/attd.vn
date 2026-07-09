@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import {
+  deletePattern,
   getPatternDetail,
   PatternValidationError,
   updatePattern,
@@ -288,5 +289,34 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       "PATTERN_MEASUREMENT_SAVE_FAILED",
       traceId,
     );
+  }
+}
+
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "tech-pack",
+    action: "delete",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
+  const auth = requireProductionUpdate(req);
+  if (auth.error) return auth.error;
+
+  const { id } = await context.params;
+  try {
+    const result = await deletePattern(id);
+    return NextResponse.json({
+      ok: true,
+      message: "Đã xóa rập.",
+      storageWarnings: result.storageWarnings,
+    });
+  } catch (err) {
+    if (err instanceof PatternValidationError) {
+      const status = err.code === "NOT_FOUND" ? 404 : 400;
+      return NextResponse.json({ message: err.message }, { status });
+    }
+    console.error("[DELETE /api/patterns/[id]]", err);
+    return NextResponse.json({ message: "Không thể xóa rập." }, { status: 500 });
   }
 }

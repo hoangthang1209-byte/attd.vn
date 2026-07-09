@@ -1,5 +1,6 @@
 import {
   PatternFileType,
+  PatternSourceType,
   PatternStatus,
   Prisma,
   ProductionMaterialCategory,
@@ -22,8 +23,9 @@ export class PatternValidationError extends Error {
 }
 
 const PATTERN_INCLUDE = {
-  productCategory: { select: { id: true, name: true } },
+  productCategory: { select: { id: true, name: true, parentId: true, skuCode: true } },
   product: { select: { id: true, name: true, productCode: true } },
+  customer: { select: { id: true, name: true, code: true } },
   files: { orderBy: { sortOrder: "asc" as const } },
   measurements: {
     orderBy: { sortOrder: "asc" as const },
@@ -48,6 +50,10 @@ export async function listPatterns(input?: {
     where.OR = [
       { code: { contains: q, mode: "insensitive" } },
       { name: { contains: q, mode: "insensitive" } },
+      { sourceSupplier: { contains: q, mode: "insensitive" } },
+      { customerNameSnapshot: { contains: q, mode: "insensitive" } },
+      { customer: { name: { contains: q, mode: "insensitive" } } },
+      { customer: { code: { contains: q, mode: "insensitive" } } },
     ];
   }
 
@@ -55,6 +61,7 @@ export async function listPatterns(input?: {
     where,
     include: {
       productCategory: { select: { id: true, name: true } },
+      customer: { select: { id: true, name: true, code: true } },
       _count: { select: { files: true, techPacks: true } },
     },
     orderBy: [{ updatedAt: "desc" }],
@@ -108,6 +115,14 @@ function buildPatternUpdateData(
     sizeRange: string | null;
     gradingRule: string | null;
     productionMaterialCategory: ProductionMaterialCategory | null;
+    sourceType: PatternSourceType | null;
+    sourceSupplier: string | null;
+    sourceSupplierContact: string | null;
+    sourcePhone: string | null;
+    sourceEmail: string | null;
+    customerId: string | null;
+    customerNameSnapshot: string | null;
+    sourceNotes: string | null;
     notes: string | null;
   }>,
 ): Prisma.PatternUncheckedUpdateInput {
@@ -127,6 +142,18 @@ function buildPatternUpdateData(
   if (input.productionMaterialCategory !== undefined) {
     data.productionMaterialCategory = input.productionMaterialCategory;
   }
+  if (input.sourceType !== undefined) data.sourceType = input.sourceType;
+  if (input.sourceSupplier !== undefined) data.sourceSupplier = input.sourceSupplier?.trim() || null;
+  if (input.sourceSupplierContact !== undefined) {
+    data.sourceSupplierContact = input.sourceSupplierContact?.trim() || null;
+  }
+  if (input.sourcePhone !== undefined) data.sourcePhone = input.sourcePhone?.trim() || null;
+  if (input.sourceEmail !== undefined) data.sourceEmail = input.sourceEmail?.trim() || null;
+  if (input.customerId !== undefined) data.customerId = input.customerId;
+  if (input.customerNameSnapshot !== undefined) {
+    data.customerNameSnapshot = input.customerNameSnapshot?.trim() || null;
+  }
+  if (input.sourceNotes !== undefined) data.sourceNotes = input.sourceNotes?.trim() || null;
   if (input.notes !== undefined) data.notes = input.notes?.trim() || null;
 
   return data;
@@ -204,6 +231,14 @@ export async function updatePattern(
     sizeRange: string | null;
     gradingRule: string | null;
     productionMaterialCategory: ProductionMaterialCategory | null;
+    sourceType: PatternSourceType | null;
+    sourceSupplier: string | null;
+    sourceSupplierContact: string | null;
+    sourcePhone: string | null;
+    sourceEmail: string | null;
+    customerId: string | null;
+    customerNameSnapshot: string | null;
+    sourceNotes: string | null;
     notes: string | null;
     measurements: PatternMeasurementInput[];
   }>,
@@ -289,6 +324,34 @@ export async function archivePattern(id: string) {
   });
 }
 
+export async function deletePattern(id: string): Promise<{
+  ok: true;
+  storageWarnings: string[];
+}> {
+  const pattern = await prisma.pattern.findUnique({
+    where: { id },
+    include: { files: { select: { r2ObjectKey: true, cloudinaryPublicId: true } } },
+  });
+  if (!pattern) throw new PatternValidationError("Không tìm thấy rập.", undefined, "NOT_FOUND");
+
+  const r2Keys = pattern.files
+    .map((file) => file.r2ObjectKey)
+    .filter((key): key is string => Boolean(key));
+
+  await prisma.pattern.delete({ where: { id } });
+
+  const storageWarnings: string[] = [];
+  for (const key of r2Keys) {
+    try {
+      await deleteR2Object(key);
+    } catch {
+      storageWarnings.push(key);
+    }
+  }
+
+  return { ok: true, storageWarnings };
+}
+
 export async function addPatternFile(
   patternId: string,
   input: {
@@ -300,6 +363,7 @@ export async function addPatternFile(
     previewUrl?: string | null;
     originalFileName?: string | null;
     mimeType?: string | null;
+    fileSizeBytes?: number | null;
     sortOrder?: number;
   },
 ) {
@@ -320,6 +384,7 @@ export async function addPatternFile(
       previewUrl: input.previewUrl || null,
       originalFileName: input.originalFileName || null,
       mimeType: input.mimeType || null,
+      fileSizeBytes: input.fileSizeBytes ?? null,
       sortOrder: input.sortOrder ?? 0,
     },
   });
@@ -354,7 +419,11 @@ export async function deletePatternFile(patternId: string, fileId: string) {
   if (!file) throw new PatternValidationError("Không tìm thấy file.");
   await prisma.patternFile.delete({ where: { id: fileId } });
   if (file.r2ObjectKey) {
-    await deleteR2Object(file.r2ObjectKey);
+    try {
+      await deleteR2Object(file.r2ObjectKey);
+    } catch {
+      // DB row removed; storage cleanup is best-effort.
+    }
   }
   return { ok: true };
 }

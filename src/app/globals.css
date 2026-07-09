@@ -25937,6 +25937,12 @@ body:has(.mp-header--v271) {
   background: #eef2f7; font-size: 11px; color: #475569;
 }
 .pattern-workspace__chip strong { font-size: 12px; color: #0f172a; font-weight: 700; }
+.pattern-workspace__chip-label { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.pattern-workspace__badge--source { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px; background: #ecfeff; font-size: 11px; font-weight: 600; color: #0f766e; }
+.pattern-workspace__measurement-lock-hint { margin: 0 0 8px; }
+.pattern-workspace__file-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pattern-workspace__file-submeta { font-size: 11px; color: #64748b; }
+.pattern-workspace__file-download-only { font-size: 11px; padding: 2px 0; }
 .pattern-workspace__chip-sizes { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-left: 2px; }
 
 .pattern-workspace__layout {
@@ -25984,6 +25990,28 @@ body:has(.mp-header--v271) {
   max-height: calc(100vh - 220px);
   min-height: min(68vh, 560px);
   overflow: auto;
+}
+.pattern-workspace__panel--measurements .tech-pack-measurement-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+  box-shadow: inset 0 -1px 0 #e2e8f0;
+}
+.pattern-workspace__panel--measurements .tech-pack-measurement-table td,
+.pattern-workspace__panel--measurements .tech-pack-measurement-table th {
+  padding: 3px 5px;
+  font-size: 12px;
+}
+.pattern-workspace__panel--measurements .tech-pack-measurement-table input {
+  padding: 2px 5px;
+  font-size: 12px;
+  min-height: 24px;
+}
+.pattern-workspace__panel--measurements .tech-pack-measurement-table input:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: -1px;
+  background: #fff;
 }
 .pattern-workspace__panel--measurements .tech-pack-measurement-toolbar {
   position: sticky;

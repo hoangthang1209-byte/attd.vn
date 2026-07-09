@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { PatternStatus } from "@prisma/client";
+import type { PatternSourceType, PatternStatus } from "@prisma/client";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
+import { formatPatternSourceLabel } from "@/features/patterns/pattern-source-labels";
 
 export type PatternPickerOption = {
   id: string;
@@ -11,7 +12,10 @@ export type PatternPickerOption = {
   version: number;
   baseSize: string | null;
   status: PatternStatus;
+  sourceType: PatternSourceType | null;
+  customerNameSnapshot: string | null;
   productCategory?: { name: string } | null;
+  customer?: { name: string; code: string } | null;
 };
 
 type Props = {
@@ -90,6 +94,12 @@ export default function PatternPicker({ value, onChange, disabled }: Props) {
                   <strong>{p.code}</strong> — {p.name}
                 </span>
                 <span className="pattern-picker__meta">
+                  {formatPatternSourceLabel(p.sourceType) && (
+                    <span>{formatPatternSourceLabel(p.sourceType)}</span>
+                  )}
+                  {(p.customer?.name ?? p.customerNameSnapshot) && (
+                    <span>{p.customer?.name ?? p.customerNameSnapshot}</span>
+                  )}
                   {p.productCategory?.name && <span>{p.productCategory.name}</span>}
                   {p.baseSize && <span>Base: {p.baseSize}</span>}
                   <PatternStatusBadge status={p.status} />

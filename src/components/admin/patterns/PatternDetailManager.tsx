@@ -10,9 +10,7 @@ import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityS
 import PrivateFileUploadZone from "@/components/admin/tech-pack/PrivateFileUploadZone";
 import {
   PATTERN_STATUS_LABELS,
-  PRIVATE_FILE_HINT,
 } from "@/features/tech-pack/tech-pack-labels";
-import type { PatternFileType, PatternStatus, ProductionMaterialCategory } from "@prisma/client";
 import {
   PRODUCTION_MATERIAL_CATEGORIES,
   PRODUCTION_MATERIAL_CATEGORY_LABELS,
@@ -20,7 +18,22 @@ import {
 import MeasurementTemplateApplyButton from "@/components/admin/tech-pack/MeasurementTemplateApplyButton";
 import TechPackMeasurementEditor from "@/components/admin/tech-pack/TechPackMeasurementEditor";
 import CopyFromTechPackButton from "@/components/admin/patterns/CopyFromTechPackButton";
-import { isPreviewableFile } from "@/features/tech-pack/tech-pack-file-validation";
+import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
+import ProductCategoryCascadingPicker from "@/components/admin/products/ProductCategoryCascadingPicker";
+import type { ProductCategoryPickerItem } from "@/features/categories/category-cascade-utils";
+import type { CrmCustomerRecord } from "@/features/crm/types";
+import {
+  formatPatternFileSize,
+  getPatternFileExtension,
+  patternFileIconLabel,
+  patternFilePreviewMode,
+} from "@/features/patterns/pattern-file-display";
+import {
+  formatPatternSourceBadge,
+  PATTERN_SOURCE_TYPES,
+  PATTERN_SOURCE_LABELS,
+} from "@/features/patterns/pattern-source-labels";
+import type { PatternFileType, PatternSourceType, PatternStatus, ProductionMaterialCategory } from "@prisma/client";
 import {
   PATTERN_ADMIN_LIST_PATH,
 } from "@/features/patterns/pattern-admin-routes";
@@ -36,8 +49,8 @@ type PatternFile = {
   title: string | null;
   previewUrl: string | null;
   originalFileName: string | null;
-  r2ObjectKey: string | null;
   mimeType?: string | null;
+  fileSizeBytes?: number | null;
   createdAt?: string;
 };
 
@@ -66,7 +79,16 @@ type PatternDetail = {
   createdBy: string | null;
   approvedBy: string | null;
   approvedAt: string | null;
+  sourceType: PatternSourceType | null;
+  sourceSupplier: string | null;
+  sourceSupplierContact: string | null;
+  sourcePhone: string | null;
+  sourceEmail: string | null;
+  customerId: string | null;
+  customerNameSnapshot: string | null;
+  sourceNotes: string | null;
   productCategory?: { id: string; name: string } | null;
+  customer?: { id: string; name: string; code: string } | null;
   product?: { id: string; name: string; productCode: string | null } | null;
   _count?: { techPacks: number };
   files: PatternFile[];
@@ -97,6 +119,13 @@ type PatternDraft = {
   sizeRange: string;
   gradingRule: string;
   productionMaterialCategory: string;
+  sourceType: string;
+  sourceSupplier: string;
+  sourceSupplierContact: string;
+  sourcePhone: string;
+  sourceEmail: string;
+  customerNameSnapshot: string;
+  sourceNotes: string;
   notes: string;
   measurements: MeasurementDraftRow;
 };
@@ -148,9 +177,77 @@ function createDraft(pattern: PatternDetail): PatternDraft {
     sizeRange: pattern.sizeRange ?? "",
     gradingRule: pattern.gradingRule ?? "",
     productionMaterialCategory: pattern.productionMaterialCategory ?? "",
+    sourceType: pattern.sourceType ?? "",
+    sourceSupplier: pattern.sourceSupplier ?? "",
+    sourceSupplierContact: pattern.sourceSupplierContact ?? "",
+    sourcePhone: pattern.sourcePhone ?? "",
+    sourceEmail: pattern.sourceEmail ?? "",
+    customerNameSnapshot: pattern.customerNameSnapshot ?? pattern.customer?.name ?? "",
+    sourceNotes: pattern.sourceNotes ?? "",
     notes: pattern.notes ?? "",
     measurements: measurementsToDraft(pattern.measurements),
   };
+}
+
+function customerFromPattern(pattern: PatternDetail): CrmCustomerRecord | null {
+  if (!pattern.customerId) return null;
+  if (pattern.customer) {
+    return {
+      id: pattern.customer.id,
+      code: pattern.customer.code,
+      name: pattern.customer.name,
+      type: "BUSINESS",
+      status: "ACTIVE",
+      legalName: null,
+      taxCode: null,
+      phone: null,
+      email: null,
+      website: null,
+      address: null,
+      province: null,
+      district: null,
+      provinceId: null,
+      wardId: null,
+      provinceNameSnapshot: null,
+      wardNameSnapshot: null,
+      addressLine1: null,
+      addressLine2: null,
+      note: null,
+      internalNote: null,
+      billingNote: null,
+      createdAt: "",
+      updatedAt: "",
+    };
+  }
+  if (pattern.customerNameSnapshot) {
+    return {
+      id: pattern.customerId,
+      code: "—",
+      name: pattern.customerNameSnapshot,
+      type: "BUSINESS",
+      status: "ACTIVE",
+      legalName: null,
+      taxCode: null,
+      phone: null,
+      email: null,
+      website: null,
+      address: null,
+      province: null,
+      district: null,
+      provinceId: null,
+      wardId: null,
+      provinceNameSnapshot: null,
+      wardNameSnapshot: null,
+      addressLine1: null,
+      addressLine2: null,
+      note: null,
+      internalNote: null,
+      billingNote: null,
+      createdAt: "",
+      updatedAt: "",
+    };
+  }
+  return null;
 }
 
 function stableJson(value: unknown): string {
@@ -242,7 +339,11 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     message?: string;
   } | null>(null);
   const [measurementSaving, setMeasurementSaving] = useState(false);
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [measurementEditing, setMeasurementEditing] = useState(false);
+  const [measurementBaseline, setMeasurementBaseline] = useState<MeasurementDraftRow | null>(null);
+  const [categories, setCategories] = useState<ProductCategoryPickerItem[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomerRecord | null>(null);
+  const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
   const [draft, setDraft] = useState<PatternDraft | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
@@ -258,13 +359,16 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         adminApiFetch("/api/categories"),
       ]);
       const data = (await patRes.json()) as PatternDetail & { message?: string };
-      const catData = (await catRes.json()) as Array<{ id: string; name: string }>;
+      const catData = (await catRes.json()) as ProductCategoryPickerItem[];
       if (!patRes.ok) throw new Error(data.message ?? "Không thể tải rập");
       setPattern(data);
       const nextDraft = createDraft(data);
       setDraft(nextDraft);
-      setSavedSnapshot(stableJson(nextDraft));
+      setSelectedCustomer(customerFromPattern(data));
+      setSavedSnapshot(stableJson({ ...nextDraft, customerId: data.customerId ?? "" }));
       setSaveStatus("saved");
+      setMeasurementEditing(false);
+      setMeasurementBaseline(null);
       setCategories(Array.isArray(catData) ? catData : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
@@ -279,8 +383,17 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
 
   const isDirty = useMemo(() => {
     if (!draft || !savedSnapshot) return false;
-    return stableJson(draft) !== savedSnapshot;
-  }, [draft, savedSnapshot]);
+    const snapshot = JSON.parse(savedSnapshot) as PatternDraft & { customerId?: string };
+    const current = {
+      ...draft,
+      customerId: selectedCustomer?.id ?? pattern?.customerId ?? "",
+    };
+    const baseline = {
+      ...snapshot,
+      customerId: snapshot.customerId ?? "",
+    };
+    return stableJson(current) !== stableJson(baseline);
+  }, [draft, savedSnapshot, selectedCustomer?.id, pattern?.customerId]);
 
   useEffect(() => {
     if (saveStatus === "saving") return;
@@ -342,6 +455,14 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       sizeRange: draft.sizeRange.trim() || null,
       gradingRule: draft.gradingRule.trim() || null,
       productionMaterialCategory: draft.productionMaterialCategory || null,
+      sourceType: draft.sourceType || null,
+      sourceSupplier: draft.sourceSupplier.trim() || null,
+      sourceSupplierContact: draft.sourceSupplierContact.trim() || null,
+      sourcePhone: draft.sourcePhone.trim() || null,
+      sourceEmail: draft.sourceEmail.trim() || null,
+      customerId: selectedCustomer?.id ?? null,
+      customerNameSnapshot: (selectedCustomer?.name ?? draft.customerNameSnapshot.trim()) || null,
+      sourceNotes: draft.sourceNotes.trim() || null,
       notes: draft.notes.trim() || null,
       measurements: draft.measurements,
     };
@@ -377,8 +498,11 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         const nextDraft = createDraft(body);
         setPattern(body);
         setDraft(nextDraft);
-        setSavedSnapshot(stableJson(nextDraft));
+        setSelectedCustomer(customerFromPattern(body));
+        setSavedSnapshot(stableJson({ ...nextDraft, customerId: body.customerId ?? "" }));
         setSaveStatus("saved");
+        setMeasurementEditing(false);
+        setMeasurementBaseline(null);
         setError(null);
         setMeasurementFieldErrors({});
         setMeasurementErrorDetail(null);
@@ -401,6 +525,50 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     values: Array<{ size: string; value: string }>;
   }>) {
     updateDraft({ measurements: rows });
+  }
+
+  function startMeasurementEdit() {
+    if (!draft) return;
+    setMeasurementBaseline(draft.measurements);
+    setMeasurementEditing(true);
+  }
+
+  function cancelMeasurementEdit() {
+    if (measurementBaseline) {
+      updateDraft({ measurements: measurementBaseline });
+    }
+    setMeasurementEditing(false);
+    setMeasurementBaseline(null);
+  }
+
+  function commitMeasurementTable() {
+    setMeasurementEditing(false);
+    setMeasurementBaseline(null);
+  }
+
+  async function deletePatternPermanently() {
+    if (!window.confirm("Xóa vĩnh viễn rập này cùng bảng đo và file? Hành động không thể hoàn tác.")) {
+      return;
+    }
+    const res = await fetch(`/api/patterns/${patternId}`, { method: "DELETE" });
+    const data = (await res.json()) as {
+      message?: string;
+      storageWarnings?: string[];
+    };
+    if (!res.ok) {
+      setError(data.message ?? "Không thể xóa rập.");
+      return;
+    }
+    if (data.storageWarnings?.length) {
+      setDeleteWarning(
+        "Đã xóa rập. Một số file trên kho lưu trữ có thể chưa được dọn sạch.",
+      );
+      window.setTimeout(() => {
+        window.location.href = PATTERN_ADMIN_LIST_PATH;
+      }, 1200);
+      return;
+    }
+    window.location.href = PATTERN_ADMIN_LIST_PATH;
   }
 
   async function approve() {
@@ -461,6 +629,12 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   const sizeChips = deriveSizeChips(draft.measurements, draft.baseSize);
   const measurementRowCount = draft.measurements.filter((row) => row.pointOfMeasure.trim()).length;
   const techPackCount = pattern._count?.techPacks ?? 0;
+  const sourceBadge = formatPatternSourceBadge(
+    (draft.sourceType as PatternSourceType) || pattern.sourceType,
+  );
+  const customerLabel =
+    selectedCustomer?.name ?? (draft.customerNameSnapshot.trim() || null);
+  const categoryLabel = pattern.productCategory?.name ?? "—";
 
   return (
     <AdminPageShell>
@@ -487,6 +661,11 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 <span className="pattern-workspace__badge pattern-workspace__badge--version">
                   v{draft.version || pattern.version}
                 </span>
+                {sourceBadge && (
+                  <span className="pattern-workspace__badge pattern-workspace__badge--source">
+                    {sourceBadge}
+                  </span>
+                )}
                 <span className={`admin-status-badge admin-status-badge--${saveStatusTone()}`}>
                   {saveStatusLabel()}
                 </span>
@@ -516,6 +695,15 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
               {!readOnly && (
                 <button
                   type="button"
+                  className="admin-btn admin-btn--xs admin-btn--danger"
+                  onClick={() => void deletePatternPermanently()}
+                >
+                  Xóa rập
+                </button>
+              )}
+              {!readOnly && (
+                <button
+                  type="button"
                   className="admin-btn admin-btn--primary admin-btn--xs"
                   disabled={!isDirty || saveStatus === "saving"}
                   onClick={() => void savePatternDraft()}
@@ -528,16 +716,44 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
 
           <div className="pattern-workspace__summary-chips">
             <span className="pattern-workspace__chip">
-              <strong>{measurementRowCount}</strong> điểm đo
+              <span className="pattern-workspace__chip-label">Rập</span>
+              <strong>{pattern.code}</strong>
             </span>
             <span className="pattern-workspace__chip">
-              <strong>{sizeChips.length}</strong> size
+              <span className="pattern-workspace__chip-label">Version</span>
+              <strong>v{draft.version || pattern.version}</strong>
             </span>
             <span className="pattern-workspace__chip">
-              <strong>{pattern.files.length}</strong> file
+              <span className="pattern-workspace__chip-label">Trạng thái</span>
+              <strong>{PATTERN_STATUS_LABELS[pattern.status]}</strong>
             </span>
             <span className="pattern-workspace__chip">
-              <strong>{techPackCount}</strong> Tech Pack
+              <span className="pattern-workspace__chip-label">Nguồn</span>
+              <strong>{sourceBadge ?? "—"}</strong>
+            </span>
+            <span className="pattern-workspace__chip">
+              <span className="pattern-workspace__chip-label">Khách hàng</span>
+              <strong>{customerLabel ?? "—"}</strong>
+            </span>
+            <span className="pattern-workspace__chip">
+              <span className="pattern-workspace__chip-label">Danh mục</span>
+              <strong>{categoryLabel}</strong>
+            </span>
+            <span className="pattern-workspace__chip">
+              <span className="pattern-workspace__chip-label">Điểm đo</span>
+              <strong>{measurementRowCount}</strong>
+            </span>
+            <span className="pattern-workspace__chip">
+              <span className="pattern-workspace__chip-label">Size</span>
+              <strong>{sizeChips.length}</strong>
+            </span>
+            <span className="pattern-workspace__chip">
+              <span className="pattern-workspace__chip-label">File</span>
+              <strong>{pattern.files.length}</strong>
+            </span>
+            <span className="pattern-workspace__chip">
+              <span className="pattern-workspace__chip-label">Tech Pack</span>
+              <strong>{techPackCount}</strong>
             </span>
             {sizeChips.length > 0 && (
               <span className="pattern-workspace__chip-sizes">
@@ -562,31 +778,66 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         </header>
 
         {error && <p className="admin-error">{error}</p>}
+        {deleteWarning && <p className="admin-kb-warning-list" role="status">{deleteWarning}</p>}
 
         <section className="pattern-workspace__panel pattern-workspace__panel--measurements admin-panel">
           <div className="pattern-workspace__panel-head">
             <h2 className="pattern-workspace__panel-title">Bảng thông số</h2>
-            {!readOnly && (
-              <div className="pattern-workspace__panel-actions">
-                <MeasurementTemplateApplyButton
-                  applyUrl={`/api/patterns/${patternId}/apply-measurement-template`}
-                  onApplied={() => void load()}
-                />
-                <CopyFromTechPackButton patternId={patternId} onCopied={() => void load()} />
-              </div>
-            )}
+            <div className="pattern-workspace__panel-actions">
+              {!readOnly && !measurementEditing && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--primary admin-btn--xs"
+                  onClick={startMeasurementEdit}
+                >
+                  Sửa bảng
+                </button>
+              )}
+              {!readOnly && measurementEditing && (
+                <>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--primary admin-btn--xs"
+                    onClick={commitMeasurementTable}
+                  >
+                    Lưu bảng
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--xs"
+                    onClick={cancelMeasurementEdit}
+                  >
+                    Huỷ
+                  </button>
+                </>
+              )}
+              {!readOnly && measurementEditing && (
+                <>
+                  <MeasurementTemplateApplyButton
+                    applyUrl={`/api/patterns/${patternId}/apply-measurement-template`}
+                    onApplied={() => void load()}
+                  />
+                  <CopyFromTechPackButton patternId={patternId} onCopied={() => void load()} />
+                </>
+              )}
+            </div>
           </div>
+          {!measurementEditing && !readOnly && (
+            <p className="admin-field-hint pattern-workspace__measurement-lock-hint">
+              Bảng đo đang ở chế độ xem. Bấm <strong>Sửa bảng</strong> để chỉnh sửa, sau đó <strong>Lưu</strong> ở header để ghi vào hệ thống.
+            </p>
+          )}
           <TechPackMeasurementEditor
             measurements={pattern.measurements}
-            readOnly={readOnly}
+            readOnly={readOnly || !measurementEditing}
             compactToolbar
-            emptyText="Chưa có bảng thông số. Thêm điểm đo hoặc dán bảng từ Excel."
+            emptyText="Chưa có bảng thông số. Bấm Sửa bảng để thêm điểm đo hoặc dán bảng từ Excel."
             saving={measurementSaving}
             fieldErrors={measurementFieldErrors}
             errorDetail={measurementErrorDetail}
             showSaveButton={false}
             onDraftChange={(rows) => saveMeasurements(rows)}
-            onSave={(rows) => void saveMeasurements(rows)}
+            onSave={(rows) => saveMeasurements(rows)}
           />
         </section>
 
@@ -623,17 +874,13 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
               </label>
               <label className="admin-field">
                 <span className="admin-field__label">Danh mục sản phẩm</span>
-                <select
-                  className="admin-select"
+                <ProductCategoryCascadingPicker
+                  categories={categories}
                   value={draft.productCategoryId}
                   disabled={readOnly}
-                  onChange={(e) => updateDraft({ productCategoryId: e.target.value })}
-                >
-                  <option value="">—</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  embedded
+                  onChange={(categoryId) => updateDraft({ productCategoryId: categoryId })}
+                />
               </label>
               <label className="admin-field">
                 <span className="admin-field__label">Danh mục vật liệu SX</span>
@@ -695,10 +942,94 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
           </section>
 
           <section className="pattern-workspace__panel admin-panel">
+            <h2 className="pattern-workspace__panel-title">Nguồn rập</h2>
+            <div className="pattern-workspace__info-grid admin-form-grid">
+              <label className="admin-field">
+                <span className="admin-field__label">Nguồn rập</span>
+                <select
+                  className="admin-select"
+                  value={draft.sourceType}
+                  disabled={readOnly}
+                  onChange={(e) => updateDraft({ sourceType: e.target.value })}
+                >
+                  <option value="">— Chọn nguồn —</option>
+                  {PATTERN_SOURCE_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {PATTERN_SOURCE_LABELS[type]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="admin-field">
+                <span className="admin-field__label">Nhà cung cấp / đối tác rập</span>
+                <input
+                  className="admin-input"
+                  value={draft.sourceSupplier}
+                  disabled={readOnly}
+                  onChange={(e) => updateDraft({ sourceSupplier: e.target.value })}
+                />
+              </label>
+              <label className="admin-field">
+                <span className="admin-field__label">Liên hệ</span>
+                <input
+                  className="admin-input"
+                  value={draft.sourceSupplierContact}
+                  disabled={readOnly}
+                  onChange={(e) => updateDraft({ sourceSupplierContact: e.target.value })}
+                />
+              </label>
+              <label className="admin-field">
+                <span className="admin-field__label">Điện thoại / Zalo</span>
+                <input
+                  className="admin-input"
+                  value={draft.sourcePhone}
+                  disabled={readOnly}
+                  onChange={(e) => updateDraft({ sourcePhone: e.target.value })}
+                />
+              </label>
+              <label className="admin-field">
+                <span className="admin-field__label">Email</span>
+                <input
+                  className="admin-input"
+                  type="email"
+                  value={draft.sourceEmail}
+                  disabled={readOnly}
+                  onChange={(e) => updateDraft({ sourceEmail: e.target.value })}
+                />
+              </label>
+              <div className="admin-field admin-field--full">
+                <CustomerSearchField
+                  value={selectedCustomer}
+                  disabled={readOnly}
+                  onSelect={(customer) => {
+                    setSelectedCustomer(customer);
+                    if (customer) {
+                      updateDraft({ customerNameSnapshot: customer.name });
+                    } else {
+                      updateDraft({ customerNameSnapshot: "" });
+                    }
+                  }}
+                />
+              </div>
+              <label className="admin-field admin-field--full">
+                <span className="admin-field__label">Ghi chú nguồn</span>
+                <textarea
+                  className="admin-textarea"
+                  value={draft.sourceNotes}
+                  disabled={readOnly}
+                  rows={2}
+                  onChange={(e) => updateDraft({ sourceNotes: e.target.value })}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="pattern-workspace__panel admin-panel">
             <h2 className="pattern-workspace__panel-title">File rập</h2>
             {!readOnly && (
               <PrivateFileUploadZone
-                label={uploading ? "Đang tải file..." : "Kéo thả hoặc chọn file"}
+                label={uploading ? "Đang tải file..." : "Kéo thả hoặc chọn nhiều file"}
+                multiple
                 onUpload={uploadFile}
               />
             )}
@@ -706,84 +1037,89 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
               <p className="admin-muted">Chưa có file.</p>
             ) : (
               <div className="pattern-workspace__file-list">
-                {pattern.files.map((file) => (
-                  <article key={file.id} className="pattern-workspace__file-card">
-                    <div className="pattern-workspace__file-card-top">
-                      {file.previewUrl && isPreviewableFile(file.type) ? (
-                        file.type === "PDF" ? (
-                          <span className="pattern-workspace__file-icon">PDF</span>
-                        ) : (
+                {pattern.files.map((file) => {
+                  const fileName = file.originalFileName ?? file.title ?? "—";
+                  const extension = getPatternFileExtension(fileName);
+                  const previewMode = patternFilePreviewMode(file.type, fileName, file.previewUrl);
+                  const canOpen = previewMode !== "download";
+                  return (
+                    <article key={file.id} className="pattern-workspace__file-card">
+                      <div className="pattern-workspace__file-card-top">
+                        {previewMode === "image" && file.previewUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={file.previewUrl}
-                            alt={file.title ?? file.originalFileName ?? "preview"}
+                            alt={fileName}
                             className="pattern-workspace__file-thumb"
                           />
-                        )
-                      ) : (
-                        <span className="pattern-workspace__file-icon">{file.type}</span>
-                      )}
-                      <div
-                        className="pattern-workspace__file-meta"
-                        title={file.r2ObjectKey ? PRIVATE_FILE_HINT : undefined}
-                      >
-                        <strong>{file.originalFileName ?? file.title ?? "—"}</strong>
-                        <span>
-                          {file.type}
-                          {file.createdAt ? ` · ${formatPatternDateTime(file.createdAt)}` : ""}
-                        </span>
+                        ) : (
+                          <span className="pattern-workspace__file-icon">
+                            {patternFileIconLabel(file.type, fileName)}
+                          </span>
+                        )}
+                        <div className="pattern-workspace__file-meta">
+                          <strong className="pattern-workspace__file-name">{fileName}</strong>
+                          <span className="pattern-workspace__file-submeta">
+                            {extension || file.type}
+                            {" · "}
+                            {formatPatternFileSize(file.fileSizeBytes)}
+                            {file.createdAt ? ` · ${formatPatternDateTime(file.createdAt)}` : ""}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="pattern-workspace__file-actions">
-                      <a
-                        className="admin-btn admin-btn--xs"
-                        href={`/api/patterns/${patternId}/files/${file.id}/open`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Xem
-                      </a>
-                      <a
-                        className="admin-btn admin-btn--xs"
-                        href={`/api/patterns/${patternId}/files/${file.id}/download`}
-                        title="Tải xuống"
-                        aria-label="Tải xuống"
-                      >
-                        ↓
-                      </a>
-                      {!readOnly && (
-                        <>
-                          <input
-                            ref={(el) => { fileInputRefs.current[file.id] = el; }}
-                            type="file"
-                            hidden
-                            onChange={(e) => {
-                              const nextFile = e.target.files?.[0];
-                              e.target.value = "";
-                              if (nextFile) void replaceFile(file.id, nextFile);
-                            }}
-                          />
-                          <button
-                            type="button"
+                      <div className="pattern-workspace__file-actions">
+                        {canOpen ? (
+                          <a
                             className="admin-btn admin-btn--xs"
-                            onClick={() => fileInputRefs.current[file.id]?.click()}
-                            title="Thay file"
+                            href={`/api/patterns/${patternId}/files/${file.id}/open`}
+                            target="_blank"
+                            rel="noreferrer"
                           >
-                            Thay
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--xs admin-btn--danger"
-                            onClick={() => void deleteFile(file.id)}
-                            title="Xóa"
-                          >
-                            Xóa
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </article>
-                ))}
+                            Xem
+                          </a>
+                        ) : (
+                          <span className="admin-field-hint pattern-workspace__file-download-only">
+                            Chỉ tải xuống
+                          </span>
+                        )}
+                        <a
+                          className="admin-btn admin-btn--xs"
+                          href={`/api/patterns/${patternId}/files/${file.id}/download`}
+                        >
+                          Tải xuống
+                        </a>
+                        {!readOnly && (
+                          <>
+                            <input
+                              ref={(el) => { fileInputRefs.current[file.id] = el; }}
+                              type="file"
+                              hidden
+                              onChange={(e) => {
+                                const nextFile = e.target.files?.[0];
+                                e.target.value = "";
+                                if (nextFile) void replaceFile(file.id, nextFile);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--xs"
+                              onClick={() => fileInputRefs.current[file.id]?.click()}
+                            >
+                              Thay
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--xs admin-btn--danger"
+                              onClick={() => void deleteFile(file.id)}
+                            >
+                              Xóa
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
           </section>

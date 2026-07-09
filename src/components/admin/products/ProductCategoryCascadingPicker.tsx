@@ -19,6 +19,7 @@ type Props = {
   onChange: (categoryId: string) => void;
   error?: string;
   disabled?: boolean;
+  embedded?: boolean;
   onClearError?: () => void;
 };
 
@@ -28,6 +29,7 @@ export default function ProductCategoryCascadingPicker({
   onChange,
   error,
   disabled = false,
+  embedded = false,
   onClearError,
 }: Props) {
   const initialSelection = useMemo(
@@ -97,21 +99,25 @@ export default function ProductCategoryCascadingPicker({
       aria-invalid={Boolean(error)}
     >
       <fieldset className="admin-product-category-picker__group">
-        <legend className="admin-label">
-          Danh mục sản phẩm <span className="admin-required">*</span>
-        </legend>
+        {!embedded && (
+          <legend className="admin-label">
+            Danh mục sản phẩm <span className="admin-required">*</span>
+          </legend>
+        )}
         <div className="admin-product-category-picker__steps">
           <div className="admin-field" data-field="category-parent">
-            <label className="admin-label" htmlFor="product-category-parent">
-              Loại sản phẩm
-            </label>
+            {!embedded && (
+              <label className="admin-label" htmlFor="product-category-parent">
+                Loại sản phẩm
+              </label>
+            )}
             <AdminSearchableSelect
               id="product-category-parent"
               value={parentId}
               onChange={handleParentChange}
               options={parentOptions}
-              placeholder="Chọn loại sản phẩm"
-              searchPlaceholder="Tìm loại sản phẩm…"
+              placeholder={embedded ? "Tìm danh mục sản phẩm..." : "Chọn loại sản phẩm"}
+              searchPlaceholder={embedded ? "Tìm danh mục sản phẩm..." : "Tìm loại sản phẩm…"}
               disabled={disabled}
               fallbackLabel={selectedParent ? formatProductCategoryOptionLabel(selectedParent) : undefined}
               className={fieldErrorInputClass(Boolean(error && !parentId))}
@@ -119,22 +125,30 @@ export default function ProductCategoryCascadingPicker({
           </div>
 
           <div className="admin-field" data-field="category-child">
-            <label className="admin-label" htmlFor="product-category-child">
-              Form dáng / Công dụng
-            </label>
+            {!embedded && (
+              <label className="admin-label" htmlFor="product-category-child">
+                Form dáng / Công dụng
+              </label>
+            )}
             <AdminSearchableSelect
               id="product-category-child"
               value={childId}
               onChange={handleChildChange}
               options={childOptions}
               placeholder={
-                parentId
-                  ? parentHasChildren
-                    ? "Chọn form dáng hoặc công dụng"
-                    : "Không có danh mục con — dùng loại sản phẩm đã chọn"
-                  : "Vui lòng chọn loại sản phẩm trước"
+                embedded
+                  ? parentId
+                    ? parentHasChildren
+                      ? "Chọn danh mục con (nếu có)"
+                      : "Không có danh mục con"
+                    : "Chọn loại sản phẩm trước"
+                  : parentId
+                    ? parentHasChildren
+                      ? "Chọn form dáng hoặc công dụng"
+                      : "Không có danh mục con — dùng loại sản phẩm đã chọn"
+                    : "Vui lòng chọn loại sản phẩm trước"
               }
-              searchPlaceholder="Tìm form dáng / công dụng…"
+              searchPlaceholder={embedded ? "Tìm danh mục sản phẩm..." : "Tìm form dáng / công dụng…"}
               disabled={disabled || !parentId || !parentHasChildren}
               emptyMessage={
                 parentId && !parentHasChildren

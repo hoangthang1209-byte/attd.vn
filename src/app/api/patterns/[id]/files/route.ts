@@ -104,6 +104,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
         previewUrl,
         originalFileName: file.name,
         mimeType: file.type || null,
+        fileSizeBytes: file.size,
       });
       return NextResponse.json(created, { status: 201 });
     }

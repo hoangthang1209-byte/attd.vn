@@ -370,6 +370,7 @@ model Customer {
   dealerCompanies      DealerCompany[]
   dealerRfqs           DealerRFQ[]
   salesOpportunities   SalesOpportunity[]
+  patterns             Pattern[]
 
   @@index([code])
   @@index([name])
@@ -3213,6 +3214,14 @@ enum PatternStatus {
   ARCHIVED
 }
 
+enum PatternSourceType {
+  INTERNAL
+  EXTERNAL_STUDIO
+  CUSTOMER
+  FACTORY
+  OTHER
+}
+
 enum PatternFileType {
   PLT
   DXF
@@ -3435,6 +3444,14 @@ model Pattern {
   gradingRule                String?                     @db.Text
   status                     PatternStatus               @default(DRAFT)
   productionMaterialCategory ProductionMaterialCategory?
+  sourceType                 PatternSourceType?
+  sourceSupplier             String?
+  sourceSupplierContact      String?
+  sourcePhone                String?
+  sourceEmail                String?
+  customerId                 String?
+  customerNameSnapshot       String?
+  sourceNotes                String?                     @db.Text
   notes                      String?                     @db.Text
   createdBy                  String?
   approvedBy                 String?
@@ -3444,13 +3461,16 @@ model Pattern {
 
   productCategory Category?            @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
   product         Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
+  customer        Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
   files           PatternFile[]
   measurements    PatternMeasurement[]
   techPacks       TechPack[]
 
   @@index([productCategoryId])
   @@index([productId])
+  @@index([customerId])
   @@index([status])
+  @@index([sourceType])
 }
 
 model PatternFile {
@@ -3464,6 +3484,7 @@ model PatternFile {
   previewUrl         String?
   originalFileName   String?
   mimeType           String?
+  fileSizeBytes      Int?
   sortOrder          Int             @default(0)
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt

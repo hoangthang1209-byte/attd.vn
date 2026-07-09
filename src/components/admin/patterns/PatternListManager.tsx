@@ -9,21 +9,34 @@ import {
   PageHeader,
 } from "@/components/admin/AdminUi";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
-import type { PatternStatus } from "@prisma/client";
+import type { PatternSourceType, PatternStatus } from "@prisma/client";
 import { patternAdminDetailPath } from "@/features/patterns/pattern-admin-routes";
+import { formatPatternSourceLabel } from "@/features/patterns/pattern-source-labels";
 
 type PatternRow = {
   id: string;
   code: string;
   name: string;
   version: number;
-  baseSize: string | null;
-  sizeRange: string | null;
   status: PatternStatus;
-  createdBy: string | null;
-  approvedBy: string | null;
+  sourceType: PatternSourceType | null;
+  sourceSupplier: string | null;
+  customerNameSnapshot: string | null;
+  updatedAt: string;
   productCategory?: { name: string } | null;
+  customer?: { name: string; code: string } | null;
+  _count?: { files: number; techPacks: number };
 };
+
+function formatPatternListDate(value: string): string {
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function PatternListManager() {
   const [items, setItems] = useState<PatternRow[]>([]);
@@ -89,7 +102,7 @@ export default function PatternListManager() {
       <div className="admin-data-toolbar" style={{ gap: 12, display: "flex", flexWrap: "wrap", marginBottom: 16 }}>
         <input
           className="admin-input"
-          placeholder="Tìm mã hoặc tên rập..."
+          placeholder="Tìm rập, khách hàng, nhà cung cấp..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void load()}
@@ -112,17 +125,19 @@ export default function PatternListManager() {
         <EmptyState title="Chưa có rập" description="Tạo rập đầu tiên để dùng trong Tech Pack." />
       ) : (
         <div className="admin-table-wrap">
-          <table className="admin-table">
+          <table className="admin-table admin-table--compact">
             <thead>
               <tr>
                 <th>Mã rập</th>
                 <th>Tên rập</th>
                 <th>Version</th>
-                <th>Base size</th>
-                <th>Size range</th>
                 <th>Trạng thái</th>
-                <th>Người tạo</th>
-                <th>Người duyệt</th>
+                <th>Nguồn</th>
+                <th>Khách hàng</th>
+                <th>Danh mục</th>
+                <th>File</th>
+                <th>Cập nhật</th>
+                <th>Tech Pack</th>
                 <th>Hành động</th>
               </tr>
             </thead>
@@ -132,13 +147,15 @@ export default function PatternListManager() {
                   <td>{row.code}</td>
                   <td>{row.name}</td>
                   <td>{row.version}</td>
-                  <td>{row.baseSize ?? "—"}</td>
-                  <td>{row.sizeRange ?? "—"}</td>
                   <td>
                     <PatternStatusBadge status={row.status} />
                   </td>
-                  <td>{row.createdBy ?? "—"}</td>
-                  <td>{row.approvedBy ?? "—"}</td>
+                  <td>{formatPatternSourceLabel(row.sourceType) ?? "—"}</td>
+                  <td>{row.customer?.name ?? row.customerNameSnapshot ?? "—"}</td>
+                  <td>{row.productCategory?.name ?? "—"}</td>
+                  <td>{row._count?.files ?? 0}</td>
+                  <td>{formatPatternListDate(row.updatedAt)}</td>
+                  <td>{row._count?.techPacks ?? 0}</td>
                   <td>
                     <Link href={patternAdminDetailPath(row.id)} className="admin-link">
                       Chi tiết
