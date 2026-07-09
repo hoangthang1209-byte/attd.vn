@@ -51,6 +51,7 @@ export const adminNavigationSections: AdminNavigationSection[] = [
         label: "Commercial Platform",
         items: [
           { label: "Pricing Engine", href: "/admin/pricing", status: "active", requiredPermissions: ["canAccessPricing"] },
+          { label: "Follow-up", href: "/admin/sales/follow-up", status: "active", requiredPermissions: ["canAccessQuotes"] },
           { label: "Pipeline bán hàng", href: "/admin/sales/pipeline", status: "active", requiredPermissions: ["canAccessQuotes"] },
           { label: "Báo giá", href: "/admin/quotes", status: "active", requiredPermissions: ["canAccessQuotes"] },
           { label: "Đơn hàng", href: "/admin/orders", status: "active", requiredPermissions: ["canViewOrders"] },

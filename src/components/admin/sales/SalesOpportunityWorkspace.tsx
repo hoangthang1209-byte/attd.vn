@@ -129,6 +129,23 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
     return SALES_OPPORTUNITY_PRIORITY_BADGE_CLASS[form.priority];
   }, [form]);
 
+  const followUpHeader = useMemo(() => {
+    if (!workspace?.opportunity.nextFollowUpAt || !form) return null;
+    if (form.stage === "WON" || form.stage === "LOST") return null;
+
+    const due = new Date(workspace.opportunity.nextFollowUpAt);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    return {
+      label: formatQuoteDateTime(workspace.opportunity.nextFollowUpAt),
+      isOverdue: due < todayStart,
+      isToday: due >= todayStart && due < todayEnd,
+    };
+  }, [workspace, form]);
+
   async function handleSave(event: React.FormEvent) {
     event.preventDefault();
     if (!form) return;
@@ -318,6 +335,17 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
               </select>
             </label>
           </div>
+
+          {followUpHeader && (
+            <div
+              className={`sales-opportunity-workspace__followup-chip${followUpHeader.isOverdue ? " is-overdue" : followUpHeader.isToday ? " is-today" : ""}`}
+            >
+              <span>Follow-up tiếp theo:</span>
+              <strong>{followUpHeader.label}</strong>
+              {followUpHeader.isOverdue ? <span>— Quá hạn</span> : followUpHeader.isToday ? <span>— Hôm nay</span> : null}
+              <Link href="/admin/sales/follow-up">Trung tâm Follow-up</Link>
+            </div>
+          )}
 
           <label className="admin-field">
             <span className="admin-field__label">Tiêu đề</span>
