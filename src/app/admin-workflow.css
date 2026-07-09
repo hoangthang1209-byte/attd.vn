@@ -201,6 +201,59 @@
   margin-top: 12px;
 }
 
+/* Temporary compatibility for existing OrderForm markup.
+   This gives workflow-heavy forms sticky totals/actions without changing API or data model. */
+.admin-panel:has(.admin-workflow-row) {
+  padding-bottom: 96px;
+}
+
+.admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(2) {
+  border-color: #dbeafe;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(2) > legend {
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) {
+  position: sticky;
+  bottom: 76px;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-color: #cbd5e1;
+  box-shadow: 0 -16px 42px rgba(15, 23, 42, 0.08);
+}
+
+.admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) .admin-catalog-variant-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) + p + div,
+.admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) + div {
+  position: sticky;
+  bottom: 0;
+  z-index: 25;
+  display: flex !important;
+  justify-content: flex-end;
+  gap: 10px !important;
+  margin: 0 -18px -18px !important;
+  padding: 14px 18px calc(14px + env(safe-area-inset-bottom, 0));
+  border-top: 1px solid #e2e8f0;
+  background: rgba(248, 250, 252, 0.94);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 -12px 32px rgba(15, 23, 42, 0.08);
+}
+
+.admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) + p + div .admin-btn--primary,
+.admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) + div .admin-btn--primary {
+  min-width: 148px;
+}
+
 @media (max-width: 1280px) {
   .admin-workflow-grid--order-line {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -229,5 +282,31 @@
   .admin-workflow-grid--order-line,
   .admin-workflow-grid--advanced {
     grid-template-columns: 1fr;
+  }
+
+  .admin-panel:has(.admin-workflow-row) {
+    padding-bottom: 84px;
+  }
+
+  .admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) {
+    position: static;
+    box-shadow: none;
+  }
+
+  .admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) .admin-catalog-variant-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) + p + div,
+  .admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) + div {
+    left: 0;
+    right: 0;
+    margin: 0 !important;
+    justify-content: stretch;
+  }
+
+  .admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) + p + div .admin-btn,
+  .admin-panel:has(.admin-workflow-row) > fieldset:nth-of-type(3) + div .admin-btn {
+    flex: 1 1 0;
   }
 }
