@@ -1,7 +1,8 @@
-import { generateBrandingIconResponse } from "@/lib/branding/favicon-metadata";
+import { createAttdIconImageResponse } from "@/lib/branding/generate-attd-icon";
 
-export const revalidate = 3600;
+export const size = { width: 180, height: 180 };
+export const contentType = "image/png";
 
 export default function AppleIcon() {
-  return generateBrandingIconResponse();
+  return createAttdIconImageResponse(180);
 }

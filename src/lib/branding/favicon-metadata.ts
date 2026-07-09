@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/seo";
 import type { BrandingSettingsData } from "@/features/settings/services/settings.service";
+import { createAttdIconImageResponse } from "@/lib/branding/generate-attd-icon";
 
-/** Next.js file-based icon route served at /icon (and /favicon.ico via rewrite). */
-export const DEFAULT_FAVICON_PATH = "/icon";
+/** Next.js file-based icon route served at /icon. */
+export const DEFAULT_FAVICON_PATH = "/icon/32";
+export const DEFAULT_APPLE_ICON_PATH = "/apple-icon";
+export const DEFAULT_FAVICON_ICO_PATH = "/favicon.ico";
+export const DEFAULT_WEB_MANIFEST_PATH = "/site.webmanifest";
 
 export type FaviconResolution = {
   faviconUrl: string | null;
@@ -34,7 +38,7 @@ export function resolveFaviconFromBranding(
   return {
     faviconUrl,
     brandingTable,
-    metadataSource: faviconUrl ? "BrandingSettings.faviconUrl" : "app/icon (default)",
+    metadataSource: faviconUrl ? "BrandingSettings.faviconUrl" : "ATTD brand icon (app/icon.tsx)",
     fallbackUsed,
     generatedIconUrl,
   };
@@ -42,15 +46,30 @@ export function resolveFaviconFromBranding(
 
 export function buildFaviconMetadata(
   branding: Pick<BrandingSettingsData, "faviconUrl">
-): Pick<Metadata, "icons"> {
-  const { faviconUrl } = resolveFaviconFromBranding(branding);
-  const iconHref = faviconUrl ? toAbsoluteAssetUrl(faviconUrl) : DEFAULT_FAVICON_PATH;
+): Pick<Metadata, "icons" | "manifest"> {
+  const faviconUrl = branding.faviconUrl?.trim() || null;
+
+  if (faviconUrl) {
+    const iconHref = toAbsoluteAssetUrl(faviconUrl);
+    return {
+      icons: {
+        icon: [{ url: iconHref, sizes: "any" }],
+        shortcut: iconHref,
+        apple: iconHref,
+      },
+    };
+  }
 
   return {
+    manifest: DEFAULT_WEB_MANIFEST_PATH,
     icons: {
-      icon: [{ url: iconHref, sizes: "any" }],
-      shortcut: iconHref,
-      apple: iconHref,
+      icon: [
+        { url: DEFAULT_FAVICON_PATH, sizes: "32x32", type: "image/png" },
+        { url: "/icon/192", sizes: "192x192", type: "image/png" },
+        { url: "/icon/512", sizes: "512x512", type: "image/png" },
+      ],
+      shortcut: DEFAULT_FAVICON_ICO_PATH,
+      apple: [{ url: DEFAULT_APPLE_ICON_PATH, sizes: "180x180", type: "image/png" }],
     },
   };
 }
@@ -85,20 +104,26 @@ export async function generateBrandingIconResponse(): Promise<Response> {
     if (cmsIcon) return cmsIcon;
   }
 
-  const fallback = await fetchIconResponse(`${SITE_URL}/attd-logo.svg`);
-  if (fallback) return fallback;
-
-  return new Response("Favicon unavailable", { status: 404 });
+  return createAttdIconImageResponse(32);
 }
 
 /** Expected link tags from metadata + file-based icon routes. */
 export function describeRenderedIconLinks(resolution: FaviconResolution): string[] {
-  const href = resolution.generatedIconUrl;
+  if (resolution.faviconUrl) {
+    const href = resolution.generatedIconUrl;
+    return [
+      `<link rel="icon" href="${href}" sizes="any" />`,
+      `<link rel="shortcut icon" href="${href}" />`,
+      `<link rel="apple-touch-icon" href="${href}" />`,
+    ];
+  }
+
   return [
-    `<link rel="icon" href="${href}" sizes="any" />`,
-    `<link rel="shortcut icon" href="${href}" />`,
-    `<link rel="apple-touch-icon" href="${href}" />`,
-    `<link rel="icon" href="${SITE_URL}${DEFAULT_FAVICON_PATH}" /> (app/icon.tsx)`,
-    `<link rel="icon" href="${SITE_URL}/favicon.ico" /> (app/favicon.ico/route.ts)`,
+    `<link rel="manifest" href="${SITE_URL}${DEFAULT_WEB_MANIFEST_PATH}" />`,
+    `<link rel="icon" href="${SITE_URL}${DEFAULT_FAVICON_PATH}" type="image/png" sizes="32x32" />`,
+    `<link rel="icon" href="${SITE_URL}/icon/192" type="image/png" sizes="192x192" />`,
+    `<link rel="icon" href="${SITE_URL}/icon/512" type="image/png" sizes="512x512" />`,
+    `<link rel="shortcut icon" href="${SITE_URL}${DEFAULT_FAVICON_ICO_PATH}" />`,
+    `<link rel="apple-touch-icon" href="${SITE_URL}${DEFAULT_APPLE_ICON_PATH}" sizes="180x180" />`,
   ];
 }

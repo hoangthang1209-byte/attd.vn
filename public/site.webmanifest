@@ -1,0 +1,19 @@
+{
+  "name": "ATTD",
+  "short_name": "ATTD",
+  "icons": [
+    {
+      "src": "/icon/192",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon/512",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#DC2626",
+  "background_color": "#ffffff",
+  "display": "standalone"
+}
