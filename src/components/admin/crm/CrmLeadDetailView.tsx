@@ -23,6 +23,7 @@ import {
 } from "@/features/crm/labels";
 import { formatCrmCurrency, formatCrmDateTime } from "@/features/crm/format";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { useAdminToast } from "@/hooks/useAdminToast";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import {
@@ -229,9 +230,15 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
               Ghi chú nội bộ
               <textarea className="admin-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
             </label>
-            <button type="button" className="admin-btn admin-btn--primary" disabled={saving} onClick={() => void saveUpdates()}>
-              {saving ? "Đang lưu..." : "Lưu thay đổi"}
-            </button>
+            <AdminLoadingButton
+              type="button"
+              variant="primary"
+              pending={saving}
+              pendingLabel="Đang lưu thông tin..."
+              onClick={() => void saveUpdates()}
+            >
+              Lưu thay đổi
+            </AdminLoadingButton>
           </div>
         </section>
 

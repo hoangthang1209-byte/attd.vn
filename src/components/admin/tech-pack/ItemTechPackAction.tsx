@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type Props = {
   orderItemId?: string;
@@ -62,14 +63,15 @@ export default function ItemTechPackAction({
 
   return (
     <div className="item-tech-pack-action">
-      <button
-        type="button"
-        className="admin-btn admin-btn--primary admin-btn--small"
-        disabled={loading}
+      <AdminLoadingButton
+        variant="primary"
+        size="small"
+        pending={loading}
+        pendingLabel="Đang tạo Tech Pack…"
         onClick={() => void createTechPack()}
       >
-        {loading ? "Đang tạo…" : "Tạo Tech Pack"}
-      </button>
+        Tạo Tech Pack
+      </AdminLoadingButton>
       {error && <p className="admin-error">{error}</p>}
     </div>
   );

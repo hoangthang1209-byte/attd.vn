@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 import ProductCategoryCascadingPicker from "@/components/admin/products/ProductCategoryCascadingPicker";
 import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { adminApiFetch, parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import { toSlug } from "@/lib/slug";
@@ -419,22 +420,27 @@ export default function ProductFastCreateWizard({ categories }: Props) {
           )}
 
           <div className="admin-fast-create__actions">
-            <button type="button" className="admin-button admin-button--primary" disabled={saving} onClick={() => void saveDraft(false)}>
+            <AdminLoadingButton
+              variant="primary"
+              pending={saving}
+              pendingLabel="Đang lưu nháp sản phẩm..."
+              onClick={() => void saveDraft(false)}
+            >
               Lưu nháp
-            </button>
+            </AdminLoadingButton>
             {!isNoVariantTemplate && (
-              <button
-                type="button"
-                className="admin-button"
-                disabled={saving || !skuMatrixAllowed}
+              <AdminLoadingButton
+                pending={saving}
+                pendingLabel="Đang lưu nháp sản phẩm..."
+                disabled={!skuMatrixAllowed}
                 onClick={() => void saveDraft(true)}
               >
                 Lưu nháp &amp; thêm biến thể
-              </button>
+              </AdminLoadingButton>
             )}
-            <button type="button" className="admin-button admin-button--ghost" disabled={saving} onClick={() => router.push("/admin/products")}>
+            <AdminLoadingButton variant="ghost" disabled={saving} onClick={() => router.push("/admin/products")}>
               Hủy
-            </button>
+            </AdminLoadingButton>
           </div>
         </section>
       )}

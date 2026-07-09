@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
+import { TableLoading } from "@/components/ui/loading/ContextLoading";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type ProductVariantRow = {
   id: string;
@@ -211,14 +213,14 @@ export default function ProductCatalogDashboard() {
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setExportOpen(true)}>
             Xuất dữ liệu
           </button>
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary"
+          <AdminLoadingButton
+            variant="secondary"
+            pending={seeding}
+            pendingLabel="Đang tạo dữ liệu mẫu..."
             onClick={() => void seedSampleData()}
-            disabled={seeding}
           >
-            {seeding ? "Đang tạo…" : "Tạo dữ liệu mẫu"}
-          </button>
+            Tạo dữ liệu mẫu
+          </AdminLoadingButton>
         </div>
         <div className="admin-catalog-toolbar-right">
           {selectedIds.size > 0 && (
@@ -273,7 +275,11 @@ export default function ProductCatalogDashboard() {
 
       {/* Table */}
       {loading ? (
-        <p className="admin-field-hint">Đang tải…</p>
+        <TableLoading
+          title="Đang tải danh sách sản phẩm..."
+          description="Hệ thống đang cập nhật dữ liệu catalog mới nhất."
+          tone="admin"
+        />
       ) : (
         <div className="admin-catalog-table-wrap">
           <table className="admin-catalog-table">

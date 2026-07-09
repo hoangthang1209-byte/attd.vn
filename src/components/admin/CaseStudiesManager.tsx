@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
 import CaseStudyEditModal from "@/components/admin/CaseStudyEditModal";
 
@@ -185,7 +186,7 @@ export default function CaseStudiesManager() {
       )}
 
       {loading ? (
-        <p className="admin-loading">Đang tải...</p>
+        <AdminLoadingState label="Đang tải dự án tiêu biểu…" />
       ) : studies.length === 0 ? (
         <div className="admin-empty-state">
           <p>Chưa có dự án tiêu biểu.</p>

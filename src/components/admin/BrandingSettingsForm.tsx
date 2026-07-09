@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export type BrandingFormState = {
   companyTagline: string;
@@ -218,13 +219,15 @@ export default function BrandingSettingsForm({ initial, readOnly = false }: Prop
         <p className={`admin-message admin-message--${message.type}`}>{message.text}</p>
       )}
 
-      <button
+      <AdminLoadingButton
         type="submit"
-        className="admin-btn admin-btn--primary"
+        variant="primary"
+        pending={loading}
+        pendingLabel="Đang lưu…"
         disabled={readOnly || loading}
       >
-        {loading ? "Đang lưu…" : "Lưu thay đổi"}
-      </button>
+        Lưu thay đổi
+      </AdminLoadingButton>
       </fieldset>
     </form>
   );

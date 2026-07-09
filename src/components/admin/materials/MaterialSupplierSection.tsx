@@ -6,6 +6,7 @@ import type { MaterialSupplierLinkRecord } from "@/features/materials/material-s
 import QuickAddMaterialSupplierModal from "@/components/admin/materials/QuickAddMaterialSupplierModal";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type Props = {
   materialId: string;
@@ -126,7 +127,7 @@ export default function MaterialSupplierSection({ materialId }: Props) {
     <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
       <legend>Nhà cung cấp</legend>
       {loading ? (
-        <p className="admin-field-hint">Đang tải…</p>
+        <AdminInlineLoader message="Đang tải nhà cung cấp liên kết…" />
       ) : (
         <>
           {links.length === 0 ? (

@@ -12,6 +12,7 @@ import VariantLifecycleDialog, {
 import VariantBulkDialogs, {
   type BulkDialogKind,
 } from "@/components/admin/products/VariantBulkDialogs";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { BulkVariantResult } from "@/features/products/product-variant-bulk.service";
 import type { VariantDependencySummary } from "@/features/products/product-variant-lifecycle.service";
 import {
@@ -530,14 +531,16 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
   function renderLegacyVariantActions(variant: MatrixVariantFormRow) {
     const isLoading = actionLoadingKey === variant.clientKey;
     return (
-      <button
-        type="button"
+      <AdminLoadingButton
+        variant="ghost"
+        size="xs"
         className="btn-tertiary btn-sm"
-        disabled={isLoading}
+        pending={isLoading}
+        pendingLabel="Đang xử lý..."
         onClick={() => void openLifecycleDialog(variant.clientKey)}
       >
-        {isLoading ? "…" : variant.id ? "Quản lý" : "Xóa khỏi danh sách"}
-      </button>
+        {variant.id ? "Quản lý" : "Xóa khỏi danh sách"}
+      </AdminLoadingButton>
     );
   }
 
@@ -700,14 +703,16 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
         )}
         <div className="admin-variant-matrix-actions">
           {productId ? (
-            <button
-              type="button"
+            <AdminLoadingButton
+              variant="primary"
               className="btn-primary"
-              disabled={generating || !matrixPreview.canGenerate}
+              pending={generating}
+              pendingLabel="Đang tạo tổ hợp biến thể..."
+              disabled={!matrixPreview.canGenerate}
               onClick={openMatrixConfirm}
             >
-              {generating ? "Đang tạo…" : "Tạo tổ hợp biến thể"}
-            </button>
+              Tạo tổ hợp biến thể
+            </AdminLoadingButton>
           ) : (
             <button
               type="button"

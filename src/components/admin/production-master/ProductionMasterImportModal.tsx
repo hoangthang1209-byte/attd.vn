@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type ImportPreviewAction = "CREATE" | "UPDATE" | "SKIP" | "ERROR";
 
@@ -132,9 +133,15 @@ export default function ProductionMasterImportModal({ importPath, open, onClose,
               <button type="button" className="admin-btn" onClick={handleClose}>
                 Đóng
               </button>
-              <button type="submit" className="admin-btn admin-btn--primary" disabled={!file || uploading}>
-                {uploading ? "Đang xử lý..." : "Xem trước dữ liệu"}
-              </button>
+              <AdminLoadingButton
+                type="submit"
+                variant="primary"
+                pending={uploading}
+                pendingLabel="Đang xử lý file nhập…"
+                disabled={!file || uploading}
+              >
+                Xem trước dữ liệu
+              </AdminLoadingButton>
             </div>
           </form>
         )}
@@ -178,14 +185,16 @@ export default function ProductionMasterImportModal({ importPath, open, onClose,
               <button type="button" className="admin-btn" onClick={() => setStep("upload")}>
                 Quay lại
               </button>
-              <button
+              <AdminLoadingButton
                 type="button"
-                className="admin-btn admin-btn--primary"
+                variant="primary"
+                pending={uploading}
+                pendingLabel="Đang nhập dữ liệu master…"
                 disabled={allErrors || uploading}
                 onClick={() => void handleCommit()}
               >
-                {uploading ? "Đang nhập..." : "Xác nhận nhập"}
-              </button>
+                Xác nhận nhập
+              </AdminLoadingButton>
             </div>
           </>
         )}

@@ -8,6 +8,7 @@ import {
   EmptyState,
   PageHeader,
 } from "@/components/admin/AdminUi";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { TechPackStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import TechPackSourceItemSelector from "@/components/admin/tech-pack/TechPackSourceItemSelector";
 import type { TechPackSourceItem } from "@/features/tech-pack/tech-pack.types";
@@ -286,13 +287,15 @@ export default function TechPackListManager() {
               <button type="button" className="admin-btn" onClick={() => setCreating(false)}>
                 Hủy
               </button>
-              <button
+              <AdminLoadingButton
                 type="submit"
-                className="admin-btn admin-btn--primary"
+                variant="primary"
+                pending={submitting}
+                pendingLabel="Đang tạo Tech Pack…"
                 disabled={submitting || (!advancedOpen && !selectedSource)}
               >
-                {submitting ? "Đang tạo…" : "Tạo Tech Pack"}
-              </button>
+                Tạo Tech Pack
+              </AdminLoadingButton>
             </div>
           </form>
         </div>

@@ -5,6 +5,7 @@ import type { MaterialType } from "@prisma/client";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import { MATERIAL_TYPE_LABELS, MATERIAL_TYPES } from "@/features/orders/production-pack-labels";
+import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import type { ProductMaterialRecord } from "@/features/products/product-material.types";
 
 type Props = {
@@ -185,7 +186,11 @@ export default function ProductMaterialSection({ productId }: Props) {
       )}
 
       {loading ? (
-        <p className="admin-field-hint">Đang tải…</p>
+        <TableLoading
+          title="Đang tải định mức..."
+          description="Hệ thống đang tải nguyên phụ liệu của sản phẩm."
+          tone="admin"
+        />
       ) : materials.length === 0 ? (
         <p className="admin-field-hint">Chưa có định mức nguyên phụ liệu.</p>
       ) : (

@@ -9,6 +9,7 @@ import {
   type WhatsAppAssistantAnalysis,
   type WhatsAppAssistantExtracted,
 } from "@/features/crm/whatsapp-assistant/types";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 const EXTRACTED_FIELDS = Object.keys(EMPTY_WHATSAPP_EXTRACTED) as Array<keyof WhatsAppAssistantExtracted>;
 
@@ -207,9 +208,9 @@ export default function WhatsAppAssistantWorkspace() {
         {leadMessage && <p className="admin-message admin-message--success">{leadMessage}</p>}
 
         <div className="admin-form-actions">
-          <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
-            {loading ? "Đang phân tích..." : "Phân tích bằng AI"}
-          </button>
+          <AdminLoadingButton type="submit" variant="primary" pending={loading} pendingLabel="Đang phân tích nội dung...">
+            Phân tích bằng AI
+          </AdminLoadingButton>
         </div>
       </form>
 
@@ -304,9 +305,15 @@ export default function WhatsAppAssistantWorkspace() {
           </section>
 
           <div className="admin-form-actions">
-            <button type="button" className="admin-btn admin-btn--primary" disabled={creatingLead} onClick={() => void createLead()}>
-              {creatingLead ? "Đang tạo Lead..." : "Tạo Lead CRM"}
-            </button>
+            <AdminLoadingButton
+              type="button"
+              variant="primary"
+              pending={creatingLead}
+              pendingLabel="Đang tạo lead CRM..."
+              onClick={() => void createLead()}
+            >
+              Tạo Lead CRM
+            </AdminLoadingButton>
           </div>
         </div>
       )}

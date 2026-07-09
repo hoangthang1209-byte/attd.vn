@@ -8,6 +8,8 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/admin/AdminUi";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import ProductionMasterSearchSelect from "@/components/admin/production-master/ProductionMasterSearchSelect";
 import type { MasterAdminConfig } from "@/components/admin/production-master/production-master-admin-config";
 
@@ -144,7 +146,7 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
       />
 
       {error && <p className="admin-error">{error}</p>}
-      {saving && <p className="admin-muted">Đang lưu...</p>}
+      {saving && <AdminInlineLoader message="Đang lưu dữ liệu master…" />}
 
       <SectionCard title="Thông tin hệ thống">
         <div className="admin-meta-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
@@ -328,14 +330,16 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
               <button type="button" className="admin-btn" onClick={() => setMergeOpen(false)}>
                 Hủy
               </button>
-              <button
+              <AdminLoadingButton
                 type="button"
-                className="admin-btn admin-btn--primary"
+                variant="primary"
+                pending={merging}
+                pendingLabel="Đang gộp dữ liệu master…"
                 disabled={!mergeTargetId || merging}
                 onClick={() => void handleMerge()}
               >
-                {merging ? "Đang gộp..." : "Xác nhận gộp"}
-              </button>
+                Xác nhận gộp
+              </AdminLoadingButton>
             </div>
           </div>
         </div>

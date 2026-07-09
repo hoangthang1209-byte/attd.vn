@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import AdminQuickCreateShell from "@/components/admin/AdminQuickCreateShell";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
@@ -103,9 +104,9 @@ export default function QuickAddProductionEmployeeModal({ open, onClose, onCreat
           <button type="button" className="admin-btn admin-btn--secondary" onClick={handleClose} disabled={pending}>
             Hủy
           </button>
-          <button type="submit" form={FORM_ID} className="admin-btn admin-btn--primary" disabled={pending}>
+          <AdminLoadingButton type="submit" form={FORM_ID} variant="primary" pending={pending} pendingLabel="Đang tạo nhân viên…">
             Tạo nhân viên
-          </button>
+          </AdminLoadingButton>
         </>
       }
     >

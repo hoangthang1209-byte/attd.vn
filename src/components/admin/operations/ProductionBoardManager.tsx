@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { OrderStatus } from "@prisma/client";
 import ProductionDetailPanel from "@/components/admin/operations/ProductionDetailPanel";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import ProductionSheetActions from "@/components/admin/orders/production-sheet/ProductionSheetActions";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import { formatOrderDate } from "@/features/orders/order-format";
@@ -334,7 +335,7 @@ export default function ProductionBoardManager() {
       {error && <p className="admin-error">{error}</p>}
 
       {loading ? (
-        <p className="admin-loading">Đang tải…</p>
+        <AdminLoadingState label="Đang tải bảng sản xuất…" />
       ) : orders.length === 0 ? (
         <div className="admin-empty-state"><p>Không có đơn hàng phù hợp</p></div>
       ) : (

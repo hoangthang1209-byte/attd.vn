@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import type { KnowledgeBaseCategoryRecord } from "@/features/knowledge-base/knowledge-base-types";
 import {
   getEntryStatusLabel,
@@ -59,6 +60,7 @@ export default function KnowledgeBaseBulkToolbar({ selectedIds, onChanged, onCle
     <div className="admin-kb-bulk-toolbar">
       <p className="admin-field-hint">Đã chọn {selectedIds.length} mục</p>
       <div className="admin-kb-bulk-toolbar-actions">
+        {loading && <AdminInlineLoader message="Đang xử lý hàng loạt…" />}
         <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" disabled={loading} onClick={() => void runBulk("verify")}>
           Kiểm chứng
         </button>

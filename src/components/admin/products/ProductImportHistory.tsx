@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SectionLoading, TableLoading } from "@/components/ui/loading/ContextLoading";
 
 type ProductImportJobSummary = {
   id: string;
@@ -122,7 +123,13 @@ export default function ProductImportHistory({ onRetryUpload, refreshKey = 0 }: 
   }
 
   if (loading) {
-    return <p className="admin-field-hint">Đang tải lịch sử…</p>;
+    return (
+      <TableLoading
+        title="Đang tải lịch sử nhập..."
+        description="Hệ thống đang tải các lần nhập file gần đây."
+        tone="admin"
+      />
+    );
   }
 
   if (jobs.length === 0) {
@@ -218,7 +225,13 @@ export default function ProductImportHistory({ onRetryUpload, refreshKey = 0 }: 
       {selectedId && (
         <div className="admin-catalog-fieldset" style={{ marginTop: 20 }}>
           <h3 className="admin-subtitle">Chi tiết import</h3>
-          {detailLoading && <p className="admin-field-hint">Đang tải…</p>}
+          {detailLoading && (
+            <SectionLoading
+              title="Đang tải chi tiết import..."
+              description="Hệ thống đang tải kết quả và thống kê của lần nhập này."
+              tone="admin"
+            />
+          )}
           {!detailLoading && detail && (
             <>
               <div className="admin-catalog-kpi-bar">

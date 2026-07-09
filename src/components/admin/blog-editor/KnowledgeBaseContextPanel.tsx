@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { KnowledgeContextEntry, KnowledgeContextResult } from "@/features/ai/ai-knowledge-context-builder";
 import KnowledgeBaseAiReadinessBadge from "@/components/admin/knowledge-base/KnowledgeBaseAiReadinessBadge";
 import type { KnowledgeAuditSnapshot } from "@/features/ai/ai-prompt-composer";
@@ -181,14 +182,16 @@ export default function KnowledgeBaseContextPanel({ keyword, onContextChange }: 
           placeholder="Nhập chủ đề để tìm ngữ cảnh…"
           onKeyDown={(e) => { if (e.key === "Enter") void search(searchQuery); }}
         />
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary admin-btn--small"
-          disabled={loading || !searchQuery.trim()}
+        <AdminLoadingButton
+          size="small"
+          variant="secondary"
+          pending={loading}
+          pendingLabel="Đang tìm ngữ cảnh…"
+          disabled={!searchQuery.trim()}
           onClick={() => void search(searchQuery)}
         >
-          {loading ? "Đang tìm…" : "Tìm ngữ cảnh"}
-        </button>
+          Tìm ngữ cảnh
+        </AdminLoadingButton>
       </div>
 
       {error && <p className="admin-kb-warning">{error}</p>}

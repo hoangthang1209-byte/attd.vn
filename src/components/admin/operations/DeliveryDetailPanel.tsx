@@ -6,6 +6,7 @@ import type { OrderStatus } from "@prisma/client";
 import AdminOpsSidePanel from "@/components/admin/operations/AdminOpsSidePanel";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
 import DeliveryCarrierSelect from "@/components/admin/orders/DeliveryCarrierSelect";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import type { DeliveryCarrierRecord } from "@/features/delivery/delivery-carrier.service";
 import type { DeliveryMethodRecord } from "@/features/delivery/delivery-method.service";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
@@ -253,7 +254,7 @@ export default function DeliveryDetailPanel({ orderId, onClose, onSaved }: Props
         </>
       }
     >
-      {loading && <p className="admin-loading">Đang tải…</p>}
+      {loading && <AdminInlineLoader message="Đang tải thông tin giao hàng…" />}
       {error && <p className="admin-error">{error}</p>}
       {order && readiness && (
         <>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import type { TechPackBomCategory } from "@prisma/client";
 import {
   TECH_PACK_BOM_CATEGORIES,
@@ -406,7 +407,7 @@ export default function TechPackBomEditor({
   return (
     <div className="tech-pack-bom-editor">
       {error && <p className="admin-error">{error}</p>}
-      {saving && <p className="admin-muted">Đang lưu BOM...</p>}
+      {saving && <AdminInlineLoader message="Đang lưu BOM…" />}
 
       <div className="tech-pack-bom-editor__toolbar">
         {!readOnly && (

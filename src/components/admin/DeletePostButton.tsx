@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 export default function DeletePostButton({ id }: { id: string }) {
   const router = useRouter();
@@ -48,7 +49,7 @@ export default function DeletePostButton({ id }: { id: string }) {
         opacity: loading ? 0.6 : 1,
       }}
     >
-      {loading ? "..." : "Xoá"}
+      {loading ? <ButtonLoading title="Đang xóa bài viết…" tone="admin" size="sm" /> : "Xoá"}
     </button>
   );
 }

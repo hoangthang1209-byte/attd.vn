@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type Props = {
   saving: boolean;
@@ -30,17 +31,17 @@ export default function KnowledgeBaseEditorNav({ saving, isDirty, onSave, onSave
       </div>
 
       <div className="admin-kb-editor-nav-bottom">
-        <button type="button" className="admin-btn admin-btn--primary" disabled={saving} onClick={() => void onSave()}>
-          {saving ? "Đang lưu…" : "Lưu"}
-        </button>
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary"
-          disabled={saving}
+        <AdminLoadingButton variant="primary" pending={saving} pendingLabel="Đang lưu mục…" onClick={() => void onSave()}>
+          Lưu
+        </AdminLoadingButton>
+        <AdminLoadingButton
+          variant="secondary"
+          pending={saving}
+          pendingLabel="Đang lưu mục…"
           onClick={() => void onSaveAndBack()}
         >
           Lưu & Quay lại
-        </button>
+        </AdminLoadingButton>
         <Link
           href="/admin/knowledge-base"
           className="admin-btn admin-btn--secondary"

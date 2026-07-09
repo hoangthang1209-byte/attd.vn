@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import BlogBlockAssistant from "@/components/admin/blog-editor/BlogBlockAssistant";
 import BlogEditorPreview from "@/components/admin/blog-editor/BlogEditorPreview";
 import BlogMobileActionBar from "@/components/admin/blog-editor/BlogMobileActionBar";
@@ -199,14 +200,14 @@ export default function BlogVisualModeEditor({ value, onChange }: BlogVisualMode
           >
             Insert SEO Template
           </button>
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary"
-            disabled={uploading}
+          <AdminLoadingButton
+            variant="secondary"
+            pending={uploading}
+            pendingLabel="Đang tải ảnh…"
             onClick={() => fileInputRef.current?.click()}
           >
-            {uploading ? "Đang tải ảnh..." : "Upload ảnh"}
-          </button>
+            Upload ảnh
+          </AdminLoadingButton>
         </div>
       </div>
 

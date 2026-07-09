@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { HomepageOemBannerConfig } from "@/features/home/homepage.types";
 import HomepageMediaAssetField from "@/components/admin/HomepageMediaAssetField";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type Props = {
   initial: HomepageOemBannerConfig;
@@ -96,9 +97,9 @@ export default function HomepageOemSettingsForm({ initial }: Props) {
 
       {message && <p className={message.type === "success" ? "admin-success" : "admin-error"}>{message.text}</p>}
 
-      <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
-        {loading ? "Đang lưu…" : "Lưu banner OEM"}
-      </button>
+      <AdminLoadingButton type="submit" variant="primary" pending={loading} pendingLabel="Đang lưu banner OEM...">
+        Lưu banner OEM
+      </AdminLoadingButton>
     </form>
   );
 }

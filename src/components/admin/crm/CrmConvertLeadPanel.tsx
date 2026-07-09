@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { CrmCustomerRecord } from "@/features/crm/types";
 import type { CrmLeadRecord } from "@/features/crm/types";
 import { displayLeadContactName } from "@/features/crm/labels";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
@@ -120,14 +122,15 @@ export default function CrmConvertLeadPanel({ lead, onDone, onError }: Props) {
             Tạo khách hàng mới từ thông tin công ty và liên hệ của lead{" "}
             <strong>{displayLeadContactName(lead)}</strong>.
           </p>
-          <button
+          <AdminLoadingButton
             type="button"
-            className="admin-btn admin-btn--primary"
-            disabled={submitting}
+            variant="primary"
+            pending={submitting}
+            pendingLabel="Đang tạo khách hàng..."
             onClick={() => void createNewCustomer()}
           >
-            {submitting ? "Đang xử lý..." : "Tạo khách hàng mới"}
-          </button>
+            Tạo khách hàng mới
+          </AdminLoadingButton>
         </div>
       ) : (
         <div className="admin-crm-convert-body">
@@ -143,7 +146,7 @@ export default function CrmConvertLeadPanel({ lead, onDone, onError }: Props) {
           </label>
 
           {loadingCustomers ? (
-            <p className="admin-loading">Đang tìm...</p>
+            <InlineLoading title="Đang tìm khách hàng..." tone="admin" />
           ) : customers.length === 0 ? (
             <p className="admin-empty-hint">Không tìm thấy khách hàng phù hợp</p>
           ) : (
@@ -184,14 +187,16 @@ export default function CrmConvertLeadPanel({ lead, onDone, onError }: Props) {
             </label>
           )}
 
-          <button
+          <AdminLoadingButton
             type="button"
-            className="admin-btn admin-btn--primary"
-            disabled={submitting || !selectedCustomerId}
+            variant="primary"
+            pending={submitting}
+            pendingLabel="Đang gắn khách hàng..."
+            disabled={!selectedCustomerId}
             onClick={() => void linkExistingCustomer()}
           >
-            {submitting ? "Đang gắn..." : "Gắn với khách hàng có sẵn"}
-          </button>
+            Gắn với khách hàng có sẵn
+          </AdminLoadingButton>
         </div>
       )}
     </section>

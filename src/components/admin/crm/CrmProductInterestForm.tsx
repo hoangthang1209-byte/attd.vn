@@ -10,6 +10,7 @@ import {
   createEmptyProductInterestRow,
   type CrmProductInterestRowState,
 } from "@/features/crm/product-interest-utils";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export function CrmProductInterestList({
   interests,
@@ -100,9 +101,9 @@ export default function CrmProductInterestForm({
     <form className="admin-form admin-form--compact" onSubmit={handleSubmit}>
       <CrmProductInterestFields row={row} products={products} onChange={setRow} />
       {error && <p className="admin-message admin-message--error">{error}</p>}
-      <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-        {saving ? "Đang lưu..." : "Thêm sản phẩm quan tâm"}
-      </button>
+      <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang thêm sản phẩm quan tâm...">
+        Thêm sản phẩm quan tâm
+      </AdminLoadingButton>
     </form>
   );
 }

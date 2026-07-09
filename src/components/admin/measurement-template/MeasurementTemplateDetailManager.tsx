@@ -8,6 +8,7 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/admin/AdminUi";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import TechPackMeasurementEditor from "@/components/admin/tech-pack/TechPackMeasurementEditor";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { adminApiFetch, parseAdminJsonResponse } from "@/lib/admin/adminMutation";
@@ -146,7 +147,7 @@ export default function MeasurementTemplateDetailManager({ templateId }: { templ
       />
 
       {error && <p className="admin-error">{error}</p>}
-      {saving && <p className="admin-muted">Đang lưu...</p>}
+      {saving && <AdminInlineLoader message="Đang lưu mẫu thông số…" />}
 
       <SectionCard title="Thông tin mẫu">
         <div className="admin-form-grid">

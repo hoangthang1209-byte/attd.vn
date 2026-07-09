@@ -3,6 +3,8 @@
 import { useEffect, useId, useRef } from "react";
 import type { VariantDependencySummary } from "@/features/products/product-variant-lifecycle.service";
 import { variantStatusLabel } from "@/features/products/product-variant-labels";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 
 export type VariantLifecycleDialogState = {
   open: boolean;
@@ -90,7 +92,9 @@ export default function VariantLifecycleDialog({ state, onClose, onConfirm }: Pr
               Trạng thái hiện tại: {variantStatusLabel(state.variantStatus)}
             </p>
           )}
-          {state.loading && <p className="admin-field-hint">Đang kiểm tra liên kết nghiệp vụ…</p>}
+          {state.loading && (
+            <InlineLoading title="Đang kiểm tra liên kết nghiệp vụ..." tone="admin" />
+          )}
           {state.error && (
             <p className="admin-field-error" role="alert">
               {state.error}
@@ -124,34 +128,39 @@ export default function VariantLifecycleDialog({ state, onClose, onConfirm }: Pr
             Hủy
           </button>
           {state.variantId && isInactive && (
-            <button
-              type="button"
+            <AdminLoadingButton
+              variant="primary"
               className="btn-primary"
-              disabled={state.loading || state.submitting}
+              pending={state.submitting}
+              pendingLabel="Đang kích hoạt lại..."
+              disabled={state.loading}
               onClick={() => onConfirm("restore")}
             >
-              {state.submitting ? "Đang xử lý…" : "Kích hoạt lại"}
-            </button>
+              Kích hoạt lại
+            </AdminLoadingButton>
           )}
           {state.variantId && !isInactive && (
-            <button
-              type="button"
+            <AdminLoadingButton
               className="btn-secondary"
-              disabled={state.loading || state.submitting}
+              pending={state.submitting}
+              pendingLabel="Đang ngừng sử dụng..."
+              disabled={state.loading}
               onClick={() => onConfirm("archive")}
             >
-              {state.submitting ? "Đang xử lý…" : "Ngừng sử dụng"}
-            </button>
+              Ngừng sử dụng
+            </AdminLoadingButton>
           )}
           {state.variantId && state.canHardDelete && !isInactive && (
-            <button
-              type="button"
+            <AdminLoadingButton
+              variant="primary"
               className="btn-primary"
-              disabled={state.loading || state.submitting}
+              pending={state.submitting}
+              pendingLabel="Đang xóa vĩnh viễn..."
+              disabled={state.loading}
               onClick={() => onConfirm("delete")}
             >
-              {state.submitting ? "Đang xử lý…" : "Xóa vĩnh viễn"}
-            </button>
+              Xóa vĩnh viễn
+            </AdminLoadingButton>
           )}
           {!state.variantId && (
             <button

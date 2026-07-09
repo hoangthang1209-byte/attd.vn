@@ -8,6 +8,7 @@ import {
   type CrmVariantOption,
   formatVariantLabel,
 } from "@/features/crm/product-interest-utils";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 
 type Props = {
   row: CrmProductInterestRowState;
@@ -90,25 +91,24 @@ export default function CrmProductInterestFields({
       {row.productId && (
         <label>
           Biến thể
-          <select
-            className="admin-input"
-            value={row.variantId}
-            onChange={(e) => patch({ variantId: e.target.value })}
-            disabled={loadingVariants}
-          >
-            <option value="">
-              {loadingVariants
-                ? "Đang tải biến thể..."
-                : variants.length === 0
-                  ? "Không có biến thể"
-                  : "Chọn biến thể"}
-            </option>
-            {variants.map((v) => (
-              <option key={v.id} value={v.id}>
-                {formatVariantLabel(v)}
+          {loadingVariants ? (
+            <InlineLoading title="Đang tải biến thể..." tone="admin" />
+          ) : (
+            <select
+              className="admin-input"
+              value={row.variantId}
+              onChange={(e) => patch({ variantId: e.target.value })}
+            >
+              <option value="">
+                {variants.length === 0 ? "Không có biến thể" : "Chọn biến thể"}
               </option>
-            ))}
-          </select>
+              {variants.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {formatVariantLabel(v)}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
       )}
 

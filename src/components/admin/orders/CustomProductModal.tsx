@@ -9,6 +9,7 @@ import type { ColorRecord } from "@/features/colors/color.service";
 import type { CategoryOption } from "@/components/admin/orders/QuickAddCategoryModal";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export type CustomProductResult = {
   productId: string;
@@ -195,9 +196,9 @@ export default function CustomProductModal({
           <button type="button" className="admin-btn admin-btn--secondary" onClick={handleClose} disabled={pending}>
             Hủy
           </button>
-          <button type="submit" form={FORM_ID} className="admin-btn admin-btn--primary" disabled={pending}>
-            {pending ? "Đang tạo…" : "Tạo sản phẩm"}
-          </button>
+          <AdminLoadingButton type="submit" form={FORM_ID} variant="primary" pending={pending} pendingLabel="Đang tạo sản phẩm…">
+            Tạo sản phẩm
+          </AdminLoadingButton>
         </>
       }
     >

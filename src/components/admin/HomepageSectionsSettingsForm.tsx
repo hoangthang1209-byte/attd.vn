@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { HomepageCmsConfig } from "@/features/home/homepage.types";
 
 type Props = {
@@ -80,9 +81,9 @@ export default function HomepageSectionsSettingsForm({ cms }: Props) {
 
       {message && <p className={message.type === "success" ? "admin-success" : "admin-error"}>{message.text}</p>}
 
-      <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
-        {loading ? "Đang lưu…" : "Lưu hiển thị trang chủ"}
-      </button>
+      <AdminLoadingButton type="submit" variant="primary" pending={loading} pendingLabel="Đang lưu hiển thị trang chủ...">
+        Lưu hiển thị trang chủ
+      </AdminLoadingButton>
     </form>
   );
 }

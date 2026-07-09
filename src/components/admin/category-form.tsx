@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 function toSlug(value: string): string {
   return value
@@ -281,7 +282,7 @@ export default function CategoryForm() {
           cursor: loading ? "not-allowed" : "pointer",
         }}
       >
-        {loading ? "Đang tạo..." : "Thêm danh mục"}
+        {loading ? <ButtonLoading title="Đang tạo danh mục…" tone="admin" /> : "Thêm danh mục"}
       </button>
     </form>
   );

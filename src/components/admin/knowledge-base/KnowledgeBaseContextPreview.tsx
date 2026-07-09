@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { KnowledgeBaseContextPreviewResult } from "@/features/knowledge-base/knowledge-base-types";
 import { KNOWLEDGE_USAGE_SCOPES } from "@/features/knowledge-base/knowledge-base-types";
 import type { ContentBlueprintId } from "@/features/blog/content-blueprints";
@@ -59,9 +60,9 @@ export default function KnowledgeBaseContextPreview() {
           <input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} />
           <span>Chỉ mục đã kiểm chứng</span>
         </label>
-        <button type="button" className="admin-btn admin-btn--primary" disabled={loading} onClick={() => void runPreview()}>
-          {loading ? "Đang tạo preview…" : "Xem preview"}
-        </button>
+        <AdminLoadingButton variant="primary" pending={loading} pendingLabel="Đang tạo preview…" onClick={() => void runPreview()}>
+          Xem preview
+        </AdminLoadingButton>
       </div>
 
       {preview && (

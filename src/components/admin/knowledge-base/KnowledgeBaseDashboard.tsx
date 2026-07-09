@@ -11,6 +11,7 @@ import KnowledgeBaseCategoryManager from "@/components/admin/knowledge-base/Know
 import KnowledgeBaseContextPreview from "@/components/admin/knowledge-base/KnowledgeBaseContextPreview";
 import KnowledgeBaseStarterImport from "@/components/admin/knowledge-base/KnowledgeBaseStarterImport";
 import KnowledgeBaseBulkToolbar from "@/components/admin/knowledge-base/KnowledgeBaseBulkToolbar";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 
 type TabId = "entries" | "categories" | "context" | "starter";
 
@@ -122,7 +123,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
               onClear={() => setSelectedIds([])}
             />
             {loading ? (
-              <p className="admin-loading">Đang tải…</p>
+              <AdminLoadingState label="Đang tải mục Knowledge Base…" />
             ) : entries.length === 0 ? (
               <KnowledgeBaseEmptyState onImported={load} />
             ) : (

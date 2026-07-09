@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { HomepageHeroConfig } from "@/features/home/homepage.types";
 
 type Props = {
@@ -86,9 +87,9 @@ export default function HomepageHeroSettingsForm({ initial }: Props) {
 
       {message && <p className={message.type === "success" ? "admin-success" : "admin-error"}>{message.text}</p>}
 
-      <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
-        {loading ? "Đang lưu…" : "Lưu hero"}
-      </button>
+      <AdminLoadingButton type="submit" variant="primary" pending={loading} pendingLabel="Đang lưu hero...">
+        Lưu hero
+      </AdminLoadingButton>
     </form>
   );
 }

@@ -19,6 +19,7 @@ import {
   optionValueFieldKey,
   resolveFieldError,
 } from "@/features/products/product-form-row-error-keys";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 
 export type OptionValueFormRow = {
   id?: string;
@@ -309,7 +310,9 @@ export default function ProductOptionGroupBuilder({
           Thuộc tính riêng chỉ dùng cho sản phẩm này và không xuất hiện trong danh mục thuộc tính chung.
         </p>
 
-        {sharedAttributesLoading && <p className="admin-field-hint">Đang tải thuộc tính dùng chung…</p>}
+        {sharedAttributesLoading && (
+          <InlineLoading title="Đang tải thuộc tính dùng chung..." tone="admin" />
+        )}
         {sharedAttributesError && <p className="admin-error" role="alert">{sharedAttributesError}</p>}
 
         {!sharedAttributesLoading && variantSharedAttributes.length === 0 && (

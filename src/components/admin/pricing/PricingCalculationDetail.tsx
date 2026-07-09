@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getPricingStatusLabel } from "@/features/pricing/labels";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import { formatPricingCurrency, formatPricingDateTime, formatPricingPercent } from "@/features/pricing/format";
 
 type CalculationDetail = {
@@ -62,7 +63,7 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminLoadingState label="Đang tải chi tiết bản tính…" />;
   if (error || !calc) {
     return (
       <div className="admin-empty-state admin-empty-state--error">

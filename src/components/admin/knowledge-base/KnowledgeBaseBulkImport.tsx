@@ -29,6 +29,8 @@ import {
   getEntryTypeLabel,
   getPriorityLabel,
 } from "@/features/knowledge-base/knowledge-base-utils";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import ImportTemplateSection from "@/components/admin/ImportTemplateSection";
 
 type Step = 1 | 2 | 3;
@@ -232,7 +234,7 @@ export default function KnowledgeBaseBulkImport() {
             />
           </div>
           {filename && <p className="admin-field-hint">Đã chọn: <strong>{filename}</strong></p>}
-          {loading && <p className="admin-loading">Đang đọc file…</p>}
+          {loading && <AdminInlineLoader message="Đang đọc file…" />}
         </div>
       )}
 
@@ -286,9 +288,9 @@ export default function KnowledgeBaseBulkImport() {
               />
               <span>Tự tạo danh mục mới nếu chưa tồn tại</span>
             </label>
-            <button type="button" className="admin-btn admin-btn--primary" disabled={loading} onClick={() => void runPreview()}>
-              {loading ? "Đang xử lý…" : "Xem trước dữ liệu"}
-            </button>
+            <AdminLoadingButton variant="primary" pending={loading} pendingLabel="Đang xử lý dữ liệu…" onClick={() => void runPreview()}>
+              Xem trước dữ liệu
+            </AdminLoadingButton>
           </div>
         </div>
       )}
@@ -442,14 +444,15 @@ export default function KnowledgeBaseBulkImport() {
           </div>
 
           {!result && (
-            <button
-              type="button"
-              className="admin-btn admin-btn--primary"
-              disabled={loading || !canExecute}
+            <AdminLoadingButton
+              variant="primary"
+              pending={loading}
+              pendingLabel="Đang import dữ liệu…"
+              disabled={!canExecute}
               onClick={() => void runImport()}
             >
-              {loading ? "Đang import…" : "Thực hiện import"}
-            </button>
+              Thực hiện import
+            </AdminLoadingButton>
           )}
         </div>
       )}

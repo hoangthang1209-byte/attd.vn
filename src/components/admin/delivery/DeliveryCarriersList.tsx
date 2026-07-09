@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { DeliveryCarrierRecord } from "@/features/delivery/delivery-carrier.service";
@@ -81,7 +82,7 @@ export default function DeliveryCarriersList() {
       </form>
 
       {error && <p className="admin-error">{error}</p>}
-      {loading && <p className="admin-loading">Đang tải...</p>}
+      {loading && <AdminLoadingState label="Đang tải đơn vị vận chuyển…" rows={3} />}
 
       {!loading && carriers.length === 0 && (
         <p className="admin-empty-state">Chưa có đơn vị vận chuyển.</p>

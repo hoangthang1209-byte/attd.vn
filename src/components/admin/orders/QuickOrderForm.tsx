@@ -46,6 +46,7 @@ import type { CrmContactRecord, CrmCustomerRecord } from "@/features/crm/types";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import "@/styles/quick-order-grid.css";
 
 type ProductStockVariant = {
@@ -750,14 +751,14 @@ export default function QuickOrderForm() {
           >
             Lưu nháp
           </button>
-          <button
-            type="button"
-            className="admin-btn admin-btn--primary"
-            disabled={submitting}
+          <AdminLoadingButton
+            variant="primary"
+            pending={submitting}
+            pendingLabel="Đang tạo đơn hàng…"
             onClick={() => void handleSubmit()}
           >
-            {submitting ? "Đang tạo đơn hàng…" : "Tạo đơn hàng"}
-          </button>
+            Tạo đơn hàng
+          </AdminLoadingButton>
           <Link href="/admin/orders/new" className="admin-btn admin-btn--ghost">
             Form chuẩn
           </Link>

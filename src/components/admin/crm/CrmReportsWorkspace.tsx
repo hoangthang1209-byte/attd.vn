@@ -5,8 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
-import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
-import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
+import { InlineLoading, PageLoading } from "@/components/ui/loading/ContextLoading";
 import AdminErrorRecovery from "@/components/admin/feedback/AdminErrorRecovery";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import { useAdminListQuery } from "@/hooks/useAdminListQuery";
@@ -197,8 +196,16 @@ export default function CrmReportsWorkspace() {
         </select>
       </form>
 
-      {query.refreshing && <AdminInlineLoader message="Đang cập nhật báo cáo…" />}
-      {query.loading && <AdminPageSkeleton />}
+      {query.refreshing && <InlineLoading title="Đang cập nhật báo cáo…" tone="admin" />}
+      {query.loading && (
+        <div className="admin-panel">
+          <PageLoading
+            title="Đang tải báo cáo CRM..."
+            description="Vui lòng chờ trong giây lát, hệ thống đang tải dữ liệu báo cáo."
+            tone="admin"
+          />
+        </div>
+      )}
       {query.error && !query.loading && (
         <AdminErrorRecovery message={query.error} onRetry={() => void query.reload()} />
       )}

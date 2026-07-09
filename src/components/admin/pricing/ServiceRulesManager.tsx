@@ -9,6 +9,8 @@ import {
   PRICING_SERVICE_TYPE_LABELS,
 } from "@/features/pricing/labels";
 import { formatPricingCurrency } from "@/features/pricing/format";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { PriceGroupRecord, ServicePriceRuleRecord } from "@/features/pricing/types";
 
 export default function ServiceRulesManager() {
@@ -154,13 +156,13 @@ export default function ServiceRulesManager() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>{saving ? "Đang lưu…" : "Lưu"}</button>
+            <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang lưu quy tắc…">Lưu</AdminLoadingButton>
             <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setShowForm(false)}>Hủy</button>
           </div>
         </form>
       )}
 
-      {loading ? <p className="admin-loading">Đang tải...</p> : (
+      {loading ? <AdminLoadingState label="Đang tải quy tắc dịch vụ…" /> : (
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>

@@ -9,6 +9,7 @@ import {
 } from "@/lib/analytics";
 import { CTA } from "@/lib/ctaConfig";
 import { TRUST_REASSURANCE_PRIVACY } from "@/lib/b2b-trust-v2-copy";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 
@@ -201,7 +202,11 @@ export default function ContactForm() {
         className="btn-primary lead-form-submit"
         disabled={formStatus === "loading"}
       >
-        {formStatus === "loading" ? "Đang gửi yêu cầu..." : "Gửi yêu cầu báo giá"}
+        {formStatus === "loading" ? (
+          <ButtonLoading title="Đang gửi yêu cầu…" tone="public" />
+        ) : (
+          "Gửi yêu cầu báo giá"
+        )}
       </button>
 
       <TrustReassuranceLine className="public-lead-form__reassurance">

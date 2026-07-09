@@ -15,6 +15,7 @@ import {
   CRM_CUSTOMER_TYPES,
   type CrmCustomerRecord,
 } from "@/features/crm/types";
+import { TableLoading } from "@/components/ui/loading/ContextLoading";
 
 type LoadState = "loading" | "error" | "empty" | "ready";
 
@@ -89,7 +90,13 @@ export default function CrmCustomersList() {
         </div>
       )}
 
-      {loadState === "loading" && <p className="admin-loading">Đang tải...</p>}
+      {loadState === "loading" && (
+        <TableLoading
+          title="Đang tải danh sách khách hàng..."
+          description="Hệ thống đang tải dữ liệu khách hàng theo bộ lọc hiện tại."
+          tone="admin"
+        />
+      )}
 
       {loadState !== "loading" && loadState !== "error" && (
         <form

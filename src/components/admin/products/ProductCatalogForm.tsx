@@ -12,6 +12,7 @@ import ProductCatalogSpecificationsSection, {
 import ProductCatalogContentSection, {
   type ProductCustomizationFormRow,
 } from "@/components/admin/products/ProductCatalogContentSection";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import ProductCatalogVariantsSection, {
   type ProductCatalogVariantsSectionHandle,
 } from "@/components/admin/products/ProductCatalogVariantsSection";
@@ -1396,9 +1397,14 @@ export default function ProductCatalogForm({
       {form.id && <ProductMaterialSection productId={form.id} />}
 
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <button type="submit" className="admin-btn admin-btn--primary" disabled={saving || bulkOpInProgress}>
-          {saving ? "Đang lưu…" : bulkOpInProgress ? "Đang cập nhật biến thể…" : form.id ? "Lưu thay đổi" : "Tạo sản phẩm"}
-        </button>
+        <AdminLoadingButton
+          type="submit"
+          variant="primary"
+          pending={saving || bulkOpInProgress}
+          pendingLabel={saving ? "Đang lưu sản phẩm..." : "Đang cập nhật biến thể..."}
+        >
+          {form.id ? "Lưu thay đổi" : "Tạo sản phẩm"}
+        </AdminLoadingButton>
         <button type="button" className="admin-btn admin-btn--secondary" onClick={() => router.push("/admin/products")}>
           Hủy
         </button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { formatPricingCurrency, formatPricingPercent } from "@/features/pricing/format";
 import {
   COST_LIBRARY,
@@ -744,15 +745,15 @@ export default function CostingCalculator() {
       </fieldset>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-        <button type="button" className="admin-btn admin-btn--primary" onClick={() => void postCosting("calculate")} disabled={loading || saving}>
-          {loading ? "Đang tính…" : "Tính costing"}
-        </button>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void postCosting("save")} disabled={loading || saving}>
-          {saving ? "Đang lưu…" : "Lưu bản tính"}
-        </button>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void postCosting("createQuote")} disabled={loading || saving}>
+        <AdminLoadingButton variant="primary" onClick={() => void postCosting("calculate")} pending={loading} pendingLabel="Đang tính costing…" disabled={saving}>
+          Tính costing
+        </AdminLoadingButton>
+        <AdminLoadingButton variant="secondary" onClick={() => void postCosting("save")} pending={saving} pendingLabel="Đang lưu bản tính…" disabled={loading}>
+          Lưu bản tính
+        </AdminLoadingButton>
+        <AdminLoadingButton variant="secondary" onClick={() => void postCosting("createQuote")} pending={saving} pendingLabel="Đang tạo báo giá…" disabled={loading}>
           Tạo báo giá nháp
-        </button>
+        </AdminLoadingButton>
       </div>
 
       <fieldset className="admin-catalog-fieldset">
@@ -768,14 +769,15 @@ export default function CostingCalculator() {
             />
           </div>
           <div className="admin-field">
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary"
+            <AdminLoadingButton
+              variant="secondary"
               onClick={() => void postQuantityBreaks()}
-              disabled={loading || saving || loadingBreaks}
+              pending={loadingBreaks}
+              pendingLabel="Đang tính bảng giá…"
+              disabled={loading || saving}
             >
-              {loadingBreaks ? "Đang tính bảng giá…" : "Tính bảng giá"}
-            </button>
+              Tính bảng giá
+            </AdminLoadingButton>
           </div>
         </div>
         <p style={{ marginTop: 10 }}>

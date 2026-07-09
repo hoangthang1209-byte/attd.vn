@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
 import AdminBackLink from "@/components/admin/AdminBackLink";
 import OrderCustomerPartyFields, {
   type OrderCustomerPartyValues,
@@ -453,7 +454,7 @@ export default function OrderForm({ mode, orderId }: Props) {
     });
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminPageSkeleton message="Đang tải đơn hàng…" />;
 
   return (
     <>

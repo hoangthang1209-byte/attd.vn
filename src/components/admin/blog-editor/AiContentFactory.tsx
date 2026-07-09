@@ -17,6 +17,8 @@ import type { SeoRecommendations } from "@/features/blog/seo-recommendations";
 import { generateSeoRecommendations } from "@/features/blog/seo-recommendations";
 import type { ClusterHandoffRequest } from "@/features/blog/cluster-handoff";
 import type { BlogCategoryRecord } from "@/features/blog/types";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { SectionLoading } from "@/components/ui/loading/ContextLoading";
 import KnowledgeBaseContextPanel, {
   type KnowledgeContextSelection,
 } from "@/components/admin/blog-editor/KnowledgeBaseContextPanel";
@@ -340,22 +342,25 @@ export default function AiContentFactory({
         </div>
 
         <div className="admin-ai-factory-primary-action">
-          <button
-            type="button"
-            className="admin-btn admin-btn--primary admin-ai-factory-cta"
-            disabled={isBusy}
+          <AdminLoadingButton
+            variant="primary"
+            className="admin-ai-factory-cta"
+            pending={loading === "complete"}
+            pendingLabel="Đang tạo bài viết…"
+            disabled={isBusy && loading !== "complete"}
             onClick={() => void handleGenerateComplete()}
           >
-            {loading === "complete" ? "Đang tạo bài viết…" : "🚀 Tạo bài viết hoàn chỉnh"}
-          </button>
+            🚀 Tạo bài viết hoàn chỉnh
+          </AdminLoadingButton>
         </div>
       </fieldset>
 
       {loading === "complete" && (
-        <div className="admin-ai-factory-loading" role="status" aria-live="polite">
-          <span className="admin-ai-factory-spinner" aria-hidden />
-          <span>Đang tạo bài viết…</span>
-        </div>
+        <SectionLoading
+          title="Đang tạo bài viết…"
+          description="AI đang soạn nội dung từ Knowledge Base và blueprint đã chọn."
+          tone="admin"
+        />
       )}
 
       {/* AI Audit Panel — shown after generation */}
@@ -460,30 +465,33 @@ export default function AiContentFactory({
           </div>
 
           <div className="admin-ai-factory-advanced-actions">
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary"
-              disabled={isBusy}
+            <AdminLoadingButton
+              variant="secondary"
+              pending={loading === "seo"}
+              pendingLabel="Đang tạo SEO…"
+              disabled={isBusy && loading !== "seo"}
               onClick={() => void handleGenerateSeo()}
             >
-              {loading === "seo" ? "Đang tạo…" : "Generate SEO"}
-            </button>
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary"
-              disabled={isBusy}
+              Generate SEO
+            </AdminLoadingButton>
+            <AdminLoadingButton
+              variant="secondary"
+              pending={loading === "faq"}
+              pendingLabel="Đang tạo FAQ…"
+              disabled={isBusy && loading !== "faq"}
               onClick={() => void handleGenerateFaq()}
             >
-              {loading === "faq" ? "Đang tạo…" : "Generate FAQ"}
-            </button>
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary"
-              disabled={isBusy}
+              Generate FAQ
+            </AdminLoadingButton>
+            <AdminLoadingButton
+              variant="secondary"
+              pending={loading === "tags"}
+              pendingLabel="Đang tạo tags…"
+              disabled={isBusy && loading !== "tags"}
               onClick={() => void handleGenerateTags()}
             >
-              {loading === "tags" ? "Đang tạo…" : "Generate Tags"}
-            </button>
+              Generate Tags
+            </AdminLoadingButton>
           </div>
 
           <details className="admin-ai-factory-prompts">

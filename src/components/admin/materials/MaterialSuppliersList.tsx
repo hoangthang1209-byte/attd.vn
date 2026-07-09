@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import SupplierMaterialsModal from "@/components/admin/materials/SupplierMaterialsModal";
@@ -86,7 +87,7 @@ export default function MaterialSuppliersList() {
       </form>
 
       {error && <p className="admin-error">{error}</p>}
-      {loading && <p className="admin-loading">Đang tải...</p>}
+      {loading && <AdminLoadingState label="Đang tải nhà cung cấp vật tư…" rows={3} />}
 
       {!loading && suppliers.length === 0 && (
         <p className="admin-empty-state">Chưa có nhà cung cấp.</p>

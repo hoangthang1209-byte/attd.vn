@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 import { trackDealerFormSubmitAttempt, trackGenerateLead } from "@/lib/analytics";
 import { getAttribution } from "@/lib/attribution";
 import { CTA } from "@/lib/ctaConfig";
@@ -247,8 +248,13 @@ export default function DealerLeadForm({
         type="submit"
         className="btn-primary lead-form-submit"
         disabled={formStatus === "loading"}
+        aria-busy={formStatus === "loading" || undefined}
       >
-        {formStatus === "loading" ? "Đang gửi thông tin..." : submitLabel}
+        {formStatus === "loading" ? (
+          <ButtonLoading title="Đang gửi thông tin..." tone="public" />
+        ) : (
+          submitLabel
+        )}
       </button>
 
       {reassuranceText ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ClipboardEvent } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export type MeasurementRow = {
   clientKey: string;
@@ -433,9 +434,16 @@ export default function TechPackMeasurementEditor({
             {compactToolbar ? "Paste Excel" : "Dán từ Excel vào ô bất kỳ"}
           </span>
           {showSaveButton && (
-            <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={!canSave} onClick={commit}>
-              {saving ? "Đang lưu bảng đo…" : "Lưu bảng"}
-            </button>
+            <AdminLoadingButton
+              variant="primary"
+              size="xs"
+              pending={!!saving}
+              pendingLabel="Đang lưu bảng đo…"
+              disabled={!canSave}
+              onClick={commit}
+            >
+              Lưu bảng
+            </AdminLoadingButton>
           )}
           {sizeError && <span className="admin-error tech-pack-measurement-toolbar__error">{sizeError}</span>}
         </div>

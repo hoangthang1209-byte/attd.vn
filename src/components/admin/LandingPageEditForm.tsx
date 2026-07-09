@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { LandingPageFaqItem } from "@/features/landing-pages/types";
 
 type Props = {
@@ -210,13 +211,15 @@ export default function LandingPageEditForm({ slug, initial, readOnly = false }:
         <p className={`admin-message admin-message--${message.type}`}>{message.text}</p>
       )}
 
-      <button
+      <AdminLoadingButton
         type="submit"
-        className="admin-btn admin-btn--primary"
-        disabled={readOnly || loading}
+        variant="primary"
+        disabled={readOnly}
+        pending={loading}
+        pendingLabel="Đang lưu landing page…"
       >
-        {loading ? "Đang lưu…" : "Lưu thay đổi"}
-      </button>
+        Lưu thay đổi
+      </AdminLoadingButton>
     </form>
   );
 }

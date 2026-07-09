@@ -10,6 +10,7 @@ import {
   DEALER_RFQ_STATUSES,
   type DealerRFQRecord,
 } from "@/features/dealer/dealer-rfq.types";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import { formatCrmDateTime } from "@/features/crm/format";
 import type { CrmCustomerRecord } from "@/features/crm/types";
 
@@ -66,7 +67,7 @@ export default function DealerRfqDetailView({ rfqId }: DealerRfqDetailViewProps)
     if (res.ok) setCrmResults(Array.isArray(data.customers) ? data.customers : []);
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminLoadingState label="Đang tải chi tiết RFQ…" />;
   if (!rfq) return <p>Không tìm thấy RFQ.</p>;
 
   return (

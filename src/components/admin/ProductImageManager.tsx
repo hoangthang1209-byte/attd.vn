@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import {
   ALLOWED_IMAGE_EXTENSIONS,
   inferImageMimeType,
@@ -179,14 +180,16 @@ export default function ProductImageManager({ productId, images }: Props) {
                 className="admin-input"
               />
             </div>
-            <button
+            <AdminLoadingButton
               type="button"
-              onClick={handleUpload}
+              variant="primary"
+              pending={uploadStatus === "uploading"}
+              pendingLabel="Đang tải lên..."
               disabled={uploadStatus === "uploading"}
-              className="admin-btn admin-btn--primary"
+              onClick={handleUpload}
             >
-              {uploadStatus === "uploading" ? "Đang tải lên..." : "Tải lên"}
-            </button>
+              Tải lên
+            </AdminLoadingButton>
           </>
         )}
       </div>

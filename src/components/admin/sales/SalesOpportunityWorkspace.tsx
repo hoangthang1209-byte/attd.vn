@@ -10,6 +10,7 @@ import {
   EmptyState,
   PageHeader,
 } from "@/components/admin/AdminUi";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { CRM_ACTIVITY_TYPE_LABELS } from "@/features/crm/labels";
 import { CRM_ACTIVITY_TYPES } from "@/features/crm/types";
 import {
@@ -300,14 +301,15 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
             <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
               Làm mới
             </button>
-            <button
+            <AdminLoadingButton
               type="submit"
               form="sales-opportunity-workspace-form"
-              className="admin-btn admin-btn--primary"
-              disabled={saving}
+              variant="primary"
+              pending={saving}
+              pendingLabel="Đang lưu…"
             >
-              {saving ? "Đang lưu…" : "Lưu thay đổi"}
-            </button>
+              Lưu thay đổi
+            </AdminLoadingButton>
           </>
         }
       />
@@ -565,14 +567,17 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
                         : "Cần liên kết báo giá có dòng sản phẩm trước khi bàn giao."
                       : "Chỉ tạo đơn hàng nháp khi cơ hội đã thắng hoặc báo giá đã được chấp nhận."}
                   </p>
-                  <button
+                  <AdminLoadingButton
                     type="button"
-                    className="admin-btn admin-btn--primary admin-btn--small"
+                    size="small"
+                    variant="primary"
+                    pending={handoverCreating}
+                    pendingLabel="Đang tạo…"
                     disabled={!canCreateHandover || handoverCreating}
                     onClick={() => void handleCreateHandover()}
                   >
-                    {handoverCreating ? "Đang tạo…" : "Tạo đơn hàng nháp"}
-                  </button>
+                    Tạo đơn hàng nháp
+                  </AdminLoadingButton>
                 </>
               )}
             </section>
@@ -664,9 +669,9 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
                 onChange={(e) => setActivityForm((current) => ({ ...current, nextFollowUpAt: e.target.value }))}
               />
             </label>
-            <button type="submit" className="admin-btn admin-btn--secondary" disabled={activitySaving}>
-              {activitySaving ? "Đang ghi…" : "Ghi hoạt động"}
-            </button>
+            <AdminLoadingButton type="submit" variant="secondary" pending={activitySaving} pendingLabel="Đang ghi…">
+              Ghi hoạt động
+            </AdminLoadingButton>
           </form>
         </section>
       )}

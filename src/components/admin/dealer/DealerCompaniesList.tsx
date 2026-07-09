@@ -20,6 +20,7 @@ import {
   DEALER_LEVELS,
   type DealerCompanyRecord,
 } from "@/features/dealer/types";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import { formatCrmDateTime } from "@/features/crm/format";
 
 type LoadState = "loading" | "error" | "empty" | "ready";
@@ -92,7 +93,7 @@ export default function DealerCompaniesList() {
         </div>
       )}
 
-      {loadState === "loading" && <p className="admin-loading">Đang tải...</p>}
+      {loadState === "loading" && <AdminLoadingState label="Đang tải danh sách đại lý…" />}
 
       {loadState !== "loading" && loadState !== "error" && (
         <form

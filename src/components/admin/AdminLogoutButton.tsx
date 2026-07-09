@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export default function AdminLogoutButton() {
   const router = useRouter();
@@ -19,13 +20,16 @@ export default function AdminLogoutButton() {
   }
 
   return (
-    <button
+    <AdminLoadingButton
       type="button"
-      className="admin-btn admin-btn--secondary admin-btn--small admin-logout-btn"
-      disabled={loading}
+      variant="secondary"
+      size="small"
+      className="admin-logout-btn"
+      pending={loading}
+      pendingLabel="Đang đăng xuất…"
       onClick={() => void handleLogout()}
     >
-      {loading ? "Đang đăng xuất…" : "Đăng xuất"}
-    </button>
+      Đăng xuất
+    </AdminLoadingButton>
   );
 }

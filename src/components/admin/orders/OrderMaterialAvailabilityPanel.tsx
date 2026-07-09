@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { MaterialAvailabilityRow } from "@/features/materials/material-availability.service";
 import { useAdminMutation, useAdminAction } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type MaterialOption = {
   id: string;
@@ -134,7 +135,7 @@ export default function OrderMaterialAvailabilityPanel({ orderId }: Props) {
     });
   }
 
-  if (loading) return <p className="admin-field-hint">Đang tải khả dụng nguyên phụ liệu…</p>;
+  if (loading) return <AdminInlineLoader message="Đang tải khả dụng nguyên phụ liệu…" />;
 
   if (rows.length === 0) {
     return <p className="admin-field-hint">Chưa có dữ liệu nguyên phụ liệu cho đơn hàng này.</p>;

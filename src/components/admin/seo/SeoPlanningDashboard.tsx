@@ -24,6 +24,7 @@ import SeoPublishCalendar from "@/components/admin/seo/SeoPublishCalendar";
 import SeoClusterProgress from "@/components/admin/seo/SeoClusterProgress";
 import SeoInternalLinkCoverage from "@/components/admin/seo/SeoInternalLinkCoverage";
 import SeoPlanningRecommendations from "@/components/admin/seo/SeoPlanningRecommendations";
+import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
 
 type TabId = "board" | "calendar" | "progress" | "links" | "recommendations";
 
@@ -102,7 +103,7 @@ export default function SeoPlanningDashboard() {
   }, [selectedCampaign, selectedCluster]);
 
   if (loading) {
-    return <p className="admin-loading">Đang tải SEO Planning Board…</p>;
+    return <AdminPageSkeleton message="Đang tải SEO Planning Board…" />;
   }
 
   return (

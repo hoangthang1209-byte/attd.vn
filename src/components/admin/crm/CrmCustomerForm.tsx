@@ -13,6 +13,7 @@ import {
   CUSTOMER_TYPE_LABELS,
 } from "@/features/crm/labels";
 import { CRM_CUSTOMER_STATUSES, CRM_CUSTOMER_TYPES } from "@/features/crm/types";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 const emptyAddress: CrmAddressFieldValues = {
   provinceId: "",
@@ -211,9 +212,9 @@ export default function CrmCustomerForm() {
       {error && <p className="admin-message admin-message--error">{error}</p>}
 
       <div className="admin-form-actions">
-        <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-          {saving ? "Đang lưu..." : "Tạo khách hàng"}
-        </button>
+        <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang tạo khách hàng...">
+          Tạo khách hàng
+        </AdminLoadingButton>
       </div>
     </form>
   );

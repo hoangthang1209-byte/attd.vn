@@ -18,6 +18,8 @@ import { mapImportVariantStatusForDisplay } from "@/features/products/product-ca
 import ImportTemplateSection from "@/components/admin/ImportTemplateSection";
 import ProductImportHistory from "@/components/admin/products/ProductImportHistory";
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 
@@ -448,7 +450,9 @@ export default function ProductBulkImport() {
                       if (file) void handleFile(file);
                     }}
                   />
-                  {previewLoading && <p className="admin-field-hint">Đang đọc và kiểm tra tệp…</p>}
+                  {previewLoading && (
+                    <InlineLoading title="Đang đọc và kiểm tra tệp..." tone="admin" />
+                  )}
                 </div>
               </div>
             </>
@@ -564,9 +568,15 @@ export default function ProductBulkImport() {
               </div>
 
               <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
-                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void handleExecute()} disabled={executing || (preview.summary.invalid > 0 && !importValidRowsOnly)}>
-                  {executing ? "Đang nhập…" : "Thực hiện nhập"}
-                </button>
+                <AdminLoadingButton
+                  variant="primary"
+                  pending={executing}
+                  pendingLabel="Đang nhập dữ liệu..."
+                  disabled={preview.summary.invalid > 0 && !importValidRowsOnly}
+                  onClick={() => void handleExecute()}
+                >
+                  Thực hiện nhập
+                </AdminLoadingButton>
                 <button type="button" className="admin-btn admin-btn--secondary" onClick={reset}>Nhập tệp khác</button>
               </div>
             </div>

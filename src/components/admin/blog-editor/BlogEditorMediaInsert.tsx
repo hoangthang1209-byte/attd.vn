@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MediaAsset } from "@prisma/client";
 import type { StorageFolderKey } from "@/lib/storage/types";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 
 type BlogEditorMediaInsertProps = {
   folder?: StorageFolderKey;
@@ -84,7 +85,7 @@ export default function BlogEditorMediaInsert({
             </div>
 
             {loading ? (
-              <p className="admin-loading">Đang tải...</p>
+              <AdminLoadingState label="Đang tải thư viện ảnh…" rows={3} />
             ) : assets.length === 0 ? (
               <p className="admin-empty-state">Không có ảnh trong thư mục blog.</p>
             ) : (

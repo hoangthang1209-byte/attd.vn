@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import type { StorageFolderKey } from "@/lib/storage/types";
+import { CardGridLoading } from "@/components/ui/loading/ContextLoading";
 
 export type HomepageMediaValue = {
   mediaAssetId: string | null;
@@ -105,7 +106,12 @@ export default function HomepageMediaAssetField({
               </button>
             </div>
             {loading ? (
-              <p className="admin-field-hint">Đang tải…</p>
+              <CardGridLoading
+                title="Đang tải thư viện ảnh..."
+                description="Hệ thống đang tải danh sách ảnh từ media."
+                tone="admin"
+                cards={6}
+              />
             ) : (
               <div className="admin-media-grid admin-media-grid--picker">
                 {assets.map((asset) => (

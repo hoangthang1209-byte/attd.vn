@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
 import ClientLogoEditModal from "@/components/admin/ClientLogoEditModal";
 
@@ -194,7 +195,7 @@ export default function ClientLogosManager() {
       )}
 
       {loading ? (
-        <p className="admin-loading">Đang tải...</p>
+        <AdminLoadingState label="Đang tải logo khách hàng…" />
       ) : logos.length === 0 ? (
         <div className="admin-empty-state">
           <p>Chưa có logo khách hàng.</p>

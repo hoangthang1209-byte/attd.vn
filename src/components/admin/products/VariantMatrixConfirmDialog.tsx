@@ -1,5 +1,7 @@
 "use client";
 
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+
 type Props = {
   open: boolean;
   previewText: string;
@@ -90,9 +92,15 @@ export default function VariantMatrixConfirmDialog({
           <button type="button" className="btn-secondary" onClick={onCancel} disabled={submitting}>
             Hủy
           </button>
-          <button type="button" className="btn-primary" onClick={onConfirm} disabled={submitting}>
-            {submitting ? "Đang tạo…" : `Tạo ${missingCount} biến thể`}
-          </button>
+          <AdminLoadingButton
+            variant="primary"
+            className="btn-primary"
+            pending={submitting}
+            pendingLabel="Đang tạo biến thể..."
+            onClick={onConfirm}
+          >
+            {`Tạo ${missingCount} biến thể`}
+          </AdminLoadingButton>
         </div>
       </div>
     </div>

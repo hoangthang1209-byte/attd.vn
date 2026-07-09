@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type DiffItem = {
   section: string;
@@ -50,7 +51,7 @@ export default function TechPackReleaseDiffPanel({ techPackId }: Props) {
   return (
     <div className="tech-pack-release-diff">
       <h3 className="tech-pack-sidebar__title">Thay đổi so với bản phát hành trước</h3>
-      {loading && <p className="admin-muted">Đang tải...</p>}
+      {loading && <AdminInlineLoader message="Đang tải so sánh phiên bản…" />}
       {!loading && diff && !diff.hasPrevious && (
         <p className="admin-muted">{diff.message ?? "Chưa có bản phát hành trước để so sánh."}</p>
       )}

@@ -5,6 +5,7 @@ import { PRIVATE_FILE_HINT } from "@/features/tech-pack/tech-pack-labels";
 import AdminUploadProgress, {
   type AdminUploadFileItem,
 } from "@/components/admin/feedback/AdminUploadProgress";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 
 type Props = {
   label?: string;
@@ -114,7 +115,7 @@ export default function PrivateFileUploadZone({
         }}
       >
         <p className="tech-pack-upload-zone__label">
-          {uploading ? "Đang tải lên…" : label}
+          {uploading ? <InlineLoading title="Đang tải file lên…" tone="admin" /> : label}
         </p>
         <p className="tech-pack-upload-zone__hint">
           {multiple ? "Có thể chọn hoặc kéo thả nhiều file cùng lúc. " : ""}

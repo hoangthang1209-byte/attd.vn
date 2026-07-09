@@ -5,6 +5,7 @@ import MediaPicker from "@/components/admin/media/MediaPicker";
 import type { BulkBlockedItem } from "@/features/products/product-variant-bulk.service";
 import { VARIANT_STATUS_OPTIONS } from "@/features/products/product-variant-labels";
 import { isValidProductImageUrl, PRODUCT_IMAGE_URL_ERROR } from "@/features/products/product-image-url";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export type BulkDialogKind =
   | "status"
@@ -456,10 +457,12 @@ export default function VariantBulkDialogs({
               Xem trước
             </button>
           )}
-          <button
-            type="button"
+          <AdminLoadingButton
+            variant="primary"
             className="btn-primary"
-            disabled={submitting || persistedCount === 0}
+            pending={submitting}
+            pendingLabel="Đang áp dụng thay đổi..."
+            disabled={persistedCount === 0}
             onClick={() => {
               if (kind === "lifecycle") submitLifecycle();
               else if (kind === "status") submitStatus();
@@ -470,8 +473,8 @@ export default function VariantBulkDialogs({
               else if (kind === "image") submitImage();
             }}
           >
-            {submitting ? "Đang xử lý…" : "Áp dụng"}
-          </button>
+            Áp dụng
+          </AdminLoadingButton>
         </div>
       </div>
     </div>

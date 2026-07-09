@@ -5,6 +5,7 @@ import Link from "next/link";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
 import { formatOrderCurrency, formatOrderDate } from "@/features/orders/order-format";
 import type { OrderListRecord } from "@/features/orders/order.types";
+import { TableLoading } from "@/components/ui/loading/ContextLoading";
 
 type Props = {
   customerId?: string;
@@ -26,7 +27,11 @@ export default function CrmRelatedOrders({ customerId, leadId, title = "Đơn h�
       .finally(() => setLoading(false));
   }, [customerId, leadId]);
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) {
+    return (
+      <TableLoading title="Đang tải đơn hàng liên quan..." tone="admin" rows={3} />
+    );
+  }
   if (orders.length === 0) return null;
 
   return (

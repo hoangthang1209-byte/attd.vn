@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import { formatOrderDate } from "@/features/orders/order-format";
 import type { TechPackSourceItem } from "@/features/tech-pack/tech-pack.types";
 
@@ -50,7 +51,7 @@ export default function TechPackSourceItemSelector({ sourceType, selectedId, onS
           onChange={(e) => setQuery(e.target.value)}
         />
       </label>
-      {loading && <p className="admin-field-hint">Đang tìm…</p>}
+      {loading && <AdminInlineLoader message="Đang tìm nguồn dữ liệu…" />}
       <ul className="tech-pack-source-selector__list">
         {items.map((item) => (
           <li key={item.id}>

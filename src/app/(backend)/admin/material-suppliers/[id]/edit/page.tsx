@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import AdminSectionSkeleton from "@/components/admin/feedback/AdminSectionSkeleton";
 import MaterialSupplierForm from "@/components/admin/materials/MaterialSupplierForm";
 
 type Props = { params: Promise<{ id: string }> };
@@ -9,7 +10,7 @@ export default async function AdminMaterialSupplierEditPage({ params }: Props) {
   return (
     <>
       <AdminPageTitle title="Sửa nhà cung cấp NPL" />
-      <Suspense fallback={<p className="admin-field-hint">Đang tải…</p>}>
+      <Suspense fallback={<AdminSectionSkeleton message="Đang chuẩn bị form nhà cung cấp…" />}>
         <MaterialSupplierForm mode="edit" supplierId={id} />
       </Suspense>
     </>

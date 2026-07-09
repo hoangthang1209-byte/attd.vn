@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { DeliveryMethodRecord } from "@/features/delivery/delivery-method.service";
@@ -81,7 +82,7 @@ export default function DeliveryMethodsList() {
       </form>
 
       {error && <p className="admin-error">{error}</p>}
-      {loading && <p className="admin-loading">Đang tải...</p>}
+      {loading && <AdminLoadingState label="Đang tải phương thức giao hàng…" rows={3} />}
 
       {!loading && methods.length === 0 && (
         <p className="admin-empty-state">Chưa có hình thức giao hàng.</p>

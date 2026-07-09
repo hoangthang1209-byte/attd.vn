@@ -30,12 +30,20 @@ import { BLOG_POST_STATUSES, BLOG_STATUS_LABELS } from "@/features/blog/types";
 import type { BlogCategoryRecord, BlogFaqItem, BlogPostRecord } from "@/features/blog/types";
 import { canonicalUrl as buildCanonicalUrl } from "@/lib/seo";
 import { toSlug } from "@/lib/slug";
+import { SectionLoading } from "@/components/ui/loading/ContextLoading";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 const BlogVisualEditor = dynamic(
   () => import("@/components/admin/blog-editor/BlogVisualEditor"),
   {
     ssr: false,
-    loading: () => <p className="admin-loading">Đang tải editor...</p>,
+    loading: () => (
+      <SectionLoading
+        title="Đang tải trình soạn thảo…"
+        description="Hệ thống đang khởi tạo editor blog."
+        tone="admin"
+      />
+    ),
   }
 );
 
@@ -476,23 +484,23 @@ export default function BlogPostEditor(props: Props) {
               ))}
             </select>
             <div className="admin-form-actions admin-form-actions--stack">
-              <button
-                type="button"
-                className="admin-btn admin-btn--primary"
-                disabled={saving}
+              <AdminLoadingButton
+                variant="primary"
+                pending={saving}
+                pendingLabel="Đang lưu bài viết…"
                 onClick={() => void save()}
               >
-                {saving ? "Đang lưu..." : isEdit ? "Lưu" : "Tạo bài viết"}
-              </button>
+                {isEdit ? "Lưu" : "Tạo bài viết"}
+              </AdminLoadingButton>
               {isEdit && status !== "PUBLISHED" && (
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--secondary"
-                  disabled={saving}
+                <AdminLoadingButton
+                  variant="secondary"
+                  pending={saving}
+                  pendingLabel="Đang xuất bản…"
                   onClick={() => void save("PUBLISHED")}
                 >
                   Publish
-                </button>
+                </AdminLoadingButton>
               )}
               {publicArticlePath && (
                 <>

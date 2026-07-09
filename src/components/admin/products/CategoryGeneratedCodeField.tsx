@@ -2,6 +2,7 @@
 
 import { RefreshCw } from "lucide-react";
 import { CATEGORY_CODE_GENERATION_FAILED } from "@/features/categories/category-admin-constants";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 
 export type CategoryCodePreviewState = {
   code: string;
@@ -24,7 +25,7 @@ export function emptyCategoryCodePreview(): CategoryCodePreviewState {
 }
 
 export function statusMessage(preview: CategoryCodePreviewState): string | null {
-  if (preview.status === "loading") return "Đang tạo mã...";
+  if (preview.status === "loading") return null;
   if (preview.status === "error") return preview.message || CATEGORY_CODE_GENERATION_FAILED;
   if (preview.status === "available") {
     return preview.isPreview
@@ -84,15 +85,17 @@ export default function CategoryGeneratedCodeField({
           &quot;Tạo lại mã&quot;.
         </p>
       )}
-      {status && (
+      {preview.status === "loading" ? (
+        <InlineLoading title="Đang tạo mã..." tone="admin" className="admin-category-code-status" />
+      ) : status ? (
         <p
           className={`admin-category-code-status admin-category-code-status--${
-            preview.status === "error" ? "taken" : preview.status === "loading" ? "suggested" : "available"
+            preview.status === "error" ? "taken" : "available"
           }`}
         >
           {status}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

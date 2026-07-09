@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { EmployeeRole } from "@prisma/client";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import { EMPLOYEE_ROLES, EMPLOYEE_ROLE_LABELS } from "@/features/employees/employee-role";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
@@ -91,7 +92,7 @@ export default function EmployeeForm({ mode, employeeId }: Props) {
     });
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminLoadingState label="Đang tải nhân viên…" />;
 
   return (
     <form className="admin-panel" onSubmit={(e) => void handleSubmit(e)}>

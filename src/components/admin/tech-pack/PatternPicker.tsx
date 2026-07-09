@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import type { PatternSourceType, PatternStatus } from "@prisma/client";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import { formatPatternSourceLabel } from "@/features/patterns/pattern-source-labels";
@@ -89,7 +90,7 @@ export default function PatternPicker({ value, onChange, disabled }: Props) {
           onFocus={() => setOpen(true)}
           disabled={disabled}
         />
-        {loading && <span className="admin-field-hint">Đang tìm…</span>}
+        {loading && <AdminInlineLoader message="Đang tìm rập…" />}
       </div>
 
       {open && !disabled && patterns.length > 0 && (

@@ -13,6 +13,7 @@ import {
   rowHasProductInterestData,
   type CrmProductInterestRowState,
 } from "@/features/crm/product-interest-utils";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import {
   CRM_PRIORITY_LABELS,
   CRM_SOURCE_LABELS,
@@ -247,9 +248,9 @@ export default function CrmLeadForm() {
       {error && <p className="admin-message admin-message--error">{error}</p>}
 
       <div className="admin-form-actions">
-        <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-          {saving ? "Đang lưu..." : "Tạo lead"}
-        </button>
+        <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang tạo lead...">
+          Tạo lead
+        </AdminLoadingButton>
       </div>
     </form>
   );

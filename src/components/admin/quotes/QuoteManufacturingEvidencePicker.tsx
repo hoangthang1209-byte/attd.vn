@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { QuoteManufacturingEvidenceItem } from "@/features/quotes/types";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { SectionLoading } from "@/components/ui/loading/ContextLoading";
 
 type Props = {
   quoteId: string;
@@ -153,14 +155,16 @@ export default function QuoteManufacturingEvidencePicker({ quoteId }: Props) {
             Chọn 2-4 tài sản Manufacturing Library để đưa vào PDF báo giá.
           </p>
         </div>
-        <button
-          type="button"
-          className="admin-btn admin-btn--primary admin-btn--small"
+        <AdminLoadingButton
+          variant="primary"
+          size="small"
+          pending={saving}
+          pendingLabel="Đang lưu minh chứng…"
           onClick={() => void save()}
           disabled={saving || loading}
         >
-          {saving ? "Đang lưu..." : "Lưu minh chứng"}
-        </button>
+          Lưu minh chứng
+        </AdminLoadingButton>
       </div>
 
       {message ? (
@@ -170,7 +174,7 @@ export default function QuoteManufacturingEvidencePicker({ quoteId }: Props) {
       ) : null}
 
       {loading ? (
-        <p className="admin-loading">Đang tải minh chứng...</p>
+        <SectionLoading title="Đang tải minh chứng sản xuất…" description="Đang đồng bộ tài sản Manufacturing Library." tone="admin" />
       ) : (
         <>
           <div className="quote-manufacturing-picker__selected">

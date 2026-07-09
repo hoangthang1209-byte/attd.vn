@@ -13,6 +13,8 @@ import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { useAdminToast } from "@/hooks/useAdminToast";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import {
   downloadQuotePdfFromApi,
   quotePdfDownloadFilename,
@@ -210,7 +212,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
     }
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminPageSkeleton message="Đang tải báo giá…" />;
   if (error || !quote) {
     return (
       <div className="admin-empty-state admin-empty-state--error">
@@ -265,9 +267,9 @@ export default function QuoteDetailView({ id }: { id: string }) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Link href={`/admin/quotes/${id}/edit`} className="admin-btn admin-btn--secondary">Chỉnh sửa</Link>
           <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} aria-busy={busy} onClick={() => void duplicateQuote()}>Sao chép</button>
-          <button type="button" className="admin-btn admin-btn--secondary" disabled={pdfDownloading} onClick={() => void downloadPdf()}>
-            {pdfDownloading ? "Đang tạo PDF..." : "Tải PDF báo giá"}
-          </button>
+          <AdminLoadingButton variant="secondary" size="xs" pending={pdfDownloading} pendingLabel="Đang tạo PDF báo giá…" onClick={() => void downloadPdf()}>
+            Tải PDF báo giá
+          </AdminLoadingButton>
         </div>
       </div>
 
@@ -382,9 +384,9 @@ export default function QuoteDetailView({ id }: { id: string }) {
             >
               In / Lưu PDF
             </button>
-            <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={pdfDownloading} onClick={() => void downloadPdf()}>
-              {pdfDownloading ? "Đang tạo PDF..." : "Tải PDF báo giá"}
-            </button>
+            <AdminLoadingButton variant="primary" size="xs" pending={pdfDownloading} pendingLabel="Đang tạo PDF báo giá…" onClick={() => void downloadPdf()}>
+              Tải PDF báo giá
+            </AdminLoadingButton>
           </div>
         ) : (
           <p className="admin-field-hint">Liên kết sẽ được tạo khi gửi báo giá.</p>
@@ -401,15 +403,14 @@ export default function QuoteDetailView({ id }: { id: string }) {
             Đơn hàng {quote.order.orderNo}
           </Link>
         ) : quote.status === "ACCEPTED" ? (
-          <button
-            type="button"
-            className="admin-btn admin-btn--primary"
-            disabled={busy}
-            aria-busy={busy}
+          <AdminLoadingButton
+            variant="primary"
+            pending={busy}
+            pendingLabel="Đang tạo đơn hàng…"
             onClick={() => void convertToOrder()}
           >
-            {busy ? "Đang tạo đơn..." : "Tạo đơn hàng"}
-          </button>
+            Tạo đơn hàng
+          </AdminLoadingButton>
         ) : null}
       </div>
     </div>

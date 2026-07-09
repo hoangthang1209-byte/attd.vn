@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { CRMActivityType } from "@prisma/client";
 import { CRM_ACTIVITY_TYPE_LABELS } from "@/features/crm/labels";
 import { CRM_ACTIVITY_TYPES } from "@/features/crm/types";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type Props = {
   leadId?: string;
@@ -113,9 +114,9 @@ export default function CrmAddActivityForm({ leadId, customerId, onCreated }: Pr
         </label>
       </div>
       {error && <p className="admin-message admin-message--error">{error}</p>}
-      <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-        {saving ? "Đang lưu..." : "Thêm hoạt động"}
-      </button>
+      <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang thêm hoạt động...">
+        Thêm hoạt động
+      </AdminLoadingButton>
     </form>
   );
 }

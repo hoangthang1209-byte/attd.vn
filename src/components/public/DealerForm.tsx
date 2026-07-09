@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 const PROVINCES = [
   "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu",
@@ -240,9 +241,14 @@ export default function DealerForm() {
         type="submit"
         className="btn-primary"
         disabled={formStatus === "loading"}
-        style={{ width: "100%", opacity: formStatus === "loading" ? 0.7 : 1 }}
+        aria-busy={formStatus === "loading" || undefined}
+        style={{ width: "100%" }}
       >
-        {formStatus === "loading" ? "Đang gửi..." : "Đăng ký ngay"}
+        {formStatus === "loading" ? (
+          <ButtonLoading title="Đang gửi..." tone="public" />
+        ) : (
+          "Đăng ký ngay"
+        )}
       </button>
     </form>
   );

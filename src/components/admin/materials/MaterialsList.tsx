@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import { useSearchParams } from "next/navigation";
 import type { MaterialType } from "@prisma/client";
 import { MATERIAL_TYPE_LABELS } from "@/features/materials/material-labels";
@@ -72,7 +73,7 @@ export default function MaterialsList() {
       </div>
 
       {loading ? (
-        <p className="admin-field-hint">Đang tải…</p>
+        <AdminInlineLoader message="Đang tải danh sách vật tư…" />
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">

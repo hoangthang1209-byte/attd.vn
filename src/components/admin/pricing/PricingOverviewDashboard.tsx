@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatPricingCurrency, formatPricingDateTime } from "@/features/pricing/format";
 import { getPricingStatusLabel } from "@/features/pricing/labels";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import type { PricingCalculationListRecord, PricingOverviewStats } from "@/features/pricing/types";
 
 export default function PricingOverviewDashboard() {
@@ -22,7 +23,7 @@ export default function PricingOverviewDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminLoadingState label="Đang tải tổng quan giá…" />;
   if (error) {
     return (
       <div className="admin-empty-state admin-empty-state--error">

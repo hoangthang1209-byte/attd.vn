@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { BlogPostStatus } from "@prisma/client";
 import { BLOG_POST_STATUSES, BLOG_STATUS_LABELS } from "@/features/blog/types";
 import type { BlogCategoryRecord, BlogPostListItem } from "@/features/blog/types";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -142,7 +143,7 @@ export default function BlogPostsManager() {
       </form>
 
       {loading ? (
-        <p className="admin-loading">Đang tải...</p>
+        <AdminLoadingState label="Đang tải danh sách bài viết…" />
       ) : posts.length === 0 ? (
         <div className="admin-empty-state">
           <p>Chưa có bài viết.</p>

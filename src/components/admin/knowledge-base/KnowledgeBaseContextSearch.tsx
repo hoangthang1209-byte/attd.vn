@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { KnowledgeBaseCategoryRecord } from "@/features/knowledge-base/knowledge-base-types";
 import { KNOWLEDGE_USAGE_SCOPES } from "@/features/knowledge-base/knowledge-base-types";
 import type { ContextPreviewRankedResult } from "@/features/knowledge-base/knowledge-base-context-preview";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import KnowledgeBaseAiReadinessBadge from "@/components/admin/knowledge-base/KnowledgeBaseAiReadinessBadge";
 
 const SAMPLE_QUERIES = [
@@ -100,14 +101,9 @@ export default function KnowledgeBaseContextSearch() {
               if (e.key === "Enter") void runSearch();
             }}
           />
-          <button
-            type="button"
-            className="admin-btn admin-btn--primary"
-            disabled={loading}
-            onClick={() => void runSearch()}
-          >
-            {loading ? "Đang tìm…" : "Tìm kiếm"}
-          </button>
+          <AdminLoadingButton variant="primary" pending={loading} pendingLabel="Đang tìm ngữ cảnh…" onClick={() => void runSearch()}>
+            Tìm kiếm
+          </AdminLoadingButton>
         </div>
 
         <div className="admin-kb-context-samples">

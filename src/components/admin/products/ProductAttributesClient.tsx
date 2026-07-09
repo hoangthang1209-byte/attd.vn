@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AttributePresetDialog from "@/components/admin/products/AttributePresetDialog";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import { useAdminAction } from "@/hooks/useAdminAction";
 
 type DisplayType = "TEXT" | "COLOR_SWATCH" | "SIZE" | "SELECT" | "IMAGE_SWATCH";
@@ -774,9 +776,14 @@ export default function ProductAttributesClient() {
           <textarea className="admin-textarea" value={attributeForm.note} onChange={(e) => setAttributeForm((form) => ({ ...form, note: e.target.value }))} />
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="submit" className="admin-btn admin-btn--primary" disabled={isSavingCreateAttribute}>
-            {isSavingCreateAttribute ? "Đang lưu…" : "Thêm thuộc tính"}
-          </button>
+          <AdminLoadingButton
+            type="submit"
+            variant="primary"
+            pending={isSavingCreateAttribute}
+            pendingLabel="Đang thêm thuộc tính..."
+          >
+            Thêm thuộc tính
+          </AdminLoadingButton>
         </div>
       </form>
 
@@ -834,14 +841,23 @@ export default function ProductAttributesClient() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="submit" className="admin-btn admin-btn--primary" disabled={isSavingCreateValue}>
-            {isSavingCreateValue ? "Đang lưu…" : "Thêm giá trị"}
-          </button>
+          <AdminLoadingButton
+            type="submit"
+            variant="primary"
+            pending={isSavingCreateValue}
+            pendingLabel="Đang thêm giá trị..."
+          >
+            Thêm giá trị
+          </AdminLoadingButton>
         </div>
       </form>
 
       {loading ? (
-        <p className="admin-field-hint">Đang tải…</p>
+        <TableLoading
+          title="Đang tải thuộc tính..."
+          description="Hệ thống đang tải danh sách thuộc tính và giá trị."
+          tone="admin"
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {attributes.map((attribute) => {
@@ -984,14 +1000,16 @@ export default function ProductAttributesClient() {
                       <p className="admin-field-error" role="alert">{inlineAttributeFieldErrors._form}</p>
                     )}
                     <div className="admin-attribute-inline-edit-actions">
-                      <button
+                      <AdminLoadingButton
                         type="button"
-                        className="admin-btn admin-btn--primary admin-btn--xs"
-                        disabled={savingAttributeId === attribute.id}
+                        variant="primary"
+                        size="xs"
+                        pending={savingAttributeId === attribute.id}
+                        pendingLabel="Đang lưu thuộc tính..."
                         onClick={() => void saveInlineAttribute(attribute)}
                       >
-                        {savingAttributeId === attribute.id ? "Đang lưu…" : "Lưu"}
-                      </button>
+                        Lưu
+                      </AdminLoadingButton>
                       <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={cancelInlineAttributeEdit}>
                         Hủy
                       </button>
@@ -1163,14 +1181,16 @@ export default function ProductAttributesClient() {
                                   <p className="admin-field-error" role="alert">{inlineValueFieldErrors._form}</p>
                                 )}
                                 <div className="admin-attribute-inline-edit-actions" style={{ marginTop: 8 }}>
-                                  <button
+                                  <AdminLoadingButton
                                     type="button"
-                                    className="admin-btn admin-btn--primary admin-btn--xs"
-                                    disabled={savingValueId === value.id}
+                                    variant="primary"
+                                    size="xs"
+                                    pending={savingValueId === value.id}
+                                    pendingLabel="Đang lưu giá trị..."
                                     onClick={() => void saveInlineValue(attribute, value)}
                                   >
-                                    {savingValueId === value.id ? "Đang lưu…" : "Lưu"}
-                                  </button>
+                                    Lưu
+                                  </AdminLoadingButton>
                                   <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={cancelInlineValueEdit}>
                                     Hủy
                                   </button>

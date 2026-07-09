@@ -8,6 +8,7 @@ import {
   DEALER_LEVEL_LABELS,
 } from "@/features/dealer/labels";
 import { DEALER_COMPANY_TYPES, DEALER_LEVELS } from "@/features/dealer/types";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type DealerCompanyFormProps = {
   mode: "create" | "edit";
@@ -208,9 +209,14 @@ export default function DealerCompanyForm({ mode, initial, companyId }: DealerCo
       </div>
 
       <div className="admin-form-actions">
-        <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-          {saving ? "Đang lưu..." : mode === "create" ? "Tạo đại lý" : "Cập nhật"}
-        </button>
+        <AdminLoadingButton
+          type="submit"
+          variant="primary"
+          pending={saving}
+          pendingLabel={mode === "create" ? "Đang tạo đại lý…" : "Đang cập nhật đại lý…"}
+        >
+          {mode === "create" ? "Tạo đại lý" : "Cập nhật"}
+        </AdminLoadingButton>
       </div>
     </form>
   );

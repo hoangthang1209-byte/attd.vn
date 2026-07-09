@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PermissionScope } from "@prisma/client";
 import AdminBackLink from "@/components/admin/AdminBackLink";
 import { AdminLoadingState, AdminPageShell, PageHeader } from "@/components/admin/AdminUi";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type PermissionRow = {
   id: string;
@@ -168,9 +169,9 @@ export default function AdminRoleDetailManager({ roleId }: { roleId: string }) {
 
         {role.code !== "OWNER" && (
           <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
-            <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-              {saving ? "Đang lưu…" : "Lưu phân quyền"}
-            </button>
+            <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang lưu…">
+              Lưu phân quyền
+            </AdminLoadingButton>
             <Link href="/admin/settings/roles" className="admin-btn admin-btn--secondary">Quay lại</Link>
           </div>
         )}

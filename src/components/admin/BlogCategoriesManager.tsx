@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BlogCategoryRecord } from "@/features/blog/types";
 import { toSlug } from "@/lib/slug";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 
 type CategoryForm = {
   name: string;
@@ -204,7 +205,7 @@ export default function BlogCategoriesManager() {
       </form>
 
       {loading ? (
-        <p className="admin-loading">Đang tải...</p>
+        <AdminLoadingState label="Đang tải danh mục blog…" />
       ) : categories.length === 0 ? (
         <div className="admin-empty-state">
           <p>Chưa có danh mục blog.</p>

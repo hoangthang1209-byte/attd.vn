@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ProductCatalogForm from "@/components/admin/products/ProductCatalogForm";
+import { SectionLoading } from "@/components/ui/loading/ContextLoading";
 import ProductSetupChecklist from "@/components/admin/products/ProductSetupChecklist";
 import { buildProductAdminEditInitialData } from "@/features/products/product-catalog-form-mappers";
 import { getProductAdminById, listProductCategories } from "@/features/products/product-admin.service";
@@ -29,7 +30,15 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   return (
     <>
       <AdminPageTitle title={`Sửa: ${product.name}`} />
-      <Suspense fallback={<p className="admin-field-hint">Đang tải form sản phẩm…</p>}>
+      <Suspense
+        fallback={
+          <SectionLoading
+            title="Đang tải form sản phẩm..."
+            description="Hệ thống đang chuẩn bị biểu mẫu và dữ liệu catalog."
+            tone="admin"
+          />
+        }
+      >
         <ProductSetupChecklist input={checklistInput} />
         <ProductCatalogForm initialData={initialData} categories={cats} />
       </Suspense>

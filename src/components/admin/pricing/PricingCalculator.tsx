@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { formatPricingCurrency, formatPricingPercent } from "@/features/pricing/format";
 import type { CalculatePricingResult, PriceGroupRecord, ServicePriceRuleRecord } from "@/features/pricing/types";
 
@@ -336,12 +337,12 @@ export default function PricingCalculator() {
       </fieldset>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
-        <button type="button" className="admin-btn admin-btn--primary" onClick={() => void handleCalculate()} disabled={calculating}>
-          {calculating ? "Đang tính…" : "Tính giá"}
-        </button>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void handleSave()} disabled={saving}>
-          {saving ? "Đang lưu…" : "Lưu bản tính giá"}
-        </button>
+        <AdminLoadingButton variant="primary" onClick={() => void handleCalculate()} pending={calculating} pendingLabel="Đang tính giá…">
+          Tính giá
+        </AdminLoadingButton>
+        <AdminLoadingButton variant="secondary" onClick={() => void handleSave()} pending={saving} pendingLabel="Đang lưu bản tính giá…">
+          Lưu bản tính giá
+        </AdminLoadingButton>
       </div>
 
       {result && (

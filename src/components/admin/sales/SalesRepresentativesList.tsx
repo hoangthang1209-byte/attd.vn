@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import { formatCrmDateTime } from "@/features/crm/format";
 import type { SalesRepresentativeRecord } from "@/features/sales/types";
 
@@ -79,7 +80,7 @@ export default function SalesRepresentativesList() {
       </form>
 
       {error && <p className="admin-error">{error}</p>}
-      {loading && <p className="admin-loading">Đang tải...</p>}
+      {loading && <AdminLoadingState label="Đang tải nhân viên tư vấn…" />}
 
       {!loading && salesReps.length === 0 && (
         <p className="admin-empty-state">Chưa có nhân viên tư vấn.</p>

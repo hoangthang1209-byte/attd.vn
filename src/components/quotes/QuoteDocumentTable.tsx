@@ -3,6 +3,7 @@
 import type { PublicQuoteDocument } from "@/features/quotes/types";
 import type { QuoteCompanyProfile } from "@/features/quotes/quote-company-profile";
 import QuoteDocumentContent from "@/components/quotes/QuoteDocumentContent";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 type Props = {
   quote: PublicQuoteDocument;
@@ -42,8 +43,13 @@ export default function QuoteDocumentTable({
                 className="admin-btn admin-btn--primary"
                 onClick={onDownloadPdf}
                 disabled={pdfDownloading}
+                aria-busy={pdfDownloading || undefined}
               >
-                {pdfDownloading ? "Đang tạo PDF..." : "Tải PDF báo giá"}
+                {pdfDownloading ? (
+                  <ButtonLoading title="Đang tạo PDF..." tone="public" />
+                ) : (
+                  "Tải PDF báo giá"
+                )}
               </button>
             )}
           </div>

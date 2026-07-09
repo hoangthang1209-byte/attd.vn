@@ -7,6 +7,7 @@ import AdminBackLink from "@/components/admin/AdminBackLink";
 import { buildListBackHref } from "@/lib/admin/list-return";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
 
 type Props = {
   mode: "create" | "edit";
@@ -106,7 +107,7 @@ export default function MaterialSupplierForm({ mode, supplierId }: Props) {
     });
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminPageSkeleton message="Đang tải nhà cung cấp vật tư…" />;
 
   if (createdId) {
     return (

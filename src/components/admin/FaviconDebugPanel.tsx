@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SectionLoading } from "@/components/ui/loading/ContextLoading";
 
 type FaviconDebugData = {
   faviconUrl: string | null;
@@ -51,7 +52,7 @@ export default function FaviconDebugPanel() {
   }, []);
 
   if (loading) {
-    return <p className="admin-loading">Đang tải diagnostics…</p>;
+    return <SectionLoading title="Đang tải diagnostics…" tone="admin" />;
   }
 
   if (error) {

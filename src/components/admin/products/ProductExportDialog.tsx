@@ -8,6 +8,7 @@ import {
   type ExportScopeType,
 } from "@/features/products/product-export.constants";
 import type { ProductListParams } from "@/features/products/product-admin.service";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export type ProductExportDialogProps = {
   open: boolean;
@@ -209,14 +210,14 @@ export default function ProductExportDialog({
         )}
 
         <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            className="admin-btn admin-btn--primary"
+          <AdminLoadingButton
+            variant="primary"
+            pending={loading}
+            pendingLabel="Đang chuẩn bị dữ liệu xuất..."
             onClick={() => void handleExport()}
-            disabled={loading}
           >
-            {loading ? "Đang chuẩn bị dữ liệu xuất…" : "Tải tệp xuất"}
-          </button>
+            Tải tệp xuất
+          </AdminLoadingButton>
           <button type="button" className="admin-btn admin-btn--secondary" onClick={onClose} disabled={loading}>
             Hủy
           </button>

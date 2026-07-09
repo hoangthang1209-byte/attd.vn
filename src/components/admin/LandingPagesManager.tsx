@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 
 type LandingPageRow = {
   id: string;
@@ -79,7 +80,7 @@ export default function LandingPagesManager() {
       )}
 
       {loading ? (
-        <p className="admin-loading">Đang tải...</p>
+        <AdminLoadingState label="Đang tải landing pages…" />
       ) : pages.length === 0 ? (
         <div className="admin-empty-state">
           <p>Chưa có landing page trong CMS.</p>

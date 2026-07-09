@@ -12,6 +12,7 @@ import type {
   CompletionReadinessResult,
   DeliveryFulfillmentSummary,
 } from "@/features/orders/delivery-fulfillment.service";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import {
   DELIVERY_ATTEMPT_RESULT_LABELS,
   DELIVERY_PROOF_TYPE_LABELS,
@@ -329,7 +330,7 @@ export default function OrderDeliveryExecutionSection({
       </div>
 
       {loading ? (
-        <p className="admin-field-hint">Đang tải…</p>
+        <AdminInlineLoader message="Đang tải tiến độ giao hàng…" />
       ) : (
         <>
           {tab === "executions" && (

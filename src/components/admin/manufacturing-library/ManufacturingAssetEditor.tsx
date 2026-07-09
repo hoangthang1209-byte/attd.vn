@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { useRouter } from "next/navigation";
 import type {
   MlAsset,
@@ -223,9 +224,14 @@ export default function ManufacturingAssetEditor({ asset, lookups }: Props) {
           <Link href="/admin/manufacturing-library" className="admin-link-button">
             Quay lại
           </Link>
-          <button className="btn-primary" type="submit" disabled={saving}>
-            {saving ? "Đang lưu..." : "Lưu"}
-          </button>
+          <AdminLoadingButton
+            type="submit"
+            variant="primary"
+            pending={saving}
+            pendingLabel="Đang lưu tài sản sản xuất…"
+          >
+            Lưu
+          </AdminLoadingButton>
         </div>
       </div>
 

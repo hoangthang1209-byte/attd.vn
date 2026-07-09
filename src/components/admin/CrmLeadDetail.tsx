@@ -13,6 +13,7 @@ import {
   type CrmLeadNoteRecord,
   type CrmLeadRecord,
 } from "@/features/crm/types";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 function toDatetimeLocalValue(iso: string | null) {
   if (!iso) return "";
@@ -211,9 +212,14 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
               </option>
             ))}
           </select>
-          <button type="button" className="admin-btn" onClick={() => void saveStatus()} disabled={savingStatus}>
-            {savingStatus ? "Đang lưu..." : "Lưu trạng thái"}
-          </button>
+          <AdminLoadingButton
+            type="button"
+            pending={savingStatus}
+            pendingLabel="Đang lưu trạng thái…"
+            onClick={() => void saveStatus()}
+          >
+            Lưu trạng thái
+          </AdminLoadingButton>
         </div>
       </section>
 
@@ -226,14 +232,14 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
             onChange={(e) => setFollowUpAt(e.target.value)}
             className="admin-input"
           />
-          <button
+          <AdminLoadingButton
             type="button"
-            className="admin-btn"
+            pending={savingFollowUp}
+            pendingLabel="Đang lưu follow-up…"
             onClick={() => void saveFollowUp()}
-            disabled={savingFollowUp}
           >
-            {savingFollowUp ? "Đang lưu..." : "Lưu follow-up"}
-          </button>
+            Lưu follow-up
+          </AdminLoadingButton>
         </div>
       </section>
 
@@ -248,14 +254,14 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
             onChange={(e) => setEstimatedValue(e.target.value.replace(/[^\d]/g, ""))}
             className="admin-input"
           />
-          <button
+          <AdminLoadingButton
             type="button"
-            className="admin-btn"
+            pending={savingValue}
+            pendingLabel="Đang lưu giá trị…"
             onClick={() => void saveEstimatedValue()}
-            disabled={savingValue}
           >
-            {savingValue ? "Đang lưu..." : "Lưu giá trị"}
-          </button>
+            Lưu giá trị
+          </AdminLoadingButton>
         </div>
       </section>
 
@@ -269,9 +275,14 @@ export default function CrmLeadDetail({ initialLead }: { initialLead: CrmLeadRec
             className="admin-input admin-textarea"
             rows={3}
           />
-          <button type="submit" className="admin-btn" disabled={savingNote || !noteContent.trim()}>
-            {savingNote ? "Đang thêm..." : "Thêm ghi chú"}
-          </button>
+          <AdminLoadingButton
+            type="submit"
+            pending={savingNote}
+            pendingLabel="Đang thêm ghi chú…"
+            disabled={!noteContent.trim()}
+          >
+            Thêm ghi chú
+          </AdminLoadingButton>
         </form>
 
         {notes.length === 0 ? (

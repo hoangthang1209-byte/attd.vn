@@ -8,6 +8,7 @@ import { CRM_CUSTOMER_TYPES } from "@/features/crm/types";
 import type { CrmContactRecord, CrmCustomerRecord } from "@/features/crm/types";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type Props = {
   open: boolean;
@@ -390,14 +391,9 @@ export default function QuickAddCustomerModal({ open, onClose, onCreated }: Prop
           >
             Hủy
           </button>
-          <button
-            type="submit"
-            form={FORM_ID}
-            className="admin-btn admin-btn--primary"
-            disabled={pending}
-          >
-            {pending ? "Đang tạo…" : "Tạo khách hàng"}
-          </button>
+          <AdminLoadingButton type="submit" form={FORM_ID} variant="primary" pending={pending} pendingLabel="Đang tạo khách hàng…">
+            Tạo khách hàng
+          </AdminLoadingButton>
         </footer>
       </div>
     </div>,

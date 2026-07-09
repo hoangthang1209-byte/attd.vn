@@ -10,6 +10,7 @@ import type { PurchaseRequestStatus } from "@prisma/client";
 import { buildListBackHref } from "@/lib/admin/list-return";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type Props = { requestId: string };
 
@@ -137,7 +138,7 @@ export default function PurchaseRequestDetail({ requestId }: Props) {
     });
   }
 
-  if (!request) return <p className="admin-field-hint">Đang tải…</p>;
+  if (!request) return <AdminInlineLoader message="Đang tải yêu cầu mua hàng…" />;
 
   const canEditSupplier = ["DRAFT", "REQUESTED"].includes(request.status);
   const contact = request.supplier;

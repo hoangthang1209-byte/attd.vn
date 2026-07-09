@@ -12,6 +12,7 @@ import {
   legacyKeysForAssignment,
   resolveFieldError,
 } from "@/features/products/product-form-row-error-keys";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 
 type Props = {
   rows: ProductAttributeAssignmentFormRow[];
@@ -93,7 +94,9 @@ export default function ProductInformationAttributesSection({
       </div>
 
       {sharedAttributesError && <p className="admin-field-error" role="alert">{sharedAttributesError}</p>}
-      {sharedAttributesLoading && <p className="admin-field-hint">Đang tải thuộc tính dùng chung…</p>}
+      {sharedAttributesLoading && (
+        <InlineLoading title="Đang tải thuộc tính dùng chung..." tone="admin" />
+      )}
 
       {visibleRows.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 16 }}>

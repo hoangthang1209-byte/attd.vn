@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { SupplierMaterialLinkRecord } from "@/features/materials/material-supplier-link.service";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type Props = {
   supplierId: string;
@@ -31,7 +32,7 @@ export default function SupplierMaterialsModal({ supplierId, supplierName, onClo
       <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
         <h3>Vật tư đang cung cấp · {supplierName}</h3>
         {loading ? (
-          <p className="admin-field-hint">Đang tải…</p>
+          <AdminInlineLoader message="Đang tải vật tư nhà cung cấp…" />
         ) : materials.length === 0 ? (
           <p className="admin-field-hint">Chưa liên kết vật tư nào.</p>
         ) : (

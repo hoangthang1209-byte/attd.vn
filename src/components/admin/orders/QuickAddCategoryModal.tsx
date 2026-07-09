@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import AdminQuickCreateShell from "@/components/admin/AdminQuickCreateShell";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export type CategoryOption = { id: string; name: string; slug: string };
 
@@ -101,9 +102,9 @@ export default function QuickAddCategoryModal({ open, onClose, onCreated }: Prop
           <button type="button" className="admin-btn admin-btn--secondary" onClick={handleClose} disabled={pending}>
             Hủy
           </button>
-          <button type="submit" form={FORM_ID} className="admin-btn admin-btn--primary" disabled={pending}>
-            {pending ? "Đang lưu…" : "Lưu danh mục"}
-          </button>
+          <AdminLoadingButton type="submit" form={FORM_ID} variant="primary" pending={pending} pendingLabel="Đang lưu danh mục…">
+            Lưu danh mục
+          </AdminLoadingButton>
         </>
       }
     >

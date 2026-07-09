@@ -13,6 +13,7 @@ import {
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
 import type { ProductQuoteContext } from "@/components/public/product-quote.types";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 import {
   trackPdpQuoteSubmitAttempt,
   trackPdpQuoteSubmitSuccess,
@@ -426,7 +427,11 @@ export default function ProductQuoteDialog({
                     className="btn-primary"
                     disabled={formStatus === "loading"}
                   >
-                    {formStatus === "loading" ? "Đang gửi yêu cầu…" : "Yêu cầu báo giá"}
+                    {formStatus === "loading" ? (
+                      <ButtonLoading title="Đang gửi yêu cầu…" tone="public" />
+                    ) : (
+                      "Yêu cầu báo giá"
+                    )}
                   </button>
                 </div>
 
@@ -454,7 +459,11 @@ export default function ProductQuoteDialog({
                 className="btn-primary product-quote-dialog__sticky-submit"
                 disabled={formStatus === "loading"}
               >
-                {formStatus === "loading" ? "Đang gửi yêu cầu…" : "Yêu cầu báo giá"}
+                {formStatus === "loading" ? (
+                  <ButtonLoading title="Đang gửi yêu cầu…" tone="public" />
+                ) : (
+                  "Yêu cầu báo giá"
+                )}
               </button>
             </div>
           </>

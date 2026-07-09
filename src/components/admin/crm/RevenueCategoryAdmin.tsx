@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import type { RevenueCategoryRecord } from "@/features/revenue-categories/revenue-category.service";
 
 type FormState = {
@@ -273,9 +275,9 @@ export default function RevenueCategoryAdmin() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-                {saving ? "Đang lưu…" : "Lưu"}
-              </button>
+              <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang lưu nhóm doanh thu…">
+                Lưu
+              </AdminLoadingButton>
               <button
                 type="button"
                 className="admin-btn admin-btn--secondary"
@@ -294,7 +296,11 @@ export default function RevenueCategoryAdmin() {
       )}
 
       {loading ? (
-        <p className="admin-loading">Đang tải...</p>
+        <TableLoading
+          title="Đang tải nhóm doanh thu..."
+          description="Hệ thống đang tải cấu trúc phân loại doanh thu."
+          tone="admin"
+        />
       ) : displayRows.length === 0 ? (
         <p className="admin-field-hint">Chưa có nhóm doanh thu.</p>
       ) : (

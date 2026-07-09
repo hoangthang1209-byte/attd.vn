@@ -2,6 +2,8 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { SectionLoading } from "@/components/ui/loading/ContextLoading";
 
 type AdminLoginFormProps = {
   configWarning?: string | null;
@@ -85,13 +87,16 @@ function AdminLoginFormInner({ configWarning }: AdminLoginFormProps) {
             />
           </div>
           {error && <p className="admin-error">{error}</p>}
-          <button
+          <AdminLoadingButton
             type="submit"
-            className="admin-btn admin-btn--primary admin-login-submit"
+            variant="primary"
+            className="admin-login-submit"
+            pending={loading}
+            pendingLabel="Đang đăng nhập…"
             disabled={loading}
           >
-            {loading ? "Đang đăng nhập…" : "Đăng nhập"}
-          </button>
+            Đăng nhập
+          </AdminLoadingButton>
         </form>
       </div>
     </div>
@@ -100,7 +105,7 @@ function AdminLoginFormInner({ configWarning }: AdminLoginFormProps) {
 
 export default function AdminLoginForm(props: AdminLoginFormProps) {
   return (
-    <Suspense fallback={<p className="admin-loading">Đang tải…</p>}>
+    <Suspense fallback={<SectionLoading title="Đang tải…" tone="admin" />}>
       <AdminLoginFormInner {...props} />
     </Suspense>
   );

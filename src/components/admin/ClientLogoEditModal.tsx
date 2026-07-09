@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export type ClientLogoFormData = {
   companyName: string;
@@ -177,9 +178,9 @@ export default function ClientLogoEditModal({ logo, onClose, onSaved, onError }:
             <button type="button" className="admin-btn" onClick={onClose} disabled={saving}>
               Hủy
             </button>
-            <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-              {saving ? "Đang lưu…" : "Lưu thay đổi"}
-            </button>
+            <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang lưu logo đối tác…">
+              Lưu thay đổi
+            </AdminLoadingButton>
           </div>
         </form>
       </div>

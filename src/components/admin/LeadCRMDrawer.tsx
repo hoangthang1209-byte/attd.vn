@@ -7,6 +7,7 @@ import {
   PIPELINE_STATUS_COLORS,
   ALL_PIPELINE_STATUSES,
 } from "@/lib/pipelineStatus";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 /** Serialised form passed from the server component. */
 export interface SerializedLead {
@@ -512,22 +513,21 @@ export default function LeadCRMDrawer({ lead }: Props) {
 
               {/* Save */}
               <div style={{ marginTop: "24px", display: "flex", alignItems: "center", gap: "12px" }}>
-                <button
+                <AdminLoadingButton
+                  type="button"
+                  variant="primary"
+                  pending={saving}
+                  pendingLabel="Đang lưu CRM…"
                   onClick={handleSave}
-                  disabled={saving}
                   style={{
                     padding: "10px 24px",
-                    background: saving ? "#9ca3af" : "#1d4ed8",
-                    color: "#fff",
-                    border: "none",
                     borderRadius: "8px",
                     fontSize: "14px",
                     fontWeight: 600,
-                    cursor: saving ? "not-allowed" : "pointer",
                   }}
                 >
-                  {saving ? "Đang lưu…" : "Lưu CRM"}
-                </button>
+                  Lưu CRM
+                </AdminLoadingButton>
 
                 {savedOk && (
                   <span style={{ fontSize: "13px", color: "#166534" }}>

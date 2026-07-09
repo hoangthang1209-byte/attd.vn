@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { CardGridLoading } from "@/components/ui/loading/ContextLoading";
 
 type PresetSummary = {
   key: string;
@@ -247,7 +249,12 @@ export default function AttributePresetDialog({ open, onClose, onSuccess, onOpen
         {step === 1 && (
           <div className="admin-modal-body">
             {loadingPresets ? (
-              <p className="admin-field-hint">Đang tải bộ mặc định…</p>
+              <CardGridLoading
+                title="Đang tải bộ mặc định..."
+                description="Hệ thống đang tải các mẫu thuộc tính có sẵn."
+                tone="admin"
+                cards={4}
+              />
             ) : (
               <div className="admin-attribute-preset-grid">
                 {presets.map((preset) => (
@@ -416,25 +423,27 @@ export default function AttributePresetDialog({ open, onClose, onSuccess, onOpen
                     >
                       Mở thuộc tính hiện có
                     </button>
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn--primary"
-                      disabled={submitting || preview.summary.newCount === 0}
+                    <AdminLoadingButton
+                      variant="primary"
+                      pending={submitting}
+                      pendingLabel="Đang bổ sung giá trị..."
+                      disabled={preview.summary.newCount === 0}
                       onClick={() => void applyPreset("add-missing-values")}
                     >
-                      {submitting ? "Đang bổ sung…" : "Bổ sung giá trị còn thiếu"}
-                    </button>
+                      Bổ sung giá trị còn thiếu
+                    </AdminLoadingButton>
                   </>
                 )}
                 {!hasAttributeConflict && (
-                  <button
-                    type="button"
-                    className="admin-btn admin-btn--primary"
-                    disabled={submitting || preview.summary.newCount === 0}
+                  <AdminLoadingButton
+                    variant="primary"
+                    pending={submitting}
+                    pendingLabel="Đang tạo thuộc tính..."
+                    disabled={preview.summary.newCount === 0}
                     onClick={() => void applyPreset("create")}
                   >
-                    {submitting ? "Đang tạo…" : "Tạo thuộc tính và giá trị"}
-                  </button>
+                    Tạo thuộc tính và giá trị
+                  </AdminLoadingButton>
                 )}
               </>
             )}

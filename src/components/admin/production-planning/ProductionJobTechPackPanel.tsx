@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { TechPackStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import type { TechPackItemLink } from "@/features/tech-pack/tech-pack.types";
 import type { TechPackStatus } from "@prisma/client";
@@ -74,7 +75,7 @@ export default function ProductionJobTechPackPanel({
   if (loading) {
     return (
       <section className="prod-job-tech-pack" aria-busy="true">
-        <p className="admin-field-hint">Đang tải Tech Pack…</p>
+        <AdminInlineLoader message="Đang tải Tech Pack công việc…" />
       </section>
     );
   }

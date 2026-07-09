@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import MediaPicker, { type MediaPickerValue } from "@/components/admin/MediaPicker";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 export type CaseStudyFormData = {
   title: string;
@@ -173,9 +174,9 @@ export default function CaseStudyEditModal({ study, onClose, onSaved }: Props) {
             <button type="button" className="admin-btn" onClick={onClose} disabled={saving}>
               Hủy
             </button>
-            <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-              {saving ? "Đang lưu…" : "Lưu thay đổi"}
-            </button>
+            <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang lưu case study…">
+              Lưu thay đổi
+            </AdminLoadingButton>
           </div>
         </form>
       </div>

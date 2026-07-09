@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import AdminSectionSkeleton from "@/components/admin/feedback/AdminSectionSkeleton";
 import MaterialForm from "@/components/admin/materials/MaterialForm";
 import { getMaterial } from "@/features/materials/material.service";
 
@@ -14,7 +15,7 @@ export default async function AdminMaterialEditPage({ params }: Props) {
   return (
     <>
       <AdminPageTitle title={`Sửa vật tư · ${material.materialCode}`} />
-      <Suspense fallback={<p className="admin-field-hint">Đang tải…</p>}>
+      <Suspense fallback={<AdminSectionSkeleton message="Đang chuẩn bị form vật tư…" />}>
         <MaterialForm
           materialId={material.id}
           initial={{

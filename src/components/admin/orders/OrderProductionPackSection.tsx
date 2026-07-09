@@ -10,6 +10,7 @@ import {
   PRODUCTION_FILE_TYPES,
 } from "@/features/orders/production-pack-labels";
 import { formatRequiredQuantityFormula } from "@/features/orders/bom-calculations";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import {
   ALLOWED_PRODUCTION_FILE_EXTENSIONS,
   classifyProductionFile,
@@ -759,7 +760,7 @@ export default function OrderProductionPackSection({
       )}
 
       {loading ? (
-        <p className="admin-field-hint">Đang tải…</p>
+        <AdminInlineLoader message="Đang tải hồ sơ sản xuất…" />
       ) : tab === "files" ? (
         <>
           {fileForm}

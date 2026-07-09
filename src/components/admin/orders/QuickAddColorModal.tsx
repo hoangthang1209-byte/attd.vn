@@ -5,6 +5,7 @@ import AdminQuickCreateShell from "@/components/admin/AdminQuickCreateShell";
 import type { ColorRecord } from "@/features/colors/color.service";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type Props = {
   open: boolean;
@@ -97,14 +98,9 @@ export default function QuickAddColorModal({ open, onClose, onCreated }: Props) 
           >
             Hủy
           </button>
-          <button
-            type="submit"
-            form={FORM_ID}
-            className="admin-btn admin-btn--primary"
-            disabled={pending}
-          >
-            {pending ? "Đang lưu…" : "Lưu màu"}
-          </button>
+          <AdminLoadingButton type="submit" form={FORM_ID} variant="primary" pending={pending} pendingLabel="Đang lưu màu…">
+            Lưu màu
+          </AdminLoadingButton>
         </>
       }
     >

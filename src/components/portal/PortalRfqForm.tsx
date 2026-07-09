@@ -8,6 +8,7 @@ import {
   DEALER_RFQ_PROJECT_TYPE_LABELS,
   type DealerRFQItemInput,
 } from "@/features/dealer/dealer-rfq.types";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 const EMPTY_ITEM = (): DealerRFQItemInput => ({
   productName: "",
@@ -232,11 +233,11 @@ export default function PortalRfqForm() {
         {error && <p className="portal-error">{error}</p>}
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" className="portal-btn" disabled={loading} onClick={() => void save(false)}>
-            Lưu nháp
+          <button type="button" className="portal-btn" disabled={loading} aria-busy={loading || undefined} onClick={() => void save(false)}>
+            {loading ? <ButtonLoading title="Đang lưu nháp…" tone="dealer" /> : "Lưu nháp"}
           </button>
-          <button type="button" className="portal-btn portal-btn--primary" disabled={loading} onClick={() => void save(true)}>
-            Gửi RFQ
+          <button type="button" className="portal-btn portal-btn--primary" disabled={loading} aria-busy={loading || undefined} onClick={() => void save(true)}>
+            {loading ? <ButtonLoading title="Đang gửi RFQ…" tone="dealer" /> : "Gửi RFQ"}
           </button>
           <Link href="/portal/rfq" className="portal-btn">
             Hủy

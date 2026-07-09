@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ProductFastCreateWizard from "@/components/admin/products/ProductFastCreateWizard";
+import { SectionLoading } from "@/components/ui/loading/ContextLoading";
 import { listProductCategories } from "@/features/products/product-admin.service";
 
 export default async function FastCreateProductPage() {
@@ -18,7 +19,15 @@ export default async function FastCreateProductPage() {
   return (
     <>
       <AdminPageTitle title="Tạo nhanh sản phẩm" />
-      <Suspense fallback={<p className="admin-field-hint">Đang tải…</p>}>
+      <Suspense
+        fallback={
+          <SectionLoading
+            title="Đang tải trình tạo nhanh..."
+            description="Hệ thống đang chuẩn bị quy trình tạo sản phẩm."
+            tone="admin"
+          />
+        }
+      >
         <ProductFastCreateWizard categories={wizardCategories} />
       </Suspense>
     </>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 export type MasterSearchItem = {
   id: string;
@@ -108,7 +109,7 @@ export default function ProductionMasterSearchSelect({
       </div>
       {open && !disabled && (
         <div className="production-master-search__dropdown">
-          {loading && <p className="admin-muted">Đang tìm...</p>}
+          {loading && <AdminInlineLoader message="Đang tìm dữ liệu master…" />}
           {!loading && items.length === 0 && <p className="admin-muted">Không có kết quả</p>}
           {items.map((item) => (
             <button

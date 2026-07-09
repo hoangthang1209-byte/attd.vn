@@ -5,6 +5,7 @@ import type { MediaUsageType } from "@prisma/client";
 import AdminUploadProgress, {
   type AdminUploadFileItem,
 } from "@/components/admin/feedback/AdminUploadProgress";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import {
   buildMediaLibraryApiUrl,
   MEDIA_LIBRARY_PAGE_SIZE,
@@ -12,6 +13,7 @@ import {
   parseMediaLibraryResponse,
   type MediaPickerLibraryView,
 } from "@/components/admin/media/media-library-api";
+import { CardGridLoading, ButtonLoading } from "@/components/ui/loading/ContextLoading";
 import { useAdminToast } from "@/hooks/useAdminToast";
 import { ALLOWED_IMAGE_EXTENSIONS, inferImageMimeType } from "@/lib/imageValidation";
 import type { StorageFolderKey } from "@/lib/storage/types";
@@ -616,7 +618,7 @@ export default function MediaPicker(props: Props) {
                 </button>
               </div>
               <label className={`admin-btn admin-btn--secondary ${uploading ? "admin-btn--disabled" : ""}`}>
-                {uploading ? "Đang tải…" : "Tải ảnh mới"}
+                {uploading ? <ButtonLoading title="Đang tải…" tone="admin" /> : "Tải ảnh mới"}
                 <input
                   ref={fileRef}
                   type="file"
@@ -648,7 +650,7 @@ export default function MediaPicker(props: Props) {
             />
 
             {loading ? (
-              <p className="admin-field-hint">Đang tải…</p>
+              <CardGridLoading title="Đang tải thư viện ảnh…" tone="admin" cards={8} />
             ) : loadError ? (
               <div className="admin-media-picker-error">
                 <p className="admin-error">{loadError}</p>
@@ -728,14 +730,16 @@ export default function MediaPicker(props: Props) {
                 )}
                 {hasMore && (
                   <div style={{ marginTop: 12, display: "flex", justifyContent: "center" }}>
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                    <AdminLoadingButton
+                      size="xs"
+                      variant="secondary"
+                      pending={loadingMore}
+                      pendingLabel="Đang tải thêm…"
                       disabled={loadingMore}
                       onClick={() => void loadMoreAssets()}
                     >
-                      {loadingMore ? "Đang tải thêm…" : "Tải thêm"}
-                    </button>
+                      Tải thêm
+                    </AdminLoadingButton>
                   </div>
                 )}
               </>

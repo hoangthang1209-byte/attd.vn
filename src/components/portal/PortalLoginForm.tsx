@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 export default function PortalLoginForm() {
   const router = useRouter();
@@ -59,8 +60,8 @@ export default function PortalLoginForm() {
         />
       </label>
       {error && <p className="portal-error">{error}</p>}
-      <button type="submit" className="portal-btn portal-btn--primary" disabled={loading}>
-        {loading ? "Đang đăng nhập…" : "Đăng nhập"}
+      <button type="submit" className="portal-btn portal-btn--primary" disabled={loading} aria-busy={loading || undefined}>
+        {loading ? <ButtonLoading title="Đang đăng nhập…" tone="dealer" /> : "Đăng nhập"}
       </button>
     </form>
   );

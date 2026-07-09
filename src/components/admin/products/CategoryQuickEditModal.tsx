@@ -20,6 +20,7 @@ import CategoryGeneratedCodeField, {
 import { fetchCategoryCodePreview } from "@/features/categories/category-code-preview.client";
 import { getCategoryAdminDetailHref } from "@/features/categories/category-admin-routes";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { isIndexableCategoryLanding } from "@/lib/seo/indexable-category-routes";
 import {
   SEO_PUBLISH_QUALITY_GATE_FAILED,
@@ -321,14 +322,15 @@ function CategoryQuickEditModalForm({
           >
             Hủy
           </button>
-          <button
+          <AdminLoadingButton
             type="submit"
             form={FORM_ID}
-            className="admin-btn admin-btn--primary"
-            disabled={pending}
+            variant="primary"
+            pending={pending}
+            pendingLabel="Đang lưu danh mục..."
           >
-            {pending ? "Đang lưu…" : "Lưu thay đổi"}
-          </button>
+            Lưu thay đổi
+          </AdminLoadingButton>
         </>
       }
     >

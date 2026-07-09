@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import type { ArtworkPlacementType } from "@prisma/client";
 import {
   ARTWORK_PLACEMENT_TYPES,
@@ -200,7 +201,7 @@ export default function TechPackArtworkPlacementsEditor({
   return (
     <div className="tech-pack-placements">
       {error && <p className="admin-error">{error}</p>}
-      {saving && <p className="admin-muted">Đang lưu...</p>}
+      {saving && <AdminInlineLoader message="Đang lưu vị trí artwork…" />}
 
       {!readOnly && (
         <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" style={{ marginBottom: 12 }} onClick={addRow}>

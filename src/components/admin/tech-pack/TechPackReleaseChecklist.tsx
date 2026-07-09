@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type ChecklistItem = {
   key: string;
@@ -90,7 +91,7 @@ export default function TechPackReleaseChecklist({
   return (
     <div className="tech-pack-release-checklist">
       <h3 className="tech-pack-sidebar__title">Điều kiện phát hành</h3>
-      {loading && <p className="admin-muted">Đang kiểm tra...</p>}
+      {loading && <AdminInlineLoader message="Đang kiểm tra điều kiện phát hành…" />}
       {readiness && (
         <>
           <ul className="tech-pack-release-checklist__list">

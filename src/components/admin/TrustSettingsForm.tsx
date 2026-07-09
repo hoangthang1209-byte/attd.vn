@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type Props = {
   initial: {
@@ -85,9 +86,9 @@ export default function TrustSettingsForm({ initial }: Props) {
       {message && (
         <p className={`admin-message admin-message--${message.type}`}>{message.text}</p>
       )}
-      <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
-        {loading ? "Đang lưu..." : "Lưu thay đổi"}
-      </button>
+      <AdminLoadingButton type="submit" variant="primary" pending={loading} pendingLabel="Đang lưu...">
+        Lưu thay đổi
+      </AdminLoadingButton>
     </form>
   );
 }

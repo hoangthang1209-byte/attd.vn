@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import ProductCatalogForm from "@/components/admin/products/ProductCatalogForm";
+import { SectionLoading } from "@/components/ui/loading/ContextLoading";
 import { FAST_CREATE_ROUTES } from "@/features/products/product-fast-create";
 
 export default function NewProductPage() {
@@ -15,7 +16,15 @@ export default function NewProductPage() {
         </Link>
         .
       </p>
-      <Suspense fallback={<p className="admin-field-hint">Đang tải form sản phẩm…</p>}>
+      <Suspense
+        fallback={
+          <SectionLoading
+            title="Đang tải form sản phẩm..."
+            description="Hệ thống đang chuẩn bị biểu mẫu và dữ liệu catalog."
+            tone="admin"
+          />
+        }
+      >
         <ProductCatalogForm />
       </Suspense>
     </>

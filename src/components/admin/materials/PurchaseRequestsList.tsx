@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { PURCHASE_REQUEST_STATUS_LABELS } from "@/features/materials/material-labels";
 import type { PurchaseRequestStatus } from "@prisma/client";
 import { withFromListParams } from "@/lib/admin/list-return";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type RequestRow = {
   id: string;
@@ -47,7 +48,7 @@ export default function PurchaseRequestsList() {
         </Link>
       </div>
       {loading ? (
-        <p className="admin-field-hint">Đang tải…</p>
+        <AdminInlineLoader message="Đang tải yêu cầu mua hàng…" />
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">

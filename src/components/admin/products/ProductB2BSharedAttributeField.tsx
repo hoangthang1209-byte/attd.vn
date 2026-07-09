@@ -17,6 +17,7 @@ import {
   type B2BManagedAttributeCode,
   upsertAssignmentForAttribute,
 } from "@/features/products/product-b2b-attribute-controls.utils";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 
 type Props = {
   attributeCode: B2BManagedAttributeCode;
@@ -118,7 +119,7 @@ export default function ProductB2BSharedAttributeField({
     >
       <label className="admin-label">{label}</label>
       {sharedAttributesLoading && (
-        <p className="admin-field-hint">Đang tải thuộc tính dùng chung…</p>
+        <InlineLoading title="Đang tải thuộc tính dùng chung..." tone="admin" />
       )}
 
       {attribute && !showCustomInput && (

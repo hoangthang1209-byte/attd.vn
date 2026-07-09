@@ -28,6 +28,8 @@ import { publicCategoryHref } from "@/features/categories/public-category-url";
 import { fetchCategoryCodePreview } from "@/features/categories/category-code-preview.client";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import PublishQualityChecklist from "@/components/admin/products/PublishQualityChecklist";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import {
   SEO_PUBLISH_QUALITY_GATE_FAILED,
   SEO_PUBLISH_QUALITY_SUMMARY,
@@ -588,9 +590,9 @@ export default function CategoryAdminManager() {
           </fieldset>
 
           <div className="admin-form-actions" style={{ marginTop: 20 }}>
-            <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-              {saving ? "Đang lưu…" : "Lưu danh mục"}
-            </button>
+            <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang lưu danh mục...">
+              Lưu danh mục
+            </AdminLoadingButton>
             <button type="button" className="admin-btn admin-btn--secondary" onClick={cancelForm}>
               Hủy
             </button>
@@ -604,7 +606,11 @@ export default function CategoryAdminManager() {
         </h3>
 
         {loading ? (
-          <p className="admin-field-hint">Đang tải…</p>
+          <TableLoading
+            title="Đang tải danh mục..."
+            description="Hệ thống đang tải cây danh mục sản phẩm."
+            tone="admin"
+          />
         ) : categories.length === 0 ? (
           <p className="admin-field-hint">Chưa có danh mục nào.</p>
         ) : (

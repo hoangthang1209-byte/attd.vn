@@ -6,6 +6,7 @@ import {
   AdminLoadingState,
   AdminPageShell,
 } from "@/components/admin/AdminUi";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import PrivateFileUploadZone from "@/components/admin/tech-pack/PrivateFileUploadZone";
 import {
@@ -790,14 +791,16 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 </button>
               )}
               {!readOnly && (
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--primary admin-btn--xs"
+                <AdminLoadingButton
+                  variant="primary"
+                  size="xs"
+                  pending={saveStatus === "saving"}
+                  pendingLabel="Đang lưu rập…"
                   disabled={!isDirty || saveStatus === "saving"}
                   onClick={() => void savePatternDraft()}
                 >
-                  {saveStatus === "saving" ? "Đang lưu…" : "Lưu"}
-                </button>
+                  Lưu
+                </AdminLoadingButton>
               )}
             </div>
           </div>
@@ -1070,7 +1073,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
             <h2 className="pattern-workspace__panel-title">File rập</h2>
             {!readOnly && (
               <PrivateFileUploadZone
-                label={uploading ? "Đang tải file..." : "Kéo thả hoặc chọn nhiều file"}
+                label="Kéo thả hoặc chọn nhiều file"
                 multiple
                 onUpload={uploadFile}
               />

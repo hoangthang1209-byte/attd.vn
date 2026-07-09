@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 type PostData = {
   id: string;
@@ -401,11 +402,13 @@ export default function PostForm(props: Props) {
           cursor: saving ? "not-allowed" : "pointer",
         }}
       >
-        {saving
-          ? "Đang lưu..."
-          : isEdit
-            ? "Lưu thay đổi"
-            : "Tạo bài viết"}
+        {saving ? (
+          <ButtonLoading title="Đang lưu bài viết…" tone="admin" />
+        ) : isEdit ? (
+          "Lưu thay đổi"
+        ) : (
+          "Tạo bài viết"
+        )}
       </button>
     </form>
   );

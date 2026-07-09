@@ -12,6 +12,7 @@ import {
   DEALER_RFQ_STATUS_LABELS,
   type DealerRFQRecord,
 } from "@/features/dealer/dealer-rfq.types";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import { formatCrmDateTime } from "@/features/crm/format";
 
 export default function DealerRfqsList() {
@@ -97,7 +98,7 @@ export default function DealerRfqsList() {
         <button type="submit" className="admin-btn">Lọc</button>
       </form>
 
-      {loading && <p className="admin-loading">Đang tải...</p>}
+      {loading && <AdminLoadingState label="Đang tải danh sách RFQ…" />}
       {error && <p className="admin-error">{error}</p>}
 
       {!loading && !error && (

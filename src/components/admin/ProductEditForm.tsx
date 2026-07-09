@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 type Category = {
   id: string;
@@ -399,7 +400,7 @@ export default function ProductEditForm({ product, categories }: Props) {
             opacity: saving ? 0.7 : 1,
           }}
         >
-          {saving ? "Đang lưu..." : "Lưu thay đổi"}
+          {saving ? <ButtonLoading title="Đang lưu sản phẩm…" tone="admin" /> : "Lưu thay đổi"}
         </button>
       </div>
     </form>

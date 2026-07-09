@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { PricingCalculationStatus } from "@prisma/client";
 import { getPricingStatusLabel, PRICING_STATUS_LABELS } from "@/features/pricing/labels";
 import { formatPricingCurrency, formatPricingDateTime } from "@/features/pricing/format";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import type { PricingCalculationListRecord } from "@/features/pricing/types";
 
 export default function PricingHistoryList() {
@@ -55,7 +56,7 @@ export default function PricingHistoryList() {
       </form>
 
       {error && <p className="admin-error">{error}</p>}
-      {loading ? <p className="admin-loading">Đang tải...</p> : rows.length === 0 ? (
+      {loading ? <AdminLoadingState label="Đang tải lịch sử tính giá…" /> : rows.length === 0 ? (
         <div className="admin-empty-state"><p>Chưa có bản tính giá nào.</p></div>
       ) : (
         <div className="admin-table-wrap">

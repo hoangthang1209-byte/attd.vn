@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LeadPriority, LeadSource, LeadStatus } from "@prisma/client";
 import CrmFollowUpWidget from "@/components/admin/CrmFollowUpWidget";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import LeadPriorityBadge from "@/components/admin/LeadPriorityBadge";
 import LeadSourceDisplay from "@/components/admin/LeadSourceDisplay";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
@@ -119,7 +120,7 @@ export default function CrmLeadsManager() {
         </div>
       )}
 
-      {loadState === "loading" && <p className="admin-loading">Đang tải...</p>}
+      {loadState === "loading" && <AdminLoadingState label="Đang tải leads CRM…" />}
 
       {loadState !== "loading" && loadState !== "error" && reminders && (
         <CrmFollowUpWidget

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type TechPackOption = {
   id: string;
@@ -66,7 +67,7 @@ export default function CopyFromTechPackButton({ patternId, onCopied }: Props) {
               onChange={(e) => setSearch(e.target.value)}
             />
             {error && <p className="admin-error">{error}</p>}
-            {loading && <p className="admin-muted">Đang tải...</p>}
+            {loading && <AdminInlineLoader message="Đang tải Tech Pack…" />}
             <ul className="admin-picker-list">
               {packs.map((p) => (
                 <li key={p.id}>

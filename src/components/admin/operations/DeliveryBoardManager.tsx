@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { OrderStatus } from "@prisma/client";
 import DeliveryDetailPanel from "@/components/admin/operations/DeliveryDetailPanel";
 import OrderStatusBadge from "@/components/admin/orders/OrderStatusBadge";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import { formatOrderDate } from "@/features/orders/order-format";
 import { ORDER_STATUS_LABELS } from "@/features/orders/order-labels";
 import {
@@ -256,7 +257,7 @@ export default function DeliveryBoardManager() {
       {error && <p className="admin-error">{error}</p>}
 
       {loading ? (
-        <p className="admin-loading">Đang tải…</p>
+        <AdminLoadingState label="Đang tải bảng giao hàng…" />
       ) : orders.length === 0 ? (
         <div className="admin-empty-state"><p>Không có đơn hàng phù hợp</p></div>
       ) : (

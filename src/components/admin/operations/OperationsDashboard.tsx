@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
 import { formatOrderCurrency } from "@/features/orders/order-format";
 import type { OrderOperationalSummary } from "@/features/orders/order-operations.types";
 
@@ -29,7 +30,7 @@ export default function OperationsDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="admin-loading">Đang tải…</p>;
+  if (loading) return <AdminPageSkeleton message="Đang tải tổng quan vận hành…" />;
   if (error) return <p className="admin-error">{error}</p>;
   if (!summary) return <div className="admin-empty-state"><p>Không có dữ liệu vận hành</p></div>;
 

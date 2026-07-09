@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { HomepageProofItemConfig } from "@/features/home/homepage.types";
 import { PROOF_ICON_LABELS } from "@/features/home/homepage-cms-defaults";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type Props = {
   initial: HomepageProofItemConfig[];
@@ -82,9 +83,9 @@ export default function HomepageProofSettingsForm({ initial }: Props) {
 
       {message && <p className={message.type === "success" ? "admin-success" : "admin-error"}>{message.text}</p>}
 
-      <button type="submit" className="admin-btn admin-btn--primary" disabled={loading}>
-        {loading ? "Đang lưu…" : "Lưu thanh lợi ích"}
-      </button>
+      <AdminLoadingButton type="submit" variant="primary" pending={loading} pendingLabel="Đang lưu thanh lợi ích...">
+        Lưu thanh lợi ích
+      </AdminLoadingButton>
     </form>
   );
 }

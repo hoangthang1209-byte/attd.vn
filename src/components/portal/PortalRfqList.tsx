@@ -9,6 +9,7 @@ import {
   DEALER_RFQ_STATUS_LABELS,
   type DealerRFQRecord,
 } from "@/features/dealer/dealer-rfq.types";
+import { TableLoading } from "@/components/ui/loading/ContextLoading";
 
 function statusClass(status: DealerRFQRecord["status"]): string {
   if (status === "DRAFT") return "portal-badge--pending";
@@ -67,7 +68,14 @@ export default function PortalRfqList() {
         </Link>
       </div>
 
-      {loading && <p style={{ color: "#737373" }}>Đang tải…</p>}
+      {loading && (
+        <TableLoading
+          title="Đang tải danh sách RFQ…"
+          description="Hệ thống đang đồng bộ yêu cầu báo giá của bạn."
+          tone="dealer"
+          rows={4}
+        />
+      )}
       {error && <p className="portal-error">{error}</p>}
 
       {!loading && !error && rfqs.length === 0 && (

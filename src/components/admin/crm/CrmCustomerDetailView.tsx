@@ -24,6 +24,7 @@ import { formatCustomerAddressPreview } from "@/features/crm/customer-address";
 import { displayWebsiteUrl } from "@/features/crm/crm-validation";
 import { formatCrmDateTime } from "@/features/crm/format";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import {
   CRM_CUSTOMER_STATUSES,
@@ -371,9 +372,15 @@ export default function CrmCustomerDetailView({
       </div>
 
       <div className="admin-form-actions">
-        <button type="button" className="admin-btn admin-btn--primary" disabled={saving} onClick={() => void saveCustomer()}>
-          {saving ? "Đang lưu…" : "Lưu thông tin khách hàng"}
-        </button>
+        <AdminLoadingButton
+          type="button"
+          variant="primary"
+          pending={saving}
+          pendingLabel="Đang lưu thông tin khách hàng..."
+          onClick={() => void saveCustomer()}
+        >
+          Lưu thông tin khách hàng
+        </AdminLoadingButton>
       </div>
 
       <CrmContactDialog

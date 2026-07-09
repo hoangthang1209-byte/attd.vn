@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
 
 type Props = {
   mode: "create" | "edit";
@@ -77,7 +78,7 @@ export default function DeliveryMethodForm({ mode, methodId }: Props) {
     });
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminPageSkeleton message="Đang tải phương thức giao hàng…" />;
 
   return (
     <form className="admin-panel" onSubmit={(e) => void handleSubmit(e)}>

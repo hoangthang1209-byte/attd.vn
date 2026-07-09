@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { MediaAsset } from "@prisma/client";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 import type { StorageFolderKey } from "@/lib/storage/types";
 import {
   ALLOWED_IMAGE_EXTENSIONS,
@@ -191,7 +193,7 @@ export default function MediaPicker({
                 className="admin-input admin-input--inline"
               />
               <label className={`admin-btn admin-btn--primary admin-upload-btn${uploading ? " admin-btn--disabled" : ""}`}>
-                {uploading ? "Đang tải lên..." : "Tải ảnh mới"}
+                {uploading ? <ButtonLoading title="Đang tải lên..." tone="admin" /> : "Tải ảnh mới"}
                 <input
                   type="file"
                   accept={ALLOWED_IMAGE_EXTENSIONS.join(",")}
@@ -207,7 +209,7 @@ export default function MediaPicker({
             )}
 
             {loading ? (
-              <p className="admin-loading">Đang tải...</p>
+              <AdminLoadingState label="Đang tải thư viện ảnh…" rows={4} />
             ) : assets.length === 0 ? (
               <div className="admin-empty-state">
                 <p>Chưa có ảnh trong thư mục này.</p>

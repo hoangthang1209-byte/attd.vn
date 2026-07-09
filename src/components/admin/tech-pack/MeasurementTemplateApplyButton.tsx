@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type TemplateOption = {
   id: string;
@@ -75,7 +76,7 @@ export default function MeasurementTemplateApplyButton({
               onChange={(e) => setSearch(e.target.value)}
             />
             {error && <p className="admin-error">{error}</p>}
-            {loading && <p className="admin-muted">Đang tải...</p>}
+            {loading && <AdminInlineLoader message="Đang tải mẫu thông số…" />}
             <ul className="admin-picker-list">
               {templates.map((t) => (
                 <li key={t.id}>

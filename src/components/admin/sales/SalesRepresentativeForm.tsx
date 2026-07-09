@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 type Props = {
   mode: "create" | "edit";
@@ -97,7 +99,7 @@ export default function SalesRepresentativeForm({ mode, salesRepId }: Props) {
     }
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminLoadingState label="Đang tải nhân viên tư vấn…" />;
 
   return (
     <form className="admin-panel admin-form" onSubmit={(e) => void handleSubmit(e)}>
@@ -105,9 +107,9 @@ export default function SalesRepresentativeForm({ mode, salesRepId }: Props) {
         <Link href="/admin/crm/sales" className="admin-btn admin-btn--secondary">
           Quay lại
         </Link>
-        <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-          {saving ? "Đang lưu…" : "Lưu nhân viên"}
-        </button>
+        <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang lưu…">
+          Lưu nhân viên
+        </AdminLoadingButton>
       </div>
 
       {error && <p className="admin-error">{error}</p>}

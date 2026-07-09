@@ -7,6 +7,7 @@ import type { HandoverReadinessResult } from "@/features/orders/handover-readine
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import OrderItemExecutionCard from "@/components/admin/orders/OrderItemExecutionCard";
 import OrderItemReadinessBadge from "@/components/admin/orders/OrderItemReadinessBadge";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type Props = {
   orderId: string;
@@ -95,7 +96,7 @@ export default function OrderProductionExecutionSection({ orderId, order }: Prop
       )}
 
       {loading ? (
-        <p className="admin-loading">Đang tải…</p>
+        <AdminInlineLoader message="Đang tải tiến độ sản xuất…" />
       ) : (
         <>
           <div className="order-item-execution-list">

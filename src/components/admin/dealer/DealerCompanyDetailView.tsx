@@ -9,6 +9,7 @@ import {
   DealerUserRoleBadge,
   DealerUserStatusBadge,
 } from "@/components/admin/dealer/DealerBadges";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
 import {
   DEALER_ACTIVITY_TYPE_LABELS,
   DEALER_USER_ROLE_LABELS,
@@ -148,7 +149,7 @@ export default function DealerCompanyDetailView({ companyId }: DealerCompanyDeta
     await loadActivities();
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) return <AdminLoadingState label="Đang tải hồ sơ đại lý…" />;
   if (error || !company) {
     return (
       <div className="admin-empty-state admin-empty-state--error">

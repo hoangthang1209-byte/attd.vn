@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatPricingCurrency, formatQuantityRange } from "@/features/pricing/format";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { PriceGroupRecord, ProductPriceTierRecord } from "@/features/pricing/types";
 
 type ProductOption = { id: string; name: string; productCode: string | null };
@@ -153,13 +155,13 @@ export default function ProductTiersManager() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>{saving ? "Đang lưu…" : "Lưu"}</button>
+            <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang lưu bảng giá…">Lưu</AdminLoadingButton>
             <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setShowForm(false)}>Hủy</button>
           </div>
         </form>
       )}
 
-      {loading ? <p className="admin-loading">Đang tải...</p> : tiers.length === 0 ? (
+      {loading ? <AdminLoadingState label="Đang tải bảng giá sản phẩm…" /> : tiers.length === 0 ? (
         <div className="admin-empty-state"><p>Chưa có dòng giá nào. Thêm bảng giá sản phẩm để bộ tính giá hoạt động.</p></div>
       ) : (
         <div className="admin-table-wrap">

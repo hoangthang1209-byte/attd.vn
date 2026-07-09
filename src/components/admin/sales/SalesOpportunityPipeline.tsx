@@ -10,6 +10,7 @@ import {
   EmptyState,
   PageHeader,
 } from "@/components/admin/AdminUi";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { formatQuoteCurrency, formatQuoteDate } from "@/features/quotes/format";
 import {
   SALES_OPPORTUNITY_PRIORITY_BADGE_CLASS,
@@ -360,9 +361,9 @@ export default function SalesOpportunityPipeline() {
             </label>
           </div>
           <div className="sales-pipeline-create__actions">
-            <button type="submit" className="admin-btn admin-btn--primary" disabled={creating}>
-              {creating ? "Đang tạo…" : "Lưu cơ hội"}
-            </button>
+            <AdminLoadingButton type="submit" variant="primary" pending={creating} pendingLabel="Đang tạo…">
+              Lưu cơ hội
+            </AdminLoadingButton>
           </div>
         </form>
       )}

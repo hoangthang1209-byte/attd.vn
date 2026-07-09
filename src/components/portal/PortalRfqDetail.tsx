@@ -9,6 +9,7 @@ import {
   DEALER_RFQ_STATUS_LABELS,
   type DealerRFQRecord,
 } from "@/features/dealer/dealer-rfq.types";
+import { SectionLoading, TableLoading, ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 type PortalRfqDetailProps = {
   rfqId: string;
@@ -63,7 +64,15 @@ export default function PortalRfqDetail({ rfqId }: PortalRfqDetailProps) {
     }
   }
 
-  if (loading) return <p style={{ color: "#737373" }}>Đang tải…</p>;
+  if (loading) {
+    return (
+      <SectionLoading
+        title="Đang tải chi tiết RFQ…"
+        description="Hệ thống đang đồng bộ yêu cầu báo giá của bạn."
+        tone="dealer"
+      />
+    );
+  }
   if (error || !rfq) {
     return (
       <div className="portal-page">
@@ -176,9 +185,10 @@ export default function PortalRfqDetail({ rfqId }: PortalRfqDetailProps) {
             type="button"
             className="portal-btn portal-btn--primary"
             disabled={submitting}
+            aria-busy={submitting || undefined}
             onClick={() => void submitRfq()}
           >
-            Gửi RFQ
+            {submitting ? <ButtonLoading title="Đang gửi RFQ…" tone="dealer" /> : "Gửi RFQ"}
           </button>
         )}
         <Link href="/portal/rfq" className="portal-btn">

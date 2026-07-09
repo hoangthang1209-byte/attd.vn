@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+
 type Props = { onImported: () => void };
 
 export default function KnowledgeBaseStarterImport({ onImported }: Props) {
@@ -31,9 +33,9 @@ export default function KnowledgeBaseStarterImport({ onImported }: Props) {
         Tạo 12 entry mẫu về thương hiệu, sản phẩm, OEM, đại lý, logistics, brand voice và SEO clusters.
         Dữ liệu mẫu được đánh dấu nháp / chưa verified — cần kiểm chứng trước khi dùng cho AI.
       </p>
-      <button type="button" className="admin-btn admin-btn--primary" disabled={loading} onClick={() => void importStarter()}>
-        {loading ? "Đang tạo…" : "Tạo dữ liệu mẫu ATTD"}
-      </button>
+      <AdminLoadingButton variant="primary" pending={loading} pendingLabel="Đang tạo dữ liệu mẫu…" onClick={() => void importStarter()}>
+        Tạo dữ liệu mẫu ATTD
+      </AdminLoadingButton>
       {message && <p className="admin-field-hint">{message}</p>}
     </div>
   );

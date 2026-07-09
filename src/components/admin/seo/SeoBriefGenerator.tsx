@@ -7,6 +7,7 @@ import KnowledgeBaseContextPanel, {
   type KnowledgeContextSelection,
 } from "@/components/admin/blog-editor/KnowledgeBaseContextPanel";
 import SeoBriefResult from "@/components/admin/seo/SeoBriefResult";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { SeoBriefResponse } from "@/features/seo/seo-brief-types";
 import { SEARCH_INTENT_LABELS } from "@/features/seo/seo-brief-types";
 import type { SearchIntent } from "@/features/seo/seo-brief-types";
@@ -203,14 +204,16 @@ export default function SeoBriefGenerator() {
 
         {error && <p className="admin-error">{error}</p>}
 
-        <button
+        <AdminLoadingButton
           type="button"
-          className="admin-btn admin-btn--primary"
+          variant="primary"
+          pending={loading}
+          pendingLabel="Đang tạo brief…"
           disabled={loading || !targetKeyword.trim()}
           onClick={() => void generate()}
         >
-          {loading ? "Đang tạo brief…" : "Tạo SEO Brief"}
-        </button>
+          Tạo SEO Brief
+        </AdminLoadingButton>
       </div>
 
       {result && (

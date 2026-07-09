@@ -7,6 +7,7 @@ import CrmActivityTimeline from "@/components/admin/crm/CrmActivityTimeline";
 import { displayLeadCompanyName, displayLeadContactName } from "@/features/crm/labels";
 import { formatCrmDateTime } from "@/features/crm/format";
 import type { CrmOverviewMetrics } from "@/features/crm/types";
+import { CardGridLoading } from "@/components/ui/loading/ContextLoading";
 
 export default function CrmOverviewDashboard() {
   const [data, setData] = useState<CrmOverviewMetrics | null>(null);
@@ -27,7 +28,16 @@ export default function CrmOverviewDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) {
+    return (
+      <CardGridLoading
+        title="Đang tải tổng quan CRM..."
+        description="Hệ thống đang tải chỉ số, lead gần đây và hoạt động chăm sóc."
+        tone="admin"
+        cards={5}
+      />
+    );
+  }
   if (error) {
     return (
       <div className="admin-empty-state admin-empty-state--error">

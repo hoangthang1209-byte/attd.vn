@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import { TECH_PACK_RELEASE_ACTION_LABELS } from "@/features/tech-pack/tech-pack-bom-labels";
 import type { TechPackReleaseAction } from "@prisma/client";
 
@@ -38,7 +39,7 @@ export default function TechPackReleaseHistoryPanel({ techPackId }: Props) {
   return (
     <div className="tech-pack-release-history">
       <h3 className="tech-pack-sidebar__title">Lịch sử phát hành</h3>
-      {loading && <p className="admin-muted">Đang tải...</p>}
+      {loading && <AdminInlineLoader message="Đang tải lịch sử phát hành…" />}
       {!loading && items.length === 0 && <p className="admin-muted">Chưa có lịch sử.</p>}
       <ul className="tech-pack-release-history__timeline">
         {items.map((item) => (

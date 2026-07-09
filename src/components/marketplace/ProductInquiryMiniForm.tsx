@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 
@@ -136,7 +137,11 @@ export default function ProductInquiryMiniForm({
         className="btn-primary mp-inquiry-btn"
         disabled={formStatus === "loading"}
       >
-        {formStatus === "loading" ? "Đang gửi..." : "Gửi yêu cầu"}
+        {formStatus === "loading" ? (
+          <ButtonLoading title="Đang gửi yêu cầu…" tone="public" />
+        ) : (
+          "Gửi yêu cầu"
+        )}
       </button>
     </form>
   );

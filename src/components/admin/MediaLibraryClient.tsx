@@ -7,6 +7,7 @@ import {
   ALLOWED_IMAGE_EXTENSIONS,
   inferImageMimeType,
 } from "@/lib/imageValidation";
+import { CardGridLoading, InlineLoading } from "@/components/ui/loading/ContextLoading";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const WARN_FILE_SIZE = 500 * 1024;
@@ -237,7 +238,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                   <span className="admin-media-queue-name">{item.file.name}</span>
                   <span className="admin-media-queue-size">({(item.file.size / 1024).toFixed(0)}KB)</span>
                   <span className="admin-media-queue-status">
-                    {item.status === "uploading" && "⏳ Đang tải…"}
+                    {item.status === "uploading" && <InlineLoading title="Đang tải…" tone="admin" />}
                     {item.status === "done" && "✅ Xong"}
                     {item.status === "pending" && "⏸ Chờ"}
                     {item.status === "warn" && `⚠ ${item.warning}`}
@@ -274,7 +275,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
 
       {/* Grid */}
       {loading ? (
-        <p className="admin-field-hint">Đang tải thư viện ảnh…</p>
+        <CardGridLoading title="Đang tải thư viện ảnh…" tone="admin" cards={8} />
       ) : assets.length === 0 ? (
         <div className="admin-empty-state">
           <p>Chưa có ảnh trong thư mục này.</p>

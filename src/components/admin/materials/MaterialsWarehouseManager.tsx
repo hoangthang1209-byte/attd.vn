@@ -6,6 +6,7 @@ import { MATERIAL_TYPE_LABELS, WAREHOUSE_STATUS_LABELS, STOCK_ADJUSTMENT_TYPE_LA
 import type { MaterialStockAdjustmentType } from "@prisma/client";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
+import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 
 type WarehouseRow = {
   materialId: string;
@@ -93,7 +94,7 @@ export default function MaterialsWarehouseManager() {
   return (
     <div>
       {loading ? (
-        <p className="admin-field-hint">Đang tải…</p>
+        <AdminInlineLoader message="Đang tải tồn kho vật tư…" />
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">

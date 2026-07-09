@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import type { CrmContactRecord } from "@/features/crm/types";
 
 type Props = {
@@ -99,9 +100,9 @@ export default function QuickAddContactModal({
           <button type="button" className="admin-btn admin-btn--secondary" onClick={onClose}>
             Hủy
           </button>
-          <button type="submit" className="admin-btn admin-btn--primary" disabled={saving}>
-            {saving ? "Đang lưu…" : "Thêm liên hệ"}
-          </button>
+          <AdminLoadingButton type="submit" variant="primary" pending={saving} pendingLabel="Đang thêm liên hệ…">
+            Thêm liên hệ
+          </AdminLoadingButton>
         </div>
       </form>
     </div>

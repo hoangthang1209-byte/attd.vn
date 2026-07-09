@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AdminLoadingState, AdminPageShell } from "@/components/admin/AdminUi";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { TechPackStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import PatternPicker from "@/components/admin/tech-pack/PatternPicker";
 import {
@@ -465,14 +466,16 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
                 Quay lại
               </Link>
               {!readOnly && (
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--primary admin-btn--xs"
+                <AdminLoadingButton
+                  variant="primary"
+                  size="xs"
+                  pending={saveStatus === "saving"}
+                  pendingLabel="Đang lưu Tech Pack…"
                   disabled={!isDirty || saveStatus === "saving"}
                   onClick={() => void saveTechPackDraft()}
                 >
-                  {saveStatus === "saving" ? "Đang lưu…" : "Lưu"}
-                </button>
+                  Lưu
+                </AdminLoadingButton>
               )}
               {!readOnly && (
                 <button type="button" className="admin-btn admin-btn--xs" onClick={() => void release()}>
