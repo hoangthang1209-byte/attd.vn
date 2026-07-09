@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
 
 type Variant = "primary" | "secondary" | "danger" | "ghost";
 
@@ -49,11 +49,8 @@ export default function AdminLoadingButton({
       aria-busy={pending || undefined}
       {...props}
     >
-      {pending && (
-        <Loader2 className="admin-loading-button__spinner" aria-hidden size={14} />
-      )}
       <span className="admin-loading-button__label">
-        {pending ? pendingLabel ?? "Đang xử lý…" : children}
+        {pending ? <ButtonLoading title={pendingLabel ?? "Đang lưu thông tin..."} tone="admin" /> : children}
       </span>
     </button>
   );

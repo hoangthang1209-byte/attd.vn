@@ -1,4 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import { TableLoading } from "@/components/ui/loading/ContextLoading";
 
 function joinClasses(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -172,18 +173,12 @@ export function AdminLoadingState({
   rows?: number;
 }) {
   return (
-    <div className="admin-loading-state" role="status" aria-live="polite">
-      <span className="admin-loading-state__label">{label}</span>
-      <div className="admin-loading-state__rows" aria-hidden="true">
-        {Array.from({ length: rows }, (_, index) => (
-          <span
-            key={index}
-            className="admin-loading-state__row"
-            style={{ width: `${100 - (index % 3) * 11}%` }}
-          />
-        ))}
-      </div>
-    </div>
+    <TableLoading
+      title={label}
+      tone="admin"
+      rows={rows}
+      description="Hệ thống đang đồng bộ dữ liệu vận hành."
+    />
   );
 }
 

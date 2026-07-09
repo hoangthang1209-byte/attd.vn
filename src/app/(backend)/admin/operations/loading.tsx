@@ -1,15 +1,11 @@
+import { PageLoading } from "@/components/ui/loading/ContextLoading";
+
 export default function AdminOperationsLoading() {
   return (
-    <div className="admin-route-loading" aria-busy="true" aria-live="polite">
-      <div className="admin-route-loading__bar">
-        <div className="admin-route-loading__bar-inner" />
-      </div>
-      <div className="admin-route-loading__skeleton-grid">
-        <div className="admin-route-loading__skeleton admin-route-loading__skeleton--title" />
-        <div className="admin-route-loading__skeleton admin-route-loading__skeleton--wide" />
-        <div className="admin-route-loading__skeleton admin-route-loading__skeleton--medium" />
-        <div className="admin-route-loading__skeleton admin-route-loading__skeleton--short" />
-      </div>
-    </div>
+    <PageLoading
+      title="Đang tải dữ liệu vận hành..."
+      description="Hệ thống đang tổng hợp trạng thái sản xuất và giao vận."
+      tone="admin"
+    />
   );
 }

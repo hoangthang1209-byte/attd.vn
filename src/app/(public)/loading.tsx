@@ -1,10 +1,13 @@
+import { PageLoading } from "@/components/ui/loading/ContextLoading";
+
 export default function PublicLoading() {
   return (
-    <div className="public-loading" role="status" aria-label="Đang tải">
-      <div className="public-loading-inner">
-        <span className="nav-progress-spinner nav-progress-spinner--lg" />
-        <p className="public-loading-text">Đang tải…</p>
-      </div>
-    </div>
+    <PageLoading
+      title="Đang tải thông tin trang..."
+      description="Nội dung đang được chuẩn bị cho bạn."
+      tone="public"
+      size="lg"
+      className="public-loading"
+    />
   );
 }
