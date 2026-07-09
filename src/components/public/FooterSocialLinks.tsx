@@ -17,7 +17,7 @@ export default function FooterSocialLinks({ links }: Props) {
             href={link.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="site-footer-social-link"
+            className="site-footer-social-pill"
           >
             {link.label}
           </a>

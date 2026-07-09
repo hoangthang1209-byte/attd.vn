@@ -23,10 +23,15 @@ export default function FooterCtaBand({ company, branding }: Props) {
       <div className="container">
         <div className="footer-cta-inner">
           <div className="footer-cta-copy">
-            <h2 className="footer-cta-title">Bạn đang tìm nguồn hàng B2B?</h2>
+            <p className="footer-cta-eyebrow">Đối tác B2B &amp; OEM</p>
+            <h2 className="footer-cta-title">Sẵn sàng nhận báo giá theo số lượng?</h2>
             <p className="footer-cta-desc">
-              Gửi yêu cầu để ATTD tư vấn MOQ, thời gian giao/sản xuất và báo giá theo số lượng
-              cho đại lý, agency và doanh nghiệp.
+              Gửi yêu cầu để ATTD tư vấn MOQ, thời gian sản xuất và báo giá cho đại lý, agency và
+              doanh nghiệp.
+            </p>
+            <p className="footer-cta-note">
+              {VERIFIED_EXPERIENCE_YEARS}+ năm kinh nghiệm · OEM / B2B sourcing · Designed &amp;
+              Manufactured in Vietnam
             </p>
           </div>
           <div className="footer-cta-btns">
@@ -45,7 +50,7 @@ export default function FooterCtaBand({ company, branding }: Props) {
                 trackSource="footer_cta_band"
                 className="btn-secondary footer-cta-btn-secondary"
               >
-                Gọi {company.hotline.display}
+                Hotline {company.hotline.display}
               </TrackedAnchor>
             ) : zaloUrl ? (
               <TrackedAnchor
@@ -60,18 +65,6 @@ export default function FooterCtaBand({ company, branding }: Props) {
               </TrackedAnchor>
             ) : null}
           </div>
-        </div>
-        <div className="footer-trust-chips" aria-label="Điểm tin cậy">
-          {[
-            `${VERIFIED_EXPERIENCE_YEARS}+ năm kinh nghiệm`,
-            "OEM / Private Label",
-            "Showroom & Kho hàng",
-            "Giao hàng toàn quốc",
-          ].map((chip) => (
-            <span key={chip} className="footer-trust-chip">
-              {chip}
-            </span>
-          ))}
         </div>
       </div>
     </section>

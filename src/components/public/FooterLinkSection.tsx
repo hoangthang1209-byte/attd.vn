@@ -12,9 +12,9 @@ type Props = {
 
 export default function FooterLinkSection({ title, links, className }: Props) {
   return (
-    <details className={["site-footer-accordion", className].filter(Boolean).join(" ")}>
+    <details className={["site-footer-nav", className].filter(Boolean).join(" ")}>
       <summary className="site-footer-heading">{title}</summary>
-      <div className="site-footer-links">
+      <nav className="site-footer-links" aria-label={title}>
         {links.map((link) => (
           <Link
             key={link.href}
@@ -25,7 +25,7 @@ export default function FooterLinkSection({ title, links, className }: Props) {
             {link.label}
           </Link>
         ))}
-      </div>
+      </nav>
     </details>
   );
 }
