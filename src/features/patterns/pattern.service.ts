@@ -22,8 +22,22 @@ export class PatternValidationError extends Error {
   }
 }
 
+const PATTERN_CATEGORY_VISUAL_SELECT = {
+  id: true,
+  name: true,
+  parentId: true,
+  skuCode: true,
+  imageUrl: true,
+  products: {
+    where: { status: "ACTIVE" as const },
+    take: 1,
+    select: { featuredImage: true },
+    orderBy: { createdAt: "desc" as const },
+  },
+} as const;
+
 const PATTERN_INCLUDE = {
-  productCategory: { select: { id: true, name: true, parentId: true, skuCode: true } },
+  productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
   product: { select: { id: true, name: true, productCode: true } },
   customer: { select: { id: true, name: true, code: true } },
   files: { orderBy: { sortOrder: "asc" as const } },
@@ -60,7 +74,7 @@ export async function listPatterns(input?: {
   const items = await prisma.pattern.findMany({
     where,
     include: {
-      productCategory: { select: { id: true, name: true } },
+      productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
       customer: { select: { id: true, name: true, code: true } },
       _count: { select: { files: true, techPacks: true } },
     },

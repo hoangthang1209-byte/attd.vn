@@ -12,6 +12,15 @@ import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityS
 import type { PatternSourceType, PatternStatus } from "@prisma/client";
 import { patternAdminDetailPath } from "@/features/patterns/pattern-admin-routes";
 import { formatPatternSourceLabel } from "@/features/patterns/pattern-source-labels";
+import PatternCategoryThumbnail from "@/components/admin/patterns/PatternCategoryThumbnail";
+import { normalizePatternCategoryVisual } from "@/features/patterns/pattern-category-visual";
+
+type PatternCategoryVisual = {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  products?: Array<{ featuredImage: string | null }>;
+};
 
 type PatternRow = {
   id: string;
@@ -23,7 +32,7 @@ type PatternRow = {
   sourceSupplier: string | null;
   customerNameSnapshot: string | null;
   updatedAt: string;
-  productCategory?: { name: string } | null;
+  productCategory?: PatternCategoryVisual | null;
   customer?: { name: string; code: string } | null;
   _count?: { files: number; techPacks: number };
 };
@@ -128,6 +137,7 @@ export default function PatternListManager() {
           <table className="admin-table admin-table--compact">
             <thead>
               <tr>
+                <th className="pattern-list__thumb-col" aria-label="Ảnh" />
                 <th>Mã rập</th>
                 <th>Tên rập</th>
                 <th>Version</th>
@@ -144,6 +154,12 @@ export default function PatternListManager() {
             <tbody>
               {items.map((row) => (
                 <tr key={row.id}>
+                  <td className="pattern-list__thumb-cell">
+                    <PatternCategoryThumbnail
+                      category={normalizePatternCategoryVisual(row.productCategory)}
+                      size="list"
+                    />
+                  </td>
                   <td>{row.code}</td>
                   <td>{row.name}</td>
                   <td>{row.version}</td>

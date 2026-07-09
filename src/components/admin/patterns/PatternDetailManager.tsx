@@ -37,6 +37,11 @@ import type { PatternFileType, PatternSourceType, PatternStatus, ProductionMater
 import {
   PATTERN_ADMIN_LIST_PATH,
 } from "@/features/patterns/pattern-admin-routes";
+import PatternCategoryThumbnail from "@/components/admin/patterns/PatternCategoryThumbnail";
+import {
+  normalizePatternCategoryVisual,
+  type PatternCategoryVisualInput,
+} from "@/features/patterns/pattern-category-visual";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import {
   adminApiFetch,
@@ -87,7 +92,12 @@ type PatternDetail = {
   customerId: string | null;
   customerNameSnapshot: string | null;
   sourceNotes: string | null;
-  productCategory?: { id: string; name: string } | null;
+  productCategory?: {
+    id: string;
+    name: string;
+    imageUrl?: string | null;
+    products?: Array<{ featuredImage: string | null }>;
+  } | null;
   customer?: { id: string; name: string; code: string } | null;
   product?: { id: string; name: string; productCode: string | null } | null;
   _count?: { techPacks: number };
@@ -634,7 +644,23 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   );
   const customerLabel =
     selectedCustomer?.name ?? (draft.customerNameSnapshot.trim() || null);
-  const categoryLabel = pattern.productCategory?.name ?? "—";
+  const draftCategoryVisual: PatternCategoryVisualInput | null = (() => {
+    if (draft.productCategoryId) {
+      const fromPicker = categories.find((category) => category.id === draft.productCategoryId);
+      if (fromPicker) {
+        return {
+          name: fromPicker.name,
+          imageUrl: fromPicker.imageUrl ?? null,
+          featuredImage: null,
+        };
+      }
+    }
+    return normalizePatternCategoryVisual(pattern.productCategory);
+  })();
+  const categoryLabel =
+    categories.find((category) => category.id === draft.productCategoryId)?.name
+    ?? pattern.productCategory?.name
+    ?? "—";
 
   return (
     <AdminPageShell>
@@ -653,22 +679,29 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
 
           <div className="pattern-workspace__header-main">
             <div className="pattern-workspace__title-block">
-              <h1 className="pattern-workspace__title">
-                {pattern.code} — {draft.name || pattern.name}
-              </h1>
-              <div className="pattern-workspace__badges">
-                <PatternStatusBadge status={pattern.status} />
-                <span className="pattern-workspace__badge pattern-workspace__badge--version">
-                  v{draft.version || pattern.version}
-                </span>
-                {sourceBadge && (
-                  <span className="pattern-workspace__badge pattern-workspace__badge--source">
-                    {sourceBadge}
+              <PatternCategoryThumbnail
+                category={draftCategoryVisual}
+                size="header"
+                showName={Boolean(draftCategoryVisual?.name)}
+              />
+              <div className="pattern-workspace__title-content">
+                <h1 className="pattern-workspace__title">
+                  {pattern.code} — {draft.name || pattern.name}
+                </h1>
+                <div className="pattern-workspace__badges">
+                  <PatternStatusBadge status={pattern.status} />
+                  <span className="pattern-workspace__badge pattern-workspace__badge--version">
+                    v{draft.version || pattern.version}
                   </span>
-                )}
-                <span className={`admin-status-badge admin-status-badge--${saveStatusTone()}`}>
-                  {saveStatusLabel()}
-                </span>
+                  {sourceBadge && (
+                    <span className="pattern-workspace__badge pattern-workspace__badge--source">
+                      {sourceBadge}
+                    </span>
+                  )}
+                  <span className={`admin-status-badge admin-status-badge--${saveStatusTone()}`}>
+                    {saveStatusLabel()}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -735,9 +768,14 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
               <span className="pattern-workspace__chip-label">Khách hàng</span>
               <strong>{customerLabel ?? "—"}</strong>
             </span>
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">Danh mục</span>
-              <strong>{categoryLabel}</strong>
+            <span className="pattern-workspace__chip pattern-workspace__chip--with-thumb">
+              {draftCategoryVisual?.name ? (
+                <PatternCategoryThumbnail category={draftCategoryVisual} size="list" />
+              ) : null}
+              <span className="pattern-workspace__chip-text">
+                <span className="pattern-workspace__chip-label">Danh mục</span>
+                <strong>{categoryLabel}</strong>
+              </span>
             </span>
             <span className="pattern-workspace__chip">
               <span className="pattern-workspace__chip-label">Điểm đo</span>

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { PatternSourceType, PatternStatus } from "@prisma/client";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import { formatPatternSourceLabel } from "@/features/patterns/pattern-source-labels";
+import PatternCategoryThumbnail from "@/components/admin/patterns/PatternCategoryThumbnail";
+import { normalizePatternCategoryVisual } from "@/features/patterns/pattern-category-visual";
 
 export type PatternPickerOption = {
   id: string;
@@ -14,7 +16,12 @@ export type PatternPickerOption = {
   status: PatternStatus;
   sourceType: PatternSourceType | null;
   customerNameSnapshot: string | null;
-  productCategory?: { name: string } | null;
+  productCategory?: {
+    id: string;
+    name: string;
+    imageUrl?: string | null;
+    products?: Array<{ featuredImage: string | null }>;
+  } | null;
   customer?: { name: string; code: string } | null;
 };
 
@@ -90,19 +97,24 @@ export default function PatternPicker({ value, onChange, disabled }: Props) {
                   setOpen(false);
                 }}
               >
-                <span>
-                  <strong>{p.code}</strong> — {p.name}
-                </span>
-                <span className="pattern-picker__meta">
-                  {formatPatternSourceLabel(p.sourceType) && (
-                    <span>{formatPatternSourceLabel(p.sourceType)}</span>
-                  )}
-                  {(p.customer?.name ?? p.customerNameSnapshot) && (
-                    <span>{p.customer?.name ?? p.customerNameSnapshot}</span>
-                  )}
-                  {p.productCategory?.name && <span>{p.productCategory.name}</span>}
-                  {p.baseSize && <span>Base: {p.baseSize}</span>}
-                  <PatternStatusBadge status={p.status} />
+                <PatternCategoryThumbnail
+                  category={normalizePatternCategoryVisual(p.productCategory)}
+                  size="picker"
+                />
+                <span className="pattern-picker__option-body">
+                  <span className="pattern-picker__option-title">
+                    <strong>{p.code}</strong> — {p.name}
+                  </span>
+                  <span className="pattern-picker__meta">
+                    {formatPatternSourceLabel(p.sourceType) && (
+                      <span>{formatPatternSourceLabel(p.sourceType)}</span>
+                    )}
+                    {(p.customer?.name ?? p.customerNameSnapshot) && (
+                      <span>{p.customer?.name ?? p.customerNameSnapshot}</span>
+                    )}
+                    {p.productCategory?.name && <span>{p.productCategory.name}</span>}
+                    <PatternStatusBadge status={p.status} />
+                  </span>
                 </span>
               </button>
             </li>

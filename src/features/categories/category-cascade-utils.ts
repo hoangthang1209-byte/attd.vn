@@ -5,6 +5,7 @@ export type ProductCategoryPickerItem = {
   skuCode?: string | null;
   parentId?: string | null;
   isActive?: boolean;
+  imageUrl?: string | null;
 };
 
 export function formatProductCategoryOptionLabel(category: ProductCategoryPickerItem): string {
