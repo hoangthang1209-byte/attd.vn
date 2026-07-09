@@ -6,6 +6,10 @@ import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityS
 import { formatPatternSourceLabel } from "@/features/patterns/pattern-source-labels";
 import PatternCategoryThumbnail from "@/components/admin/patterns/PatternCategoryThumbnail";
 import { normalizePatternCategoryVisual } from "@/features/patterns/pattern-category-visual";
+import {
+  formatPatternSupplierPickerLabel,
+  patternSourceShowsSupplier,
+} from "@/features/patterns/pattern-supplier-display";
 
 export type PatternPickerOption = {
   id: string;
@@ -15,7 +19,10 @@ export type PatternPickerOption = {
   baseSize: string | null;
   status: PatternStatus;
   sourceType: PatternSourceType | null;
+  sourceSupplier: string | null;
+  sourceSupplierCode: string | null;
   customerNameSnapshot: string | null;
+  patternSupplier?: { code: string; name: string } | null;
   productCategory?: {
     id: string;
     name: string;
@@ -111,6 +118,18 @@ export default function PatternPicker({ value, onChange, disabled }: Props) {
                     )}
                     {(p.customer?.name ?? p.customerNameSnapshot) && (
                       <span>{p.customer?.name ?? p.customerNameSnapshot}</span>
+                    )}
+                    {patternSourceShowsSupplier(p.sourceType) &&
+                      formatPatternSupplierPickerLabel({
+                        name: p.sourceSupplier,
+                        patternSupplier: p.patternSupplier,
+                      }) && (
+                      <span>
+                        {formatPatternSupplierPickerLabel({
+                          name: p.sourceSupplier,
+                          patternSupplier: p.patternSupplier,
+                        })}
+                      </span>
                     )}
                     {p.productCategory?.name && <span>{p.productCategory.name}</span>}
                     <PatternStatusBadge status={p.status} />

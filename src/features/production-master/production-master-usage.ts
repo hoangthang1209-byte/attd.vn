@@ -11,12 +11,19 @@ export async function getProductionTrimUsageCount(id: string) {
 }
 
 export async function getProductionSupplierUsageCount(id: string) {
-  const [bomCount, materialCount, trimCount] = await Promise.all([
+  const [bomCount, materialCount, trimCount, patternCount] = await Promise.all([
     prisma.techPackBomItem.count({ where: { supplierId: id } }),
     prisma.productionMaterial.count({ where: { supplierId: id } }),
     prisma.productionTrim.count({ where: { supplierId: id } }),
+    prisma.pattern.count({ where: { patternSupplierId: id } }),
   ]);
-  return { bomCount, materialCount, trimCount, total: bomCount + materialCount + trimCount };
+  return {
+    bomCount,
+    materialCount,
+    trimCount,
+    patternCount,
+    total: bomCount + materialCount + trimCount + patternCount,
+  };
 }
 
 export async function getPrintMethodUsageCount(id: string) {

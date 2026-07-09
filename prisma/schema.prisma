@@ -3214,6 +3214,17 @@ enum PatternStatus {
   ARCHIVED
 }
 
+enum SupplierCategory {
+  PATTERN_ROOM
+  FABRIC_SUPPLIER
+  TRIM_SUPPLIER
+  PRINT_EMBROIDERY
+  SEWING_FACTORY
+  WASH_FACTORY
+  LOGISTICS
+  GENERAL
+}
+
 enum PatternSourceType {
   INTERNAL
   EXTERNAL_STUDIO
@@ -3445,6 +3456,8 @@ model Pattern {
   status                     PatternStatus               @default(DRAFT)
   productionMaterialCategory ProductionMaterialCategory?
   sourceType                 PatternSourceType?
+  patternSupplierId          String?
+  sourceSupplierCode         String?
   sourceSupplier             String?
   sourceSupplierContact      String?
   sourcePhone                String?
@@ -3462,6 +3475,7 @@ model Pattern {
   productCategory Category?            @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
   product         Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
   customer        Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  patternSupplier ProductionSupplier?  @relation(fields: [patternSupplierId], references: [id], onDelete: SetNull)
   files           PatternFile[]
   measurements    PatternMeasurement[]
   techPacks       TechPack[]
@@ -3469,6 +3483,7 @@ model Pattern {
   @@index([productCategoryId])
   @@index([productId])
   @@index([customerId])
+  @@index([patternSupplierId])
   @@index([status])
   @@index([sourceType])
 }
@@ -3648,24 +3663,27 @@ model MeasurementTemplateValue {
 }
 
 model ProductionSupplier {
-  id        String   @id @default(cuid())
-  code      String   @unique
+  id        String           @id @default(cuid())
+  code      String           @unique
   name      String
+  category  SupplierCategory @default(GENERAL)
   contact   String?
   email     String?
   phone     String?
-  address   String?  @db.Text
-  notes     String?  @db.Text
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  address   String?          @db.Text
+  notes     String?          @db.Text
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   materials ProductionMaterial[]
   trims     ProductionTrim[]
   bomItems  TechPackBomItem[]
+  patterns  Pattern[]
 
   @@index([code])
   @@index([isActive])
+  @@index([category])
 }
 
 model ProductionMaterial {

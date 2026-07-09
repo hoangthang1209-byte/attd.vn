@@ -5,6 +5,8 @@ import {
   PRODUCTION_MATERIAL_CATEGORIES,
   PRODUCTION_TRIM_CATEGORY_LABELS,
   PRODUCTION_TRIM_CATEGORIES,
+  SUPPLIER_CATEGORIES,
+  SUPPLIER_CATEGORY_LABELS,
 } from "@/features/production-master/production-master-labels";
 
 export type MasterEntityKind = "material" | "trim" | "supplier" | "print-method";
@@ -100,7 +102,7 @@ export const PRODUCTION_MATERIAL_ADMIN: MasterAdminConfig = {
     { key: "composition", label: "Thành phần", type: "text" },
     { key: "gsm", label: "GSM", type: "text" },
     { key: "width", label: "Khổ rộng", type: "text" },
-    { key: "supplierId", label: "Nhà cung cấp SX", type: "supplier-select" },
+    { key: "supplierId", label: "Nhà cung cấp", type: "supplier-select" },
     { key: "defaultColor", label: "Màu mặc định", type: "text" },
     { key: "notes", label: "Ghi chú", type: "textarea", fullWidth: true },
     { key: "isActive", label: "Đang sử dụng", type: "checkbox" },
@@ -154,7 +156,7 @@ export const PRODUCTION_TRIM_ADMIN: MasterAdminConfig = {
         label: PRODUCTION_TRIM_CATEGORY_LABELS[v],
       })),
     },
-    { key: "supplierId", label: "Nhà cung cấp SX", type: "supplier-select" },
+    { key: "supplierId", label: "Nhà cung cấp", type: "supplier-select" },
     { key: "notes", label: "Ghi chú", type: "textarea", fullWidth: true },
     { key: "isActive", label: "Đang sử dụng", type: "checkbox" },
   ],
@@ -162,13 +164,18 @@ export const PRODUCTION_TRIM_ADMIN: MasterAdminConfig = {
 
 export const PRODUCTION_SUPPLIER_ADMIN: MasterAdminConfig = {
   kind: "supplier",
-  title: "Nhà cung cấp sản xuất",
+  title: "Nhà cung cấp",
   listPath: "/admin/production-suppliers",
   apiPath: "/api/production-suppliers",
   createLabel: "Tên nhà cung cấp",
   columns: [
     { key: "code", label: "Mã" },
     { key: "name", label: "Tên" },
+    {
+      key: "category",
+      label: "Loại",
+      render: (row) => categoryLabel(SUPPLIER_CATEGORY_LABELS, row.category),
+    },
     { key: "contact", label: "Liên hệ", render: (row) => String(row.contact ?? "—") },
     { key: "email", label: "Email", render: (row) => String(row.email ?? "—") },
     { key: "phone", label: "Điện thoại", render: (row) => String(row.phone ?? "—") },
@@ -179,7 +186,7 @@ export const PRODUCTION_SUPPLIER_ADMIN: MasterAdminConfig = {
     },
     {
       key: "usageCount",
-      label: "Tech Pack BOM",
+      label: "Tham chiếu",
       render: (row) => {
         const count = Number(row.usageCount ?? 0);
         return count > 0 ? String(count) : "—";
@@ -188,6 +195,15 @@ export const PRODUCTION_SUPPLIER_ADMIN: MasterAdminConfig = {
   ],
   fields: [
     { key: "name", label: "Tên", type: "text" },
+    {
+      key: "category",
+      label: "Loại nhà cung cấp",
+      type: "select",
+      options: SUPPLIER_CATEGORIES.map((value) => ({
+        value,
+        label: SUPPLIER_CATEGORY_LABELS[value] ?? value,
+      })),
+    },
     { key: "contact", label: "Người liên hệ", type: "text" },
     { key: "email", label: "Email", type: "text" },
     { key: "phone", label: "Điện thoại", type: "text" },

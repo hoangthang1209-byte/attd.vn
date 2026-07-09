@@ -5,6 +5,7 @@ import {
   ProductionMasterValidationError,
 } from "@/features/production-master/production-supplier.service";
 import { requireProductionUpdate, requireProductionView } from "@/lib/admin-auth/require-production-api";
+import { parseSupplierCategory } from "@/features/patterns/pattern-supplier-snapshots";
 import { archiveOrDeleteProductionSupplier } from "@/features/production-master/production-master-archive.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
@@ -35,6 +36,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     const body = (await req.json()) as Record<string, unknown>;
     const updated = await updateProductionSupplier(id, {
       name: typeof body.name === "string" ? body.name : undefined,
+      category: parseSupplierCategory(body.category),
       contact: body.contact === null ? null : typeof body.contact === "string" ? body.contact : undefined,
       email: body.email === null ? null : typeof body.email === "string" ? body.email : undefined,
       phone: body.phone === null ? null : typeof body.phone === "string" ? body.phone : undefined,

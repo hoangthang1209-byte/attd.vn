@@ -191,6 +191,10 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
                 <dt>Phụ liệu liên kết</dt>
                 <dd>{usageBreakdown.trimCount ?? 0}</dd>
               </div>
+              <div>
+                <dt>Rập liên kết</dt>
+                <dd>{usageBreakdown.patternCount ?? 0}</dd>
+              </div>
             </>
           )}
         </dl>
@@ -227,7 +231,7 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
                     apiPath="/api/production-suppliers"
                     value={fieldValue("supplierId") || null}
                     displayLabel={label}
-                    placeholder="Chọn NCC sản xuất..."
+                    placeholder="Chọn nhà cung cấp..."
                     onSelect={(picked) =>
                       void save({ supplierId: picked?.id ?? null })
                     }

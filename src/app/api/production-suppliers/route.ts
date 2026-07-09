@@ -4,6 +4,7 @@ import {
   listProductionSuppliers,
   ProductionMasterValidationError,
 } from "@/features/production-master/production-supplier.service";
+import { parseSupplierCategory } from "@/features/patterns/pattern-supplier-snapshots";
 import { requireProductionUpdate, requireProductionView } from "@/lib/admin-auth/require-production-api";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
@@ -16,6 +17,7 @@ export async function GET(req: NextRequest) {
       search: searchParams.get("search") ?? undefined,
       activeOnly: searchParams.get("activeOnly") === "true",
       inactiveOnly: searchParams.get("inactiveOnly") === "true",
+      category: searchParams.get("category") ?? undefined,
     });
     return NextResponse.json(result);
   } catch {
@@ -38,6 +40,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Record<string, unknown>;
     const created = await createProductionSupplier({
       name: String(body.name ?? ""),
+      category: parseSupplierCategory(body.category),
       contact: body.contact === null ? null : typeof body.contact === "string" ? body.contact : undefined,
       email: body.email === null ? null : typeof body.email === "string" ? body.email : undefined,
       phone: body.phone === null ? null : typeof body.phone === "string" ? body.phone : undefined,

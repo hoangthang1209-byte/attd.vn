@@ -14,6 +14,7 @@ import { patternAdminDetailPath } from "@/features/patterns/pattern-admin-routes
 import { formatPatternSourceLabel } from "@/features/patterns/pattern-source-labels";
 import PatternCategoryThumbnail from "@/components/admin/patterns/PatternCategoryThumbnail";
 import { normalizePatternCategoryVisual } from "@/features/patterns/pattern-category-visual";
+import { formatPatternSupplierListLabel } from "@/features/patterns/pattern-supplier-display";
 
 type PatternCategoryVisual = {
   id: string;
@@ -30,7 +31,9 @@ type PatternRow = {
   status: PatternStatus;
   sourceType: PatternSourceType | null;
   sourceSupplier: string | null;
+  sourceSupplierCode: string | null;
   customerNameSnapshot: string | null;
+  patternSupplier?: { code: string; name: string } | null;
   updatedAt: string;
   productCategory?: PatternCategoryVisual | null;
   customer?: { name: string; code: string } | null;
@@ -143,6 +146,7 @@ export default function PatternListManager() {
                 <th>Version</th>
                 <th>Trạng thái</th>
                 <th>Nguồn</th>
+                <th>Nhà cung cấp</th>
                 <th>Khách hàng</th>
                 <th>Danh mục</th>
                 <th>File</th>
@@ -167,6 +171,13 @@ export default function PatternListManager() {
                     <PatternStatusBadge status={row.status} />
                   </td>
                   <td>{formatPatternSourceLabel(row.sourceType) ?? "—"}</td>
+                  <td>
+                    {formatPatternSupplierListLabel({
+                      code: row.sourceSupplierCode,
+                      name: row.sourceSupplier,
+                      patternSupplier: row.patternSupplier,
+                    })}
+                  </td>
                   <td>{row.customer?.name ?? row.customerNameSnapshot ?? "—"}</td>
                   <td>{row.productCategory?.name ?? "—"}</td>
                   <td>{row._count?.files ?? 0}</td>

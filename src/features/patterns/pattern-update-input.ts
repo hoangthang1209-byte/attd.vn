@@ -20,6 +20,8 @@ export type PatternUpdateInput = {
   gradingRule?: string | null;
   productionMaterialCategory?: ProductionMaterialCategory | null;
   sourceType?: PatternSourceType | null;
+  patternSupplierId?: string | null;
+  sourceSupplierCode?: string | null;
   sourceSupplier?: string | null;
   sourceSupplierContact?: string | null;
   sourcePhone?: string | null;
@@ -202,6 +204,8 @@ export function parsePatternUpdateBody(body: unknown): PatternUpdateInput {
     gradingRule: nullableString(raw.gradingRule),
     productionMaterialCategory: parseProductionMaterialCategory(raw.productionMaterialCategory),
     sourceType: parsePatternSourceType(raw.sourceType),
+    patternSupplierId: nullableString(raw.patternSupplierId),
+    sourceSupplierCode: nullableString(raw.sourceSupplierCode),
     sourceSupplier: nullableString(raw.sourceSupplier),
     sourceSupplierContact: nullableString(raw.sourceSupplierContact),
     sourcePhone: nullableString(raw.sourcePhone),

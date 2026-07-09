@@ -1,9 +1,10 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, SupplierCategory } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   generateMasterCode,
   ProductionMasterValidationError,
 } from "@/features/production-master/production-master.errors";
+import { parseSupplierCategory } from "@/features/patterns/pattern-supplier-snapshots";
 
 import { getProductionSupplierUsageCount } from "@/features/production-master/production-master-usage";
 
@@ -11,15 +12,19 @@ export async function listProductionSuppliers(input?: {
   search?: string;
   activeOnly?: boolean;
   inactiveOnly?: boolean;
+  category?: string;
 }) {
   const where: Prisma.ProductionSupplierWhereInput = {};
   if (input?.activeOnly) where.isActive = true;
   if (input?.inactiveOnly) where.isActive = false;
+  const category = parseSupplierCategory(input?.category);
+  if (category) where.category = category;
   if (input?.search?.trim()) {
     const q = input.search.trim();
     where.OR = [
       { code: { contains: q, mode: "insensitive" } },
       { name: { contains: q, mode: "insensitive" } },
+      { contact: { contains: q, mode: "insensitive" } },
       { email: { contains: q, mode: "insensitive" } },
       { phone: { contains: q, mode: "insensitive" } },
     ];
@@ -32,6 +37,7 @@ export async function listProductionSuppliers(input?: {
           bomItems: true,
           materials: true,
           trims: true,
+          patterns: true,
         },
       },
     },
@@ -41,7 +47,8 @@ export async function listProductionSuppliers(input?: {
   return {
     items: items.map(({ _count, ...item }) => ({
       ...item,
-      usageCount: _count.bomItems + _count.materials + _count.trims,
+      usageCount: _count.bomItems + _count.materials + _count.trims + _count.patterns,
+      patternCount: _count.patterns,
     })),
   };
 }
@@ -57,12 +64,14 @@ export async function getProductionSupplier(id: string) {
       techPackBom: usage.bomCount,
       materialCount: usage.materialCount,
       trimCount: usage.trimCount,
+      patternCount: usage.patternCount,
     },
   };
 }
 
 export async function createProductionSupplier(input: {
   name: string;
+  category?: SupplierCategory;
   contact?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -77,6 +86,7 @@ export async function createProductionSupplier(input: {
     data: {
       code,
       name,
+      category: input.category ?? SupplierCategory.GENERAL,
       contact: input.contact?.trim() || null,
       email: input.email?.trim() || null,
       phone: input.phone?.trim() || null,
@@ -91,6 +101,7 @@ export async function updateProductionSupplier(
   id: string,
   input: Partial<{
     name: string;
+    category: SupplierCategory;
     contact: string | null;
     email: string | null;
     phone: string | null;
@@ -105,6 +116,7 @@ export async function updateProductionSupplier(
     where: { id },
     data: {
       name: input.name?.trim() ?? undefined,
+      category: input.category,
       contact: input.contact,
       email: input.email,
       phone: input.phone,

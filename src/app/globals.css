@@ -25972,6 +25972,32 @@ body:has(.mp-header--v271) {
 }
 .pattern-list__thumb-col { width: 56px; min-width: 56px; }
 .pattern-list__thumb-cell { width: 56px; min-width: 56px; vertical-align: middle; padding-right: 4px !important; }
+.supplier-search-field { display: flex; flex-direction: column; gap: 8px; }
+.supplier-search-field__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.supplier-search-field__filter-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #64748b; }
+.supplier-search-field__results {
+  list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid #e5e7eb; border-radius: 8px;
+  max-height: 260px; overflow-y: auto; background: #fff;
+}
+.supplier-search-field__option {
+  display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 0; border-bottom: 1px solid #f3f4f6; background: #fff; cursor: pointer;
+}
+.supplier-search-field__option:hover { background: #f9fafb; }
+.supplier-search-field__option-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; color: #64748b; }
+.supplier-search-field__empty { padding: 10px 12px; font-size: 12px; color: #94a3b8; }
+.supplier-search-field__card {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+  border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;
+}
+.supplier-search-field__card-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.supplier-search-field__card-meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px 12px;
+  margin: 0; font-size: 12px; color: #475569;
+}
+.supplier-search-field__card-meta dt { font-weight: 600; color: #64748b; }
+.supplier-search-field__card-meta dd { margin: 0; }
+.pattern-legacy-supplier-snapshot__body { font-size: 13px; color: #334155; display: flex; flex-direction: column; gap: 4px; }
 .pattern-workspace__badge--source { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px; background: #ecfeff; font-size: 11px; font-weight: 600; color: #0f766e; }
 .pattern-workspace__measurement-lock-hint { margin: 0 0 8px; }
 .pattern-workspace__file-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

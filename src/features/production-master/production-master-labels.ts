@@ -48,3 +48,16 @@ export const PRODUCTION_TRIM_CATEGORIES = Object.keys(
 export const PRINT_METHOD_CATEGORIES = Object.keys(
   PRINT_METHOD_CATEGORY_LABELS,
 ) as PrintMethodCategory[];
+
+export const SUPPLIER_CATEGORY_LABELS: Record<string, string> = {
+  PATTERN_ROOM: "Phòng rập",
+  FABRIC_SUPPLIER: "Nhà cung cấp vải",
+  TRIM_SUPPLIER: "Nhà cung cấp phụ liệu",
+  PRINT_EMBROIDERY: "In / thêu",
+  SEWING_FACTORY: "Xưởng may",
+  WASH_FACTORY: "Xưởng giặt",
+  LOGISTICS: "Vận chuyển",
+  GENERAL: "Chung",
+};
+
+export const SUPPLIER_CATEGORIES = Object.keys(SUPPLIER_CATEGORY_LABELS);

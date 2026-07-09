@@ -19,6 +19,9 @@ import MeasurementTemplateApplyButton from "@/components/admin/tech-pack/Measure
 import TechPackMeasurementEditor from "@/components/admin/tech-pack/TechPackMeasurementEditor";
 import CopyFromTechPackButton from "@/components/admin/patterns/CopyFromTechPackButton";
 import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
+import SupplierSearchField, {
+  type SupplierSearchRecord,
+} from "@/components/admin/suppliers/SupplierSearchField";
 import ProductCategoryCascadingPicker from "@/components/admin/products/ProductCategoryCascadingPicker";
 import type { ProductCategoryPickerItem } from "@/features/categories/category-cascade-utils";
 import type { CrmCustomerRecord } from "@/features/crm/types";
@@ -85,6 +88,8 @@ type PatternDetail = {
   approvedBy: string | null;
   approvedAt: string | null;
   sourceType: PatternSourceType | null;
+  patternSupplierId: string | null;
+  sourceSupplierCode: string | null;
   sourceSupplier: string | null;
   sourceSupplierContact: string | null;
   sourcePhone: string | null;
@@ -92,6 +97,7 @@ type PatternDetail = {
   customerId: string | null;
   customerNameSnapshot: string | null;
   sourceNotes: string | null;
+  patternSupplier?: SupplierSearchRecord | null;
   productCategory?: {
     id: string;
     name: string;
@@ -197,6 +203,33 @@ function createDraft(pattern: PatternDetail): PatternDraft {
     notes: pattern.notes ?? "",
     measurements: measurementsToDraft(pattern.measurements),
   };
+}
+
+function supplierFromPattern(pattern: PatternDetail): SupplierSearchRecord | null {
+  if (!pattern.patternSupplierId) return null;
+  if (pattern.patternSupplier) {
+    return {
+      id: pattern.patternSupplier.id,
+      code: pattern.patternSupplier.code,
+      name: pattern.patternSupplier.name,
+      category: pattern.patternSupplier.category,
+      contact: pattern.patternSupplier.contact,
+      phone: pattern.patternSupplier.phone,
+      email: pattern.patternSupplier.email,
+    };
+  }
+  if (pattern.sourceSupplier || pattern.sourceSupplierCode) {
+    return {
+      id: pattern.patternSupplierId,
+      code: pattern.sourceSupplierCode ?? "—",
+      name: pattern.sourceSupplier ?? "—",
+      category: "GENERAL",
+      contact: pattern.sourceSupplierContact,
+      phone: pattern.sourcePhone,
+      email: pattern.sourceEmail,
+    };
+  }
+  return null;
 }
 
 function customerFromPattern(pattern: PatternDetail): CrmCustomerRecord | null {
@@ -353,6 +386,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   const [measurementBaseline, setMeasurementBaseline] = useState<MeasurementDraftRow | null>(null);
   const [categories, setCategories] = useState<ProductCategoryPickerItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomerRecord | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<SupplierSearchRecord | null>(null);
   const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
   const [draft, setDraft] = useState<PatternDraft | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState("");
@@ -375,7 +409,12 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       const nextDraft = createDraft(data);
       setDraft(nextDraft);
       setSelectedCustomer(customerFromPattern(data));
-      setSavedSnapshot(stableJson({ ...nextDraft, customerId: data.customerId ?? "" }));
+      setSelectedSupplier(supplierFromPattern(data));
+      setSavedSnapshot(stableJson({
+        ...nextDraft,
+        customerId: data.customerId ?? "",
+        patternSupplierId: data.patternSupplierId ?? "",
+      }));
       setSaveStatus("saved");
       setMeasurementEditing(false);
       setMeasurementBaseline(null);
@@ -393,17 +432,22 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
 
   const isDirty = useMemo(() => {
     if (!draft || !savedSnapshot) return false;
-    const snapshot = JSON.parse(savedSnapshot) as PatternDraft & { customerId?: string };
+    const snapshot = JSON.parse(savedSnapshot) as PatternDraft & {
+      customerId?: string;
+      patternSupplierId?: string;
+    };
     const current = {
       ...draft,
       customerId: selectedCustomer?.id ?? pattern?.customerId ?? "",
+      patternSupplierId: selectedSupplier?.id ?? pattern?.patternSupplierId ?? "",
     };
     const baseline = {
       ...snapshot,
       customerId: snapshot.customerId ?? "",
+      patternSupplierId: snapshot.patternSupplierId ?? "",
     };
     return stableJson(current) !== stableJson(baseline);
-  }, [draft, savedSnapshot, selectedCustomer?.id, pattern?.customerId]);
+  }, [draft, savedSnapshot, selectedCustomer?.id, selectedSupplier?.id, pattern?.customerId, pattern?.patternSupplierId]);
 
   useEffect(() => {
     if (saveStatus === "saving") return;
@@ -466,6 +510,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       gradingRule: draft.gradingRule.trim() || null,
       productionMaterialCategory: draft.productionMaterialCategory || null,
       sourceType: draft.sourceType || null,
+      patternSupplierId: selectedSupplier?.id ?? null,
       sourceSupplier: draft.sourceSupplier.trim() || null,
       sourceSupplierContact: draft.sourceSupplierContact.trim() || null,
       sourcePhone: draft.sourcePhone.trim() || null,
@@ -509,7 +554,12 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         setPattern(body);
         setDraft(nextDraft);
         setSelectedCustomer(customerFromPattern(body));
-        setSavedSnapshot(stableJson({ ...nextDraft, customerId: body.customerId ?? "" }));
+        setSelectedSupplier(supplierFromPattern(body));
+        setSavedSnapshot(stableJson({
+          ...nextDraft,
+          customerId: body.customerId ?? "",
+          patternSupplierId: body.patternSupplierId ?? "",
+        }));
         setSaveStatus("saved");
         setMeasurementEditing(false);
         setMeasurementBaseline(null);
@@ -998,21 +1048,47 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                   ))}
                 </select>
               </label>
-              <label className="admin-field">
-                <span className="admin-field__label">Nhà cung cấp / đối tác rập</span>
-                <input
-                  className="admin-input"
-                  value={draft.sourceSupplier}
+              <div className="admin-field admin-field--full">
+                <SupplierSearchField
+                  value={selectedSupplier}
                   disabled={readOnly}
-                  onChange={(e) => updateDraft({ sourceSupplier: e.target.value })}
+                  onSelect={(supplier) => {
+                    setSelectedSupplier(supplier);
+                    updateDraft({
+                      sourceSupplier: supplier?.name ?? "",
+                      sourceSupplierContact: supplier?.contact ?? "",
+                      sourcePhone: supplier?.phone ?? "",
+                      sourceEmail: supplier?.email ?? "",
+                    });
+                  }}
                 />
-              </label>
+              </div>
+              {!selectedSupplier &&
+                (draft.sourceSupplier.trim() ||
+                  draft.sourceSupplierContact.trim() ||
+                  draft.sourcePhone.trim() ||
+                  draft.sourceEmail.trim()) && (
+                <div className="admin-field admin-field--full pattern-legacy-supplier-snapshot">
+                  <span className="admin-field__label">Nhà cung cấp (lưu dạng text)</span>
+                  <div className="pattern-legacy-supplier-snapshot__body">
+                    {draft.sourceSupplier.trim() && <p><strong>{draft.sourceSupplier}</strong></p>}
+                    {draft.sourceSupplierContact.trim() && (
+                      <p>Liên hệ: {draft.sourceSupplierContact}</p>
+                    )}
+                    {draft.sourcePhone.trim() && <p>Điện thoại / Zalo: {draft.sourcePhone}</p>}
+                    {draft.sourceEmail.trim() && <p>Email: {draft.sourceEmail}</p>}
+                  </div>
+                  <p className="admin-field-hint">
+                    Dữ liệu cũ vẫn được giữ. Chọn nhà cung cấp từ danh mục để liên kết Supplier Master.
+                  </p>
+                </div>
+              )}
               <label className="admin-field">
                 <span className="admin-field__label">Liên hệ</span>
                 <input
                   className="admin-input"
                   value={draft.sourceSupplierContact}
-                  disabled={readOnly}
+                  disabled={readOnly || Boolean(selectedSupplier)}
                   onChange={(e) => updateDraft({ sourceSupplierContact: e.target.value })}
                 />
               </label>
@@ -1021,7 +1097,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 <input
                   className="admin-input"
                   value={draft.sourcePhone}
-                  disabled={readOnly}
+                  disabled={readOnly || Boolean(selectedSupplier)}
                   onChange={(e) => updateDraft({ sourcePhone: e.target.value })}
                 />
               </label>
@@ -1031,7 +1107,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                   className="admin-input"
                   type="email"
                   value={draft.sourceEmail}
-                  disabled={readOnly}
+                  disabled={readOnly || Boolean(selectedSupplier)}
                   onChange={(e) => updateDraft({ sourceEmail: e.target.value })}
                 />
               </label>

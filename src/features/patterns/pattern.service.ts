@@ -9,6 +9,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { generatePatternCode } from "@/features/patterns/pattern-code";
 import type { PatternMeasurementInput } from "@/features/patterns/pattern-update-input";
+import { resolvePatternSupplierSnapshots } from "@/features/patterns/pattern-supplier-snapshots";
 import { deleteR2Object } from "@/features/storage/r2/r2-production-file.service";
 
 export class PatternValidationError extends Error {
@@ -36,10 +37,21 @@ const PATTERN_CATEGORY_VISUAL_SELECT = {
   },
 } as const;
 
+const PATTERN_SUPPLIER_SELECT = {
+  id: true,
+  code: true,
+  name: true,
+  contact: true,
+  phone: true,
+  email: true,
+  category: true,
+} as const;
+
 const PATTERN_INCLUDE = {
   productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
   product: { select: { id: true, name: true, productCode: true } },
   customer: { select: { id: true, name: true, code: true } },
+  patternSupplier: { select: PATTERN_SUPPLIER_SELECT },
   files: { orderBy: { sortOrder: "asc" as const } },
   measurements: {
     orderBy: { sortOrder: "asc" as const },
@@ -65,6 +77,9 @@ export async function listPatterns(input?: {
       { code: { contains: q, mode: "insensitive" } },
       { name: { contains: q, mode: "insensitive" } },
       { sourceSupplier: { contains: q, mode: "insensitive" } },
+      { sourceSupplierCode: { contains: q, mode: "insensitive" } },
+      { patternSupplier: { name: { contains: q, mode: "insensitive" } } },
+      { patternSupplier: { code: { contains: q, mode: "insensitive" } } },
       { customerNameSnapshot: { contains: q, mode: "insensitive" } },
       { customer: { name: { contains: q, mode: "insensitive" } } },
       { customer: { code: { contains: q, mode: "insensitive" } } },
@@ -76,6 +91,7 @@ export async function listPatterns(input?: {
     include: {
       productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
       customer: { select: { id: true, name: true, code: true } },
+      patternSupplier: { select: PATTERN_SUPPLIER_SELECT },
       _count: { select: { files: true, techPacks: true } },
     },
     orderBy: [{ updatedAt: "desc" }],
@@ -130,6 +146,8 @@ function buildPatternUpdateData(
     gradingRule: string | null;
     productionMaterialCategory: ProductionMaterialCategory | null;
     sourceType: PatternSourceType | null;
+    patternSupplierId: string | null;
+    sourceSupplierCode: string | null;
     sourceSupplier: string | null;
     sourceSupplierContact: string | null;
     sourcePhone: string | null;
@@ -157,6 +175,10 @@ function buildPatternUpdateData(
     data.productionMaterialCategory = input.productionMaterialCategory;
   }
   if (input.sourceType !== undefined) data.sourceType = input.sourceType;
+  if (input.patternSupplierId !== undefined) data.patternSupplierId = input.patternSupplierId;
+  if (input.sourceSupplierCode !== undefined) {
+    data.sourceSupplierCode = input.sourceSupplierCode?.trim() || null;
+  }
   if (input.sourceSupplier !== undefined) data.sourceSupplier = input.sourceSupplier?.trim() || null;
   if (input.sourceSupplierContact !== undefined) {
     data.sourceSupplierContact = input.sourceSupplierContact?.trim() || null;
@@ -246,6 +268,8 @@ export async function updatePattern(
     gradingRule: string | null;
     productionMaterialCategory: ProductionMaterialCategory | null;
     sourceType: PatternSourceType | null;
+    patternSupplierId: string | null;
+    sourceSupplierCode: string | null;
     sourceSupplier: string | null;
     sourceSupplierContact: string | null;
     sourcePhone: string | null;
@@ -264,7 +288,28 @@ export async function updatePattern(
     throw new PatternValidationError("Rập đã lưu trữ, không thể chỉnh sửa.");
   }
 
-  const metadataPatch = buildPatternUpdateData(input);
+  let supplierSnapshots: Awaited<ReturnType<typeof resolvePatternSupplierSnapshots>> | null = null;
+  if (input.patternSupplierId !== undefined) {
+    try {
+      supplierSnapshots = await resolvePatternSupplierSnapshots(input.patternSupplierId);
+    } catch {
+      throw new PatternValidationError("Nhà cung cấp rập không hợp lệ.");
+    }
+  }
+
+  const metadataInput = supplierSnapshots
+    ? {
+        ...input,
+        patternSupplierId: supplierSnapshots.patternSupplierId,
+        sourceSupplierCode: supplierSnapshots.sourceSupplierCode,
+        sourceSupplier: supplierSnapshots.sourceSupplier,
+        sourceSupplierContact: supplierSnapshots.sourceSupplierContact,
+        sourcePhone: supplierSnapshots.sourcePhone,
+        sourceEmail: supplierSnapshots.sourceEmail,
+      }
+    : input;
+
+  const metadataPatch = buildPatternUpdateData(metadataInput);
   const hasMetadataPatch = Object.keys(metadataPatch).length > 0;
 
   if (!hasMetadataPatch && input.measurements === undefined) {

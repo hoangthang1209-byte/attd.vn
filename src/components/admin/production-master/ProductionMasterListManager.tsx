@@ -17,6 +17,8 @@ import {
   PRODUCTION_MATERIAL_CATEGORY_LABELS,
   PRODUCTION_TRIM_CATEGORIES,
   PRODUCTION_TRIM_CATEGORY_LABELS,
+  SUPPLIER_CATEGORIES,
+  SUPPLIER_CATEGORY_LABELS,
 } from "@/features/production-master/production-master-labels";
 
 type Props = {
@@ -45,6 +47,12 @@ function categoryOptions(config: MasterAdminConfig) {
       label: PRINT_METHOD_CATEGORY_LABELS[v],
     }));
   }
+  if (config.kind === "supplier") {
+    return SUPPLIER_CATEGORIES.map((value) => ({
+      value,
+      label: SUPPLIER_CATEGORY_LABELS[value] ?? value,
+    }));
+  }
   return [];
 }
 
@@ -58,6 +66,7 @@ export default function ProductionMasterListManager({ config }: Props) {
   const [sortBy, setSortBy] = useState<SortFilter>("updated");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newCategory, setNewCategory] = useState("GENERAL");
   const [importOpen, setImportOpen] = useState(false);
 
   const categories = useMemo(() => categoryOptions(config), [config]);
@@ -101,10 +110,14 @@ export default function ProductionMasterListManager({ config }: Props) {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
+    const body: Record<string, unknown> = { name: newName.trim() };
+    if (config.kind === "supplier") {
+      body.category = categoryFilter || newCategory || "GENERAL";
+    }
     const res = await fetch(config.apiPath, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName.trim() }),
+      body: JSON.stringify(body),
     });
     const data = (await res.json()) as { id?: string; message?: string };
     if (!res.ok) {
@@ -202,6 +215,19 @@ export default function ProductionMasterListManager({ config }: Props) {
             onChange={(e) => setNewName(e.target.value)}
             autoFocus
           />
+          {config.kind === "supplier" && (
+            <select
+              className="admin-select"
+              value={categoryFilter || newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+            >
+              {categories.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
           <button type="submit" className="admin-btn admin-btn--primary">
             Tạo
           </button>

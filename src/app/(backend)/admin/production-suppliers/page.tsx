@@ -4,7 +4,7 @@ import { ProductionMasterListClient } from "@/components/admin/production-master
 export default function ProductionSuppliersPage() {
   return (
     <>
-      <AdminPageTitle title="Nhà cung cấp sản xuất" />
+      <AdminPageTitle title="Nhà cung cấp" />
       <ProductionMasterListClient kind="supplier" />
     </>
   );
