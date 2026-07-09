@@ -73,6 +73,7 @@ type Props = {
   fieldErrors?: Record<string, string>;
   errorDetail?: { code?: string; traceId?: string; message?: string } | null;
   showSaveButton?: boolean;
+  compactToolbar?: boolean;
   onDraftChange?: (rows: Array<{
     pointOfMeasure: string;
     description: string | null;
@@ -93,6 +94,7 @@ export default function TechPackMeasurementEditor({
   fieldErrors,
   errorDetail,
   showSaveButton = true,
+  compactToolbar = false,
   onDraftChange,
 }: Props) {
   const [rows, setRows] = useState<MeasurementRow[]>(() => toRows(measurements));
@@ -398,14 +400,16 @@ export default function TechPackMeasurementEditor({
       {!readOnly && (
         <div className="tech-pack-measurement-toolbar">
           <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" onClick={addRow}>
-            Thêm điểm đo
+            {compactToolbar ? "+ Điểm đo" : "Thêm điểm đo"}
           </button>
-          <button type="button" className="admin-btn admin-btn--xs" onClick={addCommonRows}>
-            Thêm điểm đo áo
-          </button>
+          {!compactToolbar && (
+            <button type="button" className="admin-btn admin-btn--xs" onClick={addCommonRows}>
+              Thêm điểm đo áo
+            </button>
+          )}
           <input
             className="admin-input admin-input--sm"
-            style={{ width: 96 }}
+            style={{ width: compactToolbar ? 72 : 96 }}
             value={newSize}
             placeholder="Size"
             onChange={(e) => setNewSize(e.target.value)}
@@ -417,15 +421,17 @@ export default function TechPackMeasurementEditor({
             }}
           />
           <button type="button" className="admin-btn admin-btn--xs" onClick={addSize}>
-            Thêm size
+            {compactToolbar ? "+ Size" : "Thêm size"}
           </button>
           <button type="button" className="admin-btn admin-btn--xs" onClick={() => void copyTable()}>
-            Copy bảng
+            {compactToolbar ? "Copy" : "Copy bảng"}
           </button>
           <button type="button" className="admin-btn admin-btn--xs" onClick={clearTable}>
-            Xóa bảng
+            {compactToolbar ? "Clear" : "Xóa bảng"}
           </button>
-          <span className="admin-muted tech-pack-measurement-toolbar__hint">Dán từ Excel vào ô bất kỳ</span>
+          <span className="admin-muted tech-pack-measurement-toolbar__hint">
+            {compactToolbar ? "Paste Excel" : "Dán từ Excel vào ô bất kỳ"}
+          </span>
           {showSaveButton && (
             <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" disabled={!canSave} onClick={commit}>
               {saving ? "Đang lưu bảng đo…" : "Lưu bảng"}

@@ -1,16 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  AdminLoadingState,
-  AdminPageShell,
-  PageHeader,
-  SectionCard,
-} from "@/components/admin/AdminUi";
+import { AdminLoadingState, AdminPageShell } from "@/components/admin/AdminUi";
 import { TechPackStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import PatternPicker from "@/components/admin/tech-pack/PatternPicker";
-import PrivateFileUploadZone from "@/components/admin/tech-pack/PrivateFileUploadZone";
 import {
   PATTERN_STATUS_LABELS,
   PRIVATE_FILE_HINT,
@@ -30,12 +24,10 @@ import TechPackReleaseDiffPanel from "@/components/admin/tech-pack/TechPackRelea
 import TechPackPdfActions from "@/components/admin/tech-pack/TechPackPdfActions";
 import MeasurementTemplateApplyButton from "@/components/admin/tech-pack/MeasurementTemplateApplyButton";
 import TechPackMeasurementEditor from "@/components/admin/tech-pack/TechPackMeasurementEditor";
-import type { TechPackBomCategory, ArtworkPlacementType, TechPackAssetType, TechPackStatus } from "@prisma/client";
+import type { ArtworkPlacementType, TechPackAssetType, TechPackBomCategory, TechPackStatus } from "@prisma/client";
 import type { OrderItemProcessingMethod, OrderItemSupplySource } from "@prisma/client";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { adminApiFetch, parseAdminJsonResponse } from "@/lib/admin/adminMutation";
-
-type TabId = "bom" | "construction" | "measurement";
 
 type TechPackDetail = {
   id: string;
@@ -128,6 +120,32 @@ type TechPackDetail = {
   }>;
 };
 
+type MeasurementDraftRow = Array<{
+  pointOfMeasure: string;
+  description: string | null;
+  baseSize: string | null;
+  tolerance: string | null;
+  sortOrder?: number;
+  values: Array<{ size: string; value: string }>;
+}>;
+
+type TechPackDraft = {
+  trimsNotes: string;
+  printMethodNotes: string;
+  embroideryNotes: string;
+  deadline: string;
+  qcNotes: string;
+  productionNotes: string;
+  internalNotes: string;
+  bomNotes: string;
+  patternExceptionReason: string;
+  measurements: MeasurementDraftRow;
+};
+
+type SaveStatus = "saved" | "dirty" | "saving" | "error";
+
+const UNSAVED_MESSAGE = "Bạn có thay đổi chưa lưu. Rời khỏi trang sẽ mất các thay đổi này.";
+
 const ARTWORK_ASSET_TYPES: TechPackAssetType[] = [
   "LOGO_PLACEMENT",
   "PRINT_PLACEMENT",
@@ -135,23 +153,60 @@ const ARTWORK_ASSET_TYPES: TechPackAssetType[] = [
   "ARTWORK_REFERENCE",
 ];
 
-const CONSTRUCTION_TYPES: TechPackAssetType[] = [
+const ASSET_DISPLAY_TYPES: TechPackAssetType[] = [
   "FLAT_SKETCH_FRONT",
   "FLAT_SKETCH_BACK",
+  "MEASUREMENT_DIAGRAM",
   "LOGO_PLACEMENT",
   "PRINT_PLACEMENT",
   "EMBROIDERY_PLACEMENT",
   "CONSTRUCTION_CALLOUT",
   "ARTWORK_REFERENCE",
+  "OTHER",
 ];
+
+function measurementsToDraft(
+  rows: TechPackDetail["measurements"],
+): MeasurementDraftRow {
+  return rows.map((row, index) => ({
+    pointOfMeasure: row.pointOfMeasure,
+    description: row.description ?? "",
+    baseSize: row.baseSize ?? "",
+    tolerance: row.tolerance ?? "",
+    sortOrder: index,
+    values: row.values.map((v) => ({ size: v.size, value: v.value })),
+  }));
+}
+
+function createDraft(pack: TechPackDetail): TechPackDraft {
+  return {
+    trimsNotes: pack.trimsNotes ?? "",
+    printMethodNotes: pack.printMethodNotes ?? "",
+    embroideryNotes: pack.embroideryNotes ?? "",
+    deadline: pack.deadline ? pack.deadline.slice(0, 10) : "",
+    qcNotes: pack.qcNotes ?? "",
+    productionNotes: pack.productionNotes ?? "",
+    internalNotes: pack.internalNotes ?? "",
+    bomNotes: pack.bomNotes ?? "",
+    patternExceptionReason: pack.patternExceptionReason ?? "",
+    measurements: measurementsToDraft(pack.measurements),
+  };
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(value);
+}
 
 export default function TechPackDetailManager({ techPackId }: { techPackId: string }) {
   const mutate = useAdminMutation();
+  const saveBusyRef = useRef(false);
   const [pack, setPack] = useState<TechPackDetail | null>(null);
-  const [tab, setTab] = useState<TabId>("bom");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPatternId, setSelectedPatternId] = useState("");
+  const [draft, setDraft] = useState<TechPackDraft | null>(null);
+  const [savedSnapshot, setSavedSnapshot] = useState("");
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [measurementSaving, setMeasurementSaving] = useState(false);
   const [measurementFieldErrors, setMeasurementFieldErrors] = useState<Record<string, string>>({});
   const [measurementErrorDetail, setMeasurementErrorDetail] = useState<{
@@ -164,11 +219,15 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
     setLoading(true);
     setError(null);
     try {
-      const packRes = await fetch(`/api/tech-packs/${techPackId}`);
+      const packRes = await adminApiFetch(`/api/tech-packs/${techPackId}`);
       const data = (await packRes.json()) as TechPackDetail & { message?: string };
       if (!packRes.ok) throw new Error(data.message ?? "Không thể tải Tech Pack");
       setPack(data);
       setSelectedPatternId(data.pattern?.id ?? "");
+      const nextDraft = createDraft(data);
+      setDraft(nextDraft);
+      setSavedSnapshot(stableJson(nextDraft));
+      setSaveStatus("saved");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
     } finally {
@@ -180,9 +239,113 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
     void load();
   }, [load]);
 
+  const isDirty = useMemo(() => {
+    if (!draft || !savedSnapshot) return false;
+    return stableJson(draft) !== savedSnapshot;
+  }, [draft, savedSnapshot]);
+
+  useEffect(() => {
+    if (saveStatus === "saving") return;
+    setSaveStatus(isDirty ? "dirty" : "saved");
+  }, [isDirty, saveStatus]);
+
+  useEffect(() => {
+    if (!isDirty || saveStatus === "saving") return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = UNSAVED_MESSAGE;
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [isDirty, saveStatus]);
+
   const readOnly = pack?.status !== "DRAFT";
   const isReleased = pack?.status === "RELEASED";
   const isSuperseded = pack?.status === "SUPERSEDED";
+
+  function updateDraft(patch: Partial<TechPackDraft>) {
+    setDraft((prev) => (prev ? { ...prev, ...patch } : prev));
+  }
+
+  function saveStatusLabel() {
+    if (saveStatus === "saving") return "Đang lưu...";
+    if (saveStatus === "error") return "Lưu lỗi";
+    if (isDirty) return "Chưa lưu";
+    return "Đã lưu";
+  }
+
+  function saveStatusTone(): "neutral" | "info" | "success" | "warning" | "danger" {
+    if (saveStatus === "saving") return "info";
+    if (saveStatus === "error") return "danger";
+    if (isDirty) return "warning";
+    return "success";
+  }
+
+  function confirmLeaveIfDirty() {
+    if (!isDirty || saveStatus === "saving") return true;
+    return window.confirm(UNSAVED_MESSAGE);
+  }
+
+  async function saveTechPackDraft() {
+    if (!pack || !draft || readOnly || saveBusyRef.current) return;
+    saveBusyRef.current = true;
+    setSaveStatus("saving");
+    setMeasurementSaving(true);
+    setMeasurementFieldErrors({});
+    setMeasurementErrorDetail(null);
+
+    const patch = {
+      trimsNotes: draft.trimsNotes.trim() || null,
+      printMethodNotes: draft.printMethodNotes.trim() || null,
+      embroideryNotes: draft.embroideryNotes.trim() || null,
+      deadline: draft.deadline || null,
+      qcNotes: draft.qcNotes.trim() || null,
+      productionNotes: draft.productionNotes.trim() || null,
+      internalNotes: draft.internalNotes.trim() || null,
+      bomNotes: draft.bomNotes.trim() || null,
+      patternExceptionReason: draft.patternExceptionReason.trim() || null,
+      measurements: draft.measurements,
+    };
+
+    await mutate({
+      loadingMessage: "Đang lưu Tech Pack…",
+      successMessage: "Đã lưu Tech Pack.",
+      errorFallback: "Không thể lưu Tech Pack. Vui lòng thử lại.",
+      action: async () => {
+        const res = await adminApiFetch(`/api/tech-packs/${techPackId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        const result = await parseAdminJsonResponse(res, (body) => body as TechPackDetail);
+        if (!result.ok) {
+          setMeasurementFieldErrors(result.fieldErrors ?? {});
+          setMeasurementErrorDetail({
+            code: result.code,
+            traceId: result.traceId,
+            message: result.message,
+          });
+        }
+        return result;
+      },
+      onSuccess: (body) => {
+        const nextDraft = createDraft(body);
+        setPack(body);
+        setDraft(nextDraft);
+        setSavedSnapshot(stableJson(nextDraft));
+        setSaveStatus("saved");
+        setError(null);
+        setMeasurementFieldErrors({});
+        setMeasurementErrorDetail(null);
+      },
+      onError: (message) => {
+        setSaveStatus("error");
+        setError(message);
+      },
+    });
+    setMeasurementSaving(false);
+    saveBusyRef.current = false;
+  }
 
   function formatSourceType(value: string | null): string | null {
     if (!value) return null;
@@ -196,6 +359,7 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
   }
 
   async function deleteAsset(assetId: string) {
+    if (!window.confirm("Xóa file này?")) return;
     const res = await fetch(`/api/tech-packs/${techPackId}/assets/${assetId}`, { method: "DELETE" });
     if (res.ok) void load();
     else {
@@ -217,55 +381,8 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
     }
   }
 
-  async function save(patch: Record<string, unknown>) {
-    if (!pack || readOnly) return;
-    if (Object.prototype.hasOwnProperty.call(patch, "measurements")) {
-      setMeasurementSaving(true);
-      setMeasurementFieldErrors({});
-      setMeasurementErrorDetail(null);
-      await mutate({
-        loadingMessage: "Đang lưu bảng đo…",
-        successMessage: "Đã lưu bảng đo.",
-        errorFallback: "Không thể lưu bảng đo. Vui lòng thử lại.",
-        action: async () => {
-          const res = await adminApiFetch(`/api/tech-packs/${techPackId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(patch),
-          });
-          const result = await parseAdminJsonResponse(res, (body) => body as TechPackDetail);
-          if (!result.ok) {
-            setMeasurementFieldErrors(result.fieldErrors ?? {});
-            setMeasurementErrorDetail({
-              code: result.code,
-              traceId: result.traceId,
-              message: result.message ?? "Không thể lưu bảng đo. Vui lòng kiểm tra dữ liệu và thử lại.",
-            });
-          }
-          return result;
-        },
-        onSuccess: (data) => {
-          setPack(data);
-          setError(null);
-          setMeasurementFieldErrors({});
-          setMeasurementErrorDetail(null);
-        },
-        onError: (message) => setError(message),
-      });
-      setMeasurementSaving(false);
-      return;
-    }
-    const res = await fetch(`/api/tech-packs/${techPackId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    const data = (await res.json()) as { message?: string };
-    if (!res.ok) setError(data.message ?? "Không thể lưu");
-    else void load();
-  }
-
   async function release() {
+    if (!confirmLeaveIfDirty()) return;
     const res = await fetch(`/api/tech-packs/${techPackId}/release`, { method: "POST" });
     if (res.ok) void load();
     else {
@@ -275,6 +392,7 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
   }
 
   async function newVersion() {
+    if (!confirmLeaveIfDirty()) return;
     const res = await fetch(`/api/tech-packs/${techPackId}/new-version`, { method: "POST" });
     const data = (await res.json()) as { id?: string; message?: string };
     if (res.ok && data.id) window.location.href = `/admin/tech-pack/${data.id}`;
@@ -296,332 +414,338 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
   }
 
   if (loading) return <AdminLoadingState label="Đang tải Tech Pack..." />;
-  if (!pack) return <p className="admin-error">{error ?? "Không tìm thấy Tech Pack"}</p>;
+  if (!pack || !draft) return <p className="admin-error">{error ?? "Không tìm thấy Tech Pack"}</p>;
+
+  const bomCount = pack.bomItems?.length ?? 0;
+  const artworkCount = pack.artworkPlacements?.length ?? 0;
+  const measurementCount = draft.measurements.filter((r) => r.pointOfMeasure.trim()).length;
+  const assetCount = pack.assets?.length ?? 0;
 
   return (
     <AdminPageShell className={readOnly ? "tech-pack-detail--readonly" : undefined}>
-      <PageHeader
-        title={`${pack.code} v${pack.version}`}
-        meta={<TechPackStatusBadge status={pack.status} />}
-        actions={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/admin/tech-pack" className="admin-btn">
-              Quay lại
+      <div className="tech-pack-workspace">
+        <header className="tech-pack-workspace__header">
+          <nav className="tech-pack-workspace__breadcrumb" aria-label="Breadcrumb">
+            <Link
+              href="/admin/tech-pack"
+              onClick={(e) => {
+                if (!confirmLeaveIfDirty()) e.preventDefault();
+              }}
+            >
+              Tech Pack
             </Link>
-            <TechPackPdfActions techPackId={techPackId} />
-            {pack.status === "DRAFT" && (
-              <span className="admin-muted" style={{ fontSize: 12 }}>
-                Dùng checklist bên phải để phát hành
-              </span>
-            )}
-            {isReleased && (
-              <button type="button" className="admin-btn admin-btn--primary" onClick={() => void newVersion()}>
-                Tạo version mới
-              </button>
-            )}
-          </div>
-        }
-      />
+            <span aria-hidden="true">›</span>
+            <span>{pack.code}</span>
+          </nav>
 
-      {isReleased && (
-        <div className="tech-pack-detail__banner tech-pack-detail__banner--released">
-          Tech Pack đã phát hành. Tạo version mới để chỉnh sửa.
-          <div className="tech-pack-detail__banner-actions">
-            <button type="button" className="admin-btn admin-btn--primary" onClick={() => void newVersion()}>
-              Tạo version mới
-            </button>
-            <TechPackPdfActions techPackId={techPackId} />
-          </div>
-        </div>
-      )}
-      {isSuperseded && (
-        <div className="tech-pack-detail__banner tech-pack-detail__banner--superseded">
-          Tech Pack này đã bị thay thế bởi version mới.
-          {pack.supersededBy && (
-            <>
-              {" "}
-              <Link href={`/admin/tech-pack/${pack.supersededBy.id}`} className="admin-link">
-                Xem {pack.supersededBy.code} v{pack.supersededBy.version}
+          <div className="tech-pack-workspace__header-main">
+            <div className="tech-pack-workspace__title-block">
+              <h1 className="tech-pack-workspace__title">
+                {pack.code} — {pack.title ?? pack.productNameSnapshot ?? "Tech Pack"}
+              </h1>
+              <div className="tech-pack-workspace__badges">
+                <TechPackStatusBadge status={pack.status} />
+                <span className="tech-pack-workspace__badge tech-pack-workspace__badge--version">
+                  v{pack.version}
+                </span>
+                <span className={`admin-status-badge admin-status-badge--${saveStatusTone()}`}>
+                  {saveStatusLabel()}
+                </span>
+              </div>
+            </div>
+
+            <div className="tech-pack-workspace__actions">
+              <Link
+                href="/admin/tech-pack"
+                className="admin-btn admin-btn--xs"
+                onClick={(e) => {
+                  if (!confirmLeaveIfDirty()) e.preventDefault();
+                }}
+              >
+                Quay lại
               </Link>
-            </>
-          )}
-        </div>
-      )}
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--primary admin-btn--xs"
+                  disabled={!isDirty || saveStatus === "saving"}
+                  onClick={() => void saveTechPackDraft()}
+                >
+                  {saveStatus === "saving" ? "Đang lưu…" : "Lưu"}
+                </button>
+              )}
+              {!readOnly && (
+                <button type="button" className="admin-btn admin-btn--xs" onClick={() => void release()}>
+                  Phát hành
+                </button>
+              )}
+              {isReleased && (
+                <button type="button" className="admin-btn admin-btn--xs" onClick={() => void newVersion()}>
+                  Tạo version mới
+                </button>
+              )}
+              <TechPackPdfActions techPackId={techPackId} />
+            </div>
+          </div>
 
-      {error && <p className="admin-error">{error}</p>}
+          <div className="tech-pack-workspace__summary-chips">
+            <span className="tech-pack-workspace__chip"><strong>{bomCount}</strong> BOM</span>
+            <span className="tech-pack-workspace__chip"><strong>{artworkCount}</strong> artwork</span>
+            <span className="tech-pack-workspace__chip"><strong>{measurementCount}</strong> điểm đo</span>
+            <span className="tech-pack-workspace__chip"><strong>{assetCount}</strong> file</span>
+            {pack.pattern ? (
+              <span className="tech-pack-workspace__chip">
+                Rập: <strong>{pack.pattern.code}</strong>
+              </span>
+            ) : (
+              <span className="tech-pack-workspace__chip tech-pack-workspace__chip--warn">Chưa chọn rập</span>
+            )}
+            {pack.orderCodeSnapshot ? (
+              <span className="tech-pack-workspace__chip">Đơn: {pack.orderCodeSnapshot}</span>
+            ) : null}
+            {pack.customerNameSnapshot ? (
+              <span className="tech-pack-workspace__chip">{pack.customerNameSnapshot}</span>
+            ) : null}
+          </div>
+        </header>
 
-      <div className="tech-pack-detail-layout">
-        <div className="tech-pack-detail-main">
-      <div className="admin-tabs" style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {(
-          [
-            ["bom", "Main Page / BOM"],
-            ["construction", "Construction Page"],
-            ["measurement", "Measurement & Grading"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={`admin-btn${tab === id ? " admin-btn--primary" : ""}`}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+        {isReleased && (
+          <div className="tech-pack-detail__banner tech-pack-detail__banner--released">
+            Tech Pack đã phát hành. Tạo version mới để chỉnh sửa.
+          </div>
+        )}
+        {isSuperseded && (
+          <div className="tech-pack-detail__banner tech-pack-detail__banner--superseded">
+            Tech Pack này đã bị thay thế bởi version mới.
+            {pack.supersededBy && (
+              <>
+                {" "}
+                <Link href={`/admin/tech-pack/${pack.supersededBy.id}`} className="admin-link">
+                  Xem {pack.supersededBy.code} v{pack.supersededBy.version}
+                </Link>
+              </>
+            )}
+          </div>
+        )}
 
-      {tab === "bom" && (
-        <SectionCard title="Main Page / BOM">
-          <div className="admin-form-grid">
-            <Field label="Mã đơn" value={pack.orderCodeSnapshot} />
-            <Field label="Khách hàng" value={pack.customerNameSnapshot} />
-            <Field label="Sản phẩm" value={pack.productNameSnapshot} />
-            <Field label="Màu" value={pack.colorSnapshot} />
-            <Field label="Size" value={pack.sizeSnapshot} />
-            <Field label="Số lượng" value={pack.quantitySnapshot?.toString() ?? null} />
-            <Field label="Nguồn sản phẩm" value={formatSourceType(pack.sourceType)} />
-            <Field label="Cách xử lý" value={formatProcessingMethod(pack.processingMethod)} />
-            <TextAreaField
-              label="Phụ liệu"
-              value={pack.trimsNotes}
-              readOnly={readOnly}
-              onSave={(v) => void save({ trimsNotes: v })}
-            />
-            <TextAreaField
-              label="Công nghệ in/thêu"
-              value={`${pack.printMethodNotes ?? ""}\n${pack.embroideryNotes ?? ""}`.trim()}
-              readOnly={readOnly}
-              onSave={(v) => void save({ printMethodNotes: v })}
-            />
-            <label className="admin-field">
-              <span>Deadline</span>
-              <input
-                type="date"
-                className="admin-input"
-                defaultValue={pack.deadline ? pack.deadline.slice(0, 10) : ""}
-                disabled={readOnly}
-                onBlur={(e) => void save({ deadline: e.target.value || null })}
+        {error && <p className="admin-error">{error}</p>}
+
+        <div className="tech-pack-workspace__layout">
+          <div className="tech-pack-workspace__main">
+            <section className="tech-pack-workspace__panel admin-panel">
+              <h2 className="tech-pack-workspace__panel-title">Tóm tắt sản xuất</h2>
+              <div className="tech-pack-workspace__snapshot-grid">
+                <SnapshotField label="Mã đơn" value={pack.orderCodeSnapshot} />
+                <SnapshotField label="Khách hàng" value={pack.customerNameSnapshot} />
+                <SnapshotField label="Sản phẩm" value={pack.productNameSnapshot} />
+                <SnapshotField label="Màu" value={pack.colorSnapshot} />
+                <SnapshotField label="Size" value={pack.sizeSnapshot} />
+                <SnapshotField label="Số lượng" value={pack.quantitySnapshot?.toString() ?? null} />
+                <SnapshotField label="Nguồn" value={formatSourceType(pack.sourceType)} />
+                <SnapshotField label="Xử lý" value={formatProcessingMethod(pack.processingMethod)} />
+              </div>
+            </section>
+
+            <section className="tech-pack-workspace__panel tech-pack-workspace__panel--bom admin-panel">
+              <h2 className="tech-pack-workspace__panel-title">Bảng BOM</h2>
+              <TechPackBomEditor
+                techPackId={techPackId}
+                items={pack.bomItems ?? []}
+                readOnly={readOnly}
+                patternProductionMaterialCategory={pack.pattern?.productionMaterialCategory ?? null}
+                onSaved={() => void load()}
               />
-            </label>
-            <TextAreaField
-              label="QC"
-              value={pack.qcNotes}
-              readOnly={readOnly}
-              onSave={(v) => void save({ qcNotes: v })}
-            />
-            <TextAreaField
-              label="Ghi chú sản xuất"
-              value={pack.productionNotes}
-              readOnly={readOnly}
-              onSave={(v) => void save({ productionNotes: v })}
-            />
-            <TextAreaField
-              label="Ghi chú BOM (bổ sung)"
-              value={pack.bomNotes}
-              readOnly={readOnly}
-              onSave={(v) => void save({ bomNotes: v })}
-            />
-          </div>
+            </section>
 
-          <div style={{ marginTop: 20 }}>
-            <h4 style={{ marginBottom: 8 }}>Bảng BOM</h4>
-            <TechPackBomEditor
-              techPackId={techPackId}
-              items={pack.bomItems ?? []}
-              readOnly={readOnly}
-              patternProductionMaterialCategory={pack.pattern?.productionMaterialCategory ?? null}
-              onSaved={() => void load()}
-            />
-          </div>
-        </SectionCard>
-      )}
+            <section className="tech-pack-workspace__panel admin-panel">
+              <h2 className="tech-pack-workspace__panel-title">Vị trí artwork</h2>
+              <TechPackArtworkPlacementsEditor
+                techPackId={techPackId}
+                items={pack.artworkPlacements ?? []}
+                artworkAssets={pack.assets.filter((a) => ARTWORK_ASSET_TYPES.includes(a.type))}
+                readOnly={readOnly}
+                onSaved={() => void load()}
+              />
+            </section>
 
-      {tab === "construction" && (
-        <SectionCard title="Construction Page">
-          {CONSTRUCTION_TYPES.map((type) => {
-            const assets = pack.assets.filter((a) => a.type === type);
-            return (
-              <div key={type} style={{ marginBottom: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <h4>{TECH_PACK_ASSET_TYPE_LABELS[type]}</h4>
-                  {!readOnly && (
-                    <PrivateFileUploadZone
-                      onUpload={(file) => uploadAssetFile(type, file)}
+            <section className="tech-pack-workspace__panel tech-pack-workspace__panel--measurements admin-panel">
+              <div className="tech-pack-workspace__panel-head">
+                <h2 className="tech-pack-workspace__panel-title">Bảng thông số</h2>
+                {!readOnly && (
+                  <div className="tech-pack-workspace__panel-actions">
+                    <PatternPicker value={selectedPatternId} onChange={setSelectedPatternId} />
+                    <button type="button" className="admin-btn admin-btn--xs" onClick={() => void selectPattern()}>
+                      Áp dụng rập
+                    </button>
+                    <MeasurementTemplateApplyButton
+                      disabled={readOnly}
+                      applyUrl={`/api/tech-packs/${techPackId}/apply-measurement-template`}
+                      onApplied={() => void load()}
                     />
-                  )}
-                </div>
-                {assets.length === 0 ? (
-                  <p className="admin-muted">Chưa có file.</p>
-                ) : (
-                  <div className="admin-file-grid">
-                    {assets.map((asset) => (
-                      <AssetCard
-                        key={asset.id}
-                        asset={asset}
-                        readOnly={readOnly}
-                        onDelete={() => void deleteAsset(asset.id)}
-                      />
-                    ))}
                   </div>
                 )}
               </div>
-            );
-          })}
-          <div style={{ marginTop: 24 }}>
-            <h4 style={{ marginBottom: 8 }}>Vị trí artwork</h4>
-            <TechPackArtworkPlacementsEditor
-              techPackId={techPackId}
-              items={pack.artworkPlacements ?? []}
-              artworkAssets={pack.assets.filter((a) => ARTWORK_ASSET_TYPES.includes(a.type))}
-              readOnly={readOnly}
-              onSaved={() => void load()}
-            />
-          </div>
-        </SectionCard>
-      )}
+              {pack.pattern?.status === "ARCHIVED" && (
+                <div className="tech-pack-detail__banner tech-pack-detail__banner--warning">
+                  Rập đã lưu trữ. Cân nhắc chọn rập khác trước khi phát hành.
+                </div>
+              )}
+              <TechPackMeasurementEditor
+                measurements={pack.measurements}
+                readOnly={readOnly}
+                compactToolbar
+                saving={measurementSaving}
+                fieldErrors={measurementFieldErrors}
+                errorDetail={measurementErrorDetail}
+                showSaveButton={false}
+                onDraftChange={(rows) => updateDraft({ measurements: rows })}
+                onSave={(rows) => updateDraft({ measurements: rows })}
+              />
+            </section>
 
-      {tab === "measurement" && (
-        <>
-          <SectionCard title="Rập đã chọn">
-            {pack.pattern?.status === "ARCHIVED" && (
-              <div className="tech-pack-detail__banner tech-pack-detail__banner--warning">
-                Rập đã lưu trữ. Cân nhắc chọn rập khác trước khi phát hành.
-              </div>
-            )}
-            {!readOnly && (
-              <div style={{ marginBottom: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <PatternPicker value={selectedPatternId} onChange={setSelectedPatternId} />
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--primary"
-                  onClick={() => void selectPattern()}
-                >
-                  Áp dụng rập
-                </button>
-                <MeasurementTemplateApplyButton
-                  disabled={readOnly}
-                  applyUrl={`/api/tech-packs/${techPackId}/apply-measurement-template`}
-                  onApplied={() => void load()}
+            <section className="tech-pack-workspace__panel admin-panel">
+              <h2 className="tech-pack-workspace__panel-title">Ghi chú sản xuất</h2>
+              <div className="tech-pack-workspace__notes-grid">
+                <DraftTextArea
+                  label="Phụ liệu"
+                  value={draft.trimsNotes}
+                  readOnly={readOnly}
+                  onChange={(v) => updateDraft({ trimsNotes: v })}
+                />
+                <DraftTextArea
+                  label="Công nghệ in"
+                  value={draft.printMethodNotes}
+                  readOnly={readOnly}
+                  onChange={(v) => updateDraft({ printMethodNotes: v })}
+                />
+                <DraftTextArea
+                  label="Công nghệ thêu"
+                  value={draft.embroideryNotes}
+                  readOnly={readOnly}
+                  onChange={(v) => updateDraft({ embroideryNotes: v })}
+                />
+                <DraftTextArea
+                  label="QC"
+                  value={draft.qcNotes}
+                  readOnly={readOnly}
+                  onChange={(v) => updateDraft({ qcNotes: v })}
+                />
+                <DraftTextArea
+                  label="Ghi chú sản xuất"
+                  value={draft.productionNotes}
+                  readOnly={readOnly}
+                  onChange={(v) => updateDraft({ productionNotes: v })}
+                />
+                <DraftTextArea
+                  label="Ghi chú BOM"
+                  value={draft.bomNotes}
+                  readOnly={readOnly}
+                  onChange={(v) => updateDraft({ bomNotes: v })}
+                />
+                <label className="admin-field">
+                  <span className="admin-field__label">Deadline</span>
+                  <input
+                    type="date"
+                    className="admin-input"
+                    value={draft.deadline}
+                    disabled={readOnly}
+                    onChange={(e) => updateDraft({ deadline: e.target.value })}
+                  />
+                </label>
+                <DraftTextArea
+                  label="Ghi chú nội bộ"
+                  value={draft.internalNotes}
+                  readOnly={readOnly}
+                  onChange={(v) => updateDraft({ internalNotes: v })}
                 />
               </div>
-            )}
-            {pack.pattern ? (
-              <dl className="admin-dl">
-                <dt>Mã rập</dt>
-                <dd>
-                  <Link href={patternAdminDetailPath(pack.pattern.id)} className="admin-link">
-                    {pack.pattern.code}
-                  </Link>
-                </dd>
-                <dt>Version</dt>
-                <dd>{pack.pattern.version}</dd>
-                <dt>Base size</dt>
-                <dd>{pack.pattern.baseSize ?? "—"}</dd>
-                <dt>Size range</dt>
-                <dd>{pack.pattern.sizeRange ?? "—"}</dd>
-                <dt>Grading rule</dt>
-                <dd>{pack.pattern.gradingRule ?? "—"}</dd>
-                <dt>Trạng thái duyệt</dt>
-                <dd>
-                  {PATTERN_STATUS_LABELS[pack.pattern.status as keyof typeof PATTERN_STATUS_LABELS] ??
-                    pack.pattern.status}
-                </dd>
-              </dl>
-            ) : (
-              <p className="admin-muted">Chưa chọn rập.</p>
-            )}
-          </SectionCard>
+            </section>
+          </div>
 
-          <SectionCard title="Sơ đồ đo">
-            {!readOnly && (
-              <PrivateFileUploadZone
-                label="Kéo thả sơ đồ đo hoặc bấm để chọn"
-                onUpload={(file) => uploadAssetFile("MEASUREMENT_DIAGRAM", file)}
-              />
-            )}
-            <div className="admin-file-grid">
-              {pack.assets
-                .filter((a) => a.type === "MEASUREMENT_DIAGRAM")
-                .map((asset) => (
-                  <AssetCard
-                    key={asset.id}
-                    asset={asset}
+          <aside className="tech-pack-workspace__sidebar">
+            <section className="tech-pack-workspace__panel admin-panel">
+              <h2 className="tech-pack-workspace__panel-title">Rập đã chọn</h2>
+              {pack.pattern ? (
+                <dl className="tech-pack-workspace__pattern-dl">
+                  <div>
+                    <dt>Mã</dt>
+                    <dd>
+                      <Link href={patternAdminDetailPath(pack.pattern.id)} className="admin-link">
+                        {pack.pattern.code}
+                      </Link>
+                    </dd>
+                  </div>
+                  <div><dt>Version</dt><dd>v{pack.pattern.version}</dd></div>
+                  <div><dt>Base size</dt><dd>{pack.pattern.baseSize ?? "—"}</dd></div>
+                  <div><dt>Size range</dt><dd>{pack.pattern.sizeRange ?? "—"}</dd></div>
+                  <div>
+                    <dt>Trạng thái</dt>
+                    <dd>
+                      {PATTERN_STATUS_LABELS[pack.pattern.status as keyof typeof PATTERN_STATUS_LABELS] ??
+                        pack.pattern.status}
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="admin-muted">Chưa chọn rập.</p>
+              )}
+            </section>
+
+            <section className="tech-pack-workspace__panel admin-panel">
+              <h2 className="tech-pack-workspace__panel-title">File / tài sản</h2>
+              {ASSET_DISPLAY_TYPES.map((type) => {
+                const assets = pack.assets.filter((a) => a.type === type);
+                if (assets.length === 0 && readOnly) return null;
+                return (
+                  <AssetTypeGroup
+                    key={type}
+                    type={type}
+                    label={TECH_PACK_ASSET_TYPE_LABELS[type]}
+                    assets={assets}
                     readOnly={readOnly}
-                    onDelete={() => void deleteAsset(asset.id)}
+                    onUpload={(file) => uploadAssetFile(type, file)}
+                    onDelete={(id) => void deleteAsset(id)}
                   />
-                ))}
+                );
+              })}
+            </section>
+
+            <div className="tech-pack-workspace__panel admin-panel">
+              <TechPackReleaseChecklist
+                techPackId={techPackId}
+                status={pack.status}
+                hasPattern={Boolean(pack.pattern)}
+                patternExceptionReason={draft.patternExceptionReason || null}
+                readOnly={readOnly}
+                onPatternExceptionChange={(v) => updateDraft({ patternExceptionReason: v ?? "" })}
+                onRelease={() => void release()}
+              />
             </div>
-          </SectionCard>
 
-          <SectionCard title="Bảng đo">
-            <TechPackMeasurementEditor
-              measurements={pack.measurements}
-              readOnly={readOnly}
-              saving={measurementSaving}
-              fieldErrors={measurementFieldErrors}
-              errorDetail={measurementErrorDetail}
-              onSave={(rows) => void save({ measurements: rows })}
-            />
-          </SectionCard>
-        </>
-      )}
+            <div className="tech-pack-workspace__panel admin-panel">
+              <TechPackReleaseDiffPanel techPackId={techPackId} />
+            </div>
+
+            <div className="tech-pack-workspace__panel admin-panel">
+              <TechPackReleaseHistoryPanel techPackId={techPackId} />
+            </div>
+          </aside>
         </div>
-
-        <aside className="tech-pack-detail-sidebar">
-          <TechPackReleaseChecklist
-            techPackId={techPackId}
-            status={pack.status}
-            hasPattern={Boolean(pack.pattern)}
-            patternExceptionReason={pack.patternExceptionReason}
-            readOnly={readOnly}
-            onPatternExceptionChange={(v) => void save({ patternExceptionReason: v })}
-            onRelease={() => void release()}
-          />
-          <TechPackReleaseDiffPanel techPackId={techPackId} />
-          <TechPackReleaseHistoryPanel techPackId={techPackId} />
-        </aside>
       </div>
     </AdminPageShell>
   );
 }
 
-function Field({ label, value }: { label: string; value: string | null }) {
+function SnapshotField({ label, value }: { label: string; value: string | null }) {
   return (
-    <label className="admin-field">
-      <span>{label}</span>
-      <input className="admin-input" value={value ?? ""} readOnly disabled />
-    </label>
+    <div className="tech-pack-workspace__snapshot-field">
+      <span className="tech-pack-workspace__snapshot-label">{label}</span>
+      <span className="tech-pack-workspace__snapshot-value">{value ?? "—"}</span>
+    </div>
   );
 }
 
-function TextAreaField({
-  label,
-  value,
-  readOnly,
-  onSave,
-}: {
-  label: string;
-  value: string | null;
-  readOnly: boolean;
-  onSave: (value: string | null) => void;
-}) {
-  return (
-    <label className="admin-field admin-field--full">
-      <span>{label}</span>
-      <textarea
-        className="admin-textarea"
-        defaultValue={value ?? ""}
-        rows={4}
-        readOnly={readOnly}
-        disabled={readOnly}
-        onBlur={(e) => onSave(e.target.value || null)}
-      />
-    </label>
-  );
-}
-
-function AssetCard({
+function CompactAssetCard({
   asset,
   readOnly,
   onDelete,
@@ -637,31 +761,129 @@ function AssetCard({
   onDelete?: () => void;
 }) {
   const previewable =
-    asset.previewUrl &&
-    (asset.fileType === "IMAGE" || asset.fileType === "PDF");
+    asset.previewUrl && (asset.fileType === "IMAGE" || asset.fileType === "PDF");
 
   return (
-    <div className="admin-file-card">
+    <article className="tech-pack-workspace__asset-card">
       {previewable ? (
         asset.fileType === "PDF" ? (
-          <a href={asset.previewUrl!} target="_blank" rel="noreferrer" className="admin-link">
-            PDF xem nhanh
-          </a>
+          <span className="tech-pack-workspace__asset-icon">PDF</span>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={asset.previewUrl!} alt={asset.originalFileName ?? "preview"} />
+          <img
+            src={asset.previewUrl!}
+            alt={asset.originalFileName ?? "preview"}
+            className="tech-pack-workspace__asset-thumb"
+          />
         )
       ) : (
-        <div className="admin-file-card__placeholder">
-          <strong>{asset.originalFileName ?? asset.fileType}</strong>
-          <p>{PRIVATE_FILE_HINT}</p>
-        </div>
+        <span className="tech-pack-workspace__asset-icon">{asset.fileType}</span>
       )}
-      <p className="admin-field-hint">{asset.fileType}</p>
-      {!readOnly && onDelete && (
-        <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={onDelete}>
-          Xóa
-        </button>
+      <div
+        className="tech-pack-workspace__asset-meta"
+        title={asset.r2ObjectKey ? PRIVATE_FILE_HINT : undefined}
+      >
+        <strong>{asset.originalFileName ?? asset.fileType}</strong>
+        <span>{asset.fileType}</span>
+      </div>
+      <div className="tech-pack-workspace__asset-actions">
+        {asset.previewUrl ? (
+          <a
+            className="admin-btn admin-btn--xs"
+            href={asset.previewUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Xem
+          </a>
+        ) : null}
+        {!readOnly && onDelete ? (
+          <button type="button" className="admin-btn admin-btn--xs admin-btn--danger" onClick={onDelete}>
+            Xóa
+          </button>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function DraftTextArea({
+  label,
+  value,
+  readOnly,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  readOnly: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="admin-field">
+      <span className="admin-field__label">{label}</span>
+      <textarea
+        className="admin-textarea"
+        value={value}
+        rows={2}
+        readOnly={readOnly}
+        disabled={readOnly}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
+  );
+}
+
+function AssetTypeGroup({
+  type,
+  label,
+  assets,
+  readOnly,
+  onUpload,
+  onDelete,
+}: {
+  type: TechPackAssetType;
+  label: string;
+  assets: TechPackDetail["assets"];
+  readOnly: boolean;
+  onUpload: (file: File) => Promise<void>;
+  onDelete: (id: string) => void;
+}) {
+  const inputId = `asset-upload-${type}`;
+  return (
+    <div className="tech-pack-workspace__asset-group">
+      <div className="tech-pack-workspace__asset-group-head">
+        <span>{label}</span>
+        {!readOnly && (
+          <>
+            <input
+              id={inputId}
+              type="file"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void onUpload(file);
+              }}
+            />
+            <label htmlFor={inputId} className="admin-btn admin-btn--xs">
+              Tải lên
+            </label>
+          </>
+        )}
+      </div>
+      {assets.length === 0 ? (
+        <p className="admin-muted tech-pack-workspace__asset-empty">Chưa có file.</p>
+      ) : (
+        <div className="tech-pack-workspace__asset-list">
+          {assets.map((asset) => (
+            <CompactAssetCard
+              key={asset.id}
+              asset={asset}
+              readOnly={readOnly}
+              onDelete={() => onDelete(asset.id)}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

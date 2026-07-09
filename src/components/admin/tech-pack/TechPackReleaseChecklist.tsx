@@ -162,9 +162,9 @@ export default function TechPackReleaseChecklist({
               <textarea
                 className="admin-textarea"
                 rows={3}
-                defaultValue={patternExceptionReason ?? ""}
+                value={patternExceptionReason ?? ""}
                 placeholder="Bắt buộc nếu chưa chọn rập"
-                onBlur={(e) => onPatternExceptionChange?.(e.target.value.trim() || null)}
+                onChange={(e) => onPatternExceptionChange?.(e.target.value)}
               />
             </label>
           )}

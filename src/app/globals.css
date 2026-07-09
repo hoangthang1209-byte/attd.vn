@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./tech-pack-workspace.css";
 
 :root {
   --background: #ffffff;
@@ -25915,9 +25916,14 @@ body:has(.mp-header--v271) {
 .pattern-workspace__chip-sizes { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-left: 2px; }
 
 .pattern-workspace__layout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pattern-workspace__secondary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 26%);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(200px, 0.8fr);
+  gap: 8px;
   align-items: start;
 }
 .pattern-workspace__main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -25951,12 +25957,17 @@ body:has(.mp-header--v271) {
 /* Measurement panel becomes the primary tall area */
 .pattern-workspace__panel--measurements .tech-pack-measurement-editor { display: flex; flex-direction: column; min-height: 0; }
 .pattern-workspace__panel--measurements .tech-pack-measurement-table-wrap {
-  max-height: calc(100vh - 300px);
-  min-height: 340px;
+  max-height: calc(100vh - 220px);
+  min-height: min(68vh, 560px);
   overflow: auto;
 }
 .pattern-workspace__panel--measurements .tech-pack-measurement-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #fff;
   margin-bottom: 6px;
+  padding-bottom: 4px;
 }
 
 /* File cards — compact ~72px rows */
@@ -25996,12 +26007,11 @@ body:has(.mp-header--v271) {
 .pattern-workspace__size-chip--base { background: #dbeafe; color: #1d4ed8; }
 
 @media (max-width: 1100px) {
-  .pattern-workspace__layout { grid-template-columns: 1fr; }
-  .pattern-workspace__sidebar { position: static; }
+  .pattern-workspace__secondary { grid-template-columns: 1fr; }
   .pattern-workspace__info-grid.admin-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pattern-workspace__panel--measurements .tech-pack-measurement-table-wrap { max-height: none; }
+  .pattern-workspace__panel--measurements .tech-pack-measurement-table-wrap { max-height: none; min-height: 320px; }
 }
 
 @media (min-width: 1440px) {
-  .pattern-workspace__layout { grid-template-columns: minmax(0, 1fr) 300px; }
+  .pattern-workspace__info-grid.admin-form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
