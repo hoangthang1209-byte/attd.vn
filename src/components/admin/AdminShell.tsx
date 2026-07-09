@@ -148,7 +148,13 @@ function AdminNavItem({
   );
 }
 
-function AdminShellMain({ children }: { children: React.ReactNode }) {
+function AdminShellMain({
+  children,
+  onOpenNav,
+}: {
+  children: React.ReactNode;
+  onOpenNav: () => void;
+}) {
   const pathname = usePathname();
   const { title } = useAdminTitle();
   const pageMeta = getAdminBreadcrumbMeta(pathname);
@@ -160,6 +166,15 @@ function AdminShellMain({ children }: { children: React.ReactNode }) {
         <AdminScrollRestoration />
       </Suspense>
       <header className={styles.header}>
+        <button
+          type="button"
+          className={styles.mobileHeaderToggle}
+          onClick={onOpenNav}
+          aria-controls="admin-primary-navigation"
+          aria-label="Mở menu quản trị"
+        >
+          <Menu size={20} />
+        </button>
         <div className={styles.headerBody}>
           <div className={styles.breadcrumbs} aria-label="Breadcrumb">
             {pageMeta.breadcrumbs.map((breadcrumb) => (
@@ -235,7 +250,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </Suspense>
           </div>
         </aside>
-        <AdminShellMain>{children}</AdminShellMain>
+        <AdminShellMain onOpenNav={() => setMobileNavOpen(true)}>{children}</AdminShellMain>
       </div>
     </AdminTitleProvider>
   );
