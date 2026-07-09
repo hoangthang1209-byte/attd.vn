@@ -177,94 +177,29 @@ export default function OrderCustomerPartyFields({
     setConfirmOpen(false);
   }
 
-  const customerSummary = [
-    values.customerCode,
-    values.customerTaxCode ? `MST ${values.customerTaxCode}` : null,
-    values.customerPhoneSnapshot,
-    values.customerEmailSnapshot,
-  ].filter(Boolean).join(" · ");
-
-  const contactSummary = [values.contactName, values.contactTitle, values.contactPhone, values.contactEmail]
-    .filter(Boolean)
-    .join(" · ");
-
   return (
     <>
-      <section className="admin-workflow-card admin-workflow-card--customer">
-        <div className="admin-workflow-card__header">
-          <div>
-            <p className="admin-workflow-eyebrow">Bước 1</p>
-            <h2>Khách hàng</h2>
-            <p>Tìm khách hàng để tự động điền hồ sơ. Chỉ chỉnh tay khi đơn hàng này cần snapshot riêng.</p>
-          </div>
-          {onQuickAddCustomer && (
-            <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onQuickAddCustomer}>
-              Thêm khách mới
-            </button>
-          )}
-        </div>
-
+      <div className="quote-form__card">
         <CustomerSearchField value={selectedCustomer} onSelect={(c) => void handleCustomerSelect(c)} />
-
-        {(values.customerNameSnapshot || values.contactName) && (
-          <div className="admin-workflow-summary">
-            <div>
-              <span className="admin-workflow-summary__label">Khách hàng</span>
-              <strong>{values.customerNameSnapshot || values.customerCompanyName || "Chưa chọn"}</strong>
-              {customerSummary && <p>{customerSummary}</p>}
-            </div>
-            <div>
-              <span className="admin-workflow-summary__label">Liên hệ</span>
-              <strong>{values.contactName || "Chưa chọn"}</strong>
-              {contactSummary && <p>{contactSummary}</p>}
-            </div>
-          </div>
+        {onQuickAddCustomer && (
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--small"
+            style={{ marginTop: 8 }}
+            onClick={onQuickAddCustomer}
+          >
+            Thêm khách hàng mới
+          </button>
         )}
+      </div>
 
-        {values.customerId && (
-          <div className="admin-workflow-inline-fields">
-            {contacts.length ? (
-              <div className="admin-field">
-                <label className="admin-label">Người liên hệ</label>
-                <AdminSearchableSelect
-                  value={values.contactId}
-                  onChange={(contactId) => {
-                    const contact = contacts.find((c) => c.id === contactId);
-                    if (contact) {
-                      markManualEdit();
-                      applyContactSnapshots(contact);
-                    } else {
-                      onChange({ contactId: "" });
-                    }
-                  }}
-                  options={contactOptions}
-                  placeholder="— Chọn người liên hệ —"
-                  searchPlaceholder="Tìm người liên hệ…"
-                  fallbackLabel={values.contactName || undefined}
-                  fallbackSublabel={[values.contactTitle, values.contactPhone].filter(Boolean).join(" · ") || undefined}
-                />
-              </div>
-            ) : (
-              <p className="admin-field-hint">Chưa có người liên hệ</p>
-            )}
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary admin-btn--small"
-              onClick={() => setQuickAddContactOpen(true)}
-            >
-              Thêm liên hệ
-            </button>
-          </div>
-        )}
-      </section>
+      <p className="admin-field-hint" style={{ marginTop: 8 }}>
+        Thông tin này chỉ lưu trên đơn hàng, không thay đổi hồ sơ CRM.
+      </p>
 
-      <details className="admin-workflow-disclosure admin-workflow-disclosure--panel">
-        <summary>Thông tin khách hàng nâng cao</summary>
-        <p className="admin-field-hint">
-          Các trường dưới đây chỉ lưu trên đơn hàng, không thay đổi hồ sơ CRM.
-        </p>
-
-        <div className="admin-workflow-grid admin-workflow-grid--advanced">
+      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
+        <legend>A. Khách hàng</legend>
+        <div className="quote-form__party-grid">
           <div className="admin-field">
             <label className="admin-label">Mã khách hàng</label>
             <input className="admin-input" value={values.customerCode} readOnly />
@@ -306,8 +241,51 @@ export default function OrderCustomerPartyFields({
               }}
             />
           </div>
+        </div>
+      </fieldset>
+
+      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
+        <legend>B. Người liên hệ</legend>
+        {values.customerId ? (
+          contacts.length ? (
+            <div className="admin-field">
+              <label className="admin-label">Người liên hệ</label>
+              <AdminSearchableSelect
+                value={values.contactId}
+                onChange={(contactId) => {
+                  const contact = contacts.find((c) => c.id === contactId);
+                  if (contact) {
+                    markManualEdit();
+                    applyContactSnapshots(contact);
+                  } else {
+                    onChange({ contactId: "" });
+                  }
+                }}
+                options={contactOptions}
+                placeholder="— Chọn người liên hệ —"
+                searchPlaceholder="Tìm người liên hệ…"
+                fallbackLabel={values.contactName || undefined}
+                fallbackSublabel={[values.contactTitle, values.contactPhone].filter(Boolean).join(" · ") || undefined}
+              />
+            </div>
+          ) : (
+            <p className="admin-field-hint">Chưa có người liên hệ</p>
+          )
+        ) : (
+          <p className="admin-field-hint">Chọn khách hàng để tải danh sách liên hệ</p>
+        )}
+        {values.customerId && (
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--small"
+            onClick={() => setQuickAddContactOpen(true)}
+          >
+            Thêm người liên hệ
+          </button>
+        )}
+        <div className="quote-form__party-grid" style={{ marginTop: 12 }}>
           <div className="admin-field">
-            <label className="admin-label">Họ tên liên hệ</label>
+            <label className="admin-label">Họ tên</label>
             <input
               className="admin-input"
               value={values.contactName}
@@ -340,7 +318,7 @@ export default function OrderCustomerPartyFields({
             />
           </div>
           <div className="admin-field">
-            <label className="admin-label">SĐT liên hệ</label>
+            <label className="admin-label">Số điện thoại</label>
             <input
               className="admin-input"
               value={values.contactPhone}
@@ -351,7 +329,7 @@ export default function OrderCustomerPartyFields({
             />
           </div>
           <div className="admin-field">
-            <label className="admin-label">Email liên hệ</label>
+            <label className="admin-label">Email</label>
             <input
               className="admin-input"
               type="email"
@@ -362,6 +340,12 @@ export default function OrderCustomerPartyFields({
               }}
             />
           </div>
+        </div>
+      </fieldset>
+
+      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
+        <legend>C. Thông tin giao dịch</legend>
+        <div className="quote-form__party-grid">
           <div className="admin-field admin-form-grid-span-2">
             <label className="admin-label">Địa chỉ</label>
             <input
@@ -386,7 +370,7 @@ export default function OrderCustomerPartyFields({
             />
           </div>
           <div className="admin-field">
-            <label className="admin-label">SĐT công ty</label>
+            <label className="admin-label">Số điện thoại công ty</label>
             <input
               className="admin-input"
               value={values.customerPhoneSnapshot}
@@ -397,7 +381,7 @@ export default function OrderCustomerPartyFields({
             />
           </div>
         </div>
-      </details>
+      </fieldset>
 
       {values.customerId && (
         <QuickAddContactModal
