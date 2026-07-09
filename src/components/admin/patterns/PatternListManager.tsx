@@ -120,7 +120,7 @@ export default function PatternListManager() {
   async function handleDelete(row: PatternRow) {
     if (!canDeletePattern || deletingId) return;
     const confirmed = window.confirm(
-      `Bạn chắc chắn muốn xoá rập ${row.code}? Thao tác này sẽ xoá rập, bảng thông số và file liên quan.`,
+      "Bạn chắc chắn muốn xoá rập này? Thao tác này sẽ xoá rập, bảng thông số và file liên quan.",
     );
     if (!confirmed) return;
 
@@ -155,7 +155,7 @@ export default function PatternListManager() {
         }
       />
 
-      <div className="admin-data-toolbar" style={{ gap: 12, display: "flex", flexWrap: "wrap", marginBottom: 16 }}>
+      <div className="admin-data-toolbar">
         <input
           className="admin-input"
           placeholder="Tìm rập, khách hàng, nhà cung cấp..."
@@ -228,14 +228,14 @@ export default function PatternListManager() {
                   <td>{formatPatternListDate(row.updatedAt)}</td>
                   <td>{row._count?.techPacks ?? 0}</td>
                   <td>
-                    <div className="admin-row-actions">
-                      <Link href={patternAdminDetailPath(row.id)} className="admin-link">
+                    <div className="admin-table-actions">
+                      <Link href={patternAdminDetailPath(row.id)} className="admin-link-button">
                         Chi tiết
                       </Link>
                       {canDeletePattern && (
                         <button
                           type="button"
-                          className="admin-link admin-link--danger"
+                          className="admin-link-button admin-link-button--danger"
                           onClick={() => void handleDelete(row)}
                           disabled={deletingId === row.id}
                         >
