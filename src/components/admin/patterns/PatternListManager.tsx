@@ -8,6 +8,7 @@ import {
   EmptyState,
   PageHeader,
 } from "@/components/admin/AdminUi";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import type { PatternSourceType, PatternStatus } from "@prisma/client";
 import { patternAdminDetailPath } from "@/features/patterns/pattern-admin-routes";
@@ -40,6 +41,13 @@ type PatternRow = {
   _count?: { files: number; techPacks: number };
 };
 
+type PatternDeleteResponse = {
+  message?: string;
+  error?: string;
+  traceId?: string;
+  storageWarnings?: string[];
+};
+
 function formatPatternListDate(value: string): string {
   return new Date(value).toLocaleString("vi-VN", {
     day: "2-digit",
@@ -50,6 +58,12 @@ function formatPatternListDate(value: string): string {
   });
 }
 
+function formatPatternDeleteError(data: PatternDeleteResponse): string {
+  const message = data.message ?? data.error ?? "Không thể xóa rập.";
+  if (data.traceId) return `${message} Mã tra cứu: ${data.traceId}`;
+  return message;
+}
+
 export default function PatternListManager() {
   const [items, setItems] = useState<PatternRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +72,9 @@ export default function PatternListManager() {
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { permissions } = useAdminPermissions();
+  const canDeletePattern = permissions.canUpdateProduction;
 
   async function load() {
     setLoading(true);
@@ -98,6 +115,33 @@ export default function PatternListManager() {
     setNewName("");
     if (data.id) window.location.href = patternAdminDetailPath(data.id);
     else void load();
+  }
+
+  async function handleDelete(row: PatternRow) {
+    if (!canDeletePattern || deletingId) return;
+    const confirmed = window.confirm(
+      `Bạn chắc chắn muốn xoá rập ${row.code}? Thao tác này sẽ xoá rập, bảng thông số và file liên quan.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(row.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/patterns/${row.id}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => ({}))) as PatternDeleteResponse;
+      if (!res.ok) {
+        throw new Error(formatPatternDeleteError(data));
+      }
+      setItems((current) => current.filter((item) => item.id !== row.id));
+      const warnings = data.storageWarnings?.length
+        ? ` Một số file gốc chưa được xóa khỏi storage: ${data.storageWarnings.length}.`
+        : "";
+      window.alert(`Đã xoá rập.${warnings}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể xóa rập.");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -184,9 +228,21 @@ export default function PatternListManager() {
                   <td>{formatPatternListDate(row.updatedAt)}</td>
                   <td>{row._count?.techPacks ?? 0}</td>
                   <td>
-                    <Link href={patternAdminDetailPath(row.id)} className="admin-link">
-                      Chi tiết
-                    </Link>
+                    <div className="admin-row-actions">
+                      <Link href={patternAdminDetailPath(row.id)} className="admin-link">
+                        Chi tiết
+                      </Link>
+                      {canDeletePattern && (
+                        <button
+                          type="button"
+                          className="admin-link admin-link--danger"
+                          onClick={() => void handleDelete(row)}
+                          disabled={deletingId === row.id}
+                        >
+                          {deletingId === row.id ? "Đang xoá..." : "Xóa"}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
