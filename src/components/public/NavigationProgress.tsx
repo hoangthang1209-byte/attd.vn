@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 
 export default function NavigationProgress() {
   const pathname = usePathname();
@@ -47,7 +48,7 @@ export default function NavigationProgress() {
       <div className="nav-progress-bar" />
       <div className="nav-progress-spinner-wrap">
         <span className="nav-progress-spinner" />
-        <span className="nav-progress-label">Đang tải…</span>
+        <InlineLoading title="Đang tải nội dung trang..." tone="public" />
       </div>
     </div>
   );

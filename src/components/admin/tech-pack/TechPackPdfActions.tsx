@@ -31,7 +31,7 @@ export default function TechPackPdfActions({ techPackId, compact = false }: Prop
   async function previewPdf() {
     await withGuard(() =>
       mutate({
-        loadingMessage: "Đang mở PDF…",
+        loadingMessage: "Đang xuất PDF để xem trước...",
         errorFallback: "Không thể tạo PDF Tech Pack. Vui lòng thử lại.",
         action: async () => {
           openTechPackPdfPreview(techPackId);
@@ -44,7 +44,7 @@ export default function TechPackPdfActions({ techPackId, compact = false }: Prop
   async function printPdf() {
     await withGuard(() =>
       mutate({
-        loadingMessage: "Đang tạo PDF Tech Pack…",
+        loadingMessage: "Đang xuất PDF để in...",
         errorFallback: "Không thể tạo PDF Tech Pack. Vui lòng thử lại.",
         action: async () => {
           openTechPackPdfPrint(techPackId);
@@ -57,7 +57,7 @@ export default function TechPackPdfActions({ techPackId, compact = false }: Prop
   async function downloadPdf() {
     await withGuard(() =>
       mutate({
-        loadingMessage: "Đang tải PDF…",
+        loadingMessage: "Đang xuất PDF để tải xuống...",
         successMessage: "Đã tạo PDF Tech Pack.",
         errorFallback: "Không thể tạo PDF Tech Pack. Vui lòng thử lại.",
         action: async () => {

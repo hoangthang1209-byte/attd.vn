@@ -20,9 +20,9 @@ export type AdminUploadFileItem = {
 };
 
 const STATE_LABELS: Record<AdminUploadFileState, string> = {
-  preparing: "Đang chuẩn bị…",
-  uploading: "Đang tải lên…",
-  processing: "Đang xử lý…",
+  preparing: "Đang chuẩn bị tệp...",
+  uploading: "Đang tải tệp lên...",
+  processing: "Đang xử lý tệp...",
   done: "Hoàn tất",
   error: "Không thể tải file",
 };

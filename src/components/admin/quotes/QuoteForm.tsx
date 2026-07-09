@@ -20,9 +20,11 @@ import QuoteItemFormRow, {
   type QuoteItemRow,
 } from "@/components/admin/quotes/QuoteItemFormRow";
 import QuickAddContactModal from "@/components/admin/quotes/QuickAddContactModal";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
 import { employeeRoleLabel } from "@/features/employees/employee-role";
+import { SectionLoading } from "@/components/ui/loading/ContextLoading";
 
 type ProductOption = { id: string; name: string };
 type VariantOption = {
@@ -496,7 +498,15 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
     setItems((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
-  if (loading) return <p className="admin-loading">Đang tải...</p>;
+  if (loading) {
+    return (
+      <SectionLoading
+        title="Đang chuẩn bị báo giá..."
+        description="Hệ thống đang tải thông tin khách hàng, sản phẩm và cấu hình báo giá."
+        tone="admin"
+      />
+    );
+  }
 
   return (
     <div className="quote-form admin-panel">
@@ -505,22 +515,22 @@ export default function QuoteForm({ mode, quoteId, prefillParams }: Props) {
           Hủy
         </Link>
         <div className="quote-form__actions-top-right">
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary"
-            disabled={saving}
+          <AdminLoadingButton
+            variant="secondary"
+            pending={saving}
+            pendingLabel="Đang lưu thông tin..."
             onClick={() => void handleSave(true)}
           >
-            {saving ? "Đang lưu…" : "Lưu nháp"}
-          </button>
-          <button
-            type="button"
-            className="admin-btn admin-btn--primary"
-            disabled={saving}
+            Lưu nháp
+          </AdminLoadingButton>
+          <AdminLoadingButton
+            variant="primary"
+            pending={saving}
+            pendingLabel="Đang tạo báo giá..."
             onClick={() => void handleSave(false)}
           >
             Lưu và xem chi tiết
-          </button>
+          </AdminLoadingButton>
         </div>
       </div>
 
