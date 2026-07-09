@@ -1,9 +1,9 @@
 import Link from "next/link";
 import AttdLogo from "@/components/public/AttdLogo";
-import FooterCtaBand from "@/components/public/FooterCtaBand";
 import FooterLinkSection from "@/components/public/FooterLinkSection";
 import FooterSocialLinks from "@/components/public/FooterSocialLinks";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
+import TrackedLink from "@/components/analytics/TrackedLink";
 import {
   getCompanySettings,
   getBrandingSettings,
@@ -21,8 +21,10 @@ import {
   resolveFooterZaloUrl,
 } from "@/lib/footer-config";
 
+const BRAND_HEADLINE = "Đồng phục & quà tặng";
+const BRAND_SUBHEADLINE = "doanh nghiệp bán sỉ";
 const BRAND_POSITIONING =
-  "Nguồn hàng B2B đồng phục, phôi trơn và quà tặng doanh nghiệp cho đại lý, agency và doanh nghiệp trên toàn quốc.";
+  "Đối tác sản xuất tại Việt Nam cho đại lý, agency, thương hiệu và doanh nghiệp.";
 
 export default async function Footer() {
   const [rawCompany, rawBranding] = await Promise.all([
@@ -41,125 +43,170 @@ export default async function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <>
-      <FooterCtaBand company={company} branding={branding} />
-      <footer className="site-footer site-footer--premium site-footer--launch site-footer--b2b">
-        <div className="container">
-          <div className="site-footer-shell">
-            <div className="site-footer-brand-block">
-              <AttdLogo variant="desktop" src={branding.footerLogoUrl} className="site-footer-logo" />
-              {branding.companyTagline ? (
-                <p className="site-footer-tagline">{branding.companyTagline}</p>
-              ) : null}
-              <p className="site-footer-text">{BRAND_POSITIONING}</p>
-              <ul className="site-footer-credentials" aria-label="Thông tin doanh nghiệp">
-                <li>{VERIFIED_EXPERIENCE_YEARS}+ năm kinh nghiệm</li>
-                <li>OEM / B2B sourcing</li>
-                {hasCompanyField(company.taxCode) ? <li>MST: {company.taxCode}</li> : null}
-                <li>Designed &amp; Manufactured in Vietnam</li>
-              </ul>
-            </div>
+    <footer className="site-footer site-footer--enterprise">
+      <div className="container">
+        <div className="footer-enterprise">
+          <div className="footer-enterprise__brand">
+            <AttdLogo
+              variant="desktop"
+              src={branding.footerLogoUrl}
+              className="footer-enterprise__logo"
+            />
+            {branding.companyTagline ? (
+              <p className="footer-enterprise__eyebrow">{branding.companyTagline}</p>
+            ) : null}
+            <h2 className="footer-enterprise__headline">
+              {BRAND_HEADLINE}
+              <span className="footer-enterprise__headline-sub">{BRAND_SUBHEADLINE}</span>
+            </h2>
+            <p className="footer-enterprise__positioning">{BRAND_POSITIONING}</p>
+            <ul className="footer-enterprise__credentials" aria-label="Thông tin doanh nghiệp">
+              <li>{VERIFIED_EXPERIENCE_YEARS}+ năm kinh nghiệm</li>
+              <li>OEM / Private Label</li>
+              <li>Made in Vietnam</li>
+              {hasCompanyField(company.taxCode) ? <li>MST: {company.taxCode}</li> : null}
+            </ul>
+            <FooterSocialLinks links={socialLinks} />
+          </div>
 
-            <div className="site-footer-nav-grid">
-              <FooterLinkSection title="Sản phẩm" links={FOOTER_PRODUCT_LINKS} />
-              <FooterLinkSection title="Dịch vụ B2B" links={FOOTER_SERVICE_LINKS} />
-              <FooterLinkSection title="Công ty" links={FOOTER_COMPANY_LINKS} />
-            </div>
+          <div className="footer-enterprise__nav">
+            <FooterLinkSection title="Sản phẩm" links={FOOTER_PRODUCT_LINKS} />
+            <FooterLinkSection title="Dịch vụ" links={FOOTER_SERVICE_LINKS} />
+            <FooterLinkSection title="Công ty" links={FOOTER_COMPANY_LINKS} />
+          </div>
 
-            <div className="site-footer-contact-block">
-              <p className="site-footer-heading site-footer-heading--static">Liên hệ</p>
-              <div className="site-footer-contact-lines">
-                {showHotline ? (
-                  <p className="site-footer-contact-line">
-                    <span className="site-footer-contact-kicker">Hotline</span>
+          <aside className="footer-enterprise__contact-card" aria-label="Liên hệ">
+            <h3 className="footer-enterprise__contact-title">Liên hệ</h3>
+            <ul className="footer-enterprise__contact-list">
+              {showHotline ? (
+                <li className="footer-enterprise__contact-item">
+                  <span className="footer-enterprise__contact-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+                    </svg>
+                  </span>
+                  <span className="footer-enterprise__contact-body">
+                    <span className="footer-enterprise__contact-label">Hotline</span>
                     <TrackedAnchor
                       href={`tel:${company.hotline.raw}`}
                       trackEvent="contact_hotline"
                       trackSource="footer_contact"
-                      className="site-footer-link site-footer-contact-value"
+                      className="footer-enterprise__contact-value"
                     >
                       {company.hotline.display}
                     </TrackedAnchor>
-                  </p>
-                ) : null}
-                {hasCompanyField(company.email) ? (
-                  <p className="site-footer-contact-line">
-                    <span className="site-footer-contact-kicker">Email</span>
+                  </span>
+                </li>
+              ) : null}
+              {hasCompanyField(company.email) ? (
+                <li className="footer-enterprise__contact-item">
+                  <span className="footer-enterprise__contact-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                  </span>
+                  <span className="footer-enterprise__contact-body">
+                    <span className="footer-enterprise__contact-label">Email</span>
                     <TrackedAnchor
                       href={`mailto:${company.email}`}
                       trackEvent="contact_email"
                       trackSource="footer_contact"
-                      className="site-footer-link site-footer-contact-value"
+                      className="footer-enterprise__contact-value"
                     >
                       {company.email}
                     </TrackedAnchor>
-                  </p>
-                ) : null}
-                {zaloUrl ? (
-                  <p className="site-footer-contact-line">
-                    <span className="site-footer-contact-kicker">Zalo OA</span>
+                  </span>
+                </li>
+              ) : null}
+              {zaloUrl ? (
+                <li className="footer-enterprise__contact-item">
+                  <span className="footer-enterprise__contact-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                    </svg>
+                  </span>
+                  <span className="footer-enterprise__contact-body">
+                    <span className="footer-enterprise__contact-label">Zalo OA</span>
                     <TrackedAnchor
                       href={zaloUrl}
                       trackEvent="contact_zalo"
                       trackSource="footer_contact"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="site-footer-link site-footer-contact-value"
+                      className="footer-enterprise__contact-value"
                     >
                       Chat Zalo
                     </TrackedAnchor>
-                  </p>
-                ) : null}
-                {hasCompanyField(company.address) || mapsUrl ? (
-                  <p className="site-footer-contact-line site-footer-contact-line--stack">
-                    <span className="site-footer-contact-kicker">Địa chỉ</span>
-                    <span className="site-footer-contact-stack">
-                      {hasCompanyField(company.address) ? (
-                        <span className="site-footer-contact-value">{company.address}</span>
-                      ) : null}
-                      {mapsUrl ? (
-                        <a
-                          href={mapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="site-footer-link site-footer-contact-maps"
-                        >
-                          Google Maps
-                        </a>
-                      ) : null}
+                  </span>
+                </li>
+              ) : null}
+              {hasCompanyField(company.address) ? (
+                <li className="footer-enterprise__contact-item">
+                  <span className="footer-enterprise__contact-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                  </span>
+                  <span className="footer-enterprise__contact-body">
+                    <span className="footer-enterprise__contact-label">Địa chỉ</span>
+                    <span className="footer-enterprise__contact-value footer-enterprise__contact-value--text">
+                      {company.address}
                     </span>
-                  </p>
-                ) : null}
-                {hasCompanyField(company.workingHours) ? (
-                  <p className="site-footer-contact-line">
-                    <span className="site-footer-contact-kicker">Giờ làm việc</span>
-                    <span className="site-footer-contact-value site-footer-hours">
+                    {mapsUrl ? (
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="footer-enterprise__maps-link"
+                      >
+                        Google Maps
+                      </a>
+                    ) : null}
+                  </span>
+                </li>
+              ) : null}
+              {hasCompanyField(company.workingHours) ? (
+                <li className="footer-enterprise__contact-item">
+                  <span className="footer-enterprise__contact-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  </span>
+                  <span className="footer-enterprise__contact-body">
+                    <span className="footer-enterprise__contact-label">Giờ làm việc</span>
+                    <span className="footer-enterprise__contact-value footer-enterprise__contact-value--text">
                       {company.workingHours}
                     </span>
-                  </p>
-                ) : null}
-              </div>
-
-              <FooterSocialLinks links={socialLinks} />
-            </div>
-          </div>
-
-          <div className="site-footer-bottom">
-            <div className="site-footer-bottom__meta">
-              <span>
-                © {year} {company.name}.vn
-                {hasCompanyField(company.taxCode) ? ` · MST: ${company.taxCode}` : ""}
-              </span>
-              <span className="site-footer-bottom__origin">Designed &amp; Manufactured in Vietnam</span>
-            </div>
-            <div className="site-footer-bottom__legal">
-              <Link href="/chinh-sach-dai-ly" className="site-footer-bottom__link">
-                Chính sách đại lý
-              </Link>
-            </div>
-          </div>
+                  </span>
+                </li>
+              ) : null}
+            </ul>
+            <TrackedLink
+              href="/lien-he"
+              trackEvent="contact_quote"
+              trackSource="footer_contact_card"
+              className="footer-enterprise__cta"
+            >
+              Yêu cầu báo giá
+            </TrackedLink>
+          </aside>
         </div>
-      </footer>
-    </>
+
+        <div className="footer-enterprise__bottom">
+          <p className="footer-enterprise__copyright">
+            © {year} {company.name}.vn
+            {hasCompanyField(company.taxCode) ? ` · MST: ${company.taxCode}` : ""}
+            {" · "}
+            Designed &amp; Manufactured in Vietnam
+          </p>
+          <Link href="/chinh-sach-dai-ly" className="footer-enterprise__legal-link">
+            Chính sách đại lý
+          </Link>
+        </div>
+      </div>
+    </footer>
   );
 }
