@@ -11,7 +11,6 @@ import TestimonialSection from "@/components/public/company/TestimonialSection";
 import CaseStudySection from "@/components/public/CaseStudySection";
 import CompanyContactCard from "@/components/public/company/CompanyContactCard";
 import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
-import { ManufacturingHomepageSection } from "@/components/public/manufacturing/ManufacturingPublicSections";
 import { getCompanySettings } from "@/features/settings/services/settings.service";
 import { buildAboutMetadata } from "@/lib/seo/indexation-policy";
 import { VERIFIED_EXPERIENCE_YEARS } from "@/lib/company-trust";
@@ -67,13 +66,6 @@ export default async function GioiThieuPage() {
       />
 
       <MarketplaceRFQStrip />
-
-      <ManufacturingHomepageSection
-        title="Hình ảnh sản xuất thực tế"
-        description="Minh chứng từ kho, xưởng và quy trình vận hành khi đã được công bố."
-        limit={6}
-        className="company-about-manufacturing"
-      />
 
       <FactoryOverview />
 

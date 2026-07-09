@@ -6,8 +6,8 @@ export default function MarketplaceRFQStrip() {
           <div className="mp-rfq-copy">
             <h2 className="mp-rfq-title">Không thấy sản phẩm phù hợp?</h2>
             <p className="mp-rfq-desc">
-              Gửi yêu cầu nguồn hàng, ATTD sẽ tư vấn danh mục phù hợp, số lượng
-              tối thiểu, thời gian giao/sản xuất và báo giá sỉ.
+              Gửi yêu cầu nhanh để ATTD tư vấn nhóm sản phẩm, số lượng tối thiểu
+              và lộ trình triển khai phù hợp.
             </p>
           </div>
 

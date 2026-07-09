@@ -4,13 +4,19 @@ type MarketplaceFinalCtaProps = {
   title?: string;
   description?: string;
   trustItems?: string[];
+  secondaryContactHref?: string;
+  secondaryContactLabel?: string;
 };
 
 export default function MarketplaceFinalCta({
   title = "Bạn cần nguồn hàng đồng phục hoặc quà tặng doanh nghiệp?",
-  description = "Gửi nhu cầu, ATTD sẽ tư vấn danh mục phù hợp, số lượng tối thiểu, thời gian giao/sản xuất và báo giá theo số lượng.",
-  trustItems = ["Tư vấn nhanh", "Báo giá theo số lượng", "Bảo mật thông tin", "Không spam"],
+  description = "Gửi yêu cầu để ATTD tư vấn cấu hình phù hợp, số lượng tối thiểu và tiến độ triển khai rõ ràng.",
+  trustItems = [],
+  secondaryContactHref,
+  secondaryContactLabel,
 }: MarketplaceFinalCtaProps) {
+  const showSecondaryContact = Boolean(secondaryContactHref && secondaryContactLabel);
+
   return (
     <section className="mp-final-cta">
       <div className="container">
@@ -20,22 +26,23 @@ export default function MarketplaceFinalCta({
           <p className="mp-final-cta-desc">{description}</p>
           <div className="mp-final-cta-btns">
             <Link href="/lien-he" className="btn-primary">
-              Liên hệ báo giá sỉ
+              Yêu cầu báo giá
             </Link>
-            <Link href="/dai-ly" className="btn-secondary">
-              Đăng ký đại lý
-            </Link>
-            <Link href="/san-pham" className="btn-tertiary mp-final-cta-tertiary">
-              Xem danh mục sản phẩm
-            </Link>
+            {showSecondaryContact ? (
+              <Link href={secondaryContactHref!} className="btn-secondary">
+                {secondaryContactLabel}
+              </Link>
+            ) : null}
           </div>
-          <div className="mp-final-cta-trust" aria-label="Cam kết tư vấn">
-            {trustItems.map((item) => (
-              <span key={item} className="mp-final-cta-trust-item">
-                {item}
-              </span>
-            ))}
-          </div>
+          {trustItems.length > 0 ? (
+            <div className="mp-final-cta-trust" aria-label="Cam kết tư vấn">
+              {trustItems.map((item) => (
+                <span key={item} className="mp-final-cta-trust-item">
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

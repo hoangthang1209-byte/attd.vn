@@ -128,8 +128,7 @@ export default async function HomePage() {
       <CompanyFacts className="home-company-facts" />
 
       <ManufacturingHomepageSection
-        title="Thực tế sản xuất"
-        description="Hình ảnh và quy trình sản xuất thực tế tại ATTD."
+        title="Góc nhìn từ xưởng"
         limit={6}
         className="home-manufacturing-evidence"
       />
