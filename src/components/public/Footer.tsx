@@ -22,7 +22,7 @@ import {
 } from "@/lib/footer-config";
 
 const BRAND_POSITIONING =
-  "Nguồn hàng B2B đồng phục, phôi trơn và quà tặng doanh nghiệp cho đại lý, agency, xưởng in và doanh nghiệp trên toàn quốc.";
+  "Nguồn hàng B2B đồng phục, phôi trơn và quà tặng doanh nghiệp cho đại lý, agency và doanh nghiệp trên toàn quốc.";
 
 export default async function Footer() {
   const [rawCompany, rawBranding] = await Promise.all([
@@ -68,84 +68,77 @@ export default async function Footer() {
 
             <div className="site-footer-contact-block">
               <p className="site-footer-heading site-footer-heading--static">Liên hệ</p>
-              <dl className="site-footer-contact-list">
+              <div className="site-footer-contact-lines">
                 {showHotline ? (
-                  <div className="site-footer-contact-item">
-                    <dt>Hotline</dt>
-                    <dd>
-                      <TrackedAnchor
-                        href={`tel:${company.hotline.raw}`}
-                        trackEvent="contact_hotline"
-                        trackSource="footer_contact"
-                        className="site-footer-link"
-                      >
-                        {company.hotline.display}
-                      </TrackedAnchor>
-                    </dd>
-                  </div>
+                  <p className="site-footer-contact-line">
+                    <span className="site-footer-contact-kicker">Hotline</span>
+                    <TrackedAnchor
+                      href={`tel:${company.hotline.raw}`}
+                      trackEvent="contact_hotline"
+                      trackSource="footer_contact"
+                      className="site-footer-link site-footer-contact-value"
+                    >
+                      {company.hotline.display}
+                    </TrackedAnchor>
+                  </p>
                 ) : null}
                 {hasCompanyField(company.email) ? (
-                  <div className="site-footer-contact-item">
-                    <dt>Email</dt>
-                    <dd>
-                      <TrackedAnchor
-                        href={`mailto:${company.email}`}
-                        trackEvent="contact_email"
-                        trackSource="footer_contact"
-                        className="site-footer-link"
-                      >
-                        {company.email}
-                      </TrackedAnchor>
-                    </dd>
-                  </div>
+                  <p className="site-footer-contact-line">
+                    <span className="site-footer-contact-kicker">Email</span>
+                    <TrackedAnchor
+                      href={`mailto:${company.email}`}
+                      trackEvent="contact_email"
+                      trackSource="footer_contact"
+                      className="site-footer-link site-footer-contact-value"
+                    >
+                      {company.email}
+                    </TrackedAnchor>
+                  </p>
                 ) : null}
                 {zaloUrl ? (
-                  <div className="site-footer-contact-item">
-                    <dt>Zalo</dt>
-                    <dd>
-                      <TrackedAnchor
-                        href={zaloUrl}
-                        trackEvent="contact_zalo"
-                        trackSource="footer_contact"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="site-footer-link"
-                      >
-                        Zalo OA
-                      </TrackedAnchor>
-                    </dd>
-                  </div>
+                  <p className="site-footer-contact-line">
+                    <span className="site-footer-contact-kicker">Zalo OA</span>
+                    <TrackedAnchor
+                      href={zaloUrl}
+                      trackEvent="contact_zalo"
+                      trackSource="footer_contact"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="site-footer-link site-footer-contact-value"
+                    >
+                      Chat Zalo
+                    </TrackedAnchor>
+                  </p>
                 ) : null}
-                {hasCompanyField(company.address) ? (
-                  <div className="site-footer-contact-item">
-                    <dt>Địa chỉ</dt>
-                    <dd className="site-footer-contact-value">{company.address}</dd>
-                  </div>
-                ) : null}
-                {mapsUrl ? (
-                  <div className="site-footer-contact-item">
-                    <dt>Maps</dt>
-                    <dd>
-                      <a
-                        href={mapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="site-footer-link"
-                      >
-                        Xem trên Google Maps
-                      </a>
-                    </dd>
-                  </div>
+                {hasCompanyField(company.address) || mapsUrl ? (
+                  <p className="site-footer-contact-line site-footer-contact-line--stack">
+                    <span className="site-footer-contact-kicker">Địa chỉ</span>
+                    <span className="site-footer-contact-stack">
+                      {hasCompanyField(company.address) ? (
+                        <span className="site-footer-contact-value">{company.address}</span>
+                      ) : null}
+                      {mapsUrl ? (
+                        <a
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="site-footer-link site-footer-contact-maps"
+                        >
+                          Google Maps
+                        </a>
+                      ) : null}
+                    </span>
+                  </p>
                 ) : null}
                 {hasCompanyField(company.workingHours) ? (
-                  <div className="site-footer-contact-item">
-                    <dt>Giờ làm việc</dt>
-                    <dd className="site-footer-contact-value site-footer-hours">
+                  <p className="site-footer-contact-line">
+                    <span className="site-footer-contact-kicker">Giờ làm việc</span>
+                    <span className="site-footer-contact-value site-footer-hours">
                       {company.workingHours}
-                    </dd>
-                  </div>
+                    </span>
+                  </p>
                 ) : null}
-              </dl>
+              </div>
 
               <FooterSocialLinks links={socialLinks} />
             </div>
