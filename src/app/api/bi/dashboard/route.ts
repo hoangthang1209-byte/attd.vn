@@ -4,7 +4,7 @@ import { requireAdminPermission } from "@/lib/permissions/require-admin-permissi
 
 export async function GET(request: NextRequest) {
   const permission = await requireAdminPermission({
-    platform: "commercial",
+    platform: "business-intelligence",
     action: "read",
     request,
   });

@@ -12,7 +12,7 @@ import {
   EmptyState,
   PageHeader,
 } from "@/components/admin/AdminUi";
-import { formatQuoteCurrency, formatQuoteDate } from "@/features/quotes/format";
+import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
 import { QUOTE_STATUS_LABELS } from "@/features/quotes/labels";
 import type { QuoteListRecord } from "@/features/quotes/types";
 
@@ -99,7 +99,7 @@ export default function QuoteListManager() {
                   <td><QuoteStatusBadge status={q.status} /></td>
                   <td>{formatQuoteCurrency(q.manualOverride && q.manualTotalAmount != null ? q.manualTotalAmount : q.totalAmount)}</td>
                   <td>{formatQuoteDate(q.validUntil)}</td>
-                  <td>{formatQuoteDate(q.createdAt)}</td>
+                  <td>{formatQuoteDateTime(q.createdAt)}</td>
                 </tr>
               ))}
             </tbody>

@@ -57,7 +57,10 @@ export default function PricingHistoryList() {
 
       {error && <p className="admin-error">{error}</p>}
       {loading ? <AdminLoadingState label="Đang tải lịch sử tính giá…" /> : rows.length === 0 ? (
-        <div className="admin-empty-state"><p>Chưa có bản tính giá nào.</p></div>
+        <div className="admin-empty-state">
+          <p>Chưa có bản tính giá nào.</p>
+          <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">Tạo bản tính đầu tiên</Link>
+        </div>
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">

@@ -24,7 +24,7 @@ type FilterKey = "all" | "urgent" | "opportunity" | "quote" | "lead" | "activity
 
 const FILTER_OPTIONS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "Tất cả" },
-  { key: "urgent", label: "Khẩn cấp" },
+  { key: "urgent", label: "Ưu tiên cao" },
   { key: "opportunity", label: "Cơ hội" },
   { key: "quote", label: "Báo giá" },
   { key: "lead", label: "Lead" },
@@ -92,10 +92,26 @@ export default function SalesFollowUpCenter() {
     return <AdminLoadingState label="Đang tải trung tâm follow-up…" />;
   }
 
+  if (!data && error) {
+    return (
+      <AdminPageShell>
+        <EmptyState
+          title="Không thể tải follow-up"
+          description={error}
+          action={
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
+              Thử lại
+            </button>
+          }
+        />
+      </AdminPageShell>
+    );
+  }
+
   return (
     <AdminPageShell>
       <PageHeader
-        title="Follow-up"
+        title="Trung tâm follow-up"
         description="Danh sách việc cần liên hệ hôm nay từ cơ hội, báo giá, lead và hoạt động CRM."
         actions={
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
@@ -112,8 +128,8 @@ export default function SalesFollowUpCenter() {
             <StatCard label="Tổng việc cần xử lý" value={data.stats.total} />
             <StatCard label="Quá hạn" value={data.stats.overdue} tone="danger" />
             <StatCard label="Hôm nay" value={data.stats.today} tone="info" />
-            <StatCard label="Quote sắp hết hạn" value={data.stats.quoteExpiring} tone="warning" />
-            <StatCard label="Quote chưa phản hồi" value={data.stats.noResponse} tone="warning" />
+            <StatCard label="Báo giá sắp hết hạn" value={data.stats.quoteExpiring} tone="warning" />
+            <StatCard label="Báo giá chưa phản hồi" value={data.stats.noResponse} tone="warning" />
             <StatCard label="Lead cần follow-up" value={data.stats.leadFollowUp} />
           </div>
 
@@ -185,7 +201,7 @@ function StatCard({
 }
 
 function FollowUpRow({ item }: { item: SalesFollowUpItem }) {
-  const typeLabel = SALES_FOLLOW_UP_TYPE_LABELS[item.type as SalesFollowUpType];
+  const typeLabel = SALES_FOLLOW_UP_TYPE_LABELS[item.type as SalesFollowUpType] ?? item.type;
   const contactParts = [item.phone, item.zalo ? `Zalo: ${item.zalo}` : null, item.email]
     .filter(Boolean)
     .join(" · ");

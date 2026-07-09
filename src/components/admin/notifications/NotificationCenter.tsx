@@ -89,6 +89,22 @@ export default function NotificationCenter() {
     return <AdminLoadingState label="Đang tải trung tâm thông báo…" />;
   }
 
+  if (!data && error) {
+    return (
+      <AdminPageShell>
+        <EmptyState
+          title="Không thể tải thông báo"
+          description={error}
+          action={
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
+              Thử lại
+            </button>
+          }
+        />
+      </AdminPageShell>
+    );
+  }
+
   return (
     <AdminPageShell>
       <PageHeader
@@ -185,7 +201,7 @@ function NotificationRow({ item }: { item: NotificationItem }) {
           {NOTIFICATION_SEVERITY_LABELS[item.severity]}
         </span>
       </td>
-      <td>{NOTIFICATION_TYPE_LABELS[item.type as NotificationType]}</td>
+      <td>{NOTIFICATION_TYPE_LABELS[item.type as NotificationType] ?? item.type}</td>
       <td className="sales-follow-up__title-cell">
         <strong>{item.title}</strong>
       </td>

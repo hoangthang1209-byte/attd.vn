@@ -10,7 +10,10 @@ import {
   NOTIFICATION_TYPE_LABELS,
 } from "@/features/notifications/labels";
 import type { NotificationItem } from "@/features/notifications/types";
+import type { PricingCalculationStatus, QuoteStatus } from "@prisma/client";
+import { formatPricingPercent } from "@/features/pricing/format";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
+import { REVENUE_WORKSPACE_TIMELINE_LABELS } from "@/features/revenue/workspace/labels";
 import { SALES_OPPORTUNITY_PRIORITY_LABELS, SALES_OPPORTUNITY_STAGE_LABELS } from "@/features/sales/opportunities/labels";
 import { getQuoteStatusLabel } from "@/features/quotes/labels";
 import { ORDER_STATUS_LABELS } from "@/features/orders/order-labels";
@@ -24,10 +27,10 @@ type WorkspaceTab = "overview" | "costing" | "quotes" | "orders" | "timeline";
 
 const TAB_OPTIONS: Array<{ key: WorkspaceTab; label: string }> = [
   { key: "overview", label: "Tổng quan" },
-  { key: "costing", label: "Costing" },
+  { key: "costing", label: "Bản tính giá" },
   { key: "quotes", label: "Báo giá" },
   { key: "orders", label: "Đơn hàng" },
-  { key: "timeline", label: "Timeline" },
+  { key: "timeline", label: "Dòng thời gian" },
 ];
 
 function renderValue(value: string | null | undefined): string {
@@ -45,11 +48,13 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
   const [relatedNotifications, setRelatedNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setNotFound(false);
     try {
       const [workspaceResponse, notificationsResponse] = await Promise.all([
         fetch(`/api/revenue/workspace/${opportunityId}`),
@@ -57,7 +62,10 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
       ]);
       const json = (await workspaceResponse.json()) as RevenueWorkspacePayload & { message?: string };
       if (!workspaceResponse.ok) {
-        throw new Error(json.message ?? "Không thể tải Revenue Workspace");
+        if (workspaceResponse.status === 404) {
+          setNotFound(true);
+        }
+        throw new Error(json.message ?? "Không thể tải không gian doanh thu");
       }
       setPayload(json);
 
@@ -80,7 +88,7 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
     void load();
   }, [load]);
 
-  const costingSnapshot = payload?.pricingCalculation.resultSnapshot;
+  const costingSnapshot = payload?.pricingCalculation?.resultSnapshot;
   const snapshotMarginRate = useMemo(
     () => getSnapshotNumber(costingSnapshot, "actualMarginRate"),
     [costingSnapshot],
@@ -91,19 +99,29 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
   );
 
   if (loading) {
-    return <AdminLoadingState label="Đang tải Revenue Workspace…" rows={5} />;
+    return <AdminLoadingState label="Đang tải không gian doanh thu…" rows={5} />;
   }
 
   if (!payload) {
     return (
       <AdminPageShell>
         <EmptyState
-          title="Không tìm thấy cơ hội"
-          description={error ?? "Cơ hội có thể đã bị xóa hoặc bạn không có quyền truy cập."}
+          title={notFound ? "Không tìm thấy cơ hội" : "Không thể tải dữ liệu"}
+          description={
+            error ?? (notFound
+              ? "Cơ hội có thể đã bị xóa hoặc bạn không có quyền truy cập."
+              : "Vui lòng thử lại sau.")
+          }
           action={
-            <Link href="/admin/sales/pipeline" className="admin-btn admin-btn--secondary">
-              Quay lại pipeline
-            </Link>
+            notFound ? (
+              <Link href="/admin/sales/pipeline" className="admin-btn admin-btn--secondary">
+                Quay lại pipeline
+              </Link>
+            ) : (
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
+                Thử lại
+              </button>
+            )
           }
         />
       </AdminPageShell>
@@ -131,10 +149,10 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
               Quay lại Pipeline
             </Link>
             <Link href={`/admin/sales/opportunity/${payload.opportunity.id}`} className="admin-btn admin-btn--secondary">
-              Mở Opportunity Workspace
+              Mở workspace cơ hội
             </Link>
             <Link href="/admin/sales/follow-up" className="admin-btn admin-btn--secondary">
-              Follow-up Center
+              Trung tâm follow-up
             </Link>
             <button type="button" className="admin-btn admin-btn--primary" onClick={() => void load()}>
               Làm mới
@@ -150,7 +168,7 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
           <div className="revenue-workspace__subhead">
             <h3>Thông báo liên quan</h3>
             <Link href="/admin/notifications" className="admin-link">
-              Mở Notification Center
+              Mở trung tâm thông báo
             </Link>
           </div>
           <div className="admin-table-wrap">
@@ -176,9 +194,13 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
                     <td>{item.title}</td>
                     <td className="sales-follow-up__reason">{item.message}</td>
                     <td>
-                      <Link href={item.href} className="admin-btn admin-btn--xs admin-btn--secondary">
-                        Mở
-                      </Link>
+                      {item.href && item.href !== "/admin/notifications" ? (
+                        <Link href={item.href} className="admin-btn admin-btn--xs admin-btn--secondary">
+                          Mở
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -190,23 +212,23 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
 
       <section className="admin-panel revenue-workspace__stats">
         <article className="revenue-workspace__stat-card">
-          <p className="admin-field-hint">Pipeline value</p>
+          <p className="admin-field-hint">Giá trị pipeline</p>
           <strong>{formatQuoteCurrency(payload.stats.estimatedValue ?? 0)}</strong>
         </article>
         <article className="revenue-workspace__stat-card">
-          <p className="admin-field-hint">Quote value</p>
+          <p className="admin-field-hint">Giá trị báo giá</p>
           <strong>{formatQuoteCurrency(payload.stats.quoteValue ?? 0)}</strong>
         </article>
         <article className="revenue-workspace__stat-card">
-          <p className="admin-field-hint">Order value</p>
+          <p className="admin-field-hint">Giá trị đơn hàng</p>
           <strong>{formatQuoteCurrency(payload.stats.orderValue ?? 0)}</strong>
         </article>
         <article className="revenue-workspace__stat-card">
-          <p className="admin-field-hint">Probability</p>
-          <strong>{payload.stats.probability}%</strong>
+          <p className="admin-field-hint">Xác suất</p>
+          <strong>{formatPricingPercent(payload.stats.probability)}</strong>
         </article>
         <article className="revenue-workspace__stat-card">
-          <p className="admin-field-hint">Next follow-up</p>
+          <p className="admin-field-hint">Follow-up tiếp theo</p>
           <strong>{payload.opportunity.nextFollowUpAt ? formatQuoteDateTime(payload.opportunity.nextFollowUpAt) : "—"}</strong>
         </article>
       </section>
@@ -227,28 +249,52 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
       {activeTab === "overview" ? (
         <section className="revenue-workspace__grid">
           <article className="admin-panel">
-            <h3>Customer / Lead / Contact</h3>
+            <h3>Khách hàng / Lead / Liên hệ</h3>
             <dl className="revenue-workspace__facts">
-              <div><dt>Customer</dt><dd>{renderValue(payload.customer.label)}</dd></div>
-              <div><dt>Lead</dt><dd>{renderValue(payload.lead.label)}</dd></div>
-              <div><dt>Contact</dt><dd>{renderValue(payload.contact.label)}</dd></div>
-              <div><dt>Expected close</dt><dd>{payload.opportunity.expectedCloseDate ? formatQuoteDate(payload.opportunity.expectedCloseDate) : "—"}</dd></div>
-              <div><dt>Assigned to</dt><dd>{renderValue(payload.opportunity.assignedTo)}</dd></div>
-              <div><dt>Source</dt><dd>{renderValue(payload.opportunity.source)}</dd></div>
+              <div>
+                <dt>Khách hàng</dt>
+                <dd>
+                  {payload.customer.id && payload.customer.label ? (
+                    <Link href={`/admin/crm/customers/${payload.customer.id}`} className="admin-link">
+                      {payload.customer.label}
+                    </Link>
+                  ) : (
+                    renderValue(payload.customer.label)
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Lead</dt>
+                <dd>
+                  {payload.lead.id && payload.lead.label ? (
+                    <Link href={`/admin/crm/leads/${payload.lead.id}`} className="admin-link">
+                      {payload.lead.label}
+                    </Link>
+                  ) : (
+                    renderValue(payload.lead.label)
+                  )}
+                </dd>
+              </div>
+              <div><dt>Liên hệ</dt><dd>{renderValue(payload.contact.label)}</dd></div>
+              <div><dt>Dự kiến chốt</dt><dd>{payload.opportunity.expectedCloseDate ? formatQuoteDate(payload.opportunity.expectedCloseDate) : "—"}</dd></div>
+              <div><dt>Phụ trách</dt><dd>{renderValue(payload.opportunity.assignedTo)}</dd></div>
+              <div><dt>Nguồn</dt><dd>{renderValue(payload.opportunity.source)}</dd></div>
             </dl>
           </article>
 
           <article className="admin-panel">
-            <h3>Current Quote</h3>
+            <h3>Báo giá hiện tại</h3>
             <p>
               <strong>{renderValue(payload.currentQuote.quoteNo)}</strong>
             </p>
             <p className="admin-field-hint">
-              {payload.currentQuote.status ? getQuoteStatusLabel(payload.currentQuote.status as never) : "Chưa có báo giá"}
+              {payload.currentQuote.status
+                ? getQuoteStatusLabel(payload.currentQuote.status as QuoteStatus)
+                : "Chưa có báo giá"}
             </p>
             <p>{formatQuoteCurrency(payload.currentQuote.totalAmount ?? 0)}</p>
             <p className="admin-field-hint">
-              Valid until: {payload.currentQuote.validUntil ? formatQuoteDate(payload.currentQuote.validUntil) : "—"}
+              Hết hạn: {payload.currentQuote.validUntil ? formatQuoteDate(payload.currentQuote.validUntil) : "Không có hạn"}
             </p>
             {payload.currentQuote.id ? (
               <Link href={`/admin/quotes/${payload.currentQuote.id}`} className="admin-link">
@@ -258,13 +304,13 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
           </article>
 
           <article className="admin-panel">
-            <h3>Current Costing</h3>
+            <h3>Bản tính giá hiện tại</h3>
             <p>
               <strong>{renderValue(payload.pricingCalculation.code)}</strong>
             </p>
             <p className="admin-field-hint">
               {payload.pricingCalculation.status
-                ? getPricingStatusLabel(payload.pricingCalculation.status as never)
+                ? getPricingStatusLabel(payload.pricingCalculation.status as PricingCalculationStatus)
                 : "Chưa có bản tính"}
             </p>
             <p>{formatQuoteCurrency(payload.pricingCalculation.totalAmount ?? 0)}</p>
@@ -276,7 +322,7 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
           </article>
 
           <article className="admin-panel">
-            <h3>Current Order</h3>
+            <h3>Đơn hàng hiện tại</h3>
             <p>
               <strong>{renderValue(payload.order.orderNo)}</strong>
             </p>
@@ -294,10 +340,10 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
           </article>
 
           <article className="admin-panel">
-            <h3>Quick links</h3>
+            <h3>Liên kết nhanh</h3>
             <div className="revenue-workspace__quick-links">
               <Link href={`/admin/sales/opportunity/${payload.opportunity.id}`} className="admin-btn admin-btn--secondary admin-btn--small">
-                Opportunity workspace
+                Workspace cơ hội
               </Link>
               <Link href="/admin/sales/pipeline" className="admin-btn admin-btn--secondary admin-btn--small">
                 Pipeline
@@ -306,7 +352,7 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
                 Follow-up
               </Link>
               <Link href="/admin/pricing/costing" className="admin-btn admin-btn--secondary admin-btn--small">
-                Costing calculator
+                Bộ tính giá costing
               </Link>
             </div>
           </article>
@@ -315,19 +361,20 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
 
       {activeTab === "costing" ? (
         <section className="admin-panel">
-          <h3>Costing</h3>
+          <h3>Bản tính giá</h3>
           <div className="revenue-workspace__facts-grid">
             <div><dt>Mã bản tính</dt><dd>{renderValue(payload.pricingCalculation.code)}</dd></div>
             <div><dt>Tổng giá trị</dt><dd>{formatQuoteCurrency(payload.pricingCalculation.totalAmount ?? 0)}</dd></div>
-            <div><dt>Gross margin</dt><dd>{payload.stats.grossMargin != null ? formatQuoteCurrency(payload.stats.grossMargin) : "—"}</dd></div>
-            <div><dt>Margin rate</dt><dd>{snapshotMarginRate != null ? `${snapshotMarginRate}%` : "—"}</dd></div>
-            <div><dt>Cost / unit</dt><dd>{snapshotCostPerUnit != null ? formatQuoteCurrency(snapshotCostPerUnit) : "—"}</dd></div>
+            <div><dt>Lợi nhuận gộp</dt><dd>{payload.stats.grossMargin != null ? formatQuoteCurrency(payload.stats.grossMargin) : "—"}</dd></div>
+            <div><dt>Biên lợi nhuận</dt><dd>{formatPricingPercent(snapshotMarginRate)}</dd></div>
+            <div><dt>Chi phí / đơn vị</dt><dd>{snapshotCostPerUnit != null ? formatQuoteCurrency(snapshotCostPerUnit) : "—"}</dd></div>
           </div>
 
-          <h4 className="revenue-workspace__subhead">Related calculations</h4>
+          <h4 className="revenue-workspace__subhead">Bản tính liên quan</h4>
           {payload.relatedPricingCalculations.length === 0 ? (
             <p className="admin-field-hint">Không có bản tính liên quan.</p>
           ) : (
+            <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -341,13 +388,14 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
                 {payload.relatedPricingCalculations.map((item) => (
                   <tr key={item.id}>
                     <td><Link href={`/admin/pricing/history/${item.id}`} className="admin-link">{item.code}</Link></td>
-                    <td>{getPricingStatusLabel(item.status as never)}</td>
+                    <td>{getPricingStatusLabel(item.status as PricingCalculationStatus)}</td>
                     <td>{formatQuoteCurrency(item.totalAmount)}</td>
                     <td>{formatQuoteDateTime(item.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </section>
       ) : null}
@@ -359,15 +407,16 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
             Hiện tại: <strong>{renderValue(payload.currentQuote.quoteNo)}</strong>
           </p>
           <p className="admin-field-hint">
-            Trạng thái: {payload.currentQuote.status ? getQuoteStatusLabel(payload.currentQuote.status as never) : "—"}
+            Trạng thái: {payload.currentQuote.status ? getQuoteStatusLabel(payload.currentQuote.status as QuoteStatus) : "—"}
           </p>
           <p>Tổng: {formatQuoteCurrency(payload.currentQuote.totalAmount ?? 0)}</p>
-          <p>Valid until: {payload.currentQuote.validUntil ? formatQuoteDate(payload.currentQuote.validUntil) : "—"}</p>
+          <p>Hết hạn: {payload.currentQuote.validUntil ? formatQuoteDate(payload.currentQuote.validUntil) : "Không có hạn"}</p>
 
-          <h4 className="revenue-workspace__subhead">Related quotes</h4>
+          <h4 className="revenue-workspace__subhead">Báo giá liên quan</h4>
           {payload.relatedQuotes.length === 0 ? (
             <p className="admin-field-hint">Không có báo giá liên quan.</p>
           ) : (
+            <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -381,13 +430,14 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
                 {payload.relatedQuotes.map((item) => (
                   <tr key={item.id}>
                     <td><Link href={`/admin/quotes/${item.id}`} className="admin-link">{item.quoteNo}</Link></td>
-                    <td>{getQuoteStatusLabel(item.status as never)}</td>
+                    <td>{getQuoteStatusLabel(item.status as QuoteStatus)}</td>
                     <td>{formatQuoteCurrency(item.totalAmount)}</td>
                     <td>{item.validUntil ? formatQuoteDate(item.validUntil) : "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </section>
       ) : null}
@@ -404,10 +454,11 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
           <p>Tổng: {formatQuoteCurrency(payload.order.totalAmount ?? 0)}</p>
           <p>Dự kiến giao: {payload.order.deliveryDate ? formatQuoteDate(payload.order.deliveryDate) : "—"}</p>
 
-          <h4 className="revenue-workspace__subhead">Related orders</h4>
+          <h4 className="revenue-workspace__subhead">Đơn hàng liên quan</h4>
           {payload.relatedOrders.length === 0 ? (
             <p className="admin-field-hint">Không có đơn hàng liên quan.</p>
           ) : (
+            <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -428,15 +479,16 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </section>
       ) : null}
 
       {activeTab === "timeline" ? (
         <section className="admin-panel">
-          <h3>Timeline</h3>
+          <h3>Dòng thời gian</h3>
           {payload.timeline.length === 0 ? (
-            <p className="admin-field-hint">Chưa có timeline.</p>
+            <p className="admin-field-hint">Chưa có dòng thời gian.</p>
           ) : (
             <ul className="revenue-workspace__timeline">
               {payload.timeline.map((item) => (
@@ -445,7 +497,9 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
                     <strong>{item.title}</strong>
                     <span>{formatQuoteDateTime(item.at)}</span>
                   </div>
-                  <p className="admin-field-hint">{item.type}</p>
+                  <p className="admin-field-hint">
+                    {REVENUE_WORKSPACE_TIMELINE_LABELS[item.type] ?? item.type}
+                  </p>
                   {item.description ? <p>{item.description}</p> : null}
                   {item.href ? (
                     <Link href={item.href} className="admin-link">

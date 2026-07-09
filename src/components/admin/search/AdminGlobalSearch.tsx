@@ -88,6 +88,7 @@ export default function AdminGlobalSearch() {
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         setError(err instanceof Error ? err.message : "Không thể tìm kiếm");
+        setResponse(EMPTY_RESPONSE);
       } finally {
         setLoading(false);
       }

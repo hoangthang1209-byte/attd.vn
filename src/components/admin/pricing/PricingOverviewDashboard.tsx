@@ -28,6 +28,24 @@ export default function PricingOverviewDashboard() {
     return (
       <div className="admin-empty-state admin-empty-state--error">
         <p>{error}</p>
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary"
+          onClick={() => {
+            setLoading(true);
+            setError(null);
+            void fetch("/api/pricing/overview")
+              .then(async (res) => {
+                const data = await res.json() as PricingOverviewStats & { message?: string };
+                if (!res.ok) throw new Error(data.message ?? "Không thể tải dữ liệu");
+                setStats(data);
+              })
+              .catch((err: Error) => setError(err.message))
+              .finally(() => setLoading(false));
+          }}
+        >
+          Thử lại
+        </button>
       </div>
     );
   }

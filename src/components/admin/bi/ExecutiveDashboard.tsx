@@ -24,7 +24,7 @@ import { formatPricingCurrency, formatPricingDateTime, formatPricingPercent } fr
 function formatDelta(value: number | null): string {
   if (value == null) return "—";
   const sign = value > 0 ? "+" : "";
-  return `${sign}${value.toFixed(1)}%`;
+  return `${sign}${value.toFixed(2)}%`;
 }
 
 function KpiCard({
@@ -112,7 +112,7 @@ export default function ExecutiveDashboard() {
   }, [load]);
 
   if (loading) {
-    return <AdminLoadingState label="Đang tải Executive Dashboard…" rows={6} />;
+    return <AdminLoadingState label="Đang tải bảng điều khiển điều hành…" rows={6} />;
   }
 
   if (!payload) {
@@ -134,7 +134,7 @@ export default function ExecutiveDashboard() {
   return (
     <AdminPageShell>
       <PageHeader
-        title="Executive Dashboard"
+        title="Bảng điều khiển điều hành"
         description="Tổng quan doanh thu, pipeline, báo giá, đơn hàng và cảnh báo vận hành."
         meta={
           <span className="admin-field-hint">
@@ -147,8 +147,6 @@ export default function ExecutiveDashboard() {
           </button>
         }
       />
-
-      {error ? <p className="admin-error">{error}</p> : null}
 
       <div className="admin-catalog-kpi-bar">
         <KpiCard

@@ -9,6 +9,7 @@ import QuoteManufacturingEvidencePicker from "@/components/admin/quotes/QuoteMan
 import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
 import { QuotePartyColumns } from "@/components/quotes/QuoteDocumentSections";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
+import { formatPricingPercent } from "@/features/pricing/format";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { useAdminToast } from "@/hooks/useAdminToast";
@@ -107,15 +108,25 @@ export default function QuoteDetailView({ id }: { id: string }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/quotes/${id}`);
-    const data = await res.json() as { quote?: QuoteDetail; message?: string };
-    if (!res.ok) {
-      setError(data.message ?? "Không tìm thấy báo giá");
+    setError(null);
+    try {
+      const res = await fetch(`/api/quotes/${id}`);
+      const data = await res.json() as { quote?: QuoteDetail; message?: string };
+      if (!res.ok) {
+        setError(data.message ?? "Không tìm thấy báo giá");
+        setQuote(null);
+      } else if (!data.quote) {
+        setError("Không tìm thấy báo giá");
+        setQuote(null);
+      } else {
+        setQuote(data.quote);
+      }
+    } catch {
+      setError("Không thể tải báo giá");
       setQuote(null);
-    } else {
-      setQuote(data.quote ?? null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [id]);
 
   useEffect(() => {
@@ -320,7 +331,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
             {quote.items.map((item) => (
               <tr key={item.id}>
                 <td>
-                  {item.productNameSnapshot}
+                  {item.productNameSnapshot ?? "—"}
                   {item.variantNameSnapshot && <span className="admin-field-hint"> · {item.variantNameSnapshot}</span>}
                   {item.description && <div className="admin-field-hint">{item.description}</div>}
                   {item.itemNote && <div className="admin-field-hint">{item.itemNote}</div>}
@@ -355,7 +366,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
                     <td>{row.quantity.toLocaleString("vi-VN")}</td>
                     <td>{formatQuoteCurrency(row.suggestedSellingPricePerUnit)}</td>
                     <td>{formatQuoteCurrency(row.revenueBeforeVat)}</td>
-                    <td>{row.actualMarginRate.toFixed(2)}%</td>
+                    <td>{formatPricingPercent(row.actualMarginRate)}</td>
                   </tr>
                 ))}
               </tbody>

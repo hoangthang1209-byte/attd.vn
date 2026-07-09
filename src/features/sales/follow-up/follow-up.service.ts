@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { SALES_OPPORTUNITY_STAGE_LABELS } from "@/features/sales/opportunities/labels";
 import { getQuoteStatusLabel } from "@/features/quotes/labels";
+import { resolveQuoteDisplayAmount } from "@/features/quotes/quote-amount";
 import { getLeadStatusLabel } from "@/features/crm/labels";
 import type {
   SalesFollowUpCenterResult,
@@ -242,7 +243,7 @@ async function fetchQuoteFollowUps(now: Date): Promise<SalesFollowUpItem[]> {
     title: row.title?.trim() || row.quoteNo,
     subtitle: getQuoteStatusLabel(row.status),
     dueAt: dueAt?.toISOString() ?? null,
-    amount: decimalToNumber(row.totalAmount),
+    amount: resolveQuoteDisplayAmount(row),
     customerLabel:
       row.customerCompanySnapshot ??
       row.customer?.name ??
@@ -381,7 +382,9 @@ async function fetchActivityFollowUps(): Promise<SalesFollowUpItem[]> {
         ? `/admin/crm/leads/${row.leadId}`
         : row.customerId
           ? `/admin/crm/customers/${row.customerId}`
-          : null,
+          : row.contact?.customerId
+            ? `/admin/crm/customers/${row.contact.customerId}`
+            : null,
       reason: isOverdue ? "Nhắc follow-up từ hoạt động CRM (quá hạn)" : "Nhắc follow-up từ hoạt động CRM",
     } satisfies SalesFollowUpItem;
   });

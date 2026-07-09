@@ -247,7 +247,7 @@ export default function CostingCalculator() {
     setError(null);
     try {
       const payload: ReturnType<typeof buildPayload> & { quantityBreaks?: CostingQuantityBreakResult[] } = buildPayload(mode);
-      if (mode === "createQuote") {
+      if (mode === "createQuote" || mode === "save") {
         payload.quantityBreaks = quantityBreaks;
       }
       const res = await fetch("/api/pricing/costing", {
@@ -263,7 +263,6 @@ export default function CostingCalculator() {
       if (!res.ok) throw new Error(data.message ?? "Không thể xử lý bộ tính giá");
       if (mode === "calculate") {
         setResult(data.result ?? null);
-        setQuantityBreaks([]);
       } else if (mode === "createQuote" && data.saved?.quoteId) {
         router.push(`/admin/quotes/${data.saved.quoteId}`);
       } else if (data.saved?.calculationId) {

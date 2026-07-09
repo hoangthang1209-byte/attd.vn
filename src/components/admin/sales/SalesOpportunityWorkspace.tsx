@@ -318,7 +318,7 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
       />
 
       {error && <p className="admin-error">{error}</p>}
-      {message && <p className="admin-field-hint">{message}</p>}
+      {message && <p className="admin-success">{message}</p>}
 
       <form id="sales-opportunity-workspace-form" className="sales-opportunity-workspace" onSubmit={(e) => void handleSave(e)}>
         <section className="sales-opportunity-workspace__header admin-panel">
@@ -481,7 +481,7 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
               {quote ? (
                 <div className="sales-opportunity-workspace__linked-card">
                   <p><strong>{quote.quoteNo}</strong> · {getQuoteStatusLabel(quote.status)}</p>
-                  <p>{formatQuoteCurrency(quote.totalAmount)} · Hết hạn {formatQuoteDate(quote.validUntil)}</p>
+                  <p>{formatQuoteCurrency(quote.totalAmount)} · {quote.validUntil ? `Hết hạn ${formatQuoteDate(quote.validUntil)}` : "Không có hạn"}</p>
                   <Link href={`/admin/quotes/${quote.id}`} className="admin-btn admin-btn--secondary admin-btn--small">
                     Mở báo giá
                   </Link>
@@ -613,15 +613,17 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
                   onChange={(e) => setForm((current) => current ? { ...current, note: e.target.value } : current)}
                 />
               </label>
-              <label className="admin-field">
-                <span className="admin-field__label">Lý do thua</span>
-                <textarea
-                  className="admin-input"
-                  rows={3}
-                  value={form.lostReason}
-                  onChange={(e) => setForm((current) => current ? { ...current, lostReason: e.target.value } : current)}
-                />
-              </label>
+              {form.stage === "LOST" ? (
+                <label className="admin-field">
+                  <span className="admin-field__label">Lý do thua</span>
+                  <textarea
+                    className="admin-input"
+                    rows={3}
+                    value={form.lostReason}
+                    onChange={(e) => setForm((current) => current ? { ...current, lostReason: e.target.value } : current)}
+                  />
+                </label>
+              ) : null}
             </section>
           </div>
         </div>

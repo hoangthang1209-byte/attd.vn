@@ -1,5 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getLeadStatusLabel } from "@/features/crm/labels";
+import { ORDER_STATUS_LABELS } from "@/features/orders/order-labels";
+import { getPricingStatusLabel } from "@/features/pricing/labels";
+import { SALES_OPPORTUNITY_STAGE_LABELS } from "@/features/sales/opportunities/labels";
+import { getQuoteStatusLabel } from "@/features/quotes/labels";
+import { resolveQuoteDisplayAmount } from "@/features/quotes/quote-amount";
 import type {
   AdminSearchEntityType,
   AdminSearchResponse,
@@ -24,6 +30,24 @@ const ENTITY_ORDER: AdminSearchEntityType[] = [
 
 function decimalToNumber(value: Prisma.Decimal | null | undefined): number | null {
   return value == null ? null : value.toNumber();
+}
+
+function formatSearchStatus(type: AdminSearchEntityType, status: string | null | undefined): string | null {
+  if (!status) return null;
+  switch (type) {
+    case "OPPORTUNITY":
+      return SALES_OPPORTUNITY_STAGE_LABELS[status as keyof typeof SALES_OPPORTUNITY_STAGE_LABELS] ?? status;
+    case "QUOTE":
+      return getQuoteStatusLabel(status as never);
+    case "PRICING":
+      return getPricingStatusLabel(status as never);
+    case "ORDER":
+      return ORDER_STATUS_LABELS[status as keyof typeof ORDER_STATUS_LABELS] ?? status;
+    case "LEAD":
+      return getLeadStatusLabel(status as never);
+    default:
+      return status;
+  }
 }
 
 function createEmptyGrouped(): Record<AdminSearchEntityType, AdminSearchResult[]> {
@@ -197,6 +221,8 @@ export async function runAdminSearch(rawQuery: string): Promise<AdminSearchRespo
         quoteNo: true,
         status: true,
         totalAmount: true,
+        manualOverride: true,
+        manualTotalAmount: true,
         customerCompanySnapshot: true,
         updatedAt: true,
       },
@@ -313,7 +339,7 @@ export async function runAdminSearch(rawQuery: string): Promise<AdminSearchRespo
     label: row.title,
     code: row.code,
     subtitle: row.stage,
-    status: row.stage,
+    status: formatSearchStatus("OPPORTUNITY", row.stage),
     amount: decimalToNumber(row.estimatedValue),
     href: `/admin/sales/opportunity/${row.id}`,
     updatedAt: row.updatedAt.toISOString(),
@@ -325,7 +351,7 @@ export async function runAdminSearch(rawQuery: string): Promise<AdminSearchRespo
     label: row.fullName,
     code: row.code,
     subtitle: row.companyName ?? row.company ?? row.phone,
-    status: row.status,
+    status: formatSearchStatus("LEAD", row.status),
     href: `/admin/crm/leads/${row.id}`,
     updatedAt: row.updatedAt.toISOString(),
   }));
@@ -357,8 +383,8 @@ export async function runAdminSearch(rawQuery: string): Promise<AdminSearchRespo
     label: row.quoteNo,
     code: row.quoteNo,
     subtitle: row.customerCompanySnapshot,
-    status: row.status,
-    amount: row.totalAmount.toNumber(),
+    status: formatSearchStatus("QUOTE", row.status),
+    amount: resolveQuoteDisplayAmount(row),
     href: `/admin/quotes/${row.id}`,
     updatedAt: row.updatedAt.toISOString(),
   }));
@@ -368,7 +394,7 @@ export async function runAdminSearch(rawQuery: string): Promise<AdminSearchRespo
     type: "PRICING",
     label: row.code,
     code: row.code,
-    status: row.status,
+    status: formatSearchStatus("PRICING", row.status),
     amount: row.totalAmount.toNumber(),
     href: `/admin/pricing/history/${row.id}`,
     updatedAt: row.updatedAt.toISOString(),
@@ -380,7 +406,7 @@ export async function runAdminSearch(rawQuery: string): Promise<AdminSearchRespo
     label: row.orderNo,
     code: row.orderNo,
     subtitle: row.customerNameSnapshot,
-    status: row.status,
+    status: formatSearchStatus("ORDER", row.status),
     amount: row.totalAmount.toNumber(),
     href: `/admin/orders/${row.id}`,
     updatedAt: row.updatedAt.toISOString(),

@@ -11,7 +11,8 @@ import {
   PageHeader,
 } from "@/components/admin/AdminUi";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
-import { formatQuoteCurrency, formatQuoteDate } from "@/features/quotes/format";
+import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
+import { formatPricingPercent } from "@/features/pricing/format";
 import {
   SALES_OPPORTUNITY_PRIORITY_BADGE_CLASS,
   SALES_OPPORTUNITY_PRIORITY_LABELS,
@@ -372,13 +373,23 @@ export default function SalesOpportunityPipeline() {
 
       {loading ? (
         <AdminLoadingState label="Đang tải pipeline bán hàng…" />
-      ) : !data || data.opportunities.length === 0 ? (
+      ) : !data ? null : !search.trim() && data.opportunities.length === 0 ? (
         <EmptyState
           title="Chưa có cơ hội bán hàng"
           description="Tạo cơ hội mới để theo dõi tiến trình từ tư vấn đến chốt đơn."
           action={
             <button type="button" className="admin-btn admin-btn--primary" onClick={() => setShowCreate(true)}>
               Tạo cơ hội
+            </button>
+          }
+        />
+      ) : search.trim() && data.opportunities.length === 0 ? (
+        <EmptyState
+          title="Không có kết quả"
+          description="Không tìm thấy cơ hội phù hợp với từ khóa hiện tại."
+          action={
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setSearch("")}>
+              Xóa bộ lọc
             </button>
           }
         />
@@ -407,20 +418,30 @@ export default function SalesOpportunityPipeline() {
                       </Link>
                     </h4>
                     <p className="sales-pipeline-card__meta">
-                      {opp.customerLabel || opp.leadLabel || "—"}
+                      {opp.customerId && opp.customerLabel ? (
+                        <Link href={`/admin/crm/customers/${opp.customerId}`} className="admin-link">
+                          {opp.customerLabel}
+                        </Link>
+                      ) : opp.leadId && opp.leadLabel ? (
+                        <Link href={`/admin/crm/leads/${opp.leadId}`} className="admin-link">
+                          {opp.leadLabel}
+                        </Link>
+                      ) : (
+                        opp.customerLabel || opp.leadLabel || "—"
+                      )}
                     </p>
                     <p className="sales-pipeline-card__quote">
                       <Link href={`/admin/revenue/workspace/${opp.id}`} className="admin-link">
-                        Revenue Workspace
+                        Không gian doanh thu
                       </Link>
                     </p>
                     <p className="sales-pipeline-card__value">
                       {opp.estimatedValue != null ? formatQuoteCurrency(opp.estimatedValue) : "—"}
                       {" · "}
-                      {opp.probability}%
+                      {formatPricingPercent(opp.probability)}
                     </p>
                     <p className={`sales-pipeline-card__followup${opp.isFollowUpOverdue ? " is-overdue" : ""}`}>
-                      Follow-up: {opp.nextFollowUpAt ? formatQuoteDate(opp.nextFollowUpAt) : "—"}
+                      Follow-up: {opp.nextFollowUpAt ? formatQuoteDateTime(opp.nextFollowUpAt) : "—"}
                     </p>
                     {opp.quoteNo && opp.quoteId && (
                       <p className="sales-pipeline-card__quote">
