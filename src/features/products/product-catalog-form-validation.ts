@@ -188,8 +188,8 @@ export function validateProductDraftForMatrixGeneration(
   const groupsWithValues = form.options.filter(
     (group) => group.name.trim() && group.values.some((value) => value.label.trim()),
   );
-  if (groupsWithValues.length === 0 && !errors.options) {
-    errors.options = "Thêm ít nhất một nhóm biến thể với giá trị đã chọn.";
+  if (groupsWithValues.length < 2 && !errors.options) {
+    errors.options = "Vui lòng thêm ít nhất 2 nhóm tuỳ chọn và giá trị trước khi tạo tổ hợp.";
   }
 
   return errors;

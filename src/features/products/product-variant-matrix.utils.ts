@@ -1,4 +1,8 @@
 import type { ProductOptionInput } from "@/features/products/product-admin-cms";
+import {
+  generateVariantCode,
+  normalizeSkuPart,
+} from "@/features/products/product-sku-utils";
 
 /** Warn admin when theoretical combinations exceed this count. */
 export const VARIANT_MATRIX_WARN_THRESHOLD = 100;
@@ -135,6 +139,34 @@ export function isColorOptionGroup(group: Pick<MatrixOptionGroup, "slug" | "name
   const slug = group.slug.toLowerCase();
   const name = group.name.toLowerCase();
   return slug.includes("color") || slug.includes("mau") || name.includes("màu");
+}
+
+/** Minimum option groups with values required before matrix generation. */
+export const VARIANT_MATRIX_MIN_OPTION_GROUPS = 2;
+
+export function countActiveMatrixOptionGroups(groups: Array<{ values: unknown[] }>): number {
+  return groups.filter((group) => group.values.length > 0).length;
+}
+
+export function buildMatrixCombinationSkuSuffix(
+  groups: MatrixOptionGroup[],
+  valueIds: string[],
+): string {
+  const legacy = mapCombinationToLegacyFields(groups, valueIds);
+  const fromLegacy = generateVariantCode(legacy);
+  if (fromLegacy) return fromLegacy;
+
+  const parts: string[] = [];
+  const sortedGroups = [...groups].sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const group of sortedGroups) {
+    const value = group.values.find((item) => valueIds.includes(item.id));
+    if (!value) continue;
+    const part = value.valueCode?.trim()
+      ? normalizeSkuPart(value.valueCode).slice(0, 6)
+      : normalizeSkuPart(value.label).slice(0, 6);
+    if (part) parts.push(part);
+  }
+  return parts.join("-");
 }
 
 export function mapCombinationToLegacyFields(

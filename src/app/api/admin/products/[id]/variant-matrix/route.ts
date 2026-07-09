@@ -10,9 +10,16 @@ import {
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "product",
+    action: "update",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   try {
     const preview = await previewVariantMatrixGeneration(id);
@@ -29,7 +36,7 @@ export async function POST(
 ) {
   const permission = await requireAdminPermission({
     platform: "product",
-    action: "create",
+    action: "update",
     request: req,
   });
   if (!permission.ok) return permission.response;

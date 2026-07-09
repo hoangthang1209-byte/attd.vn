@@ -7,10 +7,13 @@ import { generateSku, ensureUniqueSku } from "@/features/products/product-sku-ut
 import {
   buildCartesianCombinations,
   buildCombinationPreviewText,
+  buildMatrixCombinationSkuSuffix,
   combinationSignature,
   computeTheoreticalCombinationCount,
+  countActiveMatrixOptionGroups,
   mapCombinationToLegacyFields,
   VARIANT_MATRIX_CONFIRM_THRESHOLD,
+  VARIANT_MATRIX_MIN_OPTION_GROUPS,
   VARIANT_MATRIX_WARN_THRESHOLD,
   type MatrixOptionGroup,
 } from "@/features/products/product-variant-matrix.utils";
@@ -83,12 +86,42 @@ async function loadMatrixContext(productId: string) {
 
   if (!product?.productCode) {
     throw new ProductAdminValidationError(
-      "Không thể tạo biến thể vì sản phẩm chưa có mã sản phẩm.",
+      "Không thể tạo SKU tự động vì sản phẩm hoặc danh mục thiếu mã.",
       { productCode: "Thiếu mã sản phẩm." },
     );
   }
 
   return product;
+}
+
+function validateMatrixGroupsForGeneration(groups: MatrixOptionGroup[]): {
+  ok: boolean;
+  message?: string;
+} {
+  const activeGroups = groups.filter((group) => group.values.length > 0);
+  if (countActiveMatrixOptionGroups(groups) < VARIANT_MATRIX_MIN_OPTION_GROUPS) {
+    return {
+      ok: false,
+      message: "Vui lòng thêm ít nhất 2 nhóm tuỳ chọn và giá trị trước khi tạo tổ hợp.",
+    };
+  }
+
+  const emptyGroup = groups.find((group) => group.name.trim() && group.values.length === 0);
+  if (emptyGroup) {
+    return {
+      ok: false,
+      message: `Nhóm tuỳ chọn "${emptyGroup.name.trim()}" chưa có giá trị.`,
+    };
+  }
+
+  if (!activeGroups.length) {
+    return {
+      ok: false,
+      message: "Vui lòng thêm ít nhất 2 nhóm tuỳ chọn và giá trị trước khi tạo tổ hợp.",
+    };
+  }
+
+  return { ok: true };
 }
 
 export async function previewVariantMatrixGeneration(
@@ -98,8 +131,9 @@ export async function previewVariantMatrixGeneration(
   const groups = toMatrixGroups(product.options);
   const theoreticalCount = computeTheoreticalCombinationCount(groups);
   const previewText = buildCombinationPreviewText(groups);
+  const validation = validateMatrixGroupsForGeneration(groups);
 
-  if (!groups.length || groups.every((group) => group.values.length === 0)) {
+  if (!validation.ok) {
     return {
       previewText,
       theoreticalCount: 0,
@@ -108,20 +142,7 @@ export async function previewVariantMatrixGeneration(
       requiresConfirmation: false,
       requiresWarning: false,
       canGenerate: false,
-      message: "Thêm ít nhất một nhóm biến thể và giá trị trước khi tạo tổ hợp.",
-    };
-  }
-
-  if (groups.some((group) => group.values.length === 0)) {
-    return {
-      previewText,
-      theoreticalCount,
-      existingCount: 0,
-      missingCount: 0,
-      requiresConfirmation: false,
-      requiresWarning: false,
-      canGenerate: false,
-      message: "Mỗi nhóm biến thể cần ít nhất một giá trị để tạo tổ hợp.",
+      message: validation.message,
     };
   }
 
@@ -148,7 +169,7 @@ export async function previewVariantMatrixGeneration(
     canGenerate: missingCount > 0,
     message:
       missingCount === 0
-        ? "Tất cả tổ hợp hiện có đã được tạo. Không có biến thể mới để thêm."
+        ? "Tất cả tổ hợp biến thể đã tồn tại."
         : undefined,
   };
 }
@@ -189,14 +210,26 @@ export async function generateVariantMatrix(
   await prisma.$transaction(async (tx) => {
     for (const combo of missing) {
       const legacy = mapCombinationToLegacyFields(groups, combo.valueIds);
-      const baseSku = generateSku({
-        productCode: product.productCode!,
-        colorName: legacy.colorName,
-        colorCode: legacy.colorCode,
-        sizeName: legacy.sizeName,
-        dimensions: legacy.dimensions,
-        capacity: legacy.capacity,
-      });
+      const suffix = buildMatrixCombinationSkuSuffix(groups, combo.valueIds);
+      const baseSku = suffix
+        ? `${product.productCode!.trim().toUpperCase()}-${suffix}`
+        : generateSku({
+            productCode: product.productCode!,
+            colorName: legacy.colorName,
+            colorCode: legacy.colorCode,
+            sizeName: legacy.sizeName,
+            dimensions: legacy.dimensions,
+            capacity: legacy.capacity,
+          });
+
+      if (!suffix && baseSku.trim().toUpperCase() === product.productCode!.trim().toUpperCase()) {
+        throw new ProductAdminValidationError(
+          "Không thể tạo SKU tự động vì sản phẩm hoặc danh mục thiếu mã.",
+          {
+            variants: `Tổ hợp "${combo.displayLabel}": thiếu dữ liệu mã SKU cho nhóm tuỳ chọn.`,
+          },
+        );
+      }
 
       if (!baseSku.trim()) {
         throw new ProductAdminValidationError(

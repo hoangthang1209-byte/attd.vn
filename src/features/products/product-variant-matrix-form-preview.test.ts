@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { computeFormMatrixPreview } from "./product-variant-matrix-form-preview";
+import {
+  computeFormMatrixPreview,
+  formatVariantMatrixGenerationMessage,
+} from "./product-variant-matrix-form-preview";
 
 describe("computeFormMatrixPreview", () => {
   const groups = [
@@ -63,6 +66,29 @@ describe("computeFormMatrixPreview", () => {
     );
     assert.equal(preview.missingCount, 0);
     assert.equal(preview.canGenerate, false);
-    assert.ok(preview.message?.includes("đã được tạo"));
+    assert.equal(preview.message, "Tất cả tổ hợp biến thể đã tồn tại.");
+  });
+
+  it("requires at least two option groups", () => {
+    const preview = computeFormMatrixPreview([groups[0]], []);
+    assert.equal(preview.canGenerate, false);
+    assert.equal(
+      preview.message,
+      "Vui lòng thêm ít nhất 2 nhóm tuỳ chọn và giá trị trước khi tạo tổ hợp.",
+    );
+  });
+});
+
+describe("formatVariantMatrixGenerationMessage", () => {
+  it("formats partial and full creation summaries", () => {
+    assert.equal(
+      formatVariantMatrixGenerationMessage(3, 2),
+      "Đã tạo 3 tổ hợp mới. Bỏ qua 2 tổ hợp đã tồn tại.",
+    );
+    assert.equal(formatVariantMatrixGenerationMessage(9, 0), "Đã tạo 9 tổ hợp biến thể.");
+    assert.equal(
+      formatVariantMatrixGenerationMessage(0, 9),
+      "Tất cả tổ hợp biến thể đã tồn tại.",
+    );
   });
 });

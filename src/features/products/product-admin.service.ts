@@ -1283,19 +1283,31 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
     );
   }
 
-  if (Object.keys(updateData).length > 0 || productCode) {
+  const hasCmsRelationUpdates =
+    input.options !== undefined ||
+    input.specifications !== undefined ||
+    input.customizations !== undefined ||
+    input.attributeAssignments !== undefined;
+  const hasVariantRelationUpdates = input.variants !== undefined;
+
+  if (
+    Object.keys(updateData).length > 0 ||
+    hasCmsRelationUpdates ||
+    (productCode && hasVariantRelationUpdates)
+  ) {
     const resolvedAssignments =
       input.attributeAssignments !== undefined
         ? await timer.measure("assignment_validation", () =>
             validateProductAttributeAssignments(input.attributeAssignments!),
           )
         : undefined;
-    if (productCode) {
+    if (hasCmsRelationUpdates || productCode) {
       await timer.measure("ownership_verify", () => verifyProductRelationInputOwnership(id, input));
     }
-    const existingState = productCode
-      ? await timer.measure("relation_state_preload", () => loadExistingProductRelationState(id))
-      : undefined;
+    const existingState =
+      hasCmsRelationUpdates || (productCode && hasVariantRelationUpdates)
+        ? await timer.measure("relation_state_preload", () => loadExistingProductRelationState(id))
+        : undefined;
     const preparedVariantSkus =
       productCode && input.variants?.some((variant) => !variant.id)
         ? await timer.measure("variant_sku_prepare", () =>
@@ -1308,8 +1320,8 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
         if (Object.keys(updateData).length > 0) {
           await tx.product.update({ where: { id }, data: updateData });
         }
-        if (productCode) {
-          await writeProductDependentRelations(id, productCode, input, tx, {
+        if (hasCmsRelationUpdates || (productCode && hasVariantRelationUpdates)) {
+          await writeProductDependentRelations(id, productCode ?? null, input, tx, {
             preparedVariantSkus,
             resolvedAssignments,
             skipOwnershipVerify: true,

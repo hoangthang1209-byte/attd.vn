@@ -3,7 +3,9 @@ import {
   buildCombinationPreviewText,
   combinationSignature,
   computeTheoreticalCombinationCount,
+  countActiveMatrixOptionGroups,
   VARIANT_MATRIX_CONFIRM_THRESHOLD,
+  VARIANT_MATRIX_MIN_OPTION_GROUPS,
   VARIANT_MATRIX_WARN_THRESHOLD,
   type MatrixOptionGroup,
 } from "@/features/products/product-variant-matrix.utils";
@@ -22,14 +24,28 @@ export type FormMatrixPreview = {
 
 const PREVIEW_LIST_LIMIT = 24;
 
+export function formatVariantMatrixGenerationMessage(created: number, skipped: number): string {
+  if (created === 0 && skipped > 0) {
+    return "Tất cả tổ hợp biến thể đã tồn tại.";
+  }
+  if (created > 0 && skipped > 0) {
+    return `Đã tạo ${created} tổ hợp mới. Bỏ qua ${skipped} tổ hợp đã tồn tại.`;
+  }
+  if (created > 0) {
+    return `Đã tạo ${created} tổ hợp biến thể.`;
+  }
+  return "Không có tổ hợp mới để tạo.";
+}
+
 export function computeFormMatrixPreview(
   groups: MatrixOptionGroup[],
   structuredVariants: Array<{ optionValueIds: string[] }>,
 ): FormMatrixPreview {
   const previewText = buildCombinationPreviewText(groups);
   const theoreticalCount = computeTheoreticalCombinationCount(groups);
+  const activeGroupCount = countActiveMatrixOptionGroups(groups);
 
-  if (!groups.length || groups.every((group) => group.values.length === 0)) {
+  if (activeGroupCount < VARIANT_MATRIX_MIN_OPTION_GROUPS) {
     return {
       previewText,
       theoreticalCount: 0,
@@ -39,11 +55,12 @@ export function computeFormMatrixPreview(
       requiresWarning: false,
       requiresConfirmation: false,
       canGenerate: false,
-      message: "Thêm ít nhất một nhóm biến thể và giá trị trước khi tạo tổ hợp.",
+      message: "Vui lòng thêm ít nhất 2 nhóm tuỳ chọn và giá trị trước khi tạo tổ hợp.",
     };
   }
 
-  if (groups.some((group) => group.values.length === 0)) {
+  const emptyGroup = groups.find((group) => group.name.trim() && group.values.length === 0);
+  if (emptyGroup) {
     return {
       previewText,
       theoreticalCount,
@@ -53,7 +70,7 @@ export function computeFormMatrixPreview(
       requiresWarning: theoreticalCount >= VARIANT_MATRIX_WARN_THRESHOLD,
       requiresConfirmation: false,
       canGenerate: false,
-      message: "Mỗi nhóm biến thể cần ít nhất một giá trị để tạo tổ hợp.",
+      message: `Nhóm tuỳ chọn "${emptyGroup.name.trim()}" chưa có giá trị.`,
     };
   }
 
@@ -80,7 +97,7 @@ export function computeFormMatrixPreview(
     canGenerate: missing.length > 0,
     message:
       missing.length === 0
-        ? "Tất cả tổ hợp hiện có đã được tạo. Không có biến thể mới để thêm."
+        ? "Tất cả tổ hợp biến thể đã tồn tại."
         : undefined,
   };
 }

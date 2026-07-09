@@ -374,11 +374,11 @@ export default function ProductCatalogForm({
     setFieldErrors((prev) => clearFieldErrorsForEdit(prev, fieldKey));
   }
 
-  async function reloadProductFromServer() {
-    if (!form.id) return;
+  async function reloadProductFromServer(): Promise<boolean> {
+    if (!form.id) return false;
     try {
       const res = await fetch(`/api/admin/products/${form.id}`);
-      if (!res.ok) return;
+      if (!res.ok) return false;
       const product = (await res.json()) as {
         options: Parameters<typeof mapOptionsToFormRows>[0];
         variants: Parameters<typeof mapVariantsToFormRows>[0];
@@ -390,8 +390,9 @@ export default function ProductCatalogForm({
           (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
         ),
       }));
+      return true;
     } catch {
-      /* ignore */
+      return false;
     }
   }
 
@@ -654,15 +655,34 @@ export default function ProductCatalogForm({
       message?: string;
       error?: string;
       fieldErrors?: Record<string, string>;
+      options?: Parameters<typeof mapOptionsToFormRows>[0];
+      variants?: Parameters<typeof mapVariantsToFormRows>[0];
     };
     if (!res.ok) {
       applyValidationErrors(
-        body.fieldErrors ?? { options: body.error ?? body.message ?? "Không thể lưu nhóm biến thể." },
-        body.error ?? body.message ?? "Không thể lưu nhóm biến thể.",
+        body.fieldErrors ?? { options: body.error ?? body.message ?? "Không thể lưu nhóm tuỳ chọn." },
+        body.error ?? body.message ?? "Không thể lưu nhóm tuỳ chọn.",
       );
       return false;
     }
-    await reloadProductFromServer();
+
+    setForm((prev) => ({
+      ...prev,
+      options: body.options ? mapOptionsToFormRows(body.options) : prev.options,
+      variants: body.variants
+        ? mapVariantsToFormRows(body.variants).filter(
+            (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
+          )
+        : prev.variants,
+    }));
+
+    if (!body.options) {
+      const reloaded = await reloadProductFromServer();
+      if (!reloaded) {
+        setError("Đã lưu nhóm tuỳ chọn nhưng không thể tải lại dữ liệu. Vui lòng tải lại trang.");
+        return false;
+      }
+    }
     return true;
   }
 

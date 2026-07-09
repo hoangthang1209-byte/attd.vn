@@ -39,6 +39,7 @@ import {
 } from "@/features/products/variant-field-errors";
 import {
   computeFormMatrixPreview,
+  formatVariantMatrixGenerationMessage,
 } from "@/features/products/product-variant-matrix-form-preview";
 
 function renderVariantStatusOptions() {
@@ -63,7 +64,7 @@ type Props = {
   fieldErrors?: Record<string, string>;
   onOptionGroupsChange: (groups: OptionGroupFormRow[]) => void;
   onVariantsChange: (variants: MatrixVariantFormRow[]) => void;
-  onReloadProduct?: () => Promise<void>;
+  onReloadProduct?: () => Promise<void | boolean>;
   onBeforeMatrixGenerate?: () => Promise<boolean>;
   onSaveAndContinue?: () => Promise<boolean>;
   onVariantDeleted?: (variantId: string) => void;
@@ -557,7 +558,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
     const missing = combos.filter((combo) => !existing.has(combo.signature));
 
     if (!missing.length) {
-      setMatrixMessage("Tất cả tổ hợp hiện có đã được tạo.");
+      setMatrixMessage("Tất cả tổ hợp biến thể đã tồn tại.");
       return;
     }
 
@@ -591,7 +592,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
     if (onBeforeMatrixGenerate) {
       const ready = await onBeforeMatrixGenerate();
       if (!ready) {
-        setMatrixMessage("Lưu nhóm biến thể trước khi tạo tổ hợp.");
+        setMatrixMessage("Lưu nhóm tuỳ chọn trước khi tạo tổ hợp.");
         return;
       }
     }
@@ -607,6 +608,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       const data = (await response.json()) as {
         message?: string;
         created?: number;
+        skipped?: number;
         preserved?: number;
         error?: string;
         fieldErrors?: Record<string, string>;
@@ -623,13 +625,16 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
         return;
       }
 
-      setMatrixMessage(
-        `Đã tạo ${data.created ?? 0} biến thể mới. Giữ nguyên ${data.preserved ?? 0} biến thể hiện có.`,
-      );
-      if ((data.created ?? 0) > 0) {
-        toast.success(`Đã tạo ${data.created} biến thể.`);
+      const created = data.created ?? 0;
+      const skipped = data.skipped ?? 0;
+      const summary = formatVariantMatrixGenerationMessage(created, skipped);
+      setMatrixMessage(summary);
+      if (created > 0) {
+        toast.success(summary);
+        if (onReloadProduct) {
+          await onReloadProduct();
+        }
       }
-      if (onReloadProduct) await onReloadProduct();
     } catch {
       setMatrixMessage("Không thể kết nối máy chủ khi tạo biến thể.");
     } finally {
