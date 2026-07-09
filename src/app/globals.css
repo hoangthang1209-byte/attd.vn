@@ -26078,6 +26078,115 @@ body:has(.mp-header--v271) {
 .sales-opportunity-workspace__timeline-item { padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
 .sales-opportunity-workspace__timeline-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
 
+/* Revenue workspace (Integration-1 MVP) */
+.revenue-workspace {
+  gap: 16px;
+}
+.revenue-workspace__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.revenue-workspace__stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.revenue-workspace__stat-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+}
+.revenue-workspace__stat-card strong {
+  display: block;
+  margin-top: 6px;
+}
+.revenue-workspace__tabbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.revenue-workspace__tabbar .admin-btn.is-active {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
+}
+.revenue-workspace__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.revenue-workspace__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+.revenue-workspace__facts dt {
+  font-size: 12px;
+  color: #6b7280;
+}
+.revenue-workspace__facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+}
+.revenue-workspace__quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.revenue-workspace__facts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.revenue-workspace__facts-grid dt {
+  font-size: 12px;
+  color: #6b7280;
+}
+.revenue-workspace__facts-grid dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+.revenue-workspace__subhead {
+  margin-top: 16px;
+}
+.revenue-workspace__timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.revenue-workspace__timeline-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+.revenue-workspace__timeline-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+@media (max-width: 1100px) {
+  .revenue-workspace__stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .revenue-workspace__facts-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .revenue-workspace__grid,
+  .revenue-workspace__facts,
+  .revenue-workspace__stats,
+  .revenue-workspace__facts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Pattern manufacturing workspace — dense technical layout */
 .pattern-workspace { display: flex; flex-direction: column; gap: 6px; }
 .pattern-workspace__header {

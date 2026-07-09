@@ -409,6 +409,11 @@ export default function SalesOpportunityPipeline() {
                     <p className="sales-pipeline-card__meta">
                       {opp.customerLabel || opp.leadLabel || "—"}
                     </p>
+                    <p className="sales-pipeline-card__quote">
+                      <Link href={`/admin/revenue/workspace/${opp.id}`} className="admin-link">
+                        Revenue Workspace
+                      </Link>
+                    </p>
                     <p className="sales-pipeline-card__value">
                       {opp.estimatedValue != null ? formatQuoteCurrency(opp.estimatedValue) : "—"}
                       {" · "}

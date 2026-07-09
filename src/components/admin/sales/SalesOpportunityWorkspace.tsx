@@ -298,6 +298,9 @@ export default function SalesOpportunityWorkspace({ opportunityId }: Props) {
             <Link href="/admin/sales/pipeline" className="admin-btn admin-btn--secondary">
               Quay lại pipeline
             </Link>
+            <Link href={`/admin/revenue/workspace/${opportunity.id}`} className="admin-btn admin-btn--secondary">
+              Mở Revenue Workspace
+            </Link>
             <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
               Làm mới
             </button>
