@@ -13,6 +13,8 @@ import {
   adminNavigationSections,
   type AdminNavigationItem,
 } from "@/lib/admin/admin-navigation";
+import { getAdminBreadcrumbMeta } from "@/lib/admin/admin-breadcrumbs";
+import styles from "./AdminShell.module.css";
 
 function hasRequiredPermissions(
   permissions: AdminPermissionFlags,
@@ -80,21 +82,21 @@ function AdminShellNav() {
   }, [permissions]);
 
   return (
-    <nav className="admin-nav">
+    <nav className={styles.nav}>
       {visibleNavigation.dashboard ? (
-        <div className="admin-nav-group">
+        <div className={styles.navGroup}>
           <AdminNavItem item={visibleNavigation.dashboard} pathname={pathname} searchParams={searchParams} />
         </div>
       ) : null}
       {visibleNavigation.sections.map((section) => (
-        <section key={section.label} className="admin-nav-section" aria-labelledby={`admin-nav-${section.label}`}>
-          <p id={`admin-nav-${section.label}`} className="admin-nav-section-label">
-            <span aria-hidden="true">{section.icon}</span>
+        <section key={section.label} className={styles.navSection} aria-labelledby={`admin-nav-${section.label}`}>
+          <p id={`admin-nav-${section.label}`} className={styles.sectionLabel}>
+            <span className={styles.sectionIcon} aria-hidden="true">{section.icon}</span>
             {section.label}
           </p>
           {section.platforms.map((platform) => (
-            <div key={platform.label} className="admin-nav-group">
-              <p className="admin-nav-group-label">{platform.label}</p>
+            <div key={platform.label} className={styles.navGroup}>
+              <p className={styles.groupLabel}>{platform.label}</p>
               {platform.items.map((item) => (
                 <AdminNavItem
                   key={`${platform.label}:${item.label}`}
@@ -122,9 +124,13 @@ function AdminNavItem({
 }) {
   if (item.status === "coming-soon" || !item.href) {
     return (
-      <span className="admin-nav-link admin-nav-link--disabled" aria-disabled="true" title="Sắp ra mắt">
+      <span
+        className={`${styles.navLink} ${styles.navLinkDisabled}`}
+        aria-disabled="true"
+        title="Sắp ra mắt"
+      >
         <span>{item.label}</span>
-        <span className="admin-nav-coming-soon">Sắp ra mắt</span>
+        <span className={styles.comingSoon}>Sắp ra mắt</span>
       </span>
     );
   }
@@ -135,7 +141,7 @@ function AdminNavItem({
       href={item.href}
       scroll={false}
       prefetch
-      className={`admin-nav-link${active ? " admin-nav-link--active" : ""}`}
+      className={`${styles.navLink}${active ? ` ${styles.navLinkActive}` : ""}`}
     >
       {item.label}
     </Link>
@@ -143,15 +149,34 @@ function AdminNavItem({
 }
 
 function AdminShellMain({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const { title } = useAdminTitle();
+  const pageMeta = getAdminBreadcrumbMeta(pathname);
+  const pageTitle = title || pageMeta.title;
 
   return (
-    <main id="admin-content-scroll" className="admin-main admin-content-scroll">
+    <main id="admin-content-scroll" className={`${styles.main} admin-content-scroll`}>
       <Suspense fallback={null}>
         <AdminScrollRestoration />
       </Suspense>
-      {title ? <h1 className="admin-title">{title}</h1> : null}
-      <div className="admin-main-content">{children}</div>
+      <header className={styles.header}>
+        <div className={styles.headerBody}>
+          <div className={styles.breadcrumbs} aria-label="Breadcrumb">
+            {pageMeta.breadcrumbs.map((breadcrumb) => (
+              <span key={breadcrumb} className={styles.breadcrumbItem}>{breadcrumb}</span>
+            ))}
+          </div>
+          <h1 className={styles.title}>{pageTitle}</h1>
+          <p className={styles.description}>{pageMeta.description}</p>
+        </div>
+        <div className={styles.headerActions}>
+          <span className={styles.statusPill}>
+            <span className={styles.statusDot} aria-hidden="true" />
+            IA v2.0
+          </span>
+        </div>
+      </header>
+      <div className={`${styles.content} admin-main-content`}>{children}</div>
     </main>
   );
 }
@@ -168,24 +193,33 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   return (
     <AdminTitleProvider>
-      <div className="admin-app-shell admin-shell">
+      <div className={styles.shell}>
+        {mobileNavOpen ? (
+          <button
+            type="button"
+            className={styles.mobileOverlay}
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Đóng menu quản trị"
+          />
+        ) : null}
         <aside
-          className={`admin-sidebar${mobileNavOpen ? " is-mobile-open" : ""}`}
+          className={`${styles.sidebar}${mobileNavOpen ? ` ${styles.sidebarOpen}` : ""}`}
           onClick={(event) => {
             if ((event.target as HTMLElement).closest("a")) {
               setMobileNavOpen(false);
             }
           }}
         >
-          <div className="admin-sidebar-top">
-            <Link href="/admin/dashboard" scroll={false} className="admin-brand">
-              ATTD CMS
+          <div className={styles.sidebarTop}>
+            <Link href="/admin/dashboard" scroll={false} className={styles.brand}>
+              <span className={styles.brandMark}>ATTD CMS</span>
+              <span className={styles.brandSub}>Design Authority</span>
             </Link>
-            <div className="admin-sidebar-actions">
+            <div className={styles.sidebarActions}>
               <AdminLogoutButton />
               <button
                 type="button"
-                className="admin-mobile-nav-toggle"
+                className={styles.mobileToggle}
                 onClick={() => setMobileNavOpen((current) => !current)}
                 aria-expanded={mobileNavOpen}
                 aria-controls="admin-primary-navigation"
@@ -195,7 +229,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               </button>
             </div>
           </div>
-          <div id="admin-primary-navigation" className="admin-sidebar-nav-wrap">
+          <div id="admin-primary-navigation" className={styles.navWrap}>
             <Suspense fallback={null}>
               <AdminShellNav />
             </Suspense>
