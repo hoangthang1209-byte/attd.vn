@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminLoadingState, AdminPageShell, EmptyState, PageHeader } from "@/components/admin/AdminUi";
 import type { RevenueWorkspacePayload } from "@/features/revenue/workspace/types";
+import {
+  NOTIFICATION_SEVERITY_BADGE_CLASS,
+  NOTIFICATION_SEVERITY_LABELS,
+  NOTIFICATION_TYPE_LABELS,
+} from "@/features/notifications/labels";
+import type { NotificationItem } from "@/features/notifications/types";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
 import { SALES_OPPORTUNITY_PRIORITY_LABELS, SALES_OPPORTUNITY_STAGE_LABELS } from "@/features/sales/opportunities/labels";
 import { getQuoteStatusLabel } from "@/features/quotes/labels";
@@ -36,6 +42,7 @@ function getSnapshotNumber(snapshot: unknown, key: string): number | null {
 
 export default function RevenueWorkspace({ opportunityId }: Props) {
   const [payload, setPayload] = useState<RevenueWorkspacePayload | null>(null);
+  const [relatedNotifications, setRelatedNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("overview");
@@ -44,15 +51,26 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/revenue/workspace/${opportunityId}`);
-      const json = (await response.json()) as RevenueWorkspacePayload & { message?: string };
-      if (!response.ok) {
+      const [workspaceResponse, notificationsResponse] = await Promise.all([
+        fetch(`/api/revenue/workspace/${opportunityId}`),
+        fetch(`/api/admin/notifications?opportunityId=${encodeURIComponent(opportunityId)}`),
+      ]);
+      const json = (await workspaceResponse.json()) as RevenueWorkspacePayload & { message?: string };
+      if (!workspaceResponse.ok) {
         throw new Error(json.message ?? "Không thể tải Revenue Workspace");
       }
       setPayload(json);
+
+      if (notificationsResponse.ok) {
+        const notificationsJson = (await notificationsResponse.json()) as { notifications?: NotificationItem[] };
+        setRelatedNotifications(notificationsJson.notifications ?? []);
+      } else {
+        setRelatedNotifications([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
       setPayload(null);
+      setRelatedNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -126,6 +144,49 @@ export default function RevenueWorkspace({ opportunityId }: Props) {
       />
 
       {error ? <p className="admin-error">{error}</p> : null}
+
+      {relatedNotifications.length > 0 ? (
+        <section className="admin-panel">
+          <div className="revenue-workspace__subhead">
+            <h3>Thông báo liên quan</h3>
+            <Link href="/admin/notifications" className="admin-link">
+              Mở Notification Center
+            </Link>
+          </div>
+          <div className="admin-table-wrap">
+            <table className="admin-table admin-table--compact">
+              <thead>
+                <tr>
+                  <th>Mức độ</th>
+                  <th>Loại</th>
+                  <th>Tiêu đề</th>
+                  <th>Nội dung</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {relatedNotifications.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <span className={NOTIFICATION_SEVERITY_BADGE_CLASS[item.severity]}>
+                        {NOTIFICATION_SEVERITY_LABELS[item.severity]}
+                      </span>
+                    </td>
+                    <td>{NOTIFICATION_TYPE_LABELS[item.type]}</td>
+                    <td>{item.title}</td>
+                    <td className="sales-follow-up__reason">{item.message}</td>
+                    <td>
+                      <Link href={item.href} className="admin-btn admin-btn--xs admin-btn--secondary">
+                        Mở
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="admin-panel revenue-workspace__stats">
         <article className="revenue-workspace__stat-card">
