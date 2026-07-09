@@ -345,7 +345,7 @@ function buildPatternHistory(pattern: PatternDetail): HistoryEvent[] {
 
   events.push({
     id: "updated",
-    label: "Cập nhật gần nhất",
+    label: "Cập nhật",
     at: pattern.updatedAt,
   });
 
@@ -392,6 +392,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [uploading, setUploading] = useState(false);
+  const [activeFileMenuId, setActiveFileMenuId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const load = useCallback(async () => {
@@ -736,8 +737,12 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
               />
               <div className="pattern-workspace__title-content">
                 <h1 className="pattern-workspace__title">
-                  {pattern.code} — {draft.name || pattern.name}
+                  {draft.name || pattern.name}
                 </h1>
+                <p className="pattern-workspace__title-subline">
+                  {pattern.code}
+                  {categoryLabel !== "—" ? ` · ${categoryLabel}` : ""}
+                </p>
                 <div className="pattern-workspace__badges">
                   <PatternStatusBadge status={pattern.status} />
                   <span className="pattern-workspace__badge pattern-workspace__badge--version">
@@ -797,71 +802,23 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
             </div>
           </div>
 
-          <div className="pattern-workspace__summary-chips">
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">Rập</span>
-              <strong>{pattern.code}</strong>
-            </span>
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">Version</span>
-              <strong>v{draft.version || pattern.version}</strong>
-            </span>
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">Trạng thái</span>
-              <strong>{PATTERN_STATUS_LABELS[pattern.status]}</strong>
-            </span>
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">Nguồn</span>
-              <strong>{sourceBadge ?? "—"}</strong>
-            </span>
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">Khách hàng</span>
-              <strong>{customerLabel ?? "—"}</strong>
-            </span>
-            <span className="pattern-workspace__chip pattern-workspace__chip--with-thumb">
-              {draftCategoryVisual?.name ? (
-                <PatternCategoryThumbnail category={draftCategoryVisual} size="list" />
-              ) : null}
-              <span className="pattern-workspace__chip-text">
-                <span className="pattern-workspace__chip-label">Danh mục</span>
-                <strong>{categoryLabel}</strong>
-              </span>
-            </span>
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">Điểm đo</span>
+          <div className="pattern-workspace__summary-grid">
+            <article className="pattern-workspace__summary-card">
               <strong>{measurementRowCount}</strong>
-            </span>
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">Size</span>
+              <span>Điểm đo</span>
+            </article>
+            <article className="pattern-workspace__summary-card">
               <strong>{sizeChips.length}</strong>
-            </span>
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">File</span>
+              <span>Size</span>
+            </article>
+            <article className="pattern-workspace__summary-card">
               <strong>{pattern.files.length}</strong>
-            </span>
-            <span className="pattern-workspace__chip">
-              <span className="pattern-workspace__chip-label">Tech Pack</span>
+              <span>File</span>
+            </article>
+            <article className="pattern-workspace__summary-card">
               <strong>{techPackCount}</strong>
-            </span>
-            {sizeChips.length > 0 && (
-              <span className="pattern-workspace__chip-sizes">
-                {sizeChips.map((size) => (
-                  <span
-                    key={size}
-                    className={[
-                      "pattern-workspace__size-chip",
-                      draft.baseSize.trim().toUpperCase() === size.toUpperCase()
-                        ? "pattern-workspace__size-chip--base"
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    {size}
-                  </span>
-                ))}
-              </span>
-            )}
+              <span>Tech Pack</span>
+            </article>
           </div>
         </header>
 
@@ -957,7 +914,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 />
               </label>
               <label className="admin-field">
-                <span className="admin-field__label">Nhóm sản phẩm</span>
+                <span className="admin-field__label">Loại sản phẩm</span>
                 <input className="admin-input" value={pattern.product?.name ?? "—"} disabled readOnly />
               </label>
               <label className="admin-field">
@@ -971,7 +928,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 />
               </label>
               <label className="admin-field">
-                <span className="admin-field__label">Danh mục vật liệu SX</span>
+                <span className="admin-field__label">Danh mục vật liệu</span>
                 <select
                   className="admin-select"
                   value={draft.productionMaterialCategory}
@@ -1001,10 +958,6 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                   disabled={readOnly}
                   onChange={(e) => updateDraft({ sizeRange: e.target.value })}
                 />
-              </label>
-              <label className="admin-field">
-                <span className="admin-field__label">Trạng thái</span>
-                <input className="admin-input" value={PATTERN_STATUS_LABELS[pattern.status]} disabled readOnly />
               </label>
               <label className="admin-field admin-field--full">
                 <span className="admin-field__label">Grading rule</span>
@@ -1083,38 +1036,12 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                   </p>
                 </div>
               )}
-              <label className="admin-field">
-                <span className="admin-field__label">Liên hệ</span>
-                <input
-                  className="admin-input"
-                  value={draft.sourceSupplierContact}
-                  disabled={readOnly || Boolean(selectedSupplier)}
-                  onChange={(e) => updateDraft({ sourceSupplierContact: e.target.value })}
-                />
-              </label>
-              <label className="admin-field">
-                <span className="admin-field__label">Điện thoại / Zalo</span>
-                <input
-                  className="admin-input"
-                  value={draft.sourcePhone}
-                  disabled={readOnly || Boolean(selectedSupplier)}
-                  onChange={(e) => updateDraft({ sourcePhone: e.target.value })}
-                />
-              </label>
-              <label className="admin-field">
-                <span className="admin-field__label">Email</span>
-                <input
-                  className="admin-input"
-                  type="email"
-                  value={draft.sourceEmail}
-                  disabled={readOnly || Boolean(selectedSupplier)}
-                  onChange={(e) => updateDraft({ sourceEmail: e.target.value })}
-                />
-              </label>
               <div className="admin-field admin-field--full">
                 <CustomerSearchField
                   value={selectedCustomer}
                   disabled={readOnly}
+                  label="Khách hàng liên quan"
+                  hint="CRM là nguồn dữ liệu chính cho khách hàng liên quan."
                   onSelect={(customer) => {
                     setSelectedCustomer(customer);
                     if (customer) {
@@ -1123,6 +1050,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                       updateDraft({ customerNameSnapshot: "" });
                     }
                   }}
+                  hideHint={false}
                 />
               </div>
               <label className="admin-field admin-field--full">
@@ -1182,54 +1110,64 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                         </div>
                       </div>
                       <div className="pattern-workspace__file-actions">
-                        {canOpen ? (
-                          <a
-                            className="admin-btn admin-btn--xs"
-                            href={`/api/patterns/${patternId}/files/${file.id}/open`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Xem
-                          </a>
-                        ) : (
-                          <span className="admin-field-hint pattern-workspace__file-download-only">
-                            Chỉ tải xuống
-                          </span>
-                        )}
-                        <a
-                          className="admin-btn admin-btn--xs"
-                          href={`/api/patterns/${patternId}/files/${file.id}/download`}
-                        >
-                          Tải xuống
-                        </a>
                         {!readOnly && (
-                          <>
-                            <input
-                              ref={(el) => { fileInputRefs.current[file.id] = el; }}
-                              type="file"
-                              hidden
-                              onChange={(e) => {
-                                const nextFile = e.target.files?.[0];
-                                e.target.value = "";
-                                if (nextFile) void replaceFile(file.id, nextFile);
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--xs"
-                              onClick={() => fileInputRefs.current[file.id]?.click()}
-                            >
-                              Thay
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--xs admin-btn--danger"
-                              onClick={() => void deleteFile(file.id)}
-                            >
-                              Xóa
-                            </button>
-                          </>
+                          <input
+                            ref={(el) => { fileInputRefs.current[file.id] = el; }}
+                            type="file"
+                            hidden
+                            onChange={(e) => {
+                              const nextFile = e.target.files?.[0];
+                              e.target.value = "";
+                              if (nextFile) void replaceFile(file.id, nextFile);
+                            }}
+                          />
                         )}
+                        <details
+                          className="pattern-workspace__file-menu"
+                          open={activeFileMenuId === file.id}
+                          onToggle={(e) => {
+                            const open = (e.currentTarget as HTMLDetailsElement).open;
+                            setActiveFileMenuId(open ? file.id : null);
+                          }}
+                        >
+                          <summary className="pattern-workspace__file-menu-trigger">⋮</summary>
+                          <div className="pattern-workspace__file-menu-list">
+                            {canOpen ? (
+                              <a
+                                className="pattern-workspace__file-menu-item"
+                                href={`/api/patterns/${patternId}/files/${file.id}/open`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Xem
+                              </a>
+                            ) : null}
+                            <a
+                              className="pattern-workspace__file-menu-item"
+                              href={`/api/patterns/${patternId}/files/${file.id}/download`}
+                            >
+                              Tải xuống
+                            </a>
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                className="pattern-workspace__file-menu-item"
+                                onClick={() => fileInputRefs.current[file.id]?.click()}
+                              >
+                                Thay file
+                              </button>
+                            )}
+                            {!readOnly && (
+                              <button
+                                type="button"
+                                className="pattern-workspace__file-menu-item pattern-workspace__file-menu-item--danger"
+                                onClick={() => void deleteFile(file.id)}
+                              >
+                                Xóa
+                              </button>
+                            )}
+                          </div>
+                        </details>
                       </div>
                     </article>
                   );
@@ -1247,14 +1185,17 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 </Link>
               ) : null}
             </div>
-            <ol className="pattern-workspace__history">
+            <ol className="pattern-workspace__history pattern-workspace__timeline">
               {historyEvents.map((event) => (
                 <li key={event.id} className="pattern-workspace__history-item">
-                  <span className="pattern-workspace__history-label">{event.label}</span>
-                  <span className="pattern-workspace__history-time">{formatPatternDateTime(event.at)}</span>
-                  {event.detail ? (
-                    <span className="pattern-workspace__history-detail">{event.detail}</span>
-                  ) : null}
+                  <span className="pattern-workspace__history-dot" aria-hidden="true">●</span>
+                  <div className="pattern-workspace__history-content">
+                    <span className="pattern-workspace__history-label">{event.label}</span>
+                    <span className="pattern-workspace__history-time">{formatPatternDateTime(event.at)}</span>
+                    {event.detail ? (
+                      <span className="pattern-workspace__history-detail">{event.detail}</span>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ol>

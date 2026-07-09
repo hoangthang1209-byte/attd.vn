@@ -14,9 +14,19 @@ type Props = {
   value: CrmCustomerRecord | null;
   onSelect: (customer: CrmCustomerRecord | null) => void;
   disabled?: boolean;
+  label?: string;
+  hint?: string;
+  hideHint?: boolean;
 };
 
-export default function CustomerSearchField({ value, onSelect, disabled }: Props) {
+export default function CustomerSearchField({
+  value,
+  onSelect,
+  disabled,
+  label = "Tìm khách hàng",
+  hint = "Tự động điền từ hồ sơ khách hàng · Thông tin này chỉ lưu trên báo giá, không thay đổi hồ sơ CRM",
+  hideHint = false,
+}: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CrmCustomerRecord[]>([]);
   const [open, setOpen] = useState(false);
@@ -123,7 +133,7 @@ export default function CustomerSearchField({ value, onSelect, disabled }: Props
 
   return (
     <div className="quote-customer-search" ref={containerRef}>
-      <label className="admin-label">Tìm khách hàng</label>
+      <label className="admin-label">{label}</label>
       {value ? (
         <div className="quote-customer-search__selected">
           <div>
@@ -208,9 +218,11 @@ export default function CustomerSearchField({ value, onSelect, disabled }: Props
           )}
         </>
       )}
-      <p className="admin-field-hint quote-customer-search__hint">
-        Tự động điền từ hồ sơ khách hàng · Thông tin này chỉ lưu trên báo giá, không thay đổi hồ sơ CRM
-      </p>
+      {!hideHint ? (
+        <p className="admin-field-hint quote-customer-search__hint">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }

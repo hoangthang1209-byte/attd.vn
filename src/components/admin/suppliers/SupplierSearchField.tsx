@@ -113,12 +113,6 @@ export default function SupplierSearchField({
                 <dd>{value.phone}</dd>
               </div>
             ) : null}
-            {value.email ? (
-              <div>
-                <dt>Email</dt>
-                <dd>{value.email}</dd>
-              </div>
-            ) : null}
           </dl>
           {!disabled && (
             <button
