@@ -6,8 +6,8 @@ type Props = {
 
 function SocialIcon({ id }: { id: string }) {
   const common = {
-    width: 21,
-    height: 21,
+    width: 18,
+    height: 18,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -72,7 +72,7 @@ export default function FooterSocialLinks({ links }: Props) {
           href={link.href}
           target="_blank"
           rel="noopener noreferrer"
-          className="footer-enterprise__social-btn"
+          className="footer-enterprise__social-link"
           aria-label={link.label}
         >
           <SocialIcon id={link.id} />
