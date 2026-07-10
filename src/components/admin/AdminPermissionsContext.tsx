@@ -112,7 +112,7 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
           canViewDelivery: data.flags?.canViewDelivery ?? true,
           canManageEmployees: data.flags?.canManageEmployees ?? true,
           canManageProducts: data.flags?.canManageProducts ?? true,
-          canManageCms: data.flags?.canManageCms ?? true,
+          canManageCms: data.flags?.canManageCms ?? false,
           canViewCrm: data.flags?.canViewCrm ?? true,
           canViewDashboard: data.flags?.canViewDashboard ?? true,
           canViewWarehouse: data.flags?.canViewWarehouse ?? true,

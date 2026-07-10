@@ -10,7 +10,7 @@ export default async function SiteNavigationAdminPage() {
 
   return (
     <>
-      <AdminPageTitle title="Điều hướng & Footer" />
+      <AdminPageTitle title="Điều hướng và Footer" />
       <SiteNavigationAdminManager initialCms={cms} tableReady={tableReady} />
     </>
   );

@@ -92,10 +92,23 @@ export async function PATCH(request: Request) {
       if (!Array.isArray(items)) {
         return NextResponse.json({ message: "Thiếu dữ liệu footer." }, { status: 400 });
       }
+      const settings = body.settings as SiteNavigationSettingsConfig | undefined;
+      let savedSettings: SiteNavigationSettingsConfig | undefined;
+      if (settings) {
+        const settingsResult = await upsertSiteNavigationSettings(settings);
+        if ("error" in settingsResult) {
+          return NextResponse.json({ message: settingsResult.error }, { status: 400 });
+        }
+        savedSettings = settingsResult.settings;
+      }
       const result = await upsertSiteNavigationFooterItems(items);
       if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
       revalidatePublicNavigation();
-      return NextResponse.json({ panel, items: result.items });
+      return NextResponse.json({
+        panel,
+        items: result.items,
+        ...(savedSettings ? { settings: savedSettings } : {}),
+      });
     }
 
     if (panel === "social") {

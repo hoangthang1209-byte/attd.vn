@@ -29,6 +29,13 @@ export const DEFAULT_SITE_NAVIGATION_SETTINGS: SiteNavigationSettingsConfig = {
   megaMenuTriggerLabel: "Tất cả danh mục",
   searchPlaceholder: "Tìm áo thun, áo polo, nón, quà tặng…",
   useCategoryTreeMegaMenu: true,
+  copyrightText: "ATTD.vn",
+  showCurrentYear: true,
+  showTaxCode: true,
+  originText: "Designed & Manufactured in Vietnam",
+  legalLinkLabel: "Chính sách đại lý",
+  legalLinkHref: "/chinh-sach-dai-ly",
+  showLegalLink: true,
 };
 
 const DEFAULT_FOOTER_PRODUCT_LINKS = [

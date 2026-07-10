@@ -144,6 +144,24 @@ export function validateSettingsInput(settings: SiteNavigationSettingsConfig): s
   if (!settings.megaMenuTriggerLabel.trim()) return "Nhãn mega menu không được để trống";
   if (!settings.searchPlaceholder.trim()) return "Placeholder tìm kiếm không được để trống";
   if (settings.searchPlaceholder.length > 120) return "Placeholder tìm kiếm tối đa 120 ký tự";
+  if (!settings.copyrightText.trim()) return "Nội dung bản quyền không được để trống";
+  if (settings.copyrightText.length > 120) return "Nội dung bản quyền tối đa 120 ký tự";
+  if (!settings.originText.trim()) return "Dòng xuất xứ không được để trống";
+  if (settings.originText.length > 160) return "Dòng xuất xứ tối đa 160 ký tự";
+  if (settings.showLegalLink) {
+    if (!settings.legalLinkLabel.trim()) return "Nhãn liên kết pháp lý không được để trống khi đang bật";
+    if (settings.legalLinkLabel.length > 120) return "Nhãn liên kết pháp lý tối đa 120 ký tự";
+    if (!settings.legalLinkHref.trim()) return "Đường dẫn liên kết pháp lý không được để trống khi đang bật";
+    const href = settings.legalLinkHref.trim();
+    if (href.startsWith("/")) {
+      const hrefError = validateNavHref(href, "INTERNAL");
+      if (hrefError) return `Liên kết pháp lý: ${hrefError}`;
+    } else if (href.startsWith("http://") || href.startsWith("https://")) {
+      if (!isValidExternalUrl(href)) return "Liên kết pháp lý: URL ngoài phải bắt đầu bằng http:// hoặc https://";
+    } else {
+      return "Liên kết pháp lý: Đường dẫn phải bắt đầu bằng / hoặc http(s)://";
+    }
+  }
   return null;
 }
 

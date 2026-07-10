@@ -95,6 +95,13 @@ export function mergeSettings(
       row?.searchPlaceholder?.trim() || DEFAULT_SITE_NAVIGATION_SETTINGS.searchPlaceholder,
     useCategoryTreeMegaMenu:
       row?.useCategoryTreeMegaMenu ?? DEFAULT_SITE_NAVIGATION_SETTINGS.useCategoryTreeMegaMenu,
+    copyrightText: row?.copyrightText?.trim() || DEFAULT_SITE_NAVIGATION_SETTINGS.copyrightText,
+    showCurrentYear: row?.showCurrentYear ?? DEFAULT_SITE_NAVIGATION_SETTINGS.showCurrentYear,
+    showTaxCode: row?.showTaxCode ?? DEFAULT_SITE_NAVIGATION_SETTINGS.showTaxCode,
+    originText: row?.originText?.trim() || DEFAULT_SITE_NAVIGATION_SETTINGS.originText,
+    legalLinkLabel: row?.legalLinkLabel?.trim() || DEFAULT_SITE_NAVIGATION_SETTINGS.legalLinkLabel,
+    legalLinkHref: row?.legalLinkHref?.trim() || DEFAULT_SITE_NAVIGATION_SETTINGS.legalLinkHref,
+    showLegalLink: row?.showLegalLink ?? DEFAULT_SITE_NAVIGATION_SETTINGS.showLegalLink,
   };
 }
 

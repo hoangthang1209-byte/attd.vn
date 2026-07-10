@@ -120,7 +120,7 @@ export default function SiteNavigationAdminManager({ initialCms, tableReady }: P
     if (panel === "mobile_menu") {
       body = { panel, items: filterPlacement(cms.items, "MOBILE_MENU") };
     }
-    if (panel === "footer") body = { panel, items: footerItems };
+    if (panel === "footer") body = { panel, items: footerItems, settings: cms.settings };
     if (panel === "social") body = { panel, socialLinks: cms.socialLinks };
     if (panel === "ctas") body = { panel, ctas: cms.ctas };
 
@@ -149,7 +149,11 @@ export default function SiteNavigationAdminManager({ initialCms, tableReady }: P
             item.placement !== "FOOTER_SERVICES" &&
             item.placement !== "FOOTER_COMPANY",
         );
-        return { ...prev, items: [...others, ...data.items] };
+        return {
+          ...prev,
+          items: [...others, ...data.items],
+          ...(data.settings ? { settings: data.settings } : {}),
+        };
       }
       if (data.items && panel !== "footer") {
         const placementByPanel: Partial<Record<TabId, SiteNavPlacement>> = {
@@ -300,25 +304,113 @@ export default function SiteNavigationAdminManager({ initialCms, tableReady }: P
       ) : null}
 
       {activeTab === "footer" ? (
-        <SectionShell
-          title="Footer"
-          hint="Ba cột điều hướng footer. Kéo thả để sắp xếp trong từng nhóm."
-          loading={loading}
-          onSave={() => savePanel("footer")}
-        >
-          {(["FOOTER_PRODUCTS", "FOOTER_SERVICES", "FOOTER_COMPANY"] as const).map((placement) => (
-            <div key={placement} style={{ marginBottom: 24 }}>
-              <h3 className="admin-subtitle">{SITE_NAV_PLACEMENT_LABELS[placement]}</h3>
-              <SiteNavSortableList
-                items={filterPlacement(cms.items, placement)}
-                onChange={(items) => {
-                  const others = footerItems.filter((item) => item.placement !== placement);
-                  updateFooterItems([...others, ...items]);
-                }}
+        <>
+          <SectionShell
+            title="Footer"
+            hint="Ba cột điều hướng footer. Kéo thả để sắp xếp trong từng nhóm."
+            loading={loading}
+            onSave={() => savePanel("footer")}
+          >
+            {(["FOOTER_PRODUCTS", "FOOTER_SERVICES", "FOOTER_COMPANY"] as const).map((placement) => (
+              <div key={placement} style={{ marginBottom: 24 }}>
+                <h3 className="admin-subtitle">{SITE_NAV_PLACEMENT_LABELS[placement]}</h3>
+                <SiteNavSortableList
+                  items={filterPlacement(cms.items, placement)}
+                  onChange={(items) => {
+                    const others = footerItems.filter((item) => item.placement !== placement);
+                    updateFooterItems([...others, ...items]);
+                  }}
+                />
+              </div>
+            ))}
+          </SectionShell>
+
+          <fieldset className="admin-catalog-fieldset" style={{ marginTop: 20 }}>
+            <legend>Thanh cuối footer</legend>
+            <p className="admin-field-hint">
+              Mã số thuế lấy từ Cài đặt công ty. Tại đây chỉ bật/tắt hiển thị MST trên thanh cuối.
+            </p>
+            <div className="admin-form-group">
+              <label htmlFor="footer-copyright">Nội dung bản quyền</label>
+              <input
+                id="footer-copyright"
+                className="admin-input"
+                value={cms.settings.copyrightText}
+                onChange={(e) => updateSettings({ copyrightText: e.target.value })}
+                placeholder="ATTD.vn"
+                maxLength={120}
+              />
+              <p className="admin-field-hint">
+                Nhập tên thương hiệu hoặc dòng bản quyền. Khi bật năm hiện tại, hệ thống tự thêm © và năm.
+              </p>
+            </div>
+            <label className="admin-checkbox">
+              <input
+                type="checkbox"
+                checked={cms.settings.showCurrentYear}
+                onChange={(e) => updateSettings({ showCurrentYear: e.target.checked })}
+              />
+              Tự động dùng năm hiện tại
+            </label>
+            <label className="admin-checkbox" style={{ display: "block", marginTop: 8 }}>
+              <input
+                type="checkbox"
+                checked={cms.settings.showTaxCode}
+                onChange={(e) => updateSettings({ showTaxCode: e.target.checked })}
+              />
+              Hiển thị mã số thuế
+            </label>
+            <div className="admin-form-group" style={{ marginTop: 16 }}>
+              <label htmlFor="footer-origin">Dòng xuất xứ / thương hiệu</label>
+              <input
+                id="footer-origin"
+                className="admin-input"
+                value={cms.settings.originText}
+                onChange={(e) => updateSettings({ originText: e.target.value })}
+                placeholder="Designed & Manufactured in Vietnam"
+                maxLength={160}
               />
             </div>
-          ))}
-        </SectionShell>
+            <label className="admin-checkbox">
+              <input
+                type="checkbox"
+                checked={cms.settings.showLegalLink}
+                onChange={(e) => updateSettings({ showLegalLink: e.target.checked })}
+              />
+              Bật liên kết pháp lý
+            </label>
+            {cms.settings.showLegalLink ? (
+              <div className="admin-form-row" style={{ marginTop: 12 }}>
+                <div className="admin-form-group">
+                  <label htmlFor="footer-legal-label">Nhãn liên kết pháp lý</label>
+                  <input
+                    id="footer-legal-label"
+                    className="admin-input"
+                    value={cms.settings.legalLinkLabel}
+                    onChange={(e) => updateSettings({ legalLinkLabel: e.target.value })}
+                    placeholder="Chính sách đại lý"
+                    maxLength={120}
+                  />
+                </div>
+                <div className="admin-form-group">
+                  <label htmlFor="footer-legal-href">Đường dẫn liên kết pháp lý</label>
+                  <input
+                    id="footer-legal-href"
+                    className="admin-input"
+                    value={cms.settings.legalLinkHref}
+                    onChange={(e) => updateSettings({ legalLinkHref: e.target.value })}
+                    placeholder="/chinh-sach-dai-ly"
+                  />
+                </div>
+              </div>
+            ) : null}
+            <div style={{ marginTop: 16 }}>
+              <AdminLoadingButton type="button" pending={loading} onClick={() => savePanel("footer")}>
+                Lưu footer
+              </AdminLoadingButton>
+            </div>
+          </fieldset>
+        </>
       ) : null}
 
       {activeTab === "social" ? (

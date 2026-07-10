@@ -1267,6 +1267,13 @@ model SiteNavigationSettings {
   megaMenuTriggerLabel   String           @default("Tất cả danh mục")
   searchPlaceholder      String           @default("Tìm áo thun, áo polo, nón, quà tặng…")
   useCategoryTreeMegaMenu Boolean         @default(true)
+  copyrightText          String           @default("ATTD.vn")
+  showCurrentYear        Boolean          @default(true)
+  showTaxCode              Boolean          @default(true)
+  originText               String           @default("Designed & Manufactured in Vietnam")
+  legalLinkLabel           String           @default("Chính sách đại lý")
+  legalLinkHref            String           @default("/chinh-sach-dai-ly")
+  showLegalLink            Boolean          @default(true)
   updatedAt              DateTime         @updatedAt
   items                  SiteNavItem[]
   ctas                   SiteNavCta[]

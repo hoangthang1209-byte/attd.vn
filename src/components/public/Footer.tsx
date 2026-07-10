@@ -22,6 +22,7 @@ import {
 import type { FooterLink } from "@/lib/footer-config";
 import type { PublicSiteNavigation } from "@/features/site-navigation/site-navigation.types";
 import { publicNavLinkToNavLink } from "@/features/site-navigation/public-nav-utils";
+import { resolveFooterBottomBar } from "@/features/site-navigation/public-footer-bottom-bar";
 
 const BRAND_POSITIONING =
   "Đồng hành cùng đại lý, agency, thương hiệu và doanh nghiệp trên toàn quốc.";
@@ -65,7 +66,7 @@ export default async function Footer({
   };
   const zaloUrl = resolveFooterZaloUrl(branding, company);
   const showHotline = hasFooterHotline(company);
-  const year = new Date().getFullYear();
+  const footerBottomBar = resolveFooterBottomBar(siteNavigation?.settings, company.name);
 
   return (
     <footer className="site-footer site-footer--enterprise">
@@ -185,15 +186,19 @@ export default async function Footer({
 
         <div className="footer-enterprise__bottom">
           <div className="footer-enterprise__bottom-start">
-            <p className="footer-enterprise__copyright">© {year} {company.name}.vn</p>
-            {hasCompanyField(company.taxCode) ? (
+            <p className="footer-enterprise__copyright">{footerBottomBar.copyright}</p>
+            {footerBottomBar.showTaxCode && hasCompanyField(company.taxCode) ? (
               <p className="footer-enterprise__copyright-meta">MST {company.taxCode}</p>
             ) : null}
           </div>
-          <p className="footer-enterprise__bottom-origin">Designed &amp; Manufactured in Vietnam</p>
-          <Link href="/chinh-sach-dai-ly" className="footer-enterprise__legal-link">
-            Chính sách đại lý
-          </Link>
+          {footerBottomBar.originText ? (
+            <p className="footer-enterprise__bottom-origin">{footerBottomBar.originText}</p>
+          ) : null}
+          {footerBottomBar.legalLink ? (
+            <Link href={footerBottomBar.legalLink.href} className="footer-enterprise__legal-link">
+              {footerBottomBar.legalLink.label}
+            </Link>
+          ) : null}
         </div>
       </div>
     </footer>

@@ -52,9 +52,12 @@ function isNavItemActive(
 function AdminShellNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { permissions } = useAdminPermissions();
+  const { permissions, loading } = useAdminPermissions();
 
   const visibleNavigation = useMemo(() => {
+    if (loading) {
+      return { dashboard: null, sections: [] as typeof adminNavigationSections };
+    }
     const dashboard =
       adminDashboardNavItem.status !== "hidden" &&
       hasRequiredPermissions(permissions, adminDashboardNavItem.requiredPermissions)
@@ -79,7 +82,7 @@ function AdminShellNav() {
       .filter((section) => section.platforms.length > 0);
 
     return { dashboard, sections };
-  }, [permissions]);
+  }, [permissions, loading]);
 
   return (
     <nav className={styles.nav}>
@@ -99,7 +102,7 @@ function AdminShellNav() {
               <p className={styles.groupLabel}>{platform.label}</p>
               {platform.items.map((item) => (
                 <AdminNavItem
-                  key={`${platform.label}:${item.label}`}
+                  key={item.href ?? `${platform.label}:${item.label}`}
                   item={item}
                   pathname={pathname}
                   searchParams={searchParams}

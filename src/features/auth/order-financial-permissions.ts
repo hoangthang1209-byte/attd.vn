@@ -96,6 +96,7 @@ export function getRequiredPermissionForAdminRoute(pathname: string): string | n
   if (pathname.startsWith("/admin/media")) return "media.view";
   if (pathname.startsWith("/admin/employees")) return "employees.manage";
   if (pathname.startsWith("/admin/dashboard")) return "dashboard.view";
+  if (pathname.startsWith("/admin/site-navigation")) return "cms.manage";
   if (pathname.startsWith("/admin/operations")) return "orders.view";
   return null;
 }

@@ -45,6 +45,13 @@ export type SiteNavigationSettingsConfig = {
   megaMenuTriggerLabel: string;
   searchPlaceholder: string;
   useCategoryTreeMegaMenu: boolean;
+  copyrightText: string;
+  showCurrentYear: boolean;
+  showTaxCode: boolean;
+  originText: string;
+  legalLinkLabel: string;
+  legalLinkHref: string;
+  showLegalLink: boolean;
 };
 
 export type SiteNavigationCmsConfig = {

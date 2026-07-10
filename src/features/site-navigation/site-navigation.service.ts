@@ -380,6 +380,13 @@ export async function upsertSiteNavigationSettings(
       megaMenuTriggerLabel: settings.megaMenuTriggerLabel.trim(),
       searchPlaceholder: settings.searchPlaceholder.trim(),
       useCategoryTreeMegaMenu: settings.useCategoryTreeMegaMenu,
+      copyrightText: settings.copyrightText.trim(),
+      showCurrentYear: settings.showCurrentYear,
+      showTaxCode: settings.showTaxCode,
+      originText: settings.originText.trim(),
+      legalLinkLabel: settings.legalLinkLabel.trim(),
+      legalLinkHref: settings.legalLinkHref.trim(),
+      showLegalLink: settings.showLegalLink,
     },
   });
 

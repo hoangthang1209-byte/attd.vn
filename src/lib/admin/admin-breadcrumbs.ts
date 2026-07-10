@@ -267,6 +267,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/site-navigation",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Điều hướng và Footer"],
+      title: "Điều hướng và Footer",
+      description: "Quản lý menu header, footer, CTA và thanh cuối footer trên website công khai.",
+    },
+  },
+  {
     path: "/admin/landing-pages",
     meta: {
       breadcrumbs: ["Nội dung & Website", "Landing Page"],
