@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
-import AdminBackLink from "@/components/admin/AdminBackLink";
 import OrderCustomerPartyFields, {
   type OrderCustomerPartyValues,
 } from "@/components/admin/orders/OrderCustomerPartyFields";
@@ -25,7 +24,12 @@ import OrderItemFormRow, {
   type OrderItemRow,
 } from "@/components/admin/orders/OrderItemFormRow";
 import OrderTotalsSummary from "@/components/admin/orders/OrderTotalsSummary";
+import OrderFormHeader from "@/components/admin/orders/OrderFormHeader";
+import OrderAdvancedSection from "@/components/admin/orders/OrderAdvancedSection";
+import OrderStickySummary from "@/components/admin/orders/OrderStickySummary";
+import OrderMobileActionBar from "@/components/admin/orders/OrderMobileActionBar";
 import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
+import styles from "@/components/admin/orders/OrderWorkflow.module.css";
 import { DEFAULT_QUOTE_TERMS } from "@/features/quotes/quote-code";
 import { toDateInputValue } from "@/features/quotes/format";
 import { computeOrderItem, computeOrderTotals } from "@/features/orders/order-totals";
@@ -145,6 +149,8 @@ export default function OrderForm({ mode, orderId }: Props) {
   const [revenueCategories, setRevenueCategories] = useState<
     Array<{ id: string; displayPath: string }>
   >([]);
+  const [revealAdvanced, setRevealAdvanced] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const [orderDate, setOrderDate] = useState(toDateInputValue(new Date().toISOString()));
   const [currency, setCurrency] = useState("VND");
@@ -430,9 +436,36 @@ export default function OrderForm({ mode, orderId }: Props) {
     };
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function revealInvalidSections(form: HTMLFormElement) {
+    const firstInvalid = form.querySelector<HTMLElement>("input:invalid, select:invalid, textarea:invalid");
+    if (!firstInvalid) return false;
+
+    setRevealAdvanced(true);
+    let node: HTMLElement | null = firstInvalid;
+    while (node) {
+      if (node.tagName === "DETAILS") {
+        (node as HTMLDetailsElement).open = true;
+      }
+      node = node.parentElement;
+    }
+
+    firstInvalid.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (firstInvalid instanceof HTMLInputElement || firstInvalid instanceof HTMLSelectElement || firstInvalid instanceof HTMLTextAreaElement) {
+      firstInvalid.reportValidity();
+    }
+    return true;
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+
+    const form = formRef.current ?? e.currentTarget;
+    if (!form.checkValidity()) {
+      revealInvalidSections(form);
+      return;
+    }
+
     const payload = buildPayload();
     const url = mode === "create" ? "/api/orders" : `/api/orders/${orderId}`;
     const method = mode === "create" ? "POST" : "PATCH";
@@ -456,203 +489,327 @@ export default function OrderForm({ mode, orderId }: Props) {
 
   if (loading) return <AdminPageSkeleton message="Đang tải đơn hàng…" />;
 
+  const cancelHref = mode === "edit" && orderId ? `/admin/orders/${orderId}` : "/admin/orders";
+  const backHref = cancelHref;
+  const submitLabel = mode === "create" ? "Tạo đơn hàng" : "Lưu thay đổi";
+
   return (
     <>
-    <form className="admin-panel" onSubmit={(e) => void handleSubmit(e)}>
-      <AdminBackLink href={mode === "edit" && orderId ? `/admin/orders/${orderId}` : "/admin/orders"} />
-      <div className="admin-section-header">
-        <h2>{mode === "create" ? "Tạo đơn hàng mới" : "Chỉnh sửa đơn hàng"}</h2>
-        {mode === "create" && (
-          <Link href="/admin/orders/new/quick" className="admin-btn admin-btn--secondary">
-            Nhập nhanh dạng bảng
-          </Link>
-        )}
-      </div>
-
-      {error && (
-        <div className="admin-empty-state admin-empty-state--error" style={{ marginBottom: 16 }}>
-          <p>{error}</p>
-        </div>
-      )}
-
-      <OrderCustomerPartyFields
-        values={partyValues}
-        selectedCustomer={selectedCustomer}
-        contacts={contacts}
-        onCustomerSelect={(customer, nextContacts) => {
-          setSelectedCustomer(customer);
-          if (nextContacts) setContacts(nextContacts);
-        }}
-        onContactsChange={setContacts}
-        onChange={(patch) => setPartyValues((prev) => ({ ...prev, ...patch }))}
-        onQuickAddCustomer={() => setQuickAddCustomerOpen(true)}
+    <form
+      ref={formRef}
+      className={`admin-panel ${styles.orderWorkspace}`}
+      onSubmit={(e) => void handleSubmit(e)}
+      noValidate
+    >
+      <OrderFormHeader
+        mode={mode}
+        backHref={backHref}
+        cancelHref={cancelHref}
+        submitLabel={submitLabel}
       />
 
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>Thông tin đơn hàng</legend>
-        <div className="admin-catalog-variant-fields">
-          <div className="admin-field">
-            <label className="admin-label">Ngày đơn hàng</label>
-            <input className="admin-input" type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Nhân viên tư vấn</label>
-            <AdminSearchableSelect
-              value={salesEmployeeId}
-              onChange={(employeeId) => {
-                const employee = salesEmployees.find((record) => record.id === employeeId);
-                if (employee) applySalesEmployee(employee);
-                else {
-                  setSalesEmployeeId("");
-                  setSalesRepresentativeId("");
-                  setSalesName("");
-                  setSalesTitle("");
-                  setSalesPhone("");
-                  setSalesEmail("");
-                }
-              }}
-              options={salesEmployees.map((employee) => ({
-                value: employee.id,
-                label: employee.fullName,
-                sublabel: [
-                  employee.employeeCode,
-                  employee.jobTitle,
-                  employee.role ? employeeRoleLabel(employee.role) : null,
-                ].filter(Boolean).join(" · "),
-              }))}
-              placeholder="— Chọn nhân viên —"
-              searchPlaceholder="Tìm theo tên, mã hoặc chức vụ…"
-              emptyMessage="Chưa có nhân viên tư vấn đang hoạt động."
-              fallbackLabel={salesName || undefined}
-              fallbackSublabel={
-                salesName && !salesEmployees.some((employee) => employee.id === salesEmployeeId)
-                  ? "Dữ liệu đã lưu"
-                  : undefined
-              }
-            />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Loại tiền</label>
-            <select className="admin-input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-              <option value="VND">VND</option>
-              <option value="USD">USD</option>
-            </select>
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Loại giá / VAT</label>
-            <select className="admin-input" value={priceVatType} onChange={(e) => setPriceVatType(e.target.value)}>
-              <option value="EXCLUDING_VAT">Chưa bao gồm VAT</option>
-              <option value="INCLUDING_VAT">Đã bao gồm VAT</option>
-            </select>
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Phí mẫu</label>
-            <input className="admin-input" type="number" min="0" value={sampleFee} onChange={(e) => setSampleFee(e.target.value)} />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Thời gian làm mẫu</label>
-            <input className="admin-input" value={sampleLeadTime} onChange={(e) => setSampleLeadTime(e.target.value)} />
-          </div>
-          <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-            <label className="admin-label">Điều kiện hoàn phí</label>
-            <textarea className="admin-textarea" rows={2} value={sampleRefundCondition} onChange={(e) => setSampleRefundCondition(e.target.value)} />
-          </div>
-          <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-            <label className="admin-label">Điều khoản đơn hàng</label>
-            <textarea className="admin-textarea" rows={4} value={terms} onChange={(e) => setTerms(e.target.value)} />
-          </div>
-          <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-            <label className="admin-label">Ghi chú khách hàng</label>
-            <textarea className="admin-textarea" rows={2} value={customerNote} onChange={(e) => setCustomerNote(e.target.value)} />
-          </div>
-          <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-            <label className="admin-label">Ghi chú nội bộ</label>
-            <textarea className="admin-textarea" rows={2} value={internalNote} onChange={(e) => setInternalNote(e.target.value)} />
-          </div>
-        </div>
-      </fieldset>
+      {error ? <div className={styles.errorBanner} role="alert">{error}</div> : null}
 
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>C. Sản phẩm đặt hàng</legend>
-        {items.map((item, index) => (
-          <OrderItemFormRow
-            key={item.key}
-            index={index}
-            item={item}
-            currency={currency}
-            customerCode={partyValues.customerCode}
-            products={products}
-            variants={item.productId ? variantsMap[item.productId] ?? [] : []}
-            colors={colors}
-            categories={categories}
-            revenueCategories={revenueCategories}
-            onChange={(patch) =>
-              setItems((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
-            }
-            onRemove={items.length > 1 ? () => setItems((prev) => prev.filter((_, i) => i !== index)) : undefined}
-            onLoadVariants={loadVariants}
-            onProductSelect={(productId) => loadProductMeta(productId, index)}
-            onAddColor={(variantIndex) => {
-              if (variantIndex != null) {
-                setQuickCreateTarget({ type: "variant-color", itemIndex: index, variantIndex });
-              } else {
-                setQuickCreateTarget({ type: "item-color", itemIndex: index });
-              }
-              setQuickAddColorOpen(true);
+      <div className={styles.orderWorkspace__body}>
+        <div className={styles.orderWorkspace__main}>
+          <OrderCustomerPartyFields
+            values={partyValues}
+            selectedCustomer={selectedCustomer}
+            contacts={contacts}
+            revealAdvanced={revealAdvanced}
+            onCustomerSelect={(customer, nextContacts) => {
+              setSelectedCustomer(customer);
+              if (nextContacts) setContacts(nextContacts);
             }}
-            onAddCategory={() => {
-              setQuickCreateTarget({ type: "category", itemIndex: index });
-              setQuickAddCategoryOpen(true);
-            }}
-            onCustomProduct={() => {
-              setCustomProductItemIndex(index);
-              setCustomProductOpen(true);
-            }}
+            onContactsChange={setContacts}
+            onChange={(patch) => setPartyValues((prev) => ({ ...prev, ...patch }))}
+            onQuickAddCustomer={() => setQuickAddCustomerOpen(true)}
           />
-        ))}
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary"
-          onClick={() => setItems((prev) => [...prev, emptyOrderItem()])}
-        >
-          Thêm dòng sản phẩm
-        </button>
-      </fieldset>
 
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>D. Tổng giá trị</legend>
-        <div className="admin-catalog-variant-fields">
-          <div className="admin-field">
-            <label className="admin-label">Chiết khấu</label>
-            <input className="admin-input" type="number" min="0" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Phí vận chuyển</label>
-            <input className="admin-input" type="number" min="0" value={shippingFee} onChange={(e) => setShippingFee(e.target.value)} />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">VAT (%)</label>
-            <input className="admin-input" type="number" min="0" value={vatRate} onChange={(e) => setVatRate(e.target.value)} />
+          <section className={styles.section} aria-labelledby="order-metadata-heading">
+            <h2 id="order-metadata-heading" className={styles.section__title}>
+              Thông tin đơn hàng
+            </h2>
+            <div className={`${styles.fieldGrid} ${styles["fieldGrid--compact"]}`}>
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="order-date">
+                  Ngày đơn hàng
+                </label>
+                <input
+                  id="order-date"
+                  className="admin-input"
+                  type="date"
+                  value={orderDate}
+                  onChange={(e) => setOrderDate(e.target.value)}
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Nhân viên tư vấn</label>
+                <AdminSearchableSelect
+                  value={salesEmployeeId}
+                  onChange={(employeeId) => {
+                    const employee = salesEmployees.find((record) => record.id === employeeId);
+                    if (employee) applySalesEmployee(employee);
+                    else {
+                      setSalesEmployeeId("");
+                      setSalesRepresentativeId("");
+                      setSalesName("");
+                      setSalesTitle("");
+                      setSalesPhone("");
+                      setSalesEmail("");
+                    }
+                  }}
+                  options={salesEmployees.map((employee) => ({
+                    value: employee.id,
+                    label: employee.fullName,
+                    sublabel: [
+                      employee.employeeCode,
+                      employee.jobTitle,
+                      employee.role ? employeeRoleLabel(employee.role) : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · "),
+                  }))}
+                  placeholder="— Chọn nhân viên —"
+                  searchPlaceholder="Tìm theo tên, mã hoặc chức vụ…"
+                  emptyMessage="Chưa có nhân viên tư vấn đang hoạt động."
+                  fallbackLabel={salesName || undefined}
+                  fallbackSublabel={
+                    salesName && !salesEmployees.some((employee) => employee.id === salesEmployeeId)
+                      ? "Dữ liệu đã lưu"
+                      : undefined
+                  }
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="order-currency">
+                  Loại tiền
+                </label>
+                <select
+                  id="order-currency"
+                  className="admin-input"
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                >
+                  <option value="VND">VND</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="order-vat-type">
+                  Loại giá / VAT
+                </label>
+                <select
+                  id="order-vat-type"
+                  className="admin-input"
+                  value={priceVatType}
+                  onChange={(e) => setPriceVatType(e.target.value)}
+                >
+                  <option value="EXCLUDING_VAT">Chưa bao gồm VAT</option>
+                  <option value="INCLUDING_VAT">Đã bao gồm VAT</option>
+                </select>
+              </div>
+            </div>
+
+            <OrderAdvancedSection title="Điều khoản và thông tin bổ sung" forceOpen={revealAdvanced}>
+              <div className={styles.fieldGrid} style={{ marginTop: 12 }}>
+                <div className="admin-field">
+                  <label className="admin-label" htmlFor="order-sample-fee">
+                    Phí mẫu
+                  </label>
+                  <input
+                    id="order-sample-fee"
+                    className="admin-input"
+                    type="number"
+                    min="0"
+                    value={sampleFee}
+                    onChange={(e) => setSampleFee(e.target.value)}
+                  />
+                </div>
+                <div className="admin-field">
+                  <label className="admin-label" htmlFor="order-sample-lead">
+                    Thời gian làm mẫu
+                  </label>
+                  <input
+                    id="order-sample-lead"
+                    className="admin-input"
+                    value={sampleLeadTime}
+                    onChange={(e) => setSampleLeadTime(e.target.value)}
+                  />
+                </div>
+                <div className={`admin-field ${styles.fieldSpan2}`}>
+                  <label className="admin-label" htmlFor="order-sample-refund">
+                    Điều kiện hoàn phí
+                  </label>
+                  <textarea
+                    id="order-sample-refund"
+                    className="admin-textarea"
+                    rows={2}
+                    value={sampleRefundCondition}
+                    onChange={(e) => setSampleRefundCondition(e.target.value)}
+                  />
+                </div>
+                <div className={`admin-field ${styles.fieldSpan2}`}>
+                  <label className="admin-label" htmlFor="order-terms">
+                    Điều khoản đơn hàng
+                  </label>
+                  <textarea
+                    id="order-terms"
+                    className="admin-textarea"
+                    rows={4}
+                    value={terms}
+                    onChange={(e) => setTerms(e.target.value)}
+                  />
+                </div>
+                <div className={`admin-field ${styles.fieldSpan2}`}>
+                  <label className="admin-label" htmlFor="order-customer-note">
+                    Ghi chú khách hàng
+                  </label>
+                  <textarea
+                    id="order-customer-note"
+                    className="admin-textarea"
+                    rows={2}
+                    value={customerNote}
+                    onChange={(e) => setCustomerNote(e.target.value)}
+                  />
+                </div>
+                <div className={`admin-field ${styles.fieldSpan2}`}>
+                  <label className="admin-label" htmlFor="order-internal-note">
+                    Ghi chú nội bộ
+                  </label>
+                  <textarea
+                    id="order-internal-note"
+                    className="admin-textarea"
+                    rows={2}
+                    value={internalNote}
+                    onChange={(e) => setInternalNote(e.target.value)}
+                  />
+                </div>
+              </div>
+            </OrderAdvancedSection>
+          </section>
+
+          <section className={styles.section} aria-labelledby="order-items-heading">
+            <h2 id="order-items-heading" className={styles.section__title}>
+              Sản phẩm đặt hàng
+            </h2>
+            {items.map((item, index) => (
+              <OrderItemFormRow
+                key={item.key}
+                index={index}
+                item={item}
+                currency={currency}
+                customerCode={partyValues.customerCode}
+                products={products}
+                variants={item.productId ? variantsMap[item.productId] ?? [] : []}
+                colors={colors}
+                categories={categories}
+                revenueCategories={revenueCategories}
+                revealAdvanced={revealAdvanced}
+                onChange={(patch) =>
+                  setItems((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+                }
+                onRemove={items.length > 1 ? () => setItems((prev) => prev.filter((_, i) => i !== index)) : undefined}
+                onLoadVariants={loadVariants}
+                onProductSelect={(productId) => loadProductMeta(productId, index)}
+                onAddColor={(variantIndex) => {
+                  if (variantIndex != null) {
+                    setQuickCreateTarget({ type: "variant-color", itemIndex: index, variantIndex });
+                  } else {
+                    setQuickCreateTarget({ type: "item-color", itemIndex: index });
+                  }
+                  setQuickAddColorOpen(true);
+                }}
+                onAddCategory={() => {
+                  setQuickCreateTarget({ type: "category", itemIndex: index });
+                  setQuickAddCategoryOpen(true);
+                }}
+                onCustomProduct={() => {
+                  setCustomProductItemIndex(index);
+                  setCustomProductOpen(true);
+                }}
+              />
+            ))}
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary"
+              onClick={() => setItems((prev) => [...prev, emptyOrderItem()])}
+            >
+              Thêm dòng sản phẩm
+            </button>
+          </section>
+
+          {mode === "edit" && orderId ? (
+            <p className={styles.editHint}>
+              Quản lý hồ sơ sản xuất, BOM và file kỹ thuật tại{" "}
+              <Link href={`/admin/orders/${orderId}#production-pack`}>Bộ hồ sơ sản xuất</Link>.
+            </p>
+          ) : null}
+
+          <div className={`${styles.summaryPanel} ${styles["summaryPanel--inline"]}`} aria-label="Tổng giá trị đơn hàng (mobile)">
+            <h2 className={styles.summaryPanel__title}>Tổng giá trị</h2>
+            <div className={styles.summaryPanel__fields}>
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="order-discount-mobile">
+                  Chiết khấu
+                </label>
+                <input
+                  id="order-discount-mobile"
+                  className="admin-input"
+                  type="number"
+                  min="0"
+                  value={discountAmount}
+                  onChange={(e) => setDiscountAmount(e.target.value)}
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="order-shipping-mobile">
+                  Phí vận chuyển
+                </label>
+                <input
+                  id="order-shipping-mobile"
+                  className="admin-input"
+                  type="number"
+                  min="0"
+                  value={shippingFee}
+                  onChange={(e) => setShippingFee(e.target.value)}
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="order-vat-mobile">
+                  VAT (%)
+                </label>
+                <input
+                  id="order-vat-mobile"
+                  className="admin-input"
+                  type="number"
+                  min="0"
+                  value={vatRate}
+                  onChange={(e) => setVatRate(e.target.value)}
+                />
+              </div>
+            </div>
+            <OrderTotalsSummary totals={totals} currency={currency} vatRate={Number(vatRate) || 0} />
           </div>
         </div>
-        <OrderTotalsSummary totals={totals} currency={currency} vatRate={Number(vatRate) || 0} />
-      </fieldset>
 
-      {mode === "edit" && orderId && (
-        <p className="admin-field-hint" style={{ marginTop: 16 }}>
-          Quản lý hồ sơ sản xuất, BOM và file kỹ thuật tại{" "}
-          <Link href={`/admin/orders/${orderId}#production-pack`}>Bộ hồ sơ sản xuất</Link>.
-        </p>
-      )}
-
-      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        <button type="submit" className="admin-btn admin-btn--primary">
-          {mode === "create" ? "Tạo đơn hàng" : "Lưu thay đổi"}
-        </button>
-        <Link href={mode === "edit" && orderId ? `/admin/orders/${orderId}` : "/admin/orders"} className="admin-btn admin-btn--secondary">
-          Hủy
-        </Link>
+        <div className={styles.orderWorkspace__summary}>
+          <OrderStickySummary
+            totals={totals}
+            currency={currency}
+            vatRate={vatRate}
+            discountAmount={discountAmount}
+            shippingFee={shippingFee}
+            onDiscountChange={setDiscountAmount}
+            onShippingChange={setShippingFee}
+            onVatChange={setVatRate}
+            submitLabel={submitLabel}
+            cancelHref={cancelHref}
+          />
+        </div>
       </div>
+
+      <OrderMobileActionBar submitLabel={submitLabel} cancelHref={cancelHref} />
     </form>
 
       <QuickAddCustomerModal

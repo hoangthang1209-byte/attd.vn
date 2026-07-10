@@ -4,11 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
 import QuickAddContactModal from "@/components/admin/quotes/QuickAddContactModal";
 import AdminSearchableSelect from "@/components/admin/AdminSearchableSelect";
+import OrderAdvancedSection from "@/components/admin/orders/OrderAdvancedSection";
+import OrderCustomerSummary from "@/components/admin/orders/OrderCustomerSummary";
 import {
   contactToOrderSnapshots,
   customerToOrderSnapshots,
 } from "@/features/crm/order-customer-snapshot";
 import type { CrmContactRecord, CrmCustomerRecord } from "@/features/crm/types";
+import styles from "@/components/admin/orders/OrderWorkflow.module.css";
 
 export type OrderCustomerPartyValues = {
   customerId: string;
@@ -40,6 +43,7 @@ type Props = {
   onContactsChange: (contacts: CrmContactRecord[]) => void;
   onChange: (patch: Partial<OrderCustomerPartyValues>) => void;
   onQuickAddCustomer?: () => void;
+  revealAdvanced?: boolean;
 };
 
 export default function OrderCustomerPartyFields({
@@ -50,6 +54,7 @@ export default function OrderCustomerPartyFields({
   onContactsChange,
   onChange,
   onQuickAddCustomer,
+  revealAdvanced = false,
 }: Props) {
   const [quickAddContactOpen, setQuickAddContactOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -177,79 +182,39 @@ export default function OrderCustomerPartyFields({
     setConfirmOpen(false);
   }
 
+  const showSummary = Boolean(
+    values.customerId || values.customerNameSnapshot || values.contactName,
+  );
+
   return (
-    <>
-      <div className="quote-form__card">
-        <CustomerSearchField value={selectedCustomer} onSelect={(c) => void handleCustomerSelect(c)} />
-        {onQuickAddCustomer && (
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary admin-btn--small"
-            style={{ marginTop: 8 }}
-            onClick={onQuickAddCustomer}
-          >
-            Thêm khách hàng mới
-          </button>
-        )}
-      </div>
+  <>
+    <section className={styles.section} aria-labelledby="order-customer-heading">
+      <h2 id="order-customer-heading" className={styles.section__title}>
+        Khách hàng
+      </h2>
 
-      <p className="admin-field-hint" style={{ marginTop: 8 }}>
-        Thông tin này chỉ lưu trên đơn hàng, không thay đổi hồ sơ CRM.
-      </p>
+      <CustomerSearchField value={selectedCustomer} onSelect={(c) => void handleCustomerSelect(c)} />
 
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>A. Khách hàng</legend>
-        <div className="quote-form__party-grid">
-          <div className="admin-field">
-            <label className="admin-label">Mã khách hàng</label>
-            <input className="admin-input" value={values.customerCode} readOnly />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Tên khách hàng *</label>
-            <input
-              className="admin-input"
-              required
-              value={values.customerNameSnapshot}
-              onChange={(e) => {
-                markManualEdit();
-                onChange({
-                  customerNameSnapshot: e.target.value,
-                  customerCompanyName: e.target.value,
-                });
-              }}
-            />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Tên pháp lý</label>
-            <input
-              className="admin-input"
-              value={values.customerLegalNameSnapshot}
-              onChange={(e) => {
-                markManualEdit();
-                onChange({ customerLegalNameSnapshot: e.target.value });
-              }}
-            />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Mã số thuế</label>
-            <input
-              className="admin-input"
-              value={values.customerTaxCode}
-              onChange={(e) => {
-                markManualEdit();
-                onChange({ customerTaxCode: e.target.value });
-              }}
-            />
-          </div>
-        </div>
-      </fieldset>
+      {onQuickAddCustomer && (
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          style={{ marginTop: 8 }}
+          onClick={onQuickAddCustomer}
+        >
+          Thêm khách hàng mới
+        </button>
+      )}
 
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>B. Người liên hệ</legend>
-        {values.customerId ? (
-          contacts.length ? (
+      {showSummary ? <OrderCustomerSummary values={values} /> : null}
+
+      {values.customerId ? (
+        <div className={styles.contactRow}>
+          {contacts.length ? (
             <div className="admin-field">
-              <label className="admin-label">Người liên hệ</label>
+              <label className="admin-label" htmlFor="order-contact-select">
+                Người liên hệ
+              </label>
               <AdminSearchableSelect
                 value={values.contactId}
                 onChange={(contactId) => {
@@ -265,16 +230,14 @@ export default function OrderCustomerPartyFields({
                 placeholder="— Chọn người liên hệ —"
                 searchPlaceholder="Tìm người liên hệ…"
                 fallbackLabel={values.contactName || undefined}
-                fallbackSublabel={[values.contactTitle, values.contactPhone].filter(Boolean).join(" · ") || undefined}
+                fallbackSublabel={
+                  [values.contactTitle, values.contactPhone].filter(Boolean).join(" · ") || undefined
+                }
               />
             </div>
           ) : (
             <p className="admin-field-hint">Chưa có người liên hệ</p>
-          )
-        ) : (
-          <p className="admin-field-hint">Chọn khách hàng để tải danh sách liên hệ</p>
-        )}
-        {values.customerId && (
+          )}
           <button
             type="button"
             className="admin-btn admin-btn--secondary admin-btn--small"
@@ -282,73 +245,75 @@ export default function OrderCustomerPartyFields({
           >
             Thêm người liên hệ
           </button>
-        )}
-        <div className="quote-form__party-grid" style={{ marginTop: 12 }}>
-          <div className="admin-field">
-            <label className="admin-label">Họ tên</label>
-            <input
-              className="admin-input"
-              value={values.contactName}
-              onChange={(e) => {
-                markManualEdit();
-                onChange({ contactName: e.target.value });
-              }}
-            />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Chức vụ</label>
-            <input
-              className="admin-input"
-              value={values.contactTitle}
-              onChange={(e) => {
-                markManualEdit();
-                onChange({ contactTitle: e.target.value });
-              }}
-            />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Phòng ban</label>
-            <input
-              className="admin-input"
-              value={values.contactDepartment}
-              onChange={(e) => {
-                markManualEdit();
-                onChange({ contactDepartment: e.target.value });
-              }}
-            />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Số điện thoại</label>
-            <input
-              className="admin-input"
-              value={values.contactPhone}
-              onChange={(e) => {
-                markManualEdit();
-                onChange({ contactPhone: e.target.value });
-              }}
-            />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Email</label>
-            <input
-              className="admin-input"
-              type="email"
-              value={values.contactEmail}
-              onChange={(e) => {
-                markManualEdit();
-                onChange({ contactEmail: e.target.value });
-              }}
-            />
-          </div>
         </div>
-      </fieldset>
+      ) : (
+        <p className={styles.section__hint}>Chọn khách hàng để tải danh sách liên hệ.</p>
+      )}
 
-      <fieldset className="admin-catalog-fieldset" style={{ marginTop: 16 }}>
-        <legend>C. Thông tin giao dịch</legend>
-        <div className="quote-form__party-grid">
-          <div className="admin-field admin-form-grid-span-2">
-            <label className="admin-label">Địa chỉ</label>
+      <p className={styles.section__hint}>
+        Thông tin này chỉ lưu trên đơn hàng, không thay đổi hồ sơ CRM.
+      </p>
+
+      <OrderAdvancedSection title="Thông tin khách hàng nâng cao" forceOpen={revealAdvanced}>
+        <div className={`${styles.fieldGrid}`} style={{ marginTop: 12 }}>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="order-customer-code">
+              Mã khách hàng
+            </label>
+            <input id="order-customer-code" className="admin-input" value={values.customerCode} readOnly />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="order-customer-name">
+              Tên khách hàng *
+            </label>
             <input
+              id="order-customer-name"
+              className="admin-input"
+              required
+              value={values.customerNameSnapshot}
+              onChange={(e) => {
+                markManualEdit();
+                onChange({
+                  customerNameSnapshot: e.target.value,
+                  customerCompanyName: e.target.value,
+                });
+              }}
+            />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="order-customer-legal-name">
+              Tên pháp lý
+            </label>
+            <input
+              id="order-customer-legal-name"
+              className="admin-input"
+              value={values.customerLegalNameSnapshot}
+              onChange={(e) => {
+                markManualEdit();
+                onChange({ customerLegalNameSnapshot: e.target.value });
+              }}
+            />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="order-customer-tax">
+              Mã số thuế
+            </label>
+            <input
+              id="order-customer-tax"
+              className="admin-input"
+              value={values.customerTaxCode}
+              onChange={(e) => {
+                markManualEdit();
+                onChange({ customerTaxCode: e.target.value });
+              }}
+            />
+          </div>
+          <div className={`admin-field ${styles.fieldSpan2}`}>
+            <label className="admin-label" htmlFor="order-customer-address">
+              Địa chỉ
+            </label>
+            <input
+              id="order-customer-address"
               className="admin-input"
               value={values.customerAddress}
               onChange={(e) => {
@@ -358,8 +323,11 @@ export default function OrderCustomerPartyFields({
             />
           </div>
           <div className="admin-field">
-            <label className="admin-label">Email công ty</label>
+            <label className="admin-label" htmlFor="order-customer-email">
+              Email công ty
+            </label>
             <input
+              id="order-customer-email"
               className="admin-input"
               type="email"
               value={values.customerEmailSnapshot}
@@ -370,8 +338,11 @@ export default function OrderCustomerPartyFields({
             />
           </div>
           <div className="admin-field">
-            <label className="admin-label">Số điện thoại công ty</label>
+            <label className="admin-label" htmlFor="order-customer-phone">
+              Số điện thoại công ty
+            </label>
             <input
+              id="order-customer-phone"
               className="admin-input"
               value={values.customerPhoneSnapshot}
               onChange={(e) => {
@@ -380,41 +351,113 @@ export default function OrderCustomerPartyFields({
               }}
             />
           </div>
-        </div>
-      </fieldset>
-
-      {values.customerId && (
-        <QuickAddContactModal
-          customerId={values.customerId}
-          open={quickAddContactOpen}
-          onClose={() => setQuickAddContactOpen(false)}
-          onCreated={(contact) => {
-            onContactsChange([...contacts.filter((c) => c.id !== contact.id), contact]);
-            applyContactSnapshots(contact);
-            setQuickAddContactOpen(false);
-          }}
-        />
-      )}
-
-      {confirmOpen && (
-        <div className="quote-quick-contact-modal">
-          <div className="quote-quick-contact-modal__backdrop" aria-hidden="true" />
-          <div className="quote-quick-contact-modal__panel">
-            <h3 className="quote-quick-contact-modal__title">Cập nhật thông tin khách hàng?</h3>
-            <p>
-              Thông tin khách hàng trên đơn đã được chỉnh sửa. Bạn có muốn thay bằng thông tin của khách hàng mới?
-            </p>
-            <div className="quote-quick-contact-modal__actions">
-              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setConfirmOpen(false)}>
-                Giữ thông tin hiện tại
-              </button>
-              <button type="button" className="admin-btn admin-btn--primary" onClick={confirmReplaceCustomer}>
-                Cập nhật theo khách hàng
-              </button>
-            </div>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="order-contact-name">
+              Họ tên liên hệ
+            </label>
+            <input
+              id="order-contact-name"
+              className="admin-input"
+              value={values.contactName}
+              onChange={(e) => {
+                markManualEdit();
+                onChange({ contactName: e.target.value });
+              }}
+            />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="order-contact-title">
+              Chức vụ
+            </label>
+            <input
+              id="order-contact-title"
+              className="admin-input"
+              value={values.contactTitle}
+              onChange={(e) => {
+                markManualEdit();
+                onChange({ contactTitle: e.target.value });
+              }}
+            />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="order-contact-department">
+              Phòng ban
+            </label>
+            <input
+              id="order-contact-department"
+              className="admin-input"
+              value={values.contactDepartment}
+              onChange={(e) => {
+                markManualEdit();
+                onChange({ contactDepartment: e.target.value });
+              }}
+            />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="order-contact-phone">
+              Số điện thoại liên hệ
+            </label>
+            <input
+              id="order-contact-phone"
+              className="admin-input"
+              value={values.contactPhone}
+              onChange={(e) => {
+                markManualEdit();
+                onChange({ contactPhone: e.target.value });
+              }}
+            />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label" htmlFor="order-contact-email">
+              Email liên hệ
+            </label>
+            <input
+              id="order-contact-email"
+              className="admin-input"
+              type="email"
+              value={values.contactEmail}
+              onChange={(e) => {
+                markManualEdit();
+                onChange({ contactEmail: e.target.value });
+              }}
+            />
           </div>
         </div>
-      )}
-    </>
+      </OrderAdvancedSection>
+    </section>
+
+    {values.customerId && (
+      <QuickAddContactModal
+        customerId={values.customerId}
+        open={quickAddContactOpen}
+        onClose={() => setQuickAddContactOpen(false)}
+        onCreated={(contact) => {
+          onContactsChange([...contacts.filter((c) => c.id !== contact.id), contact]);
+          applyContactSnapshots(contact);
+          setQuickAddContactOpen(false);
+        }}
+      />
+    )}
+
+    {confirmOpen && (
+      <div className="quote-quick-contact-modal">
+        <div className="quote-quick-contact-modal__backdrop" aria-hidden="true" />
+        <div className="quote-quick-contact-modal__panel">
+          <h3 className="quote-quick-contact-modal__title">Cập nhật thông tin khách hàng?</h3>
+          <p>
+            Thông tin khách hàng trên đơn đã được chỉnh sửa. Bạn có muốn thay bằng thông tin của khách hàng mới?
+          </p>
+          <div className="quote-quick-contact-modal__actions">
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setConfirmOpen(false)}>
+              Giữ thông tin hiện tại
+            </button>
+            <button type="button" className="admin-btn admin-btn--primary" onClick={confirmReplaceCustomer}>
+              Cập nhật theo khách hàng
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 }
