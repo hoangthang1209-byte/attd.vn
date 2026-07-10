@@ -26669,16 +26669,9 @@ body:has(.mp-header--v271) {
   margin: 0 0 14px;
   font-size: clamp(1.375rem, 2.1vw, 1.75rem);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
   letter-spacing: -0.03em;
   color: #fff;
-}
-
-.footer-enterprise__headline-sub {
-  display: block;
-  margin-top: 4px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.88);
 }
 
 .footer-enterprise__positioning {
@@ -26700,21 +26693,25 @@ body:has(.mp-header--v271) {
 
 .footer-enterprise__credentials li {
   position: relative;
-  padding-left: 16px;
+  padding-left: 22px;
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .footer-enterprise__credentials li::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 0.55em;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
+  top: 0.35em;
+  width: 14px;
+  height: 14px;
+  border-radius: 0;
+  background: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M3.5 8.25 6.5 11.25 12.5 4.75' stroke='rgba(255,255,255,0.32)' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 14px 14px;
 }
 
 .footer-enterprise__social {
@@ -26727,9 +26724,9 @@ body:has(.mp-header--v271) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   color: rgba(255, 255, 255, 0.72);
   background: transparent;
@@ -26808,7 +26805,7 @@ body:has(.mp-header--v271) {
   font-size: 15px;
   font-weight: 500;
   line-height: 1.4;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.68);
   text-decoration: none;
   transition: color 0.2s ease, transform 0.2s ease;
 }
@@ -26820,14 +26817,15 @@ body:has(.mp-header--v271) {
 
 .footer-enterprise__contact-card {
   min-width: 0;
-  padding: 22px 20px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 19px 17px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: none;
 }
 
 .footer-enterprise__contact-title {
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -26838,8 +26836,8 @@ body:has(.mp-header--v271) {
 .footer-enterprise__contact-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin: 0 0 22px;
+  gap: 14px;
+  margin: 0 0 18px;
   padding: 0;
   list-style: none;
 }
@@ -26855,11 +26853,11 @@ body:has(.mp-header--v271) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.03);
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .footer-enterprise__contact-body {
@@ -26937,18 +26935,26 @@ body:has(.mp-header--v271) {
 .footer-enterprise__bottom {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-start;
   margin-top: 48px;
-  padding: 20px 0 36px;
+  padding: 18px 0 36px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .footer-enterprise__copyright {
   margin: 0;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.5;
   color: rgba(255, 255, 255, 0.45);
+}
+
+.footer-enterprise__bottom-origin {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.38);
 }
 
 .footer-enterprise__legal-link {
@@ -26971,7 +26977,7 @@ body:has(.mp-header--v271) {
 
   .footer-enterprise__nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 32px;
+    gap: 48px;
   }
 
   .footer-enterprise-nav__accordion {
@@ -26983,10 +26989,20 @@ body:has(.mp-header--v271) {
   }
 
   .footer-enterprise__bottom {
-    flex-direction: row;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 24px;
+    gap: 16px 24px;
+  }
+
+  .footer-enterprise__bottom-origin {
+    justify-self: center;
+    text-align: center;
+  }
+
+  .footer-enterprise__legal-link {
+    justify-self: end;
+    white-space: nowrap;
   }
 }
 
@@ -27000,6 +27016,7 @@ body:has(.mp-header--v271) {
   .footer-enterprise__nav {
     grid-column: auto;
     align-self: start;
+    gap: 56px;
   }
 
   .footer-enterprise__contact-card {
@@ -27022,6 +27039,6 @@ body:has(.mp-header--v271) {
   }
 
   .footer-enterprise__contact-card {
-    padding: 20px 18px;
+    padding: 17px 16px;
   }
 }

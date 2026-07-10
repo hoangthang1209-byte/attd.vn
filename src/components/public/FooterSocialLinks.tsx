@@ -6,8 +6,8 @@ type Props = {
 
 function SocialIcon({ id }: { id: string }) {
   const common = {
-    width: 20,
-    height: 20,
+    width: 21,
+    height: 21,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",

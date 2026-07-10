@@ -21,10 +21,9 @@ import {
   resolveFooterZaloUrl,
 } from "@/lib/footer-config";
 
-const BRAND_HEADLINE = "Đồng phục & quà tặng";
-const BRAND_SUBHEADLINE = "doanh nghiệp bán sỉ";
+const BRAND_HEADLINE = "Đối tác sản xuất OEM & nguồn hàng B2B";
 const BRAND_POSITIONING =
-  "Đối tác sản xuất tại Việt Nam cho đại lý, agency, thương hiệu và doanh nghiệp.";
+  "Đồng hành cùng đại lý, agency, thương hiệu và doanh nghiệp trên toàn quốc.";
 
 export default async function Footer() {
   const [rawCompany, rawBranding] = await Promise.all([
@@ -55,10 +54,7 @@ export default async function Footer() {
             {branding.companyTagline ? (
               <p className="footer-enterprise__eyebrow">{branding.companyTagline}</p>
             ) : null}
-            <h2 className="footer-enterprise__headline">
-              {BRAND_HEADLINE}
-              <span className="footer-enterprise__headline-sub">{BRAND_SUBHEADLINE}</span>
-            </h2>
+            <h2 className="footer-enterprise__headline">{BRAND_HEADLINE}</h2>
             <p className="footer-enterprise__positioning">{BRAND_POSITIONING}</p>
             <ul className="footer-enterprise__credentials" aria-label="Thông tin doanh nghiệp">
               <li>{VERIFIED_EXPERIENCE_YEARS}+ năm kinh nghiệm</li>
@@ -199,9 +195,8 @@ export default async function Footer() {
           <p className="footer-enterprise__copyright">
             © {year} {company.name}.vn
             {hasCompanyField(company.taxCode) ? ` · MST: ${company.taxCode}` : ""}
-            {" · "}
-            Designed &amp; Manufactured in Vietnam
           </p>
+          <p className="footer-enterprise__bottom-origin">Designed &amp; Manufactured in Vietnam</p>
           <Link href="/chinh-sach-dai-ly" className="footer-enterprise__legal-link">
             Chính sách đại lý
           </Link>
