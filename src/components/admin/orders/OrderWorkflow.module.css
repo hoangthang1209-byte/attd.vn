@@ -36,8 +36,15 @@
   min-width: 0;
 }
 
+@media (max-width: 1099px) {
+  .orderWorkspace__summary {
+    display: none;
+  }
+}
+
 @media (min-width: 1100px) {
   .orderWorkspace__summary {
+    display: block;
     position: sticky;
     top: 16px;
   }
