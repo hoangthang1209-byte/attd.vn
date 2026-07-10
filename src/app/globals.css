@@ -26798,12 +26798,15 @@ body:has(.mp-header--v271) {
 }
 
 .footer-enterprise-nav__link {
-  display: inline-block;
-  font-size: 15px;
+  display: block;
+  font-size: 14.5px;
   font-weight: 500;
-  line-height: 1.8;
+  line-height: 1.6;
   color: rgba(255, 255, 255, 0.72);
   text-decoration: none;
+  word-break: normal;
+  overflow-wrap: normal;
+  text-wrap: pretty;
   transition: color 0.2s ease;
 }
 
@@ -26961,7 +26964,7 @@ body:has(.mp-header--v271) {
 
   .footer-enterprise__nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 56px;
+    gap: 40px;
   }
 
   .footer-enterprise-nav__accordion {
@@ -26993,7 +26996,7 @@ body:has(.mp-header--v271) {
 
 @media (min-width: 1024px) {
   .footer-enterprise {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1.75fr) minmax(0, 1.25fr);
+    grid-template-columns: minmax(0, 1.85fr) minmax(0, 2fr) minmax(0, 1.25fr);
     gap: 64px;
     padding-top: 80px;
   }
@@ -27001,7 +27004,7 @@ body:has(.mp-header--v271) {
   .footer-enterprise__nav {
     grid-column: auto;
     align-self: start;
-    gap: 60px;
+    gap: 36px;
   }
 
   .footer-enterprise__contact-card {
