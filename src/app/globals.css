@@ -26799,9 +26799,9 @@ body:has(.mp-header--v271) {
 
 .footer-enterprise-nav__link {
   display: block;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 500;
-  line-height: 1.6;
+  line-height: 1.52;
   color: rgba(255, 255, 255, 0.72);
   text-decoration: none;
   word-break: normal;
@@ -26964,7 +26964,7 @@ body:has(.mp-header--v271) {
 
   .footer-enterprise__nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 40px;
+    gap: 32px;
   }
 
   .footer-enterprise-nav__accordion {
@@ -26996,7 +26996,7 @@ body:has(.mp-header--v271) {
 
 @media (min-width: 1024px) {
   .footer-enterprise {
-    grid-template-columns: minmax(0, 1.85fr) minmax(0, 2fr) minmax(0, 1.25fr);
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 2.2fr) minmax(240px, 1.15fr);
     gap: 64px;
     padding-top: 80px;
   }
@@ -27004,7 +27004,7 @@ body:has(.mp-header--v271) {
   .footer-enterprise__nav {
     grid-column: auto;
     align-self: start;
-    gap: 36px;
+    gap: 30px;
   }
 
   .footer-enterprise__contact-card {
