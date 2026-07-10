@@ -145,6 +145,7 @@ export const adminNavigationSections: AdminNavigationSection[] = [
         label: "Website",
         items: [
           { label: "Homepage", href: "/admin/settings/homepage", status: "active", requiredPermissions: ["canManageCms"] },
+          { label: "Điều hướng & Footer", href: "/admin/site-navigation", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Landing Page", href: "/admin/landing-pages", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Blog", href: "/admin/blog", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Case Study", href: "/admin/case-studies", status: "active", requiredPermissions: ["canManageCms"] },

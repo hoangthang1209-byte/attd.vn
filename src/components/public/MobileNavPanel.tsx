@@ -9,6 +9,8 @@ import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import AttdLogo from "@/components/public/AttdLogo";
 import { trackInferredPublicLinkClick, trackViewCatalog } from "@/lib/analytics";
 import { NAV_PRIMARY_LINKS } from "@/lib/navConfig";
+import type { PublicSiteNavigation } from "@/features/site-navigation/site-navigation.types";
+import PublicNavMenuLink from "@/components/public/PublicNavMenuLink";
 import {
   getHotlineTel,
   getHotlineDisplay,
@@ -22,6 +24,7 @@ type MobileNavPanelProps = {
   onClose: () => void;
   headerLogoUrl?: string | null;
   companyTagline?: string;
+  siteNavigation?: PublicSiteNavigation;
 };
 
 export default function MobileNavPanel({
@@ -29,6 +32,7 @@ export default function MobileNavPanel({
   onClose,
   headerLogoUrl,
   companyTagline,
+  siteNavigation,
 }: MobileNavPanelProps) {
   const pathname = usePathname();
   const menuScrollRef = useRef<HTMLElement>(null);
@@ -36,6 +40,25 @@ export default function MobileNavPanel({
     (href: string) => pathname === href || pathname.startsWith(`${href}/`),
     [pathname],
   );
+
+  const mobileMenuLinks = siteNavigation?.mobileMenuLinks ?? NAV_PRIMARY_LINKS.map((link) => ({
+    id: link.href,
+    href: link.href,
+    label: link.label,
+    openInNewTab: false,
+  }));
+  const mobilePrimaryCta = siteNavigation?.ctas.MOBILE_NAV_SECONDARY ?? {
+    href: CTA.primary.href,
+    label: CTA.primary.label,
+    trackEvent: CTA.primary.event,
+    openInNewTab: false,
+  };
+  const mobileSecondaryCta = siteNavigation?.ctas.MOBILE_NAV_PRIMARY ?? {
+    href: "/lien-he",
+    label: "Liên hệ báo giá",
+    trackEvent: "contact_quote",
+    openInNewTab: false,
+  };
 
   const handleClose = useCallback(() => {
     onClose();
@@ -105,45 +128,42 @@ export default function MobileNavPanel({
             Xem danh mục sản phẩm
           </Link>
 
-          {NAV_PRIMARY_LINKS.map((link) => {
-            const active = isNavLinkActive(link.href);
-
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`mobile-nav-sublink mobile-nav-sublink--solo${active ? " mobile-nav-sublink--active" : ""}`}
-                aria-current={active ? "page" : undefined}
-                onClick={() => {
-                  trackInferredPublicLinkClick(link.href, "mobile_nav");
-                  handleClose();
-                }}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
+          {mobileMenuLinks.map((link) => (
+            <PublicNavMenuLink
+              key={link.id}
+              link={link}
+              variant="mobile"
+              isActive={isNavLinkActive}
+              onNavigate={() => {
+                trackInferredPublicLinkClick(link.href, "mobile_nav");
+                handleClose();
+              }}
+              onChildNavigate={() => {
+                handleClose();
+              }}
+            />
+          ))}
         </nav>
 
         <div className="mobile-nav-footer">
           <div className="mobile-nav-cta-block">
             <TrackedLink
-              href={CTA.primary.href}
-              trackEvent={CTA.primary.event}
+              href={mobilePrimaryCta.href}
+              trackEvent={(mobilePrimaryCta.trackEvent as "dealer_registration_click") ?? "dealer_registration_click"}
               trackSource="MOBILE_NAV"
               className="btn-primary mobile-nav-cta"
               onClick={handleClose}
             >
-              {CTA.primary.label}
+              {mobilePrimaryCta.label}
             </TrackedLink>
             <TrackedLink
-              href="/lien-he"
-              trackEvent="contact_quote"
+              href={mobileSecondaryCta.href}
+              trackEvent={(mobileSecondaryCta.trackEvent as "contact_quote") ?? "contact_quote"}
               trackSource="MOBILE_NAV"
               className="btn-secondary mobile-nav-cta"
               onClick={handleClose}
             >
-              Liên hệ báo giá
+              {mobileSecondaryCta.label}
             </TrackedLink>
           </div>
 

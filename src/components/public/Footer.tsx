@@ -20,6 +20,8 @@ import {
   resolveFooterZaloUrl,
 } from "@/lib/footer-config";
 import type { FooterLink } from "@/lib/footer-config";
+import type { PublicSiteNavigation } from "@/features/site-navigation/site-navigation.types";
+import { publicNavLinkToNavLink } from "@/features/site-navigation/public-nav-utils";
 
 const BRAND_POSITIONING =
   "Đồng hành cùng đại lý, agency, thương hiệu và doanh nghiệp trên toàn quốc.";
@@ -31,7 +33,11 @@ const FOOTER_NAV_PRODUCT_LINKS: readonly FooterLink[] = [
   { href: "/qua-tang-doanh-nghiep", label: "Quà tặng" },
 ];
 
-export default async function Footer() {
+export default async function Footer({
+  siteNavigation,
+}: {
+  siteNavigation?: PublicSiteNavigation;
+}) {
   const [rawCompany, rawBranding] = await Promise.all([
     getCompanySettings(),
     getBrandingSettings(),
@@ -42,7 +48,21 @@ export default async function Footer() {
   const mapsUrl = hasCompanyField(company.address)
     ? buildGoogleMapsSearchUrl(company.address)
     : null;
-  const socialLinks = resolveFooterSocialLinks(branding, company);
+  const socialLinks = siteNavigation?.socialLinks.length
+    ? siteNavigation.socialLinks
+    : resolveFooterSocialLinks(branding, company);
+  const footerGroups = siteNavigation?.footerGroups ?? [
+    { key: "products" as const, title: "Sản phẩm", links: FOOTER_NAV_PRODUCT_LINKS.map((link) => ({ id: link.href, ...link, openInNewTab: false })) },
+    { key: "services" as const, title: "Dịch vụ", links: FOOTER_SERVICE_LINKS.map((link) => ({ id: link.href, ...link, openInNewTab: false })) },
+    { key: "company" as const, title: "Công ty", links: FOOTER_COMPANY_LINKS.map((link) => ({ id: link.href, ...link, openInNewTab: false })) },
+  ];
+  const footerCta = siteNavigation?.ctas.FOOTER ?? {
+    id: "footer-cta-fallback",
+    href: "/lien-he",
+    label: "Yêu cầu báo giá",
+    openInNewTab: false,
+    trackEvent: "contact_quote",
+  };
   const zaloUrl = resolveFooterZaloUrl(branding, company);
   const showHotline = hasFooterHotline(company);
   const year = new Date().getFullYear();
@@ -72,9 +92,13 @@ export default async function Footer() {
           </div>
 
           <div className="footer-enterprise__nav">
-            <FooterLinkSection title="Sản phẩm" links={FOOTER_NAV_PRODUCT_LINKS} />
-            <FooterLinkSection title="Dịch vụ" links={FOOTER_SERVICE_LINKS} />
-            <FooterLinkSection title="Công ty" links={FOOTER_COMPANY_LINKS} />
+            {footerGroups.map((group) => (
+              <FooterLinkSection
+                key={group.key}
+                title={group.title}
+                links={group.links.map(publicNavLinkToNavLink) as readonly FooterLink[]}
+              />
+            ))}
           </div>
 
           <aside className="footer-enterprise__contact-card" aria-label="Liên hệ">
@@ -147,12 +171,14 @@ export default async function Footer() {
               ) : null}
             </ul>
             <TrackedLink
-              href="/lien-he"
-              trackEvent="contact_quote"
+              href={footerCta.href}
+              trackEvent={(footerCta.trackEvent as "contact_quote") ?? "contact_quote"}
               trackSource="footer_contact_card"
               className="footer-enterprise__cta"
+              target={footerCta.openInNewTab ? "_blank" : undefined}
+              rel={footerCta.openInNewTab ? "noopener noreferrer" : undefined}
             >
-              Yêu cầu báo giá
+              {footerCta.label}
             </TrackedLink>
           </aside>
         </div>

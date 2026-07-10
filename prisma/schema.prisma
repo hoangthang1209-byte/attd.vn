@@ -1237,6 +1237,97 @@ model HomepageSourcingPathway {
   @@index([homepageSettingsId, sortOrder])
 }
 
+enum SiteNavPlacement {
+  UTILITY_BAR
+  HEADER_MENU
+  CATEGORY_NAV
+  MOBILE_MENU
+  FOOTER_PRODUCTS
+  FOOTER_SERVICES
+  FOOTER_COMPANY
+}
+
+enum SiteNavLinkTarget {
+  INTERNAL
+  EXTERNAL
+}
+
+enum SiteNavCtaSlot {
+  HEADER_PRIMARY
+  MOBILE_NAV_PRIMARY
+  MOBILE_NAV_SECONDARY
+  FOOTER
+  MOBILE_ACTION_PRIMARY
+  MOBILE_ACTION_SECONDARY
+}
+
+model SiteNavigationSettings {
+  id                     String           @id @default("default")
+  utilityTagline         String           @default("Kho sỉ đồng phục & quà tặng doanh nghiệp")
+  megaMenuTriggerLabel   String           @default("Tất cả danh mục")
+  searchPlaceholder      String           @default("Tìm áo thun, áo polo, nón, quà tặng…")
+  useCategoryTreeMegaMenu Boolean         @default(true)
+  updatedAt              DateTime         @updatedAt
+  items                  SiteNavItem[]
+  ctas                   SiteNavCta[]
+  socialLinks            SiteSocialLink[]
+}
+
+model SiteNavItem {
+  id           String                 @id @default(cuid())
+  settingsId   String                 @default("default")
+  placement    SiteNavPlacement
+  parentId     String?
+  label        String
+  href         String
+  description  String?
+  iconKey      String?
+  linkTarget   SiteNavLinkTarget      @default(INTERNAL)
+  sortOrder    Int                    @default(0)
+  isActive     Boolean                @default(true)
+  showDesktop  Boolean                @default(true)
+  showMobile   Boolean                @default(true)
+  openInNewTab Boolean                @default(false)
+  trackEvent   String?
+  settings     SiteNavigationSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  parent       SiteNavItem?           @relation("SiteNavItemTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children     SiteNavItem[]          @relation("SiteNavItemTree")
+
+  @@index([settingsId, placement, sortOrder])
+  @@index([parentId, sortOrder])
+}
+
+model SiteNavCta {
+  id           String                 @id @default(cuid())
+  settingsId   String                 @default("default")
+  slot         SiteNavCtaSlot
+  label        String
+  href         String
+  trackEvent   String?
+  sortOrder    Int                    @default(0)
+  isActive     Boolean                @default(true)
+  showDesktop  Boolean                @default(true)
+  showMobile   Boolean                @default(true)
+  openInNewTab Boolean                @default(false)
+  settings     SiteNavigationSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+
+  @@unique([settingsId, slot])
+}
+
+model SiteSocialLink {
+  id         String                 @id @default(cuid())
+  settingsId String                 @default("default")
+  platform   String
+  label      String
+  href       String
+  sortOrder  Int                    @default(0)
+  isActive   Boolean                @default(true)
+  settings   SiteNavigationSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+
+  @@unique([settingsId, platform])
+  @@index([settingsId, sortOrder])
+}
+
 model LandingPageContent {
   id                String   @id @default(cuid())
   slug              String   @unique

@@ -4,17 +4,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MARKETPLACE_CATEGORY_NAV } from "@/lib/navConfig";
 
-type MarketplaceCategoryNavProps = {
-  className?: string;
+type NavItem = {
+  href: string;
+  label: string;
+  openInNewTab?: boolean;
 };
 
-export default function MarketplaceCategoryNav({ className = "" }: MarketplaceCategoryNavProps) {
+type MarketplaceCategoryNavProps = {
+  className?: string;
+  links?: NavItem[];
+};
+
+export default function MarketplaceCategoryNav({
+  className = "",
+  links = MARKETPLACE_CATEGORY_NAV,
+}: MarketplaceCategoryNavProps) {
   const pathname = usePathname();
 
   return (
     <nav className={`mp-cat-nav ${className}`.trim()} aria-label="Danh mục nguồn hàng">
       <div className="mp-cat-nav-scroll">
-        {MARKETPLACE_CATEGORY_NAV.map((item) => {
+        {links.map((item) => {
           const active =
             pathname === item.href ||
             pathname.startsWith(`${item.href}/`) ||
@@ -22,9 +32,11 @@ export default function MarketplaceCategoryNav({ className = "" }: MarketplaceCa
 
           return (
             <Link
-              key={item.href}
+              key={`${item.href}-${item.label}`}
               href={item.href}
               className={`mp-cat-nav-item${active ? " mp-cat-nav-item--active" : ""}`}
+              target={item.openInNewTab ? "_blank" : undefined}
+              rel={item.openInNewTab ? "noopener noreferrer" : undefined}
             >
               {item.label}
             </Link>

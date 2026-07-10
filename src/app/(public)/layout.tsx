@@ -6,6 +6,7 @@ import NavigationProgress from "@/components/public/NavigationProgress";
 import OrganizationSchema from "@/components/seo/OrganizationSchema";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
 import { getMarketplaceCategoryTree } from "@/features/categories/marketplace-category-tree";
+import { getPublicSiteNavigation } from "@/features/site-navigation/site-navigation.service";
 
 /** Category tree in header must stay fresh — matches `/san-pham` CMS hierarchy. */
 export const dynamic = "force-dynamic";
@@ -15,9 +16,10 @@ export default async function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [branding, categoryTree] = await Promise.all([
+  const [branding, categoryTree, siteNavigation] = await Promise.all([
     getBrandingSettings(),
     getMarketplaceCategoryTree(),
+    getPublicSiteNavigation(),
   ]);
 
   return (
@@ -28,12 +30,13 @@ export default async function PublicLayout({
         headerLogoUrl={branding.headerLogoUrl}
         companyTagline={branding.companyTagline}
         categoryTree={categoryTree}
+        siteNavigation={siteNavigation}
       />
 
       <div className="public-main">{children}</div>
 
-      <Footer />
-      <MobileActionBar />
+      <Footer siteNavigation={siteNavigation} />
+      <MobileActionBar siteNavigation={siteNavigation} />
       <FloatingContactWidget />
     </>
   );

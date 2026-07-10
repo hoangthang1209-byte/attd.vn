@@ -11,6 +11,7 @@ type MarketplaceMegaCategoryMenuProps = {
   categories: MarketplaceCategoryTreeNode[];
   /** When false, renders only the mega-menu trigger (category nav omitted). */
   showCategoryNav?: boolean;
+  triggerLabel?: string;
 };
 
 function resolveInitialParentId(categories: MarketplaceCategoryTreeNode[]): string {
@@ -20,6 +21,7 @@ function resolveInitialParentId(categories: MarketplaceCategoryTreeNode[]): stri
 export default function MarketplaceMegaCategoryMenu({
   categories,
   showCategoryNav = true,
+  triggerLabel = "Tất cả danh mục",
 }: MarketplaceMegaCategoryMenuProps) {
   const [open, setOpen] = useState(false);
   const [activeParentId, setActiveParentId] = useState(() =>
@@ -152,7 +154,7 @@ export default function MarketplaceMegaCategoryMenu({
           aria-haspopup="true"
           onClick={() => setOpen((v) => !v)}
         >
-          Tất cả danh mục
+          {triggerLabel}
           <ChevronDown
             size={14}
             className={`mp-mega-cat-trigger-icon${open ? " mp-mega-cat-trigger-icon--open" : ""}`}

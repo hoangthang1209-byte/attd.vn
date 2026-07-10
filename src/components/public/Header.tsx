@@ -12,9 +12,13 @@ import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar"
 import MarketplaceMegaCategoryMenu from "@/components/marketplace/MarketplaceMegaCategoryMenu";
 import MarketplaceCategoryNav from "@/components/marketplace/MarketplaceCategoryNav";
 import type { MarketplaceCategoryTreeNode } from "@/features/categories/marketplace-category-tree";
+import type { PublicSiteNavigation } from "@/features/site-navigation/site-navigation.types";
+import { flattenPublicNavLinks } from "@/features/site-navigation/public-nav-utils";
+import PublicNavMenuLink from "@/components/public/PublicNavMenuLink";
 import { NAV_PRIMARY_LINKS } from "@/lib/navConfig";
+import { MARKETPLACE_CATEGORY_NAV } from "@/lib/navConfig";
 
-const HEADER_SEARCH_PLACEHOLDER = "Tìm áo thun, áo polo, nón, quà tặng…";
+const HEADER_SEARCH_PLACEHOLDER_FALLBACK = "Tìm áo thun, áo polo, nón, quà tặng…";
 
 function MobileNavCategorySlugEffect({
   onCategoryChange,
@@ -54,12 +58,14 @@ type HeaderProps = {
   headerLogoUrl?: string | null;
   companyTagline?: string;
   categoryTree?: MarketplaceCategoryTreeNode[];
+  siteNavigation?: PublicSiteNavigation;
 };
 
 export default function Header({
   headerLogoUrl,
   companyTagline,
   categoryTree = [],
+  siteNavigation,
 }: HeaderProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -73,6 +79,35 @@ export default function Header({
   const categoryAccessRef = useRef<HTMLButtonElement>(null);
 
   const showMobileCategoryTrigger = categoryTree.length > 0;
+  const utilityBarLinks = siteNavigation
+    ? flattenPublicNavLinks(siteNavigation.utilityBarLinks)
+    : [
+        { href: "/dai-ly", label: "Đại lý" },
+        { href: "/oem", label: "OEM" },
+        { href: "/lien-he", label: "Liên hệ" },
+      ];
+  const headerMenuLinks = siteNavigation?.headerMenuLinks ?? NAV_PRIMARY_LINKS.map((link) => ({
+    id: link.href,
+    href: link.href,
+    label: link.label,
+    openInNewTab: false,
+  }));
+  const categoryNavLinks = siteNavigation
+    ? flattenPublicNavLinks(siteNavigation.categoryNavLinks)
+    : MARKETPLACE_CATEGORY_NAV;
+  const searchPlaceholder =
+    siteNavigation?.settings.searchPlaceholder ?? HEADER_SEARCH_PLACEHOLDER_FALLBACK;
+  const utilityTagline =
+    siteNavigation?.settings.utilityTagline ?? "Kho sỉ đồng phục & quà tặng doanh nghiệp";
+  const megaMenuTriggerLabel =
+    siteNavigation?.settings.megaMenuTriggerLabel ?? "Tất cả danh mục";
+  const headerCta = siteNavigation?.ctas.HEADER_PRIMARY ?? {
+    id: "header-cta-fallback",
+    href: "/lien-he",
+    label: "Liên hệ báo giá sỉ",
+    openInNewTab: false,
+    trackEvent: "contact_quote",
+  };
   const isNavLinkActive = useCallback(
     (href: string) => pathname === href || pathname.startsWith(`${href}/`),
     [pathname],
@@ -166,13 +201,18 @@ export default function Header({
       >
         <div className="mp-header-top">
           <div className="container mp-header-top-inner">
-            <p className="mp-header-tagline">
-              Kho sỉ đồng phục &amp; quà tặng doanh nghiệp
-            </p>
+            <p className="mp-header-tagline">{utilityTagline}</p>
             <div className="mp-header-top-links">
-              <Link href="/dai-ly">Đại lý</Link>
-              <Link href="/oem">OEM</Link>
-              <Link href="/lien-he">Liên hệ</Link>
+              {utilityBarLinks.map((link) => (
+                <Link
+                  key={`${link.href}-${link.label}`}
+                  href={link.href}
+                  target={link.openInNewTab ? "_blank" : undefined}
+                  rel={link.openInNewTab ? "noopener noreferrer" : undefined}
+                >
+                  {link.label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>
@@ -185,38 +225,35 @@ export default function Header({
               <MarketplaceMegaCategoryMenu
                 categories={categoryTree}
                 showCategoryNav={false}
+                triggerLabel={megaMenuTriggerLabel}
               />
             </div>
 
             <div className="mp-header-search-desktop">
-              <MarketplaceSearchBar placeholder={HEADER_SEARCH_PLACEHOLDER} />
+              <MarketplaceSearchBar placeholder={searchPlaceholder} />
             </div>
 
             <nav className="mp-header-primary-nav" aria-label="Điều hướng chính">
-              {NAV_PRIMARY_LINKS.map((link) => {
-                const active = isNavLinkActive(link.href);
-
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`mp-header-primary-nav-link${active ? " mp-header-primary-nav-link--active" : ""}`}
-                    aria-current={active ? "page" : undefined}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
+              {headerMenuLinks.map((link) => (
+                <PublicNavMenuLink
+                  key={link.id}
+                  link={link}
+                  variant="header"
+                  isActive={isNavLinkActive}
+                />
+              ))}
             </nav>
 
             <div className="mp-header-actions">
               <TrackedLink
-                href="/lien-he"
-                trackEvent="contact_quote"
+                href={headerCta.href}
+                trackEvent={(headerCta.trackEvent as "contact_quote") ?? "contact_quote"}
                 trackSource="HEADER"
                 className="btn-primary mp-header-cta-primary"
+                target={headerCta.openInNewTab ? "_blank" : undefined}
+                rel={headerCta.openInNewTab ? "noopener noreferrer" : undefined}
               >
-                Liên hệ báo giá sỉ
+                {headerCta.label}
               </TrackedLink>
             </div>
 
@@ -276,7 +313,7 @@ export default function Header({
                 <div className="mp-header-search-mobile__field">
                   <MarketplaceSearchBar
                     variant="mobile-header"
-                    placeholder={HEADER_SEARCH_PLACEHOLDER}
+                    placeholder={searchPlaceholder}
                     autoFocus
                     inputRef={mobileSearchInputRef}
                     onSubmitNavigate={closeMobileSearch}
@@ -297,7 +334,7 @@ export default function Header({
 
         <div className="mp-header-cats mp-header-cats--desktop">
           <div className="container mp-header-cats-scroll-row">
-            <MarketplaceCategoryNav />
+            <MarketplaceCategoryNav links={categoryNavLinks} />
           </div>
         </div>
       </header>
@@ -307,6 +344,7 @@ export default function Header({
         onClose={() => setMobileOpen(false)}
         headerLogoUrl={headerLogoUrl}
         companyTagline={companyTagline}
+        siteNavigation={siteNavigation}
       />
 
       <MobileCategoryExplorerPanel
