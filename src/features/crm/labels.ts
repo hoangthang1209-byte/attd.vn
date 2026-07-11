@@ -1,7 +1,8 @@
 import type {
   CRMActivityType,
+  CustomerLegacyType,
+  CustomerRepresentativeSalutation,
   CustomerStatus,
-  CustomerType,
   LeadPriority,
   LeadSource,
   LeadStatus,
@@ -63,7 +64,7 @@ export function getLeadSourceLabel(source: LeadSource | string): string {
   return source;
 }
 
-export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
+export const CUSTOMER_LEGACY_TYPE_LABELS: Record<CustomerLegacyType, string> = {
   DEALER: "Đại lý",
   AGENCY: "Agency",
   PRINTER: "Xưởng in/thêu",
@@ -73,6 +74,23 @@ export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
   SUPPLIER: "Nhà cung cấp",
   OTHER: "Khác",
 };
+
+/** @deprecated Use customer type master data name */
+export const CUSTOMER_TYPE_LABELS = CUSTOMER_LEGACY_TYPE_LABELS;
+
+export const REPRESENTATIVE_SALUTATION_LABELS: Record<CustomerRepresentativeSalutation, string> = {
+  MR: "Ông",
+  MRS: "Bà",
+  MS: "Cô / Bà",
+  OTHER: "Khác",
+};
+
+export const REPRESENTATIVE_SALUTATIONS: CustomerRepresentativeSalutation[] = [
+  "MR",
+  "MRS",
+  "MS",
+  "OTHER",
+];
 
 export const CUSTOMER_STATUS_LABELS: Record<CustomerStatus, string> = {
   PROSPECT: "Tiềm năng",

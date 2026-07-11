@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { CustomerLegacyType, CustomerRepresentativeSalutation } from "@prisma/client";
 import {
   getCustomerById,
+  isValidCustomerLegacyType,
   isValidCustomerStatus,
-  isValidCustomerType,
+  isValidRepresentativeSalutationValue,
   updateCustomer,
 } from "@/features/crm/services/crm-customer.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
@@ -49,10 +51,14 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   const patch: Parameters<typeof updateCustomer>[1] = {};
 
   if (raw.type !== undefined) {
-    if (typeof raw.type !== "string" || !isValidCustomerType(raw.type)) {
+    if (typeof raw.type !== "string" || !isValidCustomerLegacyType(raw.type)) {
       return NextResponse.json({ message: "Loại khách không hợp lệ" }, { status: 400 });
     }
-    patch.type = raw.type;
+    patch.legacyType = raw.type as CustomerLegacyType;
+  }
+  if (raw.customerTypeId !== undefined) {
+    patch.customerTypeId =
+      raw.customerTypeId === null ? null : parseOptionalString(raw.customerTypeId);
   }
   if (raw.status !== undefined) {
     if (typeof raw.status !== "string" || !isValidCustomerStatus(raw.status)) {
@@ -86,6 +92,25 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   if (raw.note !== undefined) patch.note = parseOptionalString(raw.note);
   if (raw.internalNote !== undefined) patch.internalNote = parseOptionalString(raw.internalNote);
   if (raw.billingNote !== undefined) patch.billingNote = parseOptionalString(raw.billingNote);
+  if (raw.representativeName !== undefined) {
+    patch.representativeName = parseOptionalString(raw.representativeName);
+  }
+  if (raw.representativeSalutation !== undefined) {
+    if (
+      raw.representativeSalutation !== null &&
+      (typeof raw.representativeSalutation !== "string" ||
+        !isValidRepresentativeSalutationValue(raw.representativeSalutation))
+    ) {
+      return NextResponse.json({ message: "Danh xưng không hợp lệ" }, { status: 400 });
+    }
+    patch.representativeSalutation = raw.representativeSalutation as CustomerRepresentativeSalutation | null;
+  }
+  if (raw.representativeTitle !== undefined) {
+    patch.representativeTitle = parseOptionalString(raw.representativeTitle);
+  }
+  if (raw.authorizationDocumentNo !== undefined) {
+    patch.authorizationDocumentNo = parseOptionalString(raw.authorizationDocumentNo);
+  }
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });

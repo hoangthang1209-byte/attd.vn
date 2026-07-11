@@ -4,15 +4,17 @@ import { useRouter } from "next/navigation";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import { useRef, useState } from "react";
-import type { CustomerStatus, CustomerType } from "@prisma/client";
+import type { CustomerRepresentativeSalutation, CustomerStatus } from "@prisma/client";
 import CrmCustomerAddressFields, {
   type CrmAddressFieldValues,
 } from "@/components/admin/crm/CrmCustomerAddressFields";
+import { useCustomerTypeOptions } from "@/components/admin/crm/useCustomerTypeOptions";
 import {
   CUSTOMER_STATUS_LABELS,
-  CUSTOMER_TYPE_LABELS,
+  REPRESENTATIVE_SALUTATION_LABELS,
+  REPRESENTATIVE_SALUTATIONS,
 } from "@/features/crm/labels";
-import { CRM_CUSTOMER_STATUSES, CRM_CUSTOMER_TYPES } from "@/features/crm/types";
+import { CRM_CUSTOMER_STATUSES } from "@/features/crm/types";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
 const emptyAddress: CrmAddressFieldValues = {
@@ -31,7 +33,8 @@ export default function CrmCustomerForm() {
   const router = useRouter();
   const mutate = useAdminMutation();
   const submitLock = useRef(false);
-  const [type, setType] = useState<CustomerType>("BUSINESS");
+  const { types: customerTypes, loading: typesLoading } = useCustomerTypeOptions(true);
+  const [customerTypeId, setCustomerTypeId] = useState("");
   const [name, setName] = useState("");
   const [legalName, setLegalName] = useState("");
   const [taxCode, setTaxCode] = useState("");
@@ -41,6 +44,12 @@ export default function CrmCustomerForm() {
   const [addressValues, setAddressValues] = useState<CrmAddressFieldValues>(emptyAddress);
   const [status, setStatus] = useState<CustomerStatus>("PROSPECT");
   const [note, setNote] = useState("");
+  const [representativeSalutation, setRepresentativeSalutation] = useState<
+    CustomerRepresentativeSalutation | ""
+  >("");
+  const [representativeName, setRepresentativeName] = useState("");
+  const [representativeTitle, setRepresentativeTitle] = useState("");
+  const [authorizationDocumentNo, setAuthorizationDocumentNo] = useState("");
   const [contactFullName, setContactFullName] = useState("");
   const [contactTitle, setContactTitle] = useState("");
   const [contactDepartment, setContactDepartment] = useState("");
@@ -66,7 +75,7 @@ export default function CrmCustomerForm() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            type,
+            customerTypeId: customerTypeId || null,
             name,
             legalName,
             taxCode,
@@ -84,6 +93,10 @@ export default function CrmCustomerForm() {
             addressLine2: addressValues.addressLine2 || null,
             status,
             note,
+            representativeSalutation: representativeSalutation || null,
+            representativeName: representativeName || null,
+            representativeTitle: representativeTitle || null,
+            authorizationDocumentNo: authorizationDocumentNo || null,
             primaryContact: contactFullName.trim()
               ? {
                   fullName: contactFullName,
@@ -140,16 +153,6 @@ export default function CrmCustomerForm() {
             <input className="admin-input" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="example.com" />
           </label>
           <label>
-            Loại khách
-            <select className="admin-input" value={type} onChange={(e) => setType(e.target.value as CustomerType)}>
-              {CRM_CUSTOMER_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {CUSTOMER_TYPE_LABELS[t]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
             Trạng thái
             <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value as CustomerStatus)}>
               {CRM_CUSTOMER_STATUSES.map((s) => (
@@ -158,6 +161,78 @@ export default function CrmCustomerForm() {
                 </option>
               ))}
             </select>
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-section-card">
+        <h2>Phân loại khách hàng</h2>
+        <div className="admin-form-grid">
+          <label>
+            Loại khách hàng
+            <select
+              className="admin-input"
+              value={customerTypeId}
+              onChange={(e) => setCustomerTypeId(e.target.value)}
+              disabled={typesLoading}
+            >
+              <option value="">— Chọn loại khách hàng —</option>
+              {customerTypes.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section className="admin-section-card">
+        <h2>Người đại diện / người ký</h2>
+        <p className="admin-field-hint">
+          Dùng cho hợp đồng, báo giá hoặc chứng từ khi người ký khác với liên hệ làm việc hằng ngày.
+        </p>
+        <div className="admin-form-grid">
+          <label>
+            Danh xưng
+            <select
+              className="admin-input"
+              value={representativeSalutation}
+              onChange={(e) =>
+                setRepresentativeSalutation(e.target.value as CustomerRepresentativeSalutation | "")
+              }
+            >
+              <option value="">—</option>
+              {REPRESENTATIVE_SALUTATIONS.map((value) => (
+                <option key={value} value={value}>
+                  {REPRESENTATIVE_SALUTATION_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Họ và tên người đại diện
+            <input
+              className="admin-input"
+              value={representativeName}
+              onChange={(e) => setRepresentativeName(e.target.value)}
+            />
+          </label>
+          <label>
+            Chức vụ
+            <input
+              className="admin-input"
+              value={representativeTitle}
+              onChange={(e) => setRepresentativeTitle(e.target.value)}
+            />
+          </label>
+          <label>
+            Số giấy ủy quyền
+            <input
+              className="admin-input"
+              value={authorizationDocumentNo}
+              onChange={(e) => setAuthorizationDocumentNo(e.target.value)}
+            />
           </label>
         </div>
       </section>

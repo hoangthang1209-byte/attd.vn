@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { CustomerType } from "@prisma/client";
-import { CUSTOMER_TYPE_LABELS } from "@/features/crm/labels";
-import { CRM_CUSTOMER_TYPES } from "@/features/crm/types";
+import type { CustomerLegacyType } from "@prisma/client";
+import { CUSTOMER_LEGACY_TYPE_LABELS } from "@/features/crm/labels";
+import { CRM_CUSTOMER_LEGACY_TYPES } from "@/features/crm/types";
 import type { CrmContactRecord, CrmCustomerRecord } from "@/features/crm/types";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
@@ -38,7 +38,7 @@ export default function QuickAddCustomerModal({ open, onClose, onCreated }: Prop
   const submitLock = useRef(false);
   const [mounted, setMounted] = useState(false);
   const [pending, setPending] = useState(false);
-  const [type, setType] = useState<CustomerType>("BUSINESS");
+  const [type, setType] = useState<CustomerLegacyType>("BUSINESS");
   const [name, setName] = useState("");
   const [taxCode, setTaxCode] = useState("");
   const [address, setAddress] = useState("");
@@ -224,11 +224,11 @@ export default function QuickAddCustomerModal({ open, onClose, onCreated }: Prop
                     className="admin-input"
                     value={type}
                     disabled={pending}
-                    onChange={(e) => setType(e.target.value as CustomerType)}
+                    onChange={(e) => setType(e.target.value as CustomerLegacyType)}
                   >
-                    {CRM_CUSTOMER_TYPES.map((t) => (
+                    {CRM_CUSTOMER_LEGACY_TYPES.map((t) => (
                       <option key={t} value={t}>
-                        {CUSTOMER_TYPE_LABELS[t]}
+                        {CUSTOMER_LEGACY_TYPE_LABELS[t]}
                       </option>
                     ))}
                   </select>

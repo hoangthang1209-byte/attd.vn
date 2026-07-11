@@ -35,6 +35,26 @@ export type ContactSnapshotInput = {
   email?: string | null;
 };
 
+/** Legal representative line for contracts/quotes — separate from working contact snapshots. */
+export function formatCustomerLegalRepresentative(customer: {
+  representativeSalutation?: "MR" | "MRS" | "MS" | "OTHER" | null;
+  representativeName?: string | null;
+  representativeTitle?: string | null;
+}): string | null {
+  const name = customer.representativeName?.trim();
+  if (!name) return null;
+  const salutationLabels = { MR: "Ông", MRS: "Bà", MS: "Cô / Bà", OTHER: "Khác" } as const;
+  const parts: string[] = [];
+  if (customer.representativeSalutation) {
+    parts.push(salutationLabels[customer.representativeSalutation]);
+  }
+  parts.push(name);
+  if (customer.representativeTitle?.trim()) {
+    parts.push(`— ${customer.representativeTitle.trim()}`);
+  }
+  return parts.join(" ");
+}
+
 /** Map CRM customer to quote snapshot fields (company block). */
 export function customerToQuoteSnapshots(customer: CustomerSnapshotInput) {
   return {

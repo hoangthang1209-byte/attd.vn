@@ -1,4 +1,4 @@
-import type { CustomerType, LeadStatus } from "@prisma/client";
+import type { CustomerLegacyType, LeadStatus } from "@prisma/client";
 
 export type ReportRangePreset =
   | "today"
@@ -16,7 +16,7 @@ export type CrmReportFilters = {
   salesOwnerId?: string;
   leadSource?: string;
   leadStatus?: LeadStatus;
-  customerType?: CustomerType;
+  customerType?: CustomerLegacyType;
   revenueCategoryId?: string;
 };
 

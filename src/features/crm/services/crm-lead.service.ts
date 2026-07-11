@@ -697,7 +697,8 @@ export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadReco
       const customer = await tx.customer.create({
         data: {
           code: customerCode,
-          type: "BUSINESS",
+          legacyType: "BUSINESS",
+          customerTypeId: "ct_business",
           name: customerName,
           phone: lead.phone !== "—" ? lead.phone : null,
           email: lead.email,

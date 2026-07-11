@@ -3,18 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { CustomerStatus, CustomerType } from "@prisma/client";
-import { CustomerStatusBadge, CustomerTypeBadge } from "@/components/admin/crm/CustomerBadges";
+import type { CustomerStatus } from "@prisma/client";
 import {
-  CUSTOMER_STATUS_LABELS,
-  CUSTOMER_TYPE_LABELS,
-} from "@/features/crm/labels";
+  CustomerMasterTypeBadge,
+  CustomerStatusBadge,
+} from "@/components/admin/crm/CustomerBadges";
+import { useCustomerTypeOptions } from "@/components/admin/crm/useCustomerTypeOptions";
+import { CUSTOMER_STATUS_LABELS } from "@/features/crm/labels";
 import { formatCrmDateTime } from "@/features/crm/format";
-import {
-  CRM_CUSTOMER_STATUSES,
-  CRM_CUSTOMER_TYPES,
-  type CrmCustomerRecord,
-} from "@/features/crm/types";
+import { CRM_CUSTOMER_STATUSES, type CrmCustomerRecord } from "@/features/crm/types";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
 
 type LoadState = "loading" | "error" | "empty" | "ready";
@@ -22,16 +19,20 @@ type LoadState = "loading" | "error" | "empty" | "ready";
 export default function CrmCustomersList() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { types: customerTypes } = useCustomerTypeOptions(false);
   const [customers, setCustomers] = useState<CrmCustomerRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<CustomerType | "">(
-    (searchParams.get("type") as CustomerType) || ""
+  const [customerTypeFilter, setCustomerTypeFilter] = useState(
+    searchParams.get("customerTypeId") || "",
+  );
+  const [unclassifiedFilter, setUnclassifiedFilter] = useState(
+    searchParams.get("unclassified") === "1",
   );
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | "">(
-    (searchParams.get("status") as CustomerStatus) || ""
+    (searchParams.get("status") as CustomerStatus) || "",
   );
 
   const load = useCallback(async () => {
@@ -40,7 +41,8 @@ export default function CrmCustomersList() {
     try {
       const params = new URLSearchParams();
       if (search.trim()) params.set("search", search.trim());
-      if (typeFilter) params.set("type", typeFilter);
+      if (unclassifiedFilter) params.set("unclassified", "1");
+      else if (customerTypeFilter) params.set("customerTypeId", customerTypeFilter);
       if (statusFilter) params.set("status", statusFilter);
 
       const res = await fetch(`/api/crm/customers?${params.toString()}`);
@@ -62,7 +64,7 @@ export default function CrmCustomersList() {
       setCustomers([]);
       setLoadState("error");
     }
-  }, [search, typeFilter, statusFilter]);
+  }, [search, customerTypeFilter, unclassifiedFilter, statusFilter]);
 
   useEffect(() => {
     void load();
@@ -76,9 +78,14 @@ export default function CrmCustomersList() {
     <div className="admin-panel">
       <div className="admin-section-header">
         <p>Tổng: {total} khách hàng</p>
-        <Link href="/admin/crm/customers/new" className="admin-btn admin-btn--primary">
-          Thêm khách hàng
-        </Link>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link href="/admin/crm/customer-types" className="admin-btn admin-btn--secondary">
+            Loại khách hàng
+          </Link>
+          <Link href="/admin/crm/customers/new" className="admin-btn admin-btn--primary">
+            Thêm khách hàng
+          </Link>
+        </div>
       </div>
 
       {loadState === "error" && (
@@ -114,16 +121,28 @@ export default function CrmCustomersList() {
             className="admin-input"
           />
           <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as CustomerType | "")}
+            value={unclassifiedFilter ? "__unclassified__" : customerTypeFilter}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "__unclassified__") {
+                setUnclassifiedFilter(true);
+                setCustomerTypeFilter("");
+              } else {
+                setUnclassifiedFilter(false);
+                setCustomerTypeFilter(value);
+              }
+            }}
             className="admin-input"
           >
-            <option value="">Tất cả loại</option>
-            {CRM_CUSTOMER_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {CUSTOMER_TYPE_LABELS[t]}
-              </option>
-            ))}
+            <option value="">Tất cả loại khách hàng</option>
+            <option value="__unclassified__">Chưa phân loại</option>
+            {customerTypes
+              .filter((type) => type.isActive)
+              .map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
+              ))}
           </select>
           <select
             value={statusFilter}
@@ -159,7 +178,6 @@ export default function CrmCustomersList() {
               <tr>
                 <th>Mã KH</th>
                 <th>Tên khách hàng</th>
-                <th>Loại khách</th>
                 <th>SĐT</th>
                 <th>Email</th>
                 <th>Tỉnh/TP</th>
@@ -182,13 +200,13 @@ export default function CrmCustomersList() {
                   }}
                 >
                   <td>{customer.code}</td>
-                  <td>{customer.name}</td>
                   <td>
-                    <CustomerTypeBadge type={customer.type} />
+                    <div>{customer.name}</div>
+                    <CustomerMasterTypeBadge label={customer.customerType?.name} />
                   </td>
                   <td>{customer.phone || "—"}</td>
                   <td>{customer.email || "—"}</td>
-                  <td>{customer.province || "—"}</td>
+                  <td>{customer.province || customer.provinceNameSnapshot || "—"}</td>
                   <td>
                     <CustomerStatusBadge status={customer.status} />
                   </td>

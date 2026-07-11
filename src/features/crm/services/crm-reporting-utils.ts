@@ -1,4 +1,4 @@
-import type { CustomerType, LeadStatus } from "@prisma/client";
+import type { CustomerLegacyType, LeadStatus } from "@prisma/client";
 import type { CrmReportFilters, ReportRangePreset } from "@/features/crm/reporting.types";
 
 type InputParams = URLSearchParams | Record<string, string | null | undefined>;
@@ -91,7 +91,7 @@ export function parseCrmReportFilters(input: InputParams): CrmReportFilters {
   const leadStatusRaw = getParam(input, "leadStatus");
   const leadStatus = (leadStatusRaw || undefined) as LeadStatus | undefined;
   const customerTypeRaw = getParam(input, "customerType");
-  const customerType = (customerTypeRaw || undefined) as CustomerType | undefined;
+  const customerType = (customerTypeRaw || undefined) as CustomerLegacyType | undefined;
 
   return {
     preset,

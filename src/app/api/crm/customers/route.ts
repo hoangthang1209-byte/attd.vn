@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { CustomerStatus, CustomerType } from "@prisma/client";
+import type { CustomerLegacyType, CustomerRepresentativeSalutation, CustomerStatus } from "@prisma/client";
 import {
   createCustomer,
+  isValidCustomerLegacyType,
   isValidCustomerStatus,
-  isValidCustomerType,
+  isValidRepresentativeSalutationValue,
   listCustomers,
 } from "@/features/crm/services/crm-customer.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
@@ -15,10 +16,12 @@ function parseOptionalString(value: unknown): string | null {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? undefined;
-  const typeParam = searchParams.get("type") ?? undefined;
+  const customerTypeId = searchParams.get("customerTypeId") ?? undefined;
+  const unclassified = searchParams.get("unclassified") === "1";
+  const legacyTypeParam = searchParams.get("type") ?? undefined;
   const statusParam = searchParams.get("status") ?? undefined;
 
-  if (typeParam && !isValidCustomerType(typeParam)) {
+  if (legacyTypeParam && !isValidCustomerLegacyType(legacyTypeParam)) {
     return NextResponse.json({ message: "Loại khách không hợp lệ" }, { status: 400 });
   }
   if (statusParam && !isValidCustomerStatus(statusParam)) {
@@ -28,7 +31,9 @@ export async function GET(req: NextRequest) {
   try {
     const result = await listCustomers({
       search,
-      type: typeParam as CustomerType | undefined,
+      customerTypeId,
+      unclassified,
+      legacyType: legacyTypeParam as CustomerLegacyType | undefined,
       status: statusParam as CustomerStatus | undefined,
       limit: Number(searchParams.get("limit") ?? undefined) || undefined,
     });
@@ -64,12 +69,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Tên khách hàng là bắt buộc" }, { status: 400 });
   }
 
-  const type =
-    typeof raw.type === "string" && isValidCustomerType(raw.type) ? raw.type : undefined;
+  const legacyType =
+    typeof raw.type === "string" && isValidCustomerLegacyType(raw.type) ? raw.type : undefined;
   const status =
     typeof raw.status === "string" && isValidCustomerStatus(raw.status)
       ? raw.status
       : undefined;
+  const representativeSalutation =
+    typeof raw.representativeSalutation === "string" &&
+    isValidRepresentativeSalutationValue(raw.representativeSalutation)
+      ? raw.representativeSalutation
+      : raw.representativeSalutation === null
+        ? null
+        : undefined;
 
   let primaryContact = null;
   if (raw.primaryContact && typeof raw.primaryContact === "object") {
@@ -90,7 +102,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const customer = await createCustomer({
-      type,
+      customerTypeId: parseOptionalString(raw.customerTypeId),
+      legacyType,
       name,
       legalName: parseOptionalString(raw.legalName),
       taxCode: parseOptionalString(raw.taxCode),
@@ -106,6 +119,10 @@ export async function POST(req: NextRequest) {
       wardNameSnapshot: parseOptionalString(raw.wardNameSnapshot),
       addressLine1: parseOptionalString(raw.addressLine1),
       addressLine2: parseOptionalString(raw.addressLine2),
+      representativeName: parseOptionalString(raw.representativeName),
+      representativeSalutation: representativeSalutation as CustomerRepresentativeSalutation | null | undefined,
+      representativeTitle: parseOptionalString(raw.representativeTitle),
+      authorizationDocumentNo: parseOptionalString(raw.authorizationDocumentNo),
       status,
       note: parseOptionalString(raw.note),
       internalNote: parseOptionalString(raw.internalNote),

@@ -247,7 +247,7 @@ export async function getCustomerReport(
   const scope = buildReportingScope(session, filters);
   const customerRows = await prisma.customer.findMany({
     where: scope.customerWhere,
-    select: { id: true, name: true, type: true, leads: { select: { source: true }, take: 1 } },
+    select: { id: true, name: true, legacyType: true, leads: { select: { source: true }, take: 1 } },
     take: 5000,
   });
   const customerIds = customerRows.map((row) => row.id);
@@ -262,7 +262,7 @@ export async function getCustomerReport(
       : Promise.resolve([]),
     customerIds.length ? prisma.quote.groupBy({ by: ["customerId"], where: { customerId: { in: customerIds }, status: { in: QUOTE_WAITING_STATUSES } }, _count: { _all: true } }) : Promise.resolve([]),
     customerIds.length ? prisma.lead.groupBy({ by: ["customerId"], where: { customerId: { in: customerIds }, nextFollowUpAt: { lt: now }, status: { notIn: ["WON", "LOST", "NOT_FIT"] } }, _count: { _all: true } }) : Promise.resolve([]),
-    prisma.customer.groupBy({ by: ["type"], where: scope.customerWhere, _count: { _all: true } }),
+    prisma.customer.groupBy({ by: ["legacyType"], where: scope.customerWhere, _count: { _all: true } }),
     customerIds.length ? prisma.order.groupBy({ by: ["customerId"], where: { customerId: { in: customerIds }, ...scope.orderWhere }, _count: { _all: true }, _sum: { totalAmount: true } }) : Promise.resolve([]),
   ]);
 
@@ -323,7 +323,7 @@ export async function getCustomerReport(
     meta: scope.meta,
     kpis,
     inactivity: inactivityStats,
-    typeBreakdown: typeBreakdown.map((row) => ({ type: row.type, count: row._count._all })),
+    typeBreakdown: typeBreakdown.map((row) => ({ type: row.legacyType, count: row._count._all })),
     sourceBreakdown: [...sourceBreakdown.entries()].map(([source, count]) => ({ source, count })),
     topCustomers,
   };

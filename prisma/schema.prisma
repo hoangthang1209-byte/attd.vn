@@ -333,53 +333,75 @@ model AdministrativeWard {
 }
 
 model Customer {
-  id                   String                  @id @default(cuid())
-  code                 String                  @unique
-  type                 CustomerType            @default(BUSINESS)
-  name                 String
-  legalName            String?
-  taxCode              String?
-  phone                String?
-  email                String?
-  website              String?
-  address              String?
-  province             String?
-  district             String?
-  provinceId           String?
-  wardId               String?
-  provinceNameSnapshot String?
-  wardNameSnapshot     String?
-  addressLine1         String?
-  addressLine2         String?
-  status               CustomerStatus          @default(PROSPECT)
-  note                 String?                 @db.Text
-  internalNote         String?                 @db.Text
-  billingNote          String?                 @db.Text
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
-  provinceRef          AdministrativeProvince? @relation(fields: [provinceId], references: [id], onDelete: SetNull)
-  wardRef              AdministrativeWard?     @relation(fields: [wardId], references: [id], onDelete: SetNull)
-  contacts             Contact[]
-  leads                Lead[]
-  activities           CRMActivity[]
-  productInterests     CRMProductInterest[]
-  pricingCalculations  PricingCalculation[]
-  quotes               Quote[]
-  orders               Order[]
-  techPacks            TechPack[]
-  dealerCompanies      DealerCompany[]
-  dealerRfqs           DealerRFQ[]
-  salesOpportunities   SalesOpportunity[]
-  patterns             Pattern[]
+  id                        String                           @id @default(cuid())
+  code                      String                           @unique
+  legacyType                CustomerLegacyType               @default(BUSINESS) @map("type")
+  customerTypeId            String?
+  name                      String
+  legalName                 String?
+  taxCode                   String?
+  phone                     String?
+  email                     String?
+  website                   String?
+  address                   String?
+  province                  String?
+  district                  String?
+  provinceId                String?
+  wardId                    String?
+  provinceNameSnapshot      String?
+  wardNameSnapshot          String?
+  addressLine1              String?
+  addressLine2              String?
+  representativeName        String?
+  representativeSalutation  CustomerRepresentativeSalutation?
+  representativeTitle       String?
+  authorizationDocumentNo   String?
+  status                    CustomerStatus                   @default(PROSPECT)
+  note                      String?                          @db.Text
+  internalNote              String?                          @db.Text
+  billingNote               String?                          @db.Text
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
+  provinceRef               AdministrativeProvince?          @relation(fields: [provinceId], references: [id], onDelete: SetNull)
+  wardRef                   AdministrativeWard?              @relation(fields: [wardId], references: [id], onDelete: SetNull)
+  customerType              CustomerType?                    @relation(fields: [customerTypeId], references: [id], onDelete: SetNull)
+  contacts                  Contact[]
+  leads                     Lead[]
+  activities                CRMActivity[]
+  productInterests          CRMProductInterest[]
+  pricingCalculations       PricingCalculation[]
+  quotes                    Quote[]
+  orders                    Order[]
+  techPacks                 TechPack[]
+  dealerCompanies           DealerCompany[]
+  dealerRfqs                DealerRFQ[]
+  salesOpportunities        SalesOpportunity[]
+  patterns                  Pattern[]
 
   @@index([code])
   @@index([name])
   @@index([phone])
   @@index([email])
-  @@index([type])
+  @@index([legacyType])
+  @@index([customerTypeId])
   @@index([status])
   @@index([provinceId])
   @@index([wardId])
+}
+
+model CustomerType {
+  id          String     @id @default(cuid())
+  code        String     @unique
+  name        String
+  description String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  isSystem    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  customers   Customer[]
+
+  @@index([isActive, sortOrder])
 }
 
 model Contact {
@@ -1430,7 +1452,7 @@ enum LeadPriority {
   URGENT
 }
 
-enum CustomerType {
+enum CustomerLegacyType {
   DEALER
   AGENCY
   PRINTER
@@ -1438,6 +1460,13 @@ enum CustomerType {
   BUSINESS
   RETAIL
   SUPPLIER
+  OTHER
+}
+
+enum CustomerRepresentativeSalutation {
+  MR
+  MRS
+  MS
   OTHER
 }
 

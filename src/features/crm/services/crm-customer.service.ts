@@ -1,4 +1,8 @@
-import type { CustomerStatus, CustomerType } from "@prisma/client";
+import type {
+  CustomerLegacyType,
+  CustomerRepresentativeSalutation,
+  CustomerStatus,
+} from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolveCustomerAddressSnapshots } from "@/features/administrative/administrative.service";
@@ -11,22 +15,61 @@ import {
 } from "@/features/crm/crm-validation";
 import {
   CUSTOMER_DETAIL_INCLUDE,
+  CUSTOMER_LIST_INCLUDE,
   mapCustomerRow,
 } from "@/features/crm/mappers";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
+import { resolveCustomerTypeId } from "@/features/crm/services/customer-type.service";
+import { REPRESENTATIVE_SALUTATION_LABELS } from "@/features/crm/labels";
 import {
+  CRM_CUSTOMER_LEGACY_TYPES,
   CRM_CUSTOMER_STATUSES,
-  CRM_CUSTOMER_TYPES,
   type CreateCustomerInput,
   type CrmCustomerRecord,
 } from "@/features/crm/types";
 
 export type ListCustomersParams = {
   search?: string;
-  type?: CustomerType;
+  customerTypeId?: string;
+  unclassified?: boolean;
+  legacyType?: CustomerLegacyType;
   status?: CustomerStatus;
   limit?: number;
 };
+
+const LEGACY_TYPE_BY_CODE: Record<string, CustomerLegacyType> = {
+  BUSINESS: "BUSINESS",
+  DEALER: "DEALER",
+  AGENCY: "AGENCY",
+  PRINT_SHOP: "PRINTER",
+  DISTRIBUTOR: "SUPPLIER",
+  TRADING: "BUSINESS",
+  BRAND: "BUSINESS",
+  ORGANIZATION: "EVENT_COMPANY",
+  INDIVIDUAL: "RETAIL",
+  OTHER: "OTHER",
+};
+
+function normalizeOptionalString(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isValidRepresentativeSalutation(
+  value: string,
+): value is CustomerRepresentativeSalutation {
+  return value === "MR" || value === "MRS" || value === "MS" || value === "OTHER";
+}
+
+async function syncLegacyTypeFromCustomerTypeId(customerTypeId: string | null | undefined) {
+  if (!customerTypeId) return undefined;
+  const row = await prisma.customerType.findUnique({
+    where: { id: customerTypeId },
+    select: { code: true },
+  });
+  if (!row) return undefined;
+  return LEGACY_TYPE_BY_CODE[row.code] ?? "OTHER";
+}
 
 async function buildCustomerWriteData(
   input: Partial<CreateCustomerInput>,
@@ -34,7 +77,17 @@ async function buildCustomerWriteData(
 ) {
   const data: Prisma.CustomerUpdateInput = {};
 
-  if (input.type !== undefined) data.type = input.type;
+  if (input.legacyType !== undefined) data.legacyType = input.legacyType;
+  if (input.customerTypeId !== undefined) {
+    if (input.customerTypeId === null) {
+      data.customerType = { disconnect: true };
+    } else {
+      const customerTypeId = await resolveCustomerTypeId(input.customerTypeId);
+      data.customerType = customerTypeId ? { connect: { id: customerTypeId } } : { disconnect: true };
+      const legacyType = await syncLegacyTypeFromCustomerTypeId(customerTypeId);
+      if (legacyType) data.legacyType = legacyType;
+    }
+  }
   if (input.name !== undefined) {
     const name = input.name.trim();
     if (!name && options?.requireName) {
@@ -42,20 +95,32 @@ async function buildCustomerWriteData(
     }
     if (name) data.name = name;
   }
-  if (input.legalName !== undefined) data.legalName = input.legalName?.trim() || null;
+  if (input.legalName !== undefined) data.legalName = normalizeOptionalString(input.legalName);
   if (input.taxCode !== undefined) data.taxCode = validateCrmTaxCode(input.taxCode);
   if (input.phone !== undefined) data.phone = validateCrmPhone(input.phone);
   if (input.email !== undefined) data.email = validateCrmEmail(input.email);
   if (input.website !== undefined) data.website = normalizeWebsiteUrl(input.website);
-  if (input.address !== undefined) data.address = input.address?.trim() || null;
-  if (input.province !== undefined) data.province = input.province?.trim() || null;
-  if (input.district !== undefined) data.district = input.district?.trim() || null;
-  if (input.addressLine1 !== undefined) data.addressLine1 = input.addressLine1?.trim() || null;
-  if (input.addressLine2 !== undefined) data.addressLine2 = input.addressLine2?.trim() || null;
-  if (input.note !== undefined) data.note = input.note?.trim() || null;
-  if (input.internalNote !== undefined) data.internalNote = input.internalNote?.trim() || null;
-  if (input.billingNote !== undefined) data.billingNote = input.billingNote?.trim() || null;
+  if (input.address !== undefined) data.address = normalizeOptionalString(input.address);
+  if (input.province !== undefined) data.province = normalizeOptionalString(input.province);
+  if (input.district !== undefined) data.district = normalizeOptionalString(input.district);
+  if (input.addressLine1 !== undefined) data.addressLine1 = normalizeOptionalString(input.addressLine1);
+  if (input.addressLine2 !== undefined) data.addressLine2 = normalizeOptionalString(input.addressLine2);
+  if (input.note !== undefined) data.note = normalizeOptionalString(input.note);
+  if (input.internalNote !== undefined) data.internalNote = normalizeOptionalString(input.internalNote);
+  if (input.billingNote !== undefined) data.billingNote = normalizeOptionalString(input.billingNote);
   if (input.status !== undefined) data.status = input.status;
+  if (input.representativeName !== undefined) {
+    data.representativeName = normalizeOptionalString(input.representativeName);
+  }
+  if (input.representativeSalutation !== undefined) {
+    data.representativeSalutation = input.representativeSalutation;
+  }
+  if (input.representativeTitle !== undefined) {
+    data.representativeTitle = normalizeOptionalString(input.representativeTitle);
+  }
+  if (input.authorizationDocumentNo !== undefined) {
+    data.authorizationDocumentNo = normalizeOptionalString(input.authorizationDocumentNo);
+  }
 
   if (
     input.provinceId !== undefined ||
@@ -110,7 +175,12 @@ export async function listCustomers(
       { provinceNameSnapshot: { contains: search, mode: "insensitive" } },
     ];
   }
-  if (params.type) where.type = params.type;
+  if (params.unclassified) {
+    where.customerTypeId = null;
+  } else if (params.customerTypeId) {
+    where.customerTypeId = params.customerTypeId;
+  }
+  if (params.legacyType) where.legacyType = params.legacyType;
   if (params.status) where.status = params.status;
 
   const limit = Math.min(200, Math.max(1, params.limit ?? 100));
@@ -118,6 +188,7 @@ export async function listCustomers(
   const [rows, total] = await Promise.all([
     prisma.customer.findMany({
       where,
+      include: CUSTOMER_LIST_INCLUDE,
       orderBy: { createdAt: "desc" },
       take: limit,
     }),
@@ -161,27 +232,44 @@ export async function createCustomer(input: CreateCustomerInput): Promise<CrmCus
   try {
     const code = await generateCustomerCode();
     const writeData = await buildCustomerWriteData(input);
+    const defaultBusinessType = await prisma.customerType.findUnique({
+      where: { code: "BUSINESS" },
+      select: { id: true },
+    });
+    const customerTypeId =
+      input.customerTypeId !== undefined
+        ? await resolveCustomerTypeId(input.customerTypeId)
+        : defaultBusinessType?.id ?? null;
+    const legacyType =
+      input.legacyType ??
+      (await syncLegacyTypeFromCustomerTypeId(customerTypeId)) ??
+      "BUSINESS";
 
     const customer = await prisma.$transaction(async (tx) => {
       const created = await tx.customer.create({
         data: {
           code,
-          type: input.type ?? "BUSINESS",
+          legacyType,
+          customerTypeId,
           name,
           status: input.status ?? "PROSPECT",
-          legalName: input.legalName?.trim() || null,
+          legalName: normalizeOptionalString(input.legalName),
           taxCode,
           phone: validateCrmPhone(input.phone),
           email: validateCrmEmail(input.email),
           website: normalizeWebsiteUrl(input.website),
-          address: input.address?.trim() || null,
-          province: input.province?.trim() || null,
-          district: input.district?.trim() || null,
-          addressLine1: input.addressLine1?.trim() || null,
-          addressLine2: input.addressLine2?.trim() || null,
-          note: input.note?.trim() || null,
-          internalNote: input.internalNote?.trim() || null,
-          billingNote: input.billingNote?.trim() || null,
+          address: normalizeOptionalString(input.address),
+          province: normalizeOptionalString(input.province),
+          district: normalizeOptionalString(input.district),
+          addressLine1: normalizeOptionalString(input.addressLine1),
+          addressLine2: normalizeOptionalString(input.addressLine2),
+          note: normalizeOptionalString(input.note),
+          internalNote: normalizeOptionalString(input.internalNote),
+          billingNote: normalizeOptionalString(input.billingNote),
+          representativeName: normalizeOptionalString(input.representativeName),
+          representativeSalutation: input.representativeSalutation ?? null,
+          representativeTitle: normalizeOptionalString(input.representativeTitle),
+          authorizationDocumentNo: normalizeOptionalString(input.authorizationDocumentNo),
           provinceId: input.provinceId ?? null,
           wardId: input.wardId ?? null,
           provinceNameSnapshot:
@@ -200,13 +288,13 @@ export async function createCustomer(input: CreateCustomerInput): Promise<CrmCus
           data: {
             customerId: created.id,
             fullName: input.primaryContact.fullName.trim(),
-            title: input.primaryContact.title?.trim() || null,
-            department: input.primaryContact.department?.trim() || null,
+            title: normalizeOptionalString(input.primaryContact.title),
+            department: normalizeOptionalString(input.primaryContact.department),
             phone: validateCrmPhone(input.primaryContact.phone),
             email: validateCrmEmail(input.primaryContact.email),
-            zalo: input.primaryContact.zalo?.trim() || null,
+            zalo: normalizeOptionalString(input.primaryContact.zalo),
             isPrimary: true,
-            note: input.primaryContact.note?.trim() || null,
+            note: normalizeOptionalString(input.primaryContact.note),
           },
         });
       }
@@ -280,13 +368,13 @@ export async function createContact(input: {
         data: {
           customerId: input.customerId,
           fullName,
-          title: input.title?.trim() || null,
-          department: input.department?.trim() || null,
+          title: normalizeOptionalString(input.title),
+          department: normalizeOptionalString(input.department),
           phone: validateCrmPhone(input.phone),
           email: validateCrmEmail(input.email),
-          zalo: input.zalo?.trim() || null,
+          zalo: normalizeOptionalString(input.zalo),
           isPrimary: input.isPrimary ?? false,
-          note: input.note?.trim() || null,
+          note: normalizeOptionalString(input.note),
         },
       });
     });
@@ -328,12 +416,21 @@ export async function setPrimaryContact(
   }
 }
 
-export function isValidCustomerType(value: string): value is CustomerType {
-  return CRM_CUSTOMER_TYPES.includes(value as CustomerType);
+export function isValidCustomerLegacyType(value: string): value is CustomerLegacyType {
+  return CRM_CUSTOMER_LEGACY_TYPES.includes(value as CustomerLegacyType);
 }
+
+/** @deprecated Use customer type master data validation */
+export const isValidCustomerType = isValidCustomerLegacyType;
 
 export function isValidCustomerStatus(value: string): value is CustomerStatus {
   return CRM_CUSTOMER_STATUSES.includes(value as CustomerStatus);
+}
+
+export function isValidRepresentativeSalutationValue(
+  value: string,
+): value is CustomerRepresentativeSalutation {
+  return isValidRepresentativeSalutation(value);
 }
 
 export async function addCustomerActivity(
@@ -346,4 +443,22 @@ export async function addCustomerActivity(
     title: input.title,
     content: input.content,
   });
+}
+
+export function formatRepresentativeDisplay(customer: {
+  representativeSalutation?: CustomerRepresentativeSalutation | null;
+  representativeName?: string | null;
+  representativeTitle?: string | null;
+}): string | null {
+  const name = customer.representativeName?.trim();
+  if (!name) return null;
+  const parts: string[] = [];
+  if (customer.representativeSalutation) {
+    parts.push(REPRESENTATIVE_SALUTATION_LABELS[customer.representativeSalutation]);
+  }
+  parts.push(name);
+  if (customer.representativeTitle?.trim()) {
+    parts.push(`— ${customer.representativeTitle.trim()}`);
+  }
+  return parts.join(" ");
 }

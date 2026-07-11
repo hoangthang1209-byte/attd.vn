@@ -1,11 +1,13 @@
 import type {
   CRMActivityType,
+  CustomerLegacyType,
+  CustomerRepresentativeSalutation,
   CustomerStatus,
-  CustomerType,
   LeadPriority,
   LeadSource,
   LeadStatus,
 } from "@prisma/client";
+import type { CustomerTypeRecord } from "@/features/crm/customer-type-types";
 
 export type CrmLeadNoteRecord = {
   id: string;
@@ -96,10 +98,14 @@ export type CrmContactRecord = {
   updatedAt: string;
 };
 
+export type CrmCustomerTypeSummary = Pick<CustomerTypeRecord, "id" | "code" | "name" | "isActive">;
+
 export type CrmCustomerRecord = {
   id: string;
   code: string;
-  type: CustomerType;
+  legacyType: CustomerLegacyType;
+  customerTypeId: string | null;
+  customerType: CrmCustomerTypeSummary | null;
   name: string;
   legalName: string | null;
   taxCode: string | null;
@@ -115,6 +121,10 @@ export type CrmCustomerRecord = {
   wardNameSnapshot: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
+  representativeName: string | null;
+  representativeSalutation: CustomerRepresentativeSalutation | null;
+  representativeTitle: string | null;
+  authorizationDocumentNo: string | null;
   status: CustomerStatus;
   note: string | null;
   internalNote: string | null;
@@ -191,7 +201,8 @@ export type CreateProductInterestInput = {
 };
 
 export type CreateCustomerInput = {
-  type?: CustomerType;
+  customerTypeId?: string | null;
+  legacyType?: CustomerLegacyType;
   name: string;
   legalName?: string | null;
   taxCode?: string | null;
@@ -207,6 +218,10 @@ export type CreateCustomerInput = {
   wardNameSnapshot?: string | null;
   addressLine1?: string | null;
   addressLine2?: string | null;
+  representativeName?: string | null;
+  representativeSalutation?: CustomerRepresentativeSalutation | null;
+  representativeTitle?: string | null;
+  authorizationDocumentNo?: string | null;
   status?: CustomerStatus;
   note?: string | null;
   internalNote?: string | null;
@@ -291,7 +306,7 @@ export const CRM_LEAD_SOURCES: LeadSource[] = [
   "PRODUCT_INQUIRY",
 ];
 
-export const CRM_CUSTOMER_TYPES: CustomerType[] = [
+export const CRM_CUSTOMER_LEGACY_TYPES: CustomerLegacyType[] = [
   "DEALER",
   "AGENCY",
   "PRINTER",
@@ -301,6 +316,9 @@ export const CRM_CUSTOMER_TYPES: CustomerType[] = [
   "SUPPLIER",
   "OTHER",
 ];
+
+/** @deprecated Use customer type master data instead */
+export const CRM_CUSTOMER_TYPES = CRM_CUSTOMER_LEGACY_TYPES;
 
 export const CRM_CUSTOMER_STATUSES: CustomerStatus[] = [
   "PROSPECT",

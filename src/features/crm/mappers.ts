@@ -190,7 +190,9 @@ export function mapContactRow(row: {
 export function mapCustomerRow(row: {
   id: string;
   code: string;
-  type: CrmCustomerRecord["type"];
+  legacyType: CrmCustomerRecord["legacyType"];
+  customerTypeId?: string | null;
+  customerType?: { id: string; code: string; name: string; isActive: boolean } | null;
   name: string;
   legalName: string | null;
   taxCode: string | null;
@@ -206,6 +208,10 @@ export function mapCustomerRow(row: {
   wardNameSnapshot?: string | null;
   addressLine1?: string | null;
   addressLine2?: string | null;
+  representativeName?: string | null;
+  representativeSalutation?: CrmCustomerRecord["representativeSalutation"];
+  representativeTitle?: string | null;
+  authorizationDocumentNo?: string | null;
   status: CrmCustomerRecord["status"];
   note: string | null;
   internalNote?: string | null;
@@ -220,7 +226,16 @@ export function mapCustomerRow(row: {
   return {
     id: row.id,
     code: row.code,
-    type: row.type,
+    legacyType: row.legacyType,
+    customerTypeId: row.customerTypeId ?? null,
+    customerType: row.customerType
+      ? {
+          id: row.customerType.id,
+          code: row.customerType.code,
+          name: row.customerType.name,
+          isActive: row.customerType.isActive,
+        }
+      : null,
     name: row.name,
     legalName: row.legalName,
     taxCode: row.taxCode,
@@ -236,6 +251,10 @@ export function mapCustomerRow(row: {
     wardNameSnapshot: row.wardNameSnapshot ?? null,
     addressLine1: row.addressLine1 ?? null,
     addressLine2: row.addressLine2 ?? null,
+    representativeName: row.representativeName ?? null,
+    representativeSalutation: row.representativeSalutation ?? null,
+    representativeTitle: row.representativeTitle ?? null,
+    authorizationDocumentNo: row.authorizationDocumentNo ?? null,
     status: row.status,
     note: row.note,
     internalNote: row.internalNote ?? null,
@@ -256,7 +275,16 @@ export const LEAD_DETAIL_INCLUDE = {
   customer: true,
 } satisfies Prisma.LeadInclude;
 
+export const CUSTOMER_LIST_INCLUDE = {
+  customerType: {
+    select: { id: true, code: true, name: true, isActive: true },
+  },
+} satisfies Prisma.CustomerInclude;
+
 export const CUSTOMER_DETAIL_INCLUDE = {
+  customerType: {
+    select: { id: true, code: true, name: true, isActive: true },
+  },
   contacts: { orderBy: [{ isPrimary: "desc" as const }, { createdAt: "asc" as const }] },
   leads: { orderBy: { createdAt: "desc" as const } },
   activities: { orderBy: { createdAt: "desc" as const } },

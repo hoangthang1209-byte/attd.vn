@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { CustomerStatus, CustomerType } from "@prisma/client";
+import type { CustomerRepresentativeSalutation, CustomerStatus } from "@prisma/client";
 import CrmActivityTimeline from "@/components/admin/crm/CrmActivityTimeline";
 import CrmAddActivityForm from "@/components/admin/crm/CrmAddActivityForm";
 import CrmContactDialog from "@/components/admin/crm/CrmContactDialog";
@@ -12,13 +12,18 @@ import CrmCustomerAddressFields, {
 import CrmProductInterestForm, {
   CrmProductInterestList,
 } from "@/components/admin/crm/CrmProductInterestForm";
-import { CustomerStatusBadge, CustomerTypeBadge } from "@/components/admin/crm/CustomerBadges";
+import {
+  CustomerMasterTypeBadge,
+  CustomerStatusBadge,
+} from "@/components/admin/crm/CustomerBadges";
+import { useCustomerTypeOptions } from "@/components/admin/crm/useCustomerTypeOptions";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
 import CrmRelatedQuotes from "@/components/admin/crm/CrmRelatedQuotes";
 import CrmRelatedOrders from "@/components/admin/crm/CrmRelatedOrders";
 import {
   CUSTOMER_STATUS_LABELS,
-  CUSTOMER_TYPE_LABELS,
+  REPRESENTATIVE_SALUTATION_LABELS,
+  REPRESENTATIVE_SALUTATIONS,
 } from "@/features/crm/labels";
 import { formatCustomerAddressPreview } from "@/features/crm/customer-address";
 import { displayWebsiteUrl } from "@/features/crm/crm-validation";
@@ -28,7 +33,6 @@ import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import {
   CRM_CUSTOMER_STATUSES,
-  CRM_CUSTOMER_TYPES,
   type CrmContactRecord,
   type CrmCustomerRecord,
 } from "@/features/crm/types";
@@ -53,8 +57,9 @@ export default function CrmCustomerDetailView({
   initialCustomer: CrmCustomerRecord;
 }) {
   const mutate = useAdminMutation();
+  const { types: customerTypes, loading: typesLoading } = useCustomerTypeOptions(true);
   const [customer, setCustomer] = useState(initialCustomer);
-  const [type, setType] = useState<CustomerType>(initialCustomer.type);
+  const [customerTypeId, setCustomerTypeId] = useState(initialCustomer.customerTypeId ?? "");
   const [status, setStatus] = useState<CustomerStatus>(initialCustomer.status);
   const [name, setName] = useState(initialCustomer.name);
   const [legalName, setLegalName] = useState(initialCustomer.legalName ?? "");
@@ -68,6 +73,14 @@ export default function CrmCustomerDetailView({
   const [note, setNote] = useState(initialCustomer.note ?? "");
   const [internalNote, setInternalNote] = useState(initialCustomer.internalNote ?? "");
   const [billingNote, setBillingNote] = useState(initialCustomer.billingNote ?? "");
+  const [representativeSalutation, setRepresentativeSalutation] = useState<
+    CustomerRepresentativeSalutation | ""
+  >(initialCustomer.representativeSalutation ?? "");
+  const [representativeName, setRepresentativeName] = useState(initialCustomer.representativeName ?? "");
+  const [representativeTitle, setRepresentativeTitle] = useState(initialCustomer.representativeTitle ?? "");
+  const [authorizationDocumentNo, setAuthorizationDocumentNo] = useState(
+    initialCustomer.authorizationDocumentNo ?? "",
+  );
   const [contactDialogOpen, setContactDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<CrmContactRecord | null>(null);
   const [saving, setSaving] = useState(false);
@@ -78,6 +91,11 @@ export default function CrmCustomerDetailView({
     const data = await res.json();
     if (res.ok && data.customer) {
       setCustomer(data.customer);
+      setCustomerTypeId(data.customer.customerTypeId ?? "");
+      setRepresentativeSalutation(data.customer.representativeSalutation ?? "");
+      setRepresentativeName(data.customer.representativeName ?? "");
+      setRepresentativeTitle(data.customer.representativeTitle ?? "");
+      setAuthorizationDocumentNo(data.customer.authorizationDocumentNo ?? "");
       setAddressValues(toAddressValues(data.customer));
     }
   }
@@ -93,7 +111,7 @@ export default function CrmCustomerDetailView({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            type,
+            customerTypeId: customerTypeId || null,
             status,
             name,
             legalName,
@@ -104,6 +122,10 @@ export default function CrmCustomerDetailView({
             note,
             internalNote,
             billingNote,
+            representativeSalutation: representativeSalutation || null,
+            representativeName: representativeName || null,
+            representativeTitle: representativeTitle || null,
+            authorizationDocumentNo: authorizationDocumentNo || null,
             provinceId: addressValues.provinceId || null,
             wardId: addressValues.wardId || null,
             provinceNameSnapshot: addressValues.provinceNameSnapshot || null,
@@ -116,6 +138,11 @@ export default function CrmCustomerDetailView({
       },
       onSuccess: (updatedCustomer) => {
         setCustomer(updatedCustomer);
+        setCustomerTypeId(updatedCustomer.customerTypeId ?? "");
+        setRepresentativeSalutation(updatedCustomer.representativeSalutation ?? "");
+        setRepresentativeName(updatedCustomer.representativeName ?? "");
+        setRepresentativeTitle(updatedCustomer.representativeTitle ?? "");
+        setAuthorizationDocumentNo(updatedCustomer.authorizationDocumentNo ?? "");
         setAddressValues(toAddressValues(updatedCustomer));
       },
     });
@@ -170,7 +197,7 @@ export default function CrmCustomerDetailView({
           <p className="admin-crm-detail-code">Mã khách hàng: {customer.code}</p>
           <h2>{customer.name}</h2>
           <div className="admin-crm-detail-badges">
-            <CustomerTypeBadge type={customer.type} />
+            <CustomerMasterTypeBadge label={customer.customerType?.name} />
             <CustomerStatusBadge status={customer.status} />
           </div>
         </div>
@@ -210,16 +237,6 @@ export default function CrmCustomerDetailView({
               <input className="admin-input" value={legalName} onChange={(e) => setLegalName(e.target.value)} />
             </label>
             <label>
-              Loại khách
-              <select className="admin-input" value={type} onChange={(e) => setType(e.target.value as CustomerType)}>
-                {CRM_CUSTOMER_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {CUSTOMER_TYPE_LABELS[t]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
               Trạng thái
               <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value as CustomerStatus)}>
                 {CRM_CUSTOMER_STATUSES.map((s) => (
@@ -248,6 +265,78 @@ export default function CrmCustomerDetailView({
                 value={displayWebsiteUrl(website)}
                 onChange={(e) => setWebsite(e.target.value)}
                 placeholder="example.com"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="admin-section-card">
+          <h3>Phân loại khách hàng</h3>
+          <div className="admin-form admin-form--compact admin-form-grid">
+            <label>
+              Loại khách hàng
+              <select
+                className="admin-input"
+                value={customerTypeId}
+                onChange={(e) => setCustomerTypeId(e.target.value)}
+                disabled={typesLoading}
+              >
+                <option value="">— Chưa phân loại —</option>
+                {customerTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section className="admin-section-card">
+          <h3>Người đại diện / người ký</h3>
+          <p className="admin-field-hint">
+            Dùng cho hợp đồng, báo giá hoặc chứng từ khi người ký khác với liên hệ làm việc hằng ngày.
+          </p>
+          <div className="admin-form admin-form--compact admin-form-grid">
+            <label>
+              Danh xưng
+              <select
+                className="admin-input"
+                value={representativeSalutation}
+                onChange={(e) =>
+                  setRepresentativeSalutation(e.target.value as CustomerRepresentativeSalutation | "")
+                }
+              >
+                <option value="">—</option>
+                {REPRESENTATIVE_SALUTATIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {REPRESENTATIVE_SALUTATION_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Họ và tên người đại diện
+              <input
+                className="admin-input"
+                value={representativeName}
+                onChange={(e) => setRepresentativeName(e.target.value)}
+              />
+            </label>
+            <label>
+              Chức vụ
+              <input
+                className="admin-input"
+                value={representativeTitle}
+                onChange={(e) => setRepresentativeTitle(e.target.value)}
+              />
+            </label>
+            <label>
+              Số giấy ủy quyền
+              <input
+                className="admin-input"
+                value={authorizationDocumentNo}
+                onChange={(e) => setAuthorizationDocumentNo(e.target.value)}
               />
             </label>
           </div>
