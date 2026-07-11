@@ -245,19 +245,137 @@ export async function uploadProductionFileAsset(input: {
   }
 }
 
-export async function updateMediaAsset(id: string, data: {
-  altText?: string;
-  title?: string;
+export const VALID_MEDIA_STORAGE_FOLDERS = Object.keys(STORAGE_FOLDER_TO_MEDIA) as StorageFolderKey[];
+export const VALID_MEDIA_USAGE_TYPES: MediaUsageType[] = [
+  "PRODUCT",
+  "BLOG",
+  "KNOWLEDGE_BASE",
+  "GENERAL",
+];
+export const MEDIA_BULK_UPDATE_MAX = 100;
+
+export type MediaMetadataUpdateInput = {
+  folder?: MediaFolder;
+  usageType?: MediaUsageType;
+  altText?: string | null;
+  title?: string | null;
   tags?: string[];
-}) {
+};
+
+export function normalizeMediaTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const tag of tags) {
+    const trimmed = tag.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+export function parseStorageFolderKey(value: unknown): StorageFolderKey | null {
+  if (typeof value !== "string") return null;
+  return VALID_MEDIA_STORAGE_FOLDERS.includes(value as StorageFolderKey)
+    ? (value as StorageFolderKey)
+    : null;
+}
+
+export function parseMediaUsageType(value: unknown): MediaUsageType | null {
+  if (typeof value !== "string") return null;
+  return VALID_MEDIA_USAGE_TYPES.includes(value as MediaUsageType)
+    ? (value as MediaUsageType)
+    : null;
+}
+
+function buildMetadataUpdateData(data: MediaMetadataUpdateInput) {
+  const updateData: {
+    folder?: MediaFolder;
+    usageType?: MediaUsageType;
+    altText?: string | null;
+    title?: string | null;
+    tags?: string[];
+  } = {};
+
+  if (data.folder !== undefined) updateData.folder = data.folder;
+  if (data.usageType !== undefined) updateData.usageType = data.usageType;
+  if (data.altText !== undefined) {
+    updateData.altText = data.altText?.trim() ? data.altText.trim() : null;
+  }
+  if (data.title !== undefined) {
+    updateData.title = data.title?.trim() ? data.title.trim() : null;
+  }
+  if (data.tags !== undefined) {
+    updateData.tags = normalizeMediaTags(data.tags);
+  }
+
+  return updateData;
+}
+
+export function parseMediaMetadataPatchBody(
+  raw: Record<string, unknown>,
+): { ok: true; data: MediaMetadataUpdateInput; hasUpdates: boolean } | { ok: false; message: string } {
+  const data: MediaMetadataUpdateInput = {};
+  let hasUpdates = false;
+
+  if ("folder" in raw) {
+    hasUpdates = true;
+    const folderKey = parseStorageFolderKey(raw.folder);
+    if (!folderKey) return { ok: false, message: "Phân loại thư mục không hợp lệ" };
+    data.folder = STORAGE_FOLDER_TO_MEDIA[folderKey];
+  }
+
+  if ("usageType" in raw) {
+    hasUpdates = true;
+    const usageType = parseMediaUsageType(raw.usageType);
+    if (!usageType) return { ok: false, message: "Loại sử dụng ảnh không hợp lệ" };
+    data.usageType = usageType;
+  }
+
+  if ("altText" in raw) {
+    hasUpdates = true;
+    if (raw.altText !== null && typeof raw.altText !== "string") {
+      return { ok: false, message: "Alt text không hợp lệ" };
+    }
+    data.altText = raw.altText as string | null;
+  }
+
+  if ("title" in raw) {
+    hasUpdates = true;
+    if (raw.title !== null && typeof raw.title !== "string") {
+      return { ok: false, message: "Tiêu đề ảnh không hợp lệ" };
+    }
+    data.title = raw.title as string | null;
+  }
+
+  if ("tags" in raw) {
+    hasUpdates = true;
+    if (!Array.isArray(raw.tags) || !raw.tags.every((tag) => typeof tag === "string")) {
+      return { ok: false, message: "Tags không hợp lệ" };
+    }
+    data.tags = raw.tags;
+  }
+
+  return { ok: true, data, hasUpdates };
+}
+
+export async function updateMediaAsset(id: string, data: MediaMetadataUpdateInput) {
+  const existing = await prisma.mediaAsset.findUnique({ where: { id } });
+  if (!existing) return null;
+
   return prisma.mediaAsset.update({
     where: { id },
-    data: {
-      altText: data.altText ?? undefined,
-      title: data.title ?? undefined,
-      tags: data.tags ?? undefined,
-    },
+    data: buildMetadataUpdateData(data),
   });
+}
+
+export async function bulkUpdateMediaAssets(ids: string[], data: MediaMetadataUpdateInput) {
+  const uniqueIds = [...new Set(ids)];
+  const result = await prisma.mediaAsset.updateMany({
+    where: { id: { in: uniqueIds } },
+    data: buildMetadataUpdateData(data),
+  });
+  return result.count;
 }
 
 export async function deleteMediaAsset(id: string) {
