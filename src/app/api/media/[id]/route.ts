@@ -9,7 +9,7 @@ import { requireAdminPermission } from "@/lib/permissions/require-admin-permissi
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const asset = await getMediaAssetById(id);
@@ -19,7 +19,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const permission = await requireAdminPermission({
     platform: "content",
@@ -56,17 +56,17 @@ export async function PATCH(
     }
     return NextResponse.json(updated);
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Lỗi cập nhật";
+    const status =
+      message.includes("không tồn tại") || message.includes("vô hiệu hóa") ? 400 : 500;
     console.error("[PATCH /api/media/[id]]", err);
-    return NextResponse.json(
-      { message: err instanceof Error ? err.message : "Lỗi cập nhật" },
-      { status: 500 },
-    );
+    return NextResponse.json({ message }, { status });
   }
 }
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const permission = await requireAdminPermission({
     platform: "content",

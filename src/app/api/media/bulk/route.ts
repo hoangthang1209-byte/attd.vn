@@ -36,7 +36,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: "Danh sách ảnh không hợp lệ" }, { status: 400 });
   }
 
-  const ids = [...new Set(idsRaw.map((id) => id.trim()))];
+  const ids = [...new Set(idsRaw.map((id) => (id as string).trim()))];
   if (ids.length > MEDIA_BULK_UPDATE_MAX) {
     return NextResponse.json(
       { message: `Chỉ có thể cập nhật tối đa ${MEDIA_BULK_UPDATE_MAX} ảnh mỗi lần` },
@@ -50,7 +50,10 @@ export async function PATCH(request: Request) {
   }
 
   if (!parsed.hasUpdates) {
-    return NextResponse.json({ message: "Cần chọn ít nhất một trường metadata để cập nhật" }, { status: 400 });
+    return NextResponse.json(
+      { message: "Cần chọn ít nhất một trường metadata để cập nhật" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -60,10 +63,10 @@ export async function PATCH(request: Request) {
     }
     return NextResponse.json({ updatedCount });
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Lỗi cập nhật hàng loạt";
+    const status =
+      message.includes("không tồn tại") || message.includes("vô hiệu hóa") ? 400 : 500;
     console.error("[PATCH /api/media/bulk]", err);
-    return NextResponse.json(
-      { message: err instanceof Error ? err.message : "Lỗi cập nhật hàng loạt" },
-      { status: 500 },
-    );
+    return NextResponse.json({ message }, { status });
   }
 }

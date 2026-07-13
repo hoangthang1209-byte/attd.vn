@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import type { MediaFolder, MediaUsageType } from "@prisma/client";
+import type {
+  MediaFolder,
+  MediaOrientation,
+  MediaUsageType,
+  MediaVisibility,
+  ProductionFileType,
+  Prisma,
+} from "@prisma/client";
 import {
   deleteStoredMediaObject,
   requireCloudinaryStorageAdapter,
@@ -17,46 +24,127 @@ import {
   validateProductionFileUpload,
   ERROR_REQUIRES_PRODUCTION_UPLOAD,
 } from "@/lib/productionFileValidation";
-import type { ProductionFileType } from "@prisma/client";
 import { deleteR2Object } from "@/features/storage/r2/r2-production-file.service";
 import { MEDIA_LIBRARY_PAGE_SIZE } from "@/components/admin/media/media-library-api";
+import {
+  deriveMediaOrientation,
+  emptyToNull,
+  normalizeMediaKeywords,
+  normalizeMediaTags,
+  resolveDefaultLibraryIdFromLegacyFolder,
+  resolveDefaultRoleIdFromLegacyUsage,
+  resolveLegacyFolderFromLibraryCode,
+  resolveLegacyUsageTypeFromRoleCode,
+  validateMediaOrientation,
+  validateMediaVisibility,
+} from "@/features/media/media-classification";
 
 export { LARGE_IMAGE_WARNING_SIZE };
 export { MEDIA_LIBRARY_PAGE_SIZE };
+export { normalizeMediaTags, normalizeMediaKeywords };
+
+export const VALID_MEDIA_STORAGE_FOLDERS = Object.keys(STORAGE_FOLDER_TO_MEDIA) as StorageFolderKey[];
+export const VALID_MEDIA_USAGE_TYPES: MediaUsageType[] = [
+  "PRODUCT",
+  "BLOG",
+  "KNOWLEDGE_BASE",
+  "GENERAL",
+];
+export const MEDIA_BULK_UPDATE_MAX = 100;
+
+const mediaClassificationInclude = {
+  library: { select: { id: true, code: true, name: true, isActive: true } },
+  role: { select: { id: true, code: true, name: true, isActive: true } },
+} satisfies Prisma.MediaAssetInclude;
+
+export type MediaAssetWithClassification = Prisma.MediaAssetGetPayload<{
+  include: typeof mediaClassificationInclude;
+}>;
 
 export type MediaAssetListFilters = {
   folder?: MediaFolder;
   usageType?: MediaUsageType;
+  libraryId?: string;
+  libraryCode?: string;
+  roleId?: string;
+  roleCode?: string;
+  visibility?: MediaVisibility;
+  orientation?: MediaOrientation;
+  hasAltText?: boolean;
   search?: string;
 };
 
 export type MediaAssetListPage = {
-  items: Awaited<ReturnType<typeof prisma.mediaAsset.findMany>>;
+  items: MediaAssetWithClassification[];
   nextCursor: string | null;
   hasMore: boolean;
   total: number;
 };
 
-function buildMediaAssetWhere(filters: MediaAssetListFilters) {
-  return {
+export type MediaMetadataUpdateInput = {
+  folder?: MediaFolder;
+  usageType?: MediaUsageType;
+  libraryId?: string | null;
+  roleId?: string | null;
+  visibility?: MediaVisibility;
+  altText?: string | null;
+  title?: string | null;
+  caption?: string | null;
+  description?: string | null;
+  tags?: string[];
+  keywords?: string[];
+  aiTags?: string[];
+  contentLanguage?: string | null;
+};
+
+function buildMediaAssetWhere(filters: MediaAssetListFilters): Prisma.MediaAssetWhereInput {
+  const where: Prisma.MediaAssetWhereInput = {
     ...(filters.folder ? { folder: filters.folder } : {}),
     ...(filters.usageType ? { usageType: filters.usageType } : {}),
-    ...(filters.search
-      ? {
-          OR: [
-            { filename: { contains: filters.search, mode: "insensitive" as const } },
-            { title: { contains: filters.search, mode: "insensitive" as const } },
-            { originalName: { contains: filters.search, mode: "insensitive" as const } },
-          ],
-        }
+    ...(filters.libraryId ? { libraryId: filters.libraryId } : {}),
+    ...(filters.libraryCode
+      ? { library: { code: filters.libraryCode.toUpperCase() } }
       : {}),
+    ...(filters.roleId ? { roleId: filters.roleId } : {}),
+    ...(filters.roleCode ? { role: { code: filters.roleCode.toUpperCase() } } : {}),
+    ...(filters.visibility ? { visibility: filters.visibility } : {}),
+    ...(filters.orientation ? { orientation: filters.orientation } : {}),
   };
+
+  if (filters.hasAltText === true) {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      { altText: { not: null } },
+      { NOT: { altText: "" } },
+    ];
+  } else if (filters.hasAltText === false) {
+    where.OR = [{ altText: null }, { altText: "" }];
+  }
+
+  if (filters.search) {
+    const searchOr: Prisma.MediaAssetWhereInput[] = [
+      { filename: { contains: filters.search, mode: "insensitive" } },
+      { title: { contains: filters.search, mode: "insensitive" } },
+      { originalName: { contains: filters.search, mode: "insensitive" } },
+      { altText: { contains: filters.search, mode: "insensitive" } },
+      { caption: { contains: filters.search, mode: "insensitive" } },
+    ];
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      { OR: searchOr },
+    ];
+  }
+
+  return where;
 }
 
-export async function listMediaAssets(options?: MediaAssetListFilters & { limit?: number }) {
+export async function listMediaAssets(
+  options?: MediaAssetListFilters & { limit?: number },
+): Promise<MediaAssetWithClassification[]> {
   try {
     return await prisma.mediaAsset.findMany({
       where: buildMediaAssetWhere(options ?? {}),
+      include: mediaClassificationInclude,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: options?.limit ?? 200,
     });
@@ -80,6 +168,7 @@ export async function listMediaAssetsPage(
       prisma.mediaAsset.count({ where }),
       prisma.mediaAsset.findMany({
         where,
+        include: mediaClassificationInclude,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: limit + 1,
         ...(options?.cursor
@@ -103,7 +192,10 @@ export async function listMediaAssetsPage(
 }
 
 export async function getMediaAssetById(id: string) {
-  return prisma.mediaAsset.findUnique({ where: { id } });
+  return prisma.mediaAsset.findUnique({
+    where: { id },
+    include: mediaClassificationInclude,
+  });
 }
 
 export type UploadMediaInput = {
@@ -111,12 +203,19 @@ export type UploadMediaInput = {
   file: File;
   altText?: string;
   title?: string;
+  caption?: string;
+  description?: string;
   tags?: string[];
+  keywords?: string[];
   usageType?: MediaUsageType;
+  libraryId?: string;
+  roleId?: string;
+  visibility?: MediaVisibility;
+  contentLanguage?: string;
 };
 
 export type UploadMediaResult = {
-  asset: Awaited<ReturnType<typeof prisma.mediaAsset.create>>;
+  asset: MediaAssetWithClassification;
   warning?: string;
 };
 
@@ -131,8 +230,44 @@ function assertNotR2SourceFile(filename: string, mimeType: string, sizeBytes: nu
   }
 }
 
+async function resolveLibraryForWrite(
+  libraryId: string | null | undefined,
+  requireActive: boolean,
+): Promise<{ id: string; code: string } | null> {
+  if (!libraryId) return null;
+  const library = await prisma.mediaLibrary.findUnique({ where: { id: libraryId } });
+  if (!library) throw new Error("Thư viện ảnh không tồn tại");
+  if (requireActive && !library.isActive) throw new Error("Thư viện ảnh đã bị vô hiệu hóa");
+  return { id: library.id, code: library.code };
+}
+
+async function resolveRoleForWrite(
+  roleId: string | null | undefined,
+  requireActive: boolean,
+): Promise<{ id: string; code: string } | null> {
+  if (!roleId) return null;
+  const role = await prisma.mediaRole.findUnique({ where: { id: roleId } });
+  if (!role) throw new Error("Vai trò hiển thị không tồn tại");
+  if (requireActive && !role.isActive) throw new Error("Vai trò hiển thị đã bị vô hiệu hóa");
+  return { id: role.id, code: role.code };
+}
+
 export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadMediaResult> {
-  const { folder, file, altText, title, tags, usageType } = input;
+  const {
+    folder,
+    file,
+    altText,
+    title,
+    caption,
+    description,
+    tags,
+    keywords,
+    usageType,
+    libraryId,
+    roleId,
+    visibility,
+    contentLanguage,
+  } = input;
 
   assertNotR2SourceFile(file.name, file.type, file.size);
 
@@ -148,15 +283,33 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
   }
 
   const mimeType = validation.mimeType;
-  const warning = file.size > LARGE_IMAGE_WARNING_SIZE
-    ? `Ảnh này lớn hơn 500KB (${(file.size / 1024).toFixed(0)}KB), nên tối ưu trước khi upload để website tải nhanh hơn.`
-    : undefined;
+  const warning =
+    file.size > LARGE_IMAGE_WARNING_SIZE
+      ? `Ảnh này lớn hơn 500KB (${(file.size / 1024).toFixed(0)}KB), nên tối ưu trước khi upload để website tải nhanh hơn.`
+      : undefined;
+
+  const mediaFolder = STORAGE_FOLDER_TO_MEDIA[folder];
+  const mediaUsage = usageType ?? "GENERAL";
+
+  const library =
+    (await resolveLibraryForWrite(libraryId, true)) ??
+    { id: resolveDefaultLibraryIdFromLegacyFolder(mediaFolder), code: "PRODUCT" };
+  const role =
+    (await resolveRoleForWrite(roleId, true)) ??
+    { id: resolveDefaultRoleIdFromLegacyUsage(mediaUsage), code: "GENERAL" };
+
+  // Re-resolve codes for legacy sync when IDs came from defaults
+  const libraryRow = await prisma.mediaLibrary.findUnique({ where: { id: library.id } });
+  const roleRow = await prisma.mediaRole.findUnique({ where: { id: role.id } });
+  const libraryCode = libraryRow?.code ?? "GENERAL";
+  const roleCode = roleRow?.code ?? "GENERAL";
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const storage = requireCloudinaryStorageAdapter();
   const result = await storage.upload(folder, file.name, buffer, mimeType);
-
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const width = result.width ?? null;
+  const height = result.height ?? null;
 
   try {
     const asset = await prisma.mediaAsset.create({
@@ -171,14 +324,23 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
         mimeType,
         format: ext || null,
         sizeBytes: file.size,
-        width: result.width ?? null,
-        height: result.height ?? null,
-        folder: STORAGE_FOLDER_TO_MEDIA[folder],
-        usageType: usageType ?? "GENERAL",
-        altText: altText?.trim() || null,
-        title: title?.trim() || null,
-        tags: tags ?? [],
+        width,
+        height,
+        folder: libraryId ? resolveLegacyFolderFromLibraryCode(libraryCode) : mediaFolder,
+        usageType: roleId ? resolveLegacyUsageTypeFromRoleCode(roleCode) : mediaUsage,
+        libraryId: library.id,
+        roleId: role.id,
+        visibility: visibility ?? "PUBLIC",
+        altText: emptyToNull(altText),
+        title: emptyToNull(title),
+        caption: emptyToNull(caption),
+        description: emptyToNull(description),
+        tags: normalizeMediaTags(tags ?? []),
+        keywords: normalizeMediaKeywords(keywords ?? []),
+        orientation: deriveMediaOrientation(width, height),
+        contentLanguage: emptyToNull(contentLanguage),
       },
+      include: mediaClassificationInclude,
     });
     return { asset, warning };
   } catch (err) {
@@ -216,6 +378,8 @@ export async function uploadProductionFileAsset(input: {
   const storage = requireCloudinaryStorageAdapter();
   const result = await storage.upload("general", file.name, buffer, mimeType);
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const width = result.width ?? null;
+  const height = result.height ?? null;
 
   try {
     const asset = await prisma.mediaAsset.create({
@@ -230,13 +394,18 @@ export async function uploadProductionFileAsset(input: {
         mimeType,
         format: ext || null,
         sizeBytes: file.size,
-        width: result.width ?? null,
-        height: result.height ?? null,
+        width,
+        height,
         folder: "GENERAL",
         usageType: "GENERAL",
-        title: title?.trim() || null,
-        tags: tags ?? [],
+        libraryId: resolveDefaultLibraryIdFromLegacyFolder("GENERAL"),
+        roleId: resolveDefaultRoleIdFromLegacyUsage("GENERAL"),
+        visibility: "PUBLIC",
+        title: emptyToNull(title),
+        tags: normalizeMediaTags(tags ?? []),
+        orientation: deriveMediaOrientation(width, height),
       },
+      include: mediaClassificationInclude,
     });
     return { asset };
   } catch (err) {
@@ -245,33 +414,63 @@ export async function uploadProductionFileAsset(input: {
   }
 }
 
-export const VALID_MEDIA_STORAGE_FOLDERS = Object.keys(STORAGE_FOLDER_TO_MEDIA) as StorageFolderKey[];
-export const VALID_MEDIA_USAGE_TYPES: MediaUsageType[] = [
-  "PRODUCT",
-  "BLOG",
-  "KNOWLEDGE_BASE",
-  "GENERAL",
-];
-export const MEDIA_BULK_UPDATE_MAX = 100;
+/**
+ * Builds Prisma update data for metadata only.
+ * Never includes url, storageKey, publicId, filename, dimensions, mimeType, or sizeBytes.
+ */
+export async function buildMetadataUpdateData(
+  data: MediaMetadataUpdateInput,
+  options?: { requireActiveClassification?: boolean },
+): Promise<Prisma.MediaAssetUncheckedUpdateManyInput> {
+  const requireActive = options?.requireActiveClassification ?? true;
+  const updateData: Prisma.MediaAssetUncheckedUpdateManyInput = {};
 
-export type MediaMetadataUpdateInput = {
-  folder?: MediaFolder;
-  usageType?: MediaUsageType;
-  altText?: string | null;
-  title?: string | null;
-  tags?: string[];
-};
+  let folder = data.folder;
+  let usageType = data.usageType;
+  let libraryId = data.libraryId;
+  let roleId = data.roleId;
 
-export function normalizeMediaTags(tags: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const tag of tags) {
-    const trimmed = tag.trim();
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    result.push(trimmed);
+  if (libraryId !== undefined && libraryId !== null) {
+    const library = await resolveLibraryForWrite(libraryId, requireActive);
+    if (!library) throw new Error("Thư viện ảnh không tồn tại");
+    libraryId = library.id;
+    folder = resolveLegacyFolderFromLibraryCode(library.code);
+  } else if (libraryId === null) {
+    // explicit clear not supported for required-ish taxonomy; ignore
   }
-  return result;
+
+  if (roleId !== undefined && roleId !== null) {
+    const role = await resolveRoleForWrite(roleId, requireActive);
+    if (!role) throw new Error("Vai trò hiển thị không tồn tại");
+    roleId = role.id;
+    usageType = resolveLegacyUsageTypeFromRoleCode(role.code);
+  }
+
+  if (folder !== undefined && data.libraryId === undefined) {
+    libraryId = resolveDefaultLibraryIdFromLegacyFolder(folder);
+  }
+
+  if (usageType !== undefined && data.roleId === undefined) {
+    roleId = resolveDefaultRoleIdFromLegacyUsage(usageType);
+  }
+
+  if (folder !== undefined) updateData.folder = folder;
+  if (usageType !== undefined) updateData.usageType = usageType;
+  if (libraryId !== undefined && libraryId !== null) updateData.libraryId = libraryId;
+  if (roleId !== undefined && roleId !== null) updateData.roleId = roleId;
+  if (data.visibility !== undefined) updateData.visibility = data.visibility;
+  if (data.altText !== undefined) updateData.altText = emptyToNull(data.altText);
+  if (data.title !== undefined) updateData.title = emptyToNull(data.title);
+  if (data.caption !== undefined) updateData.caption = emptyToNull(data.caption);
+  if (data.description !== undefined) updateData.description = emptyToNull(data.description);
+  if (data.tags !== undefined) updateData.tags = normalizeMediaTags(data.tags);
+  if (data.keywords !== undefined) updateData.keywords = normalizeMediaKeywords(data.keywords);
+  if (data.aiTags !== undefined) updateData.aiTags = normalizeMediaTags(data.aiTags);
+  if (data.contentLanguage !== undefined) {
+    updateData.contentLanguage = emptyToNull(data.contentLanguage);
+  }
+
+  return updateData;
 }
 
 export function parseStorageFolderKey(value: unknown): StorageFolderKey | null {
@@ -286,30 +485,6 @@ export function parseMediaUsageType(value: unknown): MediaUsageType | null {
   return VALID_MEDIA_USAGE_TYPES.includes(value as MediaUsageType)
     ? (value as MediaUsageType)
     : null;
-}
-
-function buildMetadataUpdateData(data: MediaMetadataUpdateInput) {
-  const updateData: {
-    folder?: MediaFolder;
-    usageType?: MediaUsageType;
-    altText?: string | null;
-    title?: string | null;
-    tags?: string[];
-  } = {};
-
-  if (data.folder !== undefined) updateData.folder = data.folder;
-  if (data.usageType !== undefined) updateData.usageType = data.usageType;
-  if (data.altText !== undefined) {
-    updateData.altText = data.altText?.trim() ? data.altText.trim() : null;
-  }
-  if (data.title !== undefined) {
-    updateData.title = data.title?.trim() ? data.title.trim() : null;
-  }
-  if (data.tags !== undefined) {
-    updateData.tags = normalizeMediaTags(data.tags);
-  }
-
-  return updateData;
 }
 
 export function parseMediaMetadataPatchBody(
@@ -327,9 +502,32 @@ export function parseMediaMetadataPatchBody(
 
   if ("usageType" in raw) {
     hasUpdates = true;
-    const usageType = parseMediaUsageType(raw.usageType);
-    if (!usageType) return { ok: false, message: "Loại sử dụng ảnh không hợp lệ" };
-    data.usageType = usageType;
+    const usage = parseMediaUsageType(raw.usageType);
+    if (!usage) return { ok: false, message: "Loại sử dụng ảnh không hợp lệ" };
+    data.usageType = usage;
+  }
+
+  if ("libraryId" in raw) {
+    hasUpdates = true;
+    if (raw.libraryId !== null && typeof raw.libraryId !== "string") {
+      return { ok: false, message: "Thư viện ảnh không hợp lệ" };
+    }
+    data.libraryId = raw.libraryId as string | null;
+  }
+
+  if ("roleId" in raw) {
+    hasUpdates = true;
+    if (raw.roleId !== null && typeof raw.roleId !== "string") {
+      return { ok: false, message: "Vai trò hiển thị không hợp lệ" };
+    }
+    data.roleId = raw.roleId as string | null;
+  }
+
+  if ("visibility" in raw) {
+    hasUpdates = true;
+    const visibility = validateMediaVisibility(raw.visibility);
+    if (!visibility) return { ok: false, message: "Mức độ hiển thị không hợp lệ" };
+    data.visibility = visibility;
   }
 
   if ("altText" in raw) {
@@ -348,12 +546,58 @@ export function parseMediaMetadataPatchBody(
     data.title = raw.title as string | null;
   }
 
+  if ("caption" in raw) {
+    hasUpdates = true;
+    if (raw.caption !== null && typeof raw.caption !== "string") {
+      return { ok: false, message: "Chú thích không hợp lệ" };
+    }
+    data.caption = raw.caption as string | null;
+  }
+
+  if ("description" in raw) {
+    hasUpdates = true;
+    if (raw.description !== null && typeof raw.description !== "string") {
+      return { ok: false, message: "Mô tả không hợp lệ" };
+    }
+    data.description = raw.description as string | null;
+  }
+
   if ("tags" in raw) {
     hasUpdates = true;
     if (!Array.isArray(raw.tags) || !raw.tags.every((tag) => typeof tag === "string")) {
       return { ok: false, message: "Tags không hợp lệ" };
     }
     data.tags = raw.tags;
+  }
+
+  if ("keywords" in raw) {
+    hasUpdates = true;
+    if (!Array.isArray(raw.keywords) || !raw.keywords.every((k) => typeof k === "string")) {
+      return { ok: false, message: "Từ khóa SEO không hợp lệ" };
+    }
+    data.keywords = raw.keywords;
+  }
+
+  if ("aiTags" in raw) {
+    hasUpdates = true;
+    if (!Array.isArray(raw.aiTags) || !raw.aiTags.every((t) => typeof t === "string")) {
+      return { ok: false, message: "AI tags không hợp lệ" };
+    }
+    data.aiTags = raw.aiTags;
+  }
+
+  if ("contentLanguage" in raw) {
+    hasUpdates = true;
+    if (raw.contentLanguage !== null && typeof raw.contentLanguage !== "string") {
+      return { ok: false, message: "Ngôn ngữ nội dung không hợp lệ" };
+    }
+    data.contentLanguage = raw.contentLanguage as string | null;
+  }
+
+  if ("orientation" in raw) {
+    // orientation is derived from dimensions; reject manual override attempts in metadata patch
+    const orientation = validateMediaOrientation(raw.orientation);
+    if (!orientation) return { ok: false, message: "Hướng ảnh không hợp lệ" };
   }
 
   return { ok: true, data, hasUpdates };
@@ -363,17 +607,20 @@ export async function updateMediaAsset(id: string, data: MediaMetadataUpdateInpu
   const existing = await prisma.mediaAsset.findUnique({ where: { id } });
   if (!existing) return null;
 
+  const updateData = await buildMetadataUpdateData(data);
   return prisma.mediaAsset.update({
     where: { id },
-    data: buildMetadataUpdateData(data),
+    data: updateData,
+    include: mediaClassificationInclude,
   });
 }
 
 export async function bulkUpdateMediaAssets(ids: string[], data: MediaMetadataUpdateInput) {
   const uniqueIds = [...new Set(ids)];
+  const updateData = await buildMetadataUpdateData(data);
   const result = await prisma.mediaAsset.updateMany({
     where: { id: { in: uniqueIds } },
-    data: buildMetadataUpdateData(data),
+    data: updateData,
   });
   return result.count;
 }

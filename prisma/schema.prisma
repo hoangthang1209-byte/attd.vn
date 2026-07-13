@@ -848,6 +848,51 @@ enum MediaStorageProvider {
   CLOUDFLARE_R2
 }
 
+enum MediaVisibility {
+  PUBLIC
+  INTERNAL
+  PRIVATE
+}
+
+enum MediaOrientation {
+  SQUARE
+  LANDSCAPE
+  PORTRAIT
+  UNKNOWN
+}
+
+/// Manageable content-domain grouping for media assets (DAM Library).
+model MediaLibrary {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  description String?
+  sortOrder   Int          @default(0)
+  isActive    Boolean      @default(true)
+  isSystem    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  assets      MediaAsset[]
+
+  @@index([isActive, sortOrder])
+}
+
+/// Manageable display-role taxonomy for media assets (DAM Role).
+model MediaRole {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  description String?
+  sortOrder   Int          @default(0)
+  isActive    Boolean      @default(true)
+  isSystem    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  assets      MediaAsset[]
+
+  @@index([isActive, sortOrder])
+}
+
 model MediaAsset {
   id                       String                    @id @default(cuid())
   filename                 String
@@ -862,15 +907,29 @@ model MediaAsset {
   sizeBytes                Int
   width                    Int?
   height                   Int?
+  /// Legacy compatibility metadata. Prefer libraryId for new Media Library code.
   folder                   MediaFolder
+  /// Legacy compatibility metadata. Prefer roleId for new Media Library code.
   usageType                MediaUsageType            @default(GENERAL)
+  libraryId                String?
+  roleId                   String?
+  visibility               MediaVisibility           @default(PUBLIC)
   altText                  String?
   title                    String?
+  caption                  String?
+  description              String?                   @db.Text
   tags                     String[]                  @default([])
+  keywords                 String[]                  @default([])
+  aiTags                   String[]                  @default([])
+  dominantColor            String?
+  orientation              MediaOrientation          @default(UNKNOWN)
+  contentLanguage          String?
   uploadedBy               String?
   metadata                 Json?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
+  library                  MediaLibrary?             @relation(fields: [libraryId], references: [id], onDelete: SetNull)
+  role                     MediaRole?                @relation(fields: [roleId], references: [id], onDelete: SetNull)
   quoteItems               QuoteItem[]
   orderItems               OrderItem[]
   salesRepresentatives     SalesRepresentative[]
@@ -884,6 +943,10 @@ model MediaAsset {
   @@index([folder])
   @@index([filename])
   @@index([usageType])
+  @@index([libraryId])
+  @@index([roleId])
+  @@index([visibility])
+  @@index([orientation])
 }
 
 enum ManufacturingAssetStatus {

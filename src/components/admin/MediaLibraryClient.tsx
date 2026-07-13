@@ -1,41 +1,37 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MediaAsset, MediaUsageType } from "@prisma/client";
+import type { MediaOrientation, MediaVisibility } from "@prisma/client";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
-import { MEDIA_TO_STORAGE_FOLDER, type StorageFolderKey } from "@/lib/storage/types";
 import {
   ALLOWED_IMAGE_EXTENSIONS,
   inferImageMimeType,
 } from "@/lib/imageValidation";
+import { MEDIA_TO_STORAGE_FOLDER } from "@/lib/storage/types";
+import { resolveLegacyFolderFromLibraryCode } from "@/features/media/media-classification";
 import { CardGridLoading, InlineLoading } from "@/components/ui/loading/ContextLoading";
+import type { MediaMasterDataRecord } from "@/features/media/media-master-data.types";
+import type { MediaAssetWithClassification } from "@/features/media/services/media.service";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const WARN_FILE_SIZE = 500 * 1024;
 const MAX_BATCH = 50;
 const BULK_MAX = 100;
 
-const FOLDERS = [
-  { value: "", label: "Tất cả" },
-  { value: "products", label: "Sản phẩm" },
-  { value: "blog", label: "Bài viết" },
-  { value: "general", label: "Chung" },
-  { value: "clients", label: "Khách hàng" },
-  { value: "branding", label: "Thương hiệu" },
-  { value: "categories", label: "Danh mục" },
-  { value: "case-studies", label: "Dự án" },
+const VISIBILITY_OPTIONS: { value: MediaVisibility | ""; label: string }[] = [
+  { value: "", label: "Tất cả mức hiển thị" },
+  { value: "PUBLIC", label: "Công khai" },
+  { value: "INTERNAL", label: "Nội bộ" },
+  { value: "PRIVATE", label: "Riêng tư" },
 ];
 
-const USAGE_TYPES: { value: string; label: string }[] = [
-  { value: "", label: "Tất cả loại" },
-  { value: "PRODUCT", label: "Sản phẩm" },
-  { value: "BLOG", label: "Bài viết" },
-  { value: "KNOWLEDGE_BASE", label: "Knowledge Base" },
-  { value: "GENERAL", label: "Chung" },
+const ORIENTATION_OPTIONS: { value: MediaOrientation | ""; label: string }[] = [
+  { value: "", label: "Tất cả hướng" },
+  { value: "LANDSCAPE", label: "Ngang" },
+  { value: "PORTRAIT", label: "Dọc" },
+  { value: "SQUARE", label: "Vuông" },
+  { value: "UNKNOWN", label: "Chưa xác định" },
 ];
-
-const EDIT_FOLDERS = FOLDERS.filter((f) => f.value);
-const EDIT_USAGE_TYPES = USAGE_TYPES.filter((u) => u.value);
 
 type UploadFile = {
   file: File;
@@ -43,26 +39,63 @@ type UploadFile = {
   status: "pending" | "uploading" | "done" | "error" | "warn";
   warning?: string;
   error?: string;
-  result?: MediaAsset;
+  result?: MediaAssetWithClassification;
 };
 
 type EditingAsset = {
   id: string;
-  folder: StorageFolderKey;
-  usageType: MediaUsageType;
+  libraryId: string;
+  roleId: string;
+  visibility: MediaVisibility;
   altText: string;
   title: string;
+  caption: string;
+  description: string;
   tags: string;
+  keywords: string;
+  contentLanguage: string;
 };
+
+type ClassificationOption = MediaMasterDataRecord;
+
+function mergeOptions(
+  active: ClassificationOption[],
+  current?: { id: string; code: string; name: string; isActive: boolean } | null,
+): ClassificationOption[] {
+  if (!current) return active;
+  if (active.some((item) => item.id === current.id)) return active;
+  return [
+    {
+      id: current.id,
+      code: current.code,
+      name: `${current.name}${current.isActive ? "" : " (đã vô hiệu)"}`,
+      description: null,
+      sortOrder: 0,
+      isActive: current.isActive,
+      isSystem: false,
+      createdAt: "",
+      updatedAt: "",
+    },
+    ...active,
+  ];
+}
 
 export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boolean }) {
   const toast = useAdminToast();
-  const [assets, setAssets] = useState<MediaAsset[]>([]);
-  const [folder, setFolder] = useState("");
-  const [usageType, setUsageType] = useState("");
+  const [assets, setAssets] = useState<MediaAssetWithClassification[]>([]);
+  const [libraries, setLibraries] = useState<ClassificationOption[]>([]);
+  const [roles, setRoles] = useState<ClassificationOption[]>([]);
+  const [libraryId, setLibraryId] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const [visibility, setVisibility] = useState<MediaVisibility | "">("");
+  const [orientation, setOrientation] = useState<MediaOrientation | "">("");
+  const [hasAltText, setHasAltText] = useState<"" | "true" | "false">("");
   const [search, setSearch] = useState("");
-  const [uploadFolder, setUploadFolder] = useState("products");
-  const [uploadUsageType, setUploadUsageType] = useState<MediaUsageType>("PRODUCT");
+  const [uploadLibraryId, setUploadLibraryId] = useState("");
+  const [uploadRoleId, setUploadRoleId] = useState("");
+  const [uploadVisibility, setUploadVisibility] = useState<MediaVisibility>("PUBLIC");
+  const [uploadTags, setUploadTags] = useState("");
+  const [uploadKeywords, setUploadKeywords] = useState("");
   const [loading, setLoading] = useState(true);
   const [uploadQueue, setUploadQueue] = useState<UploadFile[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -70,36 +103,70 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const [editing, setEditing] = useState<EditingAsset | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editLibraryOptions, setEditLibraryOptions] = useState<ClassificationOption[]>([]);
+  const [editRoleOptions, setEditRoleOptions] = useState<ClassificationOption[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkFolder, setBulkFolder] = useState<StorageFolderKey>("products");
-  const [bulkUsageType, setBulkUsageType] = useState<MediaUsageType>("PRODUCT");
+  const [bulkLibraryId, setBulkLibraryId] = useState("");
+  const [bulkRoleId, setBulkRoleId] = useState("");
+  const [bulkVisibility, setBulkVisibility] = useState<MediaVisibility>("PUBLIC");
   const [bulkTags, setBulkTags] = useState("");
-  const [bulkUpdateFolder, setBulkUpdateFolder] = useState(false);
-  const [bulkUpdateUsageType, setBulkUpdateUsageType] = useState(false);
+  const [bulkKeywords, setBulkKeywords] = useState("");
+  const [bulkUpdateLibrary, setBulkUpdateLibrary] = useState(false);
+  const [bulkUpdateRole, setBulkUpdateRole] = useState(false);
+  const [bulkUpdateVisibility, setBulkUpdateVisibility] = useState(false);
   const [bulkUpdateTags, setBulkUpdateTags] = useState(false);
+  const [bulkUpdateKeywords, setBulkUpdateKeywords] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
+  const loadTaxonomy = useCallback(async () => {
+    try {
+      const [libRes, roleRes] = await Promise.all([
+        fetch("/api/content/media-libraries?activeOnly=1"),
+        fetch("/api/content/media-roles?activeOnly=1"),
+      ]);
+      const libData = (await libRes.json()) as { libraries?: ClassificationOption[] };
+      const roleData = (await roleRes.json()) as { roles?: ClassificationOption[] };
+      const nextLibraries = libData.libraries ?? [];
+      const nextRoles = roleData.roles ?? [];
+      setLibraries(nextLibraries);
+      setRoles(nextRoles);
+      setUploadLibraryId((prev) => prev || nextLibraries.find((l) => l.code === "PRODUCT")?.id || nextLibraries[0]?.id || "");
+      setUploadRoleId((prev) => prev || nextRoles.find((r) => r.code === "GENERAL")?.id || nextRoles[0]?.id || "");
+    } catch {
+      /* ignore taxonomy load errors */
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (folder) params.set("folder", folder);
-      if (usageType) params.set("usageType", usageType);
+      if (libraryId) params.set("libraryId", libraryId);
+      if (roleId) params.set("roleId", roleId);
+      if (visibility) params.set("visibility", visibility);
+      if (orientation) params.set("orientation", orientation);
+      if (hasAltText) params.set("hasAltText", hasAltText);
       if (search.trim()) params.set("search", search.trim());
       const res = await fetch(`/api/media?${params.toString()}`);
-      const data = await res.json() as MediaAsset[] | { message?: string };
+      const data = (await res.json()) as MediaAssetWithClassification[] | { message?: string };
       setAssets(Array.isArray(data) ? data : []);
     } catch {
       setAssets([]);
     }
     setLoading(false);
-  }, [folder, usageType, search]);
+  }, [libraryId, roleId, visibility, orientation, hasAltText, search]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void loadTaxonomy();
+  }, [loadTaxonomy]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -112,8 +179,15 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   function validateFile(file: File): { ok: boolean; error?: string; warning?: string } {
     const mimeType = inferImageMimeType(file.name, file.type);
     if (!mimeType) return { ok: false, error: "Định dạng không hỗ trợ. Chỉ hỗ trợ JPG, PNG, WebP." };
-    if (file.size > MAX_FILE_SIZE) return { ok: false, error: `Dung lượng tối đa 2MB/ảnh (${(file.size / 1024 / 1024).toFixed(1)}MB).` };
-    if (file.size > WARN_FILE_SIZE) return { ok: true, warning: `Ảnh này lớn hơn 500KB (${(file.size / 1024).toFixed(0)}KB). Khuyến nghị 200–300KB để website tải nhanh.` };
+    if (file.size > MAX_FILE_SIZE) {
+      return { ok: false, error: `Dung lượng tối đa 2MB/ảnh (${(file.size / 1024 / 1024).toFixed(1)}MB).` };
+    }
+    if (file.size > WARN_FILE_SIZE) {
+      return {
+        ok: true,
+        warning: `Ảnh này lớn hơn 500KB (${(file.size / 1024).toFixed(0)}KB). Khuyến nghị 200–300KB để website tải nhanh.`,
+      };
+    }
     return { ok: true };
   }
 
@@ -137,31 +211,61 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     if (!toUpload.length) return;
 
     for (const item of toUpload) {
-      setUploadQueue((q) => q.map((u) => u.id === item.id ? { ...u, status: "uploading" } : u));
+      setUploadQueue((q) => q.map((u) => (u.id === item.id ? { ...u, status: "uploading" } : u)));
       const fd = new FormData();
       fd.append("file", item.file);
-      fd.append("folder", uploadFolder);
-      fd.append("usageType", uploadUsageType);
+      const uploadLibrary = libraries.find((l) => l.id === uploadLibraryId);
+      const storageFolder = uploadLibrary
+        ? MEDIA_TO_STORAGE_FOLDER[resolveLegacyFolderFromLibraryCode(uploadLibrary.code)]
+        : "products";
+      fd.append("folder", storageFolder);
+      if (uploadLibraryId) fd.append("libraryId", uploadLibraryId);
+      if (uploadRoleId) fd.append("roleId", uploadRoleId);
+      fd.append("visibility", uploadVisibility);
+      if (uploadTags.trim()) fd.append("tags", uploadTags);
+      if (uploadKeywords.trim()) fd.append("keywords", uploadKeywords);
       try {
         const res = await fetch("/api/media", { method: "POST", body: fd });
-        const data = await res.json() as { message?: string; warning?: string } & MediaAsset;
+        const data = (await res.json()) as { message?: string; warning?: string } & MediaAssetWithClassification;
         if (!res.ok) {
-          setUploadQueue((q) => q.map((u) => u.id === item.id ? { ...u, status: "error", error: data.message ?? "Upload thất bại" } : u));
+          setUploadQueue((q) =>
+            q.map((u) =>
+              u.id === item.id ? { ...u, status: "error", error: data.message ?? "Upload thất bại" } : u,
+            ),
+          );
         } else {
-          setUploadQueue((q) => q.map((u) => u.id === item.id ? { ...u, status: "done", result: data, warning: data.warning ?? u.warning } : u));
+          setUploadQueue((q) =>
+            q.map((u) =>
+              u.id === item.id
+                ? { ...u, status: "done", result: data, warning: data.warning ?? u.warning }
+                : u,
+            ),
+          );
         }
       } catch {
-        setUploadQueue((q) => q.map((u) => u.id === item.id ? { ...u, status: "error", error: "Lỗi kết nối" } : u));
+        setUploadQueue((q) =>
+          q.map((u) => (u.id === item.id ? { ...u, status: "error", error: "Lỗi kết nối" } : u)),
+        );
       }
     }
     await load();
   }
 
-  function clearQueue() { setUploadQueue([]); if (fileRef.current) fileRef.current.value = ""; }
-  function removeFromQueue(id: string) { setUploadQueue((q) => q.filter((u) => u.id !== id)); }
+  function clearQueue() {
+    setUploadQueue([]);
+    if (fileRef.current) fileRef.current.value = "";
+  }
+  function removeFromQueue(id: string) {
+    setUploadQueue((q) => q.filter((u) => u.id !== id));
+  }
 
-  function onDragOver(e: React.DragEvent) { e.preventDefault(); setDragging(true); }
-  function onDragLeave() { setDragging(false); }
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(true);
+  }
+  function onDragLeave() {
+    setDragging(false);
+  }
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
@@ -174,7 +278,9 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       await navigator.clipboard.writeText(url);
       setCopied(id);
       setTimeout(() => setCopied(null), 2000);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   async function handleDelete(id: string, filename: string) {
@@ -183,15 +289,22 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     if (res.ok) await load();
   }
 
-  function openEdit(asset: MediaAsset) {
+  function openEdit(asset: MediaAssetWithClassification) {
     setEditError(null);
+    setEditLibraryOptions(mergeOptions(libraries, asset.library));
+    setEditRoleOptions(mergeOptions(roles, asset.role));
     setEditing({
       id: asset.id,
-      folder: MEDIA_TO_STORAGE_FOLDER[asset.folder],
-      usageType: asset.usageType,
+      libraryId: asset.libraryId ?? "",
+      roleId: asset.roleId ?? "",
+      visibility: asset.visibility,
       altText: asset.altText ?? "",
       title: asset.title ?? "",
+      caption: asset.caption ?? "",
+      description: asset.description ?? "",
       tags: (asset.tags ?? []).join(", "),
+      keywords: (asset.keywords ?? []).join(", "),
+      contentLanguage: asset.contentLanguage ?? "",
     });
   }
 
@@ -204,14 +317,19 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          folder: editing.folder,
-          usageType: editing.usageType,
+          libraryId: editing.libraryId || undefined,
+          roleId: editing.roleId || undefined,
+          visibility: editing.visibility,
           altText: editing.altText,
           title: editing.title,
+          caption: editing.caption,
+          description: editing.description,
           tags: editing.tags.split(",").map((t) => t.trim()).filter(Boolean),
+          keywords: editing.keywords.split(",").map((t) => t.trim()).filter(Boolean),
+          contentLanguage: editing.contentLanguage || null,
         }),
       });
-      const data = await res.json() as { message?: string };
+      const data = (await res.json()) as { message?: string };
       if (!res.ok) {
         setEditError(data.message ?? "Không thể cập nhật metadata ảnh");
         return;
@@ -245,29 +363,41 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
 
   function openBulkEdit() {
     setBulkError(null);
-    setBulkUpdateFolder(false);
-    setBulkUpdateUsageType(false);
+    setBulkUpdateLibrary(false);
+    setBulkUpdateRole(false);
+    setBulkUpdateVisibility(false);
     setBulkUpdateTags(false);
-    setBulkFolder("products");
-    setBulkUsageType("PRODUCT");
+    setBulkUpdateKeywords(false);
+    setBulkLibraryId(libraries[0]?.id ?? "");
+    setBulkRoleId(roles[0]?.id ?? "");
+    setBulkVisibility("PUBLIC");
     setBulkTags("");
+    setBulkKeywords("");
     setBulkOpen(true);
   }
 
   async function saveBulkEdit() {
     if (bulkSaving || selectedIds.size === 0) return;
-    if (!bulkUpdateFolder && !bulkUpdateUsageType && !bulkUpdateTags) {
+    if (
+      !bulkUpdateLibrary &&
+      !bulkUpdateRole &&
+      !bulkUpdateVisibility &&
+      !bulkUpdateTags &&
+      !bulkUpdateKeywords
+    ) {
       setBulkError("Chọn ít nhất một trường để cập nhật");
       return;
     }
 
-    const payload: Record<string, unknown> = {
-      ids: [...selectedIds],
-    };
-    if (bulkUpdateFolder) payload.folder = bulkFolder;
-    if (bulkUpdateUsageType) payload.usageType = bulkUsageType;
+    const payload: Record<string, unknown> = { ids: [...selectedIds] };
+    if (bulkUpdateLibrary) payload.libraryId = bulkLibraryId;
+    if (bulkUpdateRole) payload.roleId = bulkRoleId;
+    if (bulkUpdateVisibility) payload.visibility = bulkVisibility;
     if (bulkUpdateTags) {
       payload.tags = bulkTags.split(",").map((t) => t.trim()).filter(Boolean);
+    }
+    if (bulkUpdateKeywords) {
+      payload.keywords = bulkKeywords.split(",").map((t) => t.trim()).filter(Boolean);
     }
 
     setBulkSaving(true);
@@ -278,7 +408,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json() as { message?: string; updatedCount?: number };
+      const data = (await res.json()) as { message?: string; updatedCount?: number };
       if (!res.ok) {
         setBulkError(data.message ?? "Không thể cập nhật hàng loạt");
         return;
@@ -304,7 +434,6 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     <div className="admin-media-page">
       <div className="admin-catalog-fieldset">
         <h3 className="admin-subtitle">Tải ảnh lên</h3>
-
         <div
           ref={dropRef}
           className={`admin-media-dropzone ${dragging ? "is-dragging" : ""}`}
@@ -316,8 +445,9 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
           <div className="admin-media-dropzone-inner">
             <span className="admin-media-dropzone-icon">🖼</span>
             <strong>Kéo thả ảnh vào đây</strong>
-            <span className="admin-field-hint">hoặc click để chọn ảnh (JPG, PNG, WebP · max 2MB · tối đa 50 ảnh)</span>
-            <span className="admin-field-hint">Khuyến nghị 200–300KB/ảnh để website tải nhanh</span>
+            <span className="admin-field-hint">
+              hoặc click để chọn ảnh (JPG, PNG, WebP · max 2MB · tối đa 50 ảnh)
+            </span>
           </div>
           <input
             ref={fileRef}
@@ -334,23 +464,67 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
 
         {hasQueue && (
           <div className="admin-media-queue">
-            <div className="admin-media-queue-header">
-              <span className="admin-field-hint">{uploadQueue.length} ảnh đã chọn · {pendingCount} sẵn sàng upload</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div className="admin-field" style={{ margin: 0 }}>
-                  <select className="admin-input admin-input--sm" value={uploadFolder} onChange={(e) => setUploadFolder(e.target.value)}>
-                    {EDIT_FOLDERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-                  </select>
-                </div>
-                <div className="admin-field" style={{ margin: 0 }}>
-                  <select className="admin-input admin-input--sm" value={uploadUsageType} onChange={(e) => setUploadUsageType(e.target.value as MediaUsageType)}>
-                    {EDIT_USAGE_TYPES.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
-                  </select>
-                </div>
-                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void uploadAll()} disabled={!pendingCount || !cmsReady}>
+            <div className="admin-media-queue-header" style={{ flexWrap: "wrap" }}>
+              <span className="admin-field-hint">
+                {uploadQueue.length} ảnh đã chọn · {pendingCount} sẵn sàng upload
+              </span>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <select
+                  className="admin-input admin-input--sm"
+                  value={uploadLibraryId}
+                  onChange={(e) => setUploadLibraryId(e.target.value)}
+                >
+                  {libraries.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="admin-input admin-input--sm"
+                  value={uploadRoleId}
+                  onChange={(e) => setUploadRoleId(e.target.value)}
+                >
+                  {roles.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="admin-input admin-input--sm"
+                  value={uploadVisibility}
+                  onChange={(e) => setUploadVisibility(e.target.value as MediaVisibility)}
+                >
+                  {VISIBILITY_OPTIONS.filter((v) => v.value).map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="admin-input admin-input--sm"
+                  placeholder="Tags"
+                  value={uploadTags}
+                  onChange={(e) => setUploadTags(e.target.value)}
+                />
+                <input
+                  className="admin-input admin-input--sm"
+                  placeholder="Từ khóa SEO"
+                  value={uploadKeywords}
+                  onChange={(e) => setUploadKeywords(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--primary"
+                  onClick={() => void uploadAll()}
+                  disabled={!pendingCount || !cmsReady}
+                >
                   Tải lên {pendingCount > 0 ? `(${pendingCount})` : ""}
                 </button>
-                <button type="button" className="admin-btn admin-btn--secondary" onClick={clearQueue}>Xóa danh sách</button>
+                <button type="button" className="admin-btn admin-btn--secondary" onClick={clearQueue}>
+                  Xóa danh sách
+                </button>
               </div>
             </div>
             <div className="admin-media-queue-list">
@@ -366,7 +540,13 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                     {item.status === "error" && `❌ ${item.error}`}
                   </span>
                   {(item.status === "pending" || item.status === "warn" || item.status === "error") && (
-                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => removeFromQueue(item.id)}>✕</button>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      onClick={() => removeFromQueue(item.id)}
+                    >
+                      ✕
+                    </button>
                   )}
                 </div>
               ))}
@@ -375,21 +555,66 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         )}
       </div>
 
-      <div className="admin-catalog-filters">
+      <div className="admin-catalog-filters" style={{ flexWrap: "wrap" }}>
         <input
           className="admin-input"
-          placeholder="Tìm tên ảnh, tiêu đề…"
+          placeholder="Tìm tên ảnh, tiêu đề, alt…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") void load(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void load();
+          }}
         />
-        <select className="admin-input" value={folder} onChange={(e) => setFolder(e.target.value)}>
-          {FOLDERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+        <select className="admin-input" value={libraryId} onChange={(e) => setLibraryId(e.target.value)}>
+          <option value="">Tất cả thư viện</option>
+          {libraries.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
         </select>
-        <select className="admin-input" value={usageType} onChange={(e) => setUsageType(e.target.value)}>
-          {USAGE_TYPES.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+        <select className="admin-input" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
+          <option value="">Tất cả vai trò</option>
+          {roles.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
         </select>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>Lọc</button>
+        <select
+          className="admin-input"
+          value={visibility}
+          onChange={(e) => setVisibility(e.target.value as MediaVisibility | "")}
+        >
+          {VISIBILITY_OPTIONS.map((item) => (
+            <option key={item.value || "all"} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="admin-input"
+          value={orientation}
+          onChange={(e) => setOrientation(e.target.value as MediaOrientation | "")}
+        >
+          {ORIENTATION_OPTIONS.map((item) => (
+            <option key={item.value || "all"} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="admin-input"
+          value={hasAltText}
+          onChange={(e) => setHasAltText(e.target.value as "" | "true" | "false")}
+        >
+          <option value="">Alt text: tất cả</option>
+          <option value="true">Có alt text</option>
+          <option value="false">Thiếu alt text</option>
+        </select>
+        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
+          Lọc
+        </button>
         <span className="admin-field-hint">{assets.length} ảnh</span>
         {assets.length > 0 && (
           <>
@@ -428,8 +653,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         <CardGridLoading title="Đang tải thư viện ảnh…" tone="admin" cards={8} />
       ) : assets.length === 0 ? (
         <div className="admin-empty-state">
-          <p>Chưa có ảnh trong thư mục này.</p>
-          <p className="admin-field-hint">Kéo thả ảnh hoặc click vào vùng upload phía trên.</p>
+          <p>Chưa có ảnh trong bộ lọc này.</p>
         </div>
       ) : (
         <div className="admin-media-grid">
@@ -443,7 +667,14 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
               >
                 <label
                   className="admin-field-hint"
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px 0", margin: 0, cursor: "pointer" }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 8px 0",
+                    margin: 0,
+                    cursor: "pointer",
+                  }}
                 >
                   <input
                     type="checkbox"
@@ -461,15 +692,19 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                   />
                 </div>
                 <div className="admin-media-meta">
-                  <p className="admin-media-filename" title={asset.filename}>{asset.filename}</p>
-                  <p className="admin-field-hint">
-                    {MEDIA_TO_STORAGE_FOLDER[asset.folder]} · {asset.usageType} · {(asset.sizeBytes / 1024).toFixed(0)}KB
+                  <p className="admin-media-filename" title={asset.filename}>
+                    {asset.filename}
                   </p>
-                  {asset.title && (
-                    <p className="admin-field-hint" style={{ fontStyle: "italic" }}>
-                      {asset.title}
-                    </p>
-                  )}
+                  <p className="admin-field-hint" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {asset.library && (
+                      <span className="admin-badge">{asset.library.name}</span>
+                    )}
+                    {asset.role && <span className="admin-badge">{asset.role.name}</span>}
+                    <span className="admin-badge">{asset.orientation}</span>
+                    {asset.visibility !== "PUBLIC" && (
+                      <span className="admin-badge">{asset.visibility}</span>
+                    )}
+                  </p>
                   <div className="admin-media-actions">
                     <button
                       type="button"
@@ -506,28 +741,53 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="admin-subtitle">Chỉnh sửa ảnh</h3>
             <p className="admin-field-hint">
-              Việc thay đổi phân loại chỉ cập nhật metadata, không thay đổi URL hoặc file đã tải lên.
+              Thay đổi metadata không làm thay đổi URL hoặc file đã tải lên.
             </p>
             <div className="admin-field">
-              <label className="admin-label">Phân loại thư mục</label>
+              <label className="admin-label">Thư viện</label>
               <select
                 className="admin-input"
-                value={editing.folder}
-                onChange={(e) => setEditing({ ...editing, folder: e.target.value as StorageFolderKey })}
+                value={editing.libraryId}
+                onChange={(e) => setEditing({ ...editing, libraryId: e.target.value })}
                 disabled={editSaving}
               >
-                {EDIT_FOLDERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                {editLibraryOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="admin-field">
-              <label className="admin-label">Loại sử dụng</label>
+              <label className="admin-label">Vai trò hiển thị</label>
               <select
                 className="admin-input"
-                value={editing.usageType}
-                onChange={(e) => setEditing({ ...editing, usageType: e.target.value as MediaUsageType })}
+                value={editing.roleId}
+                onChange={(e) => setEditing({ ...editing, roleId: e.target.value })}
                 disabled={editSaving}
               >
-                {EDIT_USAGE_TYPES.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                {editRoleOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Mức độ hiển thị</label>
+              <select
+                className="admin-input"
+                value={editing.visibility}
+                onChange={(e) =>
+                  setEditing({ ...editing, visibility: e.target.value as MediaVisibility })
+                }
+                disabled={editSaving}
+              >
+                {VISIBILITY_OPTIONS.filter((v) => v.value).map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="admin-field">
@@ -549,11 +809,49 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
               />
             </div>
             <div className="admin-field">
-              <label className="admin-label">Tags (cách nhau bởi dấu phẩy)</label>
+              <label className="admin-label">Chú thích</label>
+              <input
+                className="admin-input"
+                value={editing.caption}
+                onChange={(e) => setEditing({ ...editing, caption: e.target.value })}
+                disabled={editSaving}
+              />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Mô tả</label>
+              <textarea
+                className="admin-input"
+                rows={3}
+                value={editing.description}
+                onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                disabled={editSaving}
+              />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Tags</label>
               <input
                 className="admin-input"
                 value={editing.tags}
                 onChange={(e) => setEditing({ ...editing, tags: e.target.value })}
+                disabled={editSaving}
+              />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Từ khóa SEO</label>
+              <input
+                className="admin-input"
+                value={editing.keywords}
+                onChange={(e) => setEditing({ ...editing, keywords: e.target.value })}
+                disabled={editSaving}
+              />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Ngôn ngữ nội dung</label>
+              <input
+                className="admin-input"
+                value={editing.contentLanguage}
+                onChange={(e) => setEditing({ ...editing, contentLanguage: e.target.value })}
+                placeholder="vi"
                 disabled={editSaving}
               />
             </div>
@@ -591,51 +889,81 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
             <p className="admin-field-hint">
               Chỉ các trường được bật bên dưới mới được cập nhật. URL và file vật lý không thay đổi.
             </p>
-
             <div className="admin-field">
               <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input
                   type="checkbox"
-                  checked={bulkUpdateFolder}
-                  onChange={(e) => setBulkUpdateFolder(e.target.checked)}
+                  checked={bulkUpdateLibrary}
+                  onChange={(e) => setBulkUpdateLibrary(e.target.checked)}
                   disabled={bulkSaving}
                 />
-                Cập nhật phân loại thư mục
+                Cập nhật thư viện
               </label>
-              {bulkUpdateFolder && (
+              {bulkUpdateLibrary && (
                 <select
                   className="admin-input"
-                  value={bulkFolder}
-                  onChange={(e) => setBulkFolder(e.target.value as StorageFolderKey)}
+                  value={bulkLibraryId}
+                  onChange={(e) => setBulkLibraryId(e.target.value)}
                   disabled={bulkSaving}
                 >
-                  {EDIT_FOLDERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                  {libraries.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
                 </select>
               )}
             </div>
-
             <div className="admin-field">
               <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input
                   type="checkbox"
-                  checked={bulkUpdateUsageType}
-                  onChange={(e) => setBulkUpdateUsageType(e.target.checked)}
+                  checked={bulkUpdateRole}
+                  onChange={(e) => setBulkUpdateRole(e.target.checked)}
                   disabled={bulkSaving}
                 />
-                Cập nhật loại sử dụng
+                Cập nhật vai trò hiển thị
               </label>
-              {bulkUpdateUsageType && (
+              {bulkUpdateRole && (
                 <select
                   className="admin-input"
-                  value={bulkUsageType}
-                  onChange={(e) => setBulkUsageType(e.target.value as MediaUsageType)}
+                  value={bulkRoleId}
+                  onChange={(e) => setBulkRoleId(e.target.value)}
                   disabled={bulkSaving}
                 >
-                  {EDIT_USAGE_TYPES.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                  {roles.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
                 </select>
               )}
             </div>
-
+            <div className="admin-field">
+              <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateVisibility}
+                  onChange={(e) => setBulkUpdateVisibility(e.target.checked)}
+                  disabled={bulkSaving}
+                />
+                Cập nhật mức độ hiển thị
+              </label>
+              {bulkUpdateVisibility && (
+                <select
+                  className="admin-input"
+                  value={bulkVisibility}
+                  onChange={(e) => setBulkVisibility(e.target.value as MediaVisibility)}
+                  disabled={bulkSaving}
+                >
+                  {VISIBILITY_OPTIONS.filter((v) => v.value).map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div className="admin-field">
               <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input
@@ -651,18 +979,34 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                   className="admin-input"
                   value={bulkTags}
                   onChange={(e) => setBulkTags(e.target.value)}
-                  placeholder="tag-1, tag-2"
                   disabled={bulkSaving}
                 />
               )}
             </div>
-
+            <div className="admin-field">
+              <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateKeywords}
+                  onChange={(e) => setBulkUpdateKeywords(e.target.checked)}
+                  disabled={bulkSaving}
+                />
+                Cập nhật từ khóa SEO
+              </label>
+              {bulkUpdateKeywords && (
+                <input
+                  className="admin-input"
+                  value={bulkKeywords}
+                  onChange={(e) => setBulkKeywords(e.target.value)}
+                  disabled={bulkSaving}
+                />
+              )}
+            </div>
             {bulkError && (
               <p className="admin-field-hint" style={{ color: "#dc2626" }} role="alert">
                 {bulkError}
               </p>
             )}
-
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="button"

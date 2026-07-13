@@ -151,6 +151,8 @@ export const adminNavigationSections: AdminNavigationSection[] = [
           { label: "Case Study", href: "/admin/case-studies", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Client Logo", href: "/admin/client-logos", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "SEO", href: "/admin/seo-planning", status: "active", requiredPermissions: ["canManageCms"] },
+          { label: "Nhóm thư viện ảnh", href: "/admin/content/media-libraries", status: "active", requiredPermissions: ["canManageCms"] },
+          { label: "Vai trò hiển thị ảnh", href: "/admin/content/media-roles", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "FAQ", status: "coming-soon", requiredPermissions: ["canManageCms"] },
         ],
       },

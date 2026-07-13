@@ -179,6 +179,22 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/media-libraries",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Nhóm thư viện ảnh"],
+      title: "Nhóm thư viện ảnh",
+      description: "Quản lý Library (nhóm nội dung) cho Media DAM và SEO asset discovery.",
+    },
+  },
+  {
+    path: "/admin/content/media-roles",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Vai trò hiển thị ảnh"],
+      title: "Vai trò hiển thị ảnh",
+      description: "Quản lý Role (vai trò hiển thị) cho Media DAM và SEO asset discovery.",
+    },
+  },
+  {
     path: "/admin/tech-pack",
     meta: {
       breadcrumbs: ["Kỹ thuật sản phẩm", "Tech Pack"],
