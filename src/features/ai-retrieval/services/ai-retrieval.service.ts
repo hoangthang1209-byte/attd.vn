@@ -19,11 +19,6 @@ import {
 import { scoreFactRelevance, sortFactsByScore } from "@/features/ai-retrieval/ai-retrieval-scoring";
 import { extractBusinessRulesFromKnowledge } from "@/features/ai-retrieval/ai-retrieval-business-rules";
 import { buildAiRetrievalContextParts } from "@/features/ai-retrieval/services/ai-context-builder.service";
-import { retrieveKnowledgeFacts } from "@/features/ai-retrieval/sources/knowledge-source";
-import { retrieveProductFacts } from "@/features/ai-retrieval/sources/product-source";
-import { retrieveManufacturingFacts } from "@/features/ai-retrieval/sources/manufacturing-source";
-import { retrieveMediaFacts } from "@/features/ai-retrieval/sources/media-source";
-import { retrieveSeoFacts } from "@/features/ai-retrieval/sources/seo-source";
 
 function mergeOmitted(buckets: AiRetrievalOmittedBucket[][]): AiRetrievalOmittedBucket[] {
   const map = new Map<string, number>();
@@ -39,46 +34,81 @@ function applyPublicOutputSafety(
   facts: AiRetrievedFact[],
   purpose: AiRetrievalRequest["purpose"],
   conflicts: ReturnType<typeof detectFactConflicts>
-): { facts: AiRetrievedFact[]; omitted: AiRetrievalOmittedBucket[] } {
-  if (purpose !== "PUBLIC_OUTPUT") return { facts, omitted: [] };
+): { facts: AiRetrievedFact[]; omitted: AiRetrievalOmittedBucket[]; warnings: string[] } {
+  if (purpose !== "PUBLIC_OUTPUT") return { facts, omitted: [], warnings: [] };
 
   const omittedMap = new Map<string, number>();
   const bump = (reason: string) => omittedMap.set(reason, (omittedMap.get(reason) ?? 0) + 1);
+  const warnings: string[] = [];
 
-  const unresolvedUnsafe = new Set(
-    conflicts
-      .filter((c) => c.resolution === "UNRESOLVED")
-      .flatMap((c) => c.facts.map((f) => f.factId))
+  const unresolvedKeys = new Set(
+    conflicts.filter((c) => c.resolution === "UNRESOLVED").map((c) => c.key)
   );
 
-  const filtered = facts.filter((fact) => {
-    if (fact.visibility !== "PUBLIC") {
-      bump("non_public_visibility");
-      return false;
-    }
-    if (!fact.publicOutputAllowed) {
-      bump("public_output_not_allowed");
-      return false;
-    }
-    if (unresolvedUnsafe.has(fact.id) && fact.authoritativeDomain === "moq") {
-      bump("unresolved_conflict_omitted");
-      return false;
-    }
-    if (fact.structuredData) {
-      const forbidden = ["costPrice", "cost", "margin", "supplierCost", "internalNote"];
-      for (const key of forbidden) {
-        if (key in fact.structuredData) {
-          delete fact.structuredData[key];
-          fact.warnings.push(`stripped_${key}`);
+  const conflictKeyToStructuredKeys: Record<string, string[]> = {
+    MOQ: ["moqValue", "defaultMoq", "moq"],
+    lead_time: ["leadTimeMinDays", "leadTimeMaxDays", "leadTime"],
+    material: ["material", "materialComposition"],
+    capacity: ["capacity"],
+    public_pricing_policy: ["pricingPolicy", "publicPriceHint"],
+    technique_compatibility: [
+      "printCompatibility",
+      "embroideryCompatibility",
+      "washCompatibility",
+    ],
+  };
+
+  const filtered = facts
+    .map((fact) => {
+      const next: AiRetrievedFact = {
+        ...fact,
+        structuredData: fact.structuredData ? { ...fact.structuredData } : null,
+        warnings: [...fact.warnings],
+      };
+
+      if (next.visibility !== "PUBLIC") {
+        bump("non_public_visibility");
+        return null;
+      }
+      if (!next.publicOutputAllowed) {
+        bump("public_output_not_allowed");
+        return null;
+      }
+
+      if (next.structuredData) {
+        const forbidden = ["costPrice", "cost", "margin", "supplierCost", "internalNote"];
+        for (const key of forbidden) {
+          if (key in next.structuredData) {
+            delete next.structuredData[key];
+            next.warnings.push(`stripped_${key}`);
+          }
+        }
+
+        // Unresolved conflicts: strip disputed structured keys (do not drop whole fact).
+        for (const conflictKey of unresolvedKeys) {
+          const keys = conflictKeyToStructuredKeys[conflictKey] ?? [];
+          let stripped = false;
+          for (const key of keys) {
+            if (next.structuredData && key in next.structuredData) {
+              delete next.structuredData[key];
+              stripped = true;
+            }
+          }
+          if (stripped) {
+            next.warnings.push(`unresolved_${conflictKey}_omitted_from_structured_data`);
+            warnings.push(`unresolved_conflict:${conflictKey}`);
+          }
         }
       }
-    }
-    return true;
-  });
+
+      return next;
+    })
+    .filter((fact): fact is AiRetrievedFact => fact != null);
 
   return {
     facts: filtered,
     omitted: [...omittedMap.entries()].map(([reason, count]) => ({ reason, count })),
+    warnings: [...new Set(warnings)],
   };
 }
 
@@ -160,16 +190,33 @@ export async function retrieveEnterpriseAiContext(
     warningGroups.push(result.warnings);
   };
 
-  await runIf("KNOWLEDGE_BASE", () => retrieveKnowledgeFacts(request, policy));
-  await runIf("PRODUCT", () => retrieveProductFacts(request, policy));
-  await runIf("MANUFACTURING_ASSET", () => retrieveManufacturingFacts(request, policy));
+  await runIf("KNOWLEDGE_BASE", async () => {
+    const { retrieveKnowledgeFacts } = await import(
+      "@/features/ai-retrieval/sources/knowledge-source"
+    );
+    return retrieveKnowledgeFacts(request, policy);
+  });
+  await runIf("PRODUCT", async () => {
+    const { retrieveProductFacts } = await import(
+      "@/features/ai-retrieval/sources/product-source"
+    );
+    return retrieveProductFacts(request, policy);
+  });
+  await runIf("MANUFACTURING_ASSET", async () => {
+    const { retrieveManufacturingFacts } = await import(
+      "@/features/ai-retrieval/sources/manufacturing-source"
+    );
+    return retrieveManufacturingFacts(request, policy);
+  });
   if (sourceTypes.includes("MEDIA_BUNDLE") || sourceTypes.includes("MEDIA_ASSET")) {
+    const { retrieveMediaFacts } = await import("@/features/ai-retrieval/sources/media-source");
     const media = await retrieveMediaFacts(request, policy);
     facts.push(...media.facts);
     omittedGroups.push(media.omitted);
     warningGroups.push(media.warnings);
   }
   if (sourceTypes.includes("SEO_TOPIC") || sourceTypes.includes("SEO_BRIEF")) {
+    const { retrieveSeoFacts } = await import("@/features/ai-retrieval/sources/seo-source");
     const seo = await retrieveSeoFacts(request, policy);
     facts.push(...seo.facts);
     omittedGroups.push(seo.omitted);
@@ -224,6 +271,7 @@ export async function retrieveEnterpriseAiContext(
   const publicSafe = applyPublicOutputSafety(facts, request.purpose, conflicts);
   facts = publicSafe.facts;
   omittedGroups.push(publicSafe.omitted);
+  warningGroups.push(publicSafe.warnings);
 
   // For PUBLIC_OUTPUT omit unresolved conflict facts from context certainty
   if (request.purpose === "PUBLIC_OUTPUT") {
