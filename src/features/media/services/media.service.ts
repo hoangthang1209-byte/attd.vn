@@ -38,6 +38,19 @@ import {
   validateMediaOrientation,
   validateMediaVisibility,
 } from "@/features/media/media-classification";
+import {
+  calculateMediaContentHash,
+  findExactDuplicateByHash,
+  clearDuplicateLinksReferencing,
+} from "@/features/media/services/media-duplicate.service";
+import {
+  assertCollectionsForAssignment,
+  setMediaAssetCollections,
+} from "@/features/media/services/media-collection.service";
+import {
+  resolveMediaReferences,
+  type MediaReference,
+} from "@/features/media/services/media-reference.service";
 
 export { LARGE_IMAGE_WARNING_SIZE };
 export { MEDIA_LIBRARY_PAGE_SIZE };
@@ -55,6 +68,13 @@ export const MEDIA_BULK_UPDATE_MAX = 100;
 const mediaClassificationInclude = {
   library: { select: { id: true, code: true, name: true, isActive: true } },
   role: { select: { id: true, code: true, name: true, isActive: true } },
+  collections: {
+    include: {
+      mediaCollection: {
+        select: { id: true, code: true, name: true, isActive: true, color: true },
+      },
+    },
+  },
 } satisfies Prisma.MediaAssetInclude;
 
 export type MediaAssetWithClassification = Prisma.MediaAssetGetPayload<{
@@ -68,6 +88,8 @@ export type MediaAssetListFilters = {
   libraryCode?: string;
   roleId?: string;
   roleCode?: string;
+  collectionId?: string;
+  collectionCode?: string;
   visibility?: MediaVisibility;
   orientation?: MediaOrientation;
   hasAltText?: boolean;
@@ -95,6 +117,7 @@ export type MediaMetadataUpdateInput = {
   keywords?: string[];
   aiTags?: string[];
   contentLanguage?: string | null;
+  collectionIds?: string[];
 };
 
 function buildMediaAssetWhere(filters: MediaAssetListFilters): Prisma.MediaAssetWhereInput {
@@ -107,6 +130,16 @@ function buildMediaAssetWhere(filters: MediaAssetListFilters): Prisma.MediaAsset
       : {}),
     ...(filters.roleId ? { roleId: filters.roleId } : {}),
     ...(filters.roleCode ? { role: { code: filters.roleCode.toUpperCase() } } : {}),
+    ...(filters.collectionId
+      ? { collections: { some: { mediaCollectionId: filters.collectionId } } }
+      : {}),
+    ...(filters.collectionCode
+      ? {
+          collections: {
+            some: { mediaCollection: { code: filters.collectionCode.toUpperCase() } },
+          },
+        }
+      : {}),
     ...(filters.visibility ? { visibility: filters.visibility } : {}),
     ...(filters.orientation ? { orientation: filters.orientation } : {}),
   };
@@ -212,12 +245,31 @@ export type UploadMediaInput = {
   roleId?: string;
   visibility?: MediaVisibility;
   contentLanguage?: string;
+  collectionIds?: string[];
+  forceDuplicateUpload?: boolean;
 };
 
 export type UploadMediaResult = {
   asset: MediaAssetWithClassification;
   warning?: string;
+  reused?: boolean;
+  duplicateOfId?: string | null;
 };
+
+export class MediaDuplicateUploadError extends Error {
+  readonly exactDuplicate: Awaited<ReturnType<typeof findExactDuplicateByHash>>;
+  readonly contentHash: string;
+
+  constructor(
+    exactDuplicate: NonNullable<Awaited<ReturnType<typeof findExactDuplicateByHash>>>,
+    contentHash: string,
+  ) {
+    super("Ảnh trùng nội dung đã tồn tại trong thư viện");
+    this.name = "MediaDuplicateUploadError";
+    this.exactDuplicate = exactDuplicate;
+    this.contentHash = contentHash;
+  }
+}
 
 function assertNotR2SourceFile(filename: string, mimeType: string, sizeBytes: number): void {
   const classification = classifyProductionFile({
@@ -267,6 +319,8 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
     roleId,
     visibility,
     contentLanguage,
+    collectionIds,
+    forceDuplicateUpload,
   } = input;
 
   assertNotR2SourceFile(file.name, file.type, file.size);
@@ -298,13 +352,23 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
     (await resolveRoleForWrite(roleId, true)) ??
     { id: resolveDefaultRoleIdFromLegacyUsage(mediaUsage), code: "GENERAL" };
 
-  // Re-resolve codes for legacy sync when IDs came from defaults
   const libraryRow = await prisma.mediaLibrary.findUnique({ where: { id: library.id } });
   const roleRow = await prisma.mediaRole.findUnique({ where: { id: role.id } });
   const libraryCode = libraryRow?.code ?? "GENERAL";
   const roleCode = roleRow?.code ?? "GENERAL";
 
+  const validatedCollectionIds = collectionIds?.length
+    ? await assertCollectionsForAssignment(collectionIds, { requireActive: true })
+    : [];
+
   const buffer = Buffer.from(await file.arrayBuffer());
+  const contentHash = calculateMediaContentHash(buffer);
+  const exactDuplicate = await findExactDuplicateByHash(contentHash);
+
+  if (exactDuplicate && !forceDuplicateUpload) {
+    throw new MediaDuplicateUploadError(exactDuplicate, contentHash);
+  }
+
   const storage = requireCloudinaryStorageAdapter();
   const result = await storage.upload(folder, file.name, buffer, mimeType);
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
@@ -312,37 +376,56 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
   const height = result.height ?? null;
 
   try {
-    const asset = await prisma.mediaAsset.create({
-      data: {
-        filename: file.name,
-        originalName: file.name,
-        url: result.url,
-        thumbnailUrl: result.thumbnailUrl ?? null,
-        storageKey: result.storageKey,
-        storageProvider: "CLOUDINARY",
-        publicId: result.publicId ?? null,
-        mimeType,
-        format: ext || null,
-        sizeBytes: file.size,
-        width,
-        height,
-        folder: libraryId ? resolveLegacyFolderFromLibraryCode(libraryCode) : mediaFolder,
-        usageType: roleId ? resolveLegacyUsageTypeFromRoleCode(roleCode) : mediaUsage,
-        libraryId: library.id,
-        roleId: role.id,
-        visibility: visibility ?? "PUBLIC",
-        altText: emptyToNull(altText),
-        title: emptyToNull(title),
-        caption: emptyToNull(caption),
-        description: emptyToNull(description),
-        tags: normalizeMediaTags(tags ?? []),
-        keywords: normalizeMediaKeywords(keywords ?? []),
-        orientation: deriveMediaOrientation(width, height),
-        contentLanguage: emptyToNull(contentLanguage),
-      },
-      include: mediaClassificationInclude,
+    const asset = await prisma.$transaction(async (tx) => {
+      const created = await tx.mediaAsset.create({
+        data: {
+          filename: file.name,
+          originalName: file.name,
+          url: result.url,
+          thumbnailUrl: result.thumbnailUrl ?? null,
+          storageKey: result.storageKey,
+          storageProvider: "CLOUDINARY",
+          publicId: result.publicId ?? null,
+          mimeType,
+          format: ext || null,
+          sizeBytes: file.size,
+          width,
+          height,
+          folder: libraryId ? resolveLegacyFolderFromLibraryCode(libraryCode) : mediaFolder,
+          usageType: roleId ? resolveLegacyUsageTypeFromRoleCode(roleCode) : mediaUsage,
+          libraryId: library.id,
+          roleId: role.id,
+          visibility: visibility ?? "PUBLIC",
+          altText: emptyToNull(altText),
+          title: emptyToNull(title),
+          caption: emptyToNull(caption),
+          description: emptyToNull(description),
+          tags: normalizeMediaTags(tags ?? []),
+          keywords: normalizeMediaKeywords(keywords ?? []),
+          orientation: deriveMediaOrientation(width, height),
+          contentLanguage: emptyToNull(contentLanguage),
+          contentHash,
+          duplicateStatus: exactDuplicate ? "CONFIRMED_DUPLICATE" : "UNIQUE",
+          duplicateOfId: exactDuplicate?.id ?? null,
+          ...(validatedCollectionIds.length
+            ? {
+                collections: {
+                  create: validatedCollectionIds.map((mediaCollectionId) => ({
+                    mediaCollectionId,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: mediaClassificationInclude,
+      });
+      return created;
     });
-    return { asset, warning };
+    return {
+      asset,
+      warning,
+      duplicateOfId: exactDuplicate?.id ?? null,
+    };
   } catch (err) {
     await storage.delete(result.url, result.storageKey);
     const detail = err instanceof Error ? err.message : String(err);
@@ -594,8 +677,18 @@ export function parseMediaMetadataPatchBody(
     data.contentLanguage = raw.contentLanguage as string | null;
   }
 
+  if ("collectionIds" in raw) {
+    hasUpdates = true;
+    if (
+      !Array.isArray(raw.collectionIds) ||
+      !raw.collectionIds.every((id) => typeof id === "string")
+    ) {
+      return { ok: false, message: "Danh sách bộ sưu tập không hợp lệ" };
+    }
+    data.collectionIds = raw.collectionIds;
+  }
+
   if ("orientation" in raw) {
-    // orientation is derived from dimensions; reject manual override attempts in metadata patch
     const orientation = validateMediaOrientation(raw.orientation);
     if (!orientation) return { ok: false, message: "Hướng ảnh không hợp lệ" };
   }
@@ -607,17 +700,32 @@ export async function updateMediaAsset(id: string, data: MediaMetadataUpdateInpu
   const existing = await prisma.mediaAsset.findUnique({ where: { id } });
   if (!existing) return null;
 
-  const updateData = await buildMetadataUpdateData(data);
-  return prisma.mediaAsset.update({
+  const { collectionIds, ...metadata } = data;
+  const updateData = await buildMetadataUpdateData(metadata);
+
+  if (Object.keys(updateData).length) {
+    await prisma.mediaAsset.update({
+      where: { id },
+      data: updateData,
+    });
+  }
+
+  if (collectionIds !== undefined) {
+    await setMediaAssetCollections(id, collectionIds);
+  }
+
+  return prisma.mediaAsset.findUnique({
     where: { id },
-    data: updateData,
     include: mediaClassificationInclude,
   });
 }
 
 export async function bulkUpdateMediaAssets(ids: string[], data: MediaMetadataUpdateInput) {
   const uniqueIds = [...new Set(ids)];
-  const updateData = await buildMetadataUpdateData(data);
+  const { collectionIds: _collectionIds, ...metadata } = data;
+  void _collectionIds;
+  const updateData = await buildMetadataUpdateData(metadata);
+  if (!Object.keys(updateData).length) return 0;
   const result = await prisma.mediaAsset.updateMany({
     where: { id: { in: uniqueIds } },
     data: updateData,
@@ -625,9 +733,25 @@ export async function bulkUpdateMediaAssets(ids: string[], data: MediaMetadataUp
   return result.count;
 }
 
+export class MediaAssetInUseError extends Error {
+  readonly references: MediaReference[];
+  constructor(references: MediaReference[]) {
+    super("Ảnh đang được sử dụng và không thể xóa");
+    this.name = "MediaAssetInUseError";
+    this.references = references;
+  }
+}
+
 export async function deleteMediaAsset(id: string) {
   const asset = await prisma.mediaAsset.findUnique({ where: { id } });
   if (!asset) return null;
+
+  const references = await resolveMediaReferences(id);
+  if (references.length) {
+    throw new MediaAssetInUseError(references);
+  }
+
+  await clearDuplicateLinksReferencing(id);
 
   if (asset.storageProvider === "CLOUDFLARE_R2") {
     await deleteR2Object(asset.storageKey);

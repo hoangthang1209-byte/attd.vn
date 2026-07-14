@@ -861,6 +861,13 @@ enum MediaOrientation {
   UNKNOWN
 }
 
+enum MediaDuplicateStatus {
+  UNIQUE
+  POSSIBLE_DUPLICATE
+  CONFIRMED_DUPLICATE
+  IGNORED
+}
+
 /// Manageable content-domain grouping for media assets (DAM Library).
 model MediaLibrary {
   id          String       @id @default(cuid())
@@ -891,6 +898,35 @@ model MediaRole {
   assets      MediaAsset[]
 
   @@index([isActive, sortOrder])
+}
+
+/// Project/campaign grouping of media assets. An asset may belong to many collections.
+model MediaCollection {
+  id          String                 @id @default(cuid())
+  code        String?                @unique
+  name        String
+  description String?                @db.Text
+  color       String?
+  sortOrder   Int                    @default(0)
+  isActive    Boolean                @default(true)
+  isSystem    Boolean                @default(false)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  assets      MediaAssetCollection[]
+
+  @@index([isActive, sortOrder])
+  @@index([name])
+}
+
+model MediaAssetCollection {
+  mediaAssetId      String
+  mediaCollectionId String
+  createdAt         DateTime        @default(now())
+  mediaAsset        MediaAsset      @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  mediaCollection   MediaCollection @relation(fields: [mediaCollectionId], references: [id], onDelete: Cascade)
+
+  @@id([mediaAssetId, mediaCollectionId])
+  @@index([mediaCollectionId])
 }
 
 model MediaAsset {
@@ -924,12 +960,19 @@ model MediaAsset {
   dominantColor            String?
   orientation              MediaOrientation          @default(UNKNOWN)
   contentLanguage          String?
+  contentHash              String?
+  perceptualHash           String?
+  duplicateOfId            String?
+  duplicateStatus          MediaDuplicateStatus      @default(UNIQUE)
   uploadedBy               String?
   metadata                 Json?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
   library                  MediaLibrary?             @relation(fields: [libraryId], references: [id], onDelete: SetNull)
   role                     MediaRole?                @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  duplicateOf              MediaAsset?               @relation("MediaAssetDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates               MediaAsset[]              @relation("MediaAssetDuplicates")
+  collections              MediaAssetCollection[]
   quoteItems               QuoteItem[]
   orderItems               OrderItem[]
   salesRepresentatives     SalesRepresentative[]
@@ -947,6 +990,10 @@ model MediaAsset {
   @@index([roleId])
   @@index([visibility])
   @@index([orientation])
+  @@index([contentHash])
+  @@index([perceptualHash])
+  @@index([duplicateOfId])
+  @@index([duplicateStatus])
 }
 
 enum ManufacturingAssetStatus {

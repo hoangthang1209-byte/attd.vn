@@ -44,6 +44,11 @@ export async function POST(request: Request) {
   const roles = parseStringArray(raw.roles, "roles");
   if ("error" in roles) return NextResponse.json({ message: roles.error }, { status: 400 });
 
+  const collections = parseStringArray(raw.collections, "collections");
+  if ("error" in collections) {
+    return NextResponse.json({ message: collections.error }, { status: 400 });
+  }
+
   const keywords = parseStringArray(raw.keywords, "keywords");
   if ("error" in keywords) return NextResponse.json({ message: keywords.error }, { status: 400 });
 
@@ -90,6 +95,7 @@ export async function POST(request: Request) {
       query: typeof raw.query === "string" ? raw.query : undefined,
       libraries,
       roles,
+      collections,
       keywords,
       tags,
       orientation,
@@ -110,6 +116,10 @@ export async function POST(request: Request) {
           ? { code: asset.library.code, name: asset.library.name }
           : null,
         role: asset.role ? { code: asset.role.code, name: asset.role.name } : null,
+        collections: (asset.collections ?? []).slice(0, 5).map((join) => ({
+          code: join.mediaCollection.code,
+          name: join.mediaCollection.name,
+        })),
         orientation: asset.orientation,
         visibility: asset.visibility,
         score,

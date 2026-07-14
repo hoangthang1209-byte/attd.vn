@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   deleteMediaAsset,
   getMediaAssetById,
+  MediaAssetInUseError,
   parseMediaMetadataPatchBody,
   updateMediaAsset,
 } from "@/features/media/services/media.service";
@@ -81,6 +82,16 @@ export async function DELETE(
     if (!deleted) return NextResponse.json({ message: "Không tìm thấy file" }, { status: 404 });
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (err instanceof MediaAssetInUseError) {
+      return NextResponse.json(
+        {
+          message: err.message,
+          referenceCount: err.references.length,
+          references: err.references,
+        },
+        { status: 409 },
+      );
+    }
     console.error("[api/media/[id]] DELETE failed:", err);
     return NextResponse.json({ message: "Xóa file thất bại" }, { status: 500 });
   }

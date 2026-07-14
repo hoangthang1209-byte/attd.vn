@@ -9,6 +9,13 @@ export type MediaAssetWithClassification = Prisma.MediaAssetGetPayload<{
   include: {
     library: { select: { id: true; code: true; name: true; isActive: true } };
     role: { select: { id: true; code: true; name: true; isActive: true } };
+    collections: {
+      include: {
+        mediaCollection: {
+          select: { id: true; code: true; name: true; isActive: true };
+        };
+      };
+    };
   };
 }>;
 
@@ -16,6 +23,7 @@ export type MediaDiscoveryInput = {
   query?: string;
   libraries?: string[];
   roles?: string[];
+  collections?: string[];
   keywords?: string[];
   tags?: string[];
   orientation?: MediaOrientation;
@@ -65,6 +73,9 @@ function scoreAsset(
   const queryTokens = query ? tokenize(query) : [];
   const requestedLibraries = (input.libraries ?? []).map((c) => c.toUpperCase());
   const requestedRoles = (input.roles ?? []).map((c) => c.toUpperCase());
+  const requestedCollections = (input.collections ?? [])
+    .map((c) => c.trim())
+    .filter(Boolean);
   const requestedKeywords = (input.keywords ?? []).map(normalizePhrase).filter(Boolean);
   const requestedTags = (input.tags ?? []).map(normalizePhrase).filter(Boolean);
 
@@ -138,6 +149,20 @@ function scoreAsset(
     matchedOn.push(`role:${asset.role.code}`);
   }
 
+  if (requestedCollections.length && asset.collections?.length) {
+    for (const join of asset.collections) {
+      const code = join.mediaCollection.code;
+      const id = join.mediaCollection.id;
+      const matched =
+        (code && requestedCollections.some((c) => c.toUpperCase() === code.toUpperCase())) ||
+        requestedCollections.includes(id);
+      if (matched) {
+        score += 8;
+        matchedOn.push(`collection:${code ?? id}`);
+      }
+    }
+  }
+
   if (input.orientation && asset.orientation === input.orientation) {
     score += 3;
     matchedOn.push(`orientation:${asset.orientation}`);
@@ -169,11 +194,24 @@ export async function discoverMediaAssets(
   const excludeIds = [...new Set((input.excludeIds ?? []).filter(Boolean))];
   const libraryCodes = (input.libraries ?? []).map((c) => c.toUpperCase()).filter(Boolean);
   const roleCodes = (input.roles ?? []).map((c) => c.toUpperCase()).filter(Boolean);
+  const collectionKeys = (input.collections ?? []).map((c) => c.trim()).filter(Boolean);
 
   const where: Prisma.MediaAssetWhereInput = {
     visibility,
     library: { isActive: true, ...(libraryCodes.length ? { code: { in: libraryCodes } } : {}) },
     role: { isActive: true, ...(roleCodes.length ? { code: { in: roleCodes } } : {}) },
+    ...(collectionKeys.length
+      ? {
+          collections: {
+            some: {
+              OR: [
+                { mediaCollection: { code: { in: collectionKeys.map((c) => c.toUpperCase()) } } },
+                { mediaCollectionId: { in: collectionKeys } },
+              ],
+            },
+          },
+        }
+      : {}),
     ...(input.orientation ? { orientation: input.orientation } : {}),
     ...(input.language ? { contentLanguage: input.language } : {}),
     ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
@@ -184,6 +222,13 @@ export async function discoverMediaAssets(
     include: {
       library: { select: { id: true, code: true, name: true, isActive: true } },
       role: { select: { id: true, code: true, name: true, isActive: true } },
+      collections: {
+        include: {
+          mediaCollection: {
+            select: { id: true, code: true, name: true, isActive: true },
+          },
+        },
+      },
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: CANDIDATE_LIMIT,

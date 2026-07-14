@@ -195,6 +195,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/media-collections",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Bộ sưu tập ảnh"],
+      title: "Bộ sưu tập ảnh",
+      description: "Nhóm ảnh theo dự án, chiến dịch, khách hàng hoặc sáng kiến nội dung.",
+    },
+  },
+  {
     path: "/admin/tech-pack",
     meta: {
       breadcrumbs: ["Kỹ thuật sản phẩm", "Tech Pack"],

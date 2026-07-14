@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { MediaOrientation, MediaVisibility } from "@prisma/client";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import {
@@ -11,6 +11,8 @@ import { MEDIA_TO_STORAGE_FOLDER } from "@/lib/storage/types";
 import { resolveLegacyFolderFromLibraryCode } from "@/features/media/media-classification";
 import { CardGridLoading, InlineLoading } from "@/components/ui/loading/ContextLoading";
 import type { MediaMasterDataRecord } from "@/features/media/media-master-data.types";
+import type { DuplicateAssetSummary } from "@/features/media/services/media-duplicate.service";
+import type { MediaReference } from "@/features/media/services/media-reference.service";
 import type { MediaAssetWithClassification } from "@/features/media/services/media.service";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
@@ -33,13 +35,27 @@ const ORIENTATION_OPTIONS: { value: MediaOrientation | ""; label: string }[] = [
   { value: "UNKNOWN", label: "Chưa xác định" },
 ];
 
+const REF_TYPE_LABELS: Record<MediaReference["type"], string> = {
+  PRODUCT: "Sản phẩm",
+  BLOG: "Bài viết",
+  QUOTE: "Báo giá",
+  ORDER: "Đơn hàng",
+  MANUFACTURING: "Sản xuất",
+  HOMEPAGE: "Trang chủ",
+  TECH_PACK: "Tech pack",
+  SALES: "Bán hàng",
+  OTHER: "Khác",
+};
+
 type UploadFile = {
   file: File;
   id: string;
-  status: "pending" | "uploading" | "done" | "error" | "warn";
+  status: "pending" | "checking" | "uploading" | "done" | "error" | "warn" | "duplicate";
   warning?: string;
   error?: string;
   result?: MediaAssetWithClassification;
+  duplicateAsset?: DuplicateAssetSummary;
+  reused?: boolean;
 };
 
 type EditingAsset = {
@@ -54,6 +70,15 @@ type EditingAsset = {
   tags: string;
   keywords: string;
   contentLanguage: string;
+  collectionIds: string[];
+};
+
+type DeleteBlockedState = {
+  id: string;
+  filename: string;
+  message: string;
+  references: MediaReference[];
+  loadingRefs: boolean;
 };
 
 type ClassificationOption = MediaMasterDataRecord;
@@ -80,13 +105,56 @@ function mergeOptions(
   ];
 }
 
+function mergeCollectionOptions(
+  active: ClassificationOption[],
+  assigned: Array<{ id: string; code: string; name: string; isActive: boolean }>,
+): ClassificationOption[] {
+  const out = [...active];
+  for (const col of assigned) {
+    if (out.some((item) => item.id === col.id)) continue;
+    out.push({
+      id: col.id,
+      code: col.code,
+      name: `${col.name}${col.isActive ? "" : " (đã vô hiệu)"}`,
+      description: null,
+      sortOrder: 0,
+      isActive: col.isActive,
+      isSystem: false,
+      createdAt: "",
+      updatedAt: "",
+    });
+  }
+  return out;
+}
+
+type MediaCollectionRef = {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+};
+
+function assetCollections(asset: MediaAssetWithClassification): MediaCollectionRef[] {
+  const rows = (asset as unknown as { collections?: Array<{ mediaCollection: MediaCollectionRef }> })
+    .collections;
+  return rows?.map((row) => row.mediaCollection) ?? [];
+}
+
+function usageBadgeLabel(count: number | undefined): string {
+  if (count === undefined) return "…";
+  if (count === 0) return "Chưa sử dụng";
+  return `Đang dùng ${count} nơi`;
+}
+
 export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boolean }) {
   const toast = useAdminToast();
   const [assets, setAssets] = useState<MediaAssetWithClassification[]>([]);
   const [libraries, setLibraries] = useState<ClassificationOption[]>([]);
   const [roles, setRoles] = useState<ClassificationOption[]>([]);
+  const [collections, setCollections] = useState<ClassificationOption[]>([]);
   const [libraryId, setLibraryId] = useState("");
   const [roleId, setRoleId] = useState("");
+  const [collectionId, setCollectionId] = useState("");
   const [visibility, setVisibility] = useState<MediaVisibility | "">("");
   const [orientation, setOrientation] = useState<MediaOrientation | "">("");
   const [hasAltText, setHasAltText] = useState<"" | "true" | "false">("");
@@ -96,6 +164,8 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const [uploadVisibility, setUploadVisibility] = useState<MediaVisibility>("PUBLIC");
   const [uploadTags, setUploadTags] = useState("");
   const [uploadKeywords, setUploadKeywords] = useState("");
+  const [uploadCollectionIds, setUploadCollectionIds] = useState<string[]>([]);
+  const [referenceCounts, setReferenceCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [uploadQueue, setUploadQueue] = useState<UploadFile[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -105,6 +175,13 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const [editError, setEditError] = useState<string | null>(null);
   const [editLibraryOptions, setEditLibraryOptions] = useState<ClassificationOption[]>([]);
   const [editRoleOptions, setEditRoleOptions] = useState<ClassificationOption[]>([]);
+  const [editCollectionOptions, setEditCollectionOptions] = useState<ClassificationOption[]>([]);
+  const [editReferences, setEditReferences] = useState<MediaReference[] | null>(null);
+  const [editReferencesLoading, setEditReferencesLoading] = useState(false);
+  const [refsModalAsset, setRefsModalAsset] = useState<MediaAssetWithClassification | null>(null);
+  const [refsModalItems, setRefsModalItems] = useState<MediaReference[]>([]);
+  const [refsModalLoading, setRefsModalLoading] = useState(false);
+  const [deleteBlocked, setDeleteBlocked] = useState<DeleteBlockedState | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkLibraryId, setBulkLibraryId] = useState("");
@@ -117,6 +194,10 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const [bulkUpdateVisibility, setBulkUpdateVisibility] = useState(false);
   const [bulkUpdateTags, setBulkUpdateTags] = useState(false);
   const [bulkUpdateKeywords, setBulkUpdateKeywords] = useState(false);
+  const [bulkAddCollections, setBulkAddCollections] = useState(false);
+  const [bulkRemoveCollections, setBulkRemoveCollections] = useState(false);
+  const [bulkAddCollectionIds, setBulkAddCollectionIds] = useState<string[]>([]);
+  const [bulkRemoveCollectionIds, setBulkRemoveCollectionIds] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -124,21 +205,51 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
 
   const loadTaxonomy = useCallback(async () => {
     try {
-      const [libRes, roleRes] = await Promise.all([
+      const [libRes, roleRes, colRes] = await Promise.all([
         fetch("/api/content/media-libraries?activeOnly=1"),
         fetch("/api/content/media-roles?activeOnly=1"),
+        fetch("/api/content/media-collections?activeOnly=1"),
       ]);
       const libData = (await libRes.json()) as { libraries?: ClassificationOption[] };
       const roleData = (await roleRes.json()) as { roles?: ClassificationOption[] };
+      const colData = (await colRes.json()) as { collections?: ClassificationOption[] };
       const nextLibraries = libData.libraries ?? [];
       const nextRoles = roleData.roles ?? [];
+      const nextCollections = colData.collections ?? [];
       setLibraries(nextLibraries);
       setRoles(nextRoles);
+      setCollections(nextCollections);
       setUploadLibraryId((prev) => prev || nextLibraries.find((l) => l.code === "PRODUCT")?.id || nextLibraries[0]?.id || "");
       setUploadRoleId((prev) => prev || nextRoles.find((r) => r.code === "GENERAL")?.id || nextRoles[0]?.id || "");
     } catch {
       /* ignore taxonomy load errors */
     }
+  }, []);
+
+  const loadReferenceCounts = useCallback(async (ids: string[]) => {
+    if (!ids.length) {
+      setReferenceCounts({});
+      return;
+    }
+    try {
+      const res = await fetch("/api/media/reference-counts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { counts?: Record<string, number> };
+      setReferenceCounts(data.counts ?? {});
+    } catch {
+      /* ignore reference count errors */
+    }
+  }, []);
+
+  const loadReferences = useCallback(async (assetId: string): Promise<MediaReference[]> => {
+    const res = await fetch(`/api/media/${assetId}/references`);
+    const data = (await res.json()) as { items?: MediaReference[]; message?: string };
+    if (!res.ok) throw new Error(data.message ?? "Không thể tải nơi sử dụng");
+    return data.items ?? [];
   }, []);
 
   const load = useCallback(async () => {
@@ -147,18 +258,22 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       const params = new URLSearchParams();
       if (libraryId) params.set("libraryId", libraryId);
       if (roleId) params.set("roleId", roleId);
+      if (collectionId) params.set("collectionId", collectionId);
       if (visibility) params.set("visibility", visibility);
       if (orientation) params.set("orientation", orientation);
       if (hasAltText) params.set("hasAltText", hasAltText);
       if (search.trim()) params.set("search", search.trim());
       const res = await fetch(`/api/media?${params.toString()}`);
       const data = (await res.json()) as MediaAssetWithClassification[] | { message?: string };
-      setAssets(Array.isArray(data) ? data : []);
+      const nextAssets = Array.isArray(data) ? data : [];
+      setAssets(nextAssets);
+      void loadReferenceCounts(nextAssets.map((asset) => asset.id));
     } catch {
       setAssets([]);
+      setReferenceCounts({});
     }
     setLoading(false);
-  }, [libraryId, roleId, visibility, orientation, hasAltText, search]);
+  }, [libraryId, roleId, collectionId, visibility, orientation, hasAltText, search, loadReferenceCounts]);
 
   useEffect(() => {
     void loadTaxonomy();
@@ -167,6 +282,29 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!editing) {
+      setEditReferences(null);
+      setEditReferencesLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setEditReferencesLoading(true);
+    void loadReferences(editing.id)
+      .then((items) => {
+        if (!cancelled) setEditReferences(items);
+      })
+      .catch(() => {
+        if (!cancelled) setEditReferences([]);
+      })
+      .finally(() => {
+        if (!cancelled) setEditReferencesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editing?.id, loadReferences]);
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -206,49 +344,193 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     setUploadQueue((q) => [...q, ...entries]);
   }
 
-  async function uploadAll() {
-    const toUpload = uploadQueue.filter((u) => u.status === "pending" || u.status === "warn");
-    if (!toUpload.length) return;
+  function buildUploadFormData(item: UploadFile, forceDuplicateUpload = false): FormData {
+    const fd = new FormData();
+    fd.append("file", item.file);
+    const uploadLibrary = libraries.find((l) => l.id === uploadLibraryId);
+    const storageFolder = uploadLibrary
+      ? MEDIA_TO_STORAGE_FOLDER[resolveLegacyFolderFromLibraryCode(uploadLibrary.code)]
+      : "products";
+    fd.append("folder", storageFolder);
+    if (uploadLibraryId) fd.append("libraryId", uploadLibraryId);
+    if (uploadRoleId) fd.append("roleId", uploadRoleId);
+    fd.append("visibility", uploadVisibility);
+    if (uploadTags.trim()) fd.append("tags", uploadTags);
+    if (uploadKeywords.trim()) fd.append("keywords", uploadKeywords);
+    if (uploadCollectionIds.length) {
+      fd.append("collectionIds", JSON.stringify(uploadCollectionIds));
+    }
+    if (forceDuplicateUpload) fd.append("forceDuplicateUpload", "true");
+    return fd;
+  }
 
-    for (const item of toUpload) {
-      setUploadQueue((q) => q.map((u) => (u.id === item.id ? { ...u, status: "uploading" } : u)));
-      const fd = new FormData();
-      fd.append("file", item.file);
-      const uploadLibrary = libraries.find((l) => l.id === uploadLibraryId);
-      const storageFolder = uploadLibrary
-        ? MEDIA_TO_STORAGE_FOLDER[resolveLegacyFolderFromLibraryCode(uploadLibrary.code)]
-        : "products";
-      fd.append("folder", storageFolder);
-      if (uploadLibraryId) fd.append("libraryId", uploadLibraryId);
-      if (uploadRoleId) fd.append("roleId", uploadRoleId);
-      fd.append("visibility", uploadVisibility);
-      if (uploadTags.trim()) fd.append("tags", uploadTags);
-      if (uploadKeywords.trim()) fd.append("keywords", uploadKeywords);
-      try {
-        const res = await fetch("/api/media", { method: "POST", body: fd });
-        const data = (await res.json()) as { message?: string; warning?: string } & MediaAssetWithClassification;
-        if (!res.ok) {
-          setUploadQueue((q) =>
-            q.map((u) =>
-              u.id === item.id ? { ...u, status: "error", error: data.message ?? "Upload thất bại" } : u,
-            ),
-          );
-        } else {
-          setUploadQueue((q) =>
-            q.map((u) =>
-              u.id === item.id
-                ? { ...u, status: "done", result: data, warning: data.warning ?? u.warning }
-                : u,
-            ),
-          );
-        }
-      } catch {
+  async function checkDuplicate(item: UploadFile): Promise<DuplicateAssetSummary | null> {
+    const fd = new FormData();
+    fd.append("file", item.file);
+    const res = await fetch("/api/media/check-duplicate", { method: "POST", body: fd });
+    const data = (await res.json()) as {
+      exactDuplicate?: DuplicateAssetSummary | null;
+      message?: string;
+    };
+    if (!res.ok) {
+      throw new Error(data.message ?? "Không thể kiểm tra trùng ảnh");
+    }
+    return data.exactDuplicate ?? null;
+  }
+
+  async function uploadSingleItem(item: UploadFile, forceDuplicateUpload = false) {
+    setUploadQueue((q) => q.map((u) => (u.id === item.id ? { ...u, status: "uploading" } : u)));
+    const fd = buildUploadFormData(item, forceDuplicateUpload);
+    try {
+      const res = await fetch("/api/media", { method: "POST", body: fd });
+      const data = (await res.json()) as {
+        message?: string;
+        warning?: string;
+        code?: string;
+        exactDuplicate?: DuplicateAssetSummary;
+      } & MediaAssetWithClassification;
+      if (res.status === 409 && data.code === "EXACT_DUPLICATE" && data.exactDuplicate) {
         setUploadQueue((q) =>
-          q.map((u) => (u.id === item.id ? { ...u, status: "error", error: "Lỗi kết nối" } : u)),
+          q.map((u) =>
+            u.id === item.id
+              ? { ...u, status: "duplicate", duplicateAsset: data.exactDuplicate, error: undefined }
+              : u,
+          ),
         );
+        return;
       }
+      if (!res.ok) {
+        setUploadQueue((q) =>
+          q.map((u) =>
+            u.id === item.id ? { ...u, status: "error", error: data.message ?? "Upload thất bại" } : u,
+          ),
+        );
+        return;
+      }
+      setUploadQueue((q) =>
+        q.map((u) =>
+          u.id === item.id
+            ? { ...u, status: "done", result: data, warning: data.warning ?? u.warning, reused: false }
+            : u,
+        ),
+      );
+    } catch {
+      setUploadQueue((q) =>
+        q.map((u) => (u.id === item.id ? { ...u, status: "error", error: "Lỗi kết nối" } : u)),
+      );
+    }
+  }
+
+  function reuseDuplicateItem(itemId: string) {
+    setUploadQueue((q) =>
+      q.map((u) => {
+        if (u.id !== itemId || !u.duplicateAsset) return u;
+        return { ...u, status: "done", reused: true, error: undefined };
+      }),
+    );
+  }
+
+  function skipDuplicateItem(itemId: string) {
+    setUploadQueue((q) => q.filter((u) => u.id !== itemId));
+  }
+
+  async function uploadAll() {
+    const toProcess = uploadQueue.filter((u) => u.status === "pending" || u.status === "warn");
+    if (!toProcess.length) return;
+
+    for (const item of toProcess) {
+      setUploadQueue((q) => q.map((u) => (u.id === item.id ? { ...u, status: "checking" } : u)));
+      try {
+        const exactDuplicate = await checkDuplicate(item);
+        if (exactDuplicate) {
+          setUploadQueue((q) =>
+            q.map((u) =>
+              u.id === item.id ? { ...u, status: "duplicate", duplicateAsset: exactDuplicate } : u,
+            ),
+          );
+          continue;
+        }
+      } catch (err) {
+        setUploadQueue((q) =>
+          q.map((u) =>
+            u.id === item.id
+              ? { ...u, status: "error", error: err instanceof Error ? err.message : "Không thể kiểm tra trùng ảnh" }
+              : u,
+          ),
+        );
+        continue;
+      }
+      await uploadSingleItem(item, false);
     }
     await load();
+  }
+
+  function reuseAllDuplicates() {
+    const duplicateIds = uploadQueue.filter((u) => u.status === "duplicate").map((u) => u.id);
+    for (const id of duplicateIds) reuseDuplicateItem(id);
+  }
+
+  function skipAllDuplicates() {
+    setUploadQueue((q) => q.filter((u) => u.status !== "duplicate"));
+  }
+
+  async function uploadAllDuplicatesAnyway() {
+    const duplicates = uploadQueue.filter((u) => u.status === "duplicate");
+    for (const item of duplicates) {
+      await uploadSingleItem(item, true);
+    }
+    await load();
+  }
+
+  function toggleUploadCollection(id: string) {
+    setUploadCollectionIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function toggleEditCollection(id: string) {
+    if (!editing) return;
+    setEditing({
+      ...editing,
+      collectionIds: editing.collectionIds.includes(id)
+        ? editing.collectionIds.filter((item) => item !== id)
+        : [...editing.collectionIds, id],
+    });
+  }
+
+  function toggleBulkCollection(
+    ids: string[],
+    setIds: Dispatch<SetStateAction<string[]>>,
+    id: string,
+  ) {
+    setIds(ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]);
+  }
+
+  async function openUsageReferences(asset: MediaAssetWithClassification) {
+    setRefsModalAsset(asset);
+    setRefsModalItems([]);
+    setRefsModalLoading(true);
+    try {
+      const items = await loadReferences(asset.id);
+      setRefsModalItems(items);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không thể tải nơi sử dụng");
+      setRefsModalAsset(null);
+    } finally {
+      setRefsModalLoading(false);
+    }
+  }
+
+  async function loadDeleteBlockedReferences() {
+    if (!deleteBlocked) return;
+    setDeleteBlocked({ ...deleteBlocked, loadingRefs: true });
+    try {
+      const items = await loadReferences(deleteBlocked.id);
+      setDeleteBlocked({ ...deleteBlocked, references: items, loadingRefs: false });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không thể tải nơi sử dụng");
+      setDeleteBlocked({ ...deleteBlocked, loadingRefs: false });
+    }
   }
 
   function clearQueue() {
@@ -286,13 +568,33 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   async function handleDelete(id: string, filename: string) {
     if (!confirm(`Xóa ảnh "${filename}"?`)) return;
     const res = await fetch(`/api/media/${id}`, { method: "DELETE" });
-    if (res.ok) await load();
+    if (res.ok) {
+      toast.success("Đã xóa ảnh");
+      await load();
+      return;
+    }
+    const data = (await res.json()) as {
+      message?: string;
+      references?: MediaReference[];
+    };
+    if (res.status === 409) {
+      setDeleteBlocked({
+        id,
+        filename,
+        message: data.message ?? "Ảnh đang được sử dụng và không thể xóa",
+        references: data.references ?? [],
+        loadingRefs: false,
+      });
+      return;
+    }
+    toast.error(data.message ?? "Không thể xóa ảnh");
   }
 
   function openEdit(asset: MediaAssetWithClassification) {
     setEditError(null);
     setEditLibraryOptions(mergeOptions(libraries, asset.library));
     setEditRoleOptions(mergeOptions(roles, asset.role));
+    setEditCollectionOptions(mergeCollectionOptions(collections, assetCollections(asset)));
     setEditing({
       id: asset.id,
       libraryId: asset.libraryId ?? "",
@@ -305,6 +607,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       tags: (asset.tags ?? []).join(", "),
       keywords: (asset.keywords ?? []).join(", "),
       contentLanguage: asset.contentLanguage ?? "",
+      collectionIds: assetCollections(asset).map((col) => col.id),
     });
   }
 
@@ -327,6 +630,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
           tags: editing.tags.split(",").map((t) => t.trim()).filter(Boolean),
           keywords: editing.keywords.split(",").map((t) => t.trim()).filter(Boolean),
           contentLanguage: editing.contentLanguage || null,
+          collectionIds: editing.collectionIds,
         }),
       });
       const data = (await res.json()) as { message?: string };
@@ -368,6 +672,10 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     setBulkUpdateVisibility(false);
     setBulkUpdateTags(false);
     setBulkUpdateKeywords(false);
+    setBulkAddCollections(false);
+    setBulkRemoveCollections(false);
+    setBulkAddCollectionIds([]);
+    setBulkRemoveCollectionIds([]);
     setBulkLibraryId(libraries[0]?.id ?? "");
     setBulkRoleId(roles[0]?.id ?? "");
     setBulkVisibility("PUBLIC");
@@ -383,7 +691,9 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       !bulkUpdateRole &&
       !bulkUpdateVisibility &&
       !bulkUpdateTags &&
-      !bulkUpdateKeywords
+      !bulkUpdateKeywords &&
+      !bulkAddCollections &&
+      !bulkRemoveCollections
     ) {
       setBulkError("Chọn ít nhất một trường để cập nhật");
       return;
@@ -399,6 +709,8 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     if (bulkUpdateKeywords) {
       payload.keywords = bulkKeywords.split(",").map((t) => t.trim()).filter(Boolean);
     }
+    if (bulkAddCollections) payload.addCollectionIds = bulkAddCollectionIds;
+    if (bulkRemoveCollections) payload.removeCollectionIds = bulkRemoveCollectionIds;
 
     setBulkSaving(true);
     setBulkError(null);
@@ -408,15 +720,27 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { message?: string; updatedCount?: number };
+      const data = (await res.json()) as {
+        message?: string;
+        updatedCount?: number;
+        addedCount?: number;
+        removedCount?: number;
+      };
       if (!res.ok) {
         setBulkError(data.message ?? "Không thể cập nhật hàng loạt");
         return;
       }
       const count = data.updatedCount ?? selectedIds.size;
+      const parts = [`Đã cập nhật ${count} ảnh`];
+      if (typeof data.addedCount === "number" && data.addedCount > 0) {
+        parts.push(`thêm ${data.addedCount} liên kết bộ sưu tập`);
+      }
+      if (typeof data.removedCount === "number" && data.removedCount > 0) {
+        parts.push(`gỡ ${data.removedCount} liên kết bộ sưu tập`);
+      }
       setBulkOpen(false);
       clearSelection();
-      toast.success(`Đã cập nhật ${count} ảnh`);
+      toast.success(parts.join(", "));
       await load();
     } catch {
       setBulkError("Lỗi kết nối. Vui lòng thử lại.");
@@ -427,8 +751,63 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
 
   const hasQueue = uploadQueue.length > 0;
   const pendingCount = uploadQueue.filter((u) => u.status === "pending" || u.status === "warn").length;
+  const duplicateCount = uploadQueue.filter((u) => u.status === "duplicate").length;
   const selectedCount = selectedIds.size;
   const allLoadedSelected = assets.length > 0 && assets.every((asset) => selectedIds.has(asset.id));
+
+  function renderReferencesList(items: MediaReference[]) {
+    if (!items.length) {
+      return <p className="admin-field-hint">Ảnh chưa được sử dụng ở đâu.</p>;
+    }
+    return (
+      <ul className="admin-field-hint" style={{ margin: 0, paddingLeft: 18 }}>
+        {items.map((ref) => (
+          <li key={`${ref.type}-${ref.entityId}-${ref.field ?? ""}`} style={{ marginBottom: 6 }}>
+            <strong>{REF_TYPE_LABELS[ref.type]}</strong>: {ref.entityTitle}
+            {ref.field ? ` · ${ref.field}` : ""}
+            {ref.route ? (
+              <>
+                {" · "}
+                <a href={ref.route} className="admin-link">
+                  Mở trong admin
+                </a>
+              </>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  function renderCollectionCheckboxes(
+    options: ClassificationOption[],
+    selected: string[],
+    onToggle: (id: string) => void,
+    disabled = false,
+  ) {
+    if (!options.length) {
+      return <p className="admin-field-hint">Chưa có bộ sưu tập nào.</p>;
+    }
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto" }}>
+        {options.map((item) => (
+          <label
+            key={item.id}
+            className="admin-field-hint"
+            style={{ display: "flex", alignItems: "center", gap: 8, margin: 0 }}
+          >
+            <input
+              type="checkbox"
+              checked={selected.includes(item.id)}
+              onChange={() => onToggle(item.id)}
+              disabled={disabled}
+            />
+            {item.name}
+          </label>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="admin-media-page">
@@ -522,23 +901,98 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                 >
                   Tải lên {pendingCount > 0 ? `(${pendingCount})` : ""}
                 </button>
+                {duplicateCount > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      onClick={reuseAllDuplicates}
+                    >
+                      Dùng tất cả ảnh có sẵn
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      onClick={skipAllDuplicates}
+                    >
+                      Bỏ qua tất cả trùng
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      onClick={() => void uploadAllDuplicatesAnyway()}
+                      disabled={!cmsReady}
+                    >
+                      Vẫn tải tất cả
+                    </button>
+                  </>
+                )}
                 <button type="button" className="admin-btn admin-btn--secondary" onClick={clearQueue}>
                   Xóa danh sách
                 </button>
               </div>
             </div>
+            <details className="admin-field" style={{ marginTop: 8 }}>
+              <summary className="admin-label" style={{ cursor: "pointer" }}>
+                Metadata nâng cao
+              </summary>
+              <div style={{ marginTop: 8 }}>
+                <label className="admin-label">Bộ sưu tập</label>
+                {renderCollectionCheckboxes(collections, uploadCollectionIds, toggleUploadCollection)}
+              </div>
+            </details>
             <div className="admin-media-queue-list">
               {uploadQueue.map((item) => (
                 <div key={item.id} className={`admin-media-queue-item status-${item.status}`}>
+                  {item.status === "duplicate" && item.duplicateAsset && (
+                    <div className="admin-media-preview" style={{ width: 48, height: 48, flexShrink: 0 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.duplicateAsset.thumbnailUrl ?? item.duplicateAsset.url}
+                        alt={item.duplicateAsset.filename}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+                  )}
                   <span className="admin-media-queue-name">{item.file.name}</span>
                   <span className="admin-media-queue-size">({(item.file.size / 1024).toFixed(0)}KB)</span>
                   <span className="admin-media-queue-status">
+                    {item.status === "checking" && <InlineLoading title="Đang kiểm tra trùng…" tone="admin" />}
                     {item.status === "uploading" && <InlineLoading title="Đang tải…" tone="admin" />}
-                    {item.status === "done" && "✅ Xong"}
+                    {item.status === "done" && (item.reused ? "✅ Đã dùng ảnh có sẵn" : "✅ Xong")}
                     {item.status === "pending" && "⏸ Chờ"}
                     {item.status === "warn" && `⚠ ${item.warning}`}
                     {item.status === "error" && `❌ ${item.error}`}
+                    {item.status === "duplicate" && item.duplicateAsset && (
+                      <>⚠ Trùng: {item.duplicateAsset.filename}</>
+                    )}
                   </span>
+                  {item.status === "duplicate" && (
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--primary admin-btn--xs"
+                        onClick={() => reuseDuplicateItem(item.id)}
+                      >
+                        Dùng ảnh đã có
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--secondary admin-btn--xs"
+                        onClick={() => void uploadSingleItem(item, true).then(() => load())}
+                        disabled={!cmsReady}
+                      >
+                        Vẫn tải ảnh mới
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--secondary admin-btn--xs"
+                        onClick={() => skipDuplicateItem(item.id)}
+                      >
+                        Bỏ qua
+                      </button>
+                    </div>
+                  )}
                   {(item.status === "pending" || item.status === "warn" || item.status === "error") && (
                     <button
                       type="button"
@@ -576,6 +1030,18 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         <select className="admin-input" value={roleId} onChange={(e) => setRoleId(e.target.value)}>
           <option value="">Tất cả vai trò</option>
           {roles.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="admin-input"
+          value={collectionId}
+          onChange={(e) => setCollectionId(e.target.value)}
+        >
+          <option value="">Tất cả bộ sưu tập</option>
+          {collections.map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
             </option>
@@ -696,10 +1162,28 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                     {asset.filename}
                   </p>
                   <p className="admin-field-hint" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="admin-badge"
+                      style={{
+                        cursor: "pointer",
+                        border: "none",
+                        background: referenceCounts[asset.id] ? "#fef3c7" : "#f3f4f6",
+                      }}
+                      onClick={() => void openUsageReferences(asset)}
+                      title="Xem nơi đang sử dụng"
+                    >
+                      {usageBadgeLabel(referenceCounts[asset.id])}
+                    </button>
                     {asset.library && (
                       <span className="admin-badge">{asset.library.name}</span>
                     )}
                     {asset.role && <span className="admin-badge">{asset.role.name}</span>}
+                    {assetCollections(asset).map((col) => (
+                      <span key={col.id} className="admin-badge">
+                        {col.name}
+                      </span>
+                    ))}
                     <span className="admin-badge">{asset.orientation}</span>
                     {asset.visibility !== "PUBLIC" && (
                       <span className="admin-badge">{asset.visibility}</span>
@@ -855,6 +1339,23 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                 disabled={editSaving}
               />
             </div>
+            <div className="admin-field">
+              <label className="admin-label">Bộ sưu tập</label>
+              {renderCollectionCheckboxes(
+                editCollectionOptions,
+                editing.collectionIds,
+                toggleEditCollection,
+                editSaving,
+              )}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Nơi đang sử dụng</label>
+              {editReferencesLoading ? (
+                <InlineLoading title="Đang tải…" tone="admin" />
+              ) : (
+                renderReferencesList(editReferences ?? [])
+              )}
+            </div>
             {editError && (
               <p className="admin-field-hint" style={{ color: "#dc2626" }} role="alert">
                 {editError}
@@ -1002,6 +1503,42 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                 />
               )}
             </div>
+            <div className="admin-field">
+              <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={bulkAddCollections}
+                  onChange={(e) => setBulkAddCollections(e.target.checked)}
+                  disabled={bulkSaving}
+                />
+                Thêm vào bộ sưu tập
+              </label>
+              {bulkAddCollections &&
+                renderCollectionCheckboxes(
+                  collections,
+                  bulkAddCollectionIds,
+                  (id) => toggleBulkCollection(bulkAddCollectionIds, setBulkAddCollectionIds, id),
+                  bulkSaving,
+                )}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={bulkRemoveCollections}
+                  onChange={(e) => setBulkRemoveCollections(e.target.checked)}
+                  disabled={bulkSaving}
+                />
+                Gỡ khỏi bộ sưu tập
+              </label>
+              {bulkRemoveCollections &&
+                renderCollectionCheckboxes(
+                  collections,
+                  bulkRemoveCollectionIds,
+                  (id) => toggleBulkCollection(bulkRemoveCollectionIds, setBulkRemoveCollectionIds, id),
+                  bulkSaving,
+                )}
+            </div>
             {bulkError && (
               <p className="admin-field-hint" style={{ color: "#dc2626" }} role="alert">
                 {bulkError}
@@ -1023,6 +1560,65 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                 disabled={bulkSaving}
               >
                 Hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {refsModalAsset && (
+        <div className="admin-modal-overlay" onClick={() => setRefsModalAsset(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="admin-subtitle">Nơi đang sử dụng</h3>
+            <p className="admin-field-hint">{refsModalAsset.filename}</p>
+            {refsModalLoading ? (
+              <InlineLoading title="Đang tải…" tone="admin" />
+            ) : (
+              renderReferencesList(refsModalItems)
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary"
+                onClick={() => setRefsModalAsset(null)}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteBlocked && (
+        <div className="admin-modal-overlay" onClick={() => setDeleteBlocked(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="admin-subtitle">Không thể xóa ảnh</h3>
+            <p className="admin-field-hint" style={{ color: "#dc2626" }} role="alert">
+              {deleteBlocked.message}
+            </p>
+            <p className="admin-field-hint">
+              Ảnh &quot;{deleteBlocked.filename}&quot; đang được sử dụng ở {deleteBlocked.references.length} nơi.
+            </p>
+            {deleteBlocked.loadingRefs ? (
+              <InlineLoading title="Đang tải…" tone="admin" />
+            ) : deleteBlocked.references.length > 0 ? (
+              renderReferencesList(deleteBlocked.references)
+            ) : (
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary"
+                onClick={() => void loadDeleteBlockedReferences()}
+              >
+                Xem nơi đang sử dụng
+              </button>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary"
+                onClick={() => setDeleteBlocked(null)}
+              >
+                Đóng
               </button>
             </div>
           </div>

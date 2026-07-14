@@ -4,6 +4,7 @@ import {
   MEDIA_BULK_UPDATE_MAX,
   parseMediaMetadataPatchBody,
 } from "@/features/media/services/media.service";
+import { bulkAssignMediaCollections } from "@/features/media/services/media-collection.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function PATCH(request: Request) {
@@ -44,12 +45,16 @@ export async function PATCH(request: Request) {
     );
   }
 
+  const hasCollectionOps =
+    ("addCollectionIds" in raw && Array.isArray(raw.addCollectionIds)) ||
+    ("removeCollectionIds" in raw && Array.isArray(raw.removeCollectionIds));
+
   const parsed = parseMediaMetadataPatchBody(raw);
   if (!parsed.ok) {
     return NextResponse.json({ message: parsed.message }, { status: 400 });
   }
 
-  if (!parsed.hasUpdates) {
+  if (!parsed.hasUpdates && !hasCollectionOps) {
     return NextResponse.json(
       { message: "Cần chọn ít nhất một trường metadata để cập nhật" },
       { status: 400 },
@@ -57,15 +62,45 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const updatedCount = await bulkUpdateMediaAssets(ids, parsed.data);
-    if (updatedCount === 0) {
-      return NextResponse.json({ message: "Không tìm thấy ảnh nào" }, { status: 404 });
+    let updatedCount = 0;
+    let addedCount = 0;
+    let removedCount = 0;
+
+    if (parsed.hasUpdates) {
+      updatedCount = await bulkUpdateMediaAssets(ids, parsed.data);
+      if (updatedCount === 0 && !hasCollectionOps) {
+        return NextResponse.json({ message: "Không tìm thấy ảnh nào" }, { status: 404 });
+      }
     }
-    return NextResponse.json({ updatedCount });
+
+    if (hasCollectionOps) {
+      const addCollectionIds = Array.isArray(raw.addCollectionIds)
+        ? raw.addCollectionIds.filter((id): id is string => typeof id === "string")
+        : [];
+      const removeCollectionIds = Array.isArray(raw.removeCollectionIds)
+        ? raw.removeCollectionIds.filter((id): id is string => typeof id === "string")
+        : [];
+
+      const result = await bulkAssignMediaCollections({
+        assetIds: ids,
+        addCollectionIds,
+        removeCollectionIds,
+      });
+      updatedCount = Math.max(updatedCount, result.updatedAssetCount);
+      addedCount = result.addedCount;
+      removedCount = result.removedCount;
+    }
+
+    return NextResponse.json({ updatedCount, addedCount, removedCount });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Lỗi cập nhật hàng loạt";
     const status =
-      message.includes("không tồn tại") || message.includes("vô hiệu hóa") ? 400 : 500;
+      message.includes("không tồn tại") ||
+      message.includes("vô hiệu hóa") ||
+      message.includes("Không tìm thấy") ||
+      message.includes("Cần chọn")
+        ? 400
+        : 500;
     console.error("[PATCH /api/media/bulk]", err);
     return NextResponse.json({ message }, { status });
   }

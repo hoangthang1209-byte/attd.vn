@@ -4,6 +4,7 @@ import {
   listMediaAssets,
   listMediaAssetsPage,
   MEDIA_LIBRARY_PAGE_SIZE,
+  MediaDuplicateUploadError,
   uploadMediaAsset,
   uploadProductionFileAsset,
 } from "@/features/media/services/media.service";
@@ -28,6 +29,8 @@ export async function GET(request: Request) {
   const libraryCode = searchParams.get("libraryCode") ?? undefined;
   const roleId = searchParams.get("roleId") ?? undefined;
   const roleCode = searchParams.get("roleCode") ?? undefined;
+  const collectionId = searchParams.get("collectionId") ?? undefined;
+  const collectionCode = searchParams.get("collectionCode") ?? undefined;
   const visibilityParam = searchParams.get("visibility");
   const orientationParam = searchParams.get("orientation");
   const hasAltTextParam = searchParams.get("hasAltText");
@@ -65,6 +68,8 @@ export async function GET(request: Request) {
     libraryCode,
     roleId,
     roleCode,
+    collectionId,
+    collectionCode,
     visibility,
     orientation,
     hasAltText,
@@ -125,6 +130,8 @@ export async function POST(request: Request) {
     const roleId = formData.get("roleId");
     const visibilityRaw = formData.get("visibility");
     const contentLanguage = formData.get("contentLanguage");
+    const collectionIdsRaw = formData.get("collectionIds");
+    const forceDuplicateUpload = formData.get("forceDuplicateUpload") === "true";
 
     const folderKey =
       typeof folder === "string" && VALID_FOLDERS.includes(folder as StorageFolderKey)
@@ -139,6 +146,20 @@ export async function POST(request: Request) {
       typeof keywordsRaw === "string"
         ? keywordsRaw.split(",").map((t) => t.trim()).filter(Boolean)
         : [];
+
+    let collectionIds: string[] = [];
+    if (typeof collectionIdsRaw === "string" && collectionIdsRaw.trim()) {
+      try {
+        const parsed = JSON.parse(collectionIdsRaw) as unknown;
+        if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
+          collectionIds = parsed;
+        } else {
+          collectionIds = collectionIdsRaw.split(",").map((t) => t.trim()).filter(Boolean);
+        }
+      } catch {
+        collectionIds = collectionIdsRaw.split(",").map((t) => t.trim()).filter(Boolean);
+      }
+    }
 
     if (!fileEntry || typeof fileEntry === "string") {
       return NextResponse.json({ message: "File là bắt buộc" }, { status: 400 });
@@ -170,7 +191,7 @@ export async function POST(request: Request) {
         ? validateMediaVisibility(visibilityRaw) ?? undefined
         : undefined;
 
-    const { asset, warning } = await uploadMediaAsset({
+    const { asset, warning, duplicateOfId } = await uploadMediaAsset({
       folder: folderKey,
       file: fileEntry as File,
       altText: typeof altText === "string" ? altText : undefined,
@@ -184,10 +205,23 @@ export async function POST(request: Request) {
       roleId: typeof roleId === "string" && roleId ? roleId : undefined,
       visibility,
       contentLanguage: typeof contentLanguage === "string" ? contentLanguage : undefined,
+      collectionIds,
+      forceDuplicateUpload,
     });
 
-    return NextResponse.json({ ...asset, warning }, { status: 201 });
+    return NextResponse.json({ ...asset, warning, duplicateOfId }, { status: 201 });
   } catch (err) {
+    if (err instanceof MediaDuplicateUploadError) {
+      return NextResponse.json(
+        {
+          message: err.message,
+          code: "EXACT_DUPLICATE",
+          contentHash: err.contentHash,
+          exactDuplicate: err.exactDuplicate,
+        },
+        { status: 409 },
+      );
+    }
     const message = err instanceof Error ? err.message : "Upload thất bại";
     console.error("[api/media] POST failed:", err);
     const status =
