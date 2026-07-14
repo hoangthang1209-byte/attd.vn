@@ -139,6 +139,32 @@ function emptySemanticState(): SemanticTermState {
   };
 }
 
+/** Search strings for vocabulary pickers — must be strings, never arrays. */
+function emptySemanticSearchState(): Record<SemanticTermField, string> {
+  return {
+    subjectTerms: "",
+    materialTerms: "",
+    colorTerms: "",
+    techniqueTerms: "",
+    industryTerms: "",
+    audienceTerms: "",
+    useCaseTerms: "",
+  };
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function asSuitabilityArray(value: unknown): MediaContentSuitability[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is MediaContentSuitability =>
+      typeof item === "string" && item in MEDIA_CONTENT_SUITABILITY_LABELS,
+  );
+}
+
 type BulkSemanticEntry = { addEnabled: boolean; removeEnabled: boolean; add: string[]; remove: string[] };
 
 function emptyBulkSemanticState(): Record<SemanticTermField, BulkSemanticEntry> {
@@ -402,9 +428,8 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const [bulkRemoveSuitabilitySearch, setBulkRemoveSuitabilitySearch] = useState("");
 
   const [vocabTerms, setVocabTerms] = useState<MediaVocabularyTermRecord[]>([]);
-  const [editVocabSearch, setEditVocabSearch] = useState<Record<SemanticTermField, string>>(
-    emptySemanticState() as unknown as Record<SemanticTermField, string>,
-  );
+  const [editVocabSearch, setEditVocabSearch] =
+    useState<Record<SemanticTermField, string>>(emptySemanticSearchState);
   const [editSuitabilitySearch, setEditSuitabilitySearch] = useState("");
   const [intelligenceOpen, setIntelligenceOpen] = useState(false);
 
@@ -420,53 +445,63 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
 
   const [uploadAssetType, setUploadAssetType] = useState<MediaAssetType>("PHOTO");
   const [uploadSemantic, setUploadSemantic] = useState<SemanticTermState>(emptySemanticState());
-  const [uploadVocabSearch, setUploadVocabSearch] = useState<Record<SemanticTermField, string>>(
-    emptySemanticState() as unknown as Record<SemanticTermField, string>,
-  );
+  const [uploadVocabSearch, setUploadVocabSearch] =
+    useState<Record<SemanticTermField, string>>(emptySemanticSearchState);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
   const loadTaxonomy = useCallback(async () => {
     try {
-      const [libRes, roleRes, colRes, vocabRes] = await Promise.all([
+      const [libRes, roleRes, colRes] = await Promise.all([
         fetch("/api/content/media-libraries?activeOnly=1"),
         fetch("/api/content/media-roles?activeOnly=1"),
         fetch("/api/content/media-collections?activeOnly=1"),
-        fetch("/api/content/media-vocabulary?activeOnly=1"),
       ]);
       const libData = (await libRes.json()) as { libraries?: ClassificationOption[] };
       const roleData = (await roleRes.json()) as { roles?: ClassificationOption[] };
       const colData = (await colRes.json()) as { collections?: ClassificationOption[] };
-      const vocabData = (await vocabRes.json()) as { terms?: MediaVocabularyTermRecord[] };
       const nextLibraries = libData.libraries ?? [];
       const nextRoles = roleData.roles ?? [];
       const nextCollections = colData.collections ?? [];
       setLibraries(nextLibraries);
       setRoles(nextRoles);
       setCollections(nextCollections);
-      setVocabTerms(vocabData.terms ?? []);
       setUploadLibraryId((prev) => prev || nextLibraries.find((l) => l.code === "PRODUCT")?.id || nextLibraries[0]?.id || "");
       setUploadRoleId((prev) => prev || nextRoles.find((r) => r.code === "GENERAL")?.id || nextRoles[0]?.id || "");
     } catch {
-      /* ignore taxonomy load errors */
+      /* ignore taxonomy load errors — modal still opens with empty selectors */
+    }
+
+    try {
+      const vocabRes = await fetch("/api/content/media-vocabulary?activeOnly=1");
+      if (!vocabRes.ok) {
+        setVocabTerms([]);
+        return;
+      }
+      const vocabData = (await vocabRes.json()) as { terms?: MediaVocabularyTermRecord[] };
+      setVocabTerms(Array.isArray(vocabData.terms) ? vocabData.terms : []);
+    } catch {
+      setVocabTerms([]);
     }
   }, []);
 
   function vocabTermsForType(type: MediaVocabularyType): MediaVocabularyTermRecord[] {
-    return vocabTerms.filter((term) => term.type === type);
+    return (vocabTerms ?? []).filter((term) => term.type === type);
   }
 
   function vocabOptionsForField(field: SemanticTermField, search: string): MediaVocabularyTermRecord[] {
     const type = SEMANTIC_FIELD_TO_VOCAB_TYPE[field];
-    const needle = search.trim().toLowerCase();
+    const needle = (typeof search === "string" ? search : "").trim().toLowerCase();
     const options = vocabTermsForType(type);
     if (!needle) return options;
-    return options.filter(
-      (term) =>
+    return options.filter((term) => {
+      const aliases = Array.isArray(term.aliases) ? term.aliases : [];
+      return (
         term.name.toLowerCase().includes(needle) ||
-        term.aliases.some((alias) => alias.toLowerCase().includes(needle)),
-    );
+        aliases.some((alias) => String(alias).toLowerCase().includes(needle))
+      );
+    });
   }
 
   const loadReferenceCounts = useCallback(async (ids: string[]) => {
@@ -944,36 +979,40 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     setEditLibraryOptions(mergeOptions(libraries, asset.library));
     setEditRoleOptions(mergeOptions(roles, asset.role));
     setEditCollectionOptions(mergeCollectionOptions(collections, assetCollections(asset)));
-    setEditVocabSearch(emptySemanticState() as unknown as Record<SemanticTermField, string>);
+    setEditVocabSearch(emptySemanticSearchState());
     setEditSuitabilitySearch("");
     setIntelligenceOpen(false);
+    setEditReferences(null);
     setEditing({
       id: asset.id,
       libraryId: asset.libraryId ?? "",
       roleId: asset.roleId ?? "",
-      visibility: asset.visibility,
+      visibility: asset.visibility ?? "PUBLIC",
       altText: asset.altText ?? "",
       title: asset.title ?? "",
       caption: asset.caption ?? "",
       description: asset.description ?? "",
-      tags: (asset.tags ?? []).join(", "),
-      keywords: (asset.keywords ?? []).join(", "),
+      tags: asStringArray(asset.tags).join(", "),
+      keywords: asStringArray(asset.keywords).join(", "),
       contentLanguage: asset.contentLanguage ?? "",
-      collectionIds: assetCollections(asset).map((col) => col.id),
-      assetType: asset.assetType,
+      collectionIds: assetCollections(asset)
+        .filter((col): col is MediaCollectionRef => Boolean(col?.id))
+        .map((col) => col.id),
+      assetType: asset.assetType ?? "PHOTO",
       semantic: {
-        subjectTerms: asset.subjectTerms ?? [],
-        materialTerms: asset.materialTerms ?? [],
-        colorTerms: asset.colorTerms ?? [],
-        techniqueTerms: asset.techniqueTerms ?? [],
-        industryTerms: asset.industryTerms ?? [],
-        audienceTerms: asset.audienceTerms ?? [],
-        useCaseTerms: asset.useCaseTerms ?? [],
+        subjectTerms: asStringArray(asset.subjectTerms),
+        materialTerms: asStringArray(asset.materialTerms),
+        colorTerms: asStringArray(asset.colorTerms),
+        techniqueTerms: asStringArray(asset.techniqueTerms),
+        industryTerms: asStringArray(asset.industryTerms),
+        audienceTerms: asStringArray(asset.audienceTerms),
+        useCaseTerms: asStringArray(asset.useCaseTerms),
       },
-      contentSuitabilities: asset.contentSuitabilities ?? [],
-      seoScore: asset.seoScore,
-      seoReadinessStatus: asset.seoReadinessStatus,
-      metadataCompleteness: asset.metadataCompleteness,
+      contentSuitabilities: asSuitabilityArray(asset.contentSuitabilities),
+      seoScore: typeof asset.seoScore === "number" ? asset.seoScore : 0,
+      seoReadinessStatus: asset.seoReadinessStatus ?? "INCOMPLETE",
+      metadataCompleteness:
+        typeof asset.metadataCompleteness === "number" ? asset.metadataCompleteness : 0,
       missingFields: computeMissingIntelligenceFields(asset),
     });
   }
@@ -981,18 +1020,21 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   function toggleEditSemanticTerm(field: SemanticTermField, name: string) {
     setEditing((prev) => {
       if (!prev) return prev;
-      const current = prev.semantic[field];
+      const current = asStringArray(prev.semantic?.[field]);
       const next = current.includes(name)
         ? current.filter((item) => item !== name)
         : [...current, name];
-      return { ...prev, semantic: { ...prev.semantic, [field]: next } };
+      return {
+        ...prev,
+        semantic: { ...emptySemanticState(), ...prev.semantic, [field]: next },
+      };
     });
   }
 
   function toggleEditContentSuitability(value: MediaContentSuitability) {
     setEditing((prev) => {
       if (!prev) return prev;
-      const current = prev.contentSuitabilities;
+      const current = asSuitabilityArray(prev.contentSuitabilities);
       const next = current.includes(value)
         ? current.filter((item) => item !== value)
         : [...current, value];
@@ -1011,7 +1053,9 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     }
     setEditing((prev) => {
       if (!prev) return prev;
-      const merged = [...new Set([...prev.contentSuitabilities, ...suggested])];
+      const merged = [
+        ...new Set([...asSuitabilityArray(prev.contentSuitabilities), ...suggested]),
+      ];
       return { ...prev, contentSuitabilities: merged };
     });
   }
@@ -1035,16 +1079,16 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
           tags: editing.tags.split(",").map((t) => t.trim()).filter(Boolean),
           keywords: editing.keywords.split(",").map((t) => t.trim()).filter(Boolean),
           contentLanguage: editing.contentLanguage || null,
-          collectionIds: editing.collectionIds,
-          assetType: editing.assetType,
-          subjectTerms: editing.semantic.subjectTerms,
-          materialTerms: editing.semantic.materialTerms,
-          colorTerms: editing.semantic.colorTerms,
-          techniqueTerms: editing.semantic.techniqueTerms,
-          industryTerms: editing.semantic.industryTerms,
-          audienceTerms: editing.semantic.audienceTerms,
-          useCaseTerms: editing.semantic.useCaseTerms,
-          contentSuitabilities: editing.contentSuitabilities,
+          collectionIds: editing.collectionIds ?? [],
+          assetType: editing.assetType ?? "PHOTO",
+          subjectTerms: asStringArray(editing.semantic?.subjectTerms),
+          materialTerms: asStringArray(editing.semantic?.materialTerms),
+          colorTerms: asStringArray(editing.semantic?.colorTerms),
+          techniqueTerms: asStringArray(editing.semantic?.techniqueTerms),
+          industryTerms: asStringArray(editing.semantic?.industryTerms),
+          audienceTerms: asStringArray(editing.semantic?.audienceTerms),
+          useCaseTerms: asStringArray(editing.semantic?.useCaseTerms),
+          contentSuitabilities: asSuitabilityArray(editing.contentSuitabilities),
         }),
       });
       const data = (await res.json()) as { message?: string };
@@ -1313,25 +1357,27 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   /** Compact searchable multi-select for one semantic vocabulary type (edit modal). */
   function renderSemanticTermPicker(
     field: SemanticTermField,
-    selected: string[],
+    selected: string[] | null | undefined,
     onToggle: (name: string) => void,
-    searchValue: string,
+    searchValue: string | null | undefined,
     onSearchChange: (value: string) => void,
     disabled = false,
   ) {
-    const options = vocabOptionsForField(field, searchValue);
+    const safeSelected = asStringArray(selected);
+    const safeSearch = typeof searchValue === "string" ? searchValue : "";
+    const options = vocabOptionsForField(field, safeSearch);
     return (
       <div className="admin-field" style={{ marginBottom: 10 }}>
         <label className="admin-label">{SEMANTIC_FIELD_LABELS[field]}</label>
-        {selected.length > 0 && (
+        {safeSelected.length > 0 && (
           <p className="admin-field-hint" style={{ margin: "0 0 4px" }}>
-            Đã chọn: {selected.join(", ")}
+            Đã chọn: {safeSelected.join(", ")}
           </p>
         )}
         <input
           className="admin-input admin-input--sm"
           placeholder={`Tìm ${SEMANTIC_FIELD_LABELS[field].toLowerCase()}…`}
-          value={searchValue}
+          value={safeSearch}
           onChange={(e) => onSearchChange(e.target.value)}
           disabled={disabled}
         />
@@ -1356,7 +1402,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
               >
                 <input
                   type="checkbox"
-                  checked={selected.includes(term.name)}
+                  checked={safeSelected.includes(term.name)}
                   onChange={() => onToggle(term.name)}
                   disabled={disabled}
                 />
@@ -1373,10 +1419,11 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   /** Compact checkbox list of vocabulary term names (bulk edit add/remove pickers). */
   function renderVocabNameCheckboxes(
     field: SemanticTermField,
-    selected: string[],
+    selected: string[] | null | undefined,
     onToggle: (name: string) => void,
     disabled = false,
   ) {
+    const safeSelected = asStringArray(selected);
     const options = vocabTermsForType(SEMANTIC_FIELD_TO_VOCAB_TYPE[field]);
     if (!options.length) {
       return <p className="admin-field-hint">Chưa có thuật ngữ nào.</p>;
@@ -1391,7 +1438,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
           >
             <input
               type="checkbox"
-              checked={selected.includes(term.name)}
+              checked={safeSelected.includes(term.name)}
               onChange={() => onToggle(term.name)}
               disabled={disabled}
             />
@@ -1404,13 +1451,15 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
 
   /** Compact searchable multi-select checkbox list for MediaContentSuitability values. */
   function renderContentSuitabilityPicker(
-    selected: MediaContentSuitability[],
+    selected: MediaContentSuitability[] | null | undefined,
     onToggle: (value: MediaContentSuitability) => void,
-    searchValue: string,
+    searchValue: string | null | undefined,
     onSearchChange: (value: string) => void,
     disabled = false,
   ) {
-    const needle = searchValue.trim().toLowerCase();
+    const safeSelected = asSuitabilityArray(selected);
+    const safeSearch = typeof searchValue === "string" ? searchValue : "";
+    const needle = safeSearch.trim().toLowerCase();
     const options = needle
       ? MEDIA_CONTENT_SUITABILITIES.filter((value) =>
           MEDIA_CONTENT_SUITABILITY_LABELS[value].toLowerCase().includes(needle),
@@ -1418,15 +1467,15 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       : MEDIA_CONTENT_SUITABILITIES;
     return (
       <div className="admin-field" style={{ marginBottom: 10 }}>
-        {selected.length > 0 && (
+        {safeSelected.length > 0 && (
           <p className="admin-field-hint" style={{ margin: "0 0 4px" }}>
-            Đã chọn: {selected.map((v) => MEDIA_CONTENT_SUITABILITY_LABELS[v]).join(", ")}
+            Đã chọn: {safeSelected.map((v) => MEDIA_CONTENT_SUITABILITY_LABELS[v]).join(", ")}
           </p>
         )}
         <input
           className="admin-input admin-input--sm"
           placeholder="Tìm vai trò nội dung…"
-          value={searchValue}
+          value={safeSearch}
           onChange={(e) => onSearchChange(e.target.value)}
           disabled={disabled}
         />
@@ -1448,7 +1497,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
             >
               <input
                 type="checkbox"
-                checked={selected.includes(value)}
+                checked={safeSelected.includes(value)}
                 onChange={() => onToggle(value)}
                 disabled={disabled}
               />
@@ -2118,7 +2167,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                     {asset.visibility !== "PUBLIC" && (
                       <span className="admin-badge">{asset.visibility}</span>
                     )}
-                    <span className="admin-badge">SEO {asset.seoScore}</span>
+                    <span className="admin-badge">SEO {asset.seoScore ?? 0}</span>
                   </p>
                   <div className="admin-media-actions">
                     <button
@@ -2285,13 +2334,20 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                 Sức khỏe metadata (Asset health)
               </p>
               <p className="admin-field-hint" style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: 0 }}>
-                <span className="admin-badge">SEO {editing.seoScore}</span>
-                <span className="admin-badge">{MEDIA_SEO_READINESS_LABELS[editing.seoReadinessStatus]}</span>
-                <span className="admin-badge">Đầy đủ {editing.metadataCompleteness}%</span>
+                <span className="admin-badge">SEO {editing.seoScore ?? 0}</span>
+                <span className="admin-badge">
+                  {MEDIA_SEO_READINESS_LABELS[editing.seoReadinessStatus] ??
+                    editing.seoReadinessStatus ??
+                    "Chưa hoàn thiện"}
+                </span>
+                <span className="admin-badge">Đầy đủ {editing.metadataCompleteness ?? 0}%</span>
               </p>
-              {editing.missingFields.length > 0 && (
+              {(editing.missingFields ?? []).length > 0 && (
                 <p className="admin-field-hint" style={{ marginTop: 4 }}>
-                  Còn thiếu: {editing.missingFields.map((key) => MISSING_FIELD_LABELS[key] ?? key).join(", ")}
+                  Còn thiếu:{" "}
+                  {(editing.missingFields ?? [])
+                    .map((key) => MISSING_FIELD_LABELS[key] ?? key)
+                    .join(", ")}
                 </p>
               )}
             </div>
@@ -2325,10 +2381,15 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                 {SEMANTIC_FIELDS.map((field) =>
                   renderSemanticTermPicker(
                     field,
-                    editing.semantic[field],
+                    editing.semantic?.[field] ?? [],
                     (name) => toggleEditSemanticTerm(field, name),
                     editVocabSearch[field] ?? "",
-                    (value) => setEditVocabSearch((prev) => ({ ...prev, [field]: value })),
+                    (value) =>
+                      setEditVocabSearch((prev) => ({
+                        ...emptySemanticSearchState(),
+                        ...prev,
+                        [field]: value,
+                      })),
                     editSaving,
                   ),
                 )}
