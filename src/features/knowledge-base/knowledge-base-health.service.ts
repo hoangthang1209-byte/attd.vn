@@ -61,6 +61,18 @@ export type KnowledgeHealthScore = {
     domainCoverage: number;
     retrievalEligibleByConsumer: Record<string, number>;
   };
+  editorialChecklist: {
+    publicApproved: number;
+    publicVerifiedLegacy: number;
+    missingSource: number;
+    missingEvidence: number;
+    withoutDomain: number;
+    withoutProduct: number;
+    withoutBundle: number;
+    withoutSeoTopic: number;
+    reviewDue: number;
+    expired: number;
+  };
 };
 
 function pct(count: number, total: number): number {
@@ -137,6 +149,15 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
   let reviewDueCount = 0;
   let withDomain = 0;
   let withSourceCoverage = 0;
+  let publicApproved = 0;
+  let publicVerifiedLegacy = 0;
+  let missingSource = 0;
+  let missingEvidence = 0;
+  let withoutDomain = 0;
+  let withoutProduct = 0;
+  let withoutBundle = 0;
+  let withoutSeoTopic = 0;
+  let expiredCount = 0;
 
   const domainBreakdown: Record<string, number> = {};
   const typeBreakdown: Record<string, number> = {};
@@ -196,6 +217,18 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
     if (entry.visibility === "PUBLIC") publicCount += 1;
     else if (entry.visibility === "CONFIDENTIAL") confidentialCount += 1;
     else internalCount += 1;
+
+    if (entry.visibility === "PUBLIC" && entry.approvedAt) publicApproved += 1;
+    if (entry.visibility === "PUBLIC" && entry.isVerified && !entry.approvedAt) {
+      publicVerifiedLegacy += 1;
+    }
+    if (!entry.sourceId) missingSource += 1;
+    if (!entry.evidenceUrl?.trim()) missingEvidence += 1;
+    if (!entry.domain?.trim()) withoutDomain += 1;
+    if (entry.relatedProductIds.length === 0) withoutProduct += 1;
+    if (entry.relatedMediaBundleIds.length === 0) withoutBundle += 1;
+    if (entry.relatedSeoTopicIds.length === 0) withoutSeoTopic += 1;
+    if (entry.expiresAt && entry.expiresAt.getTime() < Date.now()) expiredCount += 1;
 
     const claimOk = isClaimSafeForAiOutput(entry.claimStatus);
     const notStale = !staleness.stale;
@@ -306,6 +339,18 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
         INTERNAL_SEARCH: internalAiReady,
         ADMIN: total,
       },
+    },
+    editorialChecklist: {
+      publicApproved,
+      publicVerifiedLegacy,
+      missingSource,
+      missingEvidence,
+      withoutDomain,
+      withoutProduct,
+      withoutBundle,
+      withoutSeoTopic,
+      reviewDue: reviewDueCount,
+      expired: expiredCount,
     },
   };
 }

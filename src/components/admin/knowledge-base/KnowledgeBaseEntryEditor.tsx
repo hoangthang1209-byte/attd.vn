@@ -19,6 +19,10 @@ import KnowledgeBaseVerificationPanel from "@/components/admin/knowledge-base/Kn
 import KnowledgeBaseCompletenessPanel from "@/components/admin/knowledge-base/KnowledgeBaseCompletenessPanel";
 import KnowledgeBaseTemplatesPicker from "@/components/admin/knowledge-base/KnowledgeBaseTemplatesPicker";
 import KnowledgeBaseEditorNav from "@/components/admin/knowledge-base/KnowledgeBaseEditorNav";
+import KnowledgeBaseGovernancePanel, {
+  buildGovernanceState,
+  type KnowledgeGovernanceFormState,
+} from "@/components/admin/knowledge-base/KnowledgeBaseGovernancePanel";
 
 type Category = { id: string; name: string; slug: string };
 
@@ -43,9 +47,12 @@ type EditorState = {
   relatedBlogPostIds: string[];
   isVerified: boolean;
   sourceId: string | null;
+  governance: KnowledgeGovernanceFormState;
 };
 
 function buildState(initial: KnowledgeBaseEntryRecord | null, mode: Props["mode"]): EditorState {
+  void mode;
+  const governance = buildGovernanceState(initial);
   return {
     title: initial?.title ?? "",
     slug: initial?.slug ?? "",
@@ -62,8 +69,16 @@ function buildState(initial: KnowledgeBaseEntryRecord | null, mode: Props["mode"
     relatedLandingPageSlugs: initial?.relatedLandingPageSlugs ?? [],
     relatedBlogPostIds: initial?.relatedBlogPostIds ?? [],
     isVerified: initial?.isVerified ?? false,
-    sourceId: initial?.sourceId ?? null,
+    sourceId: initial?.sourceId ?? governance.sourceId,
+    governance,
   };
+}
+
+function splitCsvIds(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 export default function KnowledgeBaseEntryEditor(props: Props) {
@@ -75,8 +90,14 @@ export default function KnowledgeBaseEntryEditor(props: Props) {
   const [state, setState] = useState<EditorState>(() => buildState(initial, props.mode));
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [approvalMeta, setApprovalMeta] = useState({
+    approvedBy: initial?.approvedBy ?? null,
+    approvedAt: initial?.approvedAt ?? null,
+    lastVerifiedAt: initial?.lastVerifiedAt ?? null,
+  });
 
   const isDirty = useMemo(() => JSON.stringify(state) !== savedSnapshot, [state, savedSnapshot]);
+  const entryId = props.mode === "edit" ? props.entry.id : null;
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
@@ -112,6 +133,7 @@ export default function KnowledgeBaseEntryEditor(props: Props) {
   async function persist(): Promise<boolean> {
     setSaving(true);
     setMessage(null);
+    const g = state.governance;
     const payload = {
       title: state.title,
       slug: state.slug || generateKnowledgeBaseSlug(state.title),
@@ -127,6 +149,23 @@ export default function KnowledgeBaseEntryEditor(props: Props) {
       relatedProductIds: state.relatedProductIds,
       relatedLandingPageSlugs: state.relatedLandingPageSlugs,
       relatedBlogPostIds: state.relatedBlogPostIds,
+      relatedMediaBundleIds: splitCsvIds(g.relatedMediaBundleIds),
+      relatedSeoTopicIds: splitCsvIds(g.relatedSeoTopicIds),
+      relatedEntryIds: splitCsvIds(g.relatedEntryIds),
+      aliases: splitCsvIds(g.aliases),
+      visibility: g.visibility,
+      claimStatus: g.claimStatus,
+      confidence: g.confidence,
+      evidenceUrl: g.evidenceUrl.trim() || null,
+      domain: g.domain.trim() || null,
+      ownerId: g.ownerId.trim() || null,
+      authorName: g.authorName.trim() || null,
+      reviewIntervalDays: g.reviewIntervalDays.trim()
+        ? Number(g.reviewIntervalDays)
+        : null,
+      nextReviewAt: g.nextReviewAt || null,
+      expiresAt: g.expiresAt || null,
+      sourceId: state.sourceId ?? g.sourceId,
       isVerified: state.isVerified,
     };
 
@@ -343,6 +382,33 @@ export default function KnowledgeBaseEntryEditor(props: Props) {
             isVerified={state.isVerified}
             verifiedAt={initial?.verifiedAt ?? null}
             onChange={(value) => update("isVerified", value)}
+          />
+
+          <KnowledgeBaseGovernancePanel
+            entryId={entryId}
+            approvedBy={approvalMeta.approvedBy}
+            approvedAt={approvalMeta.approvedAt}
+            lastVerifiedAt={approvalMeta.lastVerifiedAt}
+            value={state.governance}
+            onChange={(governance) =>
+              setState((prev) => ({
+                ...prev,
+                governance,
+                sourceId: governance.sourceId ?? prev.sourceId,
+              }))
+            }
+            onApproved={(entry) => {
+              setApprovalMeta({
+                approvedBy: entry.approvedBy ?? null,
+                approvedAt: entry.approvedAt ?? null,
+                lastVerifiedAt: entry.lastVerifiedAt ?? null,
+              });
+              setState((prev) => ({
+                ...prev,
+                isVerified: entry.isVerified,
+                governance: buildGovernanceState(entry),
+              }));
+            }}
           />
         </aside>
       </div>

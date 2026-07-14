@@ -11,9 +11,10 @@ import KnowledgeBaseCategoryManager from "@/components/admin/knowledge-base/Know
 import KnowledgeBaseContextPreview from "@/components/admin/knowledge-base/KnowledgeBaseContextPreview";
 import KnowledgeBaseStarterImport from "@/components/admin/knowledge-base/KnowledgeBaseStarterImport";
 import KnowledgeBaseBulkToolbar from "@/components/admin/knowledge-base/KnowledgeBaseBulkToolbar";
+import KnowledgeBaseEditorialReadiness from "@/components/admin/knowledge-base/KnowledgeBaseEditorialReadiness";
 import { AdminLoadingState } from "@/components/admin/AdminUi";
 
-type TabId = "entries" | "categories" | "context" | "starter";
+type TabId = "entries" | "categories" | "context" | "starter" | "health";
 
 type Props = {
   initialEntries: KnowledgeBaseEntryRecord[];
@@ -36,7 +37,17 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
     verifiedOnly: false,
     needsImprovement: false,
     aiReadinessFilter: "",
+    governanceFilter: "",
   });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const fromUrl = new URLSearchParams(window.location.search).get("governanceFilter");
+    if (fromUrl) {
+      setFilters((prev) => ({ ...prev, governanceFilter: fromUrl }));
+      setActiveTab("entries");
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +62,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
       if (filters.verifiedOnly) params.set("verifiedOnly", "1");
       if (filters.needsImprovement) params.set("needsImprovement", "1");
       if (filters.aiReadinessFilter) params.set("aiReadinessFilter", filters.aiReadinessFilter);
+      if (filters.governanceFilter) params.set("governanceFilter", filters.governanceFilter);
 
       const res = await fetch(`/api/admin/knowledge-base?${params.toString()}`);
       const data = await res.json();
@@ -76,6 +88,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "entries", label: "Dữ liệu doanh nghiệp" },
+    { id: "health", label: "Sẵn sàng biên tập" },
     { id: "categories", label: "Danh mục" },
     { id: "context", label: "Xem dữ liệu AI sẽ dùng" },
     { id: "starter", label: "Nhập dữ liệu mẫu ATTD" },
@@ -137,6 +150,7 @@ export default function KnowledgeBaseDashboard({ initialEntries, initialKpis }: 
             )}
           </>
         )}
+        {activeTab === "health" && <KnowledgeBaseEditorialReadiness />}
         {activeTab === "categories" && <KnowledgeBaseCategoryManager />}
         {activeTab === "context" && <KnowledgeBaseContextPreview />}
         {activeTab === "starter" && <KnowledgeBaseStarterImport onImported={load} />}

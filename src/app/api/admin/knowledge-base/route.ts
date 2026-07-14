@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
       visibility: searchParams.get("visibility") ?? undefined,
       claimStatus: searchParams.get("claimStatus") ?? undefined,
       domain: searchParams.get("domain") ?? undefined,
+      governanceFilter: searchParams.get("governanceFilter") ?? undefined,
       page: Number(searchParams.get("page") ?? 1),
       pageSize: Number(searchParams.get("pageSize") ?? 50),
     });

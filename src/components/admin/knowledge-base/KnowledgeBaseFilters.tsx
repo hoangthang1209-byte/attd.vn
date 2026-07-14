@@ -10,7 +10,7 @@ import {
   getPriorityLabel,
 } from "@/features/knowledge-base/knowledge-base-utils";
 
-type Filters = {
+export type KnowledgeBaseFilterState = {
   search: string;
   categoryId: string;
   type: string;
@@ -20,12 +20,29 @@ type Filters = {
   verifiedOnly: boolean;
   needsImprovement: boolean;
   aiReadinessFilter: string;
+  governanceFilter: string;
 };
 
 type Props = {
-  filters: Filters;
-  onChange: (filters: Filters) => void;
+  filters: KnowledgeBaseFilterState;
+  onChange: (filters: KnowledgeBaseFilterState) => void;
 };
+
+const GOVERNANCE_QUICK: { id: string; label: string }[] = [
+  { id: "", label: "Tất cả quản trị" },
+  { id: "public", label: "Public" },
+  { id: "internal", label: "Internal" },
+  { id: "confidential", label: "Confidential" },
+  { id: "unapproved", label: "Chưa phê duyệt" },
+  { id: "approved", label: "Đã phê duyệt" },
+  { id: "needs_evidence", label: "Cần bằng chứng" },
+  { id: "review_due", label: "Sắp đến hạn rà soát" },
+  { id: "review_overdue", label: "Quá hạn rà soát" },
+  { id: "missing_source", label: "Thiếu nguồn" },
+  { id: "missing_product", label: "Chưa liên kết Product" },
+  { id: "missing_bundle", label: "Chưa liên kết Media Bundle" },
+  { id: "missing_seo_topic", label: "Chưa liên kết SEO Topic" },
+];
 
 export default function KnowledgeBaseFilters({ filters, onChange }: Props) {
   const [categories, setCategories] = useState<KnowledgeBaseCategoryRecord[]>([]);
@@ -92,6 +109,15 @@ export default function KnowledgeBaseFilters({ filters, onChange }: Props) {
         <option value="">Tất cả ưu tiên</option>
         {(["HIGH", "MEDIUM", "LOW"] as const).map((priority) => (
           <option key={priority} value={priority}>{getPriorityLabel(priority)}</option>
+        ))}
+      </select>
+      <select
+        className="admin-input"
+        value={filters.governanceFilter}
+        onChange={(e) => onChange({ ...filters, governanceFilter: e.target.value })}
+      >
+        {GOVERNANCE_QUICK.map((opt) => (
+          <option key={opt.id || "all"} value={opt.id}>{opt.label}</option>
         ))}
       </select>
       <select

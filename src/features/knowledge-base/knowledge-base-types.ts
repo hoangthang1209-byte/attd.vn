@@ -134,7 +134,11 @@ export type KnowledgeBaseEntryInput = {
   ownerId?: string | null;
   authorName?: string | null;
   evidenceUrl?: string | null;
+  /** Never set via generic save — use approve/revoke APIs. */
   approvedBy?: string | null;
+  reviewIntervalDays?: number | null;
+  nextReviewAt?: string | Date | null;
+  expiresAt?: string | Date | null;
   isFeatured?: boolean;
   isVerified?: boolean;
 };

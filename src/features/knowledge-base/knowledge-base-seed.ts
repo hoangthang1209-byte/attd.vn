@@ -86,6 +86,20 @@ export async function getCategoryIdBySlug(slug: string): Promise<string | null> 
   return category?.id ?? null;
 }
 
+export type KnowledgeBaseGovernanceFilter =
+  | "public"
+  | "internal"
+  | "confidential"
+  | "unapproved"
+  | "approved"
+  | "needs_evidence"
+  | "review_due"
+  | "review_overdue"
+  | "missing_source"
+  | "missing_product"
+  | "missing_bundle"
+  | "missing_seo_topic";
+
 export type KnowledgeBaseListParams = {
   search?: string;
   categoryId?: string;
@@ -97,6 +111,7 @@ export type KnowledgeBaseListParams = {
   claimStatus?: string;
   domain?: string;
   verifiedOnly?: boolean;
+  governanceFilter?: KnowledgeBaseGovernanceFilter | string;
   page?: number;
   pageSize?: number;
 };
@@ -129,6 +144,58 @@ const entryInclude = {
   source: { select: { id: true, name: true, url: true, type: true, note: true } },
 } as const;
 
+function applyGovernanceFilter(
+  where: Prisma.KnowledgeBaseEntryWhereInput,
+  governanceFilter?: string
+) {
+  if (!governanceFilter) return;
+  const now = new Date();
+  const inSevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  switch (governanceFilter) {
+    case "public":
+      where.visibility = "PUBLIC";
+      break;
+    case "internal":
+      where.visibility = "INTERNAL";
+      break;
+    case "confidential":
+      where.visibility = "CONFIDENTIAL";
+      break;
+    case "unapproved":
+      where.approvedAt = null;
+      break;
+    case "approved":
+      where.approvedAt = { not: null };
+      break;
+    case "needs_evidence":
+      where.claimStatus = "NEEDS_EVIDENCE";
+      break;
+    case "review_due":
+      where.nextReviewAt = { gte: now, lte: inSevenDays };
+      break;
+    case "review_overdue":
+      where.OR = [
+        { nextReviewAt: { lt: now } },
+        { expiresAt: { lt: now } },
+      ];
+      break;
+    case "missing_source":
+      where.sourceId = null;
+      break;
+    case "missing_product":
+      where.relatedProductIds = { isEmpty: true };
+      break;
+    case "missing_bundle":
+      where.relatedMediaBundleIds = { isEmpty: true };
+      break;
+    case "missing_seo_topic":
+      where.relatedSeoTopicIds = { isEmpty: true };
+      break;
+    default:
+      break;
+  }
+}
+
 export async function listKnowledgeBaseEntries(params: KnowledgeBaseListParams = {}) {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 50));
@@ -143,6 +210,7 @@ export async function listKnowledgeBaseEntries(params: KnowledgeBaseListParams =
   if (params.domain?.trim()) where.domain = params.domain.trim();
   if (params.verifiedOnly) where.isVerified = true;
   if (params.usageScope) where.usageScope = { has: params.usageScope };
+  applyGovernanceFilter(where, params.governanceFilter);
   if (params.search?.trim()) {
     const q = params.search.trim();
     where.OR = [
@@ -197,7 +265,12 @@ export async function updateKnowledgeBaseEntry(
   const existing = await prisma.knowledgeBaseEntry.findUnique({ where: { id } });
   if (!existing) throw new Error("ENTRY_NOT_FOUND");
 
-  const isVerified = typeof data.isVerified === "boolean" ? data.isVerified : existing.isVerified;
+  // Strip approval stamps from generic saves — use governance approve/revoke APIs.
+  const { approvedBy: _approvedBy, approvedAt: _approvedAt, ...safeData } = data;
+  void _approvedBy;
+  void _approvedAt;
+
+  const isVerified = typeof safeData.isVerified === "boolean" ? safeData.isVerified : existing.isVerified;
   const now = new Date();
   const wasVerified = existing.isVerified;
   const becomingVerified = isVerified && !wasVerified;
@@ -206,7 +279,7 @@ export async function updateKnowledgeBaseEntry(
   const entry = await prisma.knowledgeBaseEntry.update({
     where: { id },
     data: {
-      ...data,
+      ...safeData,
       version: nextVersion,
       verifiedAt:
         isVerified && !existing.verifiedAt
@@ -215,12 +288,6 @@ export async function updateKnowledgeBaseEntry(
             ? existing.verifiedAt ?? now
             : null,
       lastVerifiedAt: isVerified ? now : existing.lastVerifiedAt,
-      approvedAt:
-        typeof data.approvedBy === "string" && data.approvedBy.trim()
-          ? existing.approvedAt ?? now
-          : data.approvedAt === null
-            ? null
-            : existing.approvedAt,
     },
     include: entryInclude,
   });

@@ -67,6 +67,21 @@ export default function KnowledgeBaseEntryCard({ entry, onChanged, selected, onS
         <h3>{entry.title}</h3>
         {entry.aiReadiness && <KnowledgeBaseAiReadinessBadge readiness={entry.aiReadiness} />}
         {entry.isVerified && <span className="admin-kb-badge admin-kb-badge--verified">Đã kiểm chứng</span>}
+        <span className="admin-kb-badge">{entry.visibility}</span>
+        <span className="admin-kb-badge">{entry.claimStatus}</span>
+        {entry.approvedAt ? (
+          <span className="admin-kb-badge admin-kb-badge--verified">Đã duyệt</span>
+        ) : (
+          <span className="admin-kb-badge">Chưa duyệt</span>
+        )}
+        {!entry.sourceId && !entry.source && (
+          <span className="admin-kb-badge">Thiếu nguồn</span>
+        )}
+        {entry.nextReviewAt && new Date(entry.nextReviewAt).getTime() <= Date.now() + 7 * 86400000 && (
+          <span className="admin-kb-badge">
+            {new Date(entry.nextReviewAt).getTime() < Date.now() ? "Quá hạn rà soát" : "Sắp rà soát"}
+          </span>
+        )}
       </div>
       {entry.summary && <p className="admin-field-hint">{entry.summary}</p>}
       <div className="admin-kb-entry-meta">

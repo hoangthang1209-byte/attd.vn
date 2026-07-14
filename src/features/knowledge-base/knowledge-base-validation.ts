@@ -114,9 +114,27 @@ export function validateKnowledgeBaseEntry(input: Partial<KnowledgeBaseEntryInpu
       ownerId: input.ownerId?.trim() || null,
       authorName: input.authorName?.trim() || null,
       evidenceUrl: input.evidenceUrl?.trim() || null,
-      approvedBy: input.approvedBy?.trim() || null,
+      reviewIntervalDays:
+        typeof input.reviewIntervalDays === "number" && Number.isFinite(input.reviewIntervalDays)
+          ? Math.max(0, Math.floor(input.reviewIntervalDays))
+          : input.reviewIntervalDays === null
+            ? null
+            : undefined,
+      nextReviewAt: parseOptionalDate(input.nextReviewAt),
+      expiresAt: parseOptionalDate(input.expiresAt),
       isFeatured: input.isFeatured ?? false,
       isVerified,
     },
   };
+}
+
+function parseOptionalDate(value: unknown): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === "string") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return undefined;
 }

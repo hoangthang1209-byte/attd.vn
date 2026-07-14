@@ -7,6 +7,7 @@ import {
   getEntryStatusLabel,
   getPriorityLabel,
 } from "@/features/knowledge-base/knowledge-base-utils";
+import { KNOWLEDGE_VISIBILITY_OPTIONS } from "@/features/knowledge-base/knowledge-base-visibility";
 
 type Props = {
   selectedIds: string[];
@@ -19,6 +20,12 @@ export default function KnowledgeBaseBulkToolbar({ selectedIds, onChanged, onCle
   const [categoryId, setCategoryId] = useState("");
   const [status, setStatus] = useState("DRAFT");
   const [priority, setPriority] = useState("MEDIUM");
+  const [visibility, setVisibility] = useState("INTERNAL");
+  const [domain, setDomain] = useState("");
+  const [reviewIntervalDays, setReviewIntervalDays] = useState("");
+  const [ownerId, setOwnerId] = useState("");
+  const [seoTopicId, setSeoTopicId] = useState("");
+  const [mediaBundleId, setMediaBundleId] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -30,8 +37,8 @@ export default function KnowledgeBaseBulkToolbar({ selectedIds, onChanged, onCle
   if (selectedIds.length === 0) return null;
 
   async function runBulk(
-    action: "verify" | "unverify" | "archive" | "delete" | "changeCategory" | "changeStatus" | "changePriority",
-    extra?: Record<string, string>
+    action: string,
+    extra?: Record<string, string | number | null>
   ) {
     if (action === "delete" && !window.confirm(`Xóa ${selectedIds.length} mục đã chọn?`)) {
       return;
@@ -58,7 +65,9 @@ export default function KnowledgeBaseBulkToolbar({ selectedIds, onChanged, onCle
 
   return (
     <div className="admin-kb-bulk-toolbar">
-      <p className="admin-field-hint">Đã chọn {selectedIds.length} mục</p>
+      <p className="admin-field-hint">
+        Đã chọn {selectedIds.length} mục · Không hỗ trợ phê duyệt hàng loạt (giữ trách nhiệm từng mục).
+      </p>
       <div className="admin-kb-bulk-toolbar-actions">
         {loading && <AdminInlineLoader message="Đang xử lý hàng loạt…" />}
         <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" disabled={loading} onClick={() => void runBulk("verify")}>
@@ -112,6 +121,100 @@ export default function KnowledgeBaseBulkToolbar({ selectedIds, onChanged, onCle
           onClick={() => void runBulk("changePriority", { priority })}
         >
           Đổi ưu tiên
+        </button>
+
+        <select
+          className="admin-input admin-input--inline"
+          value={visibility}
+          onChange={(e) => setVisibility(e.target.value)}
+        >
+          {KNOWLEDGE_VISIBILITY_OPTIONS.map((opt) => (
+            <option key={opt.id} value={opt.id}>{opt.label}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          disabled={loading}
+          onClick={() => void runBulk("setVisibility", { visibility })}
+        >
+          Đặt visibility
+        </button>
+        <input
+          className="admin-input admin-input--inline"
+          placeholder="Domain"
+          value={domain}
+          onChange={(e) => setDomain(e.target.value)}
+        />
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          disabled={loading || !domain.trim()}
+          onClick={() => void runBulk("setDomain", { domain: domain.trim() })}
+        >
+          Đặt domain
+        </button>
+        <input
+          className="admin-input admin-input--inline"
+          type="number"
+          min={0}
+          placeholder="Chu kỳ rà soát (ngày)"
+          value={reviewIntervalDays}
+          onChange={(e) => setReviewIntervalDays(e.target.value)}
+        />
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          disabled={loading || !reviewIntervalDays}
+          onClick={() =>
+            void runBulk("setReviewInterval", {
+              reviewIntervalDays: Number(reviewIntervalDays),
+            })
+          }
+        >
+          Đặt chu kỳ rà soát
+        </button>
+        <input
+          className="admin-input admin-input--inline"
+          placeholder="Owner ID"
+          value={ownerId}
+          onChange={(e) => setOwnerId(e.target.value)}
+        />
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          disabled={loading || !ownerId.trim()}
+          onClick={() => void runBulk("setOwner", { ownerId: ownerId.trim() })}
+        >
+          Gán owner
+        </button>
+        <input
+          className="admin-input admin-input--inline"
+          placeholder="SEO Topic ID"
+          value={seoTopicId}
+          onChange={(e) => setSeoTopicId(e.target.value)}
+        />
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          disabled={loading || !seoTopicId.trim()}
+          onClick={() => void runBulk("linkSeoTopic", { seoTopicId: seoTopicId.trim() })}
+        >
+          Link SEO Topic
+        </button>
+        <input
+          className="admin-input admin-input--inline"
+          placeholder="Media Bundle ID"
+          value={mediaBundleId}
+          onChange={(e) => setMediaBundleId(e.target.value)}
+        />
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--small"
+          disabled={loading || !mediaBundleId.trim()}
+          onClick={() => void runBulk("linkMediaBundle", { mediaBundleId: mediaBundleId.trim() })}
+        >
+          Link Media Bundle
         </button>
         <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={onClear}>
           Bỏ chọn
