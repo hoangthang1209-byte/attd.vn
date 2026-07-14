@@ -363,6 +363,30 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/seo-topics",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Kế hoạch nội dung SEO"],
+      title: "Kế hoạch nội dung SEO",
+      description: "Lập kế hoạch, lọc và quản lý chủ đề SEO theo chiến lược và cụm chủ đề.",
+    },
+  },
+  {
+    path: "/admin/content/seo-strategies",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Chiến lược SEO"],
+      title: "Chiến lược SEO",
+      description: "Quản lý chiến lược SEO, cụm chủ đề và tiến độ nội dung theo chiến dịch.",
+    },
+  },
+  {
+    path: "/admin/content/seo",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Tổng quan SEO"],
+      title: "SEO Content Platform",
+      description: "Tổng quan kế hoạch nội dung SEO, chủ đề ưu tiên và độ phủ cụm chủ đề.",
+    },
+  },
+  {
     path: "/admin/knowledge-base/context-preview",
     meta: {
       breadcrumbs: ["Nội dung & Website", "Knowledge", "Prompt Library"],

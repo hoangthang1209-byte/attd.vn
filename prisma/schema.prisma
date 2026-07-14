@@ -830,6 +830,256 @@ model BlogPostCategory {
   @@index([categoryId])
 }
 
+// ---------------------------------------------------------------------------
+// SEO Content Platform (Sprint 11.0) — strategy / topics / briefs (no AI writer)
+// ---------------------------------------------------------------------------
+
+enum SeoStrategyStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum SeoTopicStatus {
+  IDEA
+  RESEARCHING
+  APPROVED
+  BRIEF_READY
+  DRAFTING
+  REVIEW
+  PUBLISHED
+  PAUSED
+  REJECTED
+  ARCHIVED
+}
+
+enum SeoSearchIntent {
+  INFORMATIONAL
+  COMMERCIAL
+  TRANSACTIONAL
+  NAVIGATIONAL
+  LOCAL
+  MIXED
+}
+
+enum SeoContentType {
+  BLOG_ARTICLE
+  LANDING_PAGE
+  CATEGORY_PAGE
+  PRODUCT_GUIDE
+  CASE_STUDY
+  KNOWLEDGE_BASE
+  COMPARISON
+  GLOSSARY
+  FAQ
+  CAPABILITY_PAGE
+  DEALER_CONTENT
+  OTHER
+}
+
+enum SeoFunnelStage {
+  AWARENESS
+  CONSIDERATION
+  DECISION
+  RETENTION
+}
+
+enum SeoTopicPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum SeoKeywordType {
+  PRIMARY
+  SECONDARY
+  LONG_TAIL
+  QUESTION
+  ENTITY
+  SUPPORTING
+  NEGATIVE
+}
+
+enum SeoTargetEntityType {
+  BLOG_POST
+  LANDING_PAGE
+  PRODUCT
+  CATEGORY
+  MANUFACTURING_ASSET
+  DEALER_PAGE
+  EXTERNAL
+  NONE
+}
+
+enum SeoInternalLinkStatus {
+  SUGGESTED
+  ACCEPTED
+  REJECTED
+  IMPLEMENTED
+}
+
+model SeoStrategy {
+  id          String            @id @default(cuid())
+  code        String?           @unique
+  name        String
+  description String?           @db.Text
+  status      SeoStrategyStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  ownerId     String?
+  sortOrder   Int               @default(0)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  clusters    SeoTopicCluster[]
+
+  @@index([status, sortOrder])
+  @@index([createdAt])
+}
+
+model SeoTopicCluster {
+  id             String            @id @default(cuid())
+  strategyId     String
+  parentId       String?
+  code           String?
+  name           String
+  slug           String?
+  description    String?           @db.Text
+  pillarTopic    String?
+  targetAudience String[]          @default([])
+  businessGoals  String[]          @default([])
+  sortOrder      Int               @default(0)
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  strategy       SeoStrategy       @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  parent         SeoTopicCluster?  @relation("SeoTopicClusterTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children       SeoTopicCluster[] @relation("SeoTopicClusterTree")
+  topics         SeoTopic[]
+
+  @@index([strategyId, sortOrder])
+  @@index([parentId])
+  @@index([isActive])
+}
+
+model SeoTopic {
+  id               String              @id @default(cuid())
+  clusterId        String
+  title            String
+  slug             String?
+  description      String?             @db.Text
+  primaryKeyword   String
+  searchIntent     SeoSearchIntent
+  contentType      SeoContentType
+  funnelStage      SeoFunnelStage
+  priority         SeoTopicPriority    @default(NORMAL)
+  status           SeoTopicStatus      @default(IDEA)
+  targetAudience   String[]            @default([])
+  businessValue    Int                 @default(0)
+  relevanceScore   Int                 @default(0)
+  opportunityScore Int                 @default(0)
+  confidenceScore  Int                 @default(0)
+  targetEntityType SeoTargetEntityType @default(NONE)
+  targetEntityId   String?
+  targetUrl        String?
+  existingUrl      String?
+  canonicalUrl     String?
+  notes            String?             @db.Text
+  assignedTo       String?
+  dueDate          DateTime?
+  publishedAt      DateTime?
+  mediaBundleId    String?
+  mediaPlanScore   Int?
+  mediaPlanStatus  String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  cluster          SeoTopicCluster     @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  keywords         SeoKeyword[]
+  internalLinksFrom SeoInternalLinkOpportunity[] @relation("SeoInternalLinkSource")
+  internalLinksTo   SeoInternalLinkOpportunity[] @relation("SeoInternalLinkTarget")
+  brief            SeoContentBrief?
+  mediaBundle      MediaBundle?        @relation(fields: [mediaBundleId], references: [id], onDelete: SetNull)
+
+  @@index([clusterId, status, priority])
+  @@index([searchIntent])
+  @@index([contentType])
+  @@index([funnelStage])
+  @@index([targetEntityType, targetEntityId])
+  @@index([mediaBundleId])
+  @@index([dueDate])
+  @@index([primaryKeyword])
+}
+
+model SeoKeyword {
+  id                String           @id @default(cuid())
+  topicId           String
+  keyword           String
+  normalized        String
+  keywordType       SeoKeywordType
+  searchIntent      SeoSearchIntent?
+  source            String?
+  searchVolume      Int?
+  keywordDifficulty Decimal?         @db.Decimal(5, 2)
+  cpc               Decimal?           @db.Decimal(12, 2)
+  priority          Int                @default(0)
+  notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  topic             SeoTopic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, normalized])
+  @@index([normalized])
+  @@index([keywordType])
+}
+
+model SeoContentBrief {
+  id                String    @id @default(cuid())
+  topicId           String    @unique
+  workingTitle      String?
+  proposedSlug      String?
+  metaTitle         String?
+  metaDescription   String?
+  searchIntentNotes String?   @db.Text
+  audienceNotes     String?   @db.Text
+  valueProposition  String?   @db.Text
+  outline           Json      @default("[]")
+  questions         Json      @default("[]")
+  entities          String[]  @default([])
+  requiredSections  String[]  @default([])
+  ctaType           String?
+  ctaText           String?
+  wordCountMin      Int?
+  wordCountMax      Int?
+  schemaTypes       String[]  @default([])
+  mediaRequirements Json?
+  editorNotes       String?   @db.Text
+  version           Int       @default(1)
+  approvedAt        DateTime?
+  approvedBy        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  topic             SeoTopic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+}
+
+model SeoInternalLinkOpportunity {
+  id             String                @id @default(cuid())
+  sourceTopicId  String
+  targetTopicId  String
+  anchorText     String?
+  context        String?
+  relevanceScore Int                   @default(0)
+  status         SeoInternalLinkStatus @default(SUGGESTED)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  sourceTopic    SeoTopic              @relation("SeoInternalLinkSource", fields: [sourceTopicId], references: [id], onDelete: Cascade)
+  targetTopic    SeoTopic              @relation("SeoInternalLinkTarget", fields: [targetTopicId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceTopicId, targetTopicId])
+  @@index([targetTopicId, status])
+}
+
 enum MediaFolder {
   PRODUCTS
   CATEGORIES
@@ -1137,6 +1387,7 @@ model MediaBundle {
   updatedAt      DateTime               @updatedAt
   slots          MediaBundleSlot[]
   blogPosts      BlogPost[]
+  seoTopics      SeoTopic[]
 
   @@index([status])
   @@index([contentType, isActive, sortOrder])
