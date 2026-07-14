@@ -3,6 +3,7 @@ import {
   rankKnowledgeEntriesForQuery,
   type ContextPreviewInput,
 } from "@/features/knowledge-base/knowledge-base-context-preview";
+import type { KnowledgeVisibilityAudience } from "@/features/knowledge-base/knowledge-base-visibility";
 import {
   calculateKnowledgeAiReadiness,
   type AiReadinessResult,
@@ -144,6 +145,7 @@ export async function buildKnowledgeContext(input: {
   usageScope?: string[];
   categoryIds?: string[];
   selectedEntryIds?: string[];
+  audience?: KnowledgeVisibilityAudience;
   limit?: number;
   minReadinessScore?: number;
 }): Promise<KnowledgeContextResult> {
@@ -162,6 +164,7 @@ export async function buildKnowledgeContext(input: {
       query: input.query,
       usageScope: input.usageScope,
       categoryIds: input.categoryIds,
+      audience: input.audience ?? "INTERNAL_AI",
       limit,
       includeArchived: false,
     };

@@ -2,6 +2,10 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { computeDashboardKpis } from "@/features/knowledge-base/knowledge-base-completeness-checklist";
 import { calculateKnowledgeCompleteness } from "@/features/knowledge-base/knowledge-base-utils";
+import {
+  buildKnowledgeEntrySnapshot,
+  createKnowledgeEntryVersion,
+} from "@/features/knowledge-base/knowledge-base-version.service";
 
 export const DEFAULT_KNOWLEDGE_CATEGORIES = [
   {
@@ -89,6 +93,9 @@ export type KnowledgeBaseListParams = {
   status?: string;
   usageScope?: string;
   priority?: string;
+  visibility?: string;
+  claimStatus?: string;
+  domain?: string;
   verifiedOnly?: boolean;
   page?: number;
   pageSize?: number;
@@ -106,6 +113,8 @@ function mapEntry(
     ...entry,
     structuredData: (entry.structuredData as Record<string, unknown> | null) ?? null,
     verifiedAt: entry.verifiedAt?.toISOString() ?? null,
+    approvedAt: entry.approvedAt?.toISOString() ?? null,
+    lastVerifiedAt: entry.lastVerifiedAt?.toISOString() ?? null,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
     category: entry.category,
@@ -127,6 +136,9 @@ export async function listKnowledgeBaseEntries(params: KnowledgeBaseListParams =
   if (params.type) where.type = params.type as Prisma.KnowledgeBaseEntryWhereInput["type"];
   if (params.status) where.status = params.status as Prisma.KnowledgeBaseEntryWhereInput["status"];
   if (params.priority) where.priority = params.priority as Prisma.KnowledgeBaseEntryWhereInput["priority"];
+  if (params.visibility) where.visibility = params.visibility as Prisma.KnowledgeBaseEntryWhereInput["visibility"];
+  if (params.claimStatus) where.claimStatus = params.claimStatus as Prisma.KnowledgeBaseEntryWhereInput["claimStatus"];
+  if (params.domain?.trim()) where.domain = params.domain.trim();
   if (params.verifiedOnly) where.isVerified = true;
   if (params.usageScope) where.usageScope = { has: params.usageScope };
   if (params.search?.trim()) {
@@ -136,6 +148,8 @@ export async function listKnowledgeBaseEntries(params: KnowledgeBaseListParams =
       { summary: { contains: q, mode: "insensitive" } },
       { content: { contains: q, mode: "insensitive" } },
       { tags: { has: q } },
+      { aliases: { has: q } },
+      { domain: { contains: q, mode: "insensitive" } },
     ];
   }
 
@@ -179,21 +193,65 @@ export async function updateKnowledgeBaseEntry(
   data: Prisma.KnowledgeBaseEntryUncheckedUpdateInput
 ) {
   const existing = await prisma.knowledgeBaseEntry.findUnique({ where: { id } });
-  const isVerified = typeof data.isVerified === "boolean" ? data.isVerified : existing?.isVerified;
+  if (!existing) throw new Error("ENTRY_NOT_FOUND");
+
+  const isVerified = typeof data.isVerified === "boolean" ? data.isVerified : existing.isVerified;
+  const now = new Date();
+  const wasVerified = existing.isVerified;
+  const becomingVerified = isVerified && !wasVerified;
+  const nextVersion = becomingVerified ? existing.version + 1 : existing.version;
 
   const entry = await prisma.knowledgeBaseEntry.update({
     where: { id },
     data: {
       ...data,
+      version: nextVersion,
       verifiedAt:
-        isVerified && !existing?.verifiedAt
-          ? new Date()
+        isVerified && !existing.verifiedAt
+          ? now
           : isVerified
-            ? existing?.verifiedAt ?? new Date()
+            ? existing.verifiedAt ?? now
             : null,
+      lastVerifiedAt: isVerified ? now : existing.lastVerifiedAt,
+      approvedAt:
+        typeof data.approvedBy === "string" && data.approvedBy.trim()
+          ? existing.approvedAt ?? now
+          : data.approvedAt === null
+            ? null
+            : existing.approvedAt,
     },
     include: entryInclude,
   });
+
+  if (becomingVerified) {
+    const snapshot = buildKnowledgeEntrySnapshot({
+      title: entry.title,
+      summary: entry.summary,
+      content: entry.content,
+      structuredData: entry.structuredData,
+      type: entry.type,
+      status: entry.status,
+      visibility: entry.visibility,
+      claimStatus: entry.claimStatus,
+      confidence: entry.confidence,
+      tags: entry.tags,
+      aliases: entry.aliases,
+      version: entry.version,
+      isVerified: entry.isVerified,
+      evidenceUrl: entry.evidenceUrl,
+      approvedBy: entry.approvedBy,
+      approvedAt: entry.approvedAt,
+    });
+    await createKnowledgeEntryVersion({
+      entryId: entry.id,
+      version: entry.version,
+      snapshot,
+      approvedBy: entry.approvedBy,
+      approvedAt: entry.approvedAt,
+      changeNote: "Auto-snapshot on verification",
+    });
+  }
+
   return mapEntry(entry);
 }
 

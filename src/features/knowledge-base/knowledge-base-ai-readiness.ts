@@ -1,4 +1,6 @@
 import type { KnowledgeBaseEntryRecord } from "@/features/knowledge-base/knowledge-base-types";
+import type { KnowledgeBaseClaimStatus } from "@prisma/client";
+import { getClaimGovernanceWarnings } from "@/features/knowledge-base/knowledge-base-claim-governance";
 import { getEntrySourceInfo } from "@/features/knowledge-base/knowledge-base-source-utils";
 
 export type AiReadinessLevel = "LOW" | "MEDIUM" | "HIGH" | "VERIFIED";
@@ -27,11 +29,17 @@ export function calculateKnowledgeAiReadiness(entry: {
   content: string | null;
   categoryId?: string;
   tags?: string[];
+  aliases?: string[];
   usageScope?: string[];
   isVerified?: boolean;
   priority?: string;
   sourceId?: string | null;
   structuredData?: Record<string, unknown> | null;
+  visibility?: string;
+  claimStatus?: string;
+  evidenceUrl?: string | null;
+  approvedBy?: string | null;
+  version?: number;
   source?: { name: string; url?: string | null } | null;
 }): AiReadinessResult {
   let score = 0;
@@ -80,6 +88,36 @@ export function calculateKnowledgeAiReadiness(entry: {
     reasons.push("Có tags");
   } else {
     missing.push("Thiếu tags");
+  }
+
+  if ((entry.aliases?.length ?? 0) > 0) {
+    score += 5;
+    reasons.push("Có aliases");
+  }
+
+  if (entry.structuredData && Object.keys(entry.structuredData).length > 0) {
+    score += 10;
+    reasons.push("Có structured data");
+  } else {
+    missing.push("Thiếu structured data");
+  }
+
+  if (entry.visibility) {
+    score += 3;
+    reasons.push(`Visibility: ${entry.visibility}`);
+  }
+
+  const claimWarnings = getClaimGovernanceWarnings({
+    claimStatus: (entry.claimStatus ?? "FACT") as KnowledgeBaseClaimStatus,
+    evidenceUrl: entry.evidenceUrl,
+    approvedBy: entry.approvedBy,
+    isVerified: Boolean(entry.isVerified),
+  });
+  if (claimWarnings.length === 0 && entry.claimStatus) {
+    score += 5;
+    reasons.push("Claim governance ổn");
+  } else {
+    missing.push(...claimWarnings);
   }
 
   if ((entry.usageScope?.length ?? 0) > 0) {

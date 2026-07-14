@@ -4,11 +4,16 @@ import {
   type AiReadinessResult,
 } from "@/features/knowledge-base/knowledge-base-ai-readiness";
 import { getEntrySourceInfo } from "@/features/knowledge-base/knowledge-base-source-utils";
+import {
+  filterEntriesByVisibility,
+  type KnowledgeVisibilityAudience,
+} from "@/features/knowledge-base/knowledge-base-visibility";
 
 export type ContextPreviewInput = {
   query: string;
   usageScope?: string[];
   categoryIds?: string[];
+  audience?: KnowledgeVisibilityAudience;
   limit?: number;
   includeArchived?: boolean;
 };
@@ -61,6 +66,10 @@ export function rankKnowledgeEntriesForQuery(
     return true;
   });
 
+  if (input.audience) {
+    pool = filterEntriesByVisibility(pool, input.audience);
+  }
+
   const ranked = pool
     .map((entry) => {
       let score = 0;
@@ -70,11 +79,23 @@ export function rankKnowledgeEntriesForQuery(
       const summary = normalizeText(entry.summary ?? "");
       const content = normalizeText(entry.content ?? "").slice(0, 2000);
       const tags = entry.tags.map(normalizeText).join(" ");
+      const aliases = (entry.aliases ?? []).map(normalizeText).join(" ");
       const category = normalizeText(entry.category?.name ?? "");
+      const structured = entry.structuredData
+        ? normalizeText(
+            Object.entries(entry.structuredData)
+              .map(([key, value]) => `${key} ${Array.isArray(value) ? value.join(" ") : String(value)}`)
+              .join(" ")
+          )
+        : "";
 
       if (normalizedQuery && title.includes(normalizedQuery)) {
         score += 25;
         matchReasons.push("Khớp tiêu đề");
+      }
+      if (normalizedQuery && aliases.includes(normalizedQuery)) {
+        score += 20;
+        matchReasons.push("Khớp alias");
       }
       if (normalizedQuery && summary.includes(normalizedQuery)) {
         score += 15;
@@ -95,6 +116,14 @@ export function rankKnowledgeEntriesForQuery(
         if (tags.includes(token)) {
           score += 6;
           matchReasons.push("Khớp tags");
+        }
+        if (aliases.includes(token)) {
+          score += 5;
+          matchReasons.push("Khớp alias");
+        }
+        if (structured.includes(token)) {
+          score += 4;
+          matchReasons.push("Khớp structured data");
         }
         if (category.includes(token)) {
           score += 5;

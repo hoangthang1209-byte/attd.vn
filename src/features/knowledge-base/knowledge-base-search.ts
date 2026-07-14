@@ -16,12 +16,21 @@ export function searchKnowledgeBase(
   if (!q) return entries;
 
   return entries.filter((entry) => {
+    const structured = entry.structuredData
+      ? Object.entries(entry.structuredData)
+          .map(([key, value]) => `${key} ${Array.isArray(value) ? value.join(" ") : String(value)}`)
+          .join(" ")
+      : "";
     const haystack = [
       entry.title,
       entry.summary ?? "",
       entry.content ?? "",
       entry.tags.join(" "),
+      (entry.aliases ?? []).join(" "),
       entry.category?.name ?? "",
+      entry.domain ?? "",
+      structured,
+      entry.relatedProductIds.join(" "),
     ]
       .join(" ")
       .toLowerCase();

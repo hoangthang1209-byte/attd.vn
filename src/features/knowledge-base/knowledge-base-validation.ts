@@ -1,6 +1,16 @@
-import type { KnowledgeBaseEntryType, KnowledgeBaseEntryStatus, KnowledgeBasePriority } from "@prisma/client";
+import type {
+  KnowledgeBaseClaimStatus,
+  KnowledgeBaseConfidence,
+  KnowledgeBaseEntryType,
+  KnowledgeBaseEntryStatus,
+  KnowledgeBasePriority,
+  KnowledgeBaseVisibility,
+} from "@prisma/client";
 import type { KnowledgeBaseEntryInput } from "@/features/knowledge-base/knowledge-base-types";
 import { generateKnowledgeBaseSlug, normalizeKnowledgeBaseTags } from "@/features/knowledge-base/knowledge-base-utils";
+import { normalizeStructuredData } from "@/features/knowledge-base/knowledge-base-structured-schema";
+import { inferVisibilityFromUsageScope } from "@/features/knowledge-base/knowledge-base-visibility";
+import { resolveClaimStatusOnVerify } from "@/features/knowledge-base/knowledge-base-claim-governance";
 
 const VALID_TYPES: KnowledgeBaseEntryType[] = [
   "COMPANY", "PRODUCT", "MATERIAL", "MANUFACTURING", "OEM", "WHOLESALE", "DEALER",
@@ -10,6 +20,22 @@ const VALID_TYPES: KnowledgeBaseEntryType[] = [
 
 const VALID_STATUSES: KnowledgeBaseEntryStatus[] = ["DRAFT", "ACTIVE", "ARCHIVED"];
 const VALID_PRIORITIES: KnowledgeBasePriority[] = ["HIGH", "MEDIUM", "LOW"];
+const VALID_VISIBILITY: KnowledgeBaseVisibility[] = ["PUBLIC", "INTERNAL", "CONFIDENTIAL"];
+const VALID_CLAIMS: KnowledgeBaseClaimStatus[] = [
+  "FACT", "OPINION", "MARKETING_CLAIM", "VERIFIED_CLAIM", "NEEDS_EVIDENCE",
+];
+const VALID_CONFIDENCE: KnowledgeBaseConfidence[] = ["LOW", "MEDIUM", "HIGH"];
+
+function normalizeAliases(value: string[] | string | undefined): string[] {
+  if (!value) return [];
+  const list = Array.isArray(value) ? value : value.split(",");
+  return [...new Set(list.map((item) => item.trim()).filter(Boolean))];
+}
+
+function normalizeIdList(value: string[] | undefined): string[] {
+  if (!value) return [];
+  return [...new Set(value.map((id) => id.trim()).filter(Boolean))];
+}
 
 export function validateKnowledgeBaseEntry(input: Partial<KnowledgeBaseEntryInput>): {
   valid: boolean;
@@ -35,6 +61,25 @@ export function validateKnowledgeBaseEntry(input: Partial<KnowledgeBaseEntryInpu
   if (input.priority && !VALID_PRIORITIES.includes(input.priority)) {
     errors.push("Mức ưu tiên không hợp lệ.");
   }
+  if (input.visibility && !VALID_VISIBILITY.includes(input.visibility)) {
+    errors.push("Visibility không hợp lệ.");
+  }
+  if (input.claimStatus && !VALID_CLAIMS.includes(input.claimStatus)) {
+    errors.push("Claim status không hợp lệ.");
+  }
+  if (input.confidence && !VALID_CONFIDENCE.includes(input.confidence)) {
+    errors.push("Confidence không hợp lệ.");
+  }
+
+  const usageScope = input.usageScope ?? [];
+  const visibility =
+    input.visibility ?? inferVisibilityFromUsageScope(usageScope);
+  const isVerified = input.isVerified ?? false;
+  const claimStatus = resolveClaimStatusOnVerify({
+    claimStatus: input.claimStatus ?? "FACT",
+    evidenceUrl: input.evidenceUrl,
+    isVerified,
+  });
 
   if (errors.length > 0) return { valid: false, errors };
 
@@ -46,19 +91,32 @@ export function validateKnowledgeBaseEntry(input: Partial<KnowledgeBaseEntryInpu
       slug,
       summary: input.summary ?? null,
       content: input.content ?? null,
-      structuredData: input.structuredData ?? null,
+      structuredData: normalizeStructuredData(input.structuredData ?? null),
       categoryId: input.categoryId!,
       type: input.type!,
       status: input.status ?? "DRAFT",
       priority: input.priority ?? "MEDIUM",
       sourceId: input.sourceId ?? null,
       tags: normalizeKnowledgeBaseTags(input.tags),
-      relatedProductIds: input.relatedProductIds ?? [],
-      relatedLandingPageSlugs: input.relatedLandingPageSlugs ?? [],
-      relatedBlogPostIds: input.relatedBlogPostIds ?? [],
-      usageScope: input.usageScope ?? [],
+      aliases: normalizeAliases(input.aliases),
+      relatedProductIds: normalizeIdList(input.relatedProductIds),
+      relatedLandingPageSlugs: normalizeIdList(input.relatedLandingPageSlugs),
+      relatedBlogPostIds: normalizeIdList(input.relatedBlogPostIds),
+      relatedMediaBundleIds: normalizeIdList(input.relatedMediaBundleIds),
+      relatedSeoTopicIds: normalizeIdList(input.relatedSeoTopicIds),
+      relatedEntryIds: normalizeIdList(input.relatedEntryIds),
+      usageScope,
+      visibility,
+      claimStatus,
+      confidence: input.confidence ?? "MEDIUM",
+      language: input.language?.trim() || "vi",
+      domain: input.domain?.trim() || null,
+      ownerId: input.ownerId?.trim() || null,
+      authorName: input.authorName?.trim() || null,
+      evidenceUrl: input.evidenceUrl?.trim() || null,
+      approvedBy: input.approvedBy?.trim() || null,
       isFeatured: input.isFeatured ?? false,
-      isVerified: input.isVerified ?? false,
+      isVerified,
     },
   };
 }

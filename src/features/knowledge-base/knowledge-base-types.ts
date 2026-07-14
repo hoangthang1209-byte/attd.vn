@@ -1,8 +1,11 @@
 import type {
+  KnowledgeBaseClaimStatus,
+  KnowledgeBaseConfidence,
   KnowledgeBaseEntryStatus,
   KnowledgeBaseEntryType,
   KnowledgeBasePriority,
   KnowledgeBaseSourceType,
+  KnowledgeBaseVisibility,
 } from "@prisma/client";
 
 export type KnowledgeBaseUsageScope =
@@ -64,10 +67,26 @@ export type KnowledgeBaseEntryRecord = {
     note: string | null;
   } | null;
   tags: string[];
+  aliases: string[];
   relatedProductIds: string[];
   relatedLandingPageSlugs: string[];
   relatedBlogPostIds: string[];
+  relatedMediaBundleIds: string[];
+  relatedSeoTopicIds: string[];
+  relatedEntryIds: string[];
   usageScope: string[];
+  visibility: KnowledgeBaseVisibility;
+  claimStatus: KnowledgeBaseClaimStatus;
+  confidence: KnowledgeBaseConfidence;
+  language: string;
+  domain: string | null;
+  ownerId: string | null;
+  authorName: string | null;
+  evidenceUrl: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  lastVerifiedAt: string | null;
+  version: number;
   isFeatured: boolean;
   isVerified: boolean;
   verifiedAt: string | null;
@@ -96,10 +115,23 @@ export type KnowledgeBaseEntryInput = {
   priority?: KnowledgeBasePriority;
   sourceId?: string | null;
   tags?: string[];
+  aliases?: string[];
   relatedProductIds?: string[];
   relatedLandingPageSlugs?: string[];
   relatedBlogPostIds?: string[];
+  relatedMediaBundleIds?: string[];
+  relatedSeoTopicIds?: string[];
+  relatedEntryIds?: string[];
   usageScope?: string[];
+  visibility?: KnowledgeBaseVisibility;
+  claimStatus?: KnowledgeBaseClaimStatus;
+  confidence?: KnowledgeBaseConfidence;
+  language?: string;
+  domain?: string | null;
+  ownerId?: string | null;
+  authorName?: string | null;
+  evidenceUrl?: string | null;
+  approvedBy?: string | null;
   isFeatured?: boolean;
   isVerified?: boolean;
 };
@@ -149,4 +181,4 @@ export type KnowledgeReadinessResult = {
   warnings: string[];
 };
 
-export type { KnowledgeBaseEntryType, KnowledgeBaseEntryStatus, KnowledgeBasePriority, KnowledgeBaseSourceType };
+export type { KnowledgeBaseEntryType, KnowledgeBaseEntryStatus, KnowledgeBasePriority, KnowledgeBaseSourceType, KnowledgeBaseVisibility, KnowledgeBaseClaimStatus, KnowledgeBaseConfidence };

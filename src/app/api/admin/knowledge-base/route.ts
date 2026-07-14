@@ -24,6 +24,9 @@ export async function GET(req: NextRequest) {
       usageScope: searchParams.get("usageScope") ?? undefined,
       priority: searchParams.get("priority") ?? undefined,
       verifiedOnly: searchParams.get("verifiedOnly") === "1",
+      visibility: searchParams.get("visibility") ?? undefined,
+      claimStatus: searchParams.get("claimStatus") ?? undefined,
+      domain: searchParams.get("domain") ?? undefined,
       page: Number(searchParams.get("page") ?? 1),
       pageSize: Number(searchParams.get("pageSize") ?? 50),
     });

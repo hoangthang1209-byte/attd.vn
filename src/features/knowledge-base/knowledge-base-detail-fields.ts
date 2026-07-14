@@ -13,17 +13,30 @@ export type DetailFormSchema = "product" | "oem" | "dealer" | "policy" | "faq" |
 
 const PRODUCT_FIELDS: DetailFieldDefinition[] = [
   { key: "material", label: "Chất liệu", type: "text", placeholder: "Ví dụ: Cotton 100%, CVC" },
+  { key: "materialComposition", label: "Thành phần vải", type: "text", placeholder: "60% cotton, 40% polyester" },
+  { key: "fabricWeightGsm", label: "Định lượng (GSM)", type: "text", placeholder: "180" },
   { key: "form", label: "Form dáng", type: "text", placeholder: "Ví dụ: Regular fit, slim fit" },
   { key: "colors", label: "Màu sắc", type: "list", placeholder: "Đen, Trắng, Xám" },
   { key: "sizes", label: "Kích thước", type: "list", placeholder: "S, M, L, XL, XXL" },
-  { key: "moq", label: "MOQ", type: "text", placeholder: "Ví dụ: 10 sản phẩm" },
+  { key: "moq", label: "MOQ (mô tả)", type: "text", placeholder: "Ví dụ: 10 sản phẩm" },
+  { key: "moqValue", label: "MOQ (số)", type: "text", placeholder: "10" },
+  { key: "moqUnit", label: "Đơn vị MOQ", type: "text", placeholder: "sản phẩm / màu" },
+  { key: "printCompatibility", label: "Tương thích in", type: "list", placeholder: "Screen print, DTG" },
+  { key: "embroideryCompatibility", label: "Tương thích thêu", type: "list", placeholder: "Logo ngực, tay áo" },
+  { key: "washCompatibility", label: "Tương thích wash", type: "list", placeholder: "Enzyme wash, stone wash" },
   { key: "useCases", label: "Ứng dụng", type: "list", placeholder: "In logo, đồng phục, bán sỉ" },
   { key: "notes", label: "Ghi chú", type: "textarea" },
 ];
 
 const OEM_FIELDS: DetailFieldDefinition[] = [
-  { key: "moq", label: "MOQ", type: "text" },
-  { key: "leadTime", label: "Lead time", type: "text", placeholder: "Ví dụ: 7–14 ngày" },
+  { key: "moq", label: "MOQ (mô tả)", type: "text" },
+  { key: "moqValue", label: "MOQ (số)", type: "text" },
+  { key: "leadTime", label: "Lead time (mô tả)", type: "text", placeholder: "Ví dụ: 7–14 ngày" },
+  { key: "leadTimeMinDays", label: "Lead time min (ngày)", type: "text", placeholder: "7" },
+  { key: "leadTimeMaxDays", label: "Lead time max (ngày)", type: "text", placeholder: "14" },
+  { key: "capacity", label: "Công suất", type: "text", placeholder: "10.000 áo/tháng" },
+  { key: "factoryLocation", label: "Vị trí xưởng", type: "text" },
+  { key: "country", label: "Quốc gia", type: "text", placeholder: "Việt Nam" },
   { key: "services", label: "Dịch vụ hỗ trợ", type: "list", placeholder: "May, In, Thêu, Đóng gói" },
   { key: "manufacturingTech", label: "Công nghệ sản xuất", type: "text" },
   { key: "designRequirements", label: "Yêu cầu thiết kế", type: "textarea" },

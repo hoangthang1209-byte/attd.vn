@@ -15,13 +15,20 @@ import {
   getRecommendedKnowledgeForBlueprint,
   getRecommendedKnowledgeForKeyword,
 } from "@/features/knowledge-base/knowledge-base-search";
+import {
+  filterEntriesByVisibility,
+  type KnowledgeVisibilityAudience,
+} from "@/features/knowledge-base/knowledge-base-visibility";
+import { isClaimSafeForAiOutput } from "@/features/knowledge-base/knowledge-base-claim-governance";
 
 export type BuildAiContextOptions = {
   keyword?: string;
   blueprintId?: string;
   usageScope?: string;
+  audience?: KnowledgeVisibilityAudience;
   maxEntries?: number;
   verifiedOnly?: boolean;
+  claimSafeOnly?: boolean;
   entryIds?: string[];
 };
 
@@ -49,8 +56,16 @@ export function buildAiContextFromKnowledgeBase(
     selected = filterKnowledgeByUsageScope(selected, options.usageScope);
   }
 
+  if (options.audience) {
+    selected = filterEntriesByVisibility(selected, options.audience);
+  }
+
   if (options.verifiedOnly) {
     selected = selected.filter((entry) => entry.isVerified);
+  }
+
+  if (options.claimSafeOnly) {
+    selected = selected.filter((entry) => isClaimSafeForAiOutput(entry.claimStatus));
   }
 
   selected = selected.filter((entry) => entry.status === "ACTIVE" || entry.status === "DRAFT");
