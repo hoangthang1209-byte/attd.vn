@@ -90,6 +90,9 @@ const emptyNewSlotForm = (): NewSlotForm => ({
 export default function MediaBundleEditorClient({ bundleId }: { bundleId: string }) {
   const toast = useAdminToast();
   const [bundle, setBundle] = useState<MediaBundleDetail | null>(null);
+  const [consumers, setConsumers] = useState<
+    Array<{ id: string; title: string; status: string; route: string }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -123,9 +126,14 @@ export default function MediaBundleEditorClient({ bundleId }: { bundleId: string
     setLoadError(null);
     try {
       const res = await fetch(`/api/content/media-bundles/${bundleId}`);
-      const data = (await res.json()) as { bundle?: MediaBundleDetail; message?: string };
+      const data = (await res.json()) as {
+        bundle?: MediaBundleDetail;
+        message?: string;
+        consumers?: { blogPosts?: Array<{ id: string; title: string; status: string; route: string }> };
+      };
       if (!res.ok || !data.bundle) throw new Error(data.message ?? "Không tìm thấy bộ media");
       setBundle(data.bundle);
+      setConsumers(data.consumers?.blogPosts ?? []);
       setHeaderForm({
         name: data.bundle.name,
         code: data.bundle.code ?? "",
@@ -505,6 +513,24 @@ export default function MediaBundleEditorClient({ bundleId }: { bundleId: string
           <span className="admin-badge">{bundle.slotCount} vị trí</span>
           <span className="admin-badge">{bundle.assetCount} ảnh</span>
           {bundle.isSystem && <span className="admin-badge">Hệ thống</span>}
+        </div>
+
+        <div className="admin-sidebar-card" style={{ marginBottom: 16 }}>
+          <h3 className="admin-sidebar-title">Đang được sử dụng bởi</h3>
+          {consumers.length === 0 ? (
+            <p className="admin-field-hint">Chưa có bài viết Blog liên kết Bundle này.</p>
+          ) : (
+            <ul className="admin-checkbox-list">
+              {consumers.map((post) => (
+                <li key={post.id}>
+                  <Link href={post.route} className="admin-link">
+                    {post.title}
+                  </Link>{" "}
+                  <span className="admin-badge">{post.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <form onSubmit={(e) => void saveHeader(e)} className="admin-form">

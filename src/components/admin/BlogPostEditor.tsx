@@ -12,6 +12,7 @@ import BlogSeoPanel from "@/components/admin/BlogSeoPanel";
 import BlogTagInput from "@/components/admin/BlogTagInput";
 import BlogClusterGenerator from "@/components/admin/BlogClusterGenerator";
 import AiContentFactory from "@/components/admin/blog-editor/AiContentFactory";
+import BlogMediaWorkspace from "@/components/admin/blog-editor/BlogMediaWorkspace";
 import type { ClusterArticle } from "@/features/blog/content-clusters";
 import type { ClusterType } from "@/features/blog/content-clusters-types";
 import { clusterArticleToHandoff, type ClusterHandoffRequest } from "@/features/blog/cluster-handoff";
@@ -71,6 +72,23 @@ function statusBadgeClass(status: BlogPostStatus): string {
   if (status === "PUBLISHED") return "admin-badge--published";
   if (status === "REVIEW") return "admin-badge--review";
   return "admin-badge--draft";
+}
+
+function contentLooksLikeMarkdown(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed) return true;
+  if (/<figure[\s>]/i.test(trimmed) || /<p[\s>]/i.test(trimmed) || /<div[\s>]/i.test(trimmed)) {
+    return false;
+  }
+  return true;
+}
+
+function inlineHtmlToMarkdown(html: string): string | null {
+  const srcMatch = html.match(/src="([^"]+)"/);
+  if (!srcMatch?.[1]) return null;
+  const altMatch = html.match(/alt="([^"]*)"/);
+  const alt = altMatch?.[1] ?? "";
+  return `\n\n![${alt}](${srcMatch[1]})\n\n`;
 }
 
 export default function BlogPostEditor(props: Props) {
@@ -201,6 +219,17 @@ export default function BlogPostEditor(props: Props) {
     setCategoryIds((prev) =>
       prev.includes(id) ? prev.filter((cid) => cid !== id) : [...prev, id]
     );
+  }
+
+  function handleInsertInlineHtml(html: string) {
+    if (contentLooksLikeMarkdown(markdown)) {
+      const md = inlineHtmlToMarkdown(html);
+      if (md) {
+        setMarkdown((prev) => (prev.trim() ? `${prev}${md}` : md.trimStart()));
+        return;
+      }
+    }
+    setMarkdown((prev) => (prev.trim() ? `${prev}\n\n${html}` : html));
   }
 
   async function copyArticleUrl() {
@@ -409,6 +438,20 @@ export default function BlogPostEditor(props: Props) {
             </div>
             <BlogVisualEditor value={markdown} onChange={setMarkdown} />
           </div>
+
+          <BlogMediaWorkspace
+            postId={isEdit ? initial!.id : null}
+            title={title}
+            keywords={tags}
+            categoryNames={categories
+              .filter((category) => categoryIds.includes(category.id))
+              .map((category) => category.name)}
+            featuredImageUrl={featuredImage?.url ?? null}
+            ogImageUrl={ogImage?.url ?? null}
+            onFeaturedUrlChange={(url) => setFeaturedImage(toMediaValue(url))}
+            onOgUrlChange={(url) => setOgImage(toMediaValue(url))}
+            onInsertInlineHtml={handleInsertInlineHtml}
+          />
 
           <div className="admin-sidebar-card">
             <BlogFaqBuilder items={faqJson} onChange={setFaqJson} />

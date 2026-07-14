@@ -122,6 +122,15 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     ) {
       return NextResponse.json({ message: "Slug đã tồn tại" }, { status: 409 });
     }
+    const message = err instanceof Error ? err.message : "Không thể cập nhật bài viết";
+    if (
+      message.includes("Media chưa sẵn sàng") ||
+      message.includes("PRIVATE") ||
+      message.includes("Thiếu ảnh Featured") ||
+      message.includes("xuất bản")
+    ) {
+      return NextResponse.json({ message }, { status: 400 });
+    }
     console.error("[PATCH /api/blog/posts/[id]]", err);
     return NextResponse.json({ message: "Không thể cập nhật bài viết" }, { status: 500 });
   }

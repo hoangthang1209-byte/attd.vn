@@ -26,10 +26,39 @@ function refKey(ref: MediaReference): string {
   return `${ref.type}:${ref.entityId}:${ref.field ?? ""}:${ref.referenceMode}`;
 }
 
+function placementDedupeKey(ref: MediaReference): string | null {
+  if (ref.type !== "BLOG") return null;
+  const field = ref.field ?? "";
+  const normalized =
+    field === "featuredImageUrl" || field === "FEATURED"
+      ? "FEATURED"
+      : field === "ogImageUrl" || field === "OG_IMAGE"
+        ? "OG_IMAGE"
+        : field.startsWith("INLINE") || field === "INLINE"
+          ? `INLINE:${field}`
+          : field;
+  return `${ref.type}:${ref.entityId}:${normalized}`;
+}
+
 function dedupe(refs: MediaReference[]): MediaReference[] {
   const seen = new Set<string>();
+  const placementSeen = new Set<string>();
   const out: MediaReference[] = [];
-  for (const ref of refs) {
+
+  // Prefer RELATION over URL_MATCH for the same Blog placement.
+  const ordered = [...refs].sort((a, b) => {
+    if (a.referenceMode === b.referenceMode) return 0;
+    return a.referenceMode === "RELATION" ? -1 : 1;
+  });
+
+  for (const ref of ordered) {
+    const placementKey = placementDedupeKey(ref);
+    if (placementKey) {
+      if (placementSeen.has(placementKey) && ref.referenceMode === "URL_MATCH") {
+        continue;
+      }
+      placementSeen.add(placementKey);
+    }
     const key = refKey(ref);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -71,6 +100,7 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
     blogFeatured,
     blogOg,
     techPackAssets,
+    contentAssignments,
   ] = await Promise.all([
     prisma.quoteItem.findMany({
       where: { designMediaAssetId: assetId },
@@ -210,6 +240,16 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
           take: 50,
         })
       : Promise.resolve([]),
+    prisma.contentMediaAssignment.findMany({
+      where: { mediaAssetId: assetId },
+      select: {
+        id: true,
+        entityType: true,
+        entityId: true,
+        placement: true,
+      },
+      take: 100,
+    }),
   ]);
 
   const refs: MediaReference[] = [];
@@ -392,6 +432,45 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
     });
   }
 
+  const blogAssignmentIds = contentAssignments
+    .filter((row) => row.entityType === "BLOG_POST")
+    .map((row) => row.entityId);
+  const blogPostsById =
+    blogAssignmentIds.length > 0
+      ? Object.fromEntries(
+          (
+            await prisma.blogPost.findMany({
+              where: { id: { in: [...new Set(blogAssignmentIds)] } },
+              select: { id: true, title: true, slug: true },
+            })
+          ).map((p) => [p.id, p]),
+        )
+      : {};
+
+  for (const row of contentAssignments) {
+    if (row.entityType === "BLOG_POST") {
+      const post = blogPostsById[row.entityId];
+      refs.push({
+        type: "BLOG",
+        entityId: row.entityId,
+        entityCode: post?.slug ?? null,
+        entityTitle: post?.title ?? "Blog",
+        field: row.placement,
+        route: `/admin/blog/${row.entityId}`,
+        referenceMode: "RELATION",
+      });
+      continue;
+    }
+    refs.push({
+      type: "OTHER",
+      entityId: row.entityId,
+      entityTitle: `${row.entityType} media`,
+      field: row.placement,
+      route: null,
+      referenceMode: "RELATION",
+    });
+  }
+
   for (const asset of techPackAssets) {
     refs.push({
       type: "TECH_PACK",
@@ -448,6 +527,7 @@ export async function countMediaReferencesBatch(
     qcEvidence,
     deliveryProofs,
     bundleSlotAssetGroups,
+    contentAssignmentGroups,
   ] = await Promise.all([
     prisma.quoteItem.groupBy({
       by: ["designMediaAssetId"],
@@ -499,6 +579,11 @@ export async function countMediaReferencesBatch(
       where: { mediaAssetId: { in: uniqueIds } },
       _count: { _all: true },
     }),
+    prisma.contentMediaAssignment.groupBy({
+      by: ["mediaAssetId"],
+      where: { mediaAssetId: { in: uniqueIds } },
+      _count: { _all: true },
+    }),
   ]);
 
   for (const row of quoteGroups) {
@@ -521,6 +606,7 @@ export async function countMediaReferencesBatch(
   for (const row of qcEvidence) bump(row.mediaAssetId, row._count._all);
   for (const row of deliveryProofs) bump(row.mediaAssetId, row._count._all);
   for (const row of bundleSlotAssetGroups) bump(row.mediaAssetId, row._count._all);
+  for (const row of contentAssignmentGroups) bump(row.mediaAssetId, row._count._all);
 
   if (urls.length) {
     const [featured, gallery, productImages, blogFeatured, blogOg, techPack] = await Promise.all([

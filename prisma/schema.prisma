@@ -807,13 +807,17 @@ model BlogPost {
   faqJson          Json               @default("[]")
   tags             Json               @default("[]")
   aiMetadata       Json?
+  /// Optional curated Media Bundle used as content-media source (explicit assignments are snapshots).
+  mediaBundleId    String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   categories       BlogPostCategory[]
+  mediaBundle      MediaBundle?       @relation(fields: [mediaBundleId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([publishedAt])
   @@index([createdAt])
+  @@index([mediaBundleId])
 }
 
 model BlogPostCategory {
@@ -916,6 +920,53 @@ enum MediaVocabularyType {
   INDUSTRY
   AUDIENCE
   USE_CASE
+}
+
+enum ContentMediaEntityType {
+  BLOG_POST
+  LANDING_PAGE
+  SEO_DRAFT
+  CASE_STUDY
+  OTHER
+}
+
+enum ContentMediaPlacement {
+  FEATURED
+  COVER
+  OG_IMAGE
+  INLINE
+  HERO
+  GALLERY
+  BACKGROUND
+  PROCESS
+  MATERIAL
+  TECHNIQUE
+  FACTORY
+  OTHER
+}
+
+/// Polymorphic media assignment for Blog (and future Landing/SEO Writer).
+/// entityId is validated in the service layer against the concrete entity type.
+model ContentMediaAssignment {
+  id              String                 @id @default(cuid())
+  entityType      ContentMediaEntityType
+  entityId        String
+  mediaAssetId    String
+  placement       ContentMediaPlacement
+  /// Empty string when unused — enables unique constraint with PostgreSQL NULLs.
+  slotKey         String                 @default("")
+  sortOrder       Int                    @default(0)
+  altTextOverride String?
+  captionOverride String?
+  metadata        Json?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  mediaAsset      MediaAsset             @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
+  @@unique([entityType, entityId, placement, mediaAssetId, slotKey])
+  @@index([entityType, entityId])
+  @@index([mediaAssetId])
+  @@index([entityType, entityId, placement, sortOrder])
 }
 
 enum MediaContentSuitability {
@@ -1085,6 +1136,7 @@ model MediaBundle {
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
   slots          MediaBundleSlot[]
+  blogPosts      BlogPost[]
 
   @@index([status])
   @@index([contentType, isActive, sortOrder])
@@ -1183,6 +1235,7 @@ model MediaAsset {
   duplicates               MediaAsset[]              @relation("MediaAssetDuplicates")
   collections              MediaAssetCollection[]
   bundleSlotAssets         MediaBundleSlotAsset[]
+  contentMediaAssignments  ContentMediaAssignment[]
   quoteItems               QuoteItem[]
   orderItems               OrderItem[]
   salesRepresentatives     SalesRepresentative[]

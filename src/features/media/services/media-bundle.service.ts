@@ -666,6 +666,13 @@ export async function deleteMediaBundle(id: string): Promise<void> {
   if (!existing) throw new Error("Không tìm thấy bộ media.");
   if (existing.isSystem) throw new Error("Không thể xóa bộ media hệ thống.");
 
+  const consumers = await prisma.blogPost.count({ where: { mediaBundleId: id } });
+  if (consumers > 0) {
+    throw new Error(
+      `Không thể xóa Bundle đang được ${consumers} bài viết sử dụng. Hãy hủy liên kết trước hoặc lưu trữ Bundle.`,
+    );
+  }
+
   await prisma.mediaBundle.delete({ where: { id } });
 }
 

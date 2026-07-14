@@ -27,7 +27,21 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (!bundle) {
     return NextResponse.json({ message: "Không tìm thấy bộ media" }, { status: 404 });
   }
-  return NextResponse.json({ bundle });
+  const { listBundlesConsumingBlog } = await import(
+    "@/features/content/services/content-media-assignment.service"
+  );
+  const consumers = await listBundlesConsumingBlog(id);
+  return NextResponse.json({
+    bundle,
+    consumers: {
+      blogPosts: consumers.map((post) => ({
+        id: post.id,
+        title: post.title,
+        status: post.status,
+        route: `/admin/blog/${post.id}`,
+      })),
+    },
+  });
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
@@ -97,7 +111,13 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     const message = err instanceof Error ? err.message : "Không thể xóa bộ media";
     return NextResponse.json(
       { message },
-      { status: message.includes("Không tìm thấy") ? 404 : 400 },
+      {
+        status: message.includes("Không tìm thấy")
+          ? 404
+          : message.includes("đang được")
+            ? 409
+            : 400,
+      },
     );
   }
 }

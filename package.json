@@ -10,7 +10,8 @@
     "security:public-token": "node scripts/security/check-public-token-safety.mjs",
     "postinstall": "prisma generate",
     "media:recalculate-intelligence": "npx tsx scripts/recalculate-media-intelligence.ts",
-    "media:suggest-suitabilities": "npx tsx scripts/suggest-media-suitabilities.ts"
+    "media:suggest-suitabilities": "npx tsx scripts/suggest-media-suitabilities.ts",
+    "media:backfill-blog-assignments": "npx tsx scripts/backfill-blog-media-assignments.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",

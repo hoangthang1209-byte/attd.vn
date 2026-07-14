@@ -134,7 +134,19 @@ export async function getPublishedBlogPostBySlug(slug: string) {
     },
   });
 
-  if (post) return post;
+  if (post) {
+    const { resolveBlogFeaturedImageUrl } = await import(
+      "@/features/content/services/content-media-assignment.service"
+    );
+    const featuredFromAssignment = await resolveBlogFeaturedImageUrl({
+      id: post.id,
+      featuredImageUrl: post.featuredImageUrl,
+    });
+    return {
+      ...post,
+      featuredImageUrl: featuredFromAssignment ?? post.featuredImageUrl,
+    };
+  }
 
   const legacy = await prisma.post.findUnique({ where: { slug } });
   if (!legacy || legacy.status !== "PUBLISHED") return null;
@@ -299,9 +311,21 @@ export async function getPublishedPostsByCategorySlug(
 }
 
 export async function resolveBlogOgImage(post: {
+  id?: string;
   ogImageUrl?: string | null;
   featuredImageUrl?: string | null;
 }) {
+  if (post.id) {
+    const { resolveBlogOgImageFromAssignments } = await import(
+      "@/features/content/services/content-media-assignment.service"
+    );
+    const fromAssignments = await resolveBlogOgImageFromAssignments({
+      id: post.id,
+      ogImageUrl: post.ogImageUrl,
+      featuredImageUrl: post.featuredImageUrl,
+    });
+    if (fromAssignments) return fromAssignments;
+  }
   if (post.ogImageUrl) return post.ogImageUrl;
   if (post.featuredImageUrl) return post.featuredImageUrl;
   const branding = await getBrandingSettings();

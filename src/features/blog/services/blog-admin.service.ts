@@ -197,6 +197,13 @@ export async function updateBlogPost(
         ? null
         : existing.publishedAt;
 
+  if (nextStatus === "PUBLISHED" && existing.status !== "PUBLISHED") {
+    const { assertBlogPublishMediaReady } = await import(
+      "@/features/content/services/content-media-assignment.service"
+    );
+    await assertBlogPublishMediaReady(id);
+  }
+
   const row = await prisma.blogPost.update({
     where: { id },
     data: {
@@ -251,7 +258,12 @@ export async function updateBlogPost(
 export async function deleteBlogPost(id: string): Promise<boolean> {
   const existing = await prisma.blogPost.findUnique({ where: { id } });
   if (!existing) return false;
-  await prisma.blogPost.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.contentMediaAssignment.deleteMany({
+      where: { entityType: "BLOG_POST", entityId: id },
+    });
+    await tx.blogPost.delete({ where: { id } });
+  });
   revalidateBlogPaths(existing.slug);
   return true;
 }
