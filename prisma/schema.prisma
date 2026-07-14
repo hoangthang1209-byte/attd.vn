@@ -2576,6 +2576,55 @@ model AiGenerationRun {
   @@index([inputHash])
 }
 
+// ---------------------------------------------------------------------------
+// Sprint 11.2 — Governed Content Context Packages
+// ---------------------------------------------------------------------------
+
+enum ContentContextPurpose {
+  SEO_ARTICLE
+  SEO_LANDING_PAGE
+  PRODUCT_GUIDE
+  CASE_STUDY
+  KNOWLEDGE_ARTICLE
+  CONTENT_REVIEW
+}
+
+enum ContentContextBuildStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  SUPERSEDED
+}
+
+model ContentContextBuild {
+  id                 String                    @id @default(cuid())
+  topicId            String
+  briefId            String?
+  purpose            ContentContextPurpose
+  status             ContentContextBuildStatus @default(RUNNING)
+  version            String
+  retrievalRequestId String?
+  inputHash          String
+  packageHash        String?
+  readinessScore     Int?
+  readinessErrors    Json?
+  readinessWarnings  Json?
+  sourceManifest     Json?
+  budgetSummary      Json?
+  packageJson        Json?
+  errorMessage       String?                   @db.Text
+  requestedBy        String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  @@index([topicId, purpose, createdAt])
+  @@index([status, createdAt])
+  @@index([inputHash])
+  @@index([topicId, purpose, status])
+}
+
 enum KnowledgeBaseImportJobStatus {
   PENDING
   COMPLETED

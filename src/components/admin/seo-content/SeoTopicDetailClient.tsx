@@ -6,6 +6,7 @@ import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import SeoBriefAiPanel from "@/components/admin/seo-content/SeoBriefAiPanel";
+import ContentContextPanel from "@/components/admin/content/ContentContextPanel";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import {
   SEO_CONTENT_TYPE_LABELS,
@@ -1075,6 +1076,7 @@ export default function SeoTopicDetailClient({ topicId }: { topicId: string }) {
             briefApproved={Boolean(topic.brief?.approvedAt)}
             onApplied={() => void load()}
           />
+          <ContentContextPanel topicId={topicId} />
           <form onSubmit={(e) => void saveBrief(e)} className="admin-form">
             <div className="admin-field">
               <label className="admin-label">Tiêu đề làm việc</label>

@@ -78,9 +78,58 @@ export async function retrieveContextForSeoBrief(
   return result.context;
 }
 
-export async function retrieveContextForContentDraft(topicId: string): Promise<never> {
-  void topicId;
-  throw new AiRetrievalConsumerNotEnabledError("SEO_CONTENT drafting pipeline");
+export async function retrieveContextForContentWriting(
+  topicId: string,
+  opts?: {
+    userId?: string | null;
+    compatibilityMode?: boolean;
+    maxItems?: number;
+    maxContextCharacters?: number;
+    sourceTypes?: import("@/features/ai-retrieval/ai-retrieval-types").AiRetrievalSourceType[];
+  }
+): Promise<AiRetrievalContext> {
+  const topic = await getSeoTopicById(topicId);
+  if (!topic) throw new Error("SEO topic not found");
+
+  const result = await retrieveEnterpriseAiContext({
+    consumer: "SEO_CONTENT",
+    purpose: "CONTENT_WRITING",
+    query: `${topic.title} ${topic.primaryKeyword}`.trim(),
+    seoTopicIds: [topicId],
+    mediaBundleIds: topic.mediaBundleId ? [topic.mediaBundleId] : undefined,
+    productIds: topic.targetEntityType === "PRODUCT" && topic.targetEntityId
+      ? [topic.targetEntityId]
+      : undefined,
+    sourceTypes: opts?.sourceTypes ?? [
+      "SEO_TOPIC",
+      "SEO_BRIEF",
+      "KNOWLEDGE_BASE",
+      "PRODUCT",
+      "MANUFACTURING_ASSET",
+      "MEDIA_BUNDLE",
+      "MEDIA_ASSET",
+      "CATEGORY",
+    ],
+    includeMedia: true,
+    includeBusinessRules: true,
+    includeConflicts: true,
+    compatibilityMode: opts?.compatibilityMode !== false,
+    userId: opts?.userId ?? null,
+    maxItems: opts?.maxItems ?? 40,
+    maxContextCharacters: opts?.maxContextCharacters,
+  });
+
+  if (!result.ok) throw new Error(result.errors.join(" "));
+  return result.context;
+}
+
+/** Brief-specific adapter — keeps Brief AI on SEO_BRIEF planning path by default. */
+export async function buildContentContextForBrief(topicId: string) {
+  return retrieveContextForSeoBrief(topicId);
+}
+
+export async function retrieveContextForContentDraft(topicId: string): Promise<AiRetrievalContext> {
+  return retrieveContextForContentWriting(topicId);
 }
 
 export async function retrieveContextForProduct(productId: string): Promise<never> {
