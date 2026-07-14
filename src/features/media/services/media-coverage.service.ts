@@ -1,9 +1,14 @@
-import type { MediaOrientation } from "@prisma/client";
+import type { MediaBundleContentType, MediaBundleSlotType, MediaOrientation } from "@prisma/client";
 import {
   discoverMediaAssets,
   type MediaDiscoveryInput,
   type MediaDiscoveryResult,
 } from "@/features/media/services/media-discovery.service";
+import {
+  getBundlePreset,
+  SLOT_DISCOVERY_PROFILES,
+  validateMediaBundleContentType,
+} from "@/features/media/media-bundle-presets";
 
 export type MediaCoverageInput = {
   query?: string;
@@ -81,5 +86,157 @@ export async function assessMediaCoverage(
     gaps,
     sampleAssets,
     coverageLevel,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Content bundle coverage planning (Sprint 10.4)                            */
+/* -------------------------------------------------------------------------- */
+
+export type MediaContentPlanInput = {
+  contentType: MediaBundleContentType | string;
+  query?: string;
+  subjectTerms?: string[];
+  industryTerms?: string[];
+  useCaseTerms?: string[];
+  techniqueTerms?: string[];
+  minimumSeoScore?: number;
+};
+
+export type MediaContentPlanSlotStatus = "MISSING" | "LOW" | "ENOUGH" | "STRONG";
+export type MediaContentPlanOverallStatus = "CRITICAL" | "INSUFFICIENT" | "BASIC" | "GOOD" | "STRONG";
+
+export type MediaContentPlanSlot = {
+  slotType: MediaBundleSlotType;
+  label: string;
+  required: boolean;
+  recommended: boolean;
+  minAssets: number;
+  foundCount: number;
+  fillRatio: number;
+  status: MediaContentPlanSlotStatus;
+  orientation?: MediaOrientation;
+  sampleAssets: MediaDiscoveryResult[];
+};
+
+export type MediaContentPlanResult = {
+  contentType: MediaBundleContentType;
+  slots: MediaContentPlanSlot[];
+  overallScore: number;
+  overallStatus: MediaContentPlanOverallStatus;
+  recommendations: string[];
+};
+
+function orientationHint(orientation?: MediaOrientation): string {
+  switch (orientation) {
+    case "LANDSCAPE":
+      return " ngang";
+    case "PORTRAIT":
+      return " dọc";
+    case "SQUARE":
+      return " vuông";
+    default:
+      return "";
+  }
+}
+
+function buildContentPlanRecommendations(slots: MediaContentPlanSlot[]): string[] {
+  const recommendations: string[] = [];
+
+  for (const slot of slots) {
+    if (slot.status === "MISSING") {
+      recommendations.push(
+        `Bổ sung ${slot.minAssets} ảnh${orientationHint(slot.orientation)} cho vị trí "${slot.label}"${
+          slot.required ? " (bắt buộc)" : ""
+        } — hiện chưa tìm thấy ảnh phù hợp.`,
+      );
+    } else if (slot.status === "LOW") {
+      const missing = Math.max(1, slot.minAssets - slot.foundCount);
+      recommendations.push(
+        `Bổ sung ${missing} ảnh${orientationHint(slot.orientation)} cho vị trí "${slot.label}" — hiện có ${slot.foundCount}/${slot.minAssets} ảnh đạt yêu cầu.`,
+      );
+    }
+  }
+
+  if (!recommendations.length) {
+    recommendations.push("Thư viện ảnh đã đáp ứng đủ các vị trí quan trọng cho loại nội dung này.");
+  }
+
+  return recommendations;
+}
+
+/**
+ * Plans media coverage for a content type against its bundle preset: for every
+ * required or recommended slot, discovers candidate assets (bounded sample) and
+ * derives a fill status. Read-only — does not create/modify any MediaBundle records.
+ */
+export async function planMediaContentCoverage(
+  input: MediaContentPlanInput,
+): Promise<MediaContentPlanResult> {
+  const contentType = validateMediaBundleContentType(input.contentType) ?? "GENERAL";
+  const preset = getBundlePreset(contentType);
+  const relevantSlots = preset.slots.filter((slot) => slot.required || slot.recommended);
+
+  const slots: MediaContentPlanSlot[] = await Promise.all(
+    relevantSlots.map(async (presetSlot) => {
+      const profile = SLOT_DISCOVERY_PROFILES[presetSlot.slotType];
+      const sampleAssets = await discoverMediaAssets({
+        query: input.query,
+        subjects: input.subjectTerms,
+        industries: input.industryTerms,
+        useCases: input.useCaseTerms,
+        techniques: input.techniqueTerms,
+        roles: profile.roles,
+        libraries: profile.libraries,
+        orientation: profile.orientation,
+        minimumSeoScore: input.minimumSeoScore ?? profile.minimumSeoScore,
+        visibility: "PUBLIC",
+        limit: 8,
+      });
+
+      const minAssets = Math.max(1, presetSlot.minAssets);
+      const foundCount = sampleAssets.length;
+
+      let status: MediaContentPlanSlotStatus;
+      if (foundCount === 0) status = "MISSING";
+      else if (foundCount < minAssets) status = "LOW";
+      else if (foundCount >= minAssets * 2) status = "STRONG";
+      else status = "ENOUGH";
+
+      return {
+        slotType: presetSlot.slotType,
+        label: presetSlot.label,
+        required: presetSlot.required,
+        recommended: presetSlot.recommended,
+        minAssets,
+        foundCount,
+        fillRatio: Math.min(1, foundCount / minAssets),
+        status,
+        orientation: profile.orientation,
+        sampleAssets,
+      };
+    }),
+  );
+
+  const totalWeight = slots.reduce((sum, slot) => sum + (slot.required ? 2 : 1), 0);
+  const weightedFill = slots.reduce(
+    (sum, slot) => sum + slot.fillRatio * (slot.required ? 2 : 1),
+    0,
+  );
+  const overallScore = totalWeight > 0 ? Math.round((weightedFill / totalWeight) * 100) : 100;
+
+  let overallStatus: MediaContentPlanOverallStatus;
+  if (overallScore < 30) overallStatus = "CRITICAL";
+  else if (overallScore < 50) overallStatus = "INSUFFICIENT";
+  else if (overallScore < 70) overallStatus = "BASIC";
+  else if (overallScore < 90) overallStatus = "GOOD";
+  else overallStatus = "STRONG";
+
+  return {
+    contentType,
+    slots,
+    overallScore,
+    overallStatus,
+    recommendations: buildContentPlanRecommendations(slots),
   };
 }

@@ -155,6 +155,8 @@ export const adminNavigationSections: AdminNavigationSection[] = [
           { label: "Vai trò hiển thị ảnh", href: "/admin/content/media-roles", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Bộ sưu tập ảnh", href: "/admin/content/media-collections", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Từ điển metadata ảnh", href: "/admin/content/media-vocabulary", status: "active", requiredPermissions: ["canManageCms"] },
+          { label: "Gói nội dung hình ảnh", href: "/admin/content/media-bundles", status: "active", requiredPermissions: ["canManageCms"] },
+          { label: "Độ phủ hình ảnh cho nội dung", href: "/admin/content/media-coverage", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "FAQ", status: "coming-soon", requiredPermissions: ["canManageCms"] },
         ],
       },

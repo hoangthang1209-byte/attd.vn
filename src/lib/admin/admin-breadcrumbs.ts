@@ -211,6 +211,22 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/media-bundles",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Gói nội dung hình ảnh"],
+      title: "Gói nội dung hình ảnh",
+      description: "Quản lý bộ ảnh theo vị trí (slot) cho từng loại nội dung: blog, landing page, sản phẩm...",
+    },
+  },
+  {
+    path: "/admin/content/media-coverage",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Độ phủ hình ảnh cho nội dung"],
+      title: "Độ phủ hình ảnh cho nội dung",
+      description: "Lập kế hoạch và kiểm tra độ phủ ảnh sẵn có trước khi tạo nội dung mới.",
+    },
+  },
+  {
     path: "/admin/tech-pack",
     meta: {
       breadcrumbs: ["Kỹ thuật sản phẩm", "Tech Pack"],

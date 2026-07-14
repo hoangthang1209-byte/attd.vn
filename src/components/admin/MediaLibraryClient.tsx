@@ -4,12 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import type {
   MediaAiProcessingStatus,
   MediaAssetType,
+  MediaContentSuitability,
   MediaOrientation,
   MediaSeoReadinessStatus,
   MediaVisibility,
   MediaVocabularyType,
 } from "@prisma/client";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
+import {
+  MEDIA_CONTENT_SUITABILITIES,
+  MEDIA_CONTENT_SUITABILITY_LABELS,
+} from "@/features/media/media-bundle-presets";
+import { inferSuggestedSuitabilities } from "@/features/media/media-suitability-client";
 import {
   ALLOWED_IMAGE_EXTENSIONS,
   inferImageMimeType,
@@ -172,11 +178,13 @@ const REF_TYPE_LABELS: Record<MediaReference["type"], string> = {
   HOMEPAGE: "Trang chủ",
   TECH_PACK: "Tech pack",
   SALES: "Bán hàng",
+  CONTENT_BUNDLE: "Bộ media nội dung",
   OTHER: "Khác",
 };
 
 type UploadOverrides = {
   assetType?: MediaAssetType;
+  contentSuitabilities?: MediaContentSuitability[];
 } & Partial<SemanticTermState>;
 
 type UploadFile = {
@@ -208,6 +216,7 @@ type EditingAsset = {
   collectionIds: string[];
   assetType: MediaAssetType;
   semantic: SemanticTermState;
+  contentSuitabilities: MediaContentSuitability[];
   seoScore: number;
   seoReadinessStatus: MediaSeoReadinessStatus;
   metadataCompleteness: number;
@@ -330,12 +339,19 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const [orientation, setOrientation] = useState<MediaOrientation | "">("");
   const [hasAltText, setHasAltText] = useState<"" | "true" | "false">("");
   const [search, setSearch] = useState("");
+  const [filterContentSuitability, setFilterContentSuitability] = useState<
+    MediaContentSuitability | ""
+  >("");
   const [uploadLibraryId, setUploadLibraryId] = useState("");
   const [uploadRoleId, setUploadRoleId] = useState("");
   const [uploadVisibility, setUploadVisibility] = useState<MediaVisibility>("PUBLIC");
   const [uploadTags, setUploadTags] = useState("");
   const [uploadKeywords, setUploadKeywords] = useState("");
   const [uploadCollectionIds, setUploadCollectionIds] = useState<string[]>([]);
+  const [uploadContentSuitabilities, setUploadContentSuitabilities] = useState<
+    MediaContentSuitability[]
+  >([]);
+  const [uploadSuitabilitySearch, setUploadSuitabilitySearch] = useState("");
   const [referenceCounts, setReferenceCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [uploadQueue, setUploadQueue] = useState<UploadFile[]>([]);
@@ -374,11 +390,22 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const [bulkUpdateAssetType, setBulkUpdateAssetType] = useState(false);
   const [bulkAssetType, setBulkAssetType] = useState<MediaAssetType>("PHOTO");
   const [bulkSemantic, setBulkSemantic] = useState(emptyBulkSemanticState());
+  const [bulkAddSuitabilities, setBulkAddSuitabilities] = useState(false);
+  const [bulkAddSuitabilityValues, setBulkAddSuitabilityValues] = useState<
+    MediaContentSuitability[]
+  >([]);
+  const [bulkAddSuitabilitySearch, setBulkAddSuitabilitySearch] = useState("");
+  const [bulkRemoveSuitabilities, setBulkRemoveSuitabilities] = useState(false);
+  const [bulkRemoveSuitabilityValues, setBulkRemoveSuitabilityValues] = useState<
+    MediaContentSuitability[]
+  >([]);
+  const [bulkRemoveSuitabilitySearch, setBulkRemoveSuitabilitySearch] = useState("");
 
   const [vocabTerms, setVocabTerms] = useState<MediaVocabularyTermRecord[]>([]);
   const [editVocabSearch, setEditVocabSearch] = useState<Record<SemanticTermField, string>>(
     emptySemanticState() as unknown as Record<SemanticTermField, string>,
   );
+  const [editSuitabilitySearch, setEditSuitabilitySearch] = useState("");
   const [intelligenceOpen, setIntelligenceOpen] = useState(false);
 
   const [filterAssetType, setFilterAssetType] = useState<MediaAssetType | "">("");
@@ -479,6 +506,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       if (orientation) params.set("orientation", orientation);
       if (hasAltText) params.set("hasAltText", hasAltText);
       if (search.trim()) params.set("search", search.trim());
+      if (filterContentSuitability) params.set("contentSuitability", filterContentSuitability);
       const res = await fetch(`/api/media?${params.toString()}`);
       const data = (await res.json()) as MediaAssetWithClassification[] | { message?: string };
       const nextAssets = Array.isArray(data) ? data : [];
@@ -489,7 +517,17 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       setReferenceCounts({});
     }
     setLoading(false);
-  }, [libraryId, roleId, collectionId, visibility, orientation, hasAltText, search, loadReferenceCounts]);
+  }, [
+    libraryId,
+    roleId,
+    collectionId,
+    visibility,
+    orientation,
+    hasAltText,
+    search,
+    filterContentSuitability,
+    loadReferenceCounts,
+  ]);
 
   useEffect(() => {
     void loadTaxonomy();
@@ -588,6 +626,10 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     for (const field of SEMANTIC_FIELDS) {
       const terms = item.overrides?.[field] ?? uploadSemantic[field];
       if (terms.length) fd.append(field, JSON.stringify(terms));
+    }
+    const contentSuitabilities = item.overrides?.contentSuitabilities ?? uploadContentSuitabilities;
+    if (contentSuitabilities.length) {
+      fd.append("contentSuitabilities", JSON.stringify(contentSuitabilities));
     }
     return fd;
   }
@@ -749,6 +791,25 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     });
   }
 
+  function toggleUploadContentSuitability(value: MediaContentSuitability) {
+    setUploadContentSuitabilities((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+    );
+  }
+
+  function toggleItemOverrideSuitability(itemId: string, value: MediaContentSuitability) {
+    setUploadQueue((q) =>
+      q.map((u) => {
+        if (u.id !== itemId) return u;
+        const current = u.overrides?.contentSuitabilities ?? uploadContentSuitabilities;
+        const next = current.includes(value)
+          ? current.filter((v) => v !== value)
+          : [...current, value];
+        return { ...u, overrides: { ...u.overrides, contentSuitabilities: next } };
+      }),
+    );
+  }
+
   function toggleItemOverridesOpen(itemId: string) {
     setUploadQueue((q) =>
       q.map((u) =>
@@ -884,6 +945,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     setEditRoleOptions(mergeOptions(roles, asset.role));
     setEditCollectionOptions(mergeCollectionOptions(collections, assetCollections(asset)));
     setEditVocabSearch(emptySemanticState() as unknown as Record<SemanticTermField, string>);
+    setEditSuitabilitySearch("");
     setIntelligenceOpen(false);
     setEditing({
       id: asset.id,
@@ -908,6 +970,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         audienceTerms: asset.audienceTerms ?? [],
         useCaseTerms: asset.useCaseTerms ?? [],
       },
+      contentSuitabilities: asset.contentSuitabilities ?? [],
       seoScore: asset.seoScore,
       seoReadinessStatus: asset.seoReadinessStatus,
       metadataCompleteness: asset.metadataCompleteness,
@@ -923,6 +986,33 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         ? current.filter((item) => item !== name)
         : [...current, name];
       return { ...prev, semantic: { ...prev.semantic, [field]: next } };
+    });
+  }
+
+  function toggleEditContentSuitability(value: MediaContentSuitability) {
+    setEditing((prev) => {
+      if (!prev) return prev;
+      const current = prev.contentSuitabilities;
+      const next = current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value];
+      return { ...prev, contentSuitabilities: next };
+    });
+  }
+
+  /** Merges deterministic role-based suggestions into the current selection (does not remove any). */
+  function applySuggestedSuitabilities() {
+    if (!editing) return;
+    const role = editRoleOptions.find((r) => r.id === editing.roleId);
+    const suggested = inferSuggestedSuitabilities({ roleCode: role?.code });
+    if (!suggested.length) {
+      toast.info("Không có gợi ý phù hợp cho vai trò hiện tại");
+      return;
+    }
+    setEditing((prev) => {
+      if (!prev) return prev;
+      const merged = [...new Set([...prev.contentSuitabilities, ...suggested])];
+      return { ...prev, contentSuitabilities: merged };
     });
   }
 
@@ -954,6 +1044,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
           industryTerms: editing.semantic.industryTerms,
           audienceTerms: editing.semantic.audienceTerms,
           useCaseTerms: editing.semantic.useCaseTerms,
+          contentSuitabilities: editing.contentSuitabilities,
         }),
       });
       const data = (await res.json()) as { message?: string };
@@ -1007,6 +1098,12 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     setBulkUpdateAssetType(false);
     setBulkAssetType("PHOTO");
     setBulkSemantic(emptyBulkSemanticState());
+    setBulkAddSuitabilities(false);
+    setBulkAddSuitabilityValues([]);
+    setBulkAddSuitabilitySearch("");
+    setBulkRemoveSuitabilities(false);
+    setBulkRemoveSuitabilityValues([]);
+    setBulkRemoveSuitabilitySearch("");
     setBulkOpen(true);
   }
 
@@ -1040,6 +1137,8 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       !bulkAddCollections &&
       !bulkRemoveCollections &&
       !bulkUpdateAssetType &&
+      !(bulkAddSuitabilities && bulkAddSuitabilityValues.length) &&
+      !(bulkRemoveSuitabilities && bulkRemoveSuitabilityValues.length) &&
       !anySemanticEnabled
     ) {
       setBulkError("Chọn ít nhất một trường để cập nhật");
@@ -1059,6 +1158,12 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     if (bulkAddCollections) payload.addCollectionIds = bulkAddCollectionIds;
     if (bulkRemoveCollections) payload.removeCollectionIds = bulkRemoveCollectionIds;
     if (bulkUpdateAssetType) payload.assetType = bulkAssetType;
+    if (bulkAddSuitabilities && bulkAddSuitabilityValues.length) {
+      payload.addContentSuitabilities = bulkAddSuitabilityValues;
+    }
+    if (bulkRemoveSuitabilities && bulkRemoveSuitabilityValues.length) {
+      payload.removeContentSuitabilities = bulkRemoveSuitabilityValues;
+    }
     for (const field of SEMANTIC_FIELDS) {
       const entry = bulkSemantic[field];
       if (entry.addEnabled && entry.add.length) {
@@ -1297,6 +1402,64 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     );
   }
 
+  /** Compact searchable multi-select checkbox list for MediaContentSuitability values. */
+  function renderContentSuitabilityPicker(
+    selected: MediaContentSuitability[],
+    onToggle: (value: MediaContentSuitability) => void,
+    searchValue: string,
+    onSearchChange: (value: string) => void,
+    disabled = false,
+  ) {
+    const needle = searchValue.trim().toLowerCase();
+    const options = needle
+      ? MEDIA_CONTENT_SUITABILITIES.filter((value) =>
+          MEDIA_CONTENT_SUITABILITY_LABELS[value].toLowerCase().includes(needle),
+        )
+      : MEDIA_CONTENT_SUITABILITIES;
+    return (
+      <div className="admin-field" style={{ marginBottom: 10 }}>
+        {selected.length > 0 && (
+          <p className="admin-field-hint" style={{ margin: "0 0 4px" }}>
+            Đã chọn: {selected.map((v) => MEDIA_CONTENT_SUITABILITY_LABELS[v]).join(", ")}
+          </p>
+        )}
+        <input
+          className="admin-input admin-input--sm"
+          placeholder="Tìm vai trò nội dung…"
+          value={searchValue}
+          onChange={(e) => onSearchChange(e.target.value)}
+          disabled={disabled}
+        />
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            maxHeight: 140,
+            overflowY: "auto",
+            marginTop: 4,
+          }}
+        >
+          {options.map((value) => (
+            <label
+              key={value}
+              className="admin-field-hint"
+              style={{ display: "flex", alignItems: "center", gap: 4, margin: 0 }}
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(value)}
+                onChange={() => onToggle(value)}
+                disabled={disabled}
+              />
+              {MEDIA_CONTENT_SUITABILITY_LABELS[value]}
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="admin-media-page">
       <div className="admin-catalog-fieldset">
@@ -1451,6 +1614,15 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                   (value) => setUploadVocabSearch((prev) => ({ ...prev, [field]: value })),
                 ),
               )}
+              <div className="admin-field" style={{ marginTop: 8 }}>
+                <label className="admin-label">Phù hợp nội dung (mặc định cho cả lô)</label>
+                {renderContentSuitabilityPicker(
+                  uploadContentSuitabilities,
+                  toggleUploadContentSuitability,
+                  uploadSuitabilitySearch,
+                  setUploadSuitabilitySearch,
+                )}
+              </div>
             </details>
             <div className="admin-media-queue-list">
               {uploadQueue.map((item) => (
@@ -1597,6 +1769,31 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                         </div>
                       );
                     })}
+                    <div>
+                      <p className="admin-field-hint" style={{ margin: "0 0 2px", fontWeight: 500 }}>
+                        Phù hợp nội dung
+                      </p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {MEDIA_CONTENT_SUITABILITIES.map((value) => {
+                          const selected =
+                            item.overrides?.contentSuitabilities ?? uploadContentSuitabilities;
+                          return (
+                            <label
+                              key={value}
+                              className="admin-field-hint"
+                              style={{ display: "flex", alignItems: "center", gap: 4, margin: 0 }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selected.includes(value)}
+                                onChange={() => toggleItemOverrideSuitability(item.id, value)}
+                              />
+                              {MEDIA_CONTENT_SUITABILITY_LABELS[value]}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
                 </div>
@@ -1792,6 +1989,20 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
               </option>
             ))}
           </select>
+          <select
+            className="admin-input"
+            value={filterContentSuitability}
+            onChange={(e) =>
+              setFilterContentSuitability(e.target.value as MediaContentSuitability | "")
+            }
+          >
+            <option value="">Phù hợp nội dung: tất cả</option>
+            {MEDIA_CONTENT_SUITABILITIES.map((value) => (
+              <option key={value} value={value}>
+                {MEDIA_CONTENT_SUITABILITY_LABELS[value]}
+              </option>
+            ))}
+          </select>
           {(filterAssetType ||
             filterSeoReadiness ||
             filterMinimumSeoScore ||
@@ -1799,6 +2010,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
             filterHasKeywords ||
             filterHasSubject ||
             filterAiStatus ||
+            filterContentSuitability ||
             activePreset) && (
             <button
               type="button"
@@ -1811,6 +2023,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                 setFilterHasKeywords("");
                 setFilterHasSubject("");
                 setFilterAiStatus("");
+                setFilterContentSuitability("");
                 setActivePreset("");
               }}
             >
@@ -2119,6 +2332,26 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                     editSaving,
                   ),
                 )}
+                <div className="admin-field" style={{ marginBottom: 10 }}>
+                  <label className="admin-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    Phù hợp nội dung (content suitability)
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      onClick={applySuggestedSuitabilities}
+                      disabled={editSaving}
+                    >
+                      Gợi ý theo vai trò hiện tại
+                    </button>
+                  </label>
+                  {renderContentSuitabilityPicker(
+                    editing.contentSuitabilities,
+                    toggleEditContentSuitability,
+                    editSuitabilitySearch,
+                    setEditSuitabilitySearch,
+                    editSaving,
+                  )}
+                </div>
               </div>
             </details>
 
@@ -2398,6 +2631,63 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                       )}
                   </div>
                 ))}
+              </div>
+            </details>
+            <details className="admin-field">
+              <summary className="admin-label" style={{ cursor: "pointer" }}>
+                Thêm / gỡ phù hợp nội dung (content suitability)
+              </summary>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div className="admin-field" style={{ margin: 0 }}>
+                  <label
+                    className="admin-field-hint"
+                    style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={bulkAddSuitabilities}
+                      onChange={(e) => setBulkAddSuitabilities(e.target.checked)}
+                      disabled={bulkSaving}
+                    />
+                    Thêm phù hợp nội dung
+                  </label>
+                  {bulkAddSuitabilities &&
+                    renderContentSuitabilityPicker(
+                      bulkAddSuitabilityValues,
+                      (value) =>
+                        setBulkAddSuitabilityValues((prev) =>
+                          prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+                        ),
+                      bulkAddSuitabilitySearch,
+                      setBulkAddSuitabilitySearch,
+                      bulkSaving,
+                    )}
+                </div>
+                <div className="admin-field" style={{ margin: 0 }}>
+                  <label
+                    className="admin-field-hint"
+                    style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={bulkRemoveSuitabilities}
+                      onChange={(e) => setBulkRemoveSuitabilities(e.target.checked)}
+                      disabled={bulkSaving}
+                    />
+                    Gỡ phù hợp nội dung
+                  </label>
+                  {bulkRemoveSuitabilities &&
+                    renderContentSuitabilityPicker(
+                      bulkRemoveSuitabilityValues,
+                      (value) =>
+                        setBulkRemoveSuitabilityValues((prev) =>
+                          prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+                        ),
+                      bulkRemoveSuitabilitySearch,
+                      setBulkRemoveSuitabilitySearch,
+                      bulkSaving,
+                    )}
+                </div>
               </div>
             </details>
             {bulkError && (

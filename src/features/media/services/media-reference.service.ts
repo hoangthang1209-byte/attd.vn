@@ -9,6 +9,7 @@ export type MediaReferenceType =
   | "HOMEPAGE"
   | "TECH_PACK"
   | "SALES"
+  | "CONTENT_BUNDLE"
   | "OTHER";
 
 export type MediaReference = {
@@ -63,6 +64,7 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
     productionFiles,
     qcEvidence,
     deliveryProofs,
+    bundleSlotAssets,
     productsFeatured,
     productsGallery,
     productImages,
@@ -142,6 +144,18 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
         title: true,
         orderId: true,
         order: { select: { orderNo: true } },
+      },
+      take: 50,
+    }),
+    prisma.mediaBundleSlotAsset.findMany({
+      where: { mediaAssetId: assetId },
+      select: {
+        mediaBundleSlot: {
+          select: {
+            label: true,
+            mediaBundle: { select: { id: true, name: true } },
+          },
+        },
       },
       take: 50,
     }),
@@ -306,6 +320,18 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
     });
   }
 
+  for (const item of bundleSlotAssets) {
+    const bundle = item.mediaBundleSlot.mediaBundle;
+    refs.push({
+      type: "CONTENT_BUNDLE",
+      entityId: bundle.id,
+      entityTitle: bundle.name,
+      field: item.mediaBundleSlot.label,
+      route: `/admin/content/media-bundles/${bundle.id}`,
+      referenceMode: "RELATION",
+    });
+  }
+
   for (const product of productsFeatured) {
     refs.push({
       type: "PRODUCT",
@@ -421,6 +447,7 @@ export async function countMediaReferencesBatch(
     productionFiles,
     qcEvidence,
     deliveryProofs,
+    bundleSlotAssetGroups,
   ] = await Promise.all([
     prisma.quoteItem.groupBy({
       by: ["designMediaAssetId"],
@@ -467,6 +494,11 @@ export async function countMediaReferencesBatch(
       where: { mediaAssetId: { in: uniqueIds } },
       _count: { _all: true },
     }),
+    prisma.mediaBundleSlotAsset.groupBy({
+      by: ["mediaAssetId"],
+      where: { mediaAssetId: { in: uniqueIds } },
+      _count: { _all: true },
+    }),
   ]);
 
   for (const row of quoteGroups) {
@@ -488,6 +520,7 @@ export async function countMediaReferencesBatch(
   for (const row of productionFiles) bump(row.mediaAssetId, row._count._all);
   for (const row of qcEvidence) bump(row.mediaAssetId, row._count._all);
   for (const row of deliveryProofs) bump(row.mediaAssetId, row._count._all);
+  for (const row of bundleSlotAssetGroups) bump(row.mediaAssetId, row._count._all);
 
   if (urls.length) {
     const [featured, gallery, productImages, blogFeatured, blogOg, techPack] = await Promise.all([

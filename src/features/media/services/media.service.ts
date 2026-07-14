@@ -3,6 +3,7 @@ import type {
   MediaAiProcessingStatus,
   MediaAssetType,
   MediaCollectionType,
+  MediaContentSuitability,
   MediaFolder,
   MediaOrientation,
   MediaSeoReadinessStatus,
@@ -68,6 +69,12 @@ import {
   validateMediaSeoReadinessStatus,
   type SemanticTermField,
 } from "@/features/media/services/media-intelligence.service";
+import {
+  mergeContentSuitabilities,
+  normalizeContentSuitabilities,
+  parseContentSuitabilitiesOrThrow,
+} from "@/features/media/services/media-content-intelligence.service";
+import { validateMediaContentSuitability } from "@/features/media/media-bundle-presets";
 
 export { LARGE_IMAGE_WARNING_SIZE };
 export { MEDIA_LIBRARY_PAGE_SIZE };
@@ -133,6 +140,7 @@ export type MediaAssetListFilters = {
   audience?: string;
   useCase?: string;
   duplicateStatus?: string;
+  contentSuitability?: MediaContentSuitability;
   search?: string;
 };
 
@@ -180,6 +188,9 @@ export type MediaMetadataUpdateInput = {
   removeAudienceTerms?: string[];
   addUseCaseTerms?: string[];
   removeUseCaseTerms?: string[];
+  contentSuitabilities?: MediaContentSuitability[];
+  addContentSuitabilities?: MediaContentSuitability[];
+  removeContentSuitabilities?: MediaContentSuitability[];
   aiProcessingStatus?: MediaAiProcessingStatus;
   mergeSemanticIntoExisting?: boolean;
 };
@@ -226,6 +237,9 @@ function buildMediaAssetWhere(filters: MediaAssetListFilters): Prisma.MediaAsset
     ...(filters.industry ? { industryTerms: { has: filters.industry } } : {}),
     ...(filters.audience ? { audienceTerms: { has: filters.audience } } : {}),
     ...(filters.useCase ? { useCaseTerms: { has: filters.useCase } } : {}),
+    ...(filters.contentSuitability
+      ? { contentSuitabilities: { has: filters.contentSuitability } }
+      : {}),
     ...(filters.duplicateStatus
       ? { duplicateStatus: filters.duplicateStatus as Prisma.EnumMediaDuplicateStatusFilter["equals"] }
       : {}),
@@ -364,6 +378,7 @@ export type UploadMediaInput = {
   industryTerms?: string[];
   audienceTerms?: string[];
   useCaseTerms?: string[];
+  contentSuitabilities?: MediaContentSuitability[];
 };
 
 export type UploadMediaResult = {
@@ -447,6 +462,7 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
     industryTerms,
     audienceTerms,
     useCaseTerms,
+    contentSuitabilities,
   } = input;
 
   assertNotR2SourceFile(file.name, file.type, file.size);
@@ -555,6 +571,7 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
   const resolvedUseCases = useCaseTerms?.length
     ? await resolveVocabularyTerms("USE_CASE", useCaseTerms)
     : [];
+  const resolvedSuitabilities = normalizeContentSuitabilities(contentSuitabilities);
 
   const storage = requireCloudinaryStorageAdapter();
   const result = await storage.upload(folder, file.name, buffer, mimeType);
@@ -602,6 +619,7 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
           industryTerms: resolvedIndustries,
           audienceTerms: resolvedAudiences,
           useCaseTerms: resolvedUseCases,
+          contentSuitabilities: resolvedSuitabilities,
           ...(validatedCollectionIds.length
             ? {
                 collections: {
@@ -718,6 +736,7 @@ export async function buildMetadataUpdateData(
       industryTerms?: string[];
       audienceTerms?: string[];
       useCaseTerms?: string[];
+      contentSuitabilities?: MediaContentSuitability[];
       aiProcessingStatus?: MediaAiProcessingStatus;
     };
   },
@@ -845,6 +864,23 @@ export async function buildMetadataUpdateData(
     data.addUseCaseTerms,
     data.removeUseCaseTerms,
   );
+
+  if (
+    data.contentSuitabilities !== undefined ||
+    data.addContentSuitabilities !== undefined ||
+    data.removeContentSuitabilities !== undefined
+  ) {
+    const current = existing?.contentSuitabilities ?? [];
+    const next =
+      data.contentSuitabilities !== undefined
+        ? normalizeContentSuitabilities(data.contentSuitabilities)
+        : mergeContentSuitabilities(
+            current,
+            data.addContentSuitabilities,
+            data.removeContentSuitabilities,
+          );
+    updateData.contentSuitabilities = next;
+  }
 
   if (data.aiProcessingStatus !== undefined) {
     const status = validateMediaAiProcessingStatus(data.aiProcessingStatus);
@@ -1045,6 +1081,46 @@ export function parseMediaMetadataPatchBody(
     if (err) return err;
   }
 
+  if ("contentSuitabilities" in raw) {
+    hasUpdates = true;
+    try {
+      data.contentSuitabilities = parseContentSuitabilitiesOrThrow(raw.contentSuitabilities);
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof Error ? err.message : "Phù hợp nội dung không hợp lệ",
+      };
+    }
+  }
+
+  if ("addContentSuitabilities" in raw) {
+    hasUpdates = true;
+    try {
+      data.addContentSuitabilities = parseContentSuitabilitiesOrThrow(
+        raw.addContentSuitabilities,
+      );
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof Error ? err.message : "Phù hợp nội dung thêm không hợp lệ",
+      };
+    }
+  }
+
+  if ("removeContentSuitabilities" in raw) {
+    hasUpdates = true;
+    try {
+      data.removeContentSuitabilities = parseContentSuitabilitiesOrThrow(
+        raw.removeContentSuitabilities,
+      );
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof Error ? err.message : "Phù hợp nội dung gỡ không hợp lệ",
+      };
+    }
+  }
+
   if ("aiProcessingStatus" in raw) {
     hasUpdates = true;
     const status = validateMediaAiProcessingStatus(raw.aiProcessingStatus);
@@ -1078,6 +1154,7 @@ export async function updateMediaAsset(id: string, data: MediaMetadataUpdateInpu
       industryTerms: existing.industryTerms,
       audienceTerms: existing.audienceTerms,
       useCaseTerms: existing.useCaseTerms,
+      contentSuitabilities: existing.contentSuitabilities,
       aiProcessingStatus: existing.aiProcessingStatus,
     },
   });
@@ -1121,6 +1198,7 @@ export async function bulkUpdateMediaAssets(ids: string[], data: MediaMetadataUp
       industryTerms: true,
       audienceTerms: true,
       useCaseTerms: true,
+      contentSuitabilities: true,
       aiProcessingStatus: true,
     },
   });

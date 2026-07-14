@@ -3,6 +3,7 @@ import type {
   MediaAiProcessingStatus,
   MediaAssetType,
   MediaCollectionType,
+  MediaContentSuitability,
   MediaFolder,
   MediaSeoReadinessStatus,
   MediaUsageType,
@@ -27,6 +28,7 @@ import {
   validateMediaAssetType,
   validateMediaSeoReadinessStatus,
 } from "@/features/media/services/media-intelligence.service";
+import { validateMediaContentSuitability } from "@/features/media/media-bundle-presets";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const VALID_FOLDERS = Object.keys(STORAGE_FOLDER_TO_MEDIA) as StorageFolderKey[];
@@ -109,6 +111,10 @@ export async function GET(request: Request) {
   const minimumSeoScore = minimumSeoScoreParam
     ? Number.parseInt(minimumSeoScoreParam, 10)
     : undefined;
+  const contentSuitabilityParam = searchParams.get("contentSuitability");
+  const contentSuitability = contentSuitabilityParam
+    ? validateMediaContentSuitability(contentSuitabilityParam) ?? undefined
+    : undefined;
 
   const filters = {
     folder,
@@ -138,6 +144,7 @@ export async function GET(request: Request) {
     audience: searchParams.get("audience") ?? undefined,
     useCase: searchParams.get("useCase") ?? undefined,
     duplicateStatus: searchParams.get("duplicateStatus") ?? undefined,
+    contentSuitability,
     search,
   };
 
@@ -286,6 +293,9 @@ export async function POST(request: Request) {
       industryTerms: parseJsonStringArray(formData.get("industryTerms")),
       audienceTerms: parseJsonStringArray(formData.get("audienceTerms")),
       useCaseTerms: parseJsonStringArray(formData.get("useCaseTerms")),
+      contentSuitabilities: parseJsonStringArray(
+        formData.get("contentSuitabilities"),
+      ) as MediaContentSuitability[],
     });
 
     return NextResponse.json({ ...asset, warning, duplicateOfId, reused }, { status: 201 });

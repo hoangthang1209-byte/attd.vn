@@ -3,11 +3,15 @@
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import type {
   MediaAssetType,
+  MediaBundleContentType,
+  MediaBundleSlotType,
   MediaCollectionType,
+  MediaContentSuitability,
   MediaOrientation,
   MediaSeoReadinessStatus,
 } from "@prisma/client";
 import { InlineLoading } from "@/components/ui/loading/ContextLoading";
+import { MEDIA_CONTENT_SUITABILITY_LABELS } from "@/features/media/media-suitability-client";
 
 export type MediaAssetSuggestion = {
   id: string;
@@ -23,6 +27,7 @@ export type MediaAssetSuggestion = {
   score: number;
   matchedOn: string[];
   subjectTerms?: string[];
+  contentSuitabilities?: MediaContentSuitability[];
   seoScore?: number;
   seoReadinessStatus?: MediaSeoReadinessStatus;
   createdAt?: string;
@@ -54,6 +59,16 @@ export type MediaSuggestionPanelProps = {
   useCases?: string[];
   minimumSeoScore?: number;
   seoReadinessStatuses?: MediaSeoReadinessStatus[];
+  /** Filter/score by content-bundle suitability (e.g. LANDING_HERO, PRODUCT_GALLERY). */
+  contentSuitabilities?: MediaContentSuitability[];
+  /** Media bundle content type context (used to bias discovery scoring). */
+  bundleContentType?: MediaBundleContentType;
+  /** Media bundle slot type context (used to bias discovery scoring toward the slot's profile). */
+  bundleSlotType?: MediaBundleSlotType;
+  /** Exclude assets already assigned to this bundle (across all its slots). */
+  excludeBundleId?: string;
+  /** Defaults to true when excludeBundleId is set; pass false to keep already-assigned assets visible. */
+  excludeAssignedToBundle?: boolean;
   selectedIds?: string[];
   multiple?: boolean;
   onSelect: (asset: MediaAssetSuggestion) => void;
@@ -80,6 +95,11 @@ export default function MediaSuggestionPanel({
   useCases,
   minimumSeoScore,
   seoReadinessStatuses,
+  contentSuitabilities,
+  bundleContentType,
+  bundleSlotType,
+  excludeBundleId,
+  excludeAssignedToBundle,
   selectedIds = [],
   multiple = false,
   onSelect,
@@ -117,6 +137,11 @@ export default function MediaSuggestionPanel({
           useCases,
           minimumSeoScore,
           seoReadinessStatuses,
+          contentSuitabilities,
+          bundleContentType,
+          bundleSlotType,
+          excludeBundleId,
+          excludeAssignedToBundle,
           excludeIds: selectedIds,
           limit: 12,
         }),
@@ -158,6 +183,11 @@ export default function MediaSuggestionPanel({
     useCases,
     minimumSeoScore,
     seoReadinessStatuses,
+    contentSuitabilities,
+    bundleContentType,
+    bundleSlotType,
+    excludeBundleId,
+    excludeAssignedToBundle,
     selectedIds,
     runDiscover,
   ]);
@@ -252,6 +282,11 @@ export default function MediaSuggestionPanel({
                   )}
                   {typeof item.seoScore === "number" && (
                     <span className="admin-badge">SEO {item.seoScore}</span>
+                  )}
+                  {item.contentSuitabilities?.[0] && (
+                    <span className="admin-badge">
+                      {MEDIA_CONTENT_SUITABILITY_LABELS[item.contentSuitabilities[0]]}
+                    </span>
                   )}
                 </p>
                 <p className="admin-field-hint">điểm {item.score}</p>

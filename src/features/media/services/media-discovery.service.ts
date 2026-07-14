@@ -1,6 +1,9 @@
 import type {
   MediaAssetType,
+  MediaBundleContentType,
+  MediaBundleSlotType,
   MediaCollectionType,
+  MediaContentSuitability,
   MediaOrientation,
   MediaSeoReadinessStatus,
   MediaVisibility,
@@ -11,6 +14,8 @@ import {
   MEDIA_DISCOVERY_CANDIDATE_LIMIT,
   MEDIA_DISCOVERY_MAX_LIMIT,
 } from "@/features/media/media-classification";
+import { SLOT_DISCOVERY_PROFILES } from "@/features/media/media-bundle-presets";
+import { calculateSuitabilityScore } from "@/features/media/services/media-content-intelligence.service";
 
 export type MediaAssetWithClassification = Prisma.MediaAssetGetPayload<{
   include: {
@@ -55,6 +60,13 @@ export type MediaDiscoveryInput = {
   useCases?: string[];
   minimumSeoScore?: number;
   seoReadinessStatuses?: MediaSeoReadinessStatus[];
+  contentSuitabilities?: MediaContentSuitability[];
+  bundleContentType?: MediaBundleContentType;
+  bundleSlotType?: MediaBundleSlotType;
+  excludeBundleId?: string;
+  excludeAssignedToBundle?: boolean;
+  /** Soft-penalize assets already assigned elsewhere in this bundle. */
+  penalizeBundleAssetIds?: string[];
 };
 
 export type MediaDiscoveryResult = {
@@ -329,6 +341,49 @@ export function scoreAssetForDiscovery(
     matchedOn.push("duplicatePenalty");
   }
 
+  const requestedSuitabilities =
+    input.contentSuitabilities?.length
+      ? input.contentSuitabilities
+      : input.bundleSlotType
+        ? SLOT_DISCOVERY_PROFILES[input.bundleSlotType]?.suitabilities ?? []
+        : [];
+
+  if (requestedSuitabilities.length) {
+    const { score: suitScore, matched } = calculateSuitabilityScore(
+      asset.contentSuitabilities,
+      requestedSuitabilities,
+    );
+    if (suitScore > 0) {
+      score += Math.min(suitScore, 10);
+      for (const value of matched) matchedOn.push(`suitability:${value}`);
+    }
+  }
+
+  if (input.bundleSlotType) {
+    const profile = SLOT_DISCOVERY_PROFILES[input.bundleSlotType];
+    if (profile?.roles?.length && asset.role && profile.roles.includes(asset.role.code)) {
+      score += 6;
+      matchedOn.push(`bundleSlot:${input.bundleSlotType}`);
+      matchedOn.push(`role:${asset.role.code}`);
+    } else if (input.bundleSlotType) {
+      matchedOn.push(`bundleSlot:${input.bundleSlotType}`);
+    }
+    if (profile?.orientation && asset.orientation === profile.orientation) {
+      score += 4;
+      matchedOn.push(`orientation:${asset.orientation}`);
+    }
+  }
+
+  if (input.bundleContentType) {
+    score += 5;
+    matchedOn.push(`bundleContentType:${input.bundleContentType}`);
+  }
+
+  if (input.penalizeBundleAssetIds?.includes(asset.id)) {
+    score -= 3;
+    matchedOn.push("bundleReusePenalty");
+  }
+
   return { score, matchedOn: [...new Set(matchedOn)] };
 }
 
@@ -343,10 +398,39 @@ export async function discoverMediaAssets(
   const limit = Math.min(Math.max(input.limit ?? 12, 1), MAX_RESULT_LIMIT);
   const visibility = input.visibility ?? "PUBLIC";
   const excludeIds = [...new Set((input.excludeIds ?? []).filter(Boolean))];
+  if (input.excludeBundleId && input.excludeAssignedToBundle !== false) {
+    const assigned = await prisma.mediaBundleSlotAsset.findMany({
+      where: { mediaBundleSlot: { mediaBundleId: input.excludeBundleId } },
+      select: { mediaAssetId: true },
+      take: 500,
+    });
+    for (const row of assigned) excludeIds.push(row.mediaAssetId);
+  }
+  const uniqueExcludeIds = [...new Set(excludeIds)];
   const libraryCodes = (input.libraries ?? []).map((c) => c.toUpperCase()).filter(Boolean);
   const roleCodes = (input.roles ?? []).map((c) => c.toUpperCase()).filter(Boolean);
   const collectionKeys = (input.collections ?? []).map((c) => c.trim()).filter(Boolean);
   const collectionTypes = input.collectionTypes ?? [];
+
+  const slotProfile = input.bundleSlotType
+    ? SLOT_DISCOVERY_PROFILES[input.bundleSlotType]
+    : null;
+  const mergedSuitabilities = [
+    ...(input.contentSuitabilities ?? []),
+    ...(slotProfile?.suitabilities ?? []),
+  ];
+  void mergedSuitabilities;
+  const mergedRoles = [...new Set([...(input.roles ?? []), ...(slotProfile?.roles ?? [])])].map(
+    (c) => c.toUpperCase(),
+  );
+  const mergedLibraries = [
+    ...new Set([...(input.libraries ?? []), ...(slotProfile?.libraries ?? [])]),
+  ].map((c) => c.toUpperCase());
+  const effectiveOrientation = input.orientation ?? slotProfile?.orientation;
+  const effectiveMinSeo =
+    typeof input.minimumSeoScore === "number"
+      ? input.minimumSeoScore
+      : slotProfile?.minimumSeoScore;
 
   const arrayHasSome = (field: string, values?: string[]) =>
     values?.length ? { [field]: { hasSome: values } } : {};
@@ -374,19 +458,28 @@ export async function discoverMediaAssets(
 
   const where: Prisma.MediaAssetWhereInput = {
     visibility,
-    library: { isActive: true, ...(libraryCodes.length ? { code: { in: libraryCodes } } : {}) },
-    role: { isActive: true, ...(roleCodes.length ? { code: { in: roleCodes } } : {}) },
+    library: {
+      isActive: true,
+      ...((mergedLibraries.length ? mergedLibraries : libraryCodes).length
+        ? { code: { in: mergedLibraries.length ? mergedLibraries : libraryCodes } }
+        : {}),
+    },
+    role: {
+      isActive: true,
+      ...((mergedRoles.length ? mergedRoles : roleCodes).length
+        ? { code: { in: mergedRoles.length ? mergedRoles : roleCodes } }
+        : {}),
+    },
     ...(collectionFilters.length ? { AND: collectionFilters } : {}),
-    ...(input.orientation ? { orientation: input.orientation } : {}),
+    ...(effectiveOrientation ? { orientation: effectiveOrientation } : {}),
     ...(input.language ? { contentLanguage: input.language } : {}),
-    ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
+    ...(uniqueExcludeIds.length ? { id: { notIn: uniqueExcludeIds } } : {}),
     ...(input.assetTypes?.length ? { assetType: { in: input.assetTypes } } : {}),
-    ...(typeof input.minimumSeoScore === "number"
-      ? { seoScore: { gte: input.minimumSeoScore } }
-      : {}),
+    ...(typeof effectiveMinSeo === "number" ? { seoScore: { gte: effectiveMinSeo } } : {}),
     ...(input.seoReadinessStatuses?.length
       ? { seoReadinessStatus: { in: input.seoReadinessStatuses } }
       : {}),
+    // Suitability is scored in-app; do not hard-filter DB (most assets still empty post-10.3).
     ...arrayHasSome("subjectTerms", input.subjects),
     ...arrayHasSome("materialTerms", input.materials),
     ...arrayHasSome("colorTerms", input.colors),

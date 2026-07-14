@@ -12,8 +12,18 @@ import {
   validateMediaAssetType,
   validateMediaSeoReadinessStatus,
 } from "@/features/media/services/media-intelligence.service";
+import {
+  validateMediaBundleContentType,
+  validateMediaBundleSlotType,
+  validateMediaContentSuitability,
+} from "@/features/media/media-bundle-presets";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
-import type { MediaCollectionType, MediaAssetType, MediaSeoReadinessStatus } from "@prisma/client";
+import type {
+  MediaCollectionType,
+  MediaAssetType,
+  MediaSeoReadinessStatus,
+  MediaContentSuitability,
+} from "@prisma/client";
 
 function parseStringArray(value: unknown, field: string): string[] | { error: string } {
   if (value === undefined) return [];
@@ -154,6 +164,41 @@ export async function POST(request: Request) {
     minimumSeoScore = Math.floor(n);
   }
 
+  const suitabilitiesRaw = parseStringArray(raw.contentSuitabilities, "contentSuitabilities");
+  if ("error" in suitabilitiesRaw) {
+    return NextResponse.json({ message: suitabilitiesRaw.error }, { status: 400 });
+  }
+  const contentSuitabilities: MediaContentSuitability[] = [];
+  for (const value of suitabilitiesRaw) {
+    const parsed = validateMediaContentSuitability(value);
+    if (!parsed) {
+      return NextResponse.json({ message: "Phù hợp nội dung không hợp lệ" }, { status: 400 });
+    }
+    contentSuitabilities.push(parsed);
+  }
+
+  let bundleContentType = undefined;
+  if ("bundleContentType" in raw && raw.bundleContentType != null) {
+    const parsed = validateMediaBundleContentType(raw.bundleContentType);
+    if (!parsed) {
+      return NextResponse.json({ message: "Loại nội dung bộ media không hợp lệ" }, { status: 400 });
+    }
+    bundleContentType = parsed;
+  }
+
+  let bundleSlotType = undefined;
+  if ("bundleSlotType" in raw && raw.bundleSlotType != null) {
+    const parsed = validateMediaBundleSlotType(raw.bundleSlotType);
+    if (!parsed) {
+      return NextResponse.json({ message: "Loại vị trí bộ media không hợp lệ" }, { status: 400 });
+    }
+    bundleSlotType = parsed;
+  }
+
+  const excludeBundleId = typeof raw.excludeBundleId === "string" ? raw.excludeBundleId : undefined;
+  const excludeAssignedToBundle =
+    typeof raw.excludeAssignedToBundle === "boolean" ? raw.excludeAssignedToBundle : undefined;
+
   let limit = 12;
   if ("limit" in raw) {
     const n = typeof raw.limit === "number" ? raw.limit : Number(raw.limit);
@@ -190,6 +235,11 @@ export async function POST(request: Request) {
       useCases,
       minimumSeoScore,
       seoReadinessStatuses,
+      contentSuitabilities,
+      bundleContentType,
+      bundleSlotType,
+      excludeBundleId,
+      excludeAssignedToBundle,
     });
 
     return NextResponse.json({
@@ -209,6 +259,7 @@ export async function POST(request: Request) {
           collectionType: join.mediaCollection.collectionType,
         })),
         subjectTerms: asset.subjectTerms,
+        contentSuitabilities: asset.contentSuitabilities,
         assetType: asset.assetType,
         seoScore: asset.seoScore,
         seoReadinessStatus: asset.seoReadinessStatus,

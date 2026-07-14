@@ -918,6 +918,72 @@ enum MediaVocabularyType {
   USE_CASE
 }
 
+enum MediaContentSuitability {
+  FEATURED_IMAGE
+  LANDING_HERO
+  BLOG_INLINE
+  BLOG_COVER
+  PRODUCT_GALLERY
+  PRODUCT_DETAIL
+  COMPARISON
+  PROCESS_STEP
+  MATERIAL_DETAIL
+  TECHNIQUE_DETAIL
+  FACTORY_STORY
+  CASE_STUDY
+  TESTIMONIAL
+  TEAM_PROFILE
+  TIMELINE
+  BEFORE_AFTER
+  SPECIFICATION
+  SOCIAL_POST
+  OG_IMAGE
+  BACKGROUND
+  CATALOGUE
+  PRESENTATION
+  DOCUMENTATION
+}
+
+enum MediaBundleStatus {
+  DRAFT
+  READY
+  ARCHIVED
+}
+
+enum MediaBundleContentType {
+  BLOG_ARTICLE
+  LANDING_PAGE
+  PRODUCT_CONTENT
+  CASE_STUDY
+  CAMPAIGN
+  SOCIAL
+  PRESENTATION
+  GENERAL
+}
+
+enum MediaBundleSlotType {
+  HERO
+  FEATURED
+  COVER
+  GALLERY
+  INLINE
+  PRODUCT
+  FACTORY
+  PROCESS
+  MATERIAL
+  TECHNIQUE
+  PACKAGING
+  CUSTOMER
+  TEAM
+  TESTIMONIAL
+  BEFORE_AFTER
+  TIMELINE
+  OG_IMAGE
+  BACKGROUND
+  DOCUMENTATION
+  OTHER
+}
+
 /// Manageable content-domain grouping for media assets (DAM Library).
 model MediaLibrary {
   id          String       @id @default(cuid())
@@ -1000,6 +1066,62 @@ model MediaVocabularyTerm {
   @@index([code])
 }
 
+/// Curated content-ready package of media assets (slots + references; never copies files).
+model MediaBundle {
+  id             String                 @id @default(cuid())
+  code           String?                @unique
+  name           String
+  description    String?                @db.Text
+  status         MediaBundleStatus      @default(DRAFT)
+  contentType    MediaBundleContentType @default(GENERAL)
+  sortOrder      Int                    @default(0)
+  isSystem       Boolean                @default(false)
+  isActive       Boolean                @default(true)
+  query          String?
+  subjectTerms   String[]               @default([])
+  industryTerms  String[]               @default([])
+  useCaseTerms   String[]               @default([])
+  techniqueTerms String[]               @default([])
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  slots          MediaBundleSlot[]
+
+  @@index([status])
+  @@index([contentType, isActive, sortOrder])
+  @@index([name])
+}
+
+model MediaBundleSlot {
+  id            String                 @id @default(cuid())
+  mediaBundleId String
+  slotType      MediaBundleSlotType
+  label         String
+  description   String?
+  required      Boolean                @default(false)
+  minAssets     Int                    @default(1)
+  maxAssets     Int?
+  sortOrder     Int                    @default(0)
+  mediaBundle   MediaBundle            @relation(fields: [mediaBundleId], references: [id], onDelete: Cascade)
+  assets        MediaBundleSlotAsset[]
+
+  @@index([mediaBundleId, sortOrder])
+  @@index([slotType])
+}
+
+model MediaBundleSlotAsset {
+  mediaBundleSlotId String
+  mediaAssetId      String
+  sortOrder         Int             @default(0)
+  note              String?
+  createdAt         DateTime        @default(now())
+  mediaBundleSlot   MediaBundleSlot @relation(fields: [mediaBundleSlotId], references: [id], onDelete: Cascade)
+  mediaAsset        MediaAsset      @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@id([mediaBundleSlotId, mediaAssetId])
+  @@index([mediaAssetId])
+  @@index([mediaBundleSlotId, sortOrder])
+}
+
 model MediaAsset {
   id                       String                    @id @default(cuid())
   filename                 String
@@ -1043,6 +1165,7 @@ model MediaAsset {
   industryTerms            String[]                  @default([])
   audienceTerms            String[]                  @default([])
   useCaseTerms             String[]                  @default([])
+  contentSuitabilities     MediaContentSuitability[] @default([])
   seoScore                 Int                       @default(0)
   metadataCompleteness     Int                       @default(0)
   seoReadinessStatus       MediaSeoReadinessStatus   @default(INCOMPLETE)
@@ -1059,6 +1182,7 @@ model MediaAsset {
   duplicateOf              MediaAsset?               @relation("MediaAssetDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
   duplicates               MediaAsset[]              @relation("MediaAssetDuplicates")
   collections              MediaAssetCollection[]
+  bundleSlotAssets         MediaBundleSlotAsset[]
   quoteItems               QuoteItem[]
   orderItems               OrderItem[]
   salesRepresentatives     SalesRepresentative[]
