@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeMasterDataCode } from "@/features/media/media-classification";
-import type {
-  CreateMediaCollectionInput,
-  MediaCollectionRecord,
-  UpdateMediaCollectionInput,
+import {
+  validateMediaCollectionType,
+  type CreateMediaCollectionInput,
+  type MediaCollectionRecord,
+  type UpdateMediaCollectionInput,
 } from "@/features/media/media-collection.types";
+import type { MediaCollectionType } from "@prisma/client";
 
 function mapCollection(row: {
   id: string;
@@ -12,6 +14,7 @@ function mapCollection(row: {
   name: string;
   description: string | null;
   color: string | null;
+  collectionType: MediaCollectionType;
   sortOrder: number;
   isActive: boolean;
   isSystem: boolean;
@@ -25,6 +28,7 @@ function mapCollection(row: {
     name: row.name,
     description: row.description,
     color: row.color,
+    collectionType: row.collectionType,
     sortOrder: row.sortOrder,
     isActive: row.isActive,
     isSystem: row.isSystem,
@@ -38,11 +42,13 @@ export async function listMediaCollections(options?: {
   activeOnly?: boolean;
   includeCounts?: boolean;
   search?: string;
+  collectionType?: MediaCollectionType;
 }): Promise<MediaCollectionRecord[]> {
   const search = options?.search?.trim();
   const rows = await prisma.mediaCollection.findMany({
     where: {
       ...(options?.activeOnly ? { isActive: true } : {}),
+      ...(options?.collectionType ? { collectionType: options.collectionType } : {}),
       ...(search
         ? {
             OR: [
@@ -84,12 +90,20 @@ export async function createMediaCollection(
     throw new Error("Thứ tự sắp xếp không hợp lệ.");
   }
 
+  let collectionType = input.collectionType ?? "OTHER";
+  if (input.collectionType !== undefined) {
+    const validated = validateMediaCollectionType(input.collectionType);
+    if (!validated) throw new Error("Loại bộ sưu tập không hợp lệ.");
+    collectionType = validated;
+  }
+
   const row = await prisma.mediaCollection.create({
     data: {
       code,
       name,
       description: input.description?.trim() || null,
       color: input.color?.trim() || null,
+      collectionType,
       sortOrder: input.sortOrder ?? 0,
       isActive: input.isActive ?? true,
       isSystem: false,
@@ -109,6 +123,7 @@ export async function updateMediaCollection(
     name?: string;
     description?: string | null;
     color?: string | null;
+    collectionType?: MediaCollectionType;
     sortOrder?: number;
     isActive?: boolean;
   } = {};
@@ -120,6 +135,11 @@ export async function updateMediaCollection(
   }
   if (input.description !== undefined) data.description = input.description?.trim() || null;
   if (input.color !== undefined) data.color = input.color?.trim() || null;
+  if (input.collectionType !== undefined) {
+    const validated = validateMediaCollectionType(input.collectionType);
+    if (!validated) throw new Error("Loại bộ sưu tập không hợp lệ.");
+    data.collectionType = validated;
+  }
   if (input.sortOrder !== undefined) {
     if (!Number.isFinite(input.sortOrder)) throw new Error("Thứ tự sắp xếp không hợp lệ.");
     data.sortOrder = input.sortOrder;

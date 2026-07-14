@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import type {
+  MediaAiProcessingStatus,
+  MediaAssetType,
+  MediaCollectionType,
   MediaFolder,
   MediaOrientation,
+  MediaSeoReadinessStatus,
   MediaUsageType,
   MediaVisibility,
   ProductionFileType,
@@ -51,6 +55,19 @@ import {
   resolveMediaReferences,
   type MediaReference,
 } from "@/features/media/services/media-reference.service";
+import {
+  assertAiStatusTransition,
+  intelligenceInputFromAsset,
+  mergeSemanticTerms,
+  metricsToPrismaUpdate,
+  recalculateMediaIntelligence,
+  recalculateMediaIntelligenceForIds,
+  resolveVocabularyTerms,
+  validateMediaAiProcessingStatus,
+  validateMediaAssetType,
+  validateMediaSeoReadinessStatus,
+  type SemanticTermField,
+} from "@/features/media/services/media-intelligence.service";
 
 export { LARGE_IMAGE_WARNING_SIZE };
 export { MEDIA_LIBRARY_PAGE_SIZE };
@@ -71,7 +88,14 @@ const mediaClassificationInclude = {
   collections: {
     include: {
       mediaCollection: {
-        select: { id: true, code: true, name: true, isActive: true, color: true },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          isActive: true,
+          color: true,
+          collectionType: true,
+        },
       },
     },
   },
@@ -90,9 +114,25 @@ export type MediaAssetListFilters = {
   roleCode?: string;
   collectionId?: string;
   collectionCode?: string;
+  collectionType?: MediaCollectionType;
   visibility?: MediaVisibility;
   orientation?: MediaOrientation;
   hasAltText?: boolean;
+  hasTitle?: boolean;
+  hasKeywords?: boolean;
+  hasSubject?: boolean;
+  assetType?: MediaAssetType;
+  seoReadinessStatus?: MediaSeoReadinessStatus;
+  minimumSeoScore?: number;
+  aiProcessingStatus?: MediaAiProcessingStatus;
+  subject?: string;
+  material?: string;
+  color?: string;
+  technique?: string;
+  industry?: string;
+  audience?: string;
+  useCase?: string;
+  duplicateStatus?: string;
   search?: string;
 };
 
@@ -118,6 +158,30 @@ export type MediaMetadataUpdateInput = {
   aiTags?: string[];
   contentLanguage?: string | null;
   collectionIds?: string[];
+  assetType?: MediaAssetType;
+  subjectTerms?: string[];
+  materialTerms?: string[];
+  colorTerms?: string[];
+  techniqueTerms?: string[];
+  industryTerms?: string[];
+  audienceTerms?: string[];
+  useCaseTerms?: string[];
+  addSubjectTerms?: string[];
+  removeSubjectTerms?: string[];
+  addMaterialTerms?: string[];
+  removeMaterialTerms?: string[];
+  addColorTerms?: string[];
+  removeColorTerms?: string[];
+  addTechniqueTerms?: string[];
+  removeTechniqueTerms?: string[];
+  addIndustryTerms?: string[];
+  removeIndustryTerms?: string[];
+  addAudienceTerms?: string[];
+  removeAudienceTerms?: string[];
+  addUseCaseTerms?: string[];
+  removeUseCaseTerms?: string[];
+  aiProcessingStatus?: MediaAiProcessingStatus;
+  mergeSemanticIntoExisting?: boolean;
 };
 
 function buildMediaAssetWhere(filters: MediaAssetListFilters): Prisma.MediaAssetWhereInput {
@@ -140,32 +204,76 @@ function buildMediaAssetWhere(filters: MediaAssetListFilters): Prisma.MediaAsset
           },
         }
       : {}),
+    ...(filters.collectionType
+      ? {
+          collections: {
+            some: { mediaCollection: { collectionType: filters.collectionType } },
+          },
+        }
+      : {}),
     ...(filters.visibility ? { visibility: filters.visibility } : {}),
     ...(filters.orientation ? { orientation: filters.orientation } : {}),
+    ...(filters.assetType ? { assetType: filters.assetType } : {}),
+    ...(filters.seoReadinessStatus ? { seoReadinessStatus: filters.seoReadinessStatus } : {}),
+    ...(typeof filters.minimumSeoScore === "number"
+      ? { seoScore: { gte: filters.minimumSeoScore } }
+      : {}),
+    ...(filters.aiProcessingStatus ? { aiProcessingStatus: filters.aiProcessingStatus } : {}),
+    ...(filters.subject ? { subjectTerms: { has: filters.subject } } : {}),
+    ...(filters.material ? { materialTerms: { has: filters.material } } : {}),
+    ...(filters.color ? { colorTerms: { has: filters.color } } : {}),
+    ...(filters.technique ? { techniqueTerms: { has: filters.technique } } : {}),
+    ...(filters.industry ? { industryTerms: { has: filters.industry } } : {}),
+    ...(filters.audience ? { audienceTerms: { has: filters.audience } } : {}),
+    ...(filters.useCase ? { useCaseTerms: { has: filters.useCase } } : {}),
+    ...(filters.duplicateStatus
+      ? { duplicateStatus: filters.duplicateStatus as Prisma.EnumMediaDuplicateStatusFilter["equals"] }
+      : {}),
   };
 
+  const andClauses: Prisma.MediaAssetWhereInput[] = [];
+
   if (filters.hasAltText === true) {
-    where.AND = [
-      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-      { altText: { not: null } },
-      { NOT: { altText: "" } },
-    ];
+    andClauses.push({ altText: { not: null } }, { NOT: { altText: "" } });
   } else if (filters.hasAltText === false) {
-    where.OR = [{ altText: null }, { altText: "" }];
+    andClauses.push({ OR: [{ altText: null }, { altText: "" }] });
+  }
+
+  if (filters.hasTitle === true) {
+    andClauses.push({ title: { not: null } }, { NOT: { title: "" } });
+  } else if (filters.hasTitle === false) {
+    andClauses.push({ OR: [{ title: null }, { title: "" }] });
+  }
+
+  if (filters.hasKeywords === true) {
+    andClauses.push({ NOT: { keywords: { equals: [] } } });
+  } else if (filters.hasKeywords === false) {
+    andClauses.push({ keywords: { equals: [] } });
+  }
+
+  if (filters.hasSubject === true) {
+    andClauses.push({ NOT: { subjectTerms: { equals: [] } } });
+  } else if (filters.hasSubject === false) {
+    andClauses.push({ subjectTerms: { equals: [] } });
   }
 
   if (filters.search) {
-    const searchOr: Prisma.MediaAssetWhereInput[] = [
-      { filename: { contains: filters.search, mode: "insensitive" } },
-      { title: { contains: filters.search, mode: "insensitive" } },
-      { originalName: { contains: filters.search, mode: "insensitive" } },
-      { altText: { contains: filters.search, mode: "insensitive" } },
-      { caption: { contains: filters.search, mode: "insensitive" } },
-    ];
-    where.AND = [
-      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-      { OR: searchOr },
-    ];
+    andClauses.push({
+      OR: [
+        { filename: { contains: filters.search, mode: "insensitive" } },
+        { title: { contains: filters.search, mode: "insensitive" } },
+        { originalName: { contains: filters.search, mode: "insensitive" } },
+        { altText: { contains: filters.search, mode: "insensitive" } },
+        { caption: { contains: filters.search, mode: "insensitive" } },
+        { subjectTerms: { has: filters.search } },
+        { keywords: { has: filters.search } },
+        { tags: { has: filters.search } },
+      ],
+    });
+  }
+
+  if (andClauses.length) {
+    where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), ...andClauses];
   }
 
   return where;
@@ -247,6 +355,15 @@ export type UploadMediaInput = {
   contentLanguage?: string;
   collectionIds?: string[];
   forceDuplicateUpload?: boolean;
+  mergeSemanticIntoExisting?: boolean;
+  assetType?: MediaAssetType;
+  subjectTerms?: string[];
+  materialTerms?: string[];
+  colorTerms?: string[];
+  techniqueTerms?: string[];
+  industryTerms?: string[];
+  audienceTerms?: string[];
+  useCaseTerms?: string[];
 };
 
 export type UploadMediaResult = {
@@ -321,6 +438,15 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
     contentLanguage,
     collectionIds,
     forceDuplicateUpload,
+    mergeSemanticIntoExisting,
+    assetType,
+    subjectTerms,
+    materialTerms,
+    colorTerms,
+    techniqueTerms,
+    industryTerms,
+    audienceTerms,
+    useCaseTerms,
   } = input;
 
   assertNotR2SourceFile(file.name, file.type, file.size);
@@ -369,6 +495,67 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
     throw new MediaDuplicateUploadError(exactDuplicate, contentHash);
   }
 
+  if (exactDuplicate && forceDuplicateUpload && mergeSemanticIntoExisting) {
+    const existing = await prisma.mediaAsset.findUnique({
+      where: { id: exactDuplicate.id },
+      include: mediaClassificationInclude,
+    });
+    if (existing) {
+      await updateMediaAsset(existing.id, {
+        addSubjectTerms: subjectTerms,
+        addMaterialTerms: materialTerms,
+        addColorTerms: colorTerms,
+        addTechniqueTerms: techniqueTerms,
+        addIndustryTerms: industryTerms,
+        addAudienceTerms: audienceTerms,
+        addUseCaseTerms: useCaseTerms,
+        collectionIds: collectionIds?.length
+          ? [
+              ...existing.collections.map((c) => c.mediaCollection.id),
+              ...collectionIds,
+            ]
+          : undefined,
+        altText: altText || undefined,
+        title: title || undefined,
+        tags: tags?.length ? [...existing.tags, ...tags] : undefined,
+        keywords: keywords?.length ? [...existing.keywords, ...keywords] : undefined,
+      });
+      const refreshed = await prisma.mediaAsset.findUnique({
+        where: { id: existing.id },
+        include: mediaClassificationInclude,
+      });
+      return {
+        asset: refreshed!,
+        warning,
+        reused: true,
+        duplicateOfId: existing.id,
+      };
+    }
+  }
+
+  const resolvedAssetType = validateMediaAssetType(assetType) ?? "PHOTO";
+  const resolvedSubjects = subjectTerms?.length
+    ? await resolveVocabularyTerms("SUBJECT", subjectTerms)
+    : [];
+  const resolvedMaterials = materialTerms?.length
+    ? await resolveVocabularyTerms("MATERIAL", materialTerms)
+    : [];
+  const resolvedColors = colorTerms?.length
+    ? await resolveVocabularyTerms("COLOR", colorTerms)
+    : [];
+  const resolvedTechniques = techniqueTerms?.length
+    ? await resolveVocabularyTerms("TECHNIQUE", techniqueTerms)
+    : [];
+  const resolvedIndustries = industryTerms?.length
+    ? await resolveVocabularyTerms("INDUSTRY", industryTerms)
+    : [];
+  const resolvedAudiences = audienceTerms?.length
+    ? await resolveVocabularyTerms("AUDIENCE", audienceTerms)
+    : [];
+  const resolvedUseCases = useCaseTerms?.length
+    ? await resolveVocabularyTerms("USE_CASE", useCaseTerms)
+    : [];
+
   const storage = requireCloudinaryStorageAdapter();
   const result = await storage.upload(folder, file.name, buffer, mimeType);
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
@@ -407,6 +594,14 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
           contentHash,
           duplicateStatus: exactDuplicate ? "CONFIRMED_DUPLICATE" : "UNIQUE",
           duplicateOfId: exactDuplicate?.id ?? null,
+          assetType: resolvedAssetType,
+          subjectTerms: resolvedSubjects,
+          materialTerms: resolvedMaterials,
+          colorTerms: resolvedColors,
+          techniqueTerms: resolvedTechniques,
+          industryTerms: resolvedIndustries,
+          audienceTerms: resolvedAudiences,
+          useCaseTerms: resolvedUseCases,
           ...(validatedCollectionIds.length
             ? {
                 collections: {
@@ -419,7 +614,17 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
         },
         include: mediaClassificationInclude,
       });
-      return created;
+      const metrics = recalculateMediaIntelligence(
+        intelligenceInputFromAsset({
+          ...created,
+          _count: { collections: validatedCollectionIds.length },
+        }),
+      );
+      return tx.mediaAsset.update({
+        where: { id: created.id },
+        data: metricsToPrismaUpdate(metrics),
+        include: mediaClassificationInclude,
+      });
     });
     return {
       asset,
@@ -503,9 +708,22 @@ export async function uploadProductionFileAsset(input: {
  */
 export async function buildMetadataUpdateData(
   data: MediaMetadataUpdateInput,
-  options?: { requireActiveClassification?: boolean },
+  options?: {
+    requireActiveClassification?: boolean;
+    existing?: {
+      subjectTerms?: string[];
+      materialTerms?: string[];
+      colorTerms?: string[];
+      techniqueTerms?: string[];
+      industryTerms?: string[];
+      audienceTerms?: string[];
+      useCaseTerms?: string[];
+      aiProcessingStatus?: MediaAiProcessingStatus;
+    };
+  },
 ): Promise<Prisma.MediaAssetUncheckedUpdateManyInput> {
   const requireActive = options?.requireActiveClassification ?? true;
+  const existing = options?.existing;
   const updateData: Prisma.MediaAssetUncheckedUpdateManyInput = {};
 
   let folder = data.folder;
@@ -551,6 +769,96 @@ export async function buildMetadataUpdateData(
   if (data.aiTags !== undefined) updateData.aiTags = normalizeMediaTags(data.aiTags);
   if (data.contentLanguage !== undefined) {
     updateData.contentLanguage = emptyToNull(data.contentLanguage);
+  }
+
+  if (data.assetType !== undefined) {
+    const assetType = validateMediaAssetType(data.assetType);
+    if (!assetType) throw new Error("Loại tài sản không hợp lệ");
+    updateData.assetType = assetType;
+  }
+
+  async function resolveReplaceOrMerge(
+    field: SemanticTermField,
+    vocabType: Parameters<typeof resolveVocabularyTerms>[0],
+    replace?: string[],
+    add?: string[],
+    remove?: string[],
+  ) {
+    if (replace === undefined && add === undefined && remove === undefined) return;
+    const current = existing?.[field] ?? [];
+    const nextBase =
+      replace !== undefined
+        ? replace
+        : mergeSemanticTerms(current, add, remove);
+    const resolved = await resolveVocabularyTerms(vocabType, nextBase, {
+      allowInactiveExisting: current,
+    });
+    updateData[field] = resolved;
+  }
+
+  await resolveReplaceOrMerge(
+    "subjectTerms",
+    "SUBJECT",
+    data.subjectTerms,
+    data.addSubjectTerms,
+    data.removeSubjectTerms,
+  );
+  await resolveReplaceOrMerge(
+    "materialTerms",
+    "MATERIAL",
+    data.materialTerms,
+    data.addMaterialTerms,
+    data.removeMaterialTerms,
+  );
+  await resolveReplaceOrMerge(
+    "colorTerms",
+    "COLOR",
+    data.colorTerms,
+    data.addColorTerms,
+    data.removeColorTerms,
+  );
+  await resolveReplaceOrMerge(
+    "techniqueTerms",
+    "TECHNIQUE",
+    data.techniqueTerms,
+    data.addTechniqueTerms,
+    data.removeTechniqueTerms,
+  );
+  await resolveReplaceOrMerge(
+    "industryTerms",
+    "INDUSTRY",
+    data.industryTerms,
+    data.addIndustryTerms,
+    data.removeIndustryTerms,
+  );
+  await resolveReplaceOrMerge(
+    "audienceTerms",
+    "AUDIENCE",
+    data.audienceTerms,
+    data.addAudienceTerms,
+    data.removeAudienceTerms,
+  );
+  await resolveReplaceOrMerge(
+    "useCaseTerms",
+    "USE_CASE",
+    data.useCaseTerms,
+    data.addUseCaseTerms,
+    data.removeUseCaseTerms,
+  );
+
+  if (data.aiProcessingStatus !== undefined) {
+    const status = validateMediaAiProcessingStatus(data.aiProcessingStatus);
+    if (!status) throw new Error("Trạng thái xử lý AI không hợp lệ");
+    if (existing?.aiProcessingStatus) {
+      assertAiStatusTransition(existing.aiProcessingStatus, status);
+    }
+    updateData.aiProcessingStatus = status;
+    if (status === "FAILED" || status === "COMPLETED") {
+      updateData.aiProcessedAt = new Date();
+    }
+    if (status === "QUEUED" || status === "PROCESSING" || status === "COMPLETED") {
+      updateData.aiProcessingError = null;
+    }
   }
 
   return updateData;
@@ -688,6 +996,62 @@ export function parseMediaMetadataPatchBody(
     data.collectionIds = raw.collectionIds;
   }
 
+  if ("assetType" in raw) {
+    hasUpdates = true;
+    const assetType = validateMediaAssetType(raw.assetType);
+    if (!assetType) return { ok: false, message: "Loại tài sản không hợp lệ" };
+    data.assetType = assetType;
+  }
+
+  const parseStringArray = (
+    key: string,
+    target: keyof MediaMetadataUpdateInput,
+    message: string,
+  ): { ok: false; message: string } | null => {
+    if (!(key in raw)) return null;
+    hasUpdates = true;
+    const value = raw[key];
+    if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+      return { ok: false, message };
+    }
+    (data as Record<string, unknown>)[target] = value;
+    return null;
+  };
+
+  for (const [key, message] of [
+    ["subjectTerms", "Chủ thể không hợp lệ"],
+    ["materialTerms", "Chất liệu không hợp lệ"],
+    ["colorTerms", "Màu sắc không hợp lệ"],
+    ["techniqueTerms", "Kỹ thuật không hợp lệ"],
+    ["industryTerms", "Ngành nghề không hợp lệ"],
+    ["audienceTerms", "Đối tượng không hợp lệ"],
+    ["useCaseTerms", "Mục đích sử dụng không hợp lệ"],
+    ["addSubjectTerms", "Chủ thể thêm không hợp lệ"],
+    ["removeSubjectTerms", "Chủ thể gỡ không hợp lệ"],
+    ["addMaterialTerms", "Chất liệu thêm không hợp lệ"],
+    ["removeMaterialTerms", "Chất liệu gỡ không hợp lệ"],
+    ["addColorTerms", "Màu sắc thêm không hợp lệ"],
+    ["removeColorTerms", "Màu sắc gỡ không hợp lệ"],
+    ["addTechniqueTerms", "Kỹ thuật thêm không hợp lệ"],
+    ["removeTechniqueTerms", "Kỹ thuật gỡ không hợp lệ"],
+    ["addIndustryTerms", "Ngành nghề thêm không hợp lệ"],
+    ["removeIndustryTerms", "Ngành nghề gỡ không hợp lệ"],
+    ["addAudienceTerms", "Đối tượng thêm không hợp lệ"],
+    ["removeAudienceTerms", "Đối tượng gỡ không hợp lệ"],
+    ["addUseCaseTerms", "Mục đích thêm không hợp lệ"],
+    ["removeUseCaseTerms", "Mục đích gỡ không hợp lệ"],
+  ] as const) {
+    const err = parseStringArray(key, key, message);
+    if (err) return err;
+  }
+
+  if ("aiProcessingStatus" in raw) {
+    hasUpdates = true;
+    const status = validateMediaAiProcessingStatus(raw.aiProcessingStatus);
+    if (!status) return { ok: false, message: "Trạng thái xử lý AI không hợp lệ" };
+    data.aiProcessingStatus = status;
+  }
+
   if ("orientation" in raw) {
     const orientation = validateMediaOrientation(raw.orientation);
     if (!orientation) return { ok: false, message: "Hướng ảnh không hợp lệ" };
@@ -697,11 +1061,26 @@ export function parseMediaMetadataPatchBody(
 }
 
 export async function updateMediaAsset(id: string, data: MediaMetadataUpdateInput) {
-  const existing = await prisma.mediaAsset.findUnique({ where: { id } });
+  const existing = await prisma.mediaAsset.findUnique({
+    where: { id },
+    include: { _count: { select: { collections: true } } },
+  });
   if (!existing) return null;
 
-  const { collectionIds, ...metadata } = data;
-  const updateData = await buildMetadataUpdateData(metadata);
+  const { collectionIds, mergeSemanticIntoExisting: _merge, ...metadata } = data;
+  void _merge;
+  const updateData = await buildMetadataUpdateData(metadata, {
+    existing: {
+      subjectTerms: existing.subjectTerms,
+      materialTerms: existing.materialTerms,
+      colorTerms: existing.colorTerms,
+      techniqueTerms: existing.techniqueTerms,
+      industryTerms: existing.industryTerms,
+      audienceTerms: existing.audienceTerms,
+      useCaseTerms: existing.useCaseTerms,
+      aiProcessingStatus: existing.aiProcessingStatus,
+    },
+  });
 
   if (Object.keys(updateData).length) {
     await prisma.mediaAsset.update({
@@ -714,6 +1093,8 @@ export async function updateMediaAsset(id: string, data: MediaMetadataUpdateInpu
     await setMediaAssetCollections(id, collectionIds);
   }
 
+  await recalculateMediaIntelligenceForIds([id]);
+
   return prisma.mediaAsset.findUnique({
     where: { id },
     include: mediaClassificationInclude,
@@ -722,15 +1103,46 @@ export async function updateMediaAsset(id: string, data: MediaMetadataUpdateInpu
 
 export async function bulkUpdateMediaAssets(ids: string[], data: MediaMetadataUpdateInput) {
   const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length > MEDIA_BULK_UPDATE_MAX) {
+    throw new Error(`Chỉ có thể cập nhật tối đa ${MEDIA_BULK_UPDATE_MAX} ảnh mỗi lần`);
+  }
+
   const { collectionIds: _collectionIds, ...metadata } = data;
   void _collectionIds;
-  const updateData = await buildMetadataUpdateData(metadata);
-  if (!Object.keys(updateData).length) return 0;
-  const result = await prisma.mediaAsset.updateMany({
+
+  const assets = await prisma.mediaAsset.findMany({
     where: { id: { in: uniqueIds } },
-    data: updateData,
+    select: {
+      id: true,
+      subjectTerms: true,
+      materialTerms: true,
+      colorTerms: true,
+      techniqueTerms: true,
+      industryTerms: true,
+      audienceTerms: true,
+      useCaseTerms: true,
+      aiProcessingStatus: true,
+    },
   });
-  return result.count;
+
+  let updated = 0;
+  for (const asset of assets) {
+    const updateData = await buildMetadataUpdateData(metadata, {
+      existing: asset,
+    });
+    if (!Object.keys(updateData).length) continue;
+    await prisma.mediaAsset.update({
+      where: { id: asset.id },
+      data: updateData,
+    });
+    updated += 1;
+  }
+
+  if (updated) {
+    await recalculateMediaIntelligenceForIds(assets.map((a) => a.id));
+  }
+
+  return updated;
 }
 
 export class MediaAssetInUseError extends Error {

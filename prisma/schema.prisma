@@ -868,6 +868,56 @@ enum MediaDuplicateStatus {
   IGNORED
 }
 
+enum MediaCollectionType {
+  PROJECT
+  CAMPAIGN
+  CUSTOMER
+  PRODUCT_LINE
+  CONTENT
+  EVENT
+  INTERNAL
+  OTHER
+}
+
+enum MediaAssetType {
+  PHOTO
+  ILLUSTRATION
+  LOGO
+  ICON
+  MOCKUP
+  SCREENSHOT
+  DIAGRAM
+  DOCUMENT_PREVIEW
+  VIDEO_THUMBNAIL
+  OTHER
+}
+
+enum MediaAiProcessingStatus {
+  NOT_PROCESSED
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum MediaSeoReadinessStatus {
+  INCOMPLETE
+  BASIC
+  READY
+  EXCELLENT
+}
+
+enum MediaVocabularyType {
+  SUBJECT
+  MATERIAL
+  COLOR
+  TECHNIQUE
+  INDUSTRY
+  AUDIENCE
+  USE_CASE
+}
+
 /// Manageable content-domain grouping for media assets (DAM Library).
 model MediaLibrary {
   id          String       @id @default(cuid())
@@ -902,20 +952,22 @@ model MediaRole {
 
 /// Project/campaign grouping of media assets. An asset may belong to many collections.
 model MediaCollection {
-  id          String                 @id @default(cuid())
-  code        String?                @unique
-  name        String
-  description String?                @db.Text
-  color       String?
-  sortOrder   Int                    @default(0)
-  isActive    Boolean                @default(true)
-  isSystem    Boolean                @default(false)
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
-  assets      MediaAssetCollection[]
+  id             String              @id @default(cuid())
+  code           String?             @unique
+  name           String
+  description    String?             @db.Text
+  color          String?
+  collectionType MediaCollectionType @default(OTHER)
+  sortOrder      Int                 @default(0)
+  isActive       Boolean             @default(true)
+  isSystem       Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  assets         MediaAssetCollection[]
 
   @@index([isActive, sortOrder])
   @@index([name])
+  @@index([collectionType])
 }
 
 model MediaAssetCollection {
@@ -927,6 +979,25 @@ model MediaAssetCollection {
 
   @@id([mediaAssetId, mediaCollectionId])
   @@index([mediaCollectionId])
+}
+
+/// Managed semantic vocabulary for Asset Intelligence metadata.
+model MediaVocabularyTerm {
+  id          String              @id @default(cuid())
+  type        MediaVocabularyType
+  code        String?
+  name        String
+  aliases     String[]            @default([])
+  description String?
+  sortOrder   Int                 @default(0)
+  isActive    Boolean             @default(true)
+  isSystem    Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([type, name])
+  @@index([type, isActive, sortOrder])
+  @@index([code])
 }
 
 model MediaAsset {
@@ -964,6 +1035,21 @@ model MediaAsset {
   perceptualHash           String?
   duplicateOfId            String?
   duplicateStatus          MediaDuplicateStatus      @default(UNIQUE)
+  assetType                MediaAssetType            @default(PHOTO)
+  subjectTerms             String[]                  @default([])
+  materialTerms            String[]                  @default([])
+  colorTerms               String[]                  @default([])
+  techniqueTerms           String[]                  @default([])
+  industryTerms            String[]                  @default([])
+  audienceTerms            String[]                  @default([])
+  useCaseTerms             String[]                  @default([])
+  seoScore                 Int                       @default(0)
+  metadataCompleteness     Int                       @default(0)
+  seoReadinessStatus       MediaSeoReadinessStatus   @default(INCOMPLETE)
+  aiProcessingStatus       MediaAiProcessingStatus   @default(NOT_PROCESSED)
+  aiProcessedAt            DateTime?
+  aiProcessingError        String?                   @db.Text
+  aiMetadataVersion        String?
   uploadedBy               String?
   metadata                 Json?
   createdAt                DateTime                  @default(now())
@@ -994,6 +1080,10 @@ model MediaAsset {
   @@index([perceptualHash])
   @@index([duplicateOfId])
   @@index([duplicateStatus])
+  @@index([assetType])
+  @@index([seoReadinessStatus])
+  @@index([aiProcessingStatus])
+  @@index([seoScore])
 }
 
 enum ManufacturingAssetStatus {

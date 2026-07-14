@@ -5,6 +5,7 @@ import {
   parseMediaMetadataPatchBody,
 } from "@/features/media/services/media.service";
 import { bulkAssignMediaCollections } from "@/features/media/services/media-collection.service";
+import { recalculateMediaIntelligenceForIds } from "@/features/media/services/media-intelligence.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function PATCH(request: Request) {
@@ -89,6 +90,7 @@ export async function PATCH(request: Request) {
       updatedCount = Math.max(updatedCount, result.updatedAssetCount);
       addedCount = result.addedCount;
       removedCount = result.removedCount;
+      await recalculateMediaIntelligenceForIds(ids);
     }
 
     return NextResponse.json({ updatedCount, addedCount, removedCount });

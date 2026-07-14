@@ -2,23 +2,38 @@
 
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { useCallback, useEffect, useState } from "react";
+import type { MediaVocabularyType } from "@prisma/client";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import { normalizeMasterDataCode } from "@/features/media/media-classification";
-import {
-  MEDIA_COLLECTION_TYPES,
-  MEDIA_COLLECTION_TYPE_LABELS,
-  type MediaCollectionRecord,
-} from "@/features/media/media-collection.types";
-import type { MediaCollectionType } from "@prisma/client";
+import type { MediaVocabularyTermRecord } from "@/features/media/services/media-vocabulary.service";
+
+const VOCAB_TYPES: MediaVocabularyType[] = [
+  "SUBJECT",
+  "MATERIAL",
+  "COLOR",
+  "TECHNIQUE",
+  "INDUSTRY",
+  "AUDIENCE",
+  "USE_CASE",
+];
+
+const VOCAB_TYPE_LABELS: Record<MediaVocabularyType, string> = {
+  SUBJECT: "Chủ thể",
+  MATERIAL: "Chất liệu",
+  COLOR: "Màu sắc",
+  TECHNIQUE: "Kỹ thuật",
+  INDUSTRY: "Ngành nghề",
+  AUDIENCE: "Đối tượng",
+  USE_CASE: "Mục đích sử dụng",
+};
 
 type FormState = {
   code: string;
   name: string;
+  aliases: string;
   description: string;
-  color: string;
-  collectionType: MediaCollectionType;
   sortOrder: string;
   isActive: boolean;
 };
@@ -26,16 +41,16 @@ type FormState = {
 const emptyForm = (): FormState => ({
   code: "",
   name: "",
+  aliases: "",
   description: "",
-  color: "",
-  collectionType: "OTHER",
   sortOrder: "0",
   isActive: true,
 });
 
-export default function MediaCollectionsPage() {
+export default function MediaVocabularyPage() {
   const toast = useAdminToast();
-  const [rows, setRows] = useState<MediaCollectionRecord[]>([]);
+  const [activeType, setActiveType] = useState<MediaVocabularyType>("SUBJECT");
+  const [rows, setRows] = useState<MediaVocabularyTermRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -43,28 +58,26 @@ export default function MediaCollectionsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<MediaCollectionType | "">("");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ includeCounts: "1" });
+      const params = new URLSearchParams({ type: activeType, includeUsage: "1" });
       if (search.trim()) params.set("search", search.trim());
-      if (filterType) params.set("collectionType", filterType);
-      const res = await fetch(`/api/content/media-collections?${params}`);
+      const res = await fetch(`/api/content/media-vocabulary?${params}`);
       const data = (await res.json()) as {
-        collections?: MediaCollectionRecord[];
+        terms?: MediaVocabularyTermRecord[];
         message?: string;
       };
-      if (!res.ok) throw new Error(data.message ?? "Không thể tải bộ sưu tập.");
-      setRows(data.collections ?? []);
+      if (!res.ok) throw new Error(data.message ?? "Không thể tải từ điển metadata ảnh.");
+      setRows(data.terms ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể tải bộ sưu tập.");
+      setError(err instanceof Error ? err.message : "Không thể tải từ điển metadata ảnh.");
     } finally {
       setLoading(false);
     }
-  }, [search, filterType]);
+  }, [activeType, search]);
 
   useEffect(() => {
     void load();
@@ -77,14 +90,13 @@ export default function MediaCollectionsPage() {
     setError(null);
   }
 
-  function openEdit(row: MediaCollectionRecord) {
+  function openEdit(row: MediaVocabularyTermRecord) {
     setEditingId(row.id);
     setForm({
       code: row.code ?? "",
       name: row.name,
+      aliases: row.aliases.join(", "),
       description: row.description ?? "",
-      color: row.color ?? "",
-      collectionType: row.collectionType,
       sortOrder: String(row.sortOrder),
       isActive: row.isActive,
     });
@@ -99,16 +111,18 @@ export default function MediaCollectionsPage() {
     try {
       const payload = {
         name: form.name.trim(),
+        aliases: form.aliases
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
         description: form.description.trim() || null,
-        color: form.color.trim() || null,
-        collectionType: form.collectionType,
         sortOrder: Number.parseInt(form.sortOrder, 10) || 0,
         isActive: form.isActive,
       };
       const res = await fetch(
         editingId
-          ? `/api/content/media-collections/${editingId}`
-          : "/api/content/media-collections",
+          ? `/api/content/media-vocabulary/${editingId}`
+          : "/api/content/media-vocabulary",
         {
           method: editingId ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -117,51 +131,46 @@ export default function MediaCollectionsPage() {
               ? payload
               : {
                   ...payload,
+                  type: activeType,
                   code: form.code.trim() ? normalizeMasterDataCode(form.code) : null,
                 },
           ),
         },
       );
       const data = (await res.json()) as { message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Không thể lưu bộ sưu tập.");
-      toast.success(editingId ? "Đã cập nhật bộ sưu tập." : "Đã tạo bộ sưu tập.");
+      if (!res.ok) throw new Error(data.message ?? "Không thể lưu thuật ngữ.");
+      toast.success(editingId ? "Đã cập nhật thuật ngữ." : "Đã tạo thuật ngữ.");
       setShowForm(false);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể lưu bộ sưu tập.");
+      setError(err instanceof Error ? err.message : "Không thể lưu thuật ngữ.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleDelete(row: MediaCollectionRecord) {
+  async function handleDelete(row: MediaVocabularyTermRecord) {
     if (row.isSystem) {
-      toast.error("Không thể xóa bộ sưu tập hệ thống.");
+      toast.error("Không thể xóa thuật ngữ hệ thống.");
       return;
     }
-    if (
-      !window.confirm(
-        `Xóa bộ sưu tập "${row.name}"? Ảnh vẫn được giữ nguyên; chỉ gỡ liên kết.`,
-      )
-    ) {
-      return;
-    }
+    if (!window.confirm(`Xóa thuật ngữ "${row.name}"?`)) return;
     try {
-      const res = await fetch(`/api/content/media-collections/${row.id}`, {
+      const res = await fetch(`/api/content/media-vocabulary/${row.id}`, {
         method: "DELETE",
       });
       const data = (await res.json()) as { message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Không thể xóa bộ sưu tập.");
-      toast.success("Đã xóa bộ sưu tập.");
+      if (!res.ok) throw new Error(data.message ?? "Không thể xóa thuật ngữ.");
+      toast.success("Đã xóa thuật ngữ.");
       await load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Không thể xóa bộ sưu tập.");
+      toast.error(err instanceof Error ? err.message : "Không thể xóa thuật ngữ.");
     }
   }
 
-  async function toggleActive(row: MediaCollectionRecord) {
+  async function toggleActive(row: MediaVocabularyTermRecord) {
     try {
-      const res = await fetch(`/api/content/media-collections/${row.id}`, {
+      const res = await fetch(`/api/content/media-vocabulary/${row.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !row.isActive }),
@@ -177,37 +186,38 @@ export default function MediaCollectionsPage() {
 
   return (
     <>
-      <AdminPageTitle title="Bộ sưu tập ảnh" />
+      <AdminPageTitle title="Từ điển metadata ảnh" />
       <div className="admin-panel">
         <div className="admin-section-header">
-          <p>Nhóm ảnh theo dự án, chiến dịch, khách hàng hoặc sáng kiến nội dung.</p>
+          <p>Chuẩn hóa chủ thể, chất liệu, màu sắc và các thuật ngữ mô tả dùng cho ảnh trong CMS.</p>
           <button type="button" className="admin-btn admin-btn--primary" onClick={openCreate}>
-            Thêm bộ sưu tập
+            Thêm thuật ngữ
           </button>
+        </div>
+
+        <div className="admin-catalog-filters" style={{ flexWrap: "wrap" }}>
+          {VOCAB_TYPES.map((type) => (
+            <button
+              key={type}
+              type="button"
+              className={`admin-btn admin-btn--xs ${activeType === type ? "admin-btn--primary" : "admin-btn--secondary"}`}
+              onClick={() => setActiveType(type)}
+            >
+              {VOCAB_TYPE_LABELS[type]}
+            </button>
+          ))}
         </div>
 
         <div className="admin-catalog-filters">
           <input
             className="admin-input"
-            placeholder="Tìm tên hoặc mã…"
+            placeholder="Tìm tên, mã hoặc alias…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void load();
             }}
           />
-          <select
-            className="admin-input"
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value as MediaCollectionType | "")}
-          >
-            <option value="">Tất cả loại bộ sưu tập</option>
-            {MEDIA_COLLECTION_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {MEDIA_COLLECTION_TYPE_LABELS[type]}
-              </option>
-            ))}
-          </select>
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
             Lọc
           </button>
@@ -217,8 +227,8 @@ export default function MediaCollectionsPage() {
 
         {loading ? (
           <TableLoading
-            title="Đang tải bộ sưu tập…"
-            description="Hệ thống đang tải danh sách bộ sưu tập ảnh."
+            title="Đang tải từ điển metadata ảnh…"
+            description="Hệ thống đang tải danh sách thuật ngữ."
             tone="admin"
           />
         ) : (
@@ -226,83 +236,71 @@ export default function MediaCollectionsPage() {
             <table className="admin-table admin-table--crm">
               <thead>
                 <tr>
-                  <th>Tên bộ sưu tập</th>
-                  <th>Loại</th>
+                  <th>Tên thuật ngữ</th>
                   <th>Mã</th>
+                  <th>Alias</th>
                   <th>Mô tả</th>
-                  <th>Màu nhận diện</th>
                   <th>Thứ tự</th>
-                  <th>Số lượng ảnh</th>
+                  <th>Số ảnh dùng</th>
                   <th>Trạng thái</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      {row.name}
-                      {row.isSystem && (
-                        <span className="admin-badge" style={{ marginLeft: 6 }}>
-                          Hệ thống
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <span className="admin-badge">{MEDIA_COLLECTION_TYPE_LABELS[row.collectionType]}</span>
-                    </td>
-                    <td>{row.code ? <code>{row.code}</code> : "—"}</td>
-                    <td>{row.description ?? "—"}</td>
-                    <td>
-                      {row.color ? (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <span
-                            style={{
-                              width: 12,
-                              height: 12,
-                              borderRadius: 2,
-                              background: row.color,
-                              border: "1px solid #d1d5db",
-                            }}
-                          />
-                          {row.color}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>{row.sortOrder}</td>
-                    <td>{row.assetCount ?? 0}</td>
-                    <td>{row.isActive ? "Đang dùng" : "Vô hiệu"}</td>
-                    <td>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--secondary admin-btn--xs"
-                          onClick={() => openEdit(row)}
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--secondary admin-btn--xs"
-                          onClick={() => void toggleActive(row)}
-                        >
-                          {row.isActive ? "Vô hiệu" : "Kích hoạt"}
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--secondary admin-btn--xs"
-                          style={{ color: "#dc2626" }}
-                          disabled={row.isSystem}
-                          onClick={() => void handleDelete(row)}
-                        >
-                          Xóa
-                        </button>
-                      </div>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="admin-field-hint">
+                      Chưa có thuật ngữ nào trong loại {VOCAB_TYPE_LABELS[activeType]}.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  rows.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        {row.name}
+                        {row.isSystem && (
+                          <span className="admin-badge" style={{ marginLeft: 6 }}>
+                            Hệ thống
+                          </span>
+                        )}
+                      </td>
+                      <td>{row.code ? <code>{row.code}</code> : "—"}</td>
+                      <td>{row.aliases.length ? row.aliases.join(", ") : "—"}</td>
+                      <td>{row.description ?? "—"}</td>
+                      <td>{row.sortOrder}</td>
+                      <td>{row.usageCount ?? 0}</td>
+                      <td>{row.isActive ? "Đang dùng" : "Vô hiệu"}</td>
+                      <td>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                            onClick={() => openEdit(row)}
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                            onClick={() => void toggleActive(row)}
+                          >
+                            {row.isActive ? "Vô hiệu" : "Kích hoạt"}
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                            style={{ color: "#dc2626" }}
+                            disabled={row.isSystem}
+                            title={row.isSystem ? "Không thể xóa thuật ngữ hệ thống" : undefined}
+                            onClick={() => void handleDelete(row)}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -312,11 +310,11 @@ export default function MediaCollectionsPage() {
           <div className="admin-modal-overlay" onClick={() => !saving && setShowForm(false)}>
             <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
               <h3 className="admin-subtitle">
-                {editingId ? "Sửa bộ sưu tập" : "Thêm bộ sưu tập"}
+                {editingId ? "Sửa thuật ngữ" : `Thêm thuật ngữ · ${VOCAB_TYPE_LABELS[activeType]}`}
               </h3>
               <form onSubmit={(e) => void handleSave(e)} className="admin-form">
                 <div className="admin-field">
-                  <label className="admin-label">Tên bộ sưu tập</label>
+                  <label className="admin-label">Tên thuật ngữ</label>
                   <input
                     className="admin-input"
                     value={form.name}
@@ -331,24 +329,17 @@ export default function MediaCollectionsPage() {
                     value={form.code}
                     onChange={(e) => setForm({ ...form, code: e.target.value })}
                     disabled={Boolean(editingId)}
-                    placeholder="BLACKPINK_2026"
+                    placeholder="AO_SO_MI"
                   />
                 </div>
                 <div className="admin-field">
-                  <label className="admin-label">Loại bộ sưu tập</label>
-                  <select
+                  <label className="admin-label">Alias (phân tách bằng dấu phẩy)</label>
+                  <input
                     className="admin-input"
-                    value={form.collectionType}
-                    onChange={(e) =>
-                      setForm({ ...form, collectionType: e.target.value as MediaCollectionType })
-                    }
-                  >
-                    {MEDIA_COLLECTION_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {MEDIA_COLLECTION_TYPE_LABELS[type]}
-                      </option>
-                    ))}
-                  </select>
+                    value={form.aliases}
+                    onChange={(e) => setForm({ ...form, aliases: e.target.value })}
+                    placeholder="áo sơ mi, shirt"
+                  />
                 </div>
                 <div className="admin-field">
                   <label className="admin-label">Mô tả</label>
@@ -357,15 +348,6 @@ export default function MediaCollectionsPage() {
                     rows={3}
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  />
-                </div>
-                <div className="admin-field">
-                  <label className="admin-label">Màu nhận diện</label>
-                  <input
-                    className="admin-input"
-                    value={form.color}
-                    onChange={(e) => setForm({ ...form, color: e.target.value })}
-                    placeholder="#4f46e5"
                   />
                 </div>
                 <div className="admin-field">

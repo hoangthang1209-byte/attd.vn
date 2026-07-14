@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import type { MediaFolder, MediaUsageType } from "@prisma/client";
+import type {
+  MediaAiProcessingStatus,
+  MediaAssetType,
+  MediaCollectionType,
+  MediaFolder,
+  MediaSeoReadinessStatus,
+  MediaUsageType,
+} from "@prisma/client";
 import {
   listMediaAssets,
   listMediaAssetsPage,
@@ -14,11 +21,36 @@ import {
   validateMediaOrientation,
   validateMediaVisibility,
 } from "@/features/media/media-classification";
+import { validateMediaCollectionType } from "@/features/media/media-collection.types";
+import {
+  validateMediaAiProcessingStatus,
+  validateMediaAssetType,
+  validateMediaSeoReadinessStatus,
+} from "@/features/media/services/media-intelligence.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const VALID_FOLDERS = Object.keys(STORAGE_FOLDER_TO_MEDIA) as StorageFolderKey[];
 const VALID_USAGE_TYPES: MediaUsageType[] = ["PRODUCT", "BLOG", "KNOWLEDGE_BASE", "GENERAL"];
 const isDev = process.env.NODE_ENV === "development";
+
+function parseBoolParam(value: string | null): boolean | undefined {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return undefined;
+}
+
+function parseJsonStringArray(raw: FormDataEntryValue | null): string[] {
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
+      return parsed.map((item) => item.trim()).filter(Boolean);
+    }
+  } catch {
+    // fall through
+  }
+  return raw.split(",").map((t) => t.trim()).filter(Boolean);
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -31,9 +63,13 @@ export async function GET(request: Request) {
   const roleCode = searchParams.get("roleCode") ?? undefined;
   const collectionId = searchParams.get("collectionId") ?? undefined;
   const collectionCode = searchParams.get("collectionCode") ?? undefined;
+  const collectionTypeParam = searchParams.get("collectionType");
   const visibilityParam = searchParams.get("visibility");
   const orientationParam = searchParams.get("orientation");
-  const hasAltTextParam = searchParams.get("hasAltText");
+  const assetTypeParam = searchParams.get("assetType");
+  const seoReadinessParam = searchParams.get("seoReadinessStatus");
+  const aiStatusParam = searchParams.get("aiProcessingStatus");
+  const minimumSeoScoreParam = searchParams.get("minimumSeoScore");
   const cursor = searchParams.get("cursor") ?? undefined;
   const paginated =
     searchParams.get("paginated") === "1" || searchParams.has("cursor");
@@ -56,10 +92,23 @@ export async function GET(request: Request) {
   const orientation = orientationParam
     ? validateMediaOrientation(orientationParam) ?? undefined
     : undefined;
-
-  let hasAltText: boolean | undefined;
-  if (hasAltTextParam === "true") hasAltText = true;
-  else if (hasAltTextParam === "false") hasAltText = false;
+  const collectionType = collectionTypeParam
+    ? validateMediaCollectionType(collectionTypeParam) ?? undefined
+    : undefined;
+  const assetType = assetTypeParam
+    ? (validateMediaAssetType(assetTypeParam) as MediaAssetType | null) ?? undefined
+    : undefined;
+  const seoReadinessStatus = seoReadinessParam
+    ? (validateMediaSeoReadinessStatus(seoReadinessParam) as MediaSeoReadinessStatus | null) ??
+      undefined
+    : undefined;
+  const aiProcessingStatus = aiStatusParam
+    ? (validateMediaAiProcessingStatus(aiStatusParam) as MediaAiProcessingStatus | null) ??
+      undefined
+    : undefined;
+  const minimumSeoScore = minimumSeoScoreParam
+    ? Number.parseInt(minimumSeoScoreParam, 10)
+    : undefined;
 
   const filters = {
     folder,
@@ -70,9 +119,25 @@ export async function GET(request: Request) {
     roleCode,
     collectionId,
     collectionCode,
+    collectionType: collectionType as MediaCollectionType | undefined,
     visibility,
     orientation,
-    hasAltText,
+    hasAltText: parseBoolParam(searchParams.get("hasAltText")),
+    hasTitle: parseBoolParam(searchParams.get("hasTitle")),
+    hasKeywords: parseBoolParam(searchParams.get("hasKeywords")),
+    hasSubject: parseBoolParam(searchParams.get("hasSubject")),
+    assetType,
+    seoReadinessStatus,
+    minimumSeoScore: Number.isFinite(minimumSeoScore) ? minimumSeoScore : undefined,
+    aiProcessingStatus,
+    subject: searchParams.get("subject") ?? undefined,
+    material: searchParams.get("material") ?? undefined,
+    color: searchParams.get("color") ?? undefined,
+    technique: searchParams.get("technique") ?? undefined,
+    industry: searchParams.get("industry") ?? undefined,
+    audience: searchParams.get("audience") ?? undefined,
+    useCase: searchParams.get("useCase") ?? undefined,
+    duplicateStatus: searchParams.get("duplicateStatus") ?? undefined,
     search,
   };
 
@@ -132,6 +197,8 @@ export async function POST(request: Request) {
     const contentLanguage = formData.get("contentLanguage");
     const collectionIdsRaw = formData.get("collectionIds");
     const forceDuplicateUpload = formData.get("forceDuplicateUpload") === "true";
+    const mergeSemanticIntoExisting = formData.get("mergeSemanticIntoExisting") === "true";
+    const assetTypeRaw = formData.get("assetType");
 
     const folderKey =
       typeof folder === "string" && VALID_FOLDERS.includes(folder as StorageFolderKey)
@@ -191,7 +258,10 @@ export async function POST(request: Request) {
         ? validateMediaVisibility(visibilityRaw) ?? undefined
         : undefined;
 
-    const { asset, warning, duplicateOfId } = await uploadMediaAsset({
+    const assetType =
+      typeof assetTypeRaw === "string" ? validateMediaAssetType(assetTypeRaw) ?? undefined : undefined;
+
+    const { asset, warning, duplicateOfId, reused } = await uploadMediaAsset({
       folder: folderKey,
       file: fileEntry as File,
       altText: typeof altText === "string" ? altText : undefined,
@@ -207,9 +277,18 @@ export async function POST(request: Request) {
       contentLanguage: typeof contentLanguage === "string" ? contentLanguage : undefined,
       collectionIds,
       forceDuplicateUpload,
+      mergeSemanticIntoExisting,
+      assetType,
+      subjectTerms: parseJsonStringArray(formData.get("subjectTerms")),
+      materialTerms: parseJsonStringArray(formData.get("materialTerms")),
+      colorTerms: parseJsonStringArray(formData.get("colorTerms")),
+      techniqueTerms: parseJsonStringArray(formData.get("techniqueTerms")),
+      industryTerms: parseJsonStringArray(formData.get("industryTerms")),
+      audienceTerms: parseJsonStringArray(formData.get("audienceTerms")),
+      useCaseTerms: parseJsonStringArray(formData.get("useCaseTerms")),
     });
 
-    return NextResponse.json({ ...asset, warning, duplicateOfId }, { status: 201 });
+    return NextResponse.json({ ...asset, warning, duplicateOfId, reused }, { status: 201 });
   } catch (err) {
     if (err instanceof MediaDuplicateUploadError) {
       return NextResponse.json(

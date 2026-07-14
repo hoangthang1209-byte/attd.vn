@@ -203,6 +203,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/media-vocabulary",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Từ điển metadata ảnh"],
+      title: "Từ điển metadata ảnh",
+      description: "Chuẩn hóa chủ thể, chất liệu, màu sắc và các thuật ngữ mô tả dùng cho ảnh.",
+    },
+  },
+  {
     path: "/admin/tech-pack",
     meta: {
       breadcrumbs: ["Kỹ thuật sản phẩm", "Tech Pack"],

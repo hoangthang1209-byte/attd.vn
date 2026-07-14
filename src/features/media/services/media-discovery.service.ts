@@ -1,4 +1,11 @@
-import type { MediaOrientation, MediaVisibility, Prisma } from "@prisma/client";
+import type {
+  MediaAssetType,
+  MediaCollectionType,
+  MediaOrientation,
+  MediaSeoReadinessStatus,
+  MediaVisibility,
+  Prisma,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   MEDIA_DISCOVERY_CANDIDATE_LIMIT,
@@ -12,7 +19,13 @@ export type MediaAssetWithClassification = Prisma.MediaAssetGetPayload<{
     collections: {
       include: {
         mediaCollection: {
-          select: { id: true; code: true; name: true; isActive: true };
+          select: {
+            id: true;
+            code: true;
+            name: true;
+            isActive: true;
+            collectionType: true;
+          };
         };
       };
     };
@@ -24,6 +37,7 @@ export type MediaDiscoveryInput = {
   libraries?: string[];
   roles?: string[];
   collections?: string[];
+  collectionTypes?: MediaCollectionType[];
   keywords?: string[];
   tags?: string[];
   orientation?: MediaOrientation;
@@ -31,6 +45,16 @@ export type MediaDiscoveryInput = {
   language?: string;
   limit?: number;
   excludeIds?: string[];
+  assetTypes?: MediaAssetType[];
+  subjects?: string[];
+  materials?: string[];
+  colors?: string[];
+  techniques?: string[];
+  industries?: string[];
+  audiences?: string[];
+  useCases?: string[];
+  minimumSeoScore?: number;
+  seoReadinessStatuses?: MediaSeoReadinessStatus[];
 };
 
 export type MediaDiscoveryResult = {
@@ -60,22 +84,47 @@ function includesNormalized(haystack: string | null | undefined, needle: string)
 
 function listIncludes(list: string[] | null | undefined, needle: string): boolean {
   if (!list?.length || !needle) return false;
-  return list.some((item) => normalizePhrase(item) === needle || normalizePhrase(item).includes(needle));
+  return list.some(
+    (item) => normalizePhrase(item) === needle || normalizePhrase(item).includes(needle),
+  );
 }
 
-function scoreAsset(
+function scoreSemanticList(
+  terms: string[] | null | undefined,
+  requested: string[],
+  prefix: string,
+  weight: number,
+  matchedOn: string[],
+  alreadyMatchedConcept: Set<string>,
+): number {
+  let score = 0;
+  for (const raw of requested) {
+    const needle = normalizePhrase(raw);
+    if (!needle) continue;
+    const conceptKey = `${prefix}:${needle}`;
+    if (alreadyMatchedConcept.has(conceptKey)) continue;
+    if (listIncludes(terms, needle)) {
+      score += weight;
+      matchedOn.push(`${prefix}:${raw}`);
+      alreadyMatchedConcept.add(conceptKey);
+    }
+  }
+  return score;
+}
+
+export function scoreAssetForDiscovery(
   asset: MediaAssetWithClassification,
   input: MediaDiscoveryInput,
 ): { score: number; matchedOn: string[] } {
   let score = 0;
   const matchedOn: string[] = [];
+  const conceptKeys = new Set<string>();
   const query = input.query ? normalizePhrase(input.query) : "";
   const queryTokens = query ? tokenize(query) : [];
   const requestedLibraries = (input.libraries ?? []).map((c) => c.toUpperCase());
   const requestedRoles = (input.roles ?? []).map((c) => c.toUpperCase());
-  const requestedCollections = (input.collections ?? [])
-    .map((c) => c.trim())
-    .filter(Boolean);
+  const requestedCollections = (input.collections ?? []).map((c) => c.trim()).filter(Boolean);
+  const requestedCollectionTypes = input.collectionTypes ?? [];
   const requestedKeywords = (input.keywords ?? []).map(normalizePhrase).filter(Boolean);
   const requestedTags = (input.tags ?? []).map(normalizePhrase).filter(Boolean);
 
@@ -106,7 +155,10 @@ function scoreAsset(
         score += 3;
         matchedOn.push(`title:${token}`);
       }
-      if (includesNormalized(asset.altText, token) && !matchedOn.some((m) => m.startsWith("altText:"))) {
+      if (
+        includesNormalized(asset.altText, token) &&
+        !matchedOn.some((m) => m.startsWith("altText:"))
+      ) {
         score += 2;
         matchedOn.push(`altText:${token}`);
       }
@@ -122,6 +174,20 @@ function scoreAsset(
         score += 5;
         matchedOn.push(`aiTag:${token}`);
       }
+      score += scoreSemanticList(asset.subjectTerms, [token], "subject", 8, matchedOn, conceptKeys);
+      score += scoreSemanticList(asset.materialTerms, [token], "material", 5, matchedOn, conceptKeys);
+      score += scoreSemanticList(asset.colorTerms, [token], "color", 4, matchedOn, conceptKeys);
+      score += scoreSemanticList(
+        asset.techniqueTerms,
+        [token],
+        "technique",
+        6,
+        matchedOn,
+        conceptKeys,
+      );
+      score += scoreSemanticList(asset.industryTerms, [token], "industry", 6, matchedOn, conceptKeys);
+      score += scoreSemanticList(asset.audienceTerms, [token], "audience", 4, matchedOn, conceptKeys);
+      score += scoreSemanticList(asset.useCaseTerms, [token], "useCase", 7, matchedOn, conceptKeys);
     }
   }
 
@@ -163,6 +229,70 @@ function scoreAsset(
     }
   }
 
+  if (requestedCollectionTypes.length && asset.collections?.length) {
+    for (const join of asset.collections) {
+      const type = join.mediaCollection.collectionType;
+      if (requestedCollectionTypes.includes(type)) {
+        const key = `collectionType:${type}`;
+        if (!conceptKeys.has(key)) {
+          score += 4;
+          matchedOn.push(key);
+          conceptKeys.add(key);
+        }
+      }
+    }
+  }
+
+  score += scoreSemanticList(
+    asset.subjectTerms,
+    input.subjects ?? [],
+    "subject",
+    8,
+    matchedOn,
+    conceptKeys,
+  );
+  score += scoreSemanticList(
+    asset.materialTerms,
+    input.materials ?? [],
+    "material",
+    5,
+    matchedOn,
+    conceptKeys,
+  );
+  score += scoreSemanticList(asset.colorTerms, input.colors ?? [], "color", 4, matchedOn, conceptKeys);
+  score += scoreSemanticList(
+    asset.techniqueTerms,
+    input.techniques ?? [],
+    "technique",
+    6,
+    matchedOn,
+    conceptKeys,
+  );
+  score += scoreSemanticList(
+    asset.industryTerms,
+    input.industries ?? [],
+    "industry",
+    6,
+    matchedOn,
+    conceptKeys,
+  );
+  score += scoreSemanticList(
+    asset.audienceTerms,
+    input.audiences ?? [],
+    "audience",
+    4,
+    matchedOn,
+    conceptKeys,
+  );
+  score += scoreSemanticList(
+    asset.useCaseTerms,
+    input.useCases ?? [],
+    "useCase",
+    7,
+    matchedOn,
+    conceptKeys,
+  );
+
   if (input.orientation && asset.orientation === input.orientation) {
     score += 3;
     matchedOn.push(`orientation:${asset.orientation}`);
@@ -176,6 +306,27 @@ function scoreAsset(
   if (asset.width && asset.height) {
     score += 1;
     matchedOn.push("hasDimensions");
+  }
+
+  if (asset.seoScore >= 85) {
+    score += 4;
+    matchedOn.push(`seoScore:${asset.seoScore}`);
+  } else if (asset.seoScore >= 65) {
+    score += 2;
+    matchedOn.push(`seoScore:${asset.seoScore}`);
+  }
+
+  if (asset.seoReadinessStatus === "EXCELLENT") {
+    score += 2;
+    matchedOn.push("seoReadiness:EXCELLENT");
+  }
+
+  if (
+    asset.duplicateStatus === "POSSIBLE_DUPLICATE" ||
+    (asset.duplicateStatus === "CONFIRMED_DUPLICATE" && !asset.duplicateOfId)
+  ) {
+    score -= 2;
+    matchedOn.push("duplicatePenalty");
   }
 
   return { score, matchedOn: [...new Set(matchedOn)] };
@@ -195,26 +346,54 @@ export async function discoverMediaAssets(
   const libraryCodes = (input.libraries ?? []).map((c) => c.toUpperCase()).filter(Boolean);
   const roleCodes = (input.roles ?? []).map((c) => c.toUpperCase()).filter(Boolean);
   const collectionKeys = (input.collections ?? []).map((c) => c.trim()).filter(Boolean);
+  const collectionTypes = input.collectionTypes ?? [];
+
+  const arrayHasSome = (field: string, values?: string[]) =>
+    values?.length ? { [field]: { hasSome: values } } : {};
+
+  const collectionFilters: Prisma.MediaAssetWhereInput[] = [];
+  if (collectionKeys.length) {
+    collectionFilters.push({
+      collections: {
+        some: {
+          OR: [
+            { mediaCollection: { code: { in: collectionKeys.map((c) => c.toUpperCase()) } } },
+            { mediaCollectionId: { in: collectionKeys } },
+          ],
+        },
+      },
+    });
+  }
+  if (collectionTypes.length) {
+    collectionFilters.push({
+      collections: {
+        some: { mediaCollection: { collectionType: { in: collectionTypes } } },
+      },
+    });
+  }
 
   const where: Prisma.MediaAssetWhereInput = {
     visibility,
     library: { isActive: true, ...(libraryCodes.length ? { code: { in: libraryCodes } } : {}) },
     role: { isActive: true, ...(roleCodes.length ? { code: { in: roleCodes } } : {}) },
-    ...(collectionKeys.length
-      ? {
-          collections: {
-            some: {
-              OR: [
-                { mediaCollection: { code: { in: collectionKeys.map((c) => c.toUpperCase()) } } },
-                { mediaCollectionId: { in: collectionKeys } },
-              ],
-            },
-          },
-        }
-      : {}),
+    ...(collectionFilters.length ? { AND: collectionFilters } : {}),
     ...(input.orientation ? { orientation: input.orientation } : {}),
     ...(input.language ? { contentLanguage: input.language } : {}),
     ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
+    ...(input.assetTypes?.length ? { assetType: { in: input.assetTypes } } : {}),
+    ...(typeof input.minimumSeoScore === "number"
+      ? { seoScore: { gte: input.minimumSeoScore } }
+      : {}),
+    ...(input.seoReadinessStatuses?.length
+      ? { seoReadinessStatus: { in: input.seoReadinessStatuses } }
+      : {}),
+    ...arrayHasSome("subjectTerms", input.subjects),
+    ...arrayHasSome("materialTerms", input.materials),
+    ...arrayHasSome("colorTerms", input.colors),
+    ...arrayHasSome("techniqueTerms", input.techniques),
+    ...arrayHasSome("industryTerms", input.industries),
+    ...arrayHasSome("audienceTerms", input.audiences),
+    ...arrayHasSome("useCaseTerms", input.useCases),
   };
 
   const candidates = await prisma.mediaAsset.findMany({
@@ -225,7 +404,13 @@ export async function discoverMediaAssets(
       collections: {
         include: {
           mediaCollection: {
-            select: { id: true, code: true, name: true, isActive: true },
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              isActive: true,
+              collectionType: true,
+            },
           },
         },
       },
@@ -236,7 +421,7 @@ export async function discoverMediaAssets(
 
   const scored = candidates
     .map((asset) => {
-      const { score, matchedOn } = scoreAsset(asset, input);
+      const { score, matchedOn } = scoreAssetForDiscovery(asset, input);
       return { asset, score, matchedOn };
     })
     .filter((item) => item.score > 0 || !input.query)

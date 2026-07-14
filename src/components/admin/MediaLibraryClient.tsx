@@ -1,7 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { MediaOrientation, MediaVisibility } from "@prisma/client";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import type {
+  MediaAiProcessingStatus,
+  MediaAssetType,
+  MediaOrientation,
+  MediaSeoReadinessStatus,
+  MediaVisibility,
+  MediaVocabularyType,
+} from "@prisma/client";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import {
   ALLOWED_IMAGE_EXTENSIONS,
@@ -14,11 +21,132 @@ import type { MediaMasterDataRecord } from "@/features/media/media-master-data.t
 import type { DuplicateAssetSummary } from "@/features/media/services/media-duplicate.service";
 import type { MediaReference } from "@/features/media/services/media-reference.service";
 import type { MediaAssetWithClassification } from "@/features/media/services/media.service";
+import type { MediaVocabularyTermRecord } from "@/features/media/services/media-vocabulary.service";
+import type { SemanticTermField } from "@/features/media/services/media-intelligence.service";
+import {
+  MEDIA_INTELLIGENCE_QUICK_PRESETS,
+  MEDIA_INTELLIGENCE_QUICK_PRESET_LABELS,
+  MEDIA_SEO_READINESS_LABELS,
+  mediaAssetMatchesIntelligencePreset,
+  type MediaIntelligenceQuickPreset,
+} from "@/features/media/media-intelligence-filters";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const WARN_FILE_SIZE = 500 * 1024;
 const MAX_BATCH = 50;
 const BULK_MAX = 100;
+
+const SEMANTIC_FIELDS: SemanticTermField[] = [
+  "subjectTerms",
+  "materialTerms",
+  "colorTerms",
+  "techniqueTerms",
+  "industryTerms",
+  "audienceTerms",
+  "useCaseTerms",
+];
+
+/** Local mirror of media-intelligence.service's SEMANTIC_FIELD_TO_VOCAB_TYPE (kept out of the
+ * client bundle since that service module also imports the Prisma client). */
+const SEMANTIC_FIELD_TO_VOCAB_TYPE: Record<SemanticTermField, MediaVocabularyType> = {
+  subjectTerms: "SUBJECT",
+  materialTerms: "MATERIAL",
+  colorTerms: "COLOR",
+  techniqueTerms: "TECHNIQUE",
+  industryTerms: "INDUSTRY",
+  audienceTerms: "AUDIENCE",
+  useCaseTerms: "USE_CASE",
+};
+
+const SEMANTIC_FIELD_LABELS: Record<SemanticTermField, string> = {
+  subjectTerms: "Chủ thể",
+  materialTerms: "Chất liệu",
+  colorTerms: "Màu sắc",
+  techniqueTerms: "Kỹ thuật",
+  industryTerms: "Ngành nghề",
+  audienceTerms: "Đối tượng",
+  useCaseTerms: "Mục đích sử dụng",
+};
+
+const ASSET_TYPE_OPTIONS: { value: MediaAssetType; label: string }[] = [
+  { value: "PHOTO", label: "Ảnh chụp" },
+  { value: "ILLUSTRATION", label: "Minh họa" },
+  { value: "LOGO", label: "Logo" },
+  { value: "ICON", label: "Icon" },
+  { value: "MOCKUP", label: "Mockup" },
+  { value: "SCREENSHOT", label: "Ảnh chụp màn hình" },
+  { value: "DIAGRAM", label: "Sơ đồ" },
+  { value: "DOCUMENT_PREVIEW", label: "Xem trước tài liệu" },
+  { value: "VIDEO_THUMBNAIL", label: "Ảnh đại diện video" },
+  { value: "OTHER", label: "Khác" },
+];
+
+const ASSET_TYPE_LABELS: Record<MediaAssetType, string> = ASSET_TYPE_OPTIONS.reduce(
+  (acc, opt) => ({ ...acc, [opt.value]: opt.label }),
+  {} as Record<MediaAssetType, string>,
+);
+
+const MISSING_FIELD_LABELS: Record<string, string> = {
+  library: "Thư viện",
+  role: "Vai trò hiển thị",
+  altText: "Alt text",
+  title: "Tiêu đề",
+  caption: "Chú thích",
+  description: "Mô tả",
+  keywords: "Từ khóa SEO",
+  subject: "Chủ thể",
+  industryOrUseCase: "Ngành nghề / Mục đích sử dụng",
+  collection: "Bộ sưu tập",
+  orientation: "Hướng ảnh",
+  dimensions: "Kích thước ảnh",
+};
+
+const AI_STATUS_OPTIONS: { value: MediaAiProcessingStatus | ""; label: string }[] = [
+  { value: "", label: "Tất cả trạng thái AI" },
+  { value: "NOT_PROCESSED", label: "Chưa xử lý" },
+  { value: "QUEUED", label: "Đã đưa vào hàng đợi" },
+  { value: "PROCESSING", label: "Đang xử lý" },
+  { value: "COMPLETED", label: "Hoàn tất" },
+  { value: "FAILED", label: "Thất bại" },
+  { value: "SKIPPED", label: "Đã bỏ qua" },
+];
+
+const SEO_READINESS_OPTIONS: { value: MediaSeoReadinessStatus | ""; label: string }[] = [
+  { value: "", label: "Tất cả trạng thái SEO" },
+  { value: "INCOMPLETE", label: MEDIA_SEO_READINESS_LABELS.INCOMPLETE },
+  { value: "BASIC", label: MEDIA_SEO_READINESS_LABELS.BASIC },
+  { value: "READY", label: MEDIA_SEO_READINESS_LABELS.READY },
+  { value: "EXCELLENT", label: MEDIA_SEO_READINESS_LABELS.EXCELLENT },
+];
+
+type SemanticTermState = Record<SemanticTermField, string[]>;
+
+function emptySemanticState(): SemanticTermState {
+  return {
+    subjectTerms: [],
+    materialTerms: [],
+    colorTerms: [],
+    techniqueTerms: [],
+    industryTerms: [],
+    audienceTerms: [],
+    useCaseTerms: [],
+  };
+}
+
+type BulkSemanticEntry = { addEnabled: boolean; removeEnabled: boolean; add: string[]; remove: string[] };
+
+function emptyBulkSemanticState(): Record<SemanticTermField, BulkSemanticEntry> {
+  const entry = (): BulkSemanticEntry => ({ addEnabled: false, removeEnabled: false, add: [], remove: [] });
+  return {
+    subjectTerms: entry(),
+    materialTerms: entry(),
+    colorTerms: entry(),
+    techniqueTerms: entry(),
+    industryTerms: entry(),
+    audienceTerms: entry(),
+    useCaseTerms: entry(),
+  };
+}
 
 const VISIBILITY_OPTIONS: { value: MediaVisibility | ""; label: string }[] = [
   { value: "", label: "Tất cả mức hiển thị" },
@@ -47,6 +175,10 @@ const REF_TYPE_LABELS: Record<MediaReference["type"], string> = {
   OTHER: "Khác",
 };
 
+type UploadOverrides = {
+  assetType?: MediaAssetType;
+} & Partial<SemanticTermState>;
+
 type UploadFile = {
   file: File;
   id: string;
@@ -56,6 +188,9 @@ type UploadFile = {
   result?: MediaAssetWithClassification;
   duplicateAsset?: DuplicateAssetSummary;
   reused?: boolean;
+  overridesOpen?: boolean;
+  overrides?: UploadOverrides;
+  mergeIntoExisting?: boolean;
 };
 
 type EditingAsset = {
@@ -71,6 +206,12 @@ type EditingAsset = {
   keywords: string;
   contentLanguage: string;
   collectionIds: string[];
+  assetType: MediaAssetType;
+  semantic: SemanticTermState;
+  seoScore: number;
+  seoReadinessStatus: MediaSeoReadinessStatus;
+  metadataCompleteness: number;
+  missingFields: string[];
 };
 
 type DeleteBlockedState = {
@@ -146,6 +287,36 @@ function usageBadgeLabel(count: number | undefined): string {
   return `Đang dùng ${count} nơi`;
 }
 
+function hasText(value: string | null | undefined): boolean {
+  return Boolean(value?.trim());
+}
+
+function hasList(value: string[] | null | undefined): boolean {
+  return Boolean(value?.some((item) => item.trim()));
+}
+
+/**
+ * Client-side mirror of media-intelligence.service's completeness checks, used only for
+ * display in the edit modal (server-computed seoScore/status remain the source of truth).
+ */
+function computeMissingIntelligenceFields(asset: MediaAssetWithClassification): string[] {
+  const checks: Array<[string, boolean]> = [
+    ["library", Boolean(asset.libraryId)],
+    ["role", Boolean(asset.roleId)],
+    ["altText", hasText(asset.altText)],
+    ["title", hasText(asset.title)],
+    ["caption", hasText(asset.caption)],
+    ["description", hasText(asset.description)],
+    ["keywords", hasList(asset.keywords)],
+    ["subject", hasList(asset.subjectTerms)],
+    ["industryOrUseCase", hasList(asset.industryTerms) || hasList(asset.useCaseTerms)],
+    ["collection", assetCollections(asset).length > 0],
+    ["orientation", Boolean(asset.orientation && asset.orientation !== "UNKNOWN")],
+    ["dimensions", Boolean(asset.width && asset.height)],
+  ];
+  return checks.filter(([, ok]) => !ok).map(([key]) => key);
+}
+
 export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boolean }) {
   const toast = useAdminToast();
   const [assets, setAssets] = useState<MediaAssetWithClassification[]>([]);
@@ -200,31 +371,76 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const [bulkRemoveCollectionIds, setBulkRemoveCollectionIds] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkUpdateAssetType, setBulkUpdateAssetType] = useState(false);
+  const [bulkAssetType, setBulkAssetType] = useState<MediaAssetType>("PHOTO");
+  const [bulkSemantic, setBulkSemantic] = useState(emptyBulkSemanticState());
+
+  const [vocabTerms, setVocabTerms] = useState<MediaVocabularyTermRecord[]>([]);
+  const [editVocabSearch, setEditVocabSearch] = useState<Record<SemanticTermField, string>>(
+    emptySemanticState() as unknown as Record<SemanticTermField, string>,
+  );
+  const [intelligenceOpen, setIntelligenceOpen] = useState(false);
+
+  const [filterAssetType, setFilterAssetType] = useState<MediaAssetType | "">("");
+  const [filterSeoReadiness, setFilterSeoReadiness] = useState<MediaSeoReadinessStatus | "">("");
+  const [filterMinimumSeoScore, setFilterMinimumSeoScore] = useState("");
+  const [filterHasTitle, setFilterHasTitle] = useState<"" | "true" | "false">("");
+  const [filterHasKeywords, setFilterHasKeywords] = useState<"" | "true" | "false">("");
+  const [filterHasSubject, setFilterHasSubject] = useState<"" | "true" | "false">("");
+  const [filterAiStatus, setFilterAiStatus] = useState<MediaAiProcessingStatus | "">("");
+  const [activePreset, setActivePreset] = useState<MediaIntelligenceQuickPreset | "">("");
+  const [showIntelligenceFilters, setShowIntelligenceFilters] = useState(false);
+
+  const [uploadAssetType, setUploadAssetType] = useState<MediaAssetType>("PHOTO");
+  const [uploadSemantic, setUploadSemantic] = useState<SemanticTermState>(emptySemanticState());
+  const [uploadVocabSearch, setUploadVocabSearch] = useState<Record<SemanticTermField, string>>(
+    emptySemanticState() as unknown as Record<SemanticTermField, string>,
+  );
+
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
   const loadTaxonomy = useCallback(async () => {
     try {
-      const [libRes, roleRes, colRes] = await Promise.all([
+      const [libRes, roleRes, colRes, vocabRes] = await Promise.all([
         fetch("/api/content/media-libraries?activeOnly=1"),
         fetch("/api/content/media-roles?activeOnly=1"),
         fetch("/api/content/media-collections?activeOnly=1"),
+        fetch("/api/content/media-vocabulary?activeOnly=1"),
       ]);
       const libData = (await libRes.json()) as { libraries?: ClassificationOption[] };
       const roleData = (await roleRes.json()) as { roles?: ClassificationOption[] };
       const colData = (await colRes.json()) as { collections?: ClassificationOption[] };
+      const vocabData = (await vocabRes.json()) as { terms?: MediaVocabularyTermRecord[] };
       const nextLibraries = libData.libraries ?? [];
       const nextRoles = roleData.roles ?? [];
       const nextCollections = colData.collections ?? [];
       setLibraries(nextLibraries);
       setRoles(nextRoles);
       setCollections(nextCollections);
+      setVocabTerms(vocabData.terms ?? []);
       setUploadLibraryId((prev) => prev || nextLibraries.find((l) => l.code === "PRODUCT")?.id || nextLibraries[0]?.id || "");
       setUploadRoleId((prev) => prev || nextRoles.find((r) => r.code === "GENERAL")?.id || nextRoles[0]?.id || "");
     } catch {
       /* ignore taxonomy load errors */
     }
   }, []);
+
+  function vocabTermsForType(type: MediaVocabularyType): MediaVocabularyTermRecord[] {
+    return vocabTerms.filter((term) => term.type === type);
+  }
+
+  function vocabOptionsForField(field: SemanticTermField, search: string): MediaVocabularyTermRecord[] {
+    const type = SEMANTIC_FIELD_TO_VOCAB_TYPE[field];
+    const needle = search.trim().toLowerCase();
+    const options = vocabTermsForType(type);
+    if (!needle) return options;
+    return options.filter(
+      (term) =>
+        term.name.toLowerCase().includes(needle) ||
+        term.aliases.some((alias) => alias.toLowerCase().includes(needle)),
+    );
+  }
 
   const loadReferenceCounts = useCallback(async (ids: string[]) => {
     if (!ids.length) {
@@ -344,7 +560,11 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     setUploadQueue((q) => [...q, ...entries]);
   }
 
-  function buildUploadFormData(item: UploadFile, forceDuplicateUpload = false): FormData {
+  function buildUploadFormData(
+    item: UploadFile,
+    forceDuplicateUpload = false,
+    mergeSemanticIntoExisting = false,
+  ): FormData {
     const fd = new FormData();
     fd.append("file", item.file);
     const uploadLibrary = libraries.find((l) => l.id === uploadLibraryId);
@@ -361,6 +581,14 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       fd.append("collectionIds", JSON.stringify(uploadCollectionIds));
     }
     if (forceDuplicateUpload) fd.append("forceDuplicateUpload", "true");
+    if (mergeSemanticIntoExisting) fd.append("mergeSemanticIntoExisting", "true");
+
+    const assetType = item.overrides?.assetType ?? uploadAssetType;
+    fd.append("assetType", assetType);
+    for (const field of SEMANTIC_FIELDS) {
+      const terms = item.overrides?.[field] ?? uploadSemantic[field];
+      if (terms.length) fd.append(field, JSON.stringify(terms));
+    }
     return fd;
   }
 
@@ -378,9 +606,13 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     return data.exactDuplicate ?? null;
   }
 
-  async function uploadSingleItem(item: UploadFile, forceDuplicateUpload = false) {
+  async function uploadSingleItem(
+    item: UploadFile,
+    forceDuplicateUpload = false,
+    mergeSemanticIntoExisting = false,
+  ) {
     setUploadQueue((q) => q.map((u) => (u.id === item.id ? { ...u, status: "uploading" } : u)));
-    const fd = buildUploadFormData(item, forceDuplicateUpload);
+    const fd = buildUploadFormData(item, forceDuplicateUpload, mergeSemanticIntoExisting);
     try {
       const res = await fetch("/api/media", { method: "POST", body: fd });
       const data = (await res.json()) as {
@@ -421,7 +653,26 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     }
   }
 
-  function reuseDuplicateItem(itemId: string) {
+  function toggleMergeIntoExisting(itemId: string) {
+    setUploadQueue((q) =>
+      q.map((u) => (u.id === itemId ? { ...u, mergeIntoExisting: !u.mergeIntoExisting } : u)),
+    );
+  }
+
+  /**
+   * "Dùng ảnh đã có": when the "Thêm metadata đã chọn vào ảnh có sẵn" checkbox is on,
+   * re-upload with forceDuplicateUpload + mergeSemanticIntoExisting so the server merges
+   * this file's tags/keywords/semantic terms into the existing asset. Otherwise this stays a
+   * purely local no-op (skip upload, keep the existing asset untouched).
+   */
+  async function reuseDuplicateItem(itemId: string) {
+    const item = uploadQueue.find((u) => u.id === itemId);
+    if (!item) return;
+    if (item.mergeIntoExisting) {
+      await uploadSingleItem(item, true, true);
+      await load();
+      return;
+    }
     setUploadQueue((q) =>
       q.map((u) => {
         if (u.id !== itemId || !u.duplicateAsset) return u;
@@ -465,9 +716,9 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     await load();
   }
 
-  function reuseAllDuplicates() {
+  async function reuseAllDuplicates() {
     const duplicateIds = uploadQueue.filter((u) => u.status === "duplicate").map((u) => u.id);
-    for (const id of duplicateIds) reuseDuplicateItem(id);
+    for (const id of duplicateIds) await reuseDuplicateItem(id);
   }
 
   function skipAllDuplicates() {
@@ -477,7 +728,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   async function uploadAllDuplicatesAnyway() {
     const duplicates = uploadQueue.filter((u) => u.status === "duplicate");
     for (const item of duplicates) {
-      await uploadSingleItem(item, true);
+      await uploadSingleItem(item, true, item.mergeIntoExisting);
     }
     await load();
   }
@@ -485,6 +736,43 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   function toggleUploadCollection(id: string) {
     setUploadCollectionIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function toggleUploadSemanticTerm(field: SemanticTermField, name: string) {
+    setUploadSemantic((prev) => {
+      const list = prev[field];
+      return {
+        ...prev,
+        [field]: list.includes(name) ? list.filter((n) => n !== name) : [...list, name],
+      };
+    });
+  }
+
+  function toggleItemOverridesOpen(itemId: string) {
+    setUploadQueue((q) =>
+      q.map((u) =>
+        u.id === itemId ? { ...u, overridesOpen: !u.overridesOpen, overrides: u.overrides ?? {} } : u,
+      ),
+    );
+  }
+
+  function setItemOverrideAssetType(itemId: string, assetType: MediaAssetType) {
+    setUploadQueue((q) =>
+      q.map((u) => (u.id === itemId ? { ...u, overrides: { ...u.overrides, assetType } } : u)),
+    );
+  }
+
+  function toggleItemOverrideTerm(itemId: string, field: SemanticTermField, name: string) {
+    setUploadQueue((q) =>
+      q.map((u) => {
+        if (u.id !== itemId) return u;
+        const current = u.overrides?.[field] ?? uploadSemantic[field];
+        const next = current.includes(name)
+          ? current.filter((n) => n !== name)
+          : [...current, name];
+        return { ...u, overrides: { ...u.overrides, [field]: next } };
+      }),
     );
   }
 
@@ -595,6 +883,8 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     setEditLibraryOptions(mergeOptions(libraries, asset.library));
     setEditRoleOptions(mergeOptions(roles, asset.role));
     setEditCollectionOptions(mergeCollectionOptions(collections, assetCollections(asset)));
+    setEditVocabSearch(emptySemanticState() as unknown as Record<SemanticTermField, string>);
+    setIntelligenceOpen(false);
     setEditing({
       id: asset.id,
       libraryId: asset.libraryId ?? "",
@@ -608,6 +898,31 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       keywords: (asset.keywords ?? []).join(", "),
       contentLanguage: asset.contentLanguage ?? "",
       collectionIds: assetCollections(asset).map((col) => col.id),
+      assetType: asset.assetType,
+      semantic: {
+        subjectTerms: asset.subjectTerms ?? [],
+        materialTerms: asset.materialTerms ?? [],
+        colorTerms: asset.colorTerms ?? [],
+        techniqueTerms: asset.techniqueTerms ?? [],
+        industryTerms: asset.industryTerms ?? [],
+        audienceTerms: asset.audienceTerms ?? [],
+        useCaseTerms: asset.useCaseTerms ?? [],
+      },
+      seoScore: asset.seoScore,
+      seoReadinessStatus: asset.seoReadinessStatus,
+      metadataCompleteness: asset.metadataCompleteness,
+      missingFields: computeMissingIntelligenceFields(asset),
+    });
+  }
+
+  function toggleEditSemanticTerm(field: SemanticTermField, name: string) {
+    setEditing((prev) => {
+      if (!prev) return prev;
+      const current = prev.semantic[field];
+      const next = current.includes(name)
+        ? current.filter((item) => item !== name)
+        : [...current, name];
+      return { ...prev, semantic: { ...prev.semantic, [field]: next } };
     });
   }
 
@@ -631,6 +946,14 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
           keywords: editing.keywords.split(",").map((t) => t.trim()).filter(Boolean),
           contentLanguage: editing.contentLanguage || null,
           collectionIds: editing.collectionIds,
+          assetType: editing.assetType,
+          subjectTerms: editing.semantic.subjectTerms,
+          materialTerms: editing.semantic.materialTerms,
+          colorTerms: editing.semantic.colorTerms,
+          techniqueTerms: editing.semantic.techniqueTerms,
+          industryTerms: editing.semantic.industryTerms,
+          audienceTerms: editing.semantic.audienceTerms,
+          useCaseTerms: editing.semantic.useCaseTerms,
         }),
       });
       const data = (await res.json()) as { message?: string };
@@ -658,7 +981,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   }
 
   function selectAllLoaded() {
-    setSelectedIds(new Set(assets.map((asset) => asset.id)));
+    setSelectedIds(new Set(displayedAssets.map((asset) => asset.id)));
   }
 
   function clearSelection() {
@@ -681,11 +1004,33 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     setBulkVisibility("PUBLIC");
     setBulkTags("");
     setBulkKeywords("");
+    setBulkUpdateAssetType(false);
+    setBulkAssetType("PHOTO");
+    setBulkSemantic(emptyBulkSemanticState());
     setBulkOpen(true);
+  }
+
+  function capitalizeFirst(value: string): string {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+
+  function toggleBulkSemanticTerm(field: SemanticTermField, mode: "add" | "remove", name: string) {
+    setBulkSemantic((prev) => {
+      const entry = prev[field];
+      const list = mode === "add" ? entry.add : entry.remove;
+      const nextList = list.includes(name) ? list.filter((item) => item !== name) : [...list, name];
+      return {
+        ...prev,
+        [field]: mode === "add" ? { ...entry, add: nextList } : { ...entry, remove: nextList },
+      };
+    });
   }
 
   async function saveBulkEdit() {
     if (bulkSaving || selectedIds.size === 0) return;
+    const anySemanticEnabled = SEMANTIC_FIELDS.some(
+      (field) => bulkSemantic[field].addEnabled || bulkSemantic[field].removeEnabled,
+    );
     if (
       !bulkUpdateLibrary &&
       !bulkUpdateRole &&
@@ -693,7 +1038,9 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       !bulkUpdateTags &&
       !bulkUpdateKeywords &&
       !bulkAddCollections &&
-      !bulkRemoveCollections
+      !bulkRemoveCollections &&
+      !bulkUpdateAssetType &&
+      !anySemanticEnabled
     ) {
       setBulkError("Chọn ít nhất một trường để cập nhật");
       return;
@@ -711,6 +1058,16 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     }
     if (bulkAddCollections) payload.addCollectionIds = bulkAddCollectionIds;
     if (bulkRemoveCollections) payload.removeCollectionIds = bulkRemoveCollectionIds;
+    if (bulkUpdateAssetType) payload.assetType = bulkAssetType;
+    for (const field of SEMANTIC_FIELDS) {
+      const entry = bulkSemantic[field];
+      if (entry.addEnabled && entry.add.length) {
+        payload[`add${capitalizeFirst(field)}`] = entry.add;
+      }
+      if (entry.removeEnabled && entry.remove.length) {
+        payload[`remove${capitalizeFirst(field)}`] = entry.remove;
+      }
+    }
 
     setBulkSaving(true);
     setBulkError(null);
@@ -753,7 +1110,46 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const pendingCount = uploadQueue.filter((u) => u.status === "pending" || u.status === "warn").length;
   const duplicateCount = uploadQueue.filter((u) => u.status === "duplicate").length;
   const selectedCount = selectedIds.size;
-  const allLoadedSelected = assets.length > 0 && assets.every((asset) => selectedIds.has(asset.id));
+
+  /**
+   * Additional Asset Intelligence filters applied client-side (assetType, SEO readiness,
+   * minimum SEO score, missing title/keywords/subject, AI status, quick presets). The
+   * underlying `MediaAssetListFilters` type already supports most of these server-side, but
+   * GET /api/media isn't in this sprint's file scope to parse the extra query params, so
+   * filtering runs here against the already-fetched page.
+   */
+  const displayedAssets = useMemo(() => {
+    const minScore = filterMinimumSeoScore.trim() ? Number(filterMinimumSeoScore) : undefined;
+    return assets.filter((asset) => {
+      if (filterAssetType && asset.assetType !== filterAssetType) return false;
+      if (filterSeoReadiness && asset.seoReadinessStatus !== filterSeoReadiness) return false;
+      if (typeof minScore === "number" && Number.isFinite(minScore) && asset.seoScore < minScore) {
+        return false;
+      }
+      if (filterHasTitle === "true" && !asset.title?.trim()) return false;
+      if (filterHasTitle === "false" && asset.title?.trim()) return false;
+      if (filterHasKeywords === "true" && !(asset.keywords?.length ?? 0)) return false;
+      if (filterHasKeywords === "false" && (asset.keywords?.length ?? 0)) return false;
+      if (filterHasSubject === "true" && !(asset.subjectTerms?.length ?? 0)) return false;
+      if (filterHasSubject === "false" && (asset.subjectTerms?.length ?? 0)) return false;
+      if (filterAiStatus && asset.aiProcessingStatus !== filterAiStatus) return false;
+      if (activePreset && !mediaAssetMatchesIntelligencePreset(asset, activePreset)) return false;
+      return true;
+    });
+  }, [
+    assets,
+    filterAssetType,
+    filterSeoReadiness,
+    filterMinimumSeoScore,
+    filterHasTitle,
+    filterHasKeywords,
+    filterHasSubject,
+    filterAiStatus,
+    activePreset,
+  ]);
+
+  const allLoadedSelected =
+    displayedAssets.length > 0 && displayedAssets.every((asset) => selectedIds.has(asset.id));
 
   function renderReferencesList(items: MediaReference[]) {
     if (!items.length) {
@@ -803,6 +1199,98 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
               disabled={disabled}
             />
             {item.name}
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  /** Compact searchable multi-select for one semantic vocabulary type (edit modal). */
+  function renderSemanticTermPicker(
+    field: SemanticTermField,
+    selected: string[],
+    onToggle: (name: string) => void,
+    searchValue: string,
+    onSearchChange: (value: string) => void,
+    disabled = false,
+  ) {
+    const options = vocabOptionsForField(field, searchValue);
+    return (
+      <div className="admin-field" style={{ marginBottom: 10 }}>
+        <label className="admin-label">{SEMANTIC_FIELD_LABELS[field]}</label>
+        {selected.length > 0 && (
+          <p className="admin-field-hint" style={{ margin: "0 0 4px" }}>
+            Đã chọn: {selected.join(", ")}
+          </p>
+        )}
+        <input
+          className="admin-input admin-input--sm"
+          placeholder={`Tìm ${SEMANTIC_FIELD_LABELS[field].toLowerCase()}…`}
+          value={searchValue}
+          onChange={(e) => onSearchChange(e.target.value)}
+          disabled={disabled}
+        />
+        {options.length === 0 ? (
+          <p className="admin-field-hint">Không có thuật ngữ phù hợp.</p>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+              maxHeight: 120,
+              overflowY: "auto",
+              marginTop: 4,
+            }}
+          >
+            {options.map((term) => (
+              <label
+                key={term.id}
+                className="admin-field-hint"
+                style={{ display: "flex", alignItems: "center", gap: 8, margin: 0 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(term.name)}
+                  onChange={() => onToggle(term.name)}
+                  disabled={disabled}
+                />
+                {term.name}
+                {!term.isActive && " (đã vô hiệu)"}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /** Compact checkbox list of vocabulary term names (bulk edit add/remove pickers). */
+  function renderVocabNameCheckboxes(
+    field: SemanticTermField,
+    selected: string[],
+    onToggle: (name: string) => void,
+    disabled = false,
+  ) {
+    const options = vocabTermsForType(SEMANTIC_FIELD_TO_VOCAB_TYPE[field]);
+    if (!options.length) {
+      return <p className="admin-field-hint">Chưa có thuật ngữ nào.</p>;
+    }
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 120, overflowY: "auto" }}>
+        {options.map((term) => (
+          <label
+            key={term.id}
+            className="admin-field-hint"
+            style={{ display: "flex", alignItems: "center", gap: 8, margin: 0 }}
+          >
+            <input
+              type="checkbox"
+              checked={selected.includes(term.name)}
+              onChange={() => onToggle(term.name)}
+              disabled={disabled}
+            />
+            {term.name}
           </label>
         ))}
       </div>
@@ -906,7 +1394,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                     <button
                       type="button"
                       className="admin-btn admin-btn--secondary admin-btn--xs"
-                      onClick={reuseAllDuplicates}
+                      onClick={() => void reuseAllDuplicates()}
                     >
                       Dùng tất cả ảnh có sẵn
                     </button>
@@ -940,10 +1428,38 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                 <label className="admin-label">Bộ sưu tập</label>
                 {renderCollectionCheckboxes(collections, uploadCollectionIds, toggleUploadCollection)}
               </div>
+              <div className="admin-field" style={{ marginTop: 8 }}>
+                <label className="admin-label">Loại tài sản (mặc định cho cả lô)</label>
+                <select
+                  className="admin-input admin-input--sm"
+                  value={uploadAssetType}
+                  onChange={(e) => setUploadAssetType(e.target.value as MediaAssetType)}
+                >
+                  {ASSET_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {SEMANTIC_FIELDS.map((field) =>
+                renderSemanticTermPicker(
+                  field,
+                  uploadSemantic[field],
+                  (name) => toggleUploadSemanticTerm(field, name),
+                  uploadVocabSearch[field] ?? "",
+                  (value) => setUploadVocabSearch((prev) => ({ ...prev, [field]: value })),
+                ),
+              )}
             </details>
             <div className="admin-media-queue-list">
               {uploadQueue.map((item) => (
-                <div key={item.id} className={`admin-media-queue-item status-${item.status}`}>
+                <div
+                  key={item.id}
+                  className={`admin-media-queue-item status-${item.status}`}
+                  style={{ flexDirection: "column", alignItems: "stretch" }}
+                >
+                <div style={{ display: "flex", gap: 8, alignItems: "center", width: "100%" }}>
                   {item.status === "duplicate" && item.duplicateAsset && (
                     <div className="admin-media-preview" style={{ width: 48, height: 48, flexShrink: 0 }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -968,30 +1484,51 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                     )}
                   </span>
                   {item.status === "duplicate" && (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <button
-                        type="button"
-                        className="admin-btn admin-btn--primary admin-btn--xs"
-                        onClick={() => reuseDuplicateItem(item.id)}
-                      >
-                        Dùng ảnh đã có
-                      </button>
-                      <button
-                        type="button"
-                        className="admin-btn admin-btn--secondary admin-btn--xs"
-                        onClick={() => void uploadSingleItem(item, true).then(() => load())}
-                        disabled={!cmsReady}
-                      >
-                        Vẫn tải ảnh mới
-                      </button>
-                      <button
-                        type="button"
-                        className="admin-btn admin-btn--secondary admin-btn--xs"
-                        onClick={() => skipDuplicateItem(item.id)}
-                      >
-                        Bỏ qua
-                      </button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, flexWrap: "wrap" }}>
+                      <label className="admin-field-hint" style={{ display: "flex", alignItems: "center", gap: 6, margin: 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={item.mergeIntoExisting ?? false}
+                          onChange={() => toggleMergeIntoExisting(item.id)}
+                        />
+                        Thêm metadata đã chọn vào ảnh có sẵn
+                      </label>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn--primary admin-btn--xs"
+                          onClick={() => void reuseDuplicateItem(item.id)}
+                        >
+                          Dùng ảnh đã có
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn--secondary admin-btn--xs"
+                          onClick={() =>
+                            void uploadSingleItem(item, true, item.mergeIntoExisting).then(() => load())
+                          }
+                          disabled={!cmsReady}
+                        >
+                          Vẫn tải ảnh mới
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn--secondary admin-btn--xs"
+                          onClick={() => skipDuplicateItem(item.id)}
+                        >
+                          Bỏ qua
+                        </button>
+                      </div>
                     </div>
+                  )}
+                  {(item.status === "pending" || item.status === "warn") && (
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      onClick={() => toggleItemOverridesOpen(item.id)}
+                    >
+                      {item.overridesOpen ? "Ẩn tùy chỉnh" : "Tùy chỉnh"}
+                    </button>
                   )}
                   {(item.status === "pending" || item.status === "warn" || item.status === "error") && (
                     <button
@@ -1002,6 +1539,66 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                       ✕
                     </button>
                   )}
+                </div>
+                {item.overridesOpen && (item.status === "pending" || item.status === "warn") && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      paddingTop: 6,
+                      borderTop: "1px solid #e5e7eb",
+                      width: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                    }}
+                  >
+                    <p className="admin-field-hint" style={{ margin: 0 }}>
+                      Ghi đè metadata cho riêng ảnh này (bỏ trống để dùng mặc định của cả lô).
+                    </p>
+                    <select
+                      className="admin-input admin-input--sm"
+                      value={item.overrides?.assetType ?? ""}
+                      onChange={(e) =>
+                        setItemOverrideAssetType(item.id, e.target.value as MediaAssetType)
+                      }
+                    >
+                      <option value="">Loại tài sản: dùng mặc định ({ASSET_TYPE_LABELS[uploadAssetType]})</option>
+                      {ASSET_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    {SEMANTIC_FIELDS.map((field) => {
+                      const selected = item.overrides?.[field] ?? uploadSemantic[field];
+                      const options = vocabTermsForType(SEMANTIC_FIELD_TO_VOCAB_TYPE[field]);
+                      if (!options.length) return null;
+                      return (
+                        <div key={field}>
+                          <p className="admin-field-hint" style={{ margin: "0 0 2px", fontWeight: 500 }}>
+                            {SEMANTIC_FIELD_LABELS[field]}
+                          </p>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {options.map((term) => (
+                              <label
+                                key={term.id}
+                                className="admin-field-hint"
+                                style={{ display: "flex", alignItems: "center", gap: 4, margin: 0 }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selected.includes(term.name)}
+                                  onChange={() => toggleItemOverrideTerm(item.id, field, term.name)}
+                                />
+                                {term.name}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 </div>
               ))}
             </div>
@@ -1081,8 +1678,15 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
           Lọc
         </button>
-        <span className="admin-field-hint">{assets.length} ảnh</span>
-        {assets.length > 0 && (
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--xs"
+          onClick={() => setShowIntelligenceFilters((v) => !v)}
+        >
+          {showIntelligenceFilters ? "Ẩn bộ lọc Asset Intelligence" : "Bộ lọc Asset Intelligence"}
+        </button>
+        <span className="admin-field-hint">{displayedAssets.length} ảnh</span>
+        {displayedAssets.length > 0 && (
           <>
             <button
               type="button"
@@ -1115,15 +1719,128 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         )}
       </div>
 
+      {showIntelligenceFilters && (
+        <div className="admin-catalog-filters" style={{ flexWrap: "wrap" }}>
+          <select
+            className="admin-input"
+            value={filterAssetType}
+            onChange={(e) => setFilterAssetType(e.target.value as MediaAssetType | "")}
+          >
+            <option value="">Tất cả loại tài sản</option>
+            {ASSET_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="admin-input"
+            value={filterSeoReadiness}
+            onChange={(e) => setFilterSeoReadiness(e.target.value as MediaSeoReadinessStatus | "")}
+          >
+            {SEO_READINESS_OPTIONS.map((opt) => (
+              <option key={opt.value || "all"} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <input
+            className="admin-input"
+            type="number"
+            min={0}
+            max={100}
+            placeholder="Điểm SEO tối thiểu"
+            value={filterMinimumSeoScore}
+            onChange={(e) => setFilterMinimumSeoScore(e.target.value)}
+            style={{ width: 140 }}
+          />
+          <select
+            className="admin-input"
+            value={filterHasTitle}
+            onChange={(e) => setFilterHasTitle(e.target.value as "" | "true" | "false")}
+          >
+            <option value="">Tiêu đề: tất cả</option>
+            <option value="true">Có tiêu đề</option>
+            <option value="false">Thiếu tiêu đề</option>
+          </select>
+          <select
+            className="admin-input"
+            value={filterHasKeywords}
+            onChange={(e) => setFilterHasKeywords(e.target.value as "" | "true" | "false")}
+          >
+            <option value="">Từ khóa SEO: tất cả</option>
+            <option value="true">Có từ khóa</option>
+            <option value="false">Thiếu từ khóa</option>
+          </select>
+          <select
+            className="admin-input"
+            value={filterHasSubject}
+            onChange={(e) => setFilterHasSubject(e.target.value as "" | "true" | "false")}
+          >
+            <option value="">Chủ thể: tất cả</option>
+            <option value="true">Có chủ thể</option>
+            <option value="false">Thiếu chủ thể</option>
+          </select>
+          <select
+            className="admin-input"
+            value={filterAiStatus}
+            onChange={(e) => setFilterAiStatus(e.target.value as MediaAiProcessingStatus | "")}
+          >
+            {AI_STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value || "all"} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {(filterAssetType ||
+            filterSeoReadiness ||
+            filterMinimumSeoScore ||
+            filterHasTitle ||
+            filterHasKeywords ||
+            filterHasSubject ||
+            filterAiStatus ||
+            activePreset) && (
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+              onClick={() => {
+                setFilterAssetType("");
+                setFilterSeoReadiness("");
+                setFilterMinimumSeoScore("");
+                setFilterHasTitle("");
+                setFilterHasKeywords("");
+                setFilterHasSubject("");
+                setFilterAiStatus("");
+                setActivePreset("");
+              }}
+            >
+              Xóa bộ lọc
+            </button>
+          )}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", width: "100%" }}>
+            {MEDIA_INTELLIGENCE_QUICK_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`admin-btn admin-btn--xs ${activePreset === preset ? "admin-btn--primary" : "admin-btn--secondary"}`}
+                onClick={() => setActivePreset((prev) => (prev === preset ? "" : preset))}
+              >
+                {MEDIA_INTELLIGENCE_QUICK_PRESET_LABELS[preset]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <CardGridLoading title="Đang tải thư viện ảnh…" tone="admin" cards={8} />
-      ) : assets.length === 0 ? (
+      ) : displayedAssets.length === 0 ? (
         <div className="admin-empty-state">
           <p>Chưa có ảnh trong bộ lọc này.</p>
         </div>
       ) : (
         <div className="admin-media-grid">
-          {assets.map((asset) => {
+          {displayedAssets.map((asset) => {
             const isSelected = selectedIds.has(asset.id);
             return (
               <div
@@ -1188,6 +1905,7 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                     {asset.visibility !== "PUBLIC" && (
                       <span className="admin-badge">{asset.visibility}</span>
                     )}
+                    <span className="admin-badge">SEO {asset.seoScore}</span>
                   </p>
                   <div className="admin-media-actions">
                     <button
@@ -1348,6 +2066,62 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                 editSaving,
               )}
             </div>
+
+            <div className="admin-field">
+              <p className="admin-label" style={{ marginBottom: 6 }}>
+                Sức khỏe metadata (Asset health)
+              </p>
+              <p className="admin-field-hint" style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: 0 }}>
+                <span className="admin-badge">SEO {editing.seoScore}</span>
+                <span className="admin-badge">{MEDIA_SEO_READINESS_LABELS[editing.seoReadinessStatus]}</span>
+                <span className="admin-badge">Đầy đủ {editing.metadataCompleteness}%</span>
+              </p>
+              {editing.missingFields.length > 0 && (
+                <p className="admin-field-hint" style={{ marginTop: 4 }}>
+                  Còn thiếu: {editing.missingFields.map((key) => MISSING_FIELD_LABELS[key] ?? key).join(", ")}
+                </p>
+              )}
+            </div>
+
+            <details
+              className="admin-field"
+              open={intelligenceOpen}
+              onToggle={(e) => setIntelligenceOpen((e.target as HTMLDetailsElement).open)}
+            >
+              <summary className="admin-label" style={{ cursor: "pointer" }}>
+                Asset Intelligence (loại ảnh &amp; thuật ngữ mô tả)
+              </summary>
+              <div style={{ marginTop: 8 }}>
+                <div className="admin-field">
+                  <label className="admin-label">Loại tài sản</label>
+                  <select
+                    className="admin-input"
+                    value={editing.assetType}
+                    onChange={(e) =>
+                      setEditing({ ...editing, assetType: e.target.value as MediaAssetType })
+                    }
+                    disabled={editSaving}
+                  >
+                    {ASSET_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {SEMANTIC_FIELDS.map((field) =>
+                  renderSemanticTermPicker(
+                    field,
+                    editing.semantic[field],
+                    (name) => toggleEditSemanticTerm(field, name),
+                    editVocabSearch[field] ?? "",
+                    (value) => setEditVocabSearch((prev) => ({ ...prev, [field]: value })),
+                    editSaving,
+                  ),
+                )}
+              </div>
+            </details>
+
             <div className="admin-field">
               <label className="admin-label">Nơi đang sử dụng</label>
               {editReferencesLoading ? (
@@ -1539,6 +2313,93 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                   bulkSaving,
                 )}
             </div>
+            <div className="admin-field">
+              <label className="admin-label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={bulkUpdateAssetType}
+                  onChange={(e) => setBulkUpdateAssetType(e.target.checked)}
+                  disabled={bulkSaving}
+                />
+                Cập nhật loại tài sản
+              </label>
+              {bulkUpdateAssetType && (
+                <select
+                  className="admin-input"
+                  value={bulkAssetType}
+                  onChange={(e) => setBulkAssetType(e.target.value as MediaAssetType)}
+                  disabled={bulkSaving}
+                >
+                  {ASSET_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <details className="admin-field">
+              <summary className="admin-label" style={{ cursor: "pointer" }}>
+                Thêm / gỡ thuật ngữ mô tả (Asset Intelligence)
+              </summary>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 12 }}>
+                {SEMANTIC_FIELDS.map((field) => (
+                  <div key={field} className="admin-field" style={{ margin: 0 }}>
+                    <p className="admin-label" style={{ marginBottom: 4 }}>
+                      {SEMANTIC_FIELD_LABELS[field]}
+                    </p>
+                    <label
+                      className="admin-field-hint"
+                      style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 0 4px" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={bulkSemantic[field].addEnabled}
+                        onChange={(e) =>
+                          setBulkSemantic((prev) => ({
+                            ...prev,
+                            [field]: { ...prev[field], addEnabled: e.target.checked },
+                          }))
+                        }
+                        disabled={bulkSaving}
+                      />
+                      Thêm {SEMANTIC_FIELD_LABELS[field].toLowerCase()}
+                    </label>
+                    {bulkSemantic[field].addEnabled &&
+                      renderVocabNameCheckboxes(
+                        field,
+                        bulkSemantic[field].add,
+                        (name) => toggleBulkSemanticTerm(field, "add", name),
+                        bulkSaving,
+                      )}
+                    <label
+                      className="admin-field-hint"
+                      style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0 4px" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={bulkSemantic[field].removeEnabled}
+                        onChange={(e) =>
+                          setBulkSemantic((prev) => ({
+                            ...prev,
+                            [field]: { ...prev[field], removeEnabled: e.target.checked },
+                          }))
+                        }
+                        disabled={bulkSaving}
+                      />
+                      Gỡ {SEMANTIC_FIELD_LABELS[field].toLowerCase()}
+                    </label>
+                    {bulkSemantic[field].removeEnabled &&
+                      renderVocabNameCheckboxes(
+                        field,
+                        bulkSemantic[field].remove,
+                        (name) => toggleBulkSemanticTerm(field, "remove", name),
+                        bulkSaving,
+                      )}
+                  </div>
+                ))}
+              </div>
+            </details>
             {bulkError && (
               <p className="admin-field-hint" style={{ color: "#dc2626" }} role="alert">
                 {bulkError}

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  deleteMediaCollection,
-  getMediaCollectionById,
-  updateMediaCollection,
-} from "@/features/media/services/media-collection.service";
-import { validateMediaCollectionType } from "@/features/media/media-collection.types";
+  deleteMediaVocabularyTerm,
+  getMediaVocabularyTermById,
+  updateMediaVocabularyTerm,
+} from "@/features/media/services/media-vocabulary.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -18,11 +17,11 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (!permission.ok) return permission.response;
 
   const { id } = await context.params;
-  const collection = await getMediaCollectionById(id);
-  if (!collection) {
-    return NextResponse.json({ message: "Không tìm thấy bộ sưu tập" }, { status: 404 });
+  const term = await getMediaVocabularyTermById(id, { includeUsage: true });
+  if (!term) {
+    return NextResponse.json({ message: "Không tìm thấy thuật ngữ" }, { status: 404 });
   }
-  return NextResponse.json({ collection });
+  return NextResponse.json({ term });
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
@@ -45,32 +44,25 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   }
 
   const raw = body as Record<string, unknown>;
-  let collectionType: ReturnType<typeof validateMediaCollectionType> | undefined;
-  if (raw.collectionType !== undefined && raw.collectionType !== null) {
-    collectionType = validateMediaCollectionType(raw.collectionType);
-    if (!collectionType) {
-      return NextResponse.json({ message: "Loại bộ sưu tập không hợp lệ" }, { status: 400 });
-    }
-  }
-
   try {
-    const collection = await updateMediaCollection(id, {
+    const term = await updateMediaVocabularyTerm(id, {
       name: typeof raw.name === "string" ? raw.name : undefined,
+      aliases: Array.isArray(raw.aliases)
+        ? raw.aliases.filter((item): item is string => typeof item === "string")
+        : undefined,
       description:
         raw.description === null
           ? null
           : typeof raw.description === "string"
             ? raw.description
             : undefined,
-      color:
-        raw.color === null ? null : typeof raw.color === "string" ? raw.color : undefined,
-      collectionType: collectionType ?? undefined,
       sortOrder: typeof raw.sortOrder === "number" ? raw.sortOrder : undefined,
       isActive: typeof raw.isActive === "boolean" ? raw.isActive : undefined,
+      code: raw.code === null ? null : typeof raw.code === "string" ? raw.code : undefined,
     });
-    return NextResponse.json({ collection });
+    return NextResponse.json({ term });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Không thể cập nhật bộ sưu tập";
+    const message = err instanceof Error ? err.message : "Không thể cập nhật thuật ngữ";
     return NextResponse.json(
       { message },
       { status: message.includes("Không tìm thấy") ? 404 : 400 },
@@ -88,10 +80,10 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
 
   const { id } = await context.params;
   try {
-    await deleteMediaCollection(id);
+    await deleteMediaVocabularyTerm(id);
     return NextResponse.json({ success: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Không thể xóa bộ sưu tập";
+    const message = err instanceof Error ? err.message : "Không thể xóa thuật ngữ";
     return NextResponse.json(
       { message },
       { status: message.includes("Không tìm thấy") ? 404 : 400 },
