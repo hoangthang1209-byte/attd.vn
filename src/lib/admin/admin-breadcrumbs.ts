@@ -371,6 +371,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/ai-retrieval",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Kiểm tra ngữ cảnh AI"],
+      title: "Kiểm tra ngữ cảnh AI",
+      description: "Xem trước ngữ cảnh retrieval mà các hệ thống AI tương lai sẽ nhận — không gọi LLM.",
+    },
+  },
+  {
     path: "/admin/content/seo-strategies",
     meta: {
       breadcrumbs: ["Nội dung & Website", "Chiến lược SEO"],

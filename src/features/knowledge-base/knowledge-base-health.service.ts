@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import {
   getExpectedStructuredKeysForType,
-  hasStructuredField,
   structuredDataCoveragePercent,
 } from "@/features/knowledge-base/knowledge-base-structured-schema";
 import { isClaimSafeForAiOutput } from "@/features/knowledge-base/knowledge-base-claim-governance";
+import { calculateKnowledgeStaleness } from "@/features/ai-retrieval/ai-retrieval-staleness";
 
 export type KnowledgeHealthScore = {
   totalEntries: number;
@@ -49,6 +49,18 @@ export type KnowledgeHealthScore = {
   domainBreakdown: Record<string, number>;
   typeBreakdown: Record<string, number>;
   warnings: string[];
+  retrievalReadiness: {
+    publicOutputReadyCount: number;
+    internalAiReadyCount: number;
+    approvedAndVerifiedCount: number;
+    staleCount: number;
+    reviewDueCount: number;
+    conflictCandidateCount: number;
+    authoritativeRelationCoverage: number;
+    sourceCoverage: number;
+    domainCoverage: number;
+    retrievalEligibleByConsumer: Record<string, number>;
+  };
 };
 
 function pct(count: number, total: number): number {
@@ -75,6 +87,11 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
       visibility: true,
       version: true,
       domain: true,
+      expiresAt: true,
+      nextReviewAt: true,
+      lastVerifiedAt: true,
+      verifiedAt: true,
+      reviewIntervalDays: true,
       relatedProductIds: true,
       relatedBlogPostIds: true,
       relatedMediaBundleIds: true,
@@ -113,6 +130,13 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
   let publicCount = 0;
   let internalCount = 0;
   let confidentialCount = 0;
+  let publicOutputReady = 0;
+  let internalAiReady = 0;
+  let approvedAndVerified = 0;
+  let staleCount = 0;
+  let reviewDueCount = 0;
+  let withDomain = 0;
+  let withSourceCoverage = 0;
 
   const domainBreakdown: Record<string, number> = {};
   const typeBreakdown: Record<string, number> = {};
@@ -121,6 +145,7 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
     typeBreakdown[entry.type] = (typeBreakdown[entry.type] ?? 0) + 1;
     const domainKey = entry.domain?.trim() || "unspecified";
     domainBreakdown[domainKey] = (domainBreakdown[domainKey] ?? 0) + 1;
+    if (entry.domain?.trim()) withDomain += 1;
 
     if (entry.summary?.trim()) withSummary += 1;
     if (entry.content?.trim() && entry.content.trim().length >= 40) withContent += 1;
@@ -133,11 +158,25 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
     );
 
     if (entry.tags.length > 0) withTags += 1;
-    if (entry.sourceId) withSource += 1;
+    if (entry.sourceId) {
+      withSource += 1;
+      withSourceCoverage += 1;
+    }
     if (entry.isVerified) verified += 1;
     if (entry.approvedAt) approved += 1;
     if (isClaimSafeForAiOutput(entry.claimStatus)) claimSafe += 1;
     if (entry.evidenceUrl?.trim()) withEvidence += 1;
+    if (entry.approvedAt && entry.isVerified) approvedAndVerified += 1;
+
+    const staleness = calculateKnowledgeStaleness({
+      expiresAt: entry.expiresAt,
+      nextReviewAt: entry.nextReviewAt,
+      lastVerifiedAt: entry.lastVerifiedAt,
+      verifiedAt: entry.verifiedAt,
+      reviewIntervalDays: entry.reviewIntervalDays,
+    });
+    if (staleness.stale) staleCount += 1;
+    if (staleness.reviewDue) reviewDueCount += 1;
 
     const hasRel =
       entry.relatedProductIds.length > 0 ||
@@ -157,6 +196,25 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
     if (entry.visibility === "PUBLIC") publicCount += 1;
     else if (entry.visibility === "CONFIDENTIAL") confidentialCount += 1;
     else internalCount += 1;
+
+    const claimOk = isClaimSafeForAiOutput(entry.claimStatus);
+    const notStale = !staleness.stale;
+    if (
+      entry.visibility === "PUBLIC" &&
+      entry.isVerified &&
+      claimOk &&
+      notStale &&
+      (entry.approvedAt || entry.isVerified)
+    ) {
+      publicOutputReady += 1;
+    }
+    if (
+      (entry.visibility === "PUBLIC" || entry.visibility === "INTERNAL") &&
+      claimOk &&
+      entry.status === "ACTIVE"
+    ) {
+      internalAiReady += 1;
+    }
   }
 
   const coverageFields = [
@@ -185,6 +243,8 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
   if (confidentialCount > 0 && publicCount === 0) {
     warnings.push("Có entry confidential nhưng chưa có entry public — kiểm tra visibility.");
   }
+
+  const moqConflicts = await detectMoqDuplicationIssues();
 
   return {
     totalEntries: total,
@@ -229,6 +289,24 @@ export async function calculateKnowledgeHealthScore(): Promise<KnowledgeHealthSc
     domainBreakdown,
     typeBreakdown,
     warnings,
+    retrievalReadiness: {
+      publicOutputReadyCount: publicOutputReady,
+      internalAiReadyCount: internalAiReady,
+      approvedAndVerifiedCount: approvedAndVerified,
+      staleCount,
+      reviewDueCount,
+      conflictCandidateCount: moqConflicts.length,
+      authoritativeRelationCoverage: pct(withProducts + withBundles + withSeo, total * 3),
+      sourceCoverage: pct(withSourceCoverage, total),
+      domainCoverage: pct(withDomain, total),
+      retrievalEligibleByConsumer: {
+        SEO_CONTENT: publicOutputReady,
+        SEO_BRIEF: internalAiReady,
+        SEO_TOPIC_PLANNER: internalAiReady,
+        INTERNAL_SEARCH: internalAiReady,
+        ADMIN: total,
+      },
+    },
   };
 }
 

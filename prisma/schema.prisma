@@ -2421,6 +2421,9 @@ model KnowledgeBaseEntry {
   approvedAt              DateTime?
   lastVerifiedAt          DateTime?
   version                 Int                      @default(1)
+  reviewIntervalDays      Int?
+  nextReviewAt            DateTime?
+  expiresAt               DateTime?
   isFeatured              Boolean                  @default(false)
   isVerified              Boolean                  @default(false)
   verifiedAt              DateTime?
@@ -2437,6 +2440,8 @@ model KnowledgeBaseEntry {
   @@index([visibility])
   @@index([claimStatus])
   @@index([domain])
+  @@index([expiresAt])
+  @@index([nextReviewAt])
 }
 
 /// Lightweight approval snapshot — historical versions remain queryable without full document history.
@@ -2466,6 +2471,59 @@ model KnowledgeBaseUsageLog {
 
   @@index([entryId])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 11.0B — Enterprise AI Retrieval Layer (provider-neutral, no LLM)
+// ---------------------------------------------------------------------------
+
+enum AiRetrievalConsumer {
+  SEO_CONTENT
+  SEO_BRIEF
+  SEO_TOPIC_PLANNER
+  SALES_COPILOT
+  SUPPORT_COPILOT
+  QUOTATION_ASSISTANT
+  MANUFACTURING_ASSISTANT
+  PROCUREMENT_ASSISTANT
+  INTERNAL_SEARCH
+  BUSINESS_INTELLIGENCE
+  ADMIN
+}
+
+enum AiRetrievalPurpose {
+  RESEARCH
+  CONTENT_PLANNING
+  CONTENT_WRITING
+  CONTENT_REVIEW
+  SALES_RESPONSE
+  CUSTOMER_SUPPORT
+  QUOTATION
+  MANUFACTURING_GUIDANCE
+  PROCUREMENT
+  INTERNAL_ANALYSIS
+  PUBLIC_OUTPUT
+}
+
+model AiRetrievalLog {
+  id                String              @id @default(cuid())
+  requestId         String              @unique
+  consumer          AiRetrievalConsumer
+  purpose           AiRetrievalPurpose
+  query             String
+  sourceTypes       String[]            @default([])
+  resultCount       Int                 @default(0)
+  conflictCount     Int                 @default(0)
+  warningCount      Int                 @default(0)
+  omittedCount      Int                 @default(0)
+  maxVisibilityUsed String
+  userId            String?
+  entityScope       Json?
+  metadata          Json?
+  createdAt         DateTime            @default(now())
+
+  @@index([consumer, createdAt])
+  @@index([userId, createdAt])
 }
 
 enum KnowledgeBaseImportJobStatus {

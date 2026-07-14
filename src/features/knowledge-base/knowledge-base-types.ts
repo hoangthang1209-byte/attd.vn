@@ -87,6 +87,9 @@ export type KnowledgeBaseEntryRecord = {
   approvedAt: string | null;
   lastVerifiedAt: string | null;
   version: number;
+  reviewIntervalDays?: number | null;
+  nextReviewAt?: string | null;
+  expiresAt?: string | null;
   isFeatured: boolean;
   isVerified: boolean;
   verifiedAt: string | null;

@@ -115,6 +115,8 @@ function mapEntry(
     verifiedAt: entry.verifiedAt?.toISOString() ?? null,
     approvedAt: entry.approvedAt?.toISOString() ?? null,
     lastVerifiedAt: entry.lastVerifiedAt?.toISOString() ?? null,
+    nextReviewAt: entry.nextReviewAt?.toISOString() ?? null,
+    expiresAt: entry.expiresAt?.toISOString() ?? null,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
     category: entry.category,

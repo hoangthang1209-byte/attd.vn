@@ -603,6 +603,12 @@ export default function SeoTopicDetailClient({ topicId }: { topicId: string }) {
             {topic.strategyName} · {topic.clusterName} · {SEO_TOPIC_STATUS_LABELS[topic.status]}
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link
+              href={`/admin/content/ai-retrieval?consumer=SEO_BRIEF&purpose=CONTENT_PLANNING&query=${encodeURIComponent(`${topic.title} ${topic.primaryKeyword}`)}&seoTopicId=${encodeURIComponent(topic.id)}`}
+              className="admin-btn admin-btn--secondary"
+            >
+              Xem ngữ cảnh AI
+            </Link>
             <Link href="/admin/content/seo-topics" className="admin-btn admin-btn--secondary">
               Danh sách chủ đề
             </Link>

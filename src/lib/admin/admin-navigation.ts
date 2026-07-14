@@ -154,6 +154,7 @@ export const adminNavigationSections: AdminNavigationSection[] = [
           { label: "Tổng quan SEO", href: "/admin/content/seo", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Chiến lược SEO", href: "/admin/content/seo-strategies", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Kế hoạch nội dung", href: "/admin/content/seo-topics", status: "active", requiredPermissions: ["canManageCms"] },
+          { label: "Kiểm tra ngữ cảnh AI", href: "/admin/content/ai-retrieval", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Nhóm thư viện ảnh", href: "/admin/content/media-libraries", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Vai trò hiển thị ảnh", href: "/admin/content/media-roles", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Bộ sưu tập ảnh", href: "/admin/content/media-collections", status: "active", requiredPermissions: ["canManageCms"] },
