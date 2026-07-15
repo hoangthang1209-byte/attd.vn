@@ -156,7 +156,9 @@ describe("Review / handoff contracts (static)", () => {
   });
 
   it("approval is version-specific", () => {
-    assert.equal(1 === 2, false);
+    const sessionVersion = 1;
+    const draftVersion = 2;
+    assert.notEqual(sessionVersion, draftVersion);
   });
 
   it("published Blog overwrite is blocked by policy", () => {

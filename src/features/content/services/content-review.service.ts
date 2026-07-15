@@ -314,18 +314,17 @@ export async function evaluateContentReviewReadiness(
   );
 
   for (const section of session.sections) {
-    if (requiredSectionIds.has(section.sectionId) || requiredSectionIds.size === 0) {
-      if (section.status === "REJECTED") blockingIssues.push(`Section rejected: ${section.heading}`);
+    const isRequired = requiredSectionIds.size === 0 || requiredSectionIds.has(section.sectionId);
+
+    if (isRequired) {
+      if (section.status === "REJECTED") {
+        blockingIssues.push(`Section rejected: ${section.heading}`);
+      }
       if (section.status === "CHANGES_REQUESTED") {
         blockingIssues.push(`Changes requested: ${section.heading}`);
       }
-      if (section.status !== "APPROVED" && section.status !== "LOCKED") {
-        // LOCKED without approval still blocks final approval for required
-        if (requiredSectionIds.has(section.sectionId) && section.status !== "APPROVED") {
-          if (section.status === "PENDING") {
-            blockingIssues.push(`Required section not approved: ${section.heading}`);
-          }
-        }
+      if (section.status === "PENDING" || section.status === "LOCKED") {
+        blockingIssues.push(`Required section not approved: ${section.heading}`);
       }
     }
 
