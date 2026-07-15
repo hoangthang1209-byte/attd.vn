@@ -362,6 +362,45 @@ export default function BlogPostEditor(props: Props) {
         </Link>
       </div>
 
+      {isEdit && initial?.sourceHandoffRecordId && (
+        <div className="admin-sidebar-card" style={{ marginBottom: 16 }}>
+          <h3 className="admin-sidebar-title">Nguồn nội dung</h3>
+          <p className="admin-field-hint">Traceability từ Writing Draft (read-only).</p>
+          <ul style={{ fontSize: 13, paddingLeft: 16 }}>
+            <li>
+              Writing Draft: {initial.sourceWritingDraftId ? `${initial.sourceWritingDraftId.slice(0, 10)}…` : "—"}
+              {initial.sourceWritingDraftVersion != null
+                ? ` · v${initial.sourceWritingDraftVersion}`
+                : ""}
+            </li>
+            <li>
+              Review:{" "}
+              {initial.sourceReviewSessionId ? (
+                <Link href={`/admin/content/reviews/${initial.sourceReviewSessionId}`}>
+                  {initial.sourceReviewSessionId.slice(0, 10)}…
+                </Link>
+              ) : (
+                "—"
+              )}
+            </li>
+            <li>Handoff: {initial.sourceHandoffRecordId.slice(0, 10)}…</li>
+            <li>Media Bundle: {initial.mediaBundleId ? `${initial.mediaBundleId.slice(0, 10)}…` : "—"}</li>
+            <li>
+              Last handoff:{" "}
+              {initial.lastHandoffAt ? formatUpdatedAt(initial.lastHandoffAt) : "—"}
+            </li>
+            {initial.contentModifiedAfterHandoff && (
+              <li style={{ color: "#b45309" }}>
+                Nội dung đã chỉnh sau handoff — không auto-sync từ Writing Draft mới.
+              </li>
+            )}
+          </ul>
+          <p className="admin-field-hint">
+            <Link href="/admin/content/reviews">Mở Kiểm duyệt nội dung</Link>
+          </p>
+        </div>
+      )}
+
       <div className="admin-form-grid">
         <div className="admin-form-main">
           <div ref={factorySectionRef} className="admin-factory-section">

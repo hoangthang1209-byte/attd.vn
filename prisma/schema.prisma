@@ -809,6 +809,13 @@ model BlogPost {
   aiMetadata       Json?
   /// Optional curated Media Bundle used as content-media source (explicit assignments are snapshots).
   mediaBundleId    String?
+  /// Sprint 11.5 — governed writing handoff traceability (admin-only).
+  sourceWritingDraftId      String?
+  sourceWritingDraftVersion Int?
+  sourceReviewSessionId     String?
+  sourceHandoffRecordId     String?
+  contentModifiedAfterHandoff Boolean           @default(false)
+  lastHandoffAt             DateTime?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   categories       BlogPostCategory[]
@@ -818,6 +825,8 @@ model BlogPost {
   @@index([publishedAt])
   @@index([createdAt])
   @@index([mediaBundleId])
+  @@index([sourceWritingDraftId])
+  @@index([sourceHandoffRecordId])
 }
 
 model BlogPostCategory {
@@ -2836,6 +2845,174 @@ model WritingDraftVersion {
 
   @@unique([writingDraftId, version])
   @@index([writingDraftId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 11.5 — Governed Content Review & Blog Handoff
+// ---------------------------------------------------------------------------
+
+enum ContentReviewStatus {
+  NOT_STARTED
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+enum ContentReviewSectionStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+  REJECTED
+  LOCKED
+}
+
+enum ContentReviewDecisionType {
+  APPROVE_SECTION
+  REQUEST_CHANGES
+  REJECT_SECTION
+  APPROVE_DRAFT
+  REJECT_DRAFT
+  REOPEN_DRAFT
+  HANDOFF_TO_BLOG
+}
+
+enum ContentReviewIssueStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum ContentReviewSeverity {
+  INFO
+  WARNING
+  ERROR
+  BLOCKING
+}
+
+enum ContentHandoffStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  SUPERSEDED
+}
+
+enum ContentHandoffTargetType {
+  BLOG_POST
+  LANDING_PAGE
+  CASE_STUDY
+  OTHER
+}
+
+model ContentReviewSession {
+  id                  String              @id @default(cuid())
+  writingDraftId      String
+  writingDraftVersion Int
+  writingPlanId       String
+  contextBuildId      String
+  status              ContentReviewStatus @default(NOT_STARTED)
+  assignedReviewerId  String?
+  startedBy           String?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  approvedBy          String?
+  approvedAt          DateTime?
+  rejectedBy          String?
+  rejectedAt          DateTime?
+  finalNotes          String?             @db.Text
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  sections  ContentReviewSection[]
+  issues    ContentReviewIssue[]
+  decisions ContentReviewDecision[]
+
+  @@index([writingDraftId, writingDraftVersion])
+  @@index([status, createdAt])
+  @@index([assignedReviewerId, status])
+}
+
+model ContentReviewSection {
+  id                  String                     @id @default(cuid())
+  reviewSessionId     String
+  sectionId           String
+  sectionKey          String
+  heading             String
+  status              ContentReviewSectionStatus @default(PENDING)
+  reviewerId          String?
+  reviewerNotes       String?                    @db.Text
+  reviewedAt          DateTime?
+  approvedContentHash String?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  reviewSession ContentReviewSession @relation(fields: [reviewSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewSessionId, sectionId])
+  @@index([reviewSessionId, status])
+}
+
+model ContentReviewIssue {
+  id              String                   @id @default(cuid())
+  reviewSessionId String
+  sectionId       String?
+  code            String
+  severity        ContentReviewSeverity
+  status          ContentReviewIssueStatus @default(OPEN)
+  message         String
+  suggestedFix    String?
+  source          String
+  metadata        Json?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  reviewSession ContentReviewSession @relation(fields: [reviewSessionId], references: [id], onDelete: Cascade)
+
+  @@index([reviewSessionId, status])
+  @@index([sectionId, status])
+}
+
+model ContentReviewDecision {
+  id              String                    @id @default(cuid())
+  reviewSessionId String
+  decisionType    ContentReviewDecisionType
+  sectionId       String?
+  actorId         String
+  note            String?                   @db.Text
+  metadata        Json?
+  createdAt       DateTime                  @default(now())
+
+  reviewSession ContentReviewSession @relation(fields: [reviewSessionId], references: [id], onDelete: Cascade)
+
+  @@index([reviewSessionId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model ContentHandoffRecord {
+  id                  String                   @id @default(cuid())
+  writingDraftId      String
+  writingDraftVersion Int
+  reviewSessionId     String
+  targetType          ContentHandoffTargetType
+  targetEntityId      String?
+  mode                String
+  status              ContentHandoffStatus     @default(PENDING)
+  fieldMapping        Json?
+  sourceSnapshotHash  String
+  resultSnapshot      Json?
+  requestedBy         String?
+  completedAt         DateTime?
+  errorMessage        String?                  @db.Text
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  @@index([writingDraftId, writingDraftVersion])
+  @@index([targetType, targetEntityId])
+  @@index([status, createdAt])
+  @@index([sourceSnapshotHash])
 }
 
 enum KnowledgeBaseImportJobStatus {

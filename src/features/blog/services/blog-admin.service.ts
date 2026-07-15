@@ -45,6 +45,13 @@ function mapPost(row: {
   publishedAt: Date | null;
   faqJson: unknown;
   tags: unknown;
+  mediaBundleId?: string | null;
+  sourceWritingDraftId?: string | null;
+  sourceWritingDraftVersion?: number | null;
+  sourceReviewSessionId?: string | null;
+  sourceHandoffRecordId?: string | null;
+  contentModifiedAfterHandoff?: boolean;
+  lastHandoffAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   categories: {
@@ -74,6 +81,13 @@ function mapPost(row: {
     publishedAt: row.publishedAt?.toISOString() ?? null,
     faqJson: parseFaqJson(row.faqJson),
     tags: parseTagsJson(row.tags),
+    mediaBundleId: row.mediaBundleId ?? null,
+    sourceWritingDraftId: row.sourceWritingDraftId ?? null,
+    sourceWritingDraftVersion: row.sourceWritingDraftVersion ?? null,
+    sourceReviewSessionId: row.sourceReviewSessionId ?? null,
+    sourceHandoffRecordId: row.sourceHandoffRecordId ?? null,
+    contentModifiedAfterHandoff: Boolean(row.contentModifiedAfterHandoff),
+    lastHandoffAt: row.lastHandoffAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     categories: row.categories.map((item) => mapCategory(item.category)),

@@ -112,6 +112,21 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ message: "Không tìm thấy bài viết" }, { status: 404 });
     }
 
+    if (
+      post.sourceHandoffRecordId &&
+      (raw.content !== undefined ||
+        raw.title !== undefined ||
+        raw.metaTitle !== undefined ||
+        raw.metaDescription !== undefined ||
+        raw.faqJson !== undefined)
+    ) {
+      const { markBlogModifiedAfterHandoff } = await import(
+        "@/features/content/services/writing-blog-handoff.service"
+      );
+      await markBlogModifiedAfterHandoff(id);
+      post.contentModifiedAfterHandoff = true;
+    }
+
     return NextResponse.json({ post });
   } catch (err: unknown) {
     if (

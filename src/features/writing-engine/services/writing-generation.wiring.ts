@@ -271,6 +271,19 @@ export function createPrismaGenerationOrchestratorStore(): GenerationOrchestrato
             : {}),
         },
       });
+
+      // Sprint 11.5 — incomplete reviews for older versions cannot approve new content.
+      if (data.version !== undefined) {
+        await prisma.contentReviewSession.updateMany({
+          where: {
+            writingDraftId: draftId,
+            writingDraftVersion: { not: data.version },
+            status: { in: ["NOT_STARTED", "IN_REVIEW", "CHANGES_REQUESTED"] },
+          },
+          data: { status: "SUPERSEDED" },
+        });
+      }
+
       return row as DraftRecordLite;
     },
     async createDraftVersion(data) {

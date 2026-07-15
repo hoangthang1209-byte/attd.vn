@@ -31,6 +31,13 @@ export type BlogPostRecord = {
   publishedAt: string | null;
   faqJson: BlogFaqItem[];
   tags: string[];
+  mediaBundleId?: string | null;
+  sourceWritingDraftId?: string | null;
+  sourceWritingDraftVersion?: number | null;
+  sourceReviewSessionId?: string | null;
+  sourceHandoffRecordId?: string | null;
+  contentModifiedAfterHandoff?: boolean;
+  lastHandoffAt?: string | null;
   createdAt: string;
   updatedAt: string;
   categories: BlogCategoryRecord[];

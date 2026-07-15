@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
@@ -122,6 +123,8 @@ export default function WritingEnginePanel({ topicId }: Props) {
   const [editSectionId, setEditSectionId] = useState("");
   const [editHtml, setEditHtml] = useState("");
   const [draftVersion, setDraftVersion] = useState(1);
+  const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadBuilds = useCallback(async () => {
@@ -356,6 +359,26 @@ export default function WritingEnginePanel({ topicId }: Props) {
     }
   }
 
+  async function startReview() {
+    if (!draft?.id) return;
+    setBuilding(true);
+    try {
+      const res = await fetch(`/api/content/writing-drafts/${draft.id}/reviews`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Không thể bắt đầu review");
+      const review = data.review as { id?: string; status?: string } | undefined;
+      if (review?.id) {
+        setActiveReviewId(review.id);
+        setReviewStatus(review.status ?? "IN_REVIEW");
+      }
+      toast.success("Đã mở review workspace — chưa approve / chưa tạo Blog.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Start review thất bại");
+    } finally {
+      setBuilding(false);
+    }
+  }
+
   function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
     const open = openSection === id;
     return (
@@ -386,7 +409,7 @@ export default function WritingEnginePanel({ topicId }: Props) {
     <div className="admin-sidebar-card" style={{ marginBottom: 16 }}>
       <h3 className="admin-sidebar-title">Writing Engine</h3>
       <p className="admin-field-hint">
-        Plan → section generation orchestrator. Không auto-publish / không tạo Blog.
+        Context → Plan → Generate → Start Review → Approve → Handoff Blog DRAFT. Không auto-publish.
       </p>
 
       <p className="admin-field-hint">
@@ -456,6 +479,11 @@ export default function WritingEnginePanel({ topicId }: Props) {
             <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void renderPreview()}>
               Render preview
             </AdminLoadingButton>
+            {(draft.status === "REVIEW_READY" || draft.status === "QA_FAILED") && (
+              <AdminLoadingButton pending={building} variant="primary" size="small" onClick={() => void startReview()}>
+                Start review
+              </AdminLoadingButton>
+            )}
             {activeRunId && (
               <AdminLoadingButton pending={false} variant="secondary" size="small" onClick={() => void cancelRun()}>
                 Cancel run
@@ -464,6 +492,19 @@ export default function WritingEnginePanel({ topicId }: Props) {
           </>
         )}
       </div>
+
+      {(activeReviewId || reviewStatus) && (
+        <p className="admin-field-hint">
+          Review: {reviewStatus ?? "—"}
+          {activeReviewId ? (
+            <>
+              {" "}
+              · <Link href={`/admin/content/reviews/${activeReviewId}`}>Open review workspace</Link>
+            </>
+          ) : null}{" "}
+          · <Link href="/admin/content/reviews">Danh sách kiểm duyệt</Link>
+        </p>
+      )}
 
       {runStatus && (
         <p className="admin-field-hint">
