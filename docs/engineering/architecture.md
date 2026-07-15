@@ -25,3 +25,7 @@ ATTD.vn uses the Next.js App Router as the application routing foundation. Route
 Business modules should keep domain behavior close to the module in `src/features/[module]`. Shared cross-module foundations belong in `src/lib` only when they are truly reusable.
 
 Do not create conflicting architecture for a single module when an ATTD.vn standard exists.
+
+## Knowledge Graph (design)
+
+Cross-domain relationship overlays are governed by [ADR-0005](../decisions/ADR-0005-enterprise-knowledge-graph.md) and `docs/architecture/knowledge-graph/`. The graph must not duplicate Product, Manufacturing, Pricing, CRM, Media, or SEO authoritative fields.
