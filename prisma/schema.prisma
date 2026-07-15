@@ -2625,6 +2625,88 @@ model ContentContextBuild {
   @@index([topicId, purpose, status])
 }
 
+// ---------------------------------------------------------------------------
+// Sprint 11.3 — Governed AI Writing Engine
+// ---------------------------------------------------------------------------
+
+enum WritingContentType {
+  SEO_ARTICLE
+  LANDING_PAGE
+  PRODUCT_GUIDE
+  CASE_STUDY
+  KNOWLEDGE_ARTICLE
+  FAQ_PAGE
+  CAPABILITY_PAGE
+  OTHER
+}
+
+enum WritingPlanStatus {
+  DRAFT
+  READY
+  INVALID
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum WritingDraftStatus {
+  PLANNED
+  GENERATING
+  GENERATED
+  QA_FAILED
+  REVIEW_READY
+  APPROVED
+  REJECTED
+  SUPERSEDED
+}
+
+model WritingPlanRecord {
+  id                String             @id @default(cuid())
+  contextBuildId    String
+  topicId           String
+  briefId           String?
+  contentType       WritingContentType
+  status            WritingPlanStatus  @default(DRAFT)
+  version           String
+  inputHash         String
+  planHash          String?
+  planJson          Json?
+  readinessScore    Int?
+  readinessErrors   Json?
+  readinessWarnings Json?
+  requestedBy       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  drafts WritingDraftRecord[]
+
+  @@index([topicId, contentType, createdAt])
+  @@index([contextBuildId])
+  @@index([inputHash])
+  @@index([status])
+}
+
+model WritingDraftRecord {
+  id               String             @id @default(cuid())
+  writingPlanId    String
+  status           WritingDraftStatus @default(PLANNED)
+  structuredDraft  Json?
+  renderedHtml     String?            @db.Text
+  renderedMarkdown String?            @db.Text
+  qaReport         Json?
+  providerRunIds   String[]           @default([])
+  version          Int                @default(1)
+  createdBy        String?
+  approvedBy       String?
+  approvedAt       DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  writingPlan WritingPlanRecord @relation(fields: [writingPlanId], references: [id], onDelete: Cascade)
+
+  @@index([writingPlanId, createdAt])
+  @@index([status, createdAt])
+}
+
 enum KnowledgeBaseImportJobStatus {
   PENDING
   COMPLETED
