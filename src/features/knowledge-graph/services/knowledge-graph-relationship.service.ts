@@ -11,6 +11,7 @@ import {
   validateRelationshipPair,
 } from "@/features/knowledge-graph/knowledge-graph-relationship-policy";
 import { strictestVisibility } from "@/features/knowledge-graph/knowledge-graph-visibility";
+import { writeGraphAuditLog } from "@/features/knowledge-graph/services/knowledge-graph-audit.service";
 
 function asJson(
   value: Record<string, unknown> | null | undefined
@@ -77,6 +78,14 @@ export async function createCuratedRelationship(input: {
     override: input.visibility,
   });
 
+  // Public curated edges cannot connect through INTERNAL/CONFIDENTIAL targets
+  if (
+    visibility === "PUBLIC" &&
+    (from.visibility !== "PUBLIC" || to.visibility !== "PUBLIC")
+  ) {
+    throw new Error("PUBLIC_EDGE_REQUIRES_PUBLIC_ENDPOINTS");
+  }
+
   const duplicate = await prisma.knowledgeGraphRelationship.findUnique({
     where: {
       fromEntityId_toEntityId_relationshipType: {
@@ -91,7 +100,7 @@ export async function createCuratedRelationship(input: {
   }
 
   if (duplicate) {
-    return prisma.knowledgeGraphRelationship.update({
+    const updated = await prisma.knowledgeGraphRelationship.update({
       where: { id: duplicate.id },
       data: {
         status: "DRAFT",
@@ -109,9 +118,17 @@ export async function createCuratedRelationship(input: {
         metadata: asJson(input.metadata),
       },
     });
+    await writeGraphAuditLog({
+      action: "CURATED_CREATED",
+      actorId: input.createdBy,
+      relationshipId: updated.id,
+      entityId: from.id,
+      summary: `${from.displayName} ${pair.policy.relationshipType} ${to.displayName}`,
+    });
+    return updated;
   }
 
-  return prisma.knowledgeGraphRelationship.create({
+  const created = await prisma.knowledgeGraphRelationship.create({
     data: {
       fromEntityId: from.id,
       toEntityId: to.id,
@@ -129,6 +146,14 @@ export async function createCuratedRelationship(input: {
       metadata: asJson(input.metadata),
     },
   });
+  await writeGraphAuditLog({
+    action: "CURATED_CREATED",
+    actorId: input.createdBy,
+    relationshipId: created.id,
+    entityId: from.id,
+    summary: `${from.displayName} ${pair.policy.relationshipType} ${to.displayName}`,
+  });
+  return created;
 }
 
 export async function updateCuratedRelationship(
@@ -159,12 +184,36 @@ export async function updateCuratedRelationship(
       (input.validFrom?.getTime() ?? null) !== (existing.validFrom?.getTime() ?? null)) ||
     (input.validUntil !== undefined &&
       (input.validUntil?.getTime() ?? null) !== (existing.validUntil?.getTime() ?? null)) ||
-    (input.visibility !== undefined && input.visibility !== existing.visibility);
+    (input.visibility !== undefined && input.visibility !== existing.visibility) ||
+    (input.sourceEntryId !== undefined && input.sourceEntryId !== existing.sourceEntryId) ||
+    (input.confidence !== undefined && input.confidence !== existing.confidence);
 
   const nextStatus: KnowledgeGraphRelationshipStatus =
     substantive && existing.status === "ACTIVE" ? "DRAFT" : existing.status;
 
-  return prisma.knowledgeGraphRelationship.update({
+  const prevMeta = (existing.metadata as Record<string, unknown> | null) ?? {};
+  const snapshot =
+    substantive && existing.status === "ACTIVE"
+      ? {
+          ...prevMeta,
+          previousActiveSnapshot: {
+            visibility: existing.visibility,
+            confidence: existing.confidence,
+            evidenceUrl: existing.evidenceUrl,
+            validFrom: existing.validFrom?.toISOString() ?? null,
+            validUntil: existing.validUntil?.toISOString() ?? null,
+            sourceEntryId: existing.sourceEntryId,
+            authorityRank: existing.authorityRank,
+            approvedBy: existing.approvedBy,
+            approvedAt: existing.approvedAt?.toISOString() ?? null,
+            snapshotAt: new Date().toISOString(),
+          },
+        }
+      : input.metadata === undefined
+        ? undefined
+        : { ...prevMeta, ...input.metadata };
+
+  const updated = await prisma.knowledgeGraphRelationship.update({
     where: { id },
     data: {
       visibility: input.visibility
@@ -176,12 +225,22 @@ export async function updateCuratedRelationship(
       validUntil: input.validUntil === undefined ? existing.validUntil : input.validUntil,
       sourceEntryId:
         input.sourceEntryId === undefined ? existing.sourceEntryId : input.sourceEntryId,
-      metadata: input.metadata === undefined ? undefined : asJson(input.metadata),
+      metadata: snapshot === undefined ? undefined : asJson(snapshot),
       status: nextStatus,
       approvedBy: nextStatus === "DRAFT" ? null : existing.approvedBy,
       approvedAt: nextStatus === "DRAFT" ? null : existing.approvedAt,
     },
   });
+
+  await writeGraphAuditLog({
+    action: "CURATED_EDITED",
+    actorId: input.actorId,
+    relationshipId: updated.id,
+    entityId: existing.fromEntityId,
+    summary: substantive ? "substantive edit → DRAFT" : "non-substantive edit",
+  });
+
+  return updated;
 }
 
 export async function approveCuratedRelationship(
@@ -200,7 +259,7 @@ export async function approveCuratedRelationship(
     throw new Error("EVIDENCE_REQUIRED");
   }
 
-  return prisma.knowledgeGraphRelationship.update({
+  const updated = await prisma.knowledgeGraphRelationship.update({
     where: { id },
     data: {
       status: "ACTIVE",
@@ -209,6 +268,13 @@ export async function approveCuratedRelationship(
       lastVerifiedAt: new Date(),
     },
   });
+  await writeGraphAuditLog({
+    action: "CURATED_APPROVED",
+    actorId,
+    relationshipId: updated.id,
+    entityId: existing.fromEntityId,
+  });
+  return updated;
 }
 
 export async function rejectCuratedRelationship(
@@ -219,7 +285,7 @@ export async function rejectCuratedRelationship(
   if (!existing) throw new Error("NOT_FOUND");
   if (existing.origin !== "CURATED") throw new Error("ONLY_CURATED_REJECTABLE");
 
-  return prisma.knowledgeGraphRelationship.update({
+  const updated = await prisma.knowledgeGraphRelationship.update({
     where: { id },
     data: {
       status: "REJECTED",
@@ -227,6 +293,13 @@ export async function rejectCuratedRelationship(
       approvedAt: new Date(),
     },
   });
+  await writeGraphAuditLog({
+    action: "CURATED_REJECTED",
+    actorId,
+    relationshipId: updated.id,
+    entityId: existing.fromEntityId,
+  });
+  return updated;
 }
 
 export async function archiveRelationship(
@@ -238,10 +311,156 @@ export async function archiveRelationship(
   if (existing.origin === "SYSTEM_DERIVED" && !options.allowSystemDerived) {
     throw new Error("SYSTEM_DERIVED_ARCHIVE_REQUIRES_EXPLICIT");
   }
-  return prisma.knowledgeGraphRelationship.update({
+  const updated = await prisma.knowledgeGraphRelationship.update({
     where: { id },
     data: { status: "ARCHIVED" },
   });
+  await writeGraphAuditLog({
+    action: "RELATION_ARCHIVED",
+    relationshipId: updated.id,
+    entityId: existing.fromEntityId,
+  });
+  return updated;
+}
+
+export async function searchGraphRelationships(input: {
+  search?: string;
+  relationshipType?: string;
+  status?: string;
+  origin?: string;
+  visibility?: string;
+  fromEntityType?: string;
+  toEntityType?: string;
+  sourceEntryId?: string;
+  page?: number;
+  pageSize?: number;
+  view?:
+    | "draft"
+    | "awaiting_approval"
+    | "active"
+    | "missing_evidence"
+    | "expired"
+    | "rejected"
+    | "archived"
+    | "system"
+    | "imported"
+    | "all";
+}) {
+  const page = Math.max(input.page ?? 1, 1);
+  const pageSize = Math.min(Math.max(input.pageSize ?? 50, 1), 200);
+  const now = new Date();
+
+  const viewWhere: Prisma.KnowledgeGraphRelationshipWhereInput = (() => {
+    switch (input.view) {
+      case "draft":
+      case "awaiting_approval":
+        return { status: "DRAFT", origin: "CURATED" };
+      case "active":
+        return { status: "ACTIVE" };
+      case "missing_evidence":
+        return {
+          origin: "CURATED",
+          status: { in: ["DRAFT", "ACTIVE"] },
+          OR: [{ evidenceUrl: null }, { evidenceUrl: "" }],
+        };
+      case "expired":
+        return { status: "ACTIVE", validUntil: { lt: now } };
+      case "rejected":
+        return { status: "REJECTED" };
+      case "archived":
+        return { status: "ARCHIVED" };
+      case "system":
+        return { origin: "SYSTEM_DERIVED" };
+      case "imported":
+        return { origin: "IMPORTED" };
+      default:
+        return {};
+    }
+  })();
+
+  const where: Prisma.KnowledgeGraphRelationshipWhereInput = {
+    ...viewWhere,
+    ...(input.relationshipType
+      ? { relationshipType: input.relationshipType as never }
+      : {}),
+    ...(input.status ? { status: input.status as never } : {}),
+    ...(input.origin ? { origin: input.origin as never } : {}),
+    ...(input.visibility ? { visibility: input.visibility as never } : {}),
+    ...(input.sourceEntryId ? { sourceEntryId: input.sourceEntryId } : {}),
+    ...(input.fromEntityType
+      ? { fromEntity: { entityType: input.fromEntityType as never } }
+      : {}),
+    ...(input.toEntityType ? { toEntity: { entityType: input.toEntityType as never } } : {}),
+    ...(input.search
+      ? {
+          OR: [
+            { fromEntity: { displayName: { contains: input.search, mode: "insensitive" } } },
+            { toEntity: { displayName: { contains: input.search, mode: "insensitive" } } },
+            { evidenceUrl: { contains: input.search, mode: "insensitive" } },
+            { sourceEntryId: { contains: input.search, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, rows] = await Promise.all([
+    prisma.knowledgeGraphRelationship.count({ where }),
+    prisma.knowledgeGraphRelationship.findMany({
+      where,
+      include: { fromEntity: true, toEntity: true },
+      orderBy: [{ updatedAt: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return {
+    total,
+    page,
+    pageSize,
+    relationships: rows.map((r) => ({
+      id: r.id,
+      relationshipType: r.relationshipType,
+      status: r.status,
+      origin: r.origin,
+      visibility: r.visibility,
+      confidence: r.confidence,
+      evidenceUrl: r.evidenceUrl,
+      sourceEntryId: r.sourceEntryId,
+      approvedBy: r.approvedBy,
+      approvedAt: r.approvedAt?.toISOString() ?? null,
+      updatedAt: r.updatedAt.toISOString(),
+      from: {
+        id: r.fromEntity.id,
+        displayName: r.fromEntity.displayName,
+        entityType: r.fromEntity.entityType,
+      },
+      to: {
+        id: r.toEntity.id,
+        displayName: r.toEntity.displayName,
+        entityType: r.toEntity.entityType,
+      },
+    })),
+  };
+}
+
+export async function batchArchiveRejectedRelationships(
+  ids: string[],
+  actorId?: string | null
+): Promise<number> {
+  let archived = 0;
+  for (const id of ids.slice(0, 100)) {
+    const row = await prisma.knowledgeGraphRelationship.findUnique({ where: { id } });
+    if (!row || row.status !== "REJECTED") continue;
+    await archiveRelationship(id);
+    archived += 1;
+  }
+  await writeGraphAuditLog({
+    action: "RELATION_ARCHIVED",
+    actorId,
+    summary: `batch archive rejected count=${archived}`,
+  });
+  return archived;
 }
 
 export async function listRelationshipsForEntity(

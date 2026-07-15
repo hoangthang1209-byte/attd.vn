@@ -17,6 +17,13 @@ type HealthPayload = {
   importedCount: number;
   unapprovedCurated: number;
   arrayGraphDivergence: number;
+  productCoverage?: {
+    total: number;
+    withUseCase: number;
+    withAudience: number;
+    withCapability: number;
+  };
+  curatedApprovalRate?: number | null;
   computedAt: string;
 };
 
@@ -63,10 +70,34 @@ export default function KnowledgeGraphDashboardClient() {
         <Link href="/admin/knowledge-graph/health" className="admin-btn">
           Health detail
         </Link>
+        <Link href="/admin/knowledge-graph/relationships" className="admin-btn">
+          Relation queue
+        </Link>
+        <Link href="/admin/knowledge-graph/evaluation" className="admin-btn">
+          Evaluation
+        </Link>
         <button type="button" className="admin-btn" onClick={() => void load()}>
           Refresh
         </button>
       </div>
+
+      {health?.productCoverage ? (
+        <div className="admin-sidebar-card" style={{ padding: 12, marginBottom: 16 }}>
+          <h3 style={{ marginTop: 0 }}>Product relation coverage</h3>
+          <p style={{ fontSize: 13, margin: 0 }}>
+            {health.productCoverage.total} products · use case {health.productCoverage.withUseCase} ·
+            audience {health.productCoverage.withAudience} · capability{" "}
+            {health.productCoverage.withCapability}
+            {health.curatedApprovalRate != null
+              ? ` · curated approval ${health.curatedApprovalRate}%`
+              : ""}
+          </p>
+          <p style={{ fontSize: 12, opacity: 0.7 }}>
+            Gaps are actionable — open products without use case/audience from the relation queue or
+            entity search. No synthetic quality score.
+          </p>
+        </div>
+      ) : null}
 
       {health ? (
         <div

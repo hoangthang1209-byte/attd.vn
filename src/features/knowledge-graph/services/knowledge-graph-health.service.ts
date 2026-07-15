@@ -25,6 +25,21 @@ export type KnowledgeGraphHealthReport = {
   unapprovedCurated: number;
   arrayGraphDivergence: number;
   syncLagHoursMax: number | null;
+  curatedActiveCount: number;
+  curatedEvidenceCoverage: number | null;
+  curatedConfidenceCoverage: number | null;
+  curatedApprovalRate: number | null;
+  productCoverage: {
+    total: number;
+    withUseCase: number;
+    withAudience: number;
+    withIndustry: number;
+    withCapability: number;
+    withMaterial: number;
+    withPrintMethod: number;
+    withMediaBundle: number;
+  };
+  systemCuratedDuplicates: number;
   computedAt: string;
 };
 
@@ -171,13 +186,33 @@ export async function calculateKnowledgeGraphHealth(): Promise<KnowledgeGraphHea
   `.catch(() => [{ c: BigInt(0) }]);
   const duplicateCanonicalCandidates = Number(displayDupes[0]?.c ?? 0);
 
-  // Entity coverage by supported source
+  // Entity coverage by supported source (count-based; avoids full ID scans)
   const entityCoverageBySource: Record<string, { sourceCount: number; graphCount: number }> = {};
+  const sourceCountResolvers: Record<string, () => Promise<number>> = {
+    Product: () => prisma.product.count(),
+    Category: () => prisma.category.count(),
+    KnowledgeBaseEntry: () => prisma.knowledgeBaseEntry.count(),
+    SeoTopic: () => prisma.seoTopic.count(),
+    MediaBundle: () => prisma.mediaBundle.count(),
+    BlogPost: () => prisma.blogPost.count(),
+    ProductionMaterial: () => prisma.productionMaterial.count(),
+    Material: () => prisma.material.count(),
+    PrintMethod: () => prisma.printMethod.count(),
+    ProductionTrim: () => prisma.productionTrim.count(),
+    TechPack: () => prisma.techPack.count(),
+    Pattern: () => prisma.pattern.count(),
+    ManufacturingAsset: () => prisma.manufacturingAsset.count(),
+    MediaVocabularyTerm: () =>
+      prisma.mediaVocabularyTerm.count({
+        where: { type: { in: ["INDUSTRY", "AUDIENCE", "USE_CASE", "TECHNIQUE"] } },
+      }),
+  };
   for (const [sourceType, entry] of Object.entries(GRAPH_ENTITY_REGISTRY)) {
     if (!entry.systemSyncSupported) continue;
-    const ids = await entry.listIds(100000);
+    const resolver = sourceCountResolvers[sourceType];
+    const sourceCount = resolver ? await resolver() : 0;
     const graphCount = await prisma.knowledgeGraphEntity.count({ where: { sourceType } });
-    entityCoverageBySource[sourceType] = { sourceCount: ids.length, graphCount };
+    entityCoverageBySource[sourceType] = { sourceCount, graphCount };
   }
 
   // Array/graph divergence for KB product relations (sample bounded)
@@ -248,6 +283,11 @@ export async function calculateKnowledgeGraphHealth(): Promise<KnowledgeGraphHea
     },
   });
 
+  const { calculateGraphCoverageDashboard } = await import(
+    "@/features/knowledge-graph/services/knowledge-graph-coverage.service"
+  );
+  const coverage = await calculateGraphCoverageDashboard();
+
   return {
     totalEntities,
     entitiesByType,
@@ -270,6 +310,27 @@ export async function calculateKnowledgeGraphHealth(): Promise<KnowledgeGraphHea
     unapprovedCurated,
     arrayGraphDivergence,
     syncLagHoursMax,
+    curatedActiveCount: coverage.curated.active,
+    curatedEvidenceCoverage:
+      coverage.curated.total > 0
+        ? Math.round((coverage.curated.withEvidence / coverage.curated.total) * 1000) / 10
+        : null,
+    curatedConfidenceCoverage:
+      coverage.curated.total > 0
+        ? Math.round((coverage.curated.withConfidence / coverage.curated.total) * 1000) / 10
+        : null,
+    curatedApprovalRate: coverage.curated.approvalRate,
+    productCoverage: {
+      total: coverage.products.totalProducts,
+      withUseCase: coverage.products.withUseCase,
+      withAudience: coverage.products.withAudience,
+      withIndustry: coverage.products.withIndustry,
+      withCapability: coverage.products.withCapability,
+      withMaterial: coverage.products.withMaterial,
+      withPrintMethod: coverage.products.withPrintMethod,
+      withMediaBundle: coverage.products.withMediaBundle,
+    },
+    systemCuratedDuplicates: coverage.systemCuratedDuplicates,
     computedAt: now.toISOString(),
   };
 }

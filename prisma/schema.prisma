@@ -3197,6 +3197,9 @@ model KnowledgeGraphRelationship {
   approvedAt       DateTime?
   metadata         Json?
   createdBy        String?
+  reviewerId       String?
+  reviewNote       String?
+  reviewDueAt      DateTime?
   createdAt        DateTime                         @default(now())
   updatedAt        DateTime                         @updatedAt
 
@@ -3209,6 +3212,31 @@ model KnowledgeGraphRelationship {
   @@index([status, visibility])
   @@index([origin, status])
   @@index([validUntil])
+  @@index([sourceEntryId])
+  @@index([evidenceUrl])
+  @@index([updatedAt])
+  @@index([reviewerId, status])
+  @@index([reviewDueAt])
+}
+
+/// Lightweight audit trail for graph governance actions (Sprint 12.1).
+/// Does not store authoritative source bodies or business facts.
+model KnowledgeGraphAuditLog {
+  id             String   @id @default(cuid())
+  action         String
+  actorId        String?
+  entityId       String?
+  relationshipId String?
+  sourceType     String?
+  sourceId       String?
+  summary        String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([entityId, createdAt])
+  @@index([relationshipId, createdAt])
+  @@index([actorId, createdAt])
 }
 
 enum KnowledgeBaseImportJobStatus {

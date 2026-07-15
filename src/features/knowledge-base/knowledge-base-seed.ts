@@ -335,6 +335,17 @@ export async function updateKnowledgeBaseEntry(
     });
     if (graphSync.warnings.length) {
       console.warn("[knowledge-graph dual-write]", graphSync.warnings.join("; "));
+      const { writeGraphAuditLog } = await import(
+        "@/features/knowledge-graph/services/knowledge-graph-audit.service"
+      );
+      await writeGraphAuditLog({
+        action: "DUAL_WRITE_WARNING",
+        entityId: undefined,
+        sourceType: "KnowledgeBaseEntry",
+        sourceId: entry.id,
+        summary: graphSync.warnings.slice(0, 5).join("; "),
+        metadata: { warnings: graphSync.warnings.slice(0, 20) },
+      });
     }
   } catch (err) {
     console.warn("[knowledge-graph dual-write] unexpected failure", err);

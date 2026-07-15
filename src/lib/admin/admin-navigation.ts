@@ -171,6 +171,8 @@ export const adminNavigationSections: AdminNavigationSection[] = [
         items: [
           { label: "Knowledge Base", href: "/admin/knowledge-base", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Knowledge Graph", href: "/admin/knowledge-graph", status: "active", requiredPermissions: ["canManageCms"] },
+          { label: "KG Relations", href: "/admin/knowledge-graph/relationships", status: "active", requiredPermissions: ["canManageCms"] },
+          { label: "KG Evaluation", href: "/admin/knowledge-graph/evaluation", status: "active", requiredPermissions: ["canManageCms"] },
           { label: "Prompt Library", href: "/admin/knowledge-base/context-preview", status: "active", requiredPermissions: ["canManageCms"] },
         ],
       },

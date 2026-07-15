@@ -135,7 +135,7 @@ export const RELATIONSHIP_POLICY: Record<
   SUPPORTS: rule({
     relationshipType: "SUPPORTS",
     allowedFrom: ["PRINT_METHOD", "CAPABILITY", "TECHNIQUE", "PRODUCT"],
-    allowedTo: ["MATERIAL", "USE_CASE", "PRODUCT", "CAPABILITY"],
+    allowedTo: ["MATERIAL", "USE_CASE", "PRODUCT", "CAPABILITY", "PRINT_METHOD"],
     allowedOrigins: ["CURATED", "SYSTEM_DERIVED", "IMPORTED"],
     approvalRequired: true,
     evidenceRequired: false,

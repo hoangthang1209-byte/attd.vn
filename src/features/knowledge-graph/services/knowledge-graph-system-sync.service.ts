@@ -359,5 +359,13 @@ export async function syncSystemDerivedRelationships(
   }
 
   await applyDesiredEdges(desired, "system-derived-v1", dryRun, report);
+  const { writeGraphAuditLog } = await import(
+    "@/features/knowledge-graph/services/knowledge-graph-audit.service"
+  );
+  await writeGraphAuditLog({
+    action: "SYSTEM_RELATION_SYNCED",
+    summary: `dryRun=${dryRun} created=${report.created} existing=${report.existing} archived=${report.archived}`,
+    metadata: { ...report },
+  });
   return report;
 }
