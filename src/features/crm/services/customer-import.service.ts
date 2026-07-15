@@ -1,4 +1,5 @@
 import { utils, write } from "xlsx";
+import type { CustomerRepresentativeSalutation, CustomerStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createCustomer } from "@/features/crm/services/crm-customer.service";
@@ -8,21 +9,44 @@ import {
   validateCrmPhone,
   validateCrmTaxCode,
 } from "@/features/crm/crm-validation";
-import type { CreateCustomerInput } from "@/features/crm/types";
+import {
+  CUSTOMER_STATUS_LABELS,
+  REPRESENTATIVE_SALUTATION_LABELS,
+} from "@/features/crm/labels";
+import { CRM_CUSTOMER_STATUSES, type CreateCustomerInput } from "@/features/crm/types";
 
 export const CUSTOMER_IMPORT_TEMPLATE_FILENAME = "CustomerImportTemplate.xlsx";
 
 export const CUSTOMER_IMPORT_COLUMNS = [
   "Company Name",
+  "Legal Name",
   "Customer Code",
+  "Customer Type",
+  "Customer Status",
   "Tax Code",
-  "Contact Name",
   "Phone",
   "Email",
-  "Address",
-  "Province",
   "Website",
+  "Address",
+  "Address Line 1",
+  "Address Line 2",
+  "Province",
+  "District",
+  "Ward",
+  "Representative Salutation",
+  "Representative Name",
+  "Representative Title",
+  "Authorization Document No",
+  "Contact Name",
+  "Contact Position",
+  "Contact Department",
+  "Contact Phone",
+  "Contact Email",
+  "Contact Zalo",
+  "Contact Notes",
   "Notes",
+  "Internal Notes",
+  "Billing Notes",
 ] as const;
 
 export type CustomerImportStatus = "OK" | "Duplicate" | "Missing Name" | "Invalid";
@@ -30,15 +54,34 @@ export type CustomerImportStatus = "OK" | "Duplicate" | "Missing Name" | "Invali
 export type CustomerImportRow = {
   rowNumber: number;
   companyName: string;
+  legalName: string;
   customerCode: string;
+  customerType: string;
+  customerStatus: string;
   taxCode: string;
-  contactName: string;
   phone: string;
   email: string;
-  address: string;
-  province: string;
   website: string;
+  address: string;
+  addressLine1: string;
+  addressLine2: string;
+  province: string;
+  district: string;
+  ward: string;
+  representativeSalutation: string;
+  representativeName: string;
+  representativeTitle: string;
+  authorizationDocumentNo: string;
+  contactName: string;
+  contactPosition: string;
+  contactDepartment: string;
+  contactPhone: string;
+  contactEmail: string;
+  contactZalo: string;
+  contactNotes: string;
   notes: string;
+  internalNotes: string;
+  billingNotes: string;
   status: CustomerImportStatus;
   errors: string[];
 };
@@ -73,15 +116,45 @@ type ParsedRow = Omit<CustomerImportRow, "status" | "errors">;
 
 const HEADER_ALIASES: Record<string, keyof ParsedRow> = {
   "company name": "companyName",
+  company: "companyName",
+  "legal name": "legalName",
   "customer code": "customerCode",
+  "customer type": "customerType",
+  "customer status": "customerStatus",
+  status: "customerStatus",
   "tax code": "taxCode",
-  "contact name": "contactName",
   phone: "phone",
+  "company phone": "phone",
   email: "email",
-  address: "address",
-  province: "province",
+  "company email": "email",
   website: "website",
+  address: "address",
+  "address line 1": "addressLine1",
+  "address line 2": "addressLine2",
+  province: "province",
+  district: "district",
+  ward: "ward",
+  "representative salutation": "representativeSalutation",
+  "representative name": "representativeName",
+  "representative title": "representativeTitle",
+  "authorization document no": "authorizationDocumentNo",
+  "authorization document number": "authorizationDocumentNo",
+  "contact name": "contactName",
+  "contact position": "contactPosition",
+  "contact title": "contactPosition",
+  "contact department": "contactDepartment",
+  "contact phone": "contactPhone",
+  "contact email": "contactEmail",
+  "contact zalo": "contactZalo",
+  zalo: "contactZalo",
+  "contact notes": "contactNotes",
+  "contact note": "contactNotes",
   notes: "notes",
+  note: "notes",
+  "internal notes": "internalNotes",
+  "internal note": "internalNotes",
+  "billing notes": "billingNotes",
+  "billing note": "billingNotes",
 };
 
 function normalizeHeader(value: unknown): string {
@@ -168,15 +241,34 @@ export async function parseCustomerImportFile(file: File | null): Promise<Parsed
     rows.push({
       rowNumber,
       companyName: get("companyName"),
+      legalName: get("legalName"),
       customerCode: get("customerCode"),
+      customerType: get("customerType"),
+      customerStatus: get("customerStatus"),
       taxCode: get("taxCode"),
-      contactName: get("contactName"),
       phone: get("phone"),
       email: get("email"),
-      address: get("address"),
-      province: get("province"),
       website: get("website"),
+      address: get("address"),
+      addressLine1: get("addressLine1"),
+      addressLine2: get("addressLine2"),
+      province: get("province"),
+      district: get("district"),
+      ward: get("ward"),
+      representativeSalutation: get("representativeSalutation"),
+      representativeName: get("representativeName"),
+      representativeTitle: get("representativeTitle"),
+      authorizationDocumentNo: get("authorizationDocumentNo"),
+      contactName: get("contactName"),
+      contactPosition: get("contactPosition"),
+      contactDepartment: get("contactDepartment"),
+      contactPhone: get("contactPhone"),
+      contactEmail: get("contactEmail"),
+      contactZalo: get("contactZalo"),
+      contactNotes: get("contactNotes"),
       notes: get("notes"),
+      internalNotes: get("internalNotes"),
+      billingNotes: get("billingNotes"),
     });
   }
 
@@ -211,26 +303,95 @@ function duplicateKey(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function validateRow(row: ParsedRow): string[] {
+function resolveCustomerStatus(value: string): CustomerStatus | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const upper = normalized.toUpperCase();
+  if (CRM_CUSTOMER_STATUSES.includes(upper as CustomerStatus)) {
+    return upper as CustomerStatus;
+  }
+  const byLabel = CRM_CUSTOMER_STATUSES.find(
+    (status) => CUSTOMER_STATUS_LABELS[status].toLowerCase() === normalized.toLowerCase(),
+  );
+  return byLabel ?? null;
+}
+
+function resolveRepresentativeSalutation(value: string): CustomerRepresentativeSalutation | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const upper = normalized.toUpperCase();
+  const allowed: CustomerRepresentativeSalutation[] = ["MR", "MRS", "MS", "OTHER"];
+  if (allowed.includes(upper as CustomerRepresentativeSalutation)) {
+    return upper as CustomerRepresentativeSalutation;
+  }
+  const byLabel = allowed.find(
+    (salutation) =>
+      REPRESENTATIVE_SALUTATION_LABELS[salutation].toLowerCase() === normalized.toLowerCase(),
+  );
+  return byLabel ?? null;
+}
+
+async function resolveCustomerTypeId(value: string): Promise<string | null> {
+  const normalized = value.trim();
+  if (!normalized) return null;
+  const row = await prisma.customerType.findFirst({
+    where: {
+      isActive: true,
+      OR: [
+        { id: normalized },
+        { code: { equals: normalized, mode: "insensitive" } },
+        { name: { equals: normalized, mode: "insensitive" } },
+      ],
+    },
+    select: { id: true },
+  });
+  return row?.id ?? null;
+}
+
+async function validateRow(row: ParsedRow): Promise<string[]> {
   const errors: string[] = [];
   if (!row.companyName) errors.push("Thiếu tên công ty.");
 
   try {
     validateCrmEmail(row.email);
   } catch (err) {
-    errors.push(err instanceof Error ? err.message : "Email không hợp lệ.");
+    errors.push(`Email công ty: ${err instanceof Error ? err.message : "Email không hợp lệ."}`);
+  }
+
+  try {
+    validateCrmEmail(row.contactEmail);
+  } catch (err) {
+    errors.push(`Contact Email: ${err instanceof Error ? err.message : "Email không hợp lệ."}`);
   }
 
   try {
     validateCrmPhone(row.phone);
   } catch (err) {
-    errors.push(err instanceof Error ? err.message : "Số điện thoại không hợp lệ.");
+    errors.push(`Phone: ${err instanceof Error ? err.message : "Số điện thoại không hợp lệ."}`);
+  }
+
+  try {
+    validateCrmPhone(row.contactPhone);
+  } catch (err) {
+    errors.push(`Contact Phone: ${err instanceof Error ? err.message : "Số điện thoại không hợp lệ."}`);
   }
 
   try {
     validateCrmTaxCode(row.taxCode);
   } catch (err) {
-    errors.push(err instanceof Error ? err.message : "Mã số thuế không hợp lệ.");
+    errors.push(`Tax Code: ${err instanceof Error ? err.message : "Mã số thuế không hợp lệ."}`);
+  }
+
+  if (row.customerStatus && !resolveCustomerStatus(row.customerStatus)) {
+    errors.push(`Customer Status không hợp lệ: ${row.customerStatus}.`);
+  }
+
+  if (row.representativeSalutation && !resolveRepresentativeSalutation(row.representativeSalutation)) {
+    errors.push(`Representative Salutation không hợp lệ: ${row.representativeSalutation}.`);
+  }
+
+  if (row.customerType && !(await resolveCustomerTypeId(row.customerType))) {
+    errors.push(`Customer Type không hợp lệ hoặc đã ngưng sử dụng: ${row.customerType}.`);
   }
 
   return errors;
@@ -253,7 +414,7 @@ export async function previewCustomerImportRows(rows: ParsedRow[]): Promise<Cust
 
   const previewRows: CustomerImportRow[] = [];
   for (const row of rows) {
-    const errors = validateRow(row);
+    const errors = await validateRow(row);
     const duplicateErrors: string[] = [];
 
     if (row.taxCode && (taxCodeCounts.get(duplicateKey(row.taxCode)) ?? 0) > 1) {
@@ -281,31 +442,57 @@ export async function previewCustomerImportRows(rows: ParsedRow[]): Promise<Cust
   return { rows: previewRows, summary: summarize(previewRows) };
 }
 
-function rowToCreateInput(row: CustomerImportRow): CreateCustomerInput {
+async function rowToCreateInput(row: CustomerImportRow): Promise<CreateCustomerInput> {
+  const contactPhone = row.contactPhone || row.phone;
+  const contactEmail = row.contactEmail || row.email;
   const primaryContact =
-    row.contactName || row.phone || row.email
+    row.contactName ||
+    row.contactPosition ||
+    row.contactDepartment ||
+    contactPhone ||
+    contactEmail ||
+    row.contactZalo ||
+    row.contactNotes
       ? {
           fullName: row.contactName || row.companyName,
-          phone: row.phone || null,
-          email: row.email || null,
+          title: row.contactPosition || null,
+          department: row.contactDepartment || null,
+          phone: contactPhone || null,
+          email: contactEmail || null,
+          zalo: row.contactZalo || null,
+          note: row.contactNotes || null,
         }
       : undefined;
+  const addressLine1 = row.addressLine1 || row.address;
 
   return {
+    customerTypeId: row.customerType ? await resolveCustomerTypeId(row.customerType) : undefined,
     name: row.companyName,
-    legalName: row.companyName,
+    legalName: row.legalName || row.companyName,
     taxCode: row.taxCode || null,
     phone: row.phone || null,
     email: row.email || null,
     website: row.website ? normalizeWebsiteUrl(row.website) : null,
     address: row.address || null,
-    addressLine1: row.address || null,
+    addressLine1: addressLine1 || null,
+    addressLine2: row.addressLine2 || null,
     province: row.province || null,
+    district: row.district || null,
     provinceNameSnapshot: row.province || null,
+    wardNameSnapshot: row.ward || null,
+    status: resolveCustomerStatus(row.customerStatus) ?? undefined,
+    representativeSalutation: row.representativeSalutation
+      ? resolveRepresentativeSalutation(row.representativeSalutation)
+      : undefined,
+    representativeName: row.representativeName || null,
+    representativeTitle: row.representativeTitle || null,
+    authorizationDocumentNo: row.authorizationDocumentNo || null,
     note: [
       row.customerCode ? `Customer Code: ${row.customerCode}` : "",
       row.notes,
     ].filter(Boolean).join("\n") || null,
+    internalNote: row.internalNotes || null,
+    billingNote: row.billingNotes || null,
     primaryContact,
   };
 }
@@ -344,7 +531,7 @@ export async function importCustomerRows(rows: ParsedRow[]): Promise<CustomerImp
     }
 
     try {
-      await createCustomer(rowToCreateInput(row));
+      await createCustomer(await rowToCreateInput(row));
       result.summary.imported += 1;
     } catch (err) {
       const reason = safeImportError(err);

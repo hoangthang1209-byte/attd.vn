@@ -119,7 +119,9 @@ export default function CustomerImportClient() {
         <div className="admin-page-header__copy">
           <h1 className="admin-page-header__title">Import khách hàng từ Excel</h1>
           <p className="admin-page-header__description">
-            Tải file mẫu, nhập dữ liệu khách hàng rồi upload để kiểm tra trước khi import.
+            File mẫu gồm các trường khách hàng đang quản lý trong CRM. Chỉ cần nhập Company Name;
+            các cột còn lại có thể để trống. Khách hàng trùng Tax Code hoặc Company Name sẽ được
+            bỏ qua, không cập nhật đè.
           </p>
         </div>
         <div className="admin-page-header__actions">
@@ -134,7 +136,7 @@ export default function CustomerImportClient() {
           <div>
             <h2>File Excel</h2>
             <p className="admin-section-card__description">
-              Chỉ nhận đúng template khách hàng và file .xlsx.
+              Tải file mẫu mới để có đầy đủ trường CRM; file mẫu MVP cũ vẫn được hỗ trợ.
             </p>
           </div>
           <a
@@ -209,6 +211,7 @@ export default function CustomerImportClient() {
                   <th>Company</th>
                   <th>Tax Code</th>
                   <th>Phone</th>
+                  <th>Email</th>
                   <th>Status</th>
                   <th>Notes / Error</th>
                 </tr>
@@ -220,6 +223,7 @@ export default function CustomerImportClient() {
                     <td>{row.companyName || "—"}</td>
                     <td>{row.taxCode || "—"}</td>
                     <td>{row.phone || "—"}</td>
+                    <td>{row.contactEmail || row.email || "—"}</td>
                     <td>
                       <span className={statusClass(row.status)}>{STATUS_LABELS[row.status]}</span>
                     </td>
