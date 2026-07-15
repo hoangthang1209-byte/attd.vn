@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 
@@ -58,17 +58,48 @@ type WritingPlanLite = {
   metadataPlan: { metaTitle: string; metaDescription: string; slug: string };
 };
 
+type DraftSection = {
+  sectionId: string;
+  heading: string;
+  plainText: string;
+  html: string;
+  warnings: string[];
+  wordCount: number;
+};
+
 type DraftLite = {
   id: string;
   status: string;
   isMock?: boolean;
+  sections?: DraftSection[];
   qa?: { passed: boolean; score: number; issues: Array<{ code: string; message: string }> };
   rendered?: { html?: string | null; markdown?: string | null };
 };
 
-type Props = {
-  topicId: string;
+type ProviderStatus = {
+  enabled: boolean;
+  provider: string;
+  model: string;
+  configured: boolean;
 };
+
+type RunStatus = {
+  runId: string;
+  status: string;
+  totalSections: number;
+  pending: number;
+  running: number;
+  generated: number;
+  failed: number;
+  cancelled: number;
+  usage: {
+    totalTokens: number | null;
+    estimatedCostUsd: number | null;
+    latencyMs: number | null;
+  };
+};
+
+type Props = { topicId: string };
 
 export default function WritingEnginePanel({ topicId }: Props) {
   const toast = useAdminToast();
@@ -82,6 +113,16 @@ export default function WritingEnginePanel({ topicId }: Props) {
   const [openSection, setOpenSection] = useState("readiness");
   const [mockEnabled, setMockEnabled] = useState(false);
   const [cacheHint, setCacheHint] = useState(false);
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
+  const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
+  const [timeline, setTimeline] = useState<Array<{ type: string; message: string; sectionId?: string }>>([]);
+  const [locks, setLocks] = useState<Record<string, boolean>>({});
+  const [editSectionId, setEditSectionId] = useState("");
+  const [editHtml, setEditHtml] = useState("");
+  const [draftVersion, setDraftVersion] = useState(1);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadBuilds = useCallback(async () => {
     const res = await fetch(`/api/content/seo/topics/${topicId}/context-builds`);
@@ -102,10 +143,39 @@ export default function WritingEnginePanel({ topicId }: Props) {
     }
   }, [topicId]);
 
+  const loadProviderStatus = useCallback(async () => {
+    const res = await fetch("/api/content/writing-generation/status");
+    const data = await res.json();
+    if (res.ok) setProviderStatus(data.providerStatus as ProviderStatus);
+  }, []);
+
   useEffect(() => {
     void loadBuilds();
     void loadPlans();
-  }, [loadBuilds, loadPlans]);
+    void loadProviderStatus();
+  }, [loadBuilds, loadPlans, loadProviderStatus]);
+
+  useEffect(() => {
+    if (!activeRunId) return;
+    const poll = async () => {
+      const res = await fetch(`/api/content/writing-generation-runs/${activeRunId}/status`);
+      const data = await res.json();
+      if (!res.ok) return;
+      setRunStatus(data.status as RunStatus);
+      setTimeline((data.timeline as typeof timeline) ?? []);
+      const st = (data.status as RunStatus).status;
+      if (["COMPLETED", "FAILED", "CANCELLED", "PARTIAL"].includes(st)) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = null;
+        setActiveRunId(null);
+      }
+    };
+    void poll();
+    pollRef.current = setInterval(() => void poll(), 2500);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [activeRunId]);
 
   async function buildPlan(forceRebuild = false) {
     if (!contextBuildId) {
@@ -124,9 +194,7 @@ export default function WritingEnginePanel({ topicId }: Props) {
       setPlan(data.plan as WritingPlanLite);
       setCacheHint(Boolean(data.cacheHint));
       setDraft(null);
-      toast.success(
-        data.cacheHint ? "Cache hit — tái sử dụng Writing Plan." : "Đã tạo Writing Plan (không LLM)."
-      );
+      toast.success(data.cacheHint ? "Cache hit — Writing Plan." : "Đã tạo Writing Plan.");
       await loadPlans();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Build plan thất bại");
@@ -143,12 +211,117 @@ export default function WritingEnginePanel({ topicId }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? "Không thể tạo draft");
       setDraft(data.draft as DraftLite);
-      toast.success("Draft shell trống — chưa có văn bản.");
+      setDraftVersion(1);
+      toast.success("Draft shell trống.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Tạo draft thất bại");
     } finally {
       setBuilding(false);
     }
+  }
+
+  async function generate(mode: "ALL" | "SELECTED" | "FAILED_ONLY" | "UNLOCKED_ONLY", regenerate = false) {
+    if (!plan?.id || !draft?.id) return;
+    setBuilding(true);
+    try {
+      const res = await fetch(`/api/content/writing-plans/${plan.id}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draftId: draft.id,
+          mode,
+          sectionIds: selectedSectionIds,
+          regenerate,
+          confirmLockedOverwrite: false,
+        }),
+      });
+      const data = await res.json();
+      if (data.providerStatus) setProviderStatus(data.providerStatus);
+      if (!res.ok) throw new Error(data.message ?? "Generation thất bại");
+      setDraft(data.draft as DraftLite);
+      setActiveRunId(data.run?.id ?? null);
+      setTimeline(data.events ?? []);
+      toast.success("Generation hoàn tất — không tạo Blog.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Generation thất bại");
+    } finally {
+      setBuilding(false);
+    }
+  }
+
+  async function generateOne(sectionId: string, action: "generate" | "retry" | "regenerate") {
+    if (!draft?.id) return;
+    setBuilding(true);
+    try {
+      const res = await fetch(
+        `/api/content/writing-drafts/${draft.id}/sections/${sectionId}/${action}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmLockedOverwrite: locks[sectionId] === true && action === "regenerate" }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Thất bại");
+      setDraft(data.draft as DraftLite);
+      setActiveRunId(data.run?.id ?? null);
+      toast.success(`Section ${action} xong`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Thất bại");
+    } finally {
+      setBuilding(false);
+    }
+  }
+
+  async function toggleLock(sectionId: string, lock: boolean) {
+    if (!draft?.id) return;
+    const path = lock ? "lock" : "unlock";
+    const res = await fetch(`/api/content/writing-drafts/${draft.id}/sections/${sectionId}/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "MANUAL_LOCK" }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      toast.error(data.message ?? "Lock failed");
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const l of data.locks ?? []) {
+      if (l.locked) next[l.sectionId] = true;
+    }
+    setLocks(next);
+    toast.success(lock ? "Đã khóa section" : "Đã mở khóa");
+  }
+
+  async function saveEdit() {
+    if (!draft?.id || !editSectionId) return;
+    setBuilding(true);
+    try {
+      const res = await fetch(`/api/content/writing-drafts/${draft.id}/sections/${editSectionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ html: editHtml, lockAfterSave: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Save failed");
+      setDraft(data.draft as DraftLite);
+      setDraftVersion(data.version ?? draftVersion + 1);
+      setLocks((prev) => ({ ...prev, [editSectionId]: true }));
+      toast.success("Đã lưu & khóa section (human edited)");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBuilding(false);
+    }
+  }
+
+  async function cancelRun() {
+    if (!activeRunId) return;
+    const res = await fetch(`/api/content/writing-generation-runs/${activeRunId}/cancel`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) toast.error(data.message ?? "Cancel failed");
+    else toast.info("Đã hủy run");
   }
 
   async function runQa() {
@@ -159,7 +332,7 @@ export default function WritingEnginePanel({ topicId }: Props) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? "QA thất bại");
       setDraft(data.draft as DraftLite);
-      toast.info(data.qa.passed ? "QA passed" : "QA có cảnh báo/lỗi");
+      toast.info(data.qa.passed ? "QA passed" : "QA có vấn đề");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "QA thất bại");
     } finally {
@@ -183,22 +356,6 @@ export default function WritingEnginePanel({ topicId }: Props) {
     }
   }
 
-  async function mockGenerate() {
-    if (!draft?.id) return;
-    setBuilding(true);
-    try {
-      const res = await fetch(`/api/content/writing-drafts/${draft.id}/mock-generate`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "Mock thất bại");
-      setDraft(data.draft as DraftLite);
-      toast.info("MOCK — không phải nội dung production");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Mock thất bại");
-    } finally {
-      setBuilding(false);
-    }
-  }
-
   function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
     const open = openSection === id;
     return (
@@ -215,24 +372,38 @@ export default function WritingEnginePanel({ topicId }: Props) {
     );
   }
 
+  function sectionBadge(sectionId: string): string {
+    if (locks[sectionId]) return "Locked";
+    const s = draft?.sections?.find((x) => x.sectionId === sectionId);
+    if (!s || !s.plainText.trim()) return "Planned";
+    if (s.warnings?.includes("USER_EDITED")) return "Human edited";
+    if (draft?.status === "REVIEW_READY") return "Review ready";
+    if (s.warnings?.length) return "Generated*";
+    return "AI generated";
+  }
+
   return (
     <div className="admin-sidebar-card" style={{ marginBottom: 16 }}>
       <h3 className="admin-sidebar-title">Writing Engine</h3>
       <p className="admin-field-hint">
-        Lập kế hoạch nội dung provider-neutral từ Context Build. Không gọi LLM production, không tạo Blog.
+        Plan → section generation orchestrator. Không auto-publish / không tạo Blog.
+      </p>
+
+      <p className="admin-field-hint">
+        Provider: {providerStatus
+          ? `${providerStatus.provider}/${providerStatus.model} · ${
+              providerStatus.configured ? "sẵn sàng" : providerStatus.enabled ? "thiếu key" : "tắt"
+            }`
+          : "…"}
       </p>
 
       <div className="admin-field">
-        <label className="admin-label">Context Build (COMPLETED)</label>
-        <select
-          className="admin-input"
-          value={contextBuildId}
-          onChange={(e) => setContextBuildId(e.target.value)}
-        >
-          <option value="">— Chọn build —</option>
+        <label className="admin-label">Context Build</label>
+        <select className="admin-input" value={contextBuildId} onChange={(e) => setContextBuildId(e.target.value)}>
+          <option value="">— Chọn —</option>
           {contextBuilds.map((b) => (
             <option key={b.id} value={b.id}>
-              {b.id.slice(0, 8)}… · {b.purpose} · score {b.readinessScore ?? "—"}
+              {b.id.slice(0, 8)}… · {b.purpose}
             </option>
           ))}
         </select>
@@ -253,135 +424,166 @@ export default function WritingEnginePanel({ topicId }: Props) {
         <AdminLoadingButton pending={building} variant="primary" size="small" onClick={() => void buildPlan(false)}>
           Tạo Writing Plan
         </AdminLoadingButton>
-        <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void buildPlan(true)}>
-          Rebuild plan
-        </AdminLoadingButton>
         {plan?.readiness.ready && (
           <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void createDraftShell()}>
-            Tạo Draft shell (trống)
+            Draft shell
           </AdminLoadingButton>
         )}
         {draft?.id && (
           <>
+            <AdminLoadingButton pending={building} variant="primary" size="small" onClick={() => void generate("ALL")}>
+              Generate all sections
+            </AdminLoadingButton>
+            <AdminLoadingButton
+              pending={building}
+              variant="secondary"
+              size="small"
+              onClick={() => void generate("SELECTED")}
+            >
+              Generate selected
+            </AdminLoadingButton>
+            <AdminLoadingButton
+              pending={building}
+              variant="secondary"
+              size="small"
+              onClick={() => void generate("UNLOCKED_ONLY")}
+            >
+              Generate unlocked
+            </AdminLoadingButton>
             <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void runQa()}>
-              Chạy QA
+              Full QA
             </AdminLoadingButton>
             <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void renderPreview()}>
               Render preview
             </AdminLoadingButton>
+            {activeRunId && (
+              <AdminLoadingButton pending={false} variant="secondary" size="small" onClick={() => void cancelRun()}>
+                Cancel run
+              </AdminLoadingButton>
+            )}
           </>
-        )}
-        {mockEnabled && draft?.id && (
-          <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void mockGenerate()}>
-            Tạo bản nháp mô phỏng (MOCK)
-          </AdminLoadingButton>
         )}
       </div>
 
-      {cacheHint && <p className="admin-field-hint">Cache hit — cùng inputHash.</p>}
+      {runStatus && (
+        <p className="admin-field-hint">
+          Run {runStatus.status}: gen {runStatus.generated}/{runStatus.totalSections} · fail {runStatus.failed} ·
+          tokens {runStatus.usage.totalTokens ?? "—"} · cost{" "}
+          {runStatus.usage.estimatedCostUsd != null ? `$${runStatus.usage.estimatedCostUsd}` : "n/a"} ·{" "}
+          {runStatus.usage.latencyMs ?? "—"}ms
+        </p>
+      )}
+
+      {draft && <p className="admin-field-hint">Draft v{draftVersion} · {draft.status}</p>}
+      {cacheHint && <p className="admin-field-hint">Plan cache hit.</p>}
 
       {plan && (
         <>
-          <p className="admin-field-hint">
-            Plan {plan.id.slice(0, 10)}… · hash {plan.planHash.slice(0, 12)} · {plan.version} ·{" "}
-            {plan.readiness.ready ? "READY" : "INVALID"} · score {plan.readiness.score}
-          </p>
-
-          <Section id="readiness" title="Readiness">
-            {plan.readiness.errors.length === 0 && plan.readiness.warnings.length === 0 ? (
-              <p className="admin-field-hint">Không có lỗi/cảnh báo.</p>
-            ) : (
-              <>
-                {plan.readiness.errors.map((e) => (
-                  <p key={e.code} style={{ color: "var(--admin-danger, #c00)" }}>
-                    [{e.severity}] {e.message}
-                  </p>
-                ))}
-                {plan.readiness.warnings.map((e) => (
-                  <p key={e.code} className="admin-field-hint">
-                    [{e.severity}] {e.message}
-                  </p>
-                ))}
-              </>
-            )}
-          </Section>
-
           <Section id="sections" title={`Sections (${plan.sections.length})`}>
-            <ul style={{ fontSize: 13, paddingLeft: 16 }}>
+            <ul style={{ fontSize: 13, paddingLeft: 16, listStyle: "none" }}>
               {plan.sections.map((s) => (
-                <li key={s.id}>
-                  <strong>{s.heading}</strong> ({s.type}) · {s.targetWordCountMin}-{s.targetWordCountMax} từ · facts{" "}
-                  {s.requiredFactIds.length}+{s.optionalFactIds.length}
+                <li key={s.id} style={{ marginBottom: 8 }}>
+                  <label style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSectionIds.includes(s.id)}
+                      onChange={(e) => {
+                        setSelectedSectionIds((prev) =>
+                          e.target.checked ? [...prev, s.id] : prev.filter((x) => x !== s.id)
+                        );
+                      }}
+                    />
+                    <span>
+                      <strong>{s.heading}</strong> · {sectionBadge(s.id)} · {s.targetWordCountMin}-{s.targetWordCountMax} từ
+                      <br />
+                      <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "generate")}>
+                          Generate
+                        </button>
+                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "retry")}>
+                          Retry
+                        </button>
+                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "regenerate")}>
+                          Regenerate
+                        </button>
+                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void toggleLock(s.id, !locks[s.id])}>
+                          {locks[s.id] ? "Unlock" : "Lock"}
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn--secondary admin-btn--small"
+                          onClick={() => {
+                            setEditSectionId(s.id);
+                            setEditHtml(draft?.sections?.find((x) => x.sectionId === s.id)?.html ?? "");
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </span>
+                    </span>
+                  </label>
                 </li>
               ))}
             </ul>
           </Section>
 
-          <Section id="facts" title="Fact allocation">
-            <p className="admin-field-hint">
-              Unallocated: {plan.factPlan.unallocatedFactIds.join(", ") || "—"} · Excluded:{" "}
-              {plan.factPlan.excludedFactIds.join(", ") || "—"}
-            </p>
-          </Section>
+          {editSectionId && (
+            <Section id="edit" title="Manual edit">
+              <textarea
+                className="admin-input"
+                rows={5}
+                value={editHtml}
+                onChange={(e) => setEditHtml(e.target.value)}
+                placeholder="HTML section body"
+              />
+              <AdminLoadingButton pending={building} variant="primary" size="small" onClick={() => void saveEdit()}>
+                Lưu & khóa
+              </AdminLoadingButton>
+            </Section>
+          )}
 
-          <Section id="media" title="Media">
-            <ul style={{ fontSize: 13, paddingLeft: 16 }}>
-              {plan.mediaPlan.placements.map((m) => (
-                <li key={m.id}>
-                  {m.placement} · {m.mediaAssetId.slice(0, 8)}… · alt: {m.altText}
-                </li>
-              ))}
-            </ul>
-          </Section>
-
-          <Section id="links" title="Internal links">
-            <ul style={{ fontSize: 13, paddingLeft: 16 }}>
-              {plan.internalLinkPlan.placements.map((l) => (
-                <li key={l.id}>
-                  {l.anchorText} → {l.url}
-                </li>
-              ))}
-            </ul>
-          </Section>
-
-          <Section id="meta" title="Metadata / CTA / Schema">
+          <Section id="readiness" title="Readiness / Meta">
             <p className="admin-field-hint">
-              SEO: {plan.metadataPlan.metaTitle} · slug {plan.metadataPlan.slug}
+              Plan score {plan.readiness.score} · CTA {plan.ctaPlan.primary.text} ·{" "}
+              {plan.keywordPlan.primaryKeyword}
             </p>
-            <p className="admin-field-hint">
-              CTA: {plan.ctaPlan.primary.text} → {plan.ctaPlan.primary.destination ?? "—"}
-            </p>
-            <p className="admin-field-hint">
-              Keywords: {plan.keywordPlan.primaryKeyword} · Schema: {plan.schemaPlan.schemaTypes.join(", ")}
-            </p>
+            {plan.readiness.errors.map((e) => (
+              <p key={e.code} style={{ color: "#c00" }}>
+                {e.message}
+              </p>
+            ))}
           </Section>
         </>
       )}
 
-      {draft && (
-        <Section id="draft" title={`Draft ${draft.id.slice(0, 8)}… (${draft.status})`}>
-          {draft.isMock && <p style={{ color: "orange" }}>MOCK OUTPUT — NOT PRODUCTION</p>}
-          {draft.qa && (
-            <p className="admin-field-hint">
-              QA: {draft.qa.passed ? "passed" : "failed"} · score {draft.qa.score} · issues {draft.qa.issues.length}
-            </p>
-          )}
-          {draft.rendered?.html && (
-            <div
-              className="admin-field-hint"
-              style={{ maxHeight: 240, overflow: "auto", border: "1px solid #ddd", padding: 8 }}
-              dangerouslySetInnerHTML={{ __html: draft.rendered.html }}
-            />
-          )}
+      {timeline.length > 0 && (
+        <Section id="timeline" title="Generation timeline">
+          <ul style={{ fontSize: 12, paddingLeft: 16 }}>
+            {timeline.slice(-12).map((e, i) => (
+              <li key={i}>
+                {e.type}: {e.message}
+                {e.sectionId ? ` (${e.sectionId.slice(0, 8)})` : ""}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {draft?.rendered?.html && (
+        <Section id="preview" title="Rendered preview">
+          <div
+            style={{ maxHeight: 240, overflow: "auto", border: "1px solid #ddd", padding: 8, fontSize: 13 }}
+            dangerouslySetInnerHTML={{ __html: draft.rendered.html }}
+          />
         </Section>
       )}
 
       {planHistory.length > 0 && (
         <Section id="history" title="Plan history">
           <ul style={{ fontSize: 12, paddingLeft: 16 }}>
-            {planHistory.slice(0, 8).map((p) => (
+            {planHistory.slice(0, 6).map((p) => (
               <li key={p.id}>
-                {p.id.slice(0, 8)}… · {p.contentType} · {p.status} · {p.sectionCount} sections
+                {p.id.slice(0, 8)}… · {p.status}
               </li>
             ))}
           </ul>

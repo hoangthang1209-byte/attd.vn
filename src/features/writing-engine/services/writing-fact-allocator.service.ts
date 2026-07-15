@@ -130,6 +130,8 @@ function buildUsage(
   return {
     factId: fact.factId,
     sectionId,
+    statement: fact.statement,
+    structuredValue: fact.structuredValue ?? null,
     required,
     allowedParaphrase: !mustExact,
     mustUseExactValue: mustExact,

@@ -18,11 +18,15 @@ export function buildSectionRequest(plan: WritingPlan, sectionId: string): Writi
     const usage = plan.factPlan.usages.find((u) => u.factId === factId);
     return {
       factId,
-      statement: `[fact:${factId}]`,
-      structuredValue: null,
+      statement: usage?.statement ?? `[fact:${factId}]`,
+      structuredValue: usage?.structuredValue ?? null,
       mustUseExactValue: usage?.mustUseExactValue ?? false,
     };
   });
+
+  const sectionIndex = plan.sections.findIndex((s) => s.id === sectionId);
+  const previous = sectionIndex > 0 ? plan.sections[sectionIndex - 1] : null;
+  const next = sectionIndex >= 0 ? plan.sections[sectionIndex + 1] : null;
 
   return {
     planId: plan.id,
@@ -48,12 +52,13 @@ export function buildSectionRequest(plan: WritingPlan, sectionId: string): Writi
     },
     brandRules: [],
     outputRules: [
-      "MOCK OUTPUT — NOT FOR PRODUCTION",
       ...Object.entries(plan.outputRules)
         .filter(([, v]) => v)
         .map(([k]) => k),
     ],
     prohibitedClaims: section.prohibitedClaims,
+    previousSectionSummary: previous ? previous.purpose : null,
+    nextSectionPurpose: next?.purpose ?? null,
   };
 }
 

@@ -119,6 +119,8 @@ export type WritingMetadataPlan = {
 export type WritingFactUsage = {
   factId: string;
   sectionId: string;
+  statement?: string;
+  structuredValue?: Record<string, unknown> | null;
   required: boolean;
   allowedParaphrase: boolean;
   mustUseExactValue: boolean;
@@ -396,6 +398,120 @@ export type BuildWritingPlanRequest = {
   language?: string;
 };
 
+export type WritingSectionProviderUsage = {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  estimatedCostUsd: number | null;
+};
+
+export type WritingSectionProviderResult = {
+  draft: WritingSectionDraft;
+  usage: WritingSectionProviderUsage;
+  latencyMs: number;
+  repaired?: boolean;
+  provider: string;
+  model: string;
+};
+
+export type WritingSectionProviderOptions = {
+  repairContext?: {
+    previousOutput: unknown;
+    validationIssues: string[];
+  };
+};
+
 export interface WritingSectionProvider {
-  generateSection(request: WritingSectionRequest): Promise<WritingSectionDraft>;
+  readonly name: string;
+  generateSection(
+    request: WritingSectionRequest,
+    options?: WritingSectionProviderOptions
+  ): Promise<WritingSectionProviderResult>;
 }
+
+export const WRITING_GENERATION_RUN_STATUSES = [
+  "PENDING",
+  "RUNNING",
+  "PARTIAL",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+] as const;
+export type WritingGenerationRunStatus = (typeof WRITING_GENERATION_RUN_STATUSES)[number];
+
+export const WRITING_SECTION_GENERATION_STATUSES = [
+  "PENDING",
+  "READY",
+  "RUNNING",
+  "GENERATED",
+  "VALIDATION_FAILED",
+  "QA_FAILED",
+  "FAILED",
+  "CANCELLED",
+  "LOCKED",
+  "SUPERSEDED",
+] as const;
+export type WritingSectionGenerationStatus = (typeof WRITING_SECTION_GENERATION_STATUSES)[number];
+
+export const WRITING_SECTION_GENERATION_TRIGGERS = [
+  "INITIAL",
+  "RETRY",
+  "REGENERATE",
+  "REPAIR",
+  "MANUAL",
+] as const;
+export type WritingSectionGenerationTrigger = (typeof WRITING_SECTION_GENERATION_TRIGGERS)[number];
+
+export const WRITING_SECTION_LOCK_REASONS = [
+  "USER_EDITED",
+  "USER_APPROVED",
+  "MANUAL_LOCK",
+  "PUBLISHED_SNAPSHOT",
+] as const;
+export type WritingSectionLockReason = (typeof WRITING_SECTION_LOCK_REASONS)[number];
+
+export type WritingSectionLock = {
+  sectionId: string;
+  locked: boolean;
+  reason: WritingSectionLockReason;
+  lockedBy?: string | null;
+  lockedAt: string;
+  note?: string | null;
+};
+
+export type WritingGenerationMode = "ALL" | "SELECTED" | "FAILED_ONLY" | "UNLOCKED_ONLY";
+
+export type WritingGenerationEvent = {
+  timestamp: string;
+  type:
+    | "RUN_CREATED"
+    | "SECTION_STARTED"
+    | "SECTION_COMPLETED"
+    | "SECTION_RETRY"
+    | "SECTION_FAILED"
+    | "SECTION_LOCKED"
+    | "RUN_COMPLETED"
+    | "RUN_CANCELLED";
+  sectionId?: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type WritingReviewInput = {
+  writingDraftId: string;
+  draftVersion: number;
+  writingPlanId: string;
+  contextBuildId: string;
+  structuredDraft: WritingStructuredDraft;
+  qaReport: WritingQaReport;
+  generationSummary: {
+    provider: string;
+    model: string;
+    cost?: number | null;
+    sectionAttempts: number;
+  };
+};
+
+export const WRITING_SECTION_PROMPT_VERSION = "writing-section-v1";
+export const WRITING_SECTION_SCHEMA_VERSION = "writing-section-schema-v1";
+export const WRITING_GENERATION_CONFIG_VERSION = "writing-generation-config-v1";

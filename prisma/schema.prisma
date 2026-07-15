@@ -2686,25 +2686,156 @@ model WritingPlanRecord {
 }
 
 model WritingDraftRecord {
-  id               String             @id @default(cuid())
-  writingPlanId    String
-  status           WritingDraftStatus @default(PLANNED)
-  structuredDraft  Json?
-  renderedHtml     String?            @db.Text
-  renderedMarkdown String?            @db.Text
-  qaReport         Json?
-  providerRunIds   String[]           @default([])
-  version          Int                @default(1)
-  createdBy        String?
-  approvedBy       String?
-  approvedAt       DateTime?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                    String             @id @default(cuid())
+  writingPlanId         String
+  status                WritingDraftStatus @default(PLANNED)
+  structuredDraft       Json?
+  renderedHtml          String?            @db.Text
+  renderedMarkdown      String?            @db.Text
+  qaReport              Json?
+  providerRunIds        String[]           @default([])
+  version               Int                @default(1)
+  sectionLocks          Json?
+  latestGenerationRunId String?
+  generatedSectionCount Int                @default(0)
+  failedSectionCount    Int                @default(0)
+  createdBy             String?
+  approvedBy            String?
+  approvedAt            DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
-  writingPlan WritingPlanRecord @relation(fields: [writingPlanId], references: [id], onDelete: Cascade)
+  writingPlan     WritingPlanRecord      @relation(fields: [writingPlanId], references: [id], onDelete: Cascade)
+  generationRuns  WritingGenerationRun[]
+  draftVersions   WritingDraftVersion[]
 
   @@index([writingPlanId, createdAt])
   @@index([status, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 11.4 — Enterprise Section Generation Orchestrator
+// ---------------------------------------------------------------------------
+
+enum WritingGenerationRunStatus {
+  PENDING
+  RUNNING
+  PARTIAL
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WritingSectionGenerationStatus {
+  PENDING
+  READY
+  RUNNING
+  GENERATED
+  VALIDATION_FAILED
+  QA_FAILED
+  FAILED
+  CANCELLED
+  LOCKED
+  SUPERSEDED
+}
+
+enum WritingSectionGenerationTrigger {
+  INITIAL
+  RETRY
+  REGENERATE
+  REPAIR
+  MANUAL
+}
+
+enum WritingSectionLockReason {
+  USER_EDITED
+  USER_APPROVED
+  MANUAL_LOCK
+  PUBLISHED_SNAPSHOT
+}
+
+model WritingGenerationRun {
+  id                   String                     @id @default(cuid())
+  writingPlanId        String
+  writingDraftId       String?
+  status               WritingGenerationRunStatus @default(PENDING)
+  provider             String
+  model                String
+  configurationVersion String
+  requestedBy          String?
+  requestedSectionIds  String[]                   @default([])
+  completedSectionIds  String[]                   @default([])
+  failedSectionIds     String[]                   @default([])
+  inputTokens          Int?
+  outputTokens         Int?
+  totalTokens          Int?
+  estimatedCostUsd     Decimal?                   @db.Decimal(12, 6)
+  latencyMs            Int?
+  errorMessage         String?                    @db.Text
+  startedAt            DateTime?
+  completedAt          DateTime?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+
+  writingDraft WritingDraftRecord?       @relation(fields: [writingDraftId], references: [id], onDelete: SetNull)
+  sections     WritingSectionGeneration[]
+
+  @@index([writingPlanId, createdAt])
+  @@index([writingDraftId, createdAt])
+  @@index([status, createdAt])
+  @@index([requestedBy, createdAt])
+}
+
+model WritingSectionGeneration {
+  id               String                          @id @default(cuid())
+  generationRunId  String
+  writingPlanId    String
+  writingDraftId   String?
+  sectionId        String
+  sectionKey       String
+  status           WritingSectionGenerationStatus  @default(PENDING)
+  trigger          WritingSectionGenerationTrigger @default(INITIAL)
+  attempt          Int                             @default(1)
+  provider         String
+  model            String
+  requestHash      String
+  requestSnapshot  Json?
+  outputJson       Json?
+  validationIssues Json?
+  qaIssues         Json?
+  inputTokens      Int?
+  outputTokens     Int?
+  totalTokens      Int?
+  estimatedCostUsd Decimal?                        @db.Decimal(12, 6)
+  latencyMs        Int?
+  errorMessage     String?                         @db.Text
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime                        @default(now())
+  updatedAt        DateTime                        @updatedAt
+
+  generationRun WritingGenerationRun @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+
+  @@index([generationRunId, status])
+  @@index([writingPlanId, sectionId, createdAt])
+  @@index([writingDraftId, sectionId, createdAt])
+  @@index([requestHash])
+}
+
+model WritingDraftVersion {
+  id             String   @id @default(cuid())
+  writingDraftId String
+  version        Int
+  reason         String
+  structuredDraft Json
+  qaReport       Json?
+  createdBy      String?
+  createdAt      DateTime @default(now())
+
+  writingDraft WritingDraftRecord @relation(fields: [writingDraftId], references: [id], onDelete: Cascade)
+
+  @@unique([writingDraftId, version])
+  @@index([writingDraftId, createdAt])
 }
 
 enum KnowledgeBaseImportJobStatus {

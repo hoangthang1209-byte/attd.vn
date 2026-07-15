@@ -13,3 +13,7 @@ export function getWritingSectionProvider(name: string): WritingSectionProvider 
 export function listWritingSectionProviders(): string[] {
   return [...providers.keys()];
 }
+
+export function clearWritingSectionProviders(): void {
+  providers.clear();
+}
