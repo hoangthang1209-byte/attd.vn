@@ -11,7 +11,11 @@
     "postinstall": "prisma generate",
     "media:recalculate-intelligence": "npx tsx scripts/recalculate-media-intelligence.ts",
     "media:suggest-suitabilities": "npx tsx scripts/suggest-media-suitabilities.ts",
-    "media:backfill-blog-assignments": "npx tsx scripts/backfill-blog-media-assignments.ts"
+    "media:backfill-blog-assignments": "npx tsx scripts/backfill-blog-media-assignments.ts",
+    "knowledge-graph:sync-entities": "npx tsx scripts/knowledge-graph-sync-entities.ts",
+    "knowledge-graph:sync-system-relations": "npx tsx scripts/knowledge-graph-sync-system-relations.ts",
+    "knowledge-graph:import-kb-relations": "npx tsx scripts/knowledge-graph-import-kb-relations.ts",
+    "knowledge-graph:health": "npx tsx scripts/knowledge-graph-health.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",

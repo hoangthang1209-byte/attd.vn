@@ -3076,6 +3076,141 @@ model ContentPublishEvent {
   @@index([idempotencyHash])
 }
 
+// ---------------------------------------------------------------------------
+// Sprint 12.0 — Enterprise Knowledge Graph Foundation (thin Postgres overlay)
+// See ADR-0005. Projection nodes + relationships only — no master-data copies.
+// ---------------------------------------------------------------------------
+
+enum KnowledgeGraphEntityType {
+  PRODUCT
+  PRODUCT_CATEGORY
+  MATERIAL
+  TRIM
+  PRINT_METHOD
+  TECHNIQUE
+  CAPABILITY
+  INDUSTRY
+  AUDIENCE
+  USE_CASE
+  CASE_STUDY
+  POLICY
+  FAQ
+  MEDIA_BUNDLE
+  SEO_TOPIC
+  BLOG_POST
+  TECH_PACK
+  PATTERN
+  KNOWLEDGE_ENTRY
+}
+
+enum KnowledgeGraphRelationshipType {
+  IS_A
+  PART_OF
+  BELONGS_TO
+  USES
+  MADE_FROM
+  COMPATIBLE_WITH
+  NOT_COMPATIBLE_WITH
+  SUPPORTS
+  REQUIRES
+  APPLIES_TO
+  TARGETS
+  SUITABLE_FOR
+  USED_IN
+  FEATURED_IN
+  DOCUMENTED_BY
+  EVIDENCED_BY
+  RELATED_TO
+  ALTERNATIVE_TO
+  HAS_CAPABILITY
+  HAS_POLICY
+  HAS_MEDIA
+  HAS_CASE_STUDY
+  HAS_SEO_TOPIC
+  LINKS_TO
+}
+
+enum KnowledgeGraphEntityStatus {
+  ACTIVE
+  INACTIVE
+  ORPHANED
+  ARCHIVED
+}
+
+enum KnowledgeGraphRelationshipStatus {
+  DRAFT
+  SUGGESTED
+  ACTIVE
+  REJECTED
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum KnowledgeGraphRelationshipOrigin {
+  SYSTEM_DERIVED
+  CURATED
+  IMPORTED
+}
+
+model KnowledgeGraphEntity {
+  id           String                     @id @default(cuid())
+  entityType   KnowledgeGraphEntityType
+  sourceType   String
+  sourceId     String
+  canonicalKey String
+  displayName  String
+  visibility   KnowledgeBaseVisibility
+  status       KnowledgeGraphEntityStatus @default(ACTIVE)
+  metadata     Json?
+  lastSyncedAt DateTime?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  outgoing KnowledgeGraphRelationship[] @relation("GraphOutgoing")
+  incoming KnowledgeGraphRelationship[] @relation("GraphIncoming")
+
+  @@unique([sourceType, sourceId])
+  @@unique([entityType, canonicalKey])
+  @@index([entityType, visibility, status])
+  @@index([displayName])
+  @@index([lastSyncedAt])
+}
+
+model KnowledgeGraphRelationship {
+  id               String                           @id @default(cuid())
+  fromEntityId     String
+  toEntityId       String
+  relationshipType KnowledgeGraphRelationshipType
+  status           KnowledgeGraphRelationshipStatus @default(DRAFT)
+  origin           KnowledgeGraphRelationshipOrigin
+  visibility       KnowledgeBaseVisibility
+  authorityRank    Int                              @default(0)
+  confidence       Int?
+  sourceEntryId    String?
+  sourceType       String?
+  sourceId         String?
+  evidenceUrl      String?
+  validFrom        DateTime?
+  validUntil       DateTime?
+  lastVerifiedAt   DateTime?
+  approvedBy       String?
+  approvedAt       DateTime?
+  metadata         Json?
+  createdBy        String?
+  createdAt        DateTime                         @default(now())
+  updatedAt        DateTime                         @updatedAt
+
+  fromEntity KnowledgeGraphEntity @relation("GraphOutgoing", fields: [fromEntityId], references: [id], onDelete: Cascade)
+  toEntity   KnowledgeGraphEntity @relation("GraphIncoming", fields: [toEntityId], references: [id], onDelete: Cascade)
+
+  @@unique([fromEntityId, toEntityId, relationshipType])
+  @@index([fromEntityId, relationshipType, status])
+  @@index([toEntityId, relationshipType, status])
+  @@index([status, visibility])
+  @@index([origin, status])
+  @@index([validUntil])
+}
+
 enum KnowledgeBaseImportJobStatus {
   PENDING
   COMPLETED

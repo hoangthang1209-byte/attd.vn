@@ -321,6 +321,25 @@ export async function updateKnowledgeBaseEntry(
     });
   }
 
+  // Knowledge Graph dual-write (best-effort). Never fails the KB save.
+  try {
+    const { dualWriteKnowledgeBaseGraphRelations } = await import(
+      "@/features/knowledge-graph/services/knowledge-graph-dual-write.service"
+    );
+    const graphSync = await dualWriteKnowledgeBaseGraphRelations({
+      entryId: entry.id,
+      relatedProductIds: entry.relatedProductIds,
+      relatedMediaBundleIds: entry.relatedMediaBundleIds,
+      relatedSeoTopicIds: entry.relatedSeoTopicIds,
+      relatedEntryIds: entry.relatedEntryIds,
+    });
+    if (graphSync.warnings.length) {
+      console.warn("[knowledge-graph dual-write]", graphSync.warnings.join("; "));
+    }
+  } catch (err) {
+    console.warn("[knowledge-graph dual-write] unexpected failure", err);
+  }
+
   return mapEntry(entry);
 }
 
