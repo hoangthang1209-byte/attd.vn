@@ -5,6 +5,7 @@ import { processDueScheduledPosts } from "@/features/content/services/content-pu
  * Durable due-publish processor.
  * Auth: Authorization: Bearer <CONTENT_PUBLISH_CRON_SECRET> or x-cron-secret header.
  * No admin session. Idempotent batch.
+ * Vercel Hobby supports daily cron only; higher-frequency cron requires Pro.
  */
 export async function POST(req: NextRequest) {
   const secret = process.env.CONTENT_PUBLISH_CRON_SECRET || process.env.CRON_SECRET;
