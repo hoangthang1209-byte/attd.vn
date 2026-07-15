@@ -11,7 +11,7 @@ export type PdfFontNames = {
 
 // Runtime-only font paths — resolved against cwd at execution, not traced at build.
 function fontPath(...segments: string[]): string {
-  return join(process.cwd(), ...segments);
+  return join(/* turbopackIgnore: true */ process.cwd(), ...segments);
 }
 
 const FONT_CANDIDATES = {
