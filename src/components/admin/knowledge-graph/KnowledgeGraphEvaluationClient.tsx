@@ -36,8 +36,25 @@ type BenchmarkRow = {
     expectedPathsFound: number;
     expectedPathsTotal: number;
   };
-  metrics: { improved: boolean };
+  metrics: { improved: boolean; baselineParity?: number; mediaBundleUseful?: boolean };
   gaps: string[];
+  graphContextBudget?: {
+    baselineCharacters?: number;
+    graphAllowance?: number;
+    proposedGraphCharacters?: number;
+    acceptedGraphCharacters?: number;
+    finalCharacters?: number | null;
+    proposedGrowthPercent?: number;
+    acceptedGrowthPercent?: number;
+    actualGrowthPercent?: number | null;
+    hardCapFallbackUsed?: boolean;
+    fallbackToBaseline?: boolean;
+    factsTrimmed?: unknown[];
+    blogCandidatesTrimmed?: number;
+    mediaItemsTrimmed?: number;
+    valueRetainedPerCharacter?: number | null;
+  } | null;
+  baselineParity?: number;
 };
 
 type RunResult = {
@@ -181,8 +198,45 @@ export default function KnowledgeGraphEvaluationClient() {
                   authority {selected.judgment.directAuthorityPreserved ? "ok" : "FAIL"} · visibility{" "}
                   {selected.judgment.visibilitySafe ? "ok" : "FAIL"} · conflicts{" "}
                   {selected.judgment.conflictSafe ? "ok" : "FAIL"} · unresolved{" "}
-                  {selected.conflictsUnresolved}
+                  {selected.conflictsUnresolved} · baseline parity{" "}
+                  {(selected.baselineParity ?? selected.metrics.baselineParity ?? 1).toFixed(2)}
+                  {selected.metrics.mediaBundleUseful ? " · media useful" : ""}
                 </p>
+
+                {selected.graphContextBudget ? (
+                  <section style={{ marginBottom: 12 }}>
+                    <h4>Context budget diagnostics</h4>
+                    <ul style={{ fontSize: 13 }}>
+                      <li>Baseline chars: {selected.graphContextBudget.baselineCharacters}</li>
+                      <li>Graph allowance: {selected.graphContextBudget.graphAllowance}</li>
+                      <li>
+                        Proposed: {selected.graphContextBudget.proposedGraphCharacters} (
+                        {selected.graphContextBudget.proposedGrowthPercent}%)
+                      </li>
+                      <li>
+                        Accepted: {selected.graphContextBudget.acceptedGraphCharacters} (
+                        {selected.graphContextBudget.acceptedGrowthPercent}%)
+                      </li>
+                      <li>
+                        Actual growth: {selected.graphContextBudget.actualGrowthPercent ?? "—"}% ·
+                        final {selected.graphContextBudget.finalCharacters ?? "—"}
+                      </li>
+                      <li>
+                        Hard-cap fallback:{" "}
+                        {selected.graphContextBudget.hardCapFallbackUsed ? "yes" : "no"} · baseline
+                        fallback: {selected.graphContextBudget.fallbackToBaseline ? "yes" : "no"}
+                      </li>
+                      <li>
+                        Trimmed facts: {selected.graphContextBudget.factsTrimmed?.length ?? 0} · blogs{" "}
+                        {selected.graphContextBudget.blogCandidatesTrimmed ?? 0} · media{" "}
+                        {selected.graphContextBudget.mediaItemsTrimmed ?? 0}
+                      </li>
+                      <li>
+                        Value/char: {selected.graphContextBudget.valueRetainedPerCharacter ?? "—"}
+                      </li>
+                    </ul>
+                  </section>
+                ) : null}
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <section>

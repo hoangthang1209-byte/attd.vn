@@ -106,8 +106,10 @@ export const GRAPH_ADDED_FACT_BUDGETS = {
 } as const;
 
 export const GRAPH_CONTEXT_GROWTH = {
+  /** Soft/target cap used for PASS and pre-assembly allowance. */
   targetPercent: 30,
-  hardMaxPercent: 40,
+  /** Absolute hard ceiling before forced baseline fallback. */
+  hardMaxPercent: 35,
 } as const;
 
 export function mapSourceTypeToBudgetKey(sourceType: string): SourceTypeBudgetKey {

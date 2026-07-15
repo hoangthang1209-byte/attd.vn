@@ -197,6 +197,7 @@ export async function retrieveEnterpriseAiContext(
       typeof import("@/features/ai-retrieval/sources/knowledge-graph-source").expandRetrievalScopeViaKnowledgeGraph
     >
   > | null = null;
+  const graphAddedSourceKeys = new Set<string>();
   try {
     const {
       expandRetrievalScopeViaKnowledgeGraph,
@@ -214,7 +215,34 @@ export async function retrieveEnterpriseAiContext(
         where: { id: { in: graphExpansion.scopeEntityIds.slice(0, 100) } },
         select: { sourceType: true, sourceId: true, visibility: true },
       });
+      const before = {
+        productIds: new Set(request.productIds ?? []),
+        knowledgeEntryIds: new Set(request.knowledgeEntryIds ?? []),
+        mediaBundleIds: new Set(request.mediaBundleIds ?? []),
+        seoTopicIds: new Set(request.seoTopicIds ?? []),
+        entityIds: new Set(request.entityIds ?? []),
+      };
       request = mergeGraphScopesIntoRequest(request, graphExpansion, scoped);
+      for (const id of request.productIds ?? []) {
+        if (!before.productIds.has(id)) graphAddedSourceKeys.add(`PRODUCT:${id}`);
+      }
+      for (const id of request.knowledgeEntryIds ?? []) {
+        if (!before.knowledgeEntryIds.has(id)) graphAddedSourceKeys.add(`KNOWLEDGE_BASE:${id}`);
+      }
+      for (const id of request.mediaBundleIds ?? []) {
+        if (!before.mediaBundleIds.has(id)) graphAddedSourceKeys.add(`MEDIA_BUNDLE:${id}`);
+      }
+      for (const id of request.seoTopicIds ?? []) {
+        if (!before.seoTopicIds.has(id)) graphAddedSourceKeys.add(`SEO_TOPIC:${id}`);
+      }
+      for (const id of request.entityIds ?? []) {
+        if (!before.entityIds.has(id)) {
+          graphAddedSourceKeys.add(`BLOG_POST:${id}`);
+          graphAddedSourceKeys.add(`MANUFACTURING_ASSET:${id}`);
+          graphAddedSourceKeys.add(`PRINT_METHOD:${id}`);
+          graphAddedSourceKeys.add(`OTHER:${id}`);
+        }
+      }
     }
   } catch (err) {
     warningGroups.push([
@@ -292,6 +320,14 @@ export async function retrieveEnterpriseAiContext(
     return false;
   });
 
+  let graphBudgetDiagnostics: Awaited<
+    ReturnType<
+      typeof import("@/features/ai-retrieval/graph-context-budget.service").enforcePreAssemblyGraphBudget
+    >
+  >["diagnostics"] | null = null;
+  let graphBaselineFactIds: Set<string> | null = null;
+  let graphBaselineCharacters = 0;
+
   if (graphExpansion?.enabled && graphExpansion.queried) {
     const {
       attachGraphProvenanceToFacts,
@@ -303,21 +339,36 @@ export async function retrieveEnterpriseAiContext(
 
     const baselineFactIds = new Set(
       facts
-        .filter((f) => baselineSourceKeys.has(`${f.sourceType}:${f.sourceId}`))
+        .filter((f) => {
+          const key = `${f.sourceType}:${f.sourceId}`;
+          // Preserve all non-graph-scope facts as mandatory baseline (query hits included)
+          if (!graphAddedSourceKeys.has(key) && !baselineSourceKeys.has(key)) {
+            return true;
+          }
+          return baselineSourceKeys.has(key);
+        })
         .map((f) => f.id)
     );
-    // Also treat query-matched facts without graph enrichment as baseline if no scopes added
+    // Explicit original scopes always baseline
     for (const f of facts) {
-      if (!f.warnings.includes("graph_scope_enrichment_only") && !baselineFactIds.has(f.id)) {
-        // Heuristic: product/KB that existed before scope merge
-        const key = `${f.sourceType}:${f.sourceId}`;
-        if (
-          (originalRequest.productIds ?? []).includes(f.sourceId) ||
-          (originalRequest.knowledgeEntryIds ?? []).includes(f.sourceId)
-        ) {
-          baselineFactIds.add(f.id);
-        }
-        void key;
+      const key = `${f.sourceType}:${f.sourceId}`;
+      if (baselineSourceKeys.has(key)) baselineFactIds.add(f.id);
+      if (
+        (originalRequest.productIds ?? []).includes(f.sourceId) ||
+        (originalRequest.knowledgeEntryIds ?? []).includes(f.sourceId) ||
+        (originalRequest.mediaBundleIds ?? []).includes(f.sourceId) ||
+        (originalRequest.seoTopicIds ?? []).includes(f.sourceId)
+      ) {
+        baselineFactIds.add(f.id);
+      }
+      // Query-native hits that merely received graph enrichment bonus remain baseline
+      if (
+        f.matchedOn.some((m) =>
+          /blog_search|product_search|kb_search|entity_scope|query/i.test(m)
+        ) &&
+        !graphAddedSourceKeys.has(key)
+      ) {
+        baselineFactIds.add(f.id);
       }
     }
 
@@ -335,6 +386,38 @@ export async function retrieveEnterpriseAiContext(
         { reason: "graph_added_fact_budget", count: budgeted.report.droppedByBudget },
         { reason: "graph_added_fact_low_relevance", count: budgeted.report.droppedByRelevance },
       ]);
+    }
+
+    const {
+      enforcePreAssemblyGraphBudget,
+      estimateFactRenderCharacters,
+      formatGraphBudgetWarning,
+    } = await import("@/features/ai-retrieval/graph-context-budget.service");
+    const baselineOnly = facts.filter((f) => baselineFactIds.has(f.id));
+    graphBaselineCharacters =
+      baselineOnly.reduce((s, f) => s + estimateFactRenderCharacters(f), 0) + 220;
+    const preAssembled = enforcePreAssemblyGraphBudget({
+      baselineFactIds,
+      facts,
+      consumer: request.consumer,
+      query: originalRequest.query,
+      maxContextCharacters: request.maxContextCharacters ?? policy.maxContextCharacters,
+      baselineCharactersOverride: graphBaselineCharacters,
+    });
+    facts = preAssembled.facts;
+    graphBudgetDiagnostics = preAssembled.diagnostics;
+    graphBaselineFactIds = baselineFactIds;
+    warningGroups.push([formatGraphBudgetWarning(preAssembled.diagnostics)]);
+    if (preAssembled.diagnostics.factsTrimmed.length) {
+      omittedGroups.push([
+        {
+          reason: "graph_pre_assembly_budget",
+          count: preAssembled.diagnostics.factsTrimmed.length,
+        },
+      ]);
+    }
+    if (preAssembled.diagnostics.fallbackToBaseline) {
+      warningGroups.push(["graph_budget_no_value_fit"]);
     }
   }
 
@@ -381,7 +464,7 @@ export async function retrieveEnterpriseAiContext(
 
   facts = sortFactsByScore(facts).slice(0, request.maxItems ?? policy.maxItems);
 
-  const businessRules =
+  let businessRules =
     request.includeBusinessRules
       ? extractBusinessRulesFromKnowledge(
           facts
@@ -396,13 +479,19 @@ export async function retrieveEnterpriseAiContext(
         )
       : [];
 
-  const omitted = mergeOmitted(omittedGroups);
-  const warnings = [...new Set(warningGroups.flat())].filter(Boolean);
+  let omitted = mergeOmitted(omittedGroups);
+  let warnings = [...new Set(warningGroups.flat())].filter(Boolean);
   if (request.includeWarnings === false) {
     // keep governance critical only
   }
 
-  const built = buildAiRetrievalContextParts({
+  const maxContextCharacters = request.maxContextCharacters ?? policy.maxContextCharacters;
+  const { GRAPH_CONTEXT_GROWTH } = await import(
+    "@/features/knowledge-graph/evaluation/graph-expansion-budgets"
+  );
+  const GRAPH_CONTEXT_GROWTH_TARGET = GRAPH_CONTEXT_GROWTH.targetPercent;
+
+  let built = buildAiRetrievalContextParts({
     requestId,
     consumer: request.consumer,
     purpose: request.purpose,
@@ -412,8 +501,165 @@ export async function retrieveEnterpriseAiContext(
     conflicts,
     warnings,
     omitted,
-    maxContextCharacters: request.maxContextCharacters ?? policy.maxContextCharacters,
+    maxContextCharacters,
   });
+
+  if (graphExpansion?.enabled && graphExpansion.queried && graphBaselineFactIds) {
+    const {
+      assertAndRepairFinalGraphGrowth,
+      formatGraphBudgetWarning,
+      mandatoryBaselineChecksum,
+    } = await import("@/features/ai-retrieval/graph-context-budget.service");
+    const { estimateContextGrowthPercent } = await import(
+      "@/features/ai-retrieval/sources/knowledge-graph-source"
+    );
+
+    const baselineFactsOnly = facts.filter((f) => graphBaselineFactIds!.has(f.id));
+    const baselineRendered = buildAiRetrievalContextParts({
+      requestId,
+      consumer: request.consumer,
+      purpose: request.purpose,
+      query: request.query,
+      facts: baselineFactsOnly,
+      businessRules: [],
+      conflicts: request.includeConflicts === false ? [] : detectFactConflicts(baselineFactsOnly),
+      warnings: [],
+      omitted: [],
+      maxContextCharacters,
+    });
+    const trueBaselineChars = baselineRendered.contextText.length;
+    graphBaselineCharacters = trueBaselineChars;
+
+    let repaired = assertAndRepairFinalGraphGrowth({
+      baselineFactIds: graphBaselineFactIds,
+      facts,
+      baselineCharacters: trueBaselineChars,
+      finalCharacters: built.contextText.length,
+    });
+
+    // If assertion wants a change, rebuild and re-check once against rendered size
+    if (
+      repaired.secondPassTrimUsed ||
+      repaired.fallbackToBaseline ||
+      repaired.hardCapFallbackUsed ||
+      estimateContextGrowthPercent(trueBaselineChars, built.contextText.length) >
+        GRAPH_CONTEXT_GROWTH_TARGET
+    ) {
+      // Prefer iterative drop using rendered growth
+      let workingFacts = repaired.facts;
+      let pass = 0;
+      while (
+        pass < 24 &&
+        estimateContextGrowthPercent(
+          trueBaselineChars,
+          buildAiRetrievalContextParts({
+            requestId,
+            consumer: request.consumer,
+            purpose: request.purpose,
+            query: request.query,
+            facts: workingFacts,
+            businessRules: [],
+            conflicts: [],
+            warnings: [],
+            omitted: [],
+            maxContextCharacters,
+          }).contextText.length
+        ) > GRAPH_CONTEXT_GROWTH_TARGET
+      ) {
+        const dropCandidate = workingFacts
+          .filter((f) => !graphBaselineFactIds!.has(f.id))
+          .sort((a, b) => a.relevanceScore - b.relevanceScore)[0];
+        if (!dropCandidate) break;
+        workingFacts = workingFacts.filter((f) => f.id !== dropCandidate.id);
+        pass += 1;
+        repaired = {
+          ...repaired,
+          secondPassTrimUsed: true,
+          facts: workingFacts,
+          warning: `graph_rendered_trim_pass:${pass}`,
+        };
+      }
+      const stillOver =
+        estimateContextGrowthPercent(
+          trueBaselineChars,
+          buildAiRetrievalContextParts({
+            requestId,
+            consumer: request.consumer,
+            purpose: request.purpose,
+            query: request.query,
+            facts: workingFacts,
+            businessRules: [],
+            conflicts: [],
+            warnings: [],
+            omitted: [],
+            maxContextCharacters,
+          }).contextText.length
+        ) > GRAPH_CONTEXT_GROWTH_TARGET;
+      if (stillOver) {
+        workingFacts = baselineFactsOnly;
+        repaired = {
+          facts: workingFacts,
+          actualGrowthPercent: 0,
+          hardCapFallbackUsed: true,
+          secondPassTrimUsed: true,
+          fallbackToBaseline: true,
+          warning: "graph_budget_fallback_baseline:oversized_after_trim",
+        };
+      }
+
+      facts = workingFacts;
+      if (repaired.warning) warningGroups.push([repaired.warning]);
+      conflicts = request.includeConflicts === false ? [] : detectFactConflicts(facts);
+      businessRules = request.includeBusinessRules
+        ? extractBusinessRulesFromKnowledge(
+            facts
+              .filter((f) => f.sourceType === "KNOWLEDGE_BASE")
+              .map((f) => ({
+                id: f.sourceId,
+                title: f.title,
+                visibility: f.visibility,
+                approvedAt: f.approvedAt,
+                structuredData: f.structuredData ?? null,
+              }))
+          )
+        : [];
+      omitted = mergeOmitted(omittedGroups);
+      warnings = [...new Set(warningGroups.flat())].filter(Boolean);
+      built = buildAiRetrievalContextParts({
+        requestId,
+        consumer: request.consumer,
+        purpose: request.purpose,
+        query: request.query,
+        facts,
+        businessRules,
+        conflicts,
+        warnings,
+        omitted,
+        maxContextCharacters,
+      });
+    }
+
+    if (graphBudgetDiagnostics) {
+      graphBudgetDiagnostics.baselineCharacters = trueBaselineChars;
+      graphBudgetDiagnostics.baselineChecksum = mandatoryBaselineChecksum(baselineFactsOnly);
+      graphBudgetDiagnostics.mandatoryBaselinePreserved =
+        mandatoryBaselineChecksum(
+          facts.filter((f) => graphBaselineFactIds!.has(f.id))
+        ) === graphBudgetDiagnostics.baselineChecksum;
+      graphBudgetDiagnostics.finalCharacters = built.contextText.length;
+      graphBudgetDiagnostics.actualGrowthPercent = Number(
+        estimateContextGrowthPercent(trueBaselineChars, built.contextText.length).toFixed(2)
+      );
+      graphBudgetDiagnostics.hardCapFallbackUsed =
+        graphBudgetDiagnostics.hardCapFallbackUsed || repaired.hardCapFallbackUsed;
+      graphBudgetDiagnostics.secondPassTrimUsed =
+        graphBudgetDiagnostics.secondPassTrimUsed || repaired.secondPassTrimUsed;
+      graphBudgetDiagnostics.fallbackToBaseline =
+        graphBudgetDiagnostics.fallbackToBaseline || repaired.fallbackToBaseline;
+      warningGroups.push([formatGraphBudgetWarning(graphBudgetDiagnostics)]);
+      warnings = [...new Set(warningGroups.flat())].filter(Boolean);
+    }
+  }
 
   const sourcesUsedMap = new Map<AiRetrievalSourceType, number>();
   for (const fact of facts) {
@@ -435,14 +681,20 @@ export async function retrieveEnterpriseAiContext(
     facts,
     businessRules,
     conflicts,
-    warnings: request.includeWarnings === false ? warnings.filter((w) => w.startsWith("legacy_")) : warnings,
+    warnings:
+      request.includeWarnings === false
+        ? warnings.filter((w) => w.startsWith("legacy_"))
+        : warnings,
     sourcesUsed: [...sourcesUsedMap.entries()].map(([sourceType, count]) => ({
       sourceType,
       count,
     })),
     omitted,
     contextText: built.contextText,
-    contextJson: built.contextJson,
+    contextJson: {
+      ...built.contextJson,
+      ...(graphBudgetDiagnostics ? { graphContextBudget: graphBudgetDiagnostics } : {}),
+    },
     sourceManifest: built.sourceManifest,
     generatedAt: new Date().toISOString(),
   };

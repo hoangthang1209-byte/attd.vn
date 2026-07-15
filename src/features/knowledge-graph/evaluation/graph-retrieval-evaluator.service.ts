@@ -66,6 +66,10 @@ export type GraphBenchmarkEvalResult = {
   conflictsUnresolved: number;
   omittedDelta: number;
   judgment: GraphEvaluationJudgment;
+  graphContextBudget?: Record<string, unknown> | null;
+  baselineParity?: number;
+  mediaBundleUseful?: boolean;
+  baselineKeysPreserved?: number;
   gaps: string[];
   metrics: BenchmarkEvalMetrics;
 };
@@ -335,6 +339,19 @@ async function runOneBenchmark(input: {
     conflictSafe: conflictSafe(expanded),
   });
 
+  const graphBudget =
+    (expanded.contextJson?.graphContextBudget as Record<string, unknown> | undefined) ?? null;
+
+  const baselineKeys = new Set(baseline.facts.map((f) => `${f.sourceType}:${f.sourceId}`));
+  const expandedBaselinePresent = baseline.facts.every((f) =>
+    expanded.facts.some((e) => e.sourceType === f.sourceType && e.sourceId === f.sourceId)
+  );
+  const baselineParity = expandedBaselinePresent ? 1 : 0;
+
+  const mediaUseful =
+    expanded.facts.some((f) => f.sourceType === "MEDIA_BUNDLE") ||
+    relevantAddedEntities.some((e) => e.startsWith("MEDIA_BUNDLE"));
+
   const useful =
     judgment.expectedPathsFound > 0 ||
     relevantAddedFacts.length > 0 ||
@@ -368,6 +385,8 @@ async function runOneBenchmark(input: {
       f.warnings.includes("graph_node_as_fact")
     ),
     usefulNewSourceOrContent: useful,
+    baselineParity,
+    mediaBundleUseful: mediaUseful,
   };
 
   void maxVisibility;
@@ -411,6 +430,12 @@ async function runOneBenchmark(input: {
       expanded.omitted.reduce((s, o) => s + o.count, 0) -
       baseline.omitted.reduce((s, o) => s + o.count, 0),
     judgment,
+    graphContextBudget: graphBudget,
+    baselineParity,
+    mediaBundleUseful: mediaUseful,
+    baselineKeysPreserved: [...baselineKeys].filter((k) =>
+      expanded.facts.some((f) => `${f.sourceType}:${f.sourceId}` === k)
+    ).length,
     gaps: buildGaps(benchmark, requiredMatch.missing, irrelevantAddedEntities),
     metrics,
   };
@@ -548,9 +573,12 @@ export async function runGraphRetrievalEvaluation(input: {
               gaps: r.gaps,
               relevantAddedEntities: r.relevantAddedEntities,
               irrelevantAddedEntities: r.irrelevantAddedEntities,
+              graphContextBudget: r.graphContextBudget ?? null,
+              baselineParity: r.baselineParity ?? 1,
+              mediaBundleUseful: r.mediaBundleUseful ?? false,
             })),
             // never store full context text
-          },
+          } as object,
         },
       });
     }

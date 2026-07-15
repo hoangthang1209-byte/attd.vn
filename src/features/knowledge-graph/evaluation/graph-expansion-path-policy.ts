@@ -6,7 +6,7 @@
 import type { KnowledgeGraphRelationshipType } from "@prisma/client";
 import type { AiRetrievalConsumer } from "@/features/ai-retrieval/ai-retrieval-types";
 
-export const GRAPH_PATH_POLICY_VERSION = "12.3.0";
+export const GRAPH_PATH_POLICY_VERSION = "12.4.0";
 
 export type RelationshipValueClass =
   | "CORE"

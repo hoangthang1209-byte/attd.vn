@@ -215,7 +215,7 @@ describe("Budgets", () => {
 
   it("documents context growth caps", () => {
     assert.equal(GRAPH_CONTEXT_GROWTH.targetPercent, 30);
-    assert.equal(GRAPH_CONTEXT_GROWTH.hardMaxPercent, 40);
+    assert.equal(GRAPH_CONTEXT_GROWTH.hardMaxPercent, 35);
   });
 });
 
@@ -235,6 +235,6 @@ describe("Safety & diagnostics", () => {
 
   it("records sprint 12.2 failure map for six benchmarks", () => {
     assert.equal(SPRINT_12_2_FAILURE_MAP.length, 6);
-    assert.ok(GRAPH_PATH_POLICY_VERSION.startsWith("12.3"));
+    assert.ok(GRAPH_PATH_POLICY_VERSION.startsWith("12.4"));
   });
 });

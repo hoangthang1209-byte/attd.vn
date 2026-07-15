@@ -28,6 +28,10 @@ export type BenchmarkEvalMetrics = {
   conflictSafe: boolean;
   graphNodesCountedAsFacts: boolean;
   usefulNewSourceOrContent: boolean;
+  /** 1.0 required — missing mandatory baseline facts → FAIL */
+  baselineParity?: number;
+  /** Reported separately; absence does not auto-fail Retrieval PASS */
+  mediaBundleUseful?: boolean;
 };
 
 export type ThresholdAggregateInput = {
@@ -85,6 +89,10 @@ export function judgeThresholds(input: ThresholdAggregateInput): {
     }
     if (row.graphNodesCountedAsFacts) {
       reasons.push(`${row.benchmarkId}: graph node treated as fact`);
+      hardFail = true;
+    }
+    if ((row.baselineParity ?? 1) < 1) {
+      reasons.push(`${row.benchmarkId}: baseline parity ${(row.baselineParity ?? 0).toFixed(2)} < 1.00`);
       hardFail = true;
     }
     if (row.improved && !row.usefulNewSourceOrContent) {

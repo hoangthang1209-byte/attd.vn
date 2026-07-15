@@ -63,6 +63,7 @@ export default function AiRetrievalPreviewClient({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RetrievalResponse | null>(null);
   const [adminGraphPilot, setAdminGraphPilot] = useState(false);
+  const [showCompactGraphDiag, setShowCompactGraphDiag] = useState(true);
 
   const policy = useMemo(() => getAiRetrievalPolicy(consumer), [consumer]);
 
@@ -147,6 +148,16 @@ export default function AiRetrievalPreviewClient({
           />
           Graph expansion pilot (admin-only, this request)
         </label>
+        {adminGraphPilot ? (
+          <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={showCompactGraphDiag}
+              onChange={(e) => setShowCompactGraphDiag(e.target.checked)}
+            />
+            Show compact graph context budget diagnostics
+          </label>
+        ) : null}
         <div className="admin-field">
           <label className="admin-label">Consumer</label>
           <select
@@ -310,6 +321,22 @@ export default function AiRetrievalPreviewClient({
               </button>
             </div>
           </div>
+
+          {adminGraphPilot &&
+          showCompactGraphDiag &&
+          result.contextJson?.graphContextBudget &&
+          typeof result.contextJson.graphContextBudget === "object" ? (
+            <div className="admin-sidebar-card" style={{ marginBottom: 16 }}>
+              <h3 className="admin-sidebar-title">Graph context budget</h3>
+              <pre style={{ fontSize: 12, overflow: "auto" }}>
+                {JSON.stringify(result.contextJson.graphContextBudget, null, 2)}
+              </pre>
+              <p className="admin-field-hint">
+                Proposed vs accepted growth, hard-cap fallback, and media contribution are
+                diagnostics-only. Production expansion flags remain off.
+              </p>
+            </div>
+          ) : null}
 
           {result.warnings.length > 0 && (
             <div className="admin-sidebar-card" style={{ marginBottom: 16 }}>

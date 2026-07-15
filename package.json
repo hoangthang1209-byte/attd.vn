@@ -24,6 +24,9 @@
     "knowledge-graph:sync-print-methods": "npx tsx scripts/knowledge-graph-sync-print-methods.ts",
     "knowledge-graph:seed-benchmark-topics": "npx tsx scripts/knowledge-graph-seed-benchmark-topics.ts",
     "knowledge-graph:prepare-benchmark-bundles": "npx tsx scripts/knowledge-graph-prepare-benchmark-bundles.ts",
+    "knowledge-graph:audit-media-evidence": "npx tsx scripts/knowledge-graph-audit-media-evidence.ts",
+    "knowledge-graph:prepare-media-evidence-pilot": "npx tsx scripts/knowledge-graph-prepare-media-evidence-pilot.ts",
+    "knowledge-graph:confirm-topic-content-links": "npx tsx scripts/knowledge-graph-confirm-topic-content-links.ts",
     "knowledge-graph:refine-curated-relations": "npx tsx scripts/knowledge-graph-refine-curated-relations.ts",
     "knowledge-graph:health": "npx tsx scripts/knowledge-graph-health.ts"
   },
