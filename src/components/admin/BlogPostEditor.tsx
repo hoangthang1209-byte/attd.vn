@@ -28,6 +28,7 @@ import { getPublishWarnings, calculateSeoScore } from "@/features/blog/seo-score
 import { getPublishReadiness } from "@/features/blog/content-health";
 import { normalizeBlogTags } from "@/features/blog/tags";
 import { BLOG_POST_STATUSES, BLOG_STATUS_LABELS } from "@/features/blog/types";
+import BlogPublishPanel from "@/components/admin/blog-editor/BlogPublishPanel";
 import type { BlogCategoryRecord, BlogFaqItem, BlogPostRecord } from "@/features/blog/types";
 import { canonicalUrl as buildCanonicalUrl } from "@/lib/seo";
 import { toSlug } from "@/lib/slug";
@@ -71,6 +72,8 @@ function formatUpdatedAt(iso: string): string {
 function statusBadgeClass(status: BlogPostStatus): string {
   if (status === "PUBLISHED") return "admin-badge--published";
   if (status === "REVIEW") return "admin-badge--review";
+  if (status === "SCHEDULED") return "admin-badge--review";
+  if (status === "ARCHIVED") return "admin-badge--draft";
   return "admin-badge--draft";
 }
 
@@ -400,6 +403,8 @@ export default function BlogPostEditor(props: Props) {
           </p>
         </div>
       )}
+
+      {isEdit && initial && <BlogPublishPanel post={initial} />}
 
       <div className="admin-form-grid">
         <div className="admin-form-main">

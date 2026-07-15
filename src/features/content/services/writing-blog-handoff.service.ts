@@ -13,6 +13,7 @@ import {
   sanitizeBlogHandoffHtml,
   type BlogHandoffFieldOptions,
 } from "@/features/content/content-review.types";
+import { hashBlogPublicContent } from "@/features/content/content-publish.types";
 
 export type BlogHandoffMode = "CREATE_NEW" | "UPDATE_EXISTING";
 export type { BlogHandoffFieldOptions };
@@ -302,6 +303,23 @@ export async function handoffApprovedWritingDraftToBlog(input: {
       }
     }
 
+    const blogAfter = await prisma.blogPost.findUnique({ where: { id: blogId } });
+    const contentHash = blogAfter
+      ? hashBlogPublicContent({
+          title: blogAfter.title,
+          slug: blogAfter.slug,
+          excerpt: blogAfter.excerpt,
+          content: blogAfter.content,
+          metaTitle: blogAfter.metaTitle,
+          metaDescription: blogAfter.metaDescription,
+          faqJson: blogAfter.faqJson,
+          featuredImageUrl: blogAfter.featuredImageUrl,
+          ogImageUrl: blogAfter.ogImageUrl,
+          canonicalUrl: blogAfter.canonicalUrl,
+          tags: blogAfter.tags,
+        })
+      : null;
+
     handoff = await prisma.contentHandoffRecord.update({
       where: { id: handoff.id },
       data: {
@@ -313,13 +331,21 @@ export async function handoffApprovedWritingDraftToBlog(input: {
           status: "DRAFT",
           title: structured.title,
           slug: structured.slug,
+          contentHash,
         } as Prisma.InputJsonValue,
       },
     });
 
     await prisma.blogPost.update({
       where: { id: blogId },
-      data: { sourceHandoffRecordId: handoff.id },
+      data: {
+        sourceHandoffRecordId: handoff.id,
+        contentModifiedAfterHandoff: false,
+        publishReadinessAcknowledgedAt: null,
+        publishReadinessAcknowledgedBy: null,
+        publishAckNote: null,
+        needsContentReview: false,
+      },
     });
 
     await prisma.contentReviewDecision.create({
@@ -366,6 +392,11 @@ export async function markBlogModifiedAfterHandoff(blogPostId: string) {
   if (!post?.sourceHandoffRecordId) return;
   await prisma.blogPost.update({
     where: { id: blogPostId },
-    data: { contentModifiedAfterHandoff: true },
+    data: {
+      contentModifiedAfterHandoff: true,
+      publishReadinessAcknowledgedAt: null,
+      publishReadinessAcknowledgedBy: null,
+      publishAckNote: null,
+    },
   });
 }

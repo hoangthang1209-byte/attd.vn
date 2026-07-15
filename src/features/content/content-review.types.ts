@@ -49,16 +49,7 @@ export type ContentReviewReadiness = {
   };
 };
 
-export type ContentPublishReadiness = {
-  ready: boolean;
-  blogPostId: string;
-  sourceWritingDraftId: string;
-  sourceDraftVersion: number;
-  approvedReviewSessionId: string;
-  handoffRecordId: string;
-  errors: string[];
-  warnings: string[];
-};
+export type ContentPublishReadiness = import("@/features/content/content-publish.types").ContentPublishReadiness;
 
 export type ContentDiffLine = {
   type: "same" | "add" | "del";

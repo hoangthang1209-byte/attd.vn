@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
-import { getContentPublishReadiness } from "@/features/content/services/content-publish-readiness.service";
+import { listPublishEvents } from "@/features/content/services/content-publishing.service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -13,9 +13,6 @@ export async function GET(req: NextRequest, context: RouteContext) {
   if (!permission.ok) return permission.response;
 
   const { id } = await context.params;
-  const readiness = await getContentPublishReadiness(id);
-  return NextResponse.json({
-    readiness,
-    message: "Publish readiness V2 — không publish tự động.",
-  });
+  const events = await listPublishEvents(id);
+  return NextResponse.json({ events });
 }

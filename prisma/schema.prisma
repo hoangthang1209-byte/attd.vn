@@ -804,6 +804,18 @@ model BlogPost {
   ogImageUrl       String?
   status           BlogPostStatus     @default(DRAFT)
   publishedAt      DateTime?
+  /// Sprint 11.6 — scheduling / publish traceability
+  scheduledAt                   DateTime?
+  lastPublishedAt               DateTime?
+  lastUnpublishedAt             DateTime?
+  publishedBy                   String?
+  scheduledBy                   String?
+  publishVersion                Int                 @default(0)
+  lastPublishedContentHash      String?
+  publishReadinessAcknowledgedAt DateTime?
+  publishReadinessAcknowledgedBy String?
+  publishAckNote                String?             @db.Text
+  needsContentReview            Boolean             @default(false)
   faqJson          Json               @default("[]")
   tags             Json               @default("[]")
   aiMetadata       Json?
@@ -827,6 +839,7 @@ model BlogPost {
   @@index([mediaBundleId])
   @@index([sourceWritingDraftId])
   @@index([sourceHandoffRecordId])
+  @@index([scheduledAt, status])
 }
 
 model BlogPostCategory {
@@ -2025,7 +2038,9 @@ enum PostStatus {
 enum BlogPostStatus {
   DRAFT
   REVIEW
+  SCHEDULED
   PUBLISHED
+  ARCHIVED
 }
 
 enum UserRole {
@@ -3013,6 +3028,52 @@ model ContentHandoffRecord {
   @@index([targetType, targetEntityId])
   @@index([status, createdAt])
   @@index([sourceSnapshotHash])
+}
+
+enum ContentPublishAction {
+  PUBLISH_NOW
+  SCHEDULE
+  RESCHEDULE
+  CANCEL_SCHEDULE
+  UNPUBLISH
+  ARCHIVE
+  RESTORE_DRAFT
+}
+
+enum ContentPublishEventStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model ContentPublishEvent {
+  id                   String                    @id @default(cuid())
+  blogPostId           String
+  action               ContentPublishAction
+  status               ContentPublishEventStatus @default(PENDING)
+  requestedBy          String?
+  scheduledFor         DateTime?
+  previousStatus       String?
+  nextStatus           String?
+  readinessSnapshot    Json?
+  sourceHandoffId      String?
+  sourceWritingDraftId String?
+  sourceDraftVersion   Int?
+  contentSnapshotHash  String?
+  idempotencyHash      String?
+  metadata             Json?
+  errorMessage         String?                   @db.Text
+  requestedAt          DateTime                  @default(now())
+  completedAt          DateTime?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  @@index([blogPostId, createdAt])
+  @@index([action, status, createdAt])
+  @@index([scheduledFor, status])
+  @@index([requestedBy, createdAt])
+  @@index([idempotencyHash])
 }
 
 enum KnowledgeBaseImportJobStatus {

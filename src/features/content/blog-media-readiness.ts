@@ -1,4 +1,4 @@
-import type { ContentMediaPlacement, MediaVisibility } from "@prisma/client";
+import type { BlogPostStatus, ContentMediaPlacement, MediaVisibility } from "@prisma/client";
 
 export type BlogMediaReadiness = {
   ready: boolean;
@@ -22,7 +22,7 @@ export type BlogMediaReadinessAssignment = {
 };
 
 export type BlogMediaReadinessInput = {
-  status: "DRAFT" | "REVIEW" | "PUBLISHED";
+  status: BlogPostStatus;
   requireFeatured?: boolean;
   featuredImageUrl?: string | null;
   ogImageUrl?: string | null;

@@ -43,6 +43,17 @@ function mapPost(row: {
   ogImageUrl: string | null;
   status: BlogPostStatus;
   publishedAt: Date | null;
+  scheduledAt?: Date | null;
+  lastPublishedAt?: Date | null;
+  lastUnpublishedAt?: Date | null;
+  publishedBy?: string | null;
+  scheduledBy?: string | null;
+  publishVersion?: number;
+  lastPublishedContentHash?: string | null;
+  publishReadinessAcknowledgedAt?: Date | null;
+  publishReadinessAcknowledgedBy?: string | null;
+  publishAckNote?: string | null;
+  needsContentReview?: boolean;
   faqJson: unknown;
   tags: unknown;
   mediaBundleId?: string | null;
@@ -79,6 +90,17 @@ function mapPost(row: {
     ogImageUrl: row.ogImageUrl,
     status: row.status,
     publishedAt: row.publishedAt?.toISOString() ?? null,
+    scheduledAt: row.scheduledAt?.toISOString() ?? null,
+    lastPublishedAt: row.lastPublishedAt?.toISOString() ?? null,
+    lastUnpublishedAt: row.lastUnpublishedAt?.toISOString() ?? null,
+    publishedBy: row.publishedBy ?? null,
+    scheduledBy: row.scheduledBy ?? null,
+    publishVersion: row.publishVersion ?? 0,
+    lastPublishedContentHash: row.lastPublishedContentHash ?? null,
+    publishReadinessAcknowledgedAt: row.publishReadinessAcknowledgedAt?.toISOString() ?? null,
+    publishReadinessAcknowledgedBy: row.publishReadinessAcknowledgedBy ?? null,
+    publishAckNote: row.publishAckNote ?? null,
+    needsContentReview: Boolean(row.needsContentReview),
     faqJson: parseFaqJson(row.faqJson),
     tags: parseTagsJson(row.tags),
     mediaBundleId: row.mediaBundleId ?? null,
@@ -207,15 +229,34 @@ export async function updateBlogPost(
   const publishedAt =
     nextStatus === "PUBLISHED"
       ? existing.publishedAt ?? new Date()
-      : nextStatus === "DRAFT"
-        ? null
+      : nextStatus === "DRAFT" || nextStatus === "ARCHIVED" || nextStatus === "SCHEDULED"
+        ? nextStatus === "SCHEDULED"
+          ? existing.publishedAt
+          : null
         : existing.publishedAt;
 
   if (nextStatus === "PUBLISHED" && existing.status !== "PUBLISHED") {
-    const { assertBlogPublishMediaReady } = await import(
-      "@/features/content/services/content-media-assignment.service"
+    const governed = Boolean(
+      existing.sourceWritingDraftId &&
+        existing.sourceReviewSessionId &&
+        existing.sourceHandoffRecordId
     );
-    await assertBlogPublishMediaReady(id);
+    if (governed) {
+      const { getContentPublishReadiness } = await import(
+        "@/features/content/services/content-publish-readiness.service"
+      );
+      const readiness = await getContentPublishReadiness(id);
+      if (!readiness.ready) {
+        throw new Error(
+          `Governed Blog chưa sẵn sàng xuất bản: ${readiness.errors.join("; ")}. Dùng panel Xuất bản nội dung.`
+        );
+      }
+    } else {
+      const { assertBlogPublishMediaReady } = await import(
+        "@/features/content/services/content-media-assignment.service"
+      );
+      await assertBlogPublishMediaReady(id);
+    }
   }
 
   const row = await prisma.blogPost.update({
@@ -358,5 +399,11 @@ export async function deleteBlogCategory(id: string): Promise<boolean> {
 }
 
 export function isValidBlogPostStatus(value: string): value is BlogPostStatus {
-  return value === "DRAFT" || value === "REVIEW" || value === "PUBLISHED";
+  return (
+    value === "DRAFT" ||
+    value === "REVIEW" ||
+    value === "SCHEDULED" ||
+    value === "PUBLISHED" ||
+    value === "ARCHIVED"
+  );
 }

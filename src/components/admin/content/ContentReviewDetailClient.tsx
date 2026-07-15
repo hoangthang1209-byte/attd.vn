@@ -325,7 +325,10 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
                 Tạo Blog Draft
               </AdminLoadingButton>
             </div>
-            <p className="admin-field-hint">Handoff chỉ tạo Blog DRAFT — không publish.</p>
+            <p className="admin-field-hint">Handoff chỉ tạo Blog DRAFT — publish qua Blog editor panel.</p>
+            <p className="admin-field-hint">
+              <Link href="/admin/content/publishing">Dashboard xuất bản</Link>
+            </p>
           </div>
 
           <div className="admin-sidebar-card">

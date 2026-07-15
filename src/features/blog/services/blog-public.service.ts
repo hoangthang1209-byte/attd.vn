@@ -257,7 +257,7 @@ function mapRelatedPost(post: {
   publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  status: "DRAFT" | "REVIEW" | "PUBLISHED";
+  status: import("@prisma/client").BlogPostStatus;
   categories: { category: { id: string; name: string; slug: string } }[];
 }) {
   return {

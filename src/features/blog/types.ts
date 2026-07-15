@@ -1,4 +1,4 @@
-import type { BlogPostStatus } from "@prisma/client";
+export type BlogPostStatus = import("@prisma/client").BlogPostStatus;
 
 export type BlogFaqItem = {
   question: string;
@@ -29,6 +29,17 @@ export type BlogPostRecord = {
   ogImageUrl: string | null;
   status: BlogPostStatus;
   publishedAt: string | null;
+  scheduledAt?: string | null;
+  lastPublishedAt?: string | null;
+  lastUnpublishedAt?: string | null;
+  publishedBy?: string | null;
+  scheduledBy?: string | null;
+  publishVersion?: number;
+  lastPublishedContentHash?: string | null;
+  publishReadinessAcknowledgedAt?: string | null;
+  publishReadinessAcknowledgedBy?: string | null;
+  publishAckNote?: string | null;
+  needsContentReview?: boolean;
   faqJson: BlogFaqItem[];
   tags: string[];
   mediaBundleId?: string | null;
@@ -75,10 +86,18 @@ export type BlogPostInput = {
   aiMetadata?: Record<string, unknown> | null;
 };
 
-export const BLOG_POST_STATUSES: BlogPostStatus[] = ["DRAFT", "REVIEW", "PUBLISHED"];
+export const BLOG_POST_STATUSES: BlogPostStatus[] = [
+  "DRAFT",
+  "REVIEW",
+  "SCHEDULED",
+  "PUBLISHED",
+  "ARCHIVED",
+];
 
 export const BLOG_STATUS_LABELS: Record<BlogPostStatus, string> = {
   DRAFT: "Draft",
   REVIEW: "Review",
+  SCHEDULED: "Scheduled",
   PUBLISHED: "Published",
+  ARCHIVED: "Archived",
 };
