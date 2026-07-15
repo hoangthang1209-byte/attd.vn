@@ -27,6 +27,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/crm/customers/import",
+    meta: {
+      breadcrumbs: ["CRM", "Khách hàng", "Import Excel"],
+      title: "Import khách hàng",
+      description: "Nhập danh sách khách hàng từ file Excel và kiểm tra trước khi import.",
+    },
+  },
+  {
     path: "/admin/crm/customers",
     meta: {
       breadcrumbs: ["Thương mại", "Khách hàng"],

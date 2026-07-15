@@ -82,6 +82,9 @@ export default function CrmCustomersList() {
           <Link href="/admin/crm/customer-types" className="admin-btn admin-btn--secondary">
             Loại khách hàng
           </Link>
+          <Link href="/admin/crm/customers/import" className="admin-btn admin-btn--secondary">
+            Import Excel
+          </Link>
           <Link href="/admin/crm/customers/new" className="admin-btn admin-btn--primary">
             Thêm khách hàng
           </Link>
