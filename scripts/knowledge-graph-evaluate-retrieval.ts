@@ -1,47 +1,61 @@
 /**
- * Print Retrieval evaluation dataset + flag status (no writes).
+ * Run governed graph retrieval evaluation (baseline vs expansion preview).
+ * Does not enable production expansion flags.
  */
-import {
-  KNOWLEDGE_GRAPH_EVALUATION_CASES,
-  evaluateGraphExpansionPreview,
-} from "../src/features/knowledge-graph/knowledge-graph-evaluation";
-import { isKnowledgeGraphExpansionEnabled } from "../src/features/ai-retrieval/sources/knowledge-graph-source";
+import { runGraphRetrievalEvaluation } from "../src/features/knowledge-graph/evaluation/graph-retrieval-evaluator.service";
+import { getKnowledgeGraphExpansionFlagSnapshot } from "../src/features/knowledge-graph/evaluation/graph-expansion-flags";
 
 async function main() {
+  const persist = process.argv.includes("--persist");
+  const consumerArg = process.argv.find((a) => a.startsWith("--consumers="));
+  const consumers = consumerArg
+    ? (consumerArg.slice("--consumers=".length).split(",") as Array<
+        "SEO_TOPIC_PLANNER" | "SEO_BRIEF"
+      >)
+    : (["SEO_TOPIC_PLANNER", "SEO_BRIEF"] as const);
+
   console.log(
-    JSON.stringify(
-      {
-        productionExpansionFlag: isKnowledgeGraphExpansionEnabled(),
-        cases: KNOWLEDGE_GRAPH_EVALUATION_CASES.map((c) => ({
-          id: c.id,
-          query: c.query,
-          expectedPaths: c.expectedPaths.length,
-        })),
-        sampleComparisonContract: evaluateGraphExpansionPreview({
-          caseId: "demo",
-          query: "demo",
-          baselineFactCount: 3,
-          previewMatchedOn: ["graph:PRODUCT→SUITABLE_FOR→USE_CASE"],
-          previewScopeEntityCount: 4,
-          baselineContextChars: 100,
-          previewContextChars: 140,
-          expectedPaths: [
-            {
-              fromEntityType: "PRODUCT",
-              relationshipType: "SUITABLE_FOR",
-              toEntityType: "USE_CASE",
-            },
-          ],
-          irrelevantPathHints: ["CUSTOMER"],
-        }),
-      },
-      null,
-      2
-    )
+    JSON.stringify({ flags: getKnowledgeGraphExpansionFlagSnapshot() }, null, 2)
   );
+
+  const result = await runGraphRetrievalEvaluation({
+    consumers: [...consumers],
+    depth: 1,
+    persist,
+    requestedBy: "cli:knowledge-graph-evaluate-retrieval",
+  });
+
+  const summary = {
+    overallVerdict: result.overallVerdict,
+    overallReasons: result.overallReasons,
+    recommendation: result.recommendation,
+    byConsumer: result.byConsumer,
+    durationMs: result.durationMs,
+    runId: result.runId,
+    productionFlags: result.productionFlags,
+    benchmarks: result.benchmarks.map((b) => ({
+      id: b.benchmarkId,
+      consumer: b.consumer,
+      improved: b.metrics.improved,
+      precision: b.judgment.precision,
+      recall: b.judgment.recall,
+      contextGrowthPercent: b.judgment.contextGrowthPercent,
+      pathsFound: b.pathsFound.length,
+      missingRequired: b.missingRequiredPaths.length,
+      visibilitySafe: b.judgment.visibilitySafe,
+      authorityPreserved: b.judgment.directAuthorityPreserved,
+      gaps: b.gaps.slice(0, 5),
+    })),
+  };
+  console.log(JSON.stringify(summary, null, 2));
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    const { prisma } = await import("../src/lib/prisma");
+    await prisma.$disconnect();
+  });

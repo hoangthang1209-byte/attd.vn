@@ -74,7 +74,7 @@ describe("Evaluation dataset", () => {
 
   it("evaluator finds expected path and reports irrelevant hints", () => {
     const comparison = evaluateGraphExpansionPreview({
-      caseId: "polo-corp",
+      caseId: "polo-corporate",
       query: "áo polo đồng phục công ty",
       baselineFactCount: 5,
       previewMatchedOn: ["graph:PRODUCT→SUITABLE_FOR→USE_CASE", "graph:PRODUCT→TARGETS→AUDIENCE"],

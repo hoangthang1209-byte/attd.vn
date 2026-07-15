@@ -19,6 +19,7 @@
     "knowledge-graph:import-kb-relations": "npx tsx scripts/knowledge-graph-import-kb-relations.ts",
     "knowledge-graph:import-product-semantics": "npx tsx scripts/knowledge-graph-import-product-semantics.ts",
     "knowledge-graph:evaluate-retrieval": "npx tsx scripts/knowledge-graph-evaluate-retrieval.ts",
+    "knowledge-graph:apply-evaluation-curation": "npx tsx scripts/knowledge-graph-apply-evaluation-curation.ts",
     "knowledge-graph:health": "npx tsx scripts/knowledge-graph-health.ts"
   },
   "dependencies": {

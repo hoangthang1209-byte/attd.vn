@@ -1,7 +1,15 @@
 /**
- * Controlled Retrieval evaluation dataset for Sprint 12.2 preview.
- * Graph expansion stays disabled in production.
+ * Sprint 12.1/12.2 evaluation surface.
+ * Prefer importing from evaluation/* modules for new code.
  */
+
+export {
+  GRAPH_EVALUATION_BENCHMARKS,
+  KNOWLEDGE_GRAPH_EVALUATION_CASES,
+  getBenchmarkById,
+  type GraphEvalBenchmark,
+  type GraphEvalPathSpec,
+} from "@/features/knowledge-graph/evaluation/graph-evaluation-benchmarks";
 
 export type GraphEvalExpectedPath = {
   fromEntityType: string;
@@ -17,71 +25,6 @@ export type GraphEvalCase = {
   expectedPaths: GraphEvalExpectedPath[];
   irrelevantPathHints: string[];
 };
-
-export const KNOWLEDGE_GRAPH_EVALUATION_CASES: GraphEvalCase[] = [
-  {
-    id: "polo-corp",
-    query: "áo polo đồng phục công ty",
-    description: "Corporate polo uniform intent",
-    expectedPaths: [
-      { fromEntityType: "PRODUCT", relationshipType: "SUITABLE_FOR", toEntityType: "USE_CASE" },
-      { fromEntityType: "PRODUCT", relationshipType: "TARGETS", toEntityType: "AUDIENCE" },
-      { fromEntityType: "PRODUCT", relationshipType: "BELONGS_TO", toEntityType: "PRODUCT_CATEGORY" },
-    ],
-    irrelevantPathHints: ["CONFIDENTIAL", "CUSTOMER", "SUPPLIER"],
-  },
-  {
-    id: "corporate-gift",
-    query: "quà tặng doanh nghiệp",
-    description: "Corporate gifting",
-    expectedPaths: [
-      { fromEntityType: "PRODUCT", relationshipType: "SUITABLE_FOR", toEntityType: "USE_CASE" },
-      { fromEntityType: "PRODUCT", relationshipType: "TARGETS", toEntityType: "INDUSTRY" },
-    ],
-    irrelevantPathHints: ["Quote", "CRM"],
-  },
-  {
-    id: "bulk-tee-factory",
-    query: "xưởng may áo thun số lượng lớn",
-    description: "Bulk t-shirt manufacturing",
-    expectedPaths: [
-      { fromEntityType: "PRODUCT", relationshipType: "HAS_CAPABILITY", toEntityType: "CAPABILITY" },
-      { fromEntityType: "CAPABILITY", relationshipType: "EVIDENCED_BY", toEntityType: "CASE_STUDY" },
-    ],
-    irrelevantPathHints: ["MOQ copied into graph metadata"],
-  },
-  {
-    id: "screen-print-bulk",
-    query: "in lụa số lượng lớn",
-    description: "Bulk silk-screen printing",
-    expectedPaths: [
-      { fromEntityType: "PRODUCT", relationshipType: "SUPPORTS", toEntityType: "PRINT_METHOD" },
-      { fromEntityType: "MATERIAL", relationshipType: "COMPATIBLE_WITH", toEntityType: "PRINT_METHOD" },
-    ],
-    irrelevantPathHints: ["unpublished Blog PUBLIC"],
-  },
-  {
-    id: "oem-private-label",
-    query: "OEM private label",
-    description: "OEM / private label capability",
-    expectedPaths: [
-      { fromEntityType: "PRODUCT", relationshipType: "HAS_CAPABILITY", toEntityType: "CAPABILITY" },
-      { fromEntityType: "CAPABILITY", relationshipType: "HAS_MEDIA", toEntityType: "MEDIA_BUNDLE" },
-    ],
-    irrelevantPathHints: ["pricing tiers", "cost"],
-  },
-  {
-    id: "bank-uniform",
-    query: "đồng phục ngân hàng",
-    description: "Banking industry uniforms",
-    expectedPaths: [
-      { fromEntityType: "PRODUCT", relationshipType: "TARGETS", toEntityType: "INDUSTRY" },
-      { fromEntityType: "PRODUCT", relationshipType: "SUITABLE_FOR", toEntityType: "USE_CASE" },
-      { fromEntityType: "SEO_TOPIC", relationshipType: "LINKS_TO", toEntityType: "BLOG_POST" },
-    ],
-    irrelevantPathHints: ["Customer account"],
-  },
-];
 
 export type GraphEvalComparison = {
   caseId: string;

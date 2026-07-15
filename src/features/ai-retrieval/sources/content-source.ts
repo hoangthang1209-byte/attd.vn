@@ -24,18 +24,23 @@ export async function retrieveContentFacts(
 
   const q = request.query.trim();
   const limit = Math.min(request.maxItems ?? policy.maxItems, 10);
+  const scopedIds = request.entityIds ?? [];
+  if (!q && scopedIds.length === 0) {
+    return { facts: [], omitted: [], warnings: [] };
+  }
   const rows = await prisma.blogPost.findMany({
     where: {
       status: "PUBLISHED",
-      ...(q
-        ? {
-            OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { excerpt: { contains: q, mode: "insensitive" } },
-              { slug: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : {}),
+      OR: [
+        ...(scopedIds.length ? [{ id: { in: scopedIds } }] : []),
+        ...(q
+          ? [
+              { title: { contains: q, mode: "insensitive" as const } },
+              { excerpt: { contains: q, mode: "insensitive" as const } },
+              { slug: { contains: q, mode: "insensitive" as const } },
+            ]
+          : []),
+      ],
     },
     select: {
       id: true,

@@ -34,6 +34,9 @@ export const KNOWLEDGE_GRAPH_EXPANSION_POLICY: Partial<
     "HAS_CASE_STUDY",
     "HAS_SEO_TOPIC",
     "LINKS_TO",
+    "FEATURED_IN",
+    "DOCUMENTED_BY",
+    "EVIDENCED_BY",
   ],
   SEO_TOPIC_PLANNER: [
     "BELONGS_TO",
@@ -41,6 +44,11 @@ export const KNOWLEDGE_GRAPH_EXPANSION_POLICY: Partial<
     "HAS_SEO_TOPIC",
     "LINKS_TO",
     "RELATED_TO",
+    "SUITABLE_FOR",
+    "TARGETS",
+    "HAS_CAPABILITY",
+    "FEATURED_IN",
+    "DOCUMENTED_BY",
   ],
   ADMIN: [
     "BELONGS_TO",

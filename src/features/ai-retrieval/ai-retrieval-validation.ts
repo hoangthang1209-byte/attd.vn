@@ -31,6 +31,14 @@ export function validateAiRetrievalRequest(raw: unknown): AiRetrievalValidationR
   if ("maxVisibility" in input || "allowConfidential" in input || "visibility" in input) {
     errors.push("Caller cannot override visibility or confidentiality policy.");
   }
+  if (
+    "enabledForEvaluation" in input ||
+    "graphExpansionOverride" in input ||
+    "evaluationMode" in input ||
+    "skipRetrievalLog" in input
+  ) {
+    errors.push("Caller cannot override Knowledge Graph evaluation mode.");
+  }
   if ("table" in input || "tables" in input || "sql" in input || "rawQuery" in input) {
     errors.push("Arbitrary database access is not allowed.");
   }

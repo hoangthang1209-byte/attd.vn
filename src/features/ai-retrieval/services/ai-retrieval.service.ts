@@ -153,13 +153,22 @@ async function writeRetrievalLog(input: {
   });
 }
 
+export type RetrieveEnterpriseOptions = {
+  /** Admin/evaluation only — never accepted from validated public request body. */
+  enabledForEvaluation?: boolean;
+  evaluationMode?: boolean;
+  skipRetrievalLog?: boolean;
+  graphExpansionDepth?: number;
+};
+
 export async function retrieveEnterpriseAiContext(
-  rawRequest: unknown
+  rawRequest: unknown,
+  options?: RetrieveEnterpriseOptions
 ): Promise<{ ok: true; context: AiRetrievalContext } | { ok: false; errors: string[] }> {
   const validated = validateAiRetrievalRequest(rawRequest);
   if (!validated.ok) return validated;
 
-  const request = validated.request;
+  let request = validated.request;
   const policy = getAiRetrievalPolicy(request.consumer);
   const requestId = randomUUID();
   const maxVisibility = resolveEffectiveMaxVisibility(policy, request.purpose);
@@ -171,6 +180,42 @@ export async function retrieveEnterpriseAiContext(
   const omittedGroups: AiRetrievalOmittedBucket[][] = [];
   const warningGroups: string[][] = [];
   let facts: AiRetrievedFact[] = [];
+
+  // Optional Knowledge Graph scope expansion (production flags default false).
+  // Evaluation override is server-option only — cannot come from request body.
+  let graphExpansion: Awaited<
+    ReturnType<
+      typeof import("@/features/ai-retrieval/sources/knowledge-graph-source").expandRetrievalScopeViaKnowledgeGraph
+    >
+  > | null = null;
+  try {
+    const {
+      expandRetrievalScopeViaKnowledgeGraph,
+      attachGraphProvenanceToFacts,
+      mergeGraphScopesIntoRequest,
+    } = await import("@/features/ai-retrieval/sources/knowledge-graph-source");
+    graphExpansion = await expandRetrievalScopeViaKnowledgeGraph(request, policy, {
+      enabledForEvaluation: options?.enabledForEvaluation,
+      depth: options?.graphExpansionDepth ?? 1,
+    });
+    warningGroups.push(graphExpansion.warnings);
+    if (graphExpansion.enabled && graphExpansion.queried && graphExpansion.scopeEntityIds.length) {
+      const { prisma: db } = await import("@/lib/prisma");
+      const scoped = await db.knowledgeGraphEntity.findMany({
+        where: { id: { in: graphExpansion.scopeEntityIds.slice(0, 100) } },
+        select: { sourceType: true, sourceId: true, visibility: true },
+      });
+      request = mergeGraphScopesIntoRequest(request, graphExpansion, scoped);
+    }
+    // attach later after facts gathered
+    void attachGraphProvenanceToFacts;
+  } catch (err) {
+    warningGroups.push([
+      `graph_expansion_failed:${err instanceof Error ? err.message : String(err)}`,
+      "graph_fallback_to_baseline",
+    ]);
+    graphExpansion = null;
+  }
 
   const runIf = async (
     type: AiRetrievalSourceType,
@@ -239,6 +284,15 @@ export async function retrieveEnterpriseAiContext(
     omittedGroups.push([{ reason: "visibility_exceeds_policy", count: 1 }]);
     return false;
   });
+
+  if (graphExpansion?.enabled && graphExpansion.queried) {
+    const { attachGraphProvenanceToFacts } = await import(
+      "@/features/ai-retrieval/sources/knowledge-graph-source"
+    );
+    const attached = attachGraphProvenanceToFacts(facts, graphExpansion);
+    facts = attached.facts;
+    omittedGroups.push(attached.omitted);
+  }
 
   // Rescore with unified scoring
   facts = facts.map((fact) => {
@@ -349,16 +403,18 @@ export async function retrieveEnterpriseAiContext(
     generatedAt: new Date().toISOString(),
   };
 
-  await writeRetrievalLog({
-    requestId,
-    request,
-    resultCount: facts.length,
-    conflictCount: conflicts.length,
-    warningCount: context.warnings.length,
-    omittedCount: omitted.reduce((sum, row) => sum + row.count, 0),
-    maxVisibilityUsed: maxVisibility,
-    sourceTypes,
-  });
+  if (!options?.skipRetrievalLog) {
+    await writeRetrievalLog({
+      requestId,
+      request,
+      resultCount: facts.length,
+      conflictCount: conflicts.length,
+      warningCount: context.warnings.length,
+      omittedCount: omitted.reduce((sum, row) => sum + row.count, 0),
+      maxVisibilityUsed: maxVisibility,
+      sourceTypes,
+    });
+  }
 
   return { ok: true, context };
 }

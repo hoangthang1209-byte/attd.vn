@@ -3239,6 +3239,69 @@ model KnowledgeGraphAuditLog {
   @@index([actorId, createdAt])
 }
 
+enum KnowledgeGraphEvaluationStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum KnowledgeGraphEvaluationAnnotationLabel {
+  RELEVANT
+  IRRELEVANT
+  DUPLICATE
+  NEEDS_REVIEW
+}
+
+enum KnowledgeGraphRolloutMode {
+  OFF
+  EVALUATION_ONLY
+  ADMIN_PILOT
+  ENABLED
+}
+
+/// Persisted evaluation run summaries (Sprint 12.2). No confidential Retrieval payloads.
+model KnowledgeGraphEvaluationRun {
+  id              String                         @id @default(cuid())
+  version         String
+  benchmarkSet    String
+  consumer        String
+  status          KnowledgeGraphEvaluationStatus @default(RUNNING)
+  baselineSummary Json?
+  expandedSummary Json?
+  resultSummary   Json?
+  thresholdResult String?
+  requestedBy     String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  errorMessage    String?
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @updatedAt
+
+  annotations KnowledgeGraphEvaluationAnnotation[]
+
+  @@index([consumer, createdAt])
+  @@index([status, createdAt])
+}
+
+/// Evaluation-only annotations; never auto-mutate graph relationships.
+model KnowledgeGraphEvaluationAnnotation {
+  id             String                                  @id @default(cuid())
+  runId          String?
+  run            KnowledgeGraphEvaluationRun?            @relation(fields: [runId], references: [id], onDelete: SetNull)
+  benchmarkId    String
+  targetType     String
+  targetKey      String
+  label          KnowledgeGraphEvaluationAnnotationLabel
+  note           String?
+  createdBy      String?
+  createdAt      DateTime                                @default(now())
+  updatedAt      DateTime                                @updatedAt
+
+  @@index([benchmarkId, targetType])
+  @@index([runId, createdAt])
+  @@unique([benchmarkId, targetType, targetKey, label])
+}
+
 enum KnowledgeBaseImportJobStatus {
   PENDING
   COMPLETED
