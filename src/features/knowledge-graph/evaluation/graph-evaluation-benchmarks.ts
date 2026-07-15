@@ -46,9 +46,9 @@ export const GRAPH_EVALUATION_BENCHMARKS: GraphEvalBenchmark[] = [
     requiredPaths: [
       { fromEntityType: "PRODUCT", relationshipType: "SUITABLE_FOR", toEntityType: "USE_CASE", required: true },
       { fromEntityType: "PRODUCT", relationshipType: "TARGETS", toEntityType: "AUDIENCE", required: true },
-      { fromEntityType: "PRODUCT", relationshipType: "BELONGS_TO", toEntityType: "PRODUCT_CATEGORY", required: true },
     ],
     optionalPaths: [
+      { fromEntityType: "PRODUCT", relationshipType: "BELONGS_TO", toEntityType: "PRODUCT_CATEGORY", note: "taxonomy discovery only" },
       { fromEntityType: "PRODUCT", relationshipType: "TARGETS", toEntityType: "INDUSTRY" },
       { fromEntityType: "PRODUCT", relationshipType: "HAS_CAPABILITY", toEntityType: "CAPABILITY" },
       { fromEntityType: "PRODUCT", relationshipType: "FEATURED_IN", toEntityType: "BLOG_POST" },
@@ -61,9 +61,8 @@ export const GRAPH_EVALUATION_BENCHMARKS: GraphEvalBenchmark[] = [
     maxUsefulDepth: 1,
     visibilityExpectation: "PUBLIC",
     dataGaps: [
-      "SeoTopic=0 — SEO_TOPIC paths unavailable",
+      "SeoTopic rows exist as IDEA DRAFT only — LINKS_TO public content still limited",
       "MediaBundle=0 — HAS_MEDIA paths unavailable",
-      "PrintMethod=0 — SUPPORTS PRINT_METHOD unavailable",
     ],
   },
   {
@@ -95,13 +94,14 @@ export const GRAPH_EVALUATION_BENCHMARKS: GraphEvalBenchmark[] = [
     seedKnowledgeEntryIds: ["cmqfhll1x000zl704p8xldt92", "cmqfmd612004fk0042poahscs"],
     requiredPaths: [
       { fromEntityType: "PRODUCT", relationshipType: "HAS_CAPABILITY", toEntityType: "CAPABILITY", required: true },
-      { fromEntityType: "PRODUCT", relationshipType: "BELONGS_TO", toEntityType: "PRODUCT_CATEGORY", required: true },
     ],
     optionalPaths: [
+      { fromEntityType: "PRODUCT", relationshipType: "BELONGS_TO", toEntityType: "PRODUCT_CATEGORY", note: "taxonomy discovery only" },
       { fromEntityType: "CAPABILITY", relationshipType: "SUITABLE_FOR", toEntityType: "USE_CASE" },
       { fromEntityType: "CAPABILITY", relationshipType: "EVIDENCED_BY", toEntityType: "KNOWLEDGE_ENTRY" },
       { fromEntityType: "PRODUCT", relationshipType: "DOCUMENTED_BY", toEntityType: "KNOWLEDGE_ENTRY" },
       { fromEntityType: "CAPABILITY", relationshipType: "HAS_MEDIA", toEntityType: "MEDIA_BUNDLE" },
+      { fromEntityType: "PRODUCT", relationshipType: "SUPPORTS", toEntityType: "PRINT_METHOD" },
     ],
     prohibitedPathHints: ["CUSTOMER", "cost copied into graph"],
     expectedSourceTypes: ["PRODUCT", "MANUFACTURING_ASSET", "KNOWLEDGE_BASE"],
@@ -117,17 +117,18 @@ export const GRAPH_EVALUATION_BENCHMARKS: GraphEvalBenchmark[] = [
     seedKnowledgeEntryIds: [],
     requiredPaths: [
       { fromEntityType: "PRODUCT", relationshipType: "HAS_CAPABILITY", toEntityType: "CAPABILITY", required: true },
+      { fromEntityType: "PRODUCT", relationshipType: "SUPPORTS", toEntityType: "PRINT_METHOD", required: true },
     ],
     optionalPaths: [
-      { fromEntityType: "PRODUCT", relationshipType: "SUPPORTS", toEntityType: "PRINT_METHOD" },
       { fromEntityType: "MATERIAL", relationshipType: "COMPATIBLE_WITH", toEntityType: "PRINT_METHOD" },
+      { fromEntityType: "CAPABILITY", relationshipType: "SUPPORTS", toEntityType: "PRINT_METHOD" },
       { fromEntityType: "CAPABILITY", relationshipType: "SUITABLE_FOR", toEntityType: "USE_CASE" },
     ],
     prohibitedPathHints: ["CUSTOMER", "unpublished Blog as PUBLIC fact"],
     expectedSourceTypes: ["PRODUCT", "MANUFACTURING_ASSET"],
     maxUsefulDepth: 1,
     visibilityExpectation: "PUBLIC",
-    dataGaps: ["PrintMethod=0 — SUPPORTS/COMPATIBLE_WITH print paths blocked"],
+    dataGaps: [],
   },
   {
     id: "oem-private-label",

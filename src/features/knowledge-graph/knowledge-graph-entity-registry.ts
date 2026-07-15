@@ -229,7 +229,7 @@ async function resolvePrintMethod(sourceId: string): Promise<GraphEntitySourceRe
     entityType: "PRINT_METHOD",
     canonicalKey: row.code || `print-method:${row.id}`,
     displayName: row.name,
-    visibility: "INTERNAL",
+    visibility: row.isActive ? "PUBLIC" : "INTERNAL",
     metadata: sanitizeGraphMetadata({ code: row.code, isActive: row.isActive }),
     exists: true,
   };
@@ -326,7 +326,14 @@ function vocabEntityType(
 async function resolveVocabularyTerm(sourceId: string): Promise<GraphEntitySourceRecord | null> {
   const row = await prisma.mediaVocabularyTerm.findUnique({
     where: { id: sourceId },
-    select: { id: true, name: true, code: true, type: true, isActive: true },
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      type: true,
+      isActive: true,
+      visibility: true,
+    },
   });
   if (!row) return null;
   const entityType = vocabEntityType(row.type);
@@ -337,7 +344,12 @@ async function resolveVocabularyTerm(sourceId: string): Promise<GraphEntitySourc
     entityType,
     canonicalKey: row.code || `${row.type.toLowerCase()}:${row.id}`,
     displayName: row.name,
-    visibility: "INTERNAL",
+    visibility:
+      row.visibility === "PUBLIC"
+        ? "PUBLIC"
+        : row.visibility === "CONFIDENTIAL"
+          ? "CONFIDENTIAL"
+          : "INTERNAL",
     metadata: sanitizeGraphMetadata({ vocabType: row.type, code: row.code, isActive: row.isActive }),
     exists: true,
   };

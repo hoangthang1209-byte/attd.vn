@@ -13,6 +13,7 @@ export type MediaVocabularyTermRecord = {
   sortOrder: number;
   isActive: boolean;
   isSystem: boolean;
+  visibility?: string;
   usageCount?: number;
   createdAt: string;
   updatedAt: string;
@@ -64,6 +65,7 @@ function mapTerm(row: {
   sortOrder: number;
   isActive: boolean;
   isSystem: boolean;
+  visibility?: string;
   createdAt: Date;
   updatedAt: Date;
   usageCount?: number;
@@ -78,6 +80,7 @@ function mapTerm(row: {
     sortOrder: row.sortOrder,
     isActive: row.isActive,
     isSystem: row.isSystem,
+    visibility: row.visibility,
     usageCount: row.usageCount,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

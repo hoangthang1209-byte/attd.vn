@@ -33,6 +33,7 @@ export function validateAiRetrievalRequest(raw: unknown): AiRetrievalValidationR
   }
   if (
     "enabledForEvaluation" in input ||
+    "enabledForAdminPilot" in input ||
     "graphExpansionOverride" in input ||
     "evaluationMode" in input ||
     "skipRetrievalLog" in input

@@ -1,99 +1,42 @@
+/**
+ * Consumer relationship allowlists — sourced from Sprint 12.3 path policy.
+ */
+
 import type { KnowledgeGraphRelationshipType } from "@prisma/client";
 import type { AiRetrievalConsumer } from "@/features/ai-retrieval/ai-retrieval-types";
+import {
+  CONSUMER_EXPANSION_RELATIONSHIPS,
+  resolveGraphQueryIntent,
+  resolveAllowedRelationshipsForExpansion,
+} from "@/features/knowledge-graph/evaluation/graph-expansion-path-policy";
 
-/** Safe allowlisted relationship types per Retrieval consumer. */
+/** @deprecated Prefer resolveAllowedRelationshipsForExpansion with intent. */
 export const KNOWLEDGE_GRAPH_EXPANSION_POLICY: Partial<
   Record<AiRetrievalConsumer, KnowledgeGraphRelationshipType[]>
-> = {
-  SEO_CONTENT: [
-    "BELONGS_TO",
-    "MADE_FROM",
-    "COMPATIBLE_WITH",
-    "SUPPORTS",
-    "APPLIES_TO",
-    "TARGETS",
-    "SUITABLE_FOR",
-    "HAS_CAPABILITY",
-    "HAS_POLICY",
-    "HAS_MEDIA",
-    "HAS_CASE_STUDY",
-    "HAS_SEO_TOPIC",
-    "LINKS_TO",
-  ],
-  SEO_BRIEF: [
-    "BELONGS_TO",
-    "MADE_FROM",
-    "COMPATIBLE_WITH",
-    "SUPPORTS",
-    "APPLIES_TO",
-    "TARGETS",
-    "SUITABLE_FOR",
-    "HAS_CAPABILITY",
-    "HAS_POLICY",
-    "HAS_MEDIA",
-    "HAS_CASE_STUDY",
-    "HAS_SEO_TOPIC",
-    "LINKS_TO",
-    "FEATURED_IN",
-    "DOCUMENTED_BY",
-    "EVIDENCED_BY",
-  ],
-  SEO_TOPIC_PLANNER: [
-    "BELONGS_TO",
-    "HAS_MEDIA",
-    "HAS_SEO_TOPIC",
-    "LINKS_TO",
-    "RELATED_TO",
-    "SUITABLE_FOR",
-    "TARGETS",
-    "HAS_CAPABILITY",
-    "FEATURED_IN",
-    "DOCUMENTED_BY",
-  ],
-  ADMIN: [
-    "BELONGS_TO",
-    "MADE_FROM",
-    "COMPATIBLE_WITH",
-    "SUPPORTS",
-    "APPLIES_TO",
-    "TARGETS",
-    "SUITABLE_FOR",
-    "HAS_CAPABILITY",
-    "HAS_POLICY",
-    "HAS_MEDIA",
-    "HAS_CASE_STUDY",
-    "HAS_SEO_TOPIC",
-    "LINKS_TO",
-    "RELATED_TO",
-    "DOCUMENTED_BY",
-    "EVIDENCED_BY",
-  ],
-};
+> = CONSUMER_EXPANSION_RELATIONSHIPS;
 
-/** Relationship types that must never expand into public SEO paths. */
-export const SEO_UNSAFE_RELATIONSHIP_TYPES: KnowledgeGraphRelationshipType[] = [
-  "REQUIRES",
-  "NOT_COMPATIBLE_WITH",
-];
+/** Unsafe for public SEO output unless consumer is ADMIN / internal brief with policy need. */
+export const SEO_UNSAFE_RELATIONSHIP_TYPES: KnowledgeGraphRelationshipType[] = ["REQUIRES"];
 
 export function getAllowedGraphRelationshipsForConsumer(
-  consumer: AiRetrievalConsumer
+  consumer: AiRetrievalConsumer,
+  query = ""
 ): KnowledgeGraphRelationshipType[] {
-  return KNOWLEDGE_GRAPH_EXPANSION_POLICY[consumer] ?? [];
+  const intent = resolveGraphQueryIntent({ query, consumer });
+  return resolveAllowedRelationshipsForExpansion({ consumer, intent });
 }
 
 export function isRelationshipAllowedForConsumer(
   consumer: AiRetrievalConsumer,
-  relationshipType: KnowledgeGraphRelationshipType
+  relationshipType: KnowledgeGraphRelationshipType,
+  query = ""
 ): boolean {
   if (
-    (consumer === "SEO_CONTENT" ||
-      consumer === "SEO_BRIEF" ||
-      consumer === "SEO_TOPIC_PLANNER") &&
+    (consumer === "SEO_CONTENT" || consumer === "SEO_TOPIC_PLANNER") &&
     SEO_UNSAFE_RELATIONSHIP_TYPES.includes(relationshipType)
   ) {
     return false;
   }
-  const allowed = getAllowedGraphRelationshipsForConsumer(consumer);
+  const allowed = getAllowedGraphRelationshipsForConsumer(consumer, query);
   return allowed.includes(relationshipType);
 }

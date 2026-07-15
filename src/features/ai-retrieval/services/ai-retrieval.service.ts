@@ -156,6 +156,8 @@ async function writeRetrievalLog(input: {
 export type RetrieveEnterpriseOptions = {
   /** Admin/evaluation only — never accepted from validated public request body. */
   enabledForEvaluation?: boolean;
+  /** Explicit Retrieval Inspector admin pilot toggle (authorized admin only). */
+  enabledForAdminPilot?: boolean;
   evaluationMode?: boolean;
   skipRetrievalLog?: boolean;
   graphExpansionDepth?: number;
@@ -169,6 +171,13 @@ export async function retrieveEnterpriseAiContext(
   if (!validated.ok) return validated;
 
   let request = validated.request;
+  const originalRequest = { ...validated.request };
+  const baselineSourceKeys = new Set<string>([
+    ...(originalRequest.productIds ?? []).map((id) => `PRODUCT:${id}`),
+    ...(originalRequest.knowledgeEntryIds ?? []).map((id) => `KNOWLEDGE_BASE:${id}`),
+    ...(originalRequest.seoTopicIds ?? []).map((id) => `SEO_TOPIC:${id}`),
+    ...(originalRequest.mediaBundleIds ?? []).map((id) => `MEDIA_BUNDLE:${id}`),
+  ]);
   const policy = getAiRetrievalPolicy(request.consumer);
   const requestId = randomUUID();
   const maxVisibility = resolveEffectiveMaxVisibility(policy, request.purpose);
@@ -182,7 +191,7 @@ export async function retrieveEnterpriseAiContext(
   let facts: AiRetrievedFact[] = [];
 
   // Optional Knowledge Graph scope expansion (production flags default false).
-  // Evaluation override is server-option only — cannot come from request body.
+  // Evaluation/admin pilot override is server-option only — cannot come from request body.
   let graphExpansion: Awaited<
     ReturnType<
       typeof import("@/features/ai-retrieval/sources/knowledge-graph-source").expandRetrievalScopeViaKnowledgeGraph
@@ -191,11 +200,11 @@ export async function retrieveEnterpriseAiContext(
   try {
     const {
       expandRetrievalScopeViaKnowledgeGraph,
-      attachGraphProvenanceToFacts,
       mergeGraphScopesIntoRequest,
     } = await import("@/features/ai-retrieval/sources/knowledge-graph-source");
     graphExpansion = await expandRetrievalScopeViaKnowledgeGraph(request, policy, {
       enabledForEvaluation: options?.enabledForEvaluation,
+      enabledForAdminPilot: options?.enabledForAdminPilot,
       depth: options?.graphExpansionDepth ?? 1,
     });
     warningGroups.push(graphExpansion.warnings);
@@ -207,8 +216,6 @@ export async function retrieveEnterpriseAiContext(
       });
       request = mergeGraphScopesIntoRequest(request, graphExpansion, scoped);
     }
-    // attach later after facts gathered
-    void attachGraphProvenanceToFacts;
   } catch (err) {
     warningGroups.push([
       `graph_expansion_failed:${err instanceof Error ? err.message : String(err)}`,
@@ -286,21 +293,58 @@ export async function retrieveEnterpriseAiContext(
   });
 
   if (graphExpansion?.enabled && graphExpansion.queried) {
-    const { attachGraphProvenanceToFacts } = await import(
-      "@/features/ai-retrieval/sources/knowledge-graph-source"
-    );
+    const {
+      attachGraphProvenanceToFacts,
+      applyGraphAddedFactBudget,
+    } = await import("@/features/ai-retrieval/sources/knowledge-graph-source");
     const attached = attachGraphProvenanceToFacts(facts, graphExpansion);
     facts = attached.facts;
     omittedGroups.push(attached.omitted);
+
+    const baselineFactIds = new Set(
+      facts
+        .filter((f) => baselineSourceKeys.has(`${f.sourceType}:${f.sourceId}`))
+        .map((f) => f.id)
+    );
+    // Also treat query-matched facts without graph enrichment as baseline if no scopes added
+    for (const f of facts) {
+      if (!f.warnings.includes("graph_scope_enrichment_only") && !baselineFactIds.has(f.id)) {
+        // Heuristic: product/KB that existed before scope merge
+        const key = `${f.sourceType}:${f.sourceId}`;
+        if (
+          (originalRequest.productIds ?? []).includes(f.sourceId) ||
+          (originalRequest.knowledgeEntryIds ?? []).includes(f.sourceId)
+        ) {
+          baselineFactIds.add(f.id);
+        }
+        void key;
+      }
+    }
+
+    const budgeted = applyGraphAddedFactBudget({
+      baselineFactIds,
+      facts,
+      consumer: request.consumer,
+    });
+    facts = budgeted.facts;
+    if (budgeted.report.droppedByBudget || budgeted.report.droppedByRelevance) {
+      warningGroups.push([
+        `graph_fact_budget:accepted=${budgeted.report.accepted};dropped_budget=${budgeted.report.droppedByBudget};dropped_relevance=${budgeted.report.droppedByRelevance};dropped_dup=${budgeted.report.droppedAsDuplicate}`,
+      ]);
+      omittedGroups.push([
+        { reason: "graph_added_fact_budget", count: budgeted.report.droppedByBudget },
+        { reason: "graph_added_fact_low_relevance", count: budgeted.report.droppedByRelevance },
+      ]);
+    }
   }
 
   // Rescore with unified scoring
   facts = facts.map((fact) => {
-    const scored = scoreFactRelevance(fact, request.query, {
-      productIds: request.productIds,
-      mediaBundleIds: request.mediaBundleIds,
-      seoTopicIds: request.seoTopicIds,
-      entityIds: request.entityIds,
+    const scored = scoreFactRelevance(fact, originalRequest.query, {
+      productIds: originalRequest.productIds,
+      mediaBundleIds: originalRequest.mediaBundleIds,
+      seoTopicIds: originalRequest.seoTopicIds,
+      entityIds: originalRequest.entityIds,
     });
     return {
       ...fact,

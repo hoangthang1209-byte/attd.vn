@@ -3,7 +3,7 @@
  * Version bump when cohort membership changes.
  */
 
-export const GRAPH_EVALUATION_COHORT_VERSION = "12.2.0";
+export const GRAPH_EVALUATION_COHORT_VERSION = "12.3.0";
 
 export type CohortRef = {
   sourceType: string;

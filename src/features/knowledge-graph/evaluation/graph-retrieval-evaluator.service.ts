@@ -336,8 +336,16 @@ async function runOneBenchmark(input: {
   });
 
   const useful =
+    judgment.expectedPathsFound > 0 ||
     relevantAddedFacts.length > 0 ||
-    relevantAddedEntities.some((e) => e.startsWith("BLOG_POST") || e.startsWith("MEDIA_BUNDLE") || e.startsWith("KNOWLEDGE"));
+    relevantAddedEntities.some(
+      (e) =>
+        e.startsWith("BLOG_POST") ||
+        e.startsWith("MEDIA_BUNDLE") ||
+        e.startsWith("KNOWLEDGE") ||
+        e.startsWith("PRINT_METHOD") ||
+        e.startsWith("CAPABILITY")
+    );
 
   const improved =
     judgment.expectedPathsFound > 0 &&

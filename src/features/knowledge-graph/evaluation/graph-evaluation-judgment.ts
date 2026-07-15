@@ -83,7 +83,7 @@ export function classifyAddedEntity(input: {
   }
 
   // Overly generic expansion without matching expected path family
-  if (["POLICY", "FAQ"].includes(input.entityType)) return "IRRELEVANT";
+  if (["POLICY", "FAQ", "PRODUCT_CATEGORY"].includes(input.entityType)) return "IRRELEVANT";
   return "IRRELEVANT";
 }
 

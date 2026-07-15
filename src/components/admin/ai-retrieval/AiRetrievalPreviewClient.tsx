@@ -62,6 +62,7 @@ export default function AiRetrievalPreviewClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RetrievalResponse | null>(null);
+  const [adminGraphPilot, setAdminGraphPilot] = useState(false);
 
   const policy = useMemo(() => getAiRetrievalPolicy(consumer), [consumer]);
 
@@ -91,6 +92,7 @@ export default function AiRetrievalPreviewClient({
           compatibilityMode,
           maxItems,
           seoTopicIds: seoTopicId.trim() ? [seoTopicId.trim()] : undefined,
+          adminGraphPilot,
         }),
       });
       const data = (await res.json()) as RetrievalResponse;
@@ -116,6 +118,7 @@ export default function AiRetrievalPreviewClient({
     compatibilityMode,
     maxItems,
     seoTopicId,
+    adminGraphPilot,
   ]);
 
   async function copyText(text: string) {
@@ -128,9 +131,22 @@ export default function AiRetrievalPreviewClient({
         <p>
           Kiểm tra ngữ cảnh mà các hệ thống AI tương lai sẽ nhận — không gọi LLM, không embeddings.
         </p>
+        {adminGraphPilot ? (
+          <p style={{ color: "#8a4b08", fontWeight: 600 }}>
+            Graph expansion pilot — evaluation override for this request only. Production flags stay off.
+          </p>
+        ) : null}
       </div>
 
       <div className="admin-form" style={{ display: "grid", gap: 12, marginBottom: 24 }}>
+        <label style={{ fontSize: 13, display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={adminGraphPilot}
+            onChange={(e) => setAdminGraphPilot(e.target.checked)}
+          />
+          Graph expansion pilot (admin-only, this request)
+        </label>
         <div className="admin-field">
           <label className="admin-label">Consumer</label>
           <select

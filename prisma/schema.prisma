@@ -1376,21 +1376,27 @@ model MediaAssetCollection {
 
 /// Managed semantic vocabulary for Asset Intelligence metadata.
 model MediaVocabularyTerm {
-  id          String              @id @default(cuid())
-  type        MediaVocabularyType
-  code        String?
-  name        String
-  aliases     String[]            @default([])
-  description String?
-  sortOrder   Int                 @default(0)
-  isActive    Boolean             @default(true)
-  isSystem    Boolean             @default(false)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id                   String                 @id @default(cuid())
+  type                 MediaVocabularyType
+  code                 String?
+  name                 String
+  aliases              String[]               @default([])
+  description          String?
+  sortOrder            Int                    @default(0)
+  isActive             Boolean                @default(true)
+  isSystem             Boolean                @default(false)
+  /// Source visibility for Knowledge Graph projection (Sprint 12.3). Default INTERNAL.
+  visibility           KnowledgeBaseVisibility @default(INTERNAL)
+  publicSafeReviewedAt DateTime?
+  publicSafeReviewedBy String?
+  publicSafeReason     String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@unique([type, name])
   @@index([type, isActive, sortOrder])
   @@index([code])
+  @@index([visibility, type])
 }
 
 /// Curated content-ready package of media assets (slots + references; never copies files).

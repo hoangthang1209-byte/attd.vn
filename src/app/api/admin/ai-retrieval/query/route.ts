@@ -17,10 +17,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
   }
 
+  const rawBody =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : null;
+  const adminPilotRequested = Boolean(rawBody?.adminGraphPilot);
+
+  // Strip client override fields — only server option can enable pilot.
+  if (rawBody) {
+    delete rawBody.enabledForEvaluation;
+    delete rawBody.enabledForAdminPilot;
+    delete rawBody.adminGraphPilot;
+    delete rawBody.evaluationMode;
+    delete rawBody.skipRetrievalLog;
+  }
+
   const raw =
-    body && typeof body === "object"
+    rawBody
       ? {
-          ...(body as Record<string, unknown>),
+          ...rawBody,
           userId:
             permission.user.userId ??
             (permission.user as { id?: string }).id ??
@@ -36,7 +49,9 @@ export async function POST(req: NextRequest) {
     // ADMIN diagnostic still uses content.read for this sprint; tighten later with owner gate if needed.
   }
 
-  const result = await retrieveEnterpriseAiContext(raw);
+  const result = await retrieveEnterpriseAiContext(raw, {
+    enabledForAdminPilot: adminPilotRequested,
+  });
   if (!result.ok) {
     return NextResponse.json({ message: result.errors.join(" "), errors: result.errors }, { status: 400 });
   }
@@ -58,5 +73,6 @@ export async function POST(req: NextRequest) {
     contextText: context.contextText,
     contextJson: context.contextJson,
     generatedAt: context.generatedAt,
+    graphExpansionPilot: adminPilotRequested,
   });
 }
