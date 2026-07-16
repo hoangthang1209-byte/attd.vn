@@ -152,6 +152,49 @@ export async function getProductById(id: string) {
 
 const PUBLIC_PRODUCT_CARD_VARIANT_SELECT = PRODUCT_CARD_COLOR_VARIANT_SELECT;
 
+/** Search OR clauses for public catalog listing — name, code, slug, tags. */
+export function buildPublicProductListingSearchOr(
+  search: string,
+): Prisma.ProductWhereInput[] {
+  const q = search.trim();
+  if (!q) return [];
+  return [
+    { name: { contains: q, mode: "insensitive" } },
+    { productCode: { contains: q, mode: "insensitive" } },
+    { slug: { contains: q, mode: "insensitive" } },
+    { tags: { has: q } },
+  ];
+}
+
+export function buildPublicProductListingWhere(params: {
+  categoryIds?: string[];
+  search?: string;
+  inStock?: boolean;
+  supportsPrinting?: boolean;
+  supportsEmbroidery?: boolean;
+  supportsOem?: boolean;
+  material?: string;
+}): Prisma.ProductWhereInput {
+  const searchOr = params.search ? buildPublicProductListingSearchOr(params.search) : [];
+  return {
+    status: "ACTIVE",
+    slug: { not: "" },
+    ...(params.categoryIds && { categoryId: { in: params.categoryIds } }),
+    ...(searchOr.length > 0 && { OR: searchOr }),
+    ...(params.supportsPrinting && { supportsPrinting: true }),
+    ...(params.supportsEmbroidery && { supportsEmbroidery: true }),
+    ...(params.supportsOem && { supportsOem: true }),
+    ...(params.material && {
+      material: { contains: params.material, mode: "insensitive" },
+    }),
+    ...(params.inStock && {
+      variants: {
+        some: PUBLIC_IN_STOCK_VARIANT_FILTER,
+      },
+    }),
+  };
+}
+
 /** Public product listing with optional category/search filter and pagination. */
 export async function getProductsForPublicListing(params: {
   categorySlug?: string;
@@ -184,29 +227,15 @@ export async function getProductsForPublicListing(params: {
     }
   }
 
-  const where: Prisma.ProductWhereInput = {
-    status: "ACTIVE",
-    slug: { not: "" },
-    ...(categoryIds && { categoryId: { in: categoryIds } }),
-    ...(search && {
-      OR: [
-        { name: { contains: search, mode: "insensitive" } },
-        { productCode: { contains: search, mode: "insensitive" } },
-        { tags: { has: search } },
-      ],
-    }),
-    ...(supportsPrinting && { supportsPrinting: true }),
-    ...(supportsEmbroidery && { supportsEmbroidery: true }),
-    ...(supportsOem && { supportsOem: true }),
-    ...(material && {
-      material: { contains: material, mode: "insensitive" },
-    }),
-    ...(inStock && {
-      variants: {
-        some: PUBLIC_IN_STOCK_VARIANT_FILTER,
-      },
-    }),
-  };
+  const where = buildPublicProductListingWhere({
+    categoryIds,
+    search,
+    inStock,
+    supportsPrinting,
+    supportsEmbroidery,
+    supportsOem,
+    material,
+  });
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
