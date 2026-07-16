@@ -8583,12 +8583,15 @@ body:has(.mp-pdp--b2b) .floating-contact {
   flex-wrap: wrap;
   align-items: center;
   gap: 5px;
-  margin: 0;
+  margin: 4px 0 2px;
   padding: 0;
   list-style: none;
-  min-height: 18px;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
 }
-.product-card-colors--compact { gap: 4px; }
+.product-card--compact .product-card-colors { margin: 2px 0 0; gap: 4px; }
+.product-card--catalog .product-card-colors { margin: 2px 0 0; }
 .product-card-colors__item { display: flex; align-items: center; }
 .product-card-swatch {
   display: inline-flex;

@@ -215,21 +215,16 @@ function isSellableVariant(variant: ProductCardColorVariantInput): boolean {
 }
 
 /**
- * Stocked products prefer sellable variants.
- * When none are sellable (common for quote-first B2B cards), fall back to ACTIVE configured variants.
- * MTO/OEM always uses ACTIVE configured variants even at stockQty 0.
+ * Color swatches represent configured sellable colors for B2B / made-to-order.
+ * Use every ACTIVE (non-archived) variant — do not require warehouse stock.
+ * Stock status still feeds `isAvailable` for optional UI signals.
  */
 function selectVariantsForColorSwatches(
   product: ProductCardColorProductInput,
 ): ProductCardColorVariantInput[] {
-  const active = (product.variants ?? []).filter(
+  return (product.variants ?? []).filter(
     (variant) => variant && !isArchivedOrHiddenVariant(variant),
   );
-  if (!active.length) return [];
-  if (isMadeToOrderOrOemProduct(product)) return active;
-
-  const sellable = active.filter(isSellableVariant);
-  return sellable.length > 0 ? sellable : active;
 }
 
 type RawColorCandidate = {

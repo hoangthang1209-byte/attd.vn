@@ -122,8 +122,6 @@ export default function ProductCard({
         </div>
 
         <div className="product-card-body">
-          <ProductCardColorSwatches colors={availableColors} compact={compact} />
-
           {showCategory && (
             <Link href={productHref} className="product-card-category">
               {category}
@@ -158,6 +156,8 @@ export default function ProductCard({
               )}
             </div>
           )}
+
+          <ProductCardColorSwatches colors={availableColors} compact={compact} />
 
           <div className="product-card-footer">
             <button

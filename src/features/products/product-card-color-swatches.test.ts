@@ -81,7 +81,63 @@ describe("product-card-color-swatches", () => {
 
     assert.deepEqual(
       colors.map((c) => c.name).sort(),
-      ["Xanh", "Đen", "Đỏ"].sort(),
+      ["Trắng", "Xanh", "Đen", "Đỏ"].sort(),
+    );
+  });
+
+  it("1b active variants with stockQty=0 / OUT_OF_STOCK still show configured colors", () => {
+    const colors = extractProductCardColorSwatches({
+      supportsOem: false,
+      variants: [
+        {
+          id: "v1",
+          variantStatus: "ACTIVE",
+          stockStatus: "OUT_OF_STOCK",
+          stockQty: 0,
+          optionValues: [colorOptionValue("c-den", "Den"), colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" })],
+        },
+        {
+          id: "v2",
+          variantStatus: "ACTIVE",
+          stockStatus: "OUT_OF_STOCK",
+          stockQty: 0,
+          optionValues: [colorOptionValue("c-den", "Den"), colorOptionValue("s-l", "L", { name: "Kích thước", slug: "size" })],
+        },
+        {
+          id: "v3",
+          variantStatus: "ACTIVE",
+          stockStatus: "OUT_OF_STOCK",
+          stockQty: 0,
+          optionValues: [colorOptionValue("c-xanh", "Xanh"), colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" })],
+        },
+        {
+          id: "v4",
+          variantStatus: "ACTIVE",
+          stockStatus: "OUT_OF_STOCK",
+          stockQty: 0,
+          optionValues: [colorOptionValue("c-xanh", "Xanh"), colorOptionValue("s-l", "L", { name: "Kích thước", slug: "size" })],
+        },
+        {
+          id: "v5",
+          variantStatus: "ACTIVE",
+          stockStatus: "OUT_OF_STOCK",
+          stockQty: 0,
+          optionValues: [colorOptionValue("c-trang", "Trang"), colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" })],
+        },
+        {
+          id: "v6",
+          variantStatus: "ACTIVE",
+          stockStatus: "OUT_OF_STOCK",
+          stockQty: 0,
+          optionValues: [colorOptionValue("c-do", "Do"), colorOptionValue("s-xl", "XL", { name: "Kích thước", slug: "size" })],
+        },
+      ],
+    });
+
+    assert.equal(colors.length, 4);
+    assert.deepEqual(
+      colors.map((c) => c.name).sort(),
+      ["Trắng", "Xanh", "Đen", "Đỏ"].sort(),
     );
   });
 
@@ -239,6 +295,13 @@ describe("product-card-color-swatches", () => {
     assert.ok(serviceSource.includes('where: { variantStatus: "ACTIVE" }'));
     assert.ok(serviceSource.includes("optionValues"));
 
+    const listingPage = readFileSync(
+      resolve(repoRoot, "app/(public)/san-pham/page.tsx"),
+      "utf8",
+    );
+    assert.ok(listingPage.includes("mapProductCardAvailableColors"));
+    assert.ok(listingPage.includes("availableColors={mapProductCardAvailableColors(product)}"));
+
     const cardSource = readFileSync(
       resolve(repoRoot, "components/public/ProductCard.tsx"),
       "utf8",
@@ -246,6 +309,62 @@ describe("product-card-color-swatches", () => {
     assert.ok(cardSource.includes("availableColors"));
     assert.ok(cardSource.includes("ProductCardColorSwatches"));
     assert.ok(!cardSource.includes("prisma."));
+  });
+
+  it("10b ProductCard renders swatches after lead-time and before Liên hệ CTA", () => {
+    const cardSource = readFileSync(
+      resolve(repoRoot, "components/public/ProductCard.tsx"),
+      "utf8",
+    );
+    const leadTimeIdx = cardSource.indexOf("product-card-leadtime");
+    const catalogLeadIdx = cardSource.indexOf('product-card-catalog-meta__label">Lead time');
+    const swatchIdx = cardSource.indexOf("<ProductCardColorSwatches colors={availableColors}");
+    const contactIdx = cardSource.indexOf("product-card-footer");
+    const lienHeIdx = cardSource.indexOf("Liên hệ báo giá sỉ");
+
+    assert.ok(swatchIdx > 0, "swatch component must be rendered");
+    assert.ok(contactIdx > swatchIdx, "swatches must appear before footer/contact CTA");
+    assert.ok(lienHeIdx > swatchIdx, "swatches must appear before Liên hệ CTA text");
+    assert.ok(
+      leadTimeIdx > 0 && swatchIdx > leadTimeIdx,
+      "swatches must appear after lead-time row",
+    );
+    assert.ok(
+      catalogLeadIdx > 0 && swatchIdx > catalogLeadIdx,
+      "swatches must appear after catalog lead-time meta",
+    );
+    assert.ok(
+      !cardSource.includes("product-card-media") ||
+        cardSource.indexOf("product-card-media") < swatchIdx,
+      "swatches stay in body, not under media-only placement before title",
+    );
+
+    // Swatches must not be the first child of product-card-body (no longer under image).
+    const bodyStart = cardSource.indexOf('<div className="product-card-body">');
+    const bodySlice = cardSource.slice(bodyStart, bodyStart + 280);
+    assert.ok(
+      !bodySlice.includes("<ProductCardColorSwatches"),
+      "swatches must not be first content under the image/body start",
+    );
+
+    const swatchSource = readFileSync(
+      resolve(repoRoot, "components/public/ProductCardColorSwatches.tsx"),
+      "utf8",
+    );
+    assert.ok(swatchSource.includes('className={["product-card-colors"'));
+    assert.ok(swatchSource.includes("if (!colors.length) return null"));
+  });
+
+  it("10c swatch CSS class is present and not hidden", () => {
+    const css = readFileSync(resolve(repoRoot, "app/globals.css"), "utf8");
+    assert.ok(css.includes(".product-card-colors {"));
+    assert.ok(css.includes(".product-card-swatch {"));
+    assert.ok(css.includes(".product-card-swatch--bordered"));
+    const colorsBlockStart = css.indexOf(".product-card-colors {");
+    const colorsBlock = css.slice(colorsBlockStart, colorsBlockStart + 280);
+    assert.ok(!/display:\s*none/.test(colorsBlock));
+    assert.ok(!/visibility:\s*hidden/.test(colorsBlock));
+    assert.ok(!/height:\s*0(?!\d)/.test(colorsBlock.replace(/min-height:\s*0;?/g, "")));
   });
 
   it("11 archived/hidden variants do not contribute colors", () => {
