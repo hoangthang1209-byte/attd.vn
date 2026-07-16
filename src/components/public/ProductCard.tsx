@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
+import ProductCardColorSwatches from "@/components/public/ProductCardColorSwatches";
 import ProductQuoteDialog from "@/components/public/ProductQuoteDialog";
 import ProductSalesBadgeOverlay from "@/components/public/ProductSalesBadgeOverlay";
 import type { PublicProductSalesBadge } from "@/features/products/product-sales-badges";
+import type { ProductCardColorSwatch } from "@/features/products/product-card-color-swatches";
 import { trackPdpQuoteClicked, trackViewProduct } from "@/lib/analytics";
 import { formatProductCardMoq, isPublicMoq } from "@/lib/formatMoq";
 
@@ -31,6 +33,7 @@ type ProductCardProps = {
   /** Catalog mode adds B2B sourcing metadata without changing homepage cards. */
   variant?: "default" | "catalog";
   salesBadges?: PublicProductSalesBadge[];
+  availableColors?: ProductCardColorSwatch[];
 };
 
 const STOCK_COLORS: Record<string, string> = {
@@ -54,6 +57,7 @@ export default function ProductCard({
   compact = false,
   variant = "default",
   salesBadges = [],
+  availableColors = [],
 }: ProductCardProps) {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const quoteTriggerRef = useRef<HTMLButtonElement>(null);
@@ -118,6 +122,8 @@ export default function ProductCard({
         </div>
 
         <div className="product-card-body">
+          <ProductCardColorSwatches colors={availableColors} compact={compact} />
+
           {showCategory && (
             <Link href={productHref} className="product-card-category">
               {category}

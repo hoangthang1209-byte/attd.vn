@@ -7,6 +7,7 @@ import {
 } from "@/features/categories/services/category.service";
 import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
+import { mapProductCardAvailableColors } from "@/features/products/product-card-color-swatches";
 import CatalogFilterToolbar from "@/components/marketplace/CatalogFilterToolbar";
 import CatalogSearchTracking from "@/components/analytics/CatalogSearchTracking";
 import CatalogEmptyActions from "@/components/marketplace/CatalogEmptyActions";
@@ -215,6 +216,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                         supportsOem={product.supportsOem}
                         variant="catalog"
                         salesBadges={mapPublicProductCardSalesBadges(product)}
+                        availableColors={mapProductCardAvailableColors(product)}
                       />
                     );
                   })}

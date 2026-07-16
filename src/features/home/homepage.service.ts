@@ -5,6 +5,7 @@ import {
 } from "@/features/categories/services/category.service";
 import { getProductsForPublicListing } from "@/features/products/services/product.service";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
+import { mapProductCardAvailableColors } from "@/features/products/product-card-color-swatches";
 import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
 import { catalogCategoryHref } from "@/lib/marketplaceCategoryTree";
 import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
@@ -496,6 +497,7 @@ function mapProduct(product: PublicListingProduct): HomepageProductItem {
     productionLeadTime: product.leadTime ?? null,
     availabilityLabel: deriveAvailabilityLabel(product.variants),
     salesBadges: mapPublicProductCardSalesBadges(product),
+    availableColors: mapProductCardAvailableColors(product),
   };
 }
 

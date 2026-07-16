@@ -7,6 +7,7 @@ import {
 } from "@/features/products/services/product.service";
 import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
+import { mapProductCardAvailableColors } from "@/features/products/product-card-color-swatches";
 import ProductDetailInteractive from "@/components/marketplace/ProductDetailInteractive";
 import ProductFaqList from "@/components/public/ProductFaqList";
 import Breadcrumb from "@/components/seo/Breadcrumb";
@@ -203,6 +204,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     leadTime={related.leadTime}
                     compact
                     salesBadges={mapPublicProductCardSalesBadges(related)}
+                    availableColors={mapProductCardAvailableColors(related)}
                   />
                 ))}
               </div>

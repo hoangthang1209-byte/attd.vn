@@ -6,6 +6,7 @@ import {
   isCategoryPubliclyAccessibleBySlug,
   loadCategoryVisibilityNodes,
 } from "@/features/categories/category-public-visibility";
+import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
 
 export async function getCategories() {
   return prisma.category.findMany({
@@ -296,7 +297,11 @@ export async function getCategoryBySlug(slug: string) {
           featuredImage: true, gallery: true,
           defaultMoq: true, leadTime: true,
           supportsPrinting: true, supportsEmbroidery: true, supportsOem: true,
-          variants: { select: { id: true, stockStatus: true } },
+          metadata: true,
+          variants: {
+            where: { variantStatus: "ACTIVE" as const },
+            select: PRODUCT_CARD_COLOR_VARIANT_SELECT,
+          },
           images: {
             select: { imageUrl: true, altText: true, sortOrder: true },
             orderBy: { sortOrder: "asc" },

@@ -1,4 +1,5 @@
 import type { PublicProductSalesBadge } from "@/features/products/product-sales-badges";
+import type { ProductCardColorSwatch } from "@/features/products/product-card-color-swatches";
 
 /** CMS-editable homepage hero copy and CTAs. */
 export type HomepageHeroConfig = {
@@ -97,6 +98,7 @@ export type HomepageProductItem = {
   productionLeadTime: string | null;
   availabilityLabel: string | null;
   salesBadges: PublicProductSalesBadge[];
+  availableColors: ProductCardColorSwatch[];
 };
 
 /** Serializable homepage blog teaser row. */

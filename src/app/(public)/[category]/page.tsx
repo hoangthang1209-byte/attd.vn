@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
+import { mapProductCardAvailableColors } from "@/features/products/product-card-color-swatches";
 import CatalogSourcingBadges from "@/components/marketplace/CatalogSourcingBadges";
 import InternalLinkBlock from "@/components/public/InternalLinkBlock";
 import EmptyState from "@/components/public/EmptyState";
@@ -342,6 +343,7 @@ export default async function CategoryPage({ params }: PageProps) {
                     supportsOem={product.supportsOem}
                     variant="catalog"
                     salesBadges={mapPublicProductCardSalesBadges(product)}
+                    availableColors={mapProductCardAvailableColors(product)}
                   />
                 );
               })}

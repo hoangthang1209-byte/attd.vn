@@ -12,6 +12,7 @@ import {
   PRODUCT_DETAIL_LEGACY_SELECT,
 } from "@/features/products/product-detail-compat";
 import { PUBLIC_IN_STOCK_VARIANT_FILTER } from "@/features/products/product-foundation-validation";
+import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
 
 const PRODUCT_DETAIL_INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
@@ -149,6 +150,8 @@ export async function getProductById(id: string) {
   });
 }
 
+const PUBLIC_PRODUCT_CARD_VARIANT_SELECT = PRODUCT_CARD_COLOR_VARIANT_SELECT;
+
 /** Public product listing with optional category/search filter and pagination. */
 export async function getProductsForPublicListing(params: {
   categorySlug?: string;
@@ -214,7 +217,10 @@ export async function getProductsForPublicListing(params: {
           select: { imageUrl: true, altText: true, sortOrder: true },
           orderBy: { sortOrder: "asc" },
         },
-        variants: { select: { id: true, stockStatus: true, colorName: true, sizeName: true } },
+        variants: {
+          where: { variantStatus: "ACTIVE" as const },
+          select: PUBLIC_PRODUCT_CARD_VARIANT_SELECT,
+        },
       },
       orderBy: { createdAt: "desc" },
       take: perPage,
@@ -252,14 +258,17 @@ const PUBLIC_PRODUCT_CARD_SELECT = {
   supportsOem: true,
   metadata: true,
   category: { select: { name: true, slug: true } },
-  variants: { select: { id: true, stockStatus: true } },
+  variants: {
+    where: { variantStatus: "ACTIVE" as const },
+    select: PUBLIC_PRODUCT_CARD_VARIANT_SELECT,
+  },
   images: {
     select: { imageUrl: true, altText: true, sortOrder: true },
     orderBy: { sortOrder: "asc" as const },
   },
-};
+} as const;
 
-export { PUBLIC_PRODUCT_CARD_SELECT };
+export { PUBLIC_PRODUCT_CARD_SELECT, PUBLIC_PRODUCT_CARD_VARIANT_SELECT };
 
 /** Returns up to `limit` active products in the same category, excluding the given product. */
 export async function getRelatedProducts(
