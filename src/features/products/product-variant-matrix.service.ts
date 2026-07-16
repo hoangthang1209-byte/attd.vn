@@ -1,7 +1,9 @@
 import type { VariantStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { normalizeVariantStockFields } from "@/features/products/product-foundation-validation";
 import { prisma } from "@/lib/prisma";
 import type { DbClient } from "@/features/products/product-relation-ownership";
+import { assertOptionValueIdsBelongToProduct } from "@/features/products/product-relation-ownership";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 import { generateSku, ensureUniqueSku } from "@/features/products/product-sku-utils";
 import {
@@ -12,9 +14,11 @@ import {
   computeTheoreticalCombinationCount,
   countActiveMatrixOptionGroups,
   mapCombinationToLegacyFields,
+  validateMatrixCombinationForGeneration,
   VARIANT_MATRIX_CONFIRM_THRESHOLD,
   VARIANT_MATRIX_MIN_OPTION_GROUPS,
   VARIANT_MATRIX_WARN_THRESHOLD,
+  type MatrixCombination,
   type MatrixOptionGroup,
 } from "@/features/products/product-variant-matrix.utils";
 
@@ -124,6 +128,70 @@ function validateMatrixGroupsForGeneration(groups: MatrixOptionGroup[]): {
   return { ok: true };
 }
 
+function throwMatrixCombinationError(
+  combo: Pick<MatrixCombination, "displayLabel">,
+  message: string,
+): never {
+  throw new ProductAdminValidationError(
+    `Không thể tạo tổ hợp "${combo.displayLabel}": ${message}`,
+    { variants: `Tổ hợp "${combo.displayLabel}": ${message}` },
+  );
+}
+
+function mapMatrixCombinationCreateError(
+  error: unknown,
+  combo: Pick<MatrixCombination, "displayLabel">,
+  sku: string,
+): string {
+  if (error instanceof ProductAdminValidationError) {
+    throw error;
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === "P2002") {
+      const target = error.meta?.target;
+      if (Array.isArray(target) && target.includes("sku")) {
+        return `SKU "${sku}" đã tồn tại.`;
+      }
+      return "Tổ hợp biến thể đã tồn tại.";
+    }
+    if (error.code === "P2003") {
+      return "Giá trị tuỳ chọn không tồn tại hoặc không thuộc sản phẩm này.";
+    }
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.error("[variant-matrix] create combination failed", {
+      displayLabel: combo.displayLabel,
+      sku,
+      error,
+    });
+  }
+
+  return "Dữ liệu tổ hợp không hợp lệ.";
+}
+
+async function assertMatrixCombinationReady(
+  db: DbClient,
+  productId: string,
+  groups: MatrixOptionGroup[],
+  combo: MatrixCombination,
+): Promise<void> {
+  const coverageError = validateMatrixCombinationForGeneration(groups, combo.valueIds);
+  if (coverageError) {
+    throwMatrixCombinationError(combo, coverageError);
+  }
+
+  try {
+    await assertOptionValueIdsBelongToProduct(db, productId, combo.valueIds);
+  } catch {
+    throwMatrixCombinationError(
+      combo,
+      "Giá trị tuỳ chọn không tồn tại hoặc không thuộc sản phẩm này.",
+    );
+  }
+}
+
 export async function previewVariantMatrixGeneration(
   productId: string,
 ): Promise<VariantMatrixPreview> {
@@ -206,9 +274,18 @@ export async function generateVariantMatrix(
 
   const missing = allCombinations.filter((combo) => !existingSignatures.has(combo.signature));
   const createdVariants: Array<{ id: string; sku: string; displayLabel: string | null }> = [];
+  const initialExistingCount = existingSignatures.size;
+  let skipped = allCombinations.length - missing.length;
 
   await prisma.$transaction(async (tx) => {
     for (const combo of missing) {
+      if (existingSignatures.has(combo.signature)) {
+        skipped += 1;
+        continue;
+      }
+
+      await assertMatrixCombinationReady(tx, productId, groups, combo);
+
       const legacy = mapCombinationToLegacyFields(groups, combo.valueIds);
       const suffix = buildMatrixCombinationSkuSuffix(groups, combo.valueIds);
       const baseSku = suffix
@@ -278,23 +355,24 @@ export async function generateVariantMatrix(
           sku: variant.sku,
           displayLabel: variant.displayLabel,
         });
+        existingSignatures.add(combo.signature);
       } catch (error) {
-        const message =
-          error instanceof Error && error.message.includes("Unique constraint")
-            ? `SKU "${sku}" đã tồn tại.`
-            : "Dữ liệu tổ hợp không hợp lệ.";
-        throw new ProductAdminValidationError(
-          `Không thể tạo tổ hợp "${combo.displayLabel}": ${message}`,
-          { variants: `Tổ hợp "${combo.displayLabel}": ${message}` },
-        );
+        const message = mapMatrixCombinationCreateError(error, combo, sku);
+        throwMatrixCombinationError(combo, message);
       }
     }
   });
 
+  if (createdVariants.length === 0 && skipped > 0) {
+    throw new ProductAdminValidationError("Tất cả tổ hợp biến thể đã tồn tại.", {
+      variants: "Tất cả tổ hợp biến thể đã tồn tại.",
+    });
+  }
+
   return {
     created: createdVariants.length,
-    skipped: allCombinations.length - missing.length,
-    preserved: existingSignatures.size,
+    skipped,
+    preserved: initialExistingCount,
     variants: createdVariants,
   };
 }

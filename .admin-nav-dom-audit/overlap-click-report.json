@@ -1,0 +1,131 @@
+{
+  "comfortableScroll": {
+    "scrollTop": 1662,
+    "removeTop": false,
+    "audit": {
+      "homepage": {
+        "found": true,
+        "top": 480,
+        "cy": 498,
+        "inViewport": true,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "isLink": true,
+          "text": "Homepage"
+        }
+      },
+      "siteNavigation": {
+        "found": true,
+        "top": 519,
+        "cy": 537,
+        "inViewport": true,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "isLink": true,
+          "text": "Điều hướng và Footer"
+        }
+      }
+    },
+    "screenshot": "/Users/nuhatachic/attd.vn/.admin-nav-dom-audit/overlap-scroll-1662.png",
+    "click": {
+      "before": "http://localhost:3462/admin/dashboard",
+      "after": "http://localhost:3462/admin/dashboard",
+      "navigated": false
+    }
+  },
+  "overlapBefore": {
+    "scrollTop": 2180,
+    "removeTop": false,
+    "audit": {
+      "homepage": {
+        "found": true,
+        "top": -38,
+        "cy": -20,
+        "inViewport": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "found": true,
+        "top": 1,
+        "cy": 19,
+        "inViewport": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "isLink": false,
+          "text": "ATTD CMSDesign AuthorityĐăng x"
+        }
+      }
+    },
+    "screenshot": "/Users/nuhatachic/attd.vn/.admin-nav-dom-audit/overlap-scroll-2180.png",
+    "click": {
+      "before": "http://localhost:3462/admin/dashboard",
+      "after": "http://localhost:3462/admin/dashboard",
+      "navigated": false
+    }
+  },
+  "overlapAfterRemoveTop": {
+    "scrollTop": 2180,
+    "removeTop": true,
+    "audit": {
+      "homepage": {
+        "found": true,
+        "top": -38,
+        "cy": -20,
+        "inViewport": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "found": true,
+        "top": 1,
+        "cy": 19,
+        "inViewport": true,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "isLink": true,
+          "text": "Điều hướng và Footer"
+        }
+      }
+    },
+    "screenshot": "/Users/nuhatachic/attd.vn/.admin-nav-dom-audit/overlap-scroll-2180-no-top.png",
+    "click": {
+      "before": "http://localhost:3462/admin/dashboard",
+      "after": "http://localhost:3462/admin/dashboard",
+      "navigated": false
+    }
+  },
+  "homepageAt2180": {
+    "scrollTop": 2180,
+    "removeTop": false,
+    "audit": {
+      "homepage": {
+        "found": true,
+        "top": -38,
+        "cy": -20,
+        "inViewport": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "found": true,
+        "top": 1,
+        "cy": 19,
+        "inViewport": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "isLink": false,
+          "text": "ATTD CMSDesign AuthorityĐăng x"
+        }
+      }
+    },
+    "screenshot": "/Users/nuhatachic/attd.vn/.admin-nav-dom-audit/overlap-scroll-2180.png",
+    "click": {
+      "before": "http://localhost:3462/admin/dashboard",
+      "after": "http://localhost:3462/admin/dashboard",
+      "navigated": false
+    }
+  }
+}

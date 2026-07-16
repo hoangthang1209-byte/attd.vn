@@ -1,0 +1,825 @@
+{
+  "fineSweep": [
+    {
+      "scrollTop": 2050,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 92,
+        "bottom": 128,
+        "cy": 110,
+        "inViewport": true,
+        "overlapsTop": false,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/settings/homepage",
+          "text": "Homepage",
+          "isTarget": true
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 131,
+        "bottom": 167,
+        "cy": 149,
+        "inViewport": true,
+        "overlapsTop": false,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "text": "Điều hướng và Footer",
+          "isTarget": true
+        }
+      }
+    },
+    {
+      "scrollTop": 2060,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 82,
+        "bottom": 118,
+        "cy": 100,
+        "inViewport": true,
+        "overlapsTop": false,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/settings/homepage",
+          "text": "Homepage",
+          "isTarget": true
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 121,
+        "bottom": 157,
+        "cy": 139,
+        "inViewport": true,
+        "overlapsTop": false,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "text": "Điều hướng và Footer",
+          "isTarget": true
+        }
+      }
+    },
+    {
+      "scrollTop": 2070,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 72,
+        "bottom": 108,
+        "cy": 90,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/settings/homepage",
+          "text": "Homepage",
+          "isTarget": true
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 111,
+        "bottom": 147,
+        "cy": 129,
+        "inViewport": true,
+        "overlapsTop": false,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "text": "Điều hướng và Footer",
+          "isTarget": true
+        }
+      }
+    },
+    {
+      "scrollTop": 2080,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 62,
+        "bottom": 98,
+        "cy": 80,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/settings/homepage",
+          "text": "Homepage",
+          "isTarget": true
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 101,
+        "bottom": 137,
+        "cy": 119,
+        "inViewport": true,
+        "overlapsTop": false,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "text": "Điều hướng và Footer",
+          "isTarget": true
+        }
+      }
+    },
+    {
+      "scrollTop": 2090,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 52,
+        "bottom": 88,
+        "cy": 70,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 91,
+        "bottom": 127,
+        "cy": 109,
+        "inViewport": true,
+        "overlapsTop": false,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "text": "Điều hướng và Footer",
+          "isTarget": true
+        }
+      }
+    },
+    {
+      "scrollTop": 2100,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 42,
+        "bottom": 78,
+        "cy": 60,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 81,
+        "bottom": 117,
+        "cy": 99,
+        "inViewport": true,
+        "overlapsTop": false,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "text": "Điều hướng và Footer",
+          "isTarget": true
+        }
+      }
+    },
+    {
+      "scrollTop": 2110,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 32,
+        "bottom": 68,
+        "cy": 50,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandSub",
+          "href": null,
+          "text": "Design Authority",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 71,
+        "bottom": 107,
+        "cy": 89,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "text": "Điều hướng và Footer",
+          "isTarget": true
+        }
+      }
+    },
+    {
+      "scrollTop": 2120,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 22,
+        "bottom": 58,
+        "cy": 40,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandMark",
+          "href": null,
+          "text": "ATTD CMS",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 61,
+        "bottom": 97,
+        "cy": 79,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "text": "Điều hướng và Footer",
+          "isTarget": true
+        }
+      }
+    },
+    {
+      "scrollTop": 2130,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 12,
+        "bottom": 48,
+        "cy": 30,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandMark",
+          "href": null,
+          "text": "ATTD CMS",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 51,
+        "bottom": 87,
+        "cy": 69,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2140,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 2,
+        "bottom": 38,
+        "cy": 20,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 41,
+        "bottom": 77,
+        "cy": 59,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2150,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -8,
+        "bottom": 28,
+        "cy": 10,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 31,
+        "bottom": 67,
+        "cy": 49,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandSub",
+          "href": null,
+          "text": "Design Authority",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2160,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -18,
+        "bottom": 18,
+        "cy": 0,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 21,
+        "bottom": 57,
+        "cy": 39,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandMark",
+          "href": null,
+          "text": "ATTD CMS",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2170,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -28,
+        "bottom": 8,
+        "cy": -10,
+        "inViewport": false,
+        "overlapsTop": true,
+        "hit": null
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 11,
+        "bottom": 47,
+        "cy": 29,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandMark",
+          "href": null,
+          "text": "ATTD CMS",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2180,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -38,
+        "bottom": -2,
+        "cy": -20,
+        "inViewport": false,
+        "overlapsTop": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 1,
+        "bottom": 37,
+        "cy": 19,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2190,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -48,
+        "bottom": -12,
+        "cy": -30,
+        "inViewport": false,
+        "overlapsTop": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": -9,
+        "bottom": 27,
+        "cy": 9,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2200,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -58,
+        "bottom": -22,
+        "cy": -40,
+        "inViewport": false,
+        "overlapsTop": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": -19,
+        "bottom": 17,
+        "cy": -1,
+        "inViewport": false,
+        "overlapsTop": true,
+        "hit": null
+      }
+    },
+    {
+      "scrollTop": 2210,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -68,
+        "bottom": -32,
+        "cy": -50,
+        "inViewport": false,
+        "overlapsTop": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": -29,
+        "bottom": 7,
+        "cy": -11,
+        "inViewport": false,
+        "overlapsTop": true,
+        "hit": null
+      }
+    },
+    {
+      "scrollTop": 2220,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -78,
+        "bottom": -42,
+        "cy": -60,
+        "inViewport": false,
+        "overlapsTop": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": -39,
+        "bottom": -3,
+        "cy": -21,
+        "inViewport": false,
+        "overlapsTop": false,
+        "hit": null
+      }
+    }
+  ],
+  "interceptRows": [
+    {
+      "scrollTop": 2130,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 12,
+        "bottom": 48,
+        "cy": 30,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandMark",
+          "href": null,
+          "text": "ATTD CMS",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 51,
+        "bottom": 87,
+        "cy": 69,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2140,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": 2,
+        "bottom": 38,
+        "cy": 20,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 41,
+        "bottom": 77,
+        "cy": 59,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2150,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -8,
+        "bottom": 28,
+        "cy": 10,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 31,
+        "bottom": 67,
+        "cy": 49,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandSub",
+          "href": null,
+          "text": "Design Authority",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2160,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -18,
+        "bottom": 18,
+        "cy": 0,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 21,
+        "bottom": 57,
+        "cy": 39,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandMark",
+          "href": null,
+          "text": "ATTD CMS",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2170,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -28,
+        "bottom": 8,
+        "cy": -10,
+        "inViewport": false,
+        "overlapsTop": true,
+        "hit": null
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 11,
+        "bottom": 47,
+        "cy": 29,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "SPAN",
+          "className": "AdminShell-module__Sp33bq__brandMark",
+          "href": null,
+          "text": "ATTD CMS",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2180,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -38,
+        "bottom": -2,
+        "cy": -20,
+        "inViewport": false,
+        "overlapsTop": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": 1,
+        "bottom": 37,
+        "cy": 19,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      }
+    },
+    {
+      "scrollTop": 2190,
+      "sidebarTopBottom": 73,
+      "homepage": {
+        "label": "Homepage",
+        "top": -48,
+        "bottom": -12,
+        "cy": -30,
+        "inViewport": false,
+        "overlapsTop": false,
+        "hit": null
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "top": -9,
+        "bottom": 27,
+        "cy": 9,
+        "inViewport": true,
+        "overlapsTop": true,
+        "hit": {
+          "tag": "DIV",
+          "className": "AdminShell-module__Sp33bq__sidebarTop",
+          "href": null,
+          "text": "ATTD CMSDesign AuthorityĐăng xuất",
+          "isTarget": false
+        }
+      }
+    }
+  ],
+  "clickHome": {
+    "label": "Homepage",
+    "before": "http://localhost:3462/admin/dashboard",
+    "after": "http://localhost:3462/admin/settings/homepage",
+    "navigated": true,
+    "href": "http://localhost:3462/admin/settings/homepage",
+    "cx": 142.5,
+    "cy": 450,
+    "inViewport": true,
+    "hitTag": "A",
+    "hitClass": "AdminShell-module__Sp33bq__navLink",
+    "hitIsLink": true
+  },
+  "clickSite": {
+    "label": "Điều hướng và Footer",
+    "before": "http://localhost:3462/admin/dashboard",
+    "after": "http://localhost:3462/admin/dashboard",
+    "navigated": false,
+    "href": "http://localhost:3462/admin/site-navigation",
+    "cx": 142.5,
+    "cy": 450,
+    "inViewport": true,
+    "hitTag": "A",
+    "hitClass": "AdminShell-module__Sp33bq__navLink",
+    "hitIsLink": true
+  },
+  "removeTopTest": {
+    "badScroll": 2130,
+    "before": {
+      "hitTag": "DIV",
+      "hitClass": "AdminShell-module__Sp33bq__sidebarTop",
+      "hitIsLink": false
+    },
+    "after": {
+      "hitTag": "A",
+      "hitClass": "AdminShell-module__Sp33bq__navLink",
+      "hitIsLink": true
+    },
+    "urlBefore": "http://localhost:3462/admin/dashboard",
+    "urlAfter": "http://localhost:3462/admin/dashboard"
+  }
+}

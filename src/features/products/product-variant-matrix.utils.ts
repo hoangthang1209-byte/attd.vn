@@ -148,6 +148,56 @@ export function countActiveMatrixOptionGroups(groups: Array<{ values: unknown[] 
   return groups.filter((group) => group.values.length > 0).length;
 }
 
+/** Deterministic ASCII suffix when option value code/label normalize to empty. */
+export function shortDeterministicOptionValueSuffix(optionValueId: string): string {
+  const alnum = optionValueId.replace(/[^a-z0-9]/gi, "").toUpperCase();
+  if (alnum.length >= 4) return alnum.slice(-4);
+  if (alnum.length > 0) return alnum.padStart(4, "0");
+  return "V000";
+}
+
+export function resolveMatrixOptionValueSkuPart(value: MatrixOptionValue): string {
+  const fromCode = value.valueCode?.trim() ? normalizeSkuPart(value.valueCode).slice(0, 6) : "";
+  if (fromCode) return fromCode;
+  const fromLabel = normalizeSkuPart(value.label).slice(0, 6);
+  if (fromLabel) return fromLabel;
+  return shortDeterministicOptionValueSuffix(value.id);
+}
+
+export function validateMatrixCombinationForGeneration(
+  groups: MatrixOptionGroup[],
+  valueIds: string[],
+): string | null {
+  const activeGroups = groups
+    .filter((group) => group.values.length > 0)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  if (!valueIds.length) {
+    return "Tổ hợp chưa chọn giá trị tuỳ chọn.";
+  }
+
+  if (valueIds.length !== activeGroups.length) {
+    return `Tổ hợp thiếu giá trị tuỳ chọn (cần ${activeGroups.length}, có ${valueIds.length}).`;
+  }
+
+  const uniqueIds = new Set(valueIds);
+  if (uniqueIds.size !== valueIds.length) {
+    return "Tổ hợp chứa giá trị tuỳ chọn bị trùng.";
+  }
+
+  for (const group of activeGroups) {
+    const selected = group.values.filter((value) => valueIds.includes(value.id));
+    if (!selected.length) {
+      return `Giá trị tuỳ chọn không tồn tại trong nhóm "${group.name.trim()}".`;
+    }
+    if (selected.length > 1) {
+      return `Tổ hợp chọn nhiều giá trị trong nhóm "${group.name.trim()}".`;
+    }
+  }
+
+  return null;
+}
+
 export function buildMatrixCombinationSkuSuffix(
   groups: MatrixOptionGroup[],
   valueIds: string[],
@@ -157,14 +207,13 @@ export function buildMatrixCombinationSkuSuffix(
   if (fromLegacy) return fromLegacy;
 
   const parts: string[] = [];
-  const sortedGroups = [...groups].sort((a, b) => a.sortOrder - b.sortOrder);
+  const sortedGroups = [...groups]
+    .filter((group) => group.values.length > 0)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
   for (const group of sortedGroups) {
     const value = group.values.find((item) => valueIds.includes(item.id));
     if (!value) continue;
-    const part = value.valueCode?.trim()
-      ? normalizeSkuPart(value.valueCode).slice(0, 6)
-      : normalizeSkuPart(value.label).slice(0, 6);
-    if (part) parts.push(part);
+    parts.push(resolveMatrixOptionValueSkuPart(value));
   }
   return parts.join("-");
 }

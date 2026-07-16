@@ -1,0 +1,1470 @@
+{
+  "base": "http://localhost:3462",
+  "beforeRemoval": {
+    "sidebarTop": {
+      "className": "AdminShell-module__Sp33bq__sidebarTop",
+      "rect": {
+        "top": 0,
+        "left": 0,
+        "width": 285,
+        "height": 73,
+        "bottom": 73
+      },
+      "computed": {
+        "position": "sticky",
+        "zIndex": "2",
+        "pointerEvents": "auto",
+        "top": "-18px",
+        "background": "rgba(11, 17, 32, 0.92) none repeat scroll 0% 0% / auto padding-box border-box"
+      }
+    },
+    "homepage": {
+      "label": "Homepage",
+      "found": true,
+      "element": {
+        "tag": "A",
+        "href": "/admin/settings/homepage",
+        "ariaDisabled": null,
+        "className": "AdminShell-module__Sp33bq__navLink",
+        "cssPath": "body.min-h-full.flex > div.AdminShell-module__Sp33bq__shell > aside.AdminShell-module__Sp33bq__sidebar > div#admin-primary-navigation > nav.AdminShell-module__Sp33bq__nav > section.AdminShell-module__Sp33bq__navSection > div.AdminShell-module__Sp33bq__navGroup > a.AdminShell-module__Sp33bq__navLink"
+      },
+      "rect": {
+        "top": 393,
+        "left": 14,
+        "width": 257,
+        "height": 36,
+        "cx": 142.5,
+        "cy": 411
+      },
+      "elementFromPoint": {
+        "tag": "A",
+        "id": null,
+        "className": "AdminShell-module__Sp33bq__navLink",
+        "href": "/admin/settings/homepage",
+        "text": "Homepage",
+        "cssPath": "body.min-h-full.flex > div.AdminShell-module__Sp33bq__shell > aside.AdminShell-module__Sp33bq__sidebar > div#admin-primary-navigation > nav.AdminShell-module__Sp33bq__nav > section.AdminShell-module__Sp33bq__navSection > div.AdminShell-module__Sp33bq__navGroup > a.AdminShell-module__Sp33bq__navLink",
+        "sameAsTarget": true,
+        "targetContainsHit": true,
+        "hitContainsTarget": true
+      },
+      "ancestorChain": [
+        {
+          "tag": "A",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/settings/homepage",
+          "ariaDisabled": null,
+          "rect": {
+            "top": 393,
+            "left": 14,
+            "width": 257,
+            "height": 36,
+            "bottom": 429
+          },
+          "computed": {
+            "position": "relative",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navGroup",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 368,
+            "left": 14,
+            "width": 257,
+            "height": 334,
+            "bottom": 702
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "SECTION",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navSection",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 334.5,
+            "left": 14,
+            "width": 257,
+            "height": 487.5,
+            "bottom": 822
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "NAV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__nav",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": -1662,
+            "left": 14,
+            "width": 257,
+            "height": 4121,
+            "bottom": 2459
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": "admin-primary-navigation",
+          "className": "AdminShell-module__Sp33bq__navWrap",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": -1662,
+            "left": 14,
+            "width": 257,
+            "height": 4145,
+            "bottom": 2483
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "ASIDE",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__sidebar",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 286,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "sticky",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "auto",
+            "overflowX": "auto",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__shell",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "BODY",
+          "id": null,
+          "className": "min-h-full flex flex-col",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "hidden auto",
+            "overflowX": "hidden",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "HTML",
+          "id": null,
+          "className": "h-full antialiased",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "hidden auto",
+            "overflowX": "hidden",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        }
+      ]
+    },
+    "siteNavigation": {
+      "label": "Điều hướng và Footer",
+      "found": true,
+      "element": {
+        "tag": "A",
+        "href": "/admin/site-navigation",
+        "ariaDisabled": null,
+        "className": "AdminShell-module__Sp33bq__navLink",
+        "cssPath": "body.min-h-full.flex > div.AdminShell-module__Sp33bq__shell > aside.AdminShell-module__Sp33bq__sidebar > div#admin-primary-navigation > nav.AdminShell-module__Sp33bq__nav > section.AdminShell-module__Sp33bq__navSection > div.AdminShell-module__Sp33bq__navGroup > a.AdminShell-module__Sp33bq__navLink"
+      },
+      "rect": {
+        "top": 432,
+        "left": 14,
+        "width": 257,
+        "height": 36,
+        "cx": 142.5,
+        "cy": 450
+      },
+      "elementFromPoint": {
+        "tag": "A",
+        "id": null,
+        "className": "AdminShell-module__Sp33bq__navLink",
+        "href": "/admin/site-navigation",
+        "text": "Điều hướng và Footer",
+        "cssPath": "body.min-h-full.flex > div.AdminShell-module__Sp33bq__shell > aside.AdminShell-module__Sp33bq__sidebar > div#admin-primary-navigation > nav.AdminShell-module__Sp33bq__nav > section.AdminShell-module__Sp33bq__navSection > div.AdminShell-module__Sp33bq__navGroup > a.AdminShell-module__Sp33bq__navLink",
+        "sameAsTarget": true,
+        "targetContainsHit": true,
+        "hitContainsTarget": true
+      },
+      "ancestorChain": [
+        {
+          "tag": "A",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "ariaDisabled": null,
+          "rect": {
+            "top": 432,
+            "left": 14,
+            "width": 257,
+            "height": 36,
+            "bottom": 468
+          },
+          "computed": {
+            "position": "relative",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navGroup",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 368,
+            "left": 14,
+            "width": 257,
+            "height": 334,
+            "bottom": 702
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "SECTION",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navSection",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 334.5,
+            "left": 14,
+            "width": 257,
+            "height": 487.5,
+            "bottom": 822
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "NAV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__nav",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": -1662,
+            "left": 14,
+            "width": 257,
+            "height": 4121,
+            "bottom": 2459
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": "admin-primary-navigation",
+          "className": "AdminShell-module__Sp33bq__navWrap",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": -1662,
+            "left": 14,
+            "width": 257,
+            "height": 4145,
+            "bottom": 2483
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "ASIDE",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__sidebar",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 286,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "sticky",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "auto",
+            "overflowX": "auto",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__shell",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "BODY",
+          "id": null,
+          "className": "min-h-full flex flex-col",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "hidden auto",
+            "overflowX": "hidden",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "HTML",
+          "id": null,
+          "className": "h-full antialiased",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "hidden auto",
+            "overflowX": "hidden",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        }
+      ]
+    }
+  },
+  "clickTestBeforeRemoval": {
+    "found": true,
+    "href": "http://localhost:3462/admin/site-navigation",
+    "beforeUrl": "http://localhost:3462/admin/dashboard",
+    "afterUrl": "http://localhost:3462/admin/dashboard",
+    "navigated": false,
+    "defaultPrevented": false,
+    "finalUrl": "http://localhost:3462/admin/dashboard"
+  },
+  "afterRemoval": {
+    "sidebarTop": null,
+    "homepage": {
+      "label": "Homepage",
+      "found": true,
+      "element": {
+        "tag": "A",
+        "href": "/admin/settings/homepage",
+        "ariaDisabled": null,
+        "className": "AdminShell-module__Sp33bq__navLink",
+        "cssPath": "body.min-h-full.flex > div.AdminShell-module__Sp33bq__shell > aside.AdminShell-module__Sp33bq__sidebar > div#admin-primary-navigation > nav.AdminShell-module__Sp33bq__nav > section.AdminShell-module__Sp33bq__navSection > div.AdminShell-module__Sp33bq__navGroup > a.AdminShell-module__Sp33bq__navLink"
+      },
+      "rect": {
+        "top": 393,
+        "left": 14,
+        "width": 257,
+        "height": 36,
+        "cx": 142.5,
+        "cy": 411
+      },
+      "elementFromPoint": {
+        "tag": "A",
+        "id": null,
+        "className": "AdminShell-module__Sp33bq__navLink",
+        "href": "/admin/settings/homepage",
+        "text": "Homepage",
+        "cssPath": "body.min-h-full.flex > div.AdminShell-module__Sp33bq__shell > aside.AdminShell-module__Sp33bq__sidebar > div#admin-primary-navigation > nav.AdminShell-module__Sp33bq__nav > section.AdminShell-module__Sp33bq__navSection > div.AdminShell-module__Sp33bq__navGroup > a.AdminShell-module__Sp33bq__navLink",
+        "sameAsTarget": true,
+        "targetContainsHit": true,
+        "hitContainsTarget": true
+      },
+      "ancestorChain": [
+        {
+          "tag": "A",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/settings/homepage",
+          "ariaDisabled": null,
+          "rect": {
+            "top": 393,
+            "left": 14,
+            "width": 257,
+            "height": 36,
+            "bottom": 429
+          },
+          "computed": {
+            "position": "relative",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navGroup",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 368,
+            "left": 14,
+            "width": 257,
+            "height": 334,
+            "bottom": 702
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "SECTION",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navSection",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 334.5,
+            "left": 14,
+            "width": 257,
+            "height": 487.5,
+            "bottom": 822
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "NAV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__nav",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": -1662,
+            "left": 14,
+            "width": 257,
+            "height": 4121,
+            "bottom": 2459
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": "admin-primary-navigation",
+          "className": "AdminShell-module__Sp33bq__navWrap",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": -1662,
+            "left": 14,
+            "width": 257,
+            "height": 4145,
+            "bottom": 2483
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "ASIDE",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__sidebar",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 286,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "sticky",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "auto",
+            "overflowX": "auto",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__shell",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "BODY",
+          "id": null,
+          "className": "min-h-full flex flex-col",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "hidden auto",
+            "overflowX": "hidden",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "HTML",
+          "id": null,
+          "className": "h-full antialiased",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "hidden auto",
+            "overflowX": "hidden",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        }
+      ]
+    },
+    "siteNavigation": {
+      "label": "Điều hướng và Footer",
+      "found": true,
+      "element": {
+        "tag": "A",
+        "href": "/admin/site-navigation",
+        "ariaDisabled": null,
+        "className": "AdminShell-module__Sp33bq__navLink",
+        "cssPath": "body.min-h-full.flex > div.AdminShell-module__Sp33bq__shell > aside.AdminShell-module__Sp33bq__sidebar > div#admin-primary-navigation > nav.AdminShell-module__Sp33bq__nav > section.AdminShell-module__Sp33bq__navSection > div.AdminShell-module__Sp33bq__navGroup > a.AdminShell-module__Sp33bq__navLink"
+      },
+      "rect": {
+        "top": 432,
+        "left": 14,
+        "width": 257,
+        "height": 36,
+        "cx": 142.5,
+        "cy": 450
+      },
+      "elementFromPoint": {
+        "tag": "A",
+        "id": null,
+        "className": "AdminShell-module__Sp33bq__navLink",
+        "href": "/admin/site-navigation",
+        "text": "Điều hướng và Footer",
+        "cssPath": "body.min-h-full.flex > div.AdminShell-module__Sp33bq__shell > aside.AdminShell-module__Sp33bq__sidebar > div#admin-primary-navigation > nav.AdminShell-module__Sp33bq__nav > section.AdminShell-module__Sp33bq__navSection > div.AdminShell-module__Sp33bq__navGroup > a.AdminShell-module__Sp33bq__navLink",
+        "sameAsTarget": true,
+        "targetContainsHit": true,
+        "hitContainsTarget": true
+      },
+      "ancestorChain": [
+        {
+          "tag": "A",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "ariaDisabled": null,
+          "rect": {
+            "top": 432,
+            "left": 14,
+            "width": 257,
+            "height": 36,
+            "bottom": 468
+          },
+          "computed": {
+            "position": "relative",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navGroup",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 368,
+            "left": 14,
+            "width": 257,
+            "height": 334,
+            "bottom": 702
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "SECTION",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__navSection",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 334.5,
+            "left": 14,
+            "width": 257,
+            "height": 487.5,
+            "bottom": 822
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "NAV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__nav",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": -1662,
+            "left": 14,
+            "width": 257,
+            "height": 4121,
+            "bottom": 2459
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": "admin-primary-navigation",
+          "className": "AdminShell-module__Sp33bq__navWrap",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": -1662,
+            "left": 14,
+            "width": 257,
+            "height": 4145,
+            "bottom": 2483
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "ASIDE",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__sidebar",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 286,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "sticky",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "auto",
+            "overflowX": "auto",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "DIV",
+          "id": null,
+          "className": "AdminShell-module__Sp33bq__shell",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "visible",
+            "overflowX": "visible",
+            "overflowY": "visible",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "BODY",
+          "id": null,
+          "className": "min-h-full flex flex-col",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "hidden auto",
+            "overflowX": "hidden",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "flex",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tag": "HTML",
+          "id": null,
+          "className": "h-full antialiased",
+          "href": null,
+          "ariaDisabled": null,
+          "rect": {
+            "top": 0,
+            "left": 0,
+            "width": 1280,
+            "height": 900,
+            "bottom": 900
+          },
+          "computed": {
+            "position": "static",
+            "zIndex": "auto",
+            "pointerEvents": "auto",
+            "overflow": "hidden auto",
+            "overflowX": "hidden",
+            "overflowY": "auto",
+            "transform": "none",
+            "opacity": "1",
+            "display": "block",
+            "visibility": "visible"
+          },
+          "pseudoBefore": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          },
+          "pseudoAfter": {
+            "content": "none",
+            "position": "static",
+            "pointerEvents": "auto"
+          }
+        }
+      ]
+    }
+  },
+  "clickTestAfterSidebarTopRemoval": {
+    "found": true,
+    "href": "http://localhost:3462/admin/site-navigation",
+    "beforeUrl": "http://localhost:3462/admin/dashboard",
+    "afterUrl": "http://localhost:3462/admin/dashboard",
+    "navigated": false,
+    "finalUrl": "http://localhost:3462/admin/dashboard"
+  },
+  "screenshots": {
+    "before": "/Users/nuhatachic/attd.vn/.admin-nav-dom-audit/before-sidebarTop-removal.png",
+    "after": "/Users/nuhatachic/attd.vn/.admin-nav-dom-audit/after-sidebarTop-removal.png"
+  }
+}

@@ -1,0 +1,583 @@
+{
+  "maxScroll": 3350,
+  "scrollSweep": [
+    {
+      "scrollTop": 0,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 2142,
+          "bottom": 2178,
+          "cx": 142.5,
+          "cy": 2160
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 0
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 2181,
+          "bottom": 2217,
+          "cx": 142.5,
+          "cy": 2199
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 0
+      }
+    },
+    {
+      "scrollTop": 100,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 2042,
+          "bottom": 2078,
+          "cx": 142.5,
+          "cy": 2060
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 100
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 2081,
+          "bottom": 2117,
+          "cx": 142.5,
+          "cy": 2099
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 100
+      }
+    },
+    {
+      "scrollTop": 200,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 1942,
+          "bottom": 1978,
+          "cx": 142.5,
+          "cy": 1960
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 200
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 1981,
+          "bottom": 2017,
+          "cx": 142.5,
+          "cy": 1999
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 200
+      }
+    },
+    {
+      "scrollTop": 300,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 1842,
+          "bottom": 1878,
+          "cx": 142.5,
+          "cy": 1860
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 300
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 1881,
+          "bottom": 1917,
+          "cx": 142.5,
+          "cy": 1899
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 300
+      }
+    },
+    {
+      "scrollTop": 400,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 1742,
+          "bottom": 1778,
+          "cx": 142.5,
+          "cy": 1760
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 400
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 1781,
+          "bottom": 1817,
+          "cx": 142.5,
+          "cy": 1799
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 400
+      }
+    },
+    {
+      "scrollTop": 500,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 1642,
+          "bottom": 1678,
+          "cx": 142.5,
+          "cy": 1660
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 500
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 1681,
+          "bottom": 1717,
+          "cx": 142.5,
+          "cy": 1699
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 500
+      }
+    },
+    {
+      "scrollTop": 600,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 1542,
+          "bottom": 1578,
+          "cx": 142.5,
+          "cy": 1560
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 600
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 1581,
+          "bottom": 1617,
+          "cx": 142.5,
+          "cy": 1599
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 600
+      }
+    },
+    {
+      "scrollTop": 700,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 1442,
+          "bottom": 1478,
+          "cx": 142.5,
+          "cy": 1460
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 700
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 1481,
+          "bottom": 1517,
+          "cx": 142.5,
+          "cy": 1499
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 700
+      }
+    },
+    {
+      "scrollTop": 800,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 1342,
+          "bottom": 1378,
+          "cx": 142.5,
+          "cy": 1360
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 800
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 1381,
+          "bottom": 1417,
+          "cx": 142.5,
+          "cy": 1399
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 800
+      }
+    },
+    {
+      "scrollTop": 900,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 1242,
+          "bottom": 1278,
+          "cx": 142.5,
+          "cy": 1260
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 900
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 1281,
+          "bottom": 1317,
+          "cx": 142.5,
+          "cy": 1299
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 900
+      }
+    },
+    {
+      "scrollTop": 1000,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 1142,
+          "bottom": 1178,
+          "cx": 142.5,
+          "cy": 1160
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 1000
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 1181,
+          "bottom": 1217,
+          "cx": 142.5,
+          "cy": 1199
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 1000
+      }
+    },
+    {
+      "scrollTop": 1200,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 942,
+          "bottom": 978,
+          "cx": 142.5,
+          "cy": 960
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 1200
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 981,
+          "bottom": 1017,
+          "cx": 142.5,
+          "cy": 999
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 1200
+      }
+    },
+    {
+      "scrollTop": 1400,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": 742,
+          "bottom": 778,
+          "cx": 142.5,
+          "cy": 760
+        },
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/settings/homepage",
+          "text": "Homepage",
+          "isLink": true
+        },
+        "underSidebarTop": false,
+        "sidebarScrollTop": 1400
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": 781,
+          "bottom": 817,
+          "cx": 142.5,
+          "cy": 799
+        },
+        "hit": {
+          "tag": "A",
+          "className": "AdminShell-module__Sp33bq__navLink",
+          "href": "/admin/site-navigation",
+          "text": "Điều hướng và Footer",
+          "isLink": true
+        },
+        "underSidebarTop": false,
+        "sidebarScrollTop": 1400
+      }
+    },
+    {
+      "scrollTop": 3350,
+      "sidebarTop": {
+        "top": 0,
+        "bottom": 73,
+        "height": 73
+      },
+      "homepage": {
+        "label": "Homepage",
+        "found": true,
+        "href": "/admin/settings/homepage",
+        "rect": {
+          "top": -1208,
+          "bottom": -1172,
+          "cx": 142.5,
+          "cy": -1190
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 3350
+      },
+      "siteNavigation": {
+        "label": "Điều hướng và Footer",
+        "found": true,
+        "href": "/admin/site-navigation",
+        "rect": {
+          "top": -1169,
+          "bottom": -1133,
+          "cx": 142.5,
+          "cy": -1151
+        },
+        "hit": null,
+        "underSidebarTop": false,
+        "sidebarScrollTop": 3350
+      }
+    }
+  ],
+  "overlapScrollFound": null,
+  "mouseClicks": {
+    "homepageAtScroll0": {
+      "found": true,
+      "label": "Homepage",
+      "cx": 142.5,
+      "cy": 2160,
+      "href": "http://localhost:3462/admin/settings/homepage",
+      "beforeUrl": "http://localhost:3462/admin/dashboard",
+      "afterUrl": "http://localhost:3462/admin/dashboard",
+      "navigated": false
+    },
+    "siteNavAtScroll0": {
+      "found": true,
+      "label": "Điều hướng và Footer",
+      "cx": 142.5,
+      "cy": 2199,
+      "href": "http://localhost:3462/admin/site-navigation",
+      "beforeUrl": "http://localhost:3462/admin/dashboard",
+      "afterUrl": "http://localhost:3462/admin/dashboard",
+      "navigated": false
+    },
+    "siteNavAtOverlapScroll": null,
+    "siteNavBeforeSidebarTopRemoval": {
+      "found": true,
+      "label": "Điều hướng và Footer",
+      "cx": 142.5,
+      "cy": 1799,
+      "href": "http://localhost:3462/admin/site-navigation",
+      "beforeUrl": "http://localhost:3462/admin/dashboard",
+      "afterUrl": "http://localhost:3462/admin/dashboard",
+      "navigated": false
+    },
+    "siteNavAfterSidebarTopRemoval": {
+      "found": true,
+      "label": "Điều hướng và Footer",
+      "cx": 142.5,
+      "cy": 1799,
+      "href": "http://localhost:3462/admin/site-navigation",
+      "beforeUrl": "http://localhost:3462/admin/dashboard",
+      "afterUrl": "http://localhost:3462/admin/dashboard",
+      "navigated": false
+    }
+  },
+  "afterRemoveAudit": {
+    "homepage": {
+      "label": "Homepage",
+      "rect": {
+        "top": 1742,
+        "cy": 1760
+      },
+      "hit": null
+    },
+    "siteNavigation": {
+      "label": "Điều hướng và Footer",
+      "rect": {
+        "top": 1781,
+        "cy": 1799
+      },
+      "hit": null
+    }
+  }
+}

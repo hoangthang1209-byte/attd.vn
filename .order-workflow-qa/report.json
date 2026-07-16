@@ -1,0 +1,140 @@
+{
+  "base": "http://localhost:3458",
+  "passed": 31,
+  "failed": 0,
+  "warnings": 0,
+  "results": {
+    "passed": [
+      {
+        "id": "admin-login",
+        "detail": ""
+      },
+      {
+        "id": "viewport-360-overflow",
+        "detail": ""
+      },
+      {
+        "id": "viewport-360-structure",
+        "detail": ""
+      },
+      {
+        "id": "viewport-360-mobile-bar-visible",
+        "detail": ""
+      },
+      {
+        "id": "viewport-360-sidebar-summary-hidden",
+        "detail": ""
+      },
+      {
+        "id": "viewport-360-main-bottom-pad",
+        "detail": "72px"
+      },
+      {
+        "id": "viewport-768-overflow",
+        "detail": ""
+      },
+      {
+        "id": "viewport-768-structure",
+        "detail": ""
+      },
+      {
+        "id": "viewport-768-mobile-bar-visible",
+        "detail": ""
+      },
+      {
+        "id": "viewport-768-sidebar-summary-hidden",
+        "detail": ""
+      },
+      {
+        "id": "viewport-768-main-bottom-pad",
+        "detail": "72px"
+      },
+      {
+        "id": "viewport-1280-overflow",
+        "detail": ""
+      },
+      {
+        "id": "viewport-1280-structure",
+        "detail": ""
+      },
+      {
+        "id": "viewport-1280-desktop-grid",
+        "detail": "590px 300px"
+      },
+      {
+        "id": "viewport-1280-header-actions",
+        "detail": ""
+      },
+      {
+        "id": "viewport-1280-mobile-bar-hidden",
+        "detail": ""
+      },
+      {
+        "id": "viewport-1280-inline-summary-hidden",
+        "detail": ""
+      },
+      {
+        "id": "customer-summary-visible",
+        "detail": ""
+      },
+      {
+        "id": "customer-advanced-open",
+        "detail": ""
+      },
+      {
+        "id": "validation-blocked-empty-customer-name",
+        "detail": ""
+      },
+      {
+        "id": "validation-reveal-customer-advanced",
+        "detail": ""
+      },
+      {
+        "id": "totals-render-zero",
+        "detail": "0 đTạm tính0 đChiết khấu0 đPhí vận chuyển0 đVAT (0%)0 đTổng cộng"
+      },
+      {
+        "id": "create-order-submit",
+        "detail": "cmrenk7hw000irwc1b4rap383"
+      },
+      {
+        "id": "edit-hydrate-internal-note",
+        "detail": ""
+      },
+      {
+        "id": "edit-hydrate-advanced-field",
+        "detail": ""
+      },
+      {
+        "id": "edit-persist-item-note",
+        "detail": ""
+      },
+      {
+        "id": "edit-persist-internal-note",
+        "detail": ""
+      },
+      {
+        "id": "order-detail-route",
+        "detail": ""
+      },
+      {
+        "id": "regression-public-footer",
+        "detail": ""
+      },
+      {
+        "id": "regression-pattern-delete-button",
+        "detail": ""
+      },
+      {
+        "id": "regression-quick-order-route",
+        "detail": ""
+      }
+    ],
+    "failed": [],
+    "warnings": []
+  },
+  "consoleIssues": [
+    "console: Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "screenshots": "/Users/nuhatachic/attd.vn/.order-workflow-qa"
+}

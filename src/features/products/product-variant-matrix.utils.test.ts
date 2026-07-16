@@ -1,6 +1,39 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildMatrixCombinationSkuSuffix } from "./product-variant-matrix.utils";
+import {
+  buildMatrixCombinationSkuSuffix,
+  resolveMatrixOptionValueSkuPart,
+  shortDeterministicOptionValueSuffix,
+  validateMatrixCombinationForGeneration,
+} from "./product-variant-matrix.utils";
+
+const regressionGroups = [
+  {
+    id: "color",
+    name: "Màu sắc",
+    slug: "color",
+    sortOrder: 0,
+    values: [
+      { id: "color-den", label: "Den", valueCode: null, sortOrder: 0 },
+      { id: "color-xanh", label: "Xanh", valueCode: null, sortOrder: 1 },
+      { id: "color-trang", label: "Trang", valueCode: null, sortOrder: 2 },
+      { id: "color-do", label: "Do", valueCode: null, sortOrder: 3 },
+    ],
+  },
+  {
+    id: "size",
+    name: "Kích thước",
+    slug: "size",
+    sortOrder: 1,
+    values: [
+      { id: "size-m", label: "M", valueCode: null, sortOrder: 0 },
+      { id: "size-l", label: "L", valueCode: null, sortOrder: 1 },
+      { id: "size-xl", label: "XL", valueCode: null, sortOrder: 2 },
+      { id: "size-2xl", label: "2XL", valueCode: null, sortOrder: 3 },
+      { id: "size-3xl", label: "3XL", valueCode: null, sortOrder: 4 },
+    ],
+  },
+];
 
 describe("buildMatrixCombinationSkuSuffix", () => {
   it("uses value codes for generic option groups", () => {
@@ -29,5 +62,38 @@ describe("buildMatrixCombinationSkuSuffix", () => {
 
     assert.equal(buildMatrixCombinationSkuSuffix(groups, ["v1", "v3"]), "PRM-24");
     assert.equal(buildMatrixCombinationSkuSuffix(groups, ["v2", "v4"]), "STD-25");
+  });
+
+  it("builds legacy color/size suffix for Den / M without legacy colorId/sizeId", () => {
+    assert.equal(
+      buildMatrixCombinationSkuSuffix(regressionGroups, ["color-den", "size-m"]),
+      "BLK-M",
+    );
+  });
+
+  it("falls back to deterministic optionValueId suffix when code and label normalize empty", () => {
+    const value = { id: "cmk9abc123xyz", label: "---", valueCode: null, sortOrder: 0 };
+    assert.equal(resolveMatrixOptionValueSkuPart(value), shortDeterministicOptionValueSuffix(value.id));
+    assert.equal(resolveMatrixOptionValueSkuPart(value).length, 4);
+  });
+});
+
+describe("validateMatrixCombinationForGeneration", () => {
+  it("accepts one option value id from each active group", () => {
+    assert.equal(
+      validateMatrixCombinationForGeneration(regressionGroups, ["color-den", "size-m"]),
+      null,
+    );
+  });
+
+  it("rejects missing option values with actionable detail", () => {
+    assert.match(
+      validateMatrixCombinationForGeneration(regressionGroups, ["color-den"]) ?? "",
+      /thiếu giá trị tuỳ chọn/i,
+    );
+    assert.match(
+      validateMatrixCombinationForGeneration(regressionGroups, ["missing-id", "size-m"]) ?? "",
+      /không tồn tại trong nhóm "Màu sắc"/,
+    );
   });
 });
