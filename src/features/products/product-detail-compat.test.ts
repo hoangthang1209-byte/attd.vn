@@ -50,6 +50,7 @@ describe("normalizeLegacyProductRow", () => {
       targetCustomers: [],
       featuredImage: null,
       gallery: [],
+      metadata: null,
       category: { id: "c1", name: "Áo thun", slug: "ao-thun-tron" },
       images: [],
       variants: [

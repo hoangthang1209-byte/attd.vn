@@ -16,6 +16,7 @@ import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-c
 
 const PRODUCT_DETAIL_INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
+  metadata: true,
   images: { orderBy: { sortOrder: "asc" as const } },
   options: {
     orderBy: { sortOrder: "asc" as const },

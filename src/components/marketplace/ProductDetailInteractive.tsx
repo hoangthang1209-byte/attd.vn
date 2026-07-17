@@ -9,6 +9,7 @@ import ProductPdpMobileBar from "@/components/marketplace/ProductPdpMobileBar";
 import ProductSpecificationsSection from "@/components/marketplace/ProductSpecificationsSection";
 import ProductCustomizationsSection from "@/components/marketplace/ProductCustomizationsSection";
 import ProductDetailTabs from "@/components/marketplace/ProductDetailTabs";
+import ProductSizeChartSection from "@/components/marketplace/ProductSizeChartSection";
 import ProductQuoteDialog from "@/components/public/ProductQuoteDialog";
 import type { PublicProductDetail } from "@/features/products/product-detail.types";
 import {
@@ -88,6 +89,7 @@ export default function ProductDetailInteractive({
   const specifications = product.specifications ?? [];
   const customizations = product.customizations ?? [];
   const images = product.images ?? [];
+  const sizeChart = product.sizeChart;
 
   const [selection, setSelection] = useState<OptionSelectionState>(() =>
     getInitialSelection(optionGroups),
@@ -113,6 +115,9 @@ export default function ProductDetailInteractive({
     if (specifications.length > 0) {
       tabs.push({ id: "mp-pdp-specs", label: "Thông số" });
     }
+    if (sizeChart) {
+      tabs.push({ id: "mp-pdp-size-chart", label: "Bảng size" });
+    }
     if (displayContent || displayShortDescription) {
       tabs.push({ id: "mp-pdp-desc", label: "Mô tả" });
     }
@@ -124,6 +129,7 @@ export default function ProductDetailInteractive({
     return tabs;
   }, [
     specifications.length,
+    sizeChart,
     customizations.length,
     displayContent,
     displayShortDescription,
@@ -436,6 +442,8 @@ export default function ProductDetailInteractive({
                 {specifications.length > 0 && (
                   <ProductSpecificationsSection rows={specifications} />
                 )}
+
+                <ProductSizeChartSection chart={sizeChart} />
 
                 {(displayContent || displayShortDescription) && (
                   <section className="mp-section mp-pdp-section" id="mp-pdp-desc">

@@ -64,6 +64,7 @@ const FIELD_LABELS: Record<string, string> = {
   leadTime: "Lead time",
   featuredImage: "Ảnh đại diện",
   curatedSalesBadges: "Nhãn bán hàng",
+  publicSizeChart: "Bảng size",
   shortDescription: "Mô tả ngắn",
   description: "Mô tả",
   tags: "Tags",
@@ -257,6 +258,16 @@ function resolveDescriptorMeta(
       section: fieldKey === "curatedSalesBadges" ? "Nhãn bán hàng trên ảnh đại diện" : fieldKey.startsWith("gallery") ? "Thư viện ảnh" : "Ảnh đại diện",
       focusTarget: fieldKey,
       field: fieldKey.split(".").pop() ?? fieldKey,
+      severity: "field",
+    };
+  }
+
+  if (fieldKey === "publicSizeChart") {
+    return {
+      tab: "content",
+      section: "Bảng size",
+      focusTarget: "publicSizeChart",
+      field: "publicSizeChart",
       severity: "field",
     };
   }

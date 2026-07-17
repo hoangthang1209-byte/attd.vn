@@ -27,6 +27,7 @@ import {
 import ProductCatalogFormErrorSummary from "@/components/admin/products/ProductCatalogFormErrorSummary";
 import ProductCategoryCascadingPicker from "@/components/admin/products/ProductCategoryCascadingPicker";
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
+import ProductSizeChartEditor from "@/components/admin/products/ProductSizeChartEditor";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
 import {
   resolveOptionValueRefFromGroups,
@@ -44,6 +45,7 @@ import {
   clearFieldErrorsForEdit,
   focusProductFormError,
   type ProductFormErrorDescriptor,
+  type ProductFormTabId,
 } from "@/features/products/product-form-error-descriptors";
 import { normalizeProductFormFieldErrors } from "@/features/products/product-form-row-error-keys";
 import {
@@ -52,6 +54,13 @@ import {
   PRODUCT_CURATED_BADGE_KEYS,
   type ProductCuratedBadgeKey,
 } from "@/features/products/product-sales-badges";
+import {
+  createEmptyProductSizeChart,
+  isLikelyApparelProduct,
+  isPublicSizeChartRenderable,
+  validateProductSizeChartForSave,
+  type ProductSizeChart,
+} from "@/features/products/product-size-chart";
 import { validateProductCategorySelection } from "@/features/categories/category-cascade-utils";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import {
@@ -101,17 +110,20 @@ type ProductFormData = {
   options: OptionGroupFormRow[];
   variants: MatrixVariantFormRow[];
   curatedSalesBadges: ProductCuratedBadgeKey[];
+  publicSizeChart: ProductSizeChart;
 };
 
-const FORM_TABS = [
-  { id: "basic", label: "Thông tin cơ bản" },
-  { id: "media", label: "Hình ảnh & media" },
-  { id: "variants", label: "Thuộc tính & biến thể" },
-  { id: "content", label: "Mô tả & thông số" },
-  { id: "seo", label: "SEO & hiển thị" },
+const FORM_SECTIONS = [
+  { id: "section-basic", tab: "basic" as const, label: "Cơ bản" },
+  { id: "section-media", tab: "media" as const, label: "Hình ảnh" },
+  { id: "section-b2b", tab: "basic" as const, label: "B2B" },
+  { id: "section-variants", tab: "variants" as const, label: "Biến thể" },
+  { id: "section-size-chart", tab: "content" as const, label: "Bảng size" },
+  { id: "section-content", tab: "content" as const, label: "Nội dung" },
+  { id: "section-seo", tab: "seo" as const, label: "SEO" },
 ] as const;
 
-type FormTabId = (typeof FORM_TABS)[number]["id"];
+type FormTabId = ProductFormTabId;
 
 type Props = {
   initialData?: Partial<ProductFormData> & { id?: string; slug?: string };
@@ -144,6 +156,24 @@ export default function ProductCatalogForm({
   const [activeTab, setActiveTab] = useState<FormTabId>(() =>
     searchParams.get("generateVariants") === "1" ? "variants" : "basic",
   );
+
+  const scrollToFormSection = useCallback((sectionId: string) => {
+    const el = document.getElementById(sectionId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const focusFormTabSection = useCallback((tab: FormTabId) => {
+    setActiveTab(tab);
+    const sectionByTab: Record<FormTabId, string> = {
+      basic: "section-basic",
+      media: "section-media",
+      variants: "section-variants",
+      content: "section-content",
+      seo: "section-seo",
+    };
+    requestAnimationFrame(() => scrollToFormSection(sectionByTab[tab] ?? "section-basic"));
+  }, [scrollToFormSection]);
   const [form, setForm] = useState<ProductFormData>({
     id: initialData?.id,
     slug: initialData?.slug,
@@ -174,6 +204,7 @@ export default function ProductCatalogForm({
     options: initialData?.options ?? [],
     variants: initialData?.variants ?? [],
     curatedSalesBadges: initialData?.curatedSalesBadges ?? [],
+    publicSizeChart: initialData?.publicSizeChart ?? createEmptyProductSizeChart(),
   });
   const [saving, setSaving] = useState(false);
   const [bulkOpInProgress, setBulkOpInProgress] = useState(false);
@@ -212,6 +243,12 @@ export default function ProductCatalogForm({
     specifications: form.specifications,
     attributeAssignments: form.attributeAssignments,
     options: form.options,
+    warnMissingSizeChart: isLikelyApparelProduct({
+      name: form.name,
+      options: form.options,
+    }),
+    publicSizeChartEnabled: form.publicSizeChart.enabled,
+    publicSizeChartRenderable: isPublicSizeChartRenderable(form.publicSizeChart),
   }), [form]);
 
   const productPublishChecklist = useMemo(
@@ -288,7 +325,7 @@ export default function ProductCatalogForm({
 
     preselectHandledRef.current = true;
     const timer = window.setTimeout(() => {
-      setActiveTab("content");
+      focusFormTabSection("content");
       setForm((prev) => {
         if (prev.attributeAssignments.some((row) => row.attributeId === attributeId)) {
           return prev;
@@ -418,16 +455,29 @@ export default function ProductCatalogForm({
     });
     setFieldErrors(normalized);
     const firstField = Object.keys(normalized)[0];
-    if (firstField) {
-      setActiveTab(resolveTabForField(firstField, { form, sharedAttributes }));
+    if (firstField === "publicSizeChart") {
+      setActiveTab("content");
+      requestAnimationFrame(() => {
+        scrollToFormSection("section-size-chart");
+        scrollToFirstFieldError(normalized);
+      });
+    } else if (firstField) {
+      focusFormTabSection(resolveTabForField(firstField, { form, sharedAttributes }));
+      requestAnimationFrame(() => scrollToFirstFieldError(normalized));
+    } else {
+      requestAnimationFrame(() => scrollToFirstFieldError(normalized));
     }
     setError(summaryMessage);
-    requestAnimationFrame(() => scrollToFirstFieldError(normalized));
   }
 
   async function handleFocusError(descriptor: ProductFormErrorDescriptor) {
+    if (descriptor.key === "publicSizeChart" || descriptor.focusTarget === "publicSizeChart") {
+      setActiveTab("content");
+      requestAnimationFrame(() => scrollToFormSection("section-size-chart"));
+      return;
+    }
     await focusProductFormError(descriptor, {
-      setActiveTab,
+      setActiveTab: focusFormTabSection,
     });
   }
 
@@ -547,6 +597,7 @@ export default function ProductCatalogForm({
       tags: form.tags.split(",").map((s) => s.trim()).filter(Boolean),
       status: form.status,
       curatedSalesBadges: form.curatedSalesBadges,
+      publicSizeChart: form.publicSizeChart,
       featuredImage: form.featuredImage.trim() || undefined,
       gallery: form.gallery.map((url) => url.trim()).filter(Boolean),
       specifications: form.specifications
@@ -620,19 +671,6 @@ export default function ProductCatalogForm({
     };
   }
 
-  function fieldLabel(field: string): string {
-    if (field.startsWith("variants.") && field.endsWith(".imageUrl")) return "Ảnh biến thể";
-    if (field.endsWith(".dealerPrice")) return "Giá đại lý";
-    if (field.endsWith(".wholesalePrice")) return "Giá sỉ";
-    if (field.endsWith(".stockQty")) return "Tồn kho";
-    if (field === "featuredImage") return "Ảnh đại diện";
-    if (field === "productCode") return "ID sản phẩm";
-    if (field === "categoryId") return "Danh mục";
-    if (field === "name") return "Tên sản phẩm";
-    if (field.startsWith("options")) return "Nhóm biến thể";
-    return field;
-  }
-
   async function ensureOptionsSavedForMatrix(): Promise<boolean> {
     if (!form.id) return true;
     const localErrors = validateProductDraftForMatrixGeneration(form);
@@ -696,6 +734,10 @@ export default function ProductCatalogForm({
     const categoryError = validateProductCategorySelection(form.categoryId, categories);
     if (categoryError) {
       localErrors.categoryId = categoryError;
+    }
+    const sizeChartError = validateProductSizeChartForSave(form.publicSizeChart);
+    if (sizeChartError && form.status === "ACTIVE") {
+      localErrors.publicSizeChart = sizeChartError;
     }
     if (Object.keys(localErrors).length > 0) {
       applyValidationErrors(
@@ -765,7 +807,7 @@ export default function ProductCatalogForm({
                 )
               : prev.variants,
           }));
-          setActiveTab("variants");
+          focusFormTabSection("variants");
           if (!form.id) {
             router.replace(`/admin/products/${product.id}/edit`);
           }
@@ -879,10 +921,16 @@ export default function ProductCatalogForm({
   const publicSlug = form.slug ?? "";
   const publicUrl = publicSlug ? `/san-pham/${publicSlug}` : null;
 
+  useEffect(() => {
+    if (searchParams.get("generateVariants") !== "1") return;
+    requestAnimationFrame(() => scrollToFormSection("section-variants"));
+  }, [searchParams]);
+
   return (
     <form
-      className={`admin-catalog-form${activeTab === "variants" ? " admin-catalog-form--variants" : ""}`}
+      className="admin-catalog-form admin-catalog-form--onescreen"
       onSubmit={(e) => void handleSubmit(e)}
+      data-testid="product-catalog-form-onescreen"
     >
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
@@ -923,27 +971,29 @@ export default function ProductCatalogForm({
         onFocusError={(descriptor) => void handleFocusError(descriptor)}
       />
 
-      <div className="admin-catalog-tabs" role="tablist" aria-label="Các phần biểu mẫu sản phẩm">
-        {FORM_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            className={`admin-catalog-tab${activeTab === tab.id ? " is-active" : ""}`}
-            onClick={() => setActiveTab(tab.id)}
+      <nav className="admin-catalog-section-nav" aria-label="Mục biểu mẫu sản phẩm">
+        {FORM_SECTIONS.map((section) => (
+          <a
+            key={section.id}
+            href={`#${section.id}`}
+            className={`admin-catalog-section-nav__link${activeTab === section.tab ? " is-active" : ""}`}
+            onClick={(e) => {
+              e.preventDefault();
+              setActiveTab(section.tab);
+              scrollToFormSection(section.id);
+            }}
           >
-            {tab.label}
-            {tabErrorCounts[tab.id] > 0 && (
-              <span className="admin-catalog-tab__badge" aria-label={`${tabErrorCounts[tab.id]} lỗi`}>
-                {tabErrorCounts[tab.id]}
+            {section.label}
+            {tabErrorCounts[section.tab] > 0 && (
+              <span className="admin-catalog-tab__badge" aria-label={`${tabErrorCounts[section.tab]} lỗi`}>
+                {tabErrorCounts[section.tab]}
               </span>
             )}
-          </button>
+          </a>
         ))}
-      </div>
+      </nav>
 
-      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "basic"}>
+      <fieldset className="admin-catalog-fieldset" id="section-basic">
         <legend>1. Thông tin cơ bản</legend>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field" data-field="name">
@@ -1038,137 +1088,15 @@ export default function ProductCatalogForm({
           <label className="admin-label">Mô tả ngắn</label>
           <textarea className="admin-textarea" rows={2} value={form.shortDescription} onChange={(e) => setField("shortDescription", e.target.value)} />
         </div>
-        <div className="admin-field" data-field="description">
-          <label className="admin-label">Mô tả chi tiết</label>
-          <textarea
-            className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.description))}`}
-            rows={4}
-            data-field="description"
-            value={form.description}
-            onChange={(e) => setField("description", e.target.value)}
-          />
-          {fieldErrors.description && <p className="admin-field-error" role="alert">{fieldErrors.description}</p>}
-        </div>
         <div className="admin-field">
           <label className="admin-label">Tags (cách nhau bởi dấu phẩy)</label>
           <input className="admin-input" value={form.tags} onChange={(e) => setField("tags", e.target.value)} placeholder="áo thun trơn, CVC, nguồn hàng sỉ" />
         </div>
       </fieldset>
 
-      {/* ── 2. Thông tin B2B ─────────────────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "basic"}>
-        <legend>2. Thông tin B2B & Sản xuất</legend>
-        <div className="admin-seo-brief-form-grid">
-          <ProductB2BSharedAttributeField
-            attributeCode="MATERIAL"
-            label="Chất liệu"
-            customValueActionLabel="Nhập chất liệu riêng"
-            assignments={form.attributeAssignments}
-            sharedAttributes={sharedAttributes}
-            sharedAttributesLoading={sharedAttributesLoading}
-            fieldErrors={fieldErrors}
-            onAssignmentsChange={(attributeAssignments) => setField("attributeAssignments", attributeAssignments)}
-            onRefreshSharedAttributes={loadSharedAttributes}
-          />
-          <div className="admin-field">
-            <ProductB2BSharedAttributeField
-              attributeCode="FIT"
-              label="Form / Kiểu dáng"
-              customValueActionLabel="Nhập form riêng"
-              assignments={form.attributeAssignments}
-              sharedAttributes={sharedAttributes}
-              sharedAttributesLoading={sharedAttributesLoading}
-              fieldErrors={fieldErrors}
-              onAssignmentsChange={(attributeAssignments) => setField("attributeAssignments", attributeAssignments)}
-              onRefreshSharedAttributes={loadSharedAttributes}
-            />
-            {initialLegacyFit && !legacyFitClearPending && (
-              <div className="admin-field-hint" style={{ marginTop: 8 }}>
-                Fit cũ: {initialLegacyFit}
-                {" "}
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--secondary admin-btn--xs"
-                  onClick={() => {
-                    if (!window.confirm("Xóa dữ liệu Fit cũ khỏi sản phẩm khi lưu?")) return;
-                    setLegacyFitClearPending(true);
-                  }}
-                >
-                  Xóa dữ liệu Fit cũ
-                </button>
-              </div>
-            )}
-            {legacyFitClearPending && (
-              <p className="admin-field-hint" style={{ marginTop: 8 }}>
-                Dữ liệu Fit cũ sẽ được xóa khi lưu sản phẩm.
-              </p>
-            )}
-          </div>
-          <div className="admin-field" data-field="defaultMoq">
-            <label className="admin-label">MOQ tối thiểu (cái)</label>
-            <input
-              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.defaultMoq))}`}
-              type="number"
-              min="1"
-              data-field="defaultMoq"
-              value={form.defaultMoq}
-              onChange={(e) => setField("defaultMoq", e.target.value)}
-              placeholder="50"
-            />
-            {fieldErrors.defaultMoq && <p className="admin-field-error" role="alert">{fieldErrors.defaultMoq}</p>}
-            <p className="admin-field-hint">Số lượng tối thiểu cho một đơn sỉ</p>
-          </div>
-          <div className="admin-field" data-field="leadTime">
-            <label className="admin-label">Lead-time (thời gian giao/sản xuất)</label>
-            <input
-              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.leadTime))}`}
-              value={form.leadTime}
-              data-field="leadTime"
-              onChange={(e) => setField("leadTime", e.target.value)}
-              placeholder="Có sẵn: 1–3 ngày"
-            />
-            {fieldErrors.leadTime && <p className="admin-field-error" role="alert">{fieldErrors.leadTime}</p>}
-            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
-              {LEAD_TIME_PRESETS.map((preset) => (
-                <button key={preset} type="button" className="admin-btn admin-btn--secondary admin-btn--xs"
-                  onClick={() => setField("leadTime", preset)}>
-                  {preset}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="admin-seo-brief-form-grid">
-          <div className="admin-field">
-            <label className="admin-label">Ứng dụng B2B (cách nhau bởi dấu phẩy)</label>
-            <input className="admin-input" value={form.useCases} onChange={(e) => setField("useCases", e.target.value)} placeholder="Xưởng in, Đồng phục công ty, Đại lý sỉ" />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Đối tượng phù hợp (cách nhau bởi dấu phẩy)</label>
-            <input className="admin-input" value={form.targetCustomers} onChange={(e) => setField("targetCustomers", e.target.value)} placeholder="Đại lý sỉ, Doanh nghiệp, Agency" />
-          </div>
-        </div>
-
-        <div className="admin-catalog-toggles">
-          <label className="admin-catalog-toggle">
-            <input type="checkbox" checked={form.supportsPrinting} onChange={(e) => setField("supportsPrinting", e.target.checked)} />
-            Hỗ trợ in
-          </label>
-          <label className="admin-catalog-toggle">
-            <input type="checkbox" checked={form.supportsEmbroidery} onChange={(e) => setField("supportsEmbroidery", e.target.checked)} />
-            Hỗ trợ thêu
-          </label>
-          <label className="admin-catalog-toggle">
-            <input type="checkbox" checked={form.supportsOem} onChange={(e) => setField("supportsOem", e.target.checked)} />
-            Hỗ trợ OEM
-          </label>
-        </div>
-      </fieldset>
-
-      {/* ── 3. Hình ảnh ──────────────────────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "media"}>
-        <legend>3. Hình ảnh sản phẩm</legend>
+      {/* ── Hình ảnh sản phẩm ───────────────────────────────────────────── */}
+      <fieldset className="admin-catalog-fieldset" id="section-media">
+        <legend>2. Hình ảnh sản phẩm</legend>
         <p className="admin-field-hint">Ảnh nên tối ưu 200–300KB trước khi upload để website tải nhanh.</p>
 
         {/* Featured image */}
@@ -1300,9 +1228,120 @@ export default function ProductCatalogForm({
         </div>
       </fieldset>
 
-      {/* ── 4. Biến thể ───────────────────────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "variants"}>
-        <legend>Thuộc tính &amp; biến thể</legend>
+      {/* ── Thông tin B2B ───────────────────────────────────────────────── */}
+      <fieldset className="admin-catalog-fieldset" id="section-b2b">
+        <legend>3. Thông tin bán sỉ / B2B</legend>
+        <div className="admin-seo-brief-form-grid">
+          <ProductB2BSharedAttributeField
+            attributeCode="MATERIAL"
+            label="Chất liệu"
+            customValueActionLabel="Nhập chất liệu riêng"
+            assignments={form.attributeAssignments}
+            sharedAttributes={sharedAttributes}
+            sharedAttributesLoading={sharedAttributesLoading}
+            fieldErrors={fieldErrors}
+            onAssignmentsChange={(attributeAssignments) => setField("attributeAssignments", attributeAssignments)}
+            onRefreshSharedAttributes={loadSharedAttributes}
+          />
+          <div className="admin-field">
+            <ProductB2BSharedAttributeField
+              attributeCode="FIT"
+              label="Form / Kiểu dáng"
+              customValueActionLabel="Nhập form riêng"
+              assignments={form.attributeAssignments}
+              sharedAttributes={sharedAttributes}
+              sharedAttributesLoading={sharedAttributesLoading}
+              fieldErrors={fieldErrors}
+              onAssignmentsChange={(attributeAssignments) => setField("attributeAssignments", attributeAssignments)}
+              onRefreshSharedAttributes={loadSharedAttributes}
+            />
+            {initialLegacyFit && !legacyFitClearPending && (
+              <div className="admin-field-hint" style={{ marginTop: 8 }}>
+                Fit cũ: {initialLegacyFit}
+                {" "}
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  onClick={() => {
+                    if (!window.confirm("Xóa dữ liệu Fit cũ khỏi sản phẩm khi lưu?")) return;
+                    setLegacyFitClearPending(true);
+                  }}
+                >
+                  Xóa dữ liệu Fit cũ
+                </button>
+              </div>
+            )}
+            {legacyFitClearPending && (
+              <p className="admin-field-hint" style={{ marginTop: 8 }}>
+                Dữ liệu Fit cũ sẽ được xóa khi lưu sản phẩm.
+              </p>
+            )}
+          </div>
+          <div className="admin-field" data-field="defaultMoq">
+            <label className="admin-label">MOQ tối thiểu (cái)</label>
+            <input
+              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.defaultMoq))}`}
+              type="number"
+              min="1"
+              data-field="defaultMoq"
+              value={form.defaultMoq}
+              onChange={(e) => setField("defaultMoq", e.target.value)}
+              placeholder="50"
+            />
+            {fieldErrors.defaultMoq && <p className="admin-field-error" role="alert">{fieldErrors.defaultMoq}</p>}
+            <p className="admin-field-hint">Số lượng tối thiểu cho một đơn sỉ</p>
+          </div>
+          <div className="admin-field" data-field="leadTime">
+            <label className="admin-label">Lead-time (thời gian giao/sản xuất)</label>
+            <input
+              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.leadTime))}`}
+              value={form.leadTime}
+              data-field="leadTime"
+              onChange={(e) => setField("leadTime", e.target.value)}
+              placeholder="Có sẵn: 1–3 ngày"
+            />
+            {fieldErrors.leadTime && <p className="admin-field-error" role="alert">{fieldErrors.leadTime}</p>}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
+              {LEAD_TIME_PRESETS.map((preset) => (
+                <button key={preset} type="button" className="admin-btn admin-btn--secondary admin-btn--xs"
+                  onClick={() => setField("leadTime", preset)}>
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="admin-seo-brief-form-grid">
+          <div className="admin-field">
+            <label className="admin-label">Ứng dụng B2B (cách nhau bởi dấu phẩy)</label>
+            <input className="admin-input" value={form.useCases} onChange={(e) => setField("useCases", e.target.value)} placeholder="Xưởng in, Đồng phục công ty, Đại lý sỉ" />
+          </div>
+          <div className="admin-field">
+            <label className="admin-label">Đối tượng phù hợp (cách nhau bởi dấu phẩy)</label>
+            <input className="admin-input" value={form.targetCustomers} onChange={(e) => setField("targetCustomers", e.target.value)} placeholder="Đại lý sỉ, Doanh nghiệp, Agency" />
+          </div>
+        </div>
+
+        <div className="admin-catalog-toggles">
+          <label className="admin-catalog-toggle">
+            <input type="checkbox" checked={form.supportsPrinting} onChange={(e) => setField("supportsPrinting", e.target.checked)} />
+            Hỗ trợ in
+          </label>
+          <label className="admin-catalog-toggle">
+            <input type="checkbox" checked={form.supportsEmbroidery} onChange={(e) => setField("supportsEmbroidery", e.target.checked)} />
+            Hỗ trợ thêu
+          </label>
+          <label className="admin-catalog-toggle">
+            <input type="checkbox" checked={form.supportsOem} onChange={(e) => setField("supportsOem", e.target.checked)} />
+            Hỗ trợ OEM
+          </label>
+        </div>
+      </fieldset>
+
+      {/* ── Biến thể ─────────────────────────────────────────────────────── */}
+      <fieldset className="admin-catalog-fieldset" id="section-variants">
+        <legend>4. Biến thể &amp; thuộc tính</legend>
         <ProductCatalogVariantsSection
           ref={variantsSectionRef}
           productId={form.id}
@@ -1329,15 +1368,35 @@ export default function ProductCatalogForm({
         )}
       </fieldset>
 
-      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "content"}>
-        <legend>Mô tả & thông số</legend>
-        <div className="admin-field">
-          <label className="admin-label">Tóm tắt ngắn (hiển thị gần tiêu đề PDP)</label>
-          <textarea className="admin-textarea" rows={2} value={form.shortDescription} onChange={(e) => setField("shortDescription", e.target.value)} />
-        </div>
-        <div className="admin-field">
+      <fieldset className="admin-catalog-fieldset" id="section-size-chart" data-field="publicSizeChart">
+        <legend>5. Bảng size</legend>
+        <p className="admin-field-hint" style={{ marginBottom: 10 }}>
+          Bảng size riêng của sản phẩm — hiển thị trên trang chi tiết khi được bật.
+        </p>
+        <ProductSizeChartEditor
+          value={form.publicSizeChart}
+          onChange={(publicSizeChart) => {
+            setField("publicSizeChart", publicSizeChart);
+            clearFieldErrorKey("publicSizeChart");
+          }}
+          options={form.options}
+          variants={form.variants}
+          error={fieldErrors.publicSizeChart}
+        />
+      </fieldset>
+
+      <fieldset className="admin-catalog-fieldset" id="section-content">
+        <legend>6. Nội dung chi tiết</legend>
+        <div className="admin-field" data-field="description">
           <label className="admin-label">Mô tả sản phẩm đầy đủ</label>
-          <textarea className="admin-textarea" rows={8} value={form.description} onChange={(e) => setField("description", e.target.value)} />
+          <textarea
+            className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.description))}`}
+            rows={8}
+            data-field="description"
+            value={form.description}
+            onChange={(e) => setField("description", e.target.value)}
+          />
+          {fieldErrors.description && <p className="admin-field-error" role="alert">{fieldErrors.description}</p>}
           <p className="admin-field-hint">Nội dung văn bản an toàn — không dán HTML thô từ nguồn không tin cậy.</p>
         </div>
         <ProductInformationAttributesSection
@@ -1364,8 +1423,8 @@ export default function ProductCatalogForm({
         />
       </fieldset>
 
-      <fieldset className="admin-catalog-fieldset" hidden={activeTab !== "seo"}>
-        <legend>SEO & hiển thị</legend>
+      <fieldset className="admin-catalog-fieldset" id="section-seo">
+        <legend>7. SEO &amp; hiển thị website</legend>
         <div className="admin-field" data-field="seoTitle">
           <label className="admin-label">SEO title</label>
           <input
@@ -1392,11 +1451,17 @@ export default function ProductCatalogForm({
             Xem trước công khai: <a href={publicUrl} target="_blank" rel="noopener noreferrer">{publicUrl}</a>
           </p>
         )}
+        {showProductPublishChecklist && (
+          <PublishQualityChecklist
+            items={productPublishChecklist}
+            legacyWarning={showProductLegacySeoWarning}
+          />
+        )}
       </fieldset>
 
       {form.id && <ProductMaterialSection productId={form.id} />}
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div className="admin-catalog-form__sticky-actions" id="section-save">
         <AdminLoadingButton
           type="submit"
           variant="primary"

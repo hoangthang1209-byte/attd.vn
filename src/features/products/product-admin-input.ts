@@ -11,6 +11,10 @@ import {
   type ProductCuratedBadgeKey,
 } from "@/features/products/product-sales-badges";
 import {
+  normalizeProductSizeChart,
+  validateProductSizeChartForSave,
+} from "@/features/products/product-size-chart";
+import {
   SeoPublishQualityGateError,
   formatSeoPublishQualityGateApiError,
 } from "@/lib/seo/publish-quality-gate";
@@ -301,6 +305,24 @@ export function parseProductInput(
     }
   }
 
+  let publicSizeChart: ReturnType<typeof normalizeProductSizeChart> | null | undefined;
+  if (raw.publicSizeChart !== undefined) {
+    if (raw.publicSizeChart === null) {
+      publicSizeChart = null;
+    } else {
+      const chart = normalizeProductSizeChart(raw.publicSizeChart);
+      const sizeChartError = validateProductSizeChartForSave(chart);
+      if (sizeChartError && status === "ACTIVE") {
+        fieldErrors.publicSizeChart = sizeChartError;
+      } else if (sizeChartError && chart.enabled) {
+        // Soft: still allow draft/other statuses, but surface when explicitly enabled incomplete
+        // Only block ACTIVE aggressively; for drafts allow save with enabled incomplete by auto-keeping data
+        // User asked: do not block draft too aggressively — skip field error for non-ACTIVE
+      }
+      publicSizeChart = chart;
+    }
+  }
+
   if (Object.keys(fieldErrors).length > 0) {
     throw new ProductAdminValidationError(
       mode === "create"
@@ -340,6 +362,7 @@ export function parseProductInput(
     input.metadata = raw.metadata as Record<string, unknown>;
   }
   if (curatedSalesBadges !== undefined) input.curatedSalesBadges = curatedSalesBadges;
+  if (publicSizeChart !== undefined) input.publicSizeChart = publicSizeChart;
   if (variants !== undefined) input.variants = variants;
 
   if (Array.isArray(raw.options)) {

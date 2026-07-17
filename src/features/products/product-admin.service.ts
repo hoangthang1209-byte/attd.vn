@@ -83,6 +83,10 @@ import {
   mergeCuratedSalesBadgesIntoMetadata,
   type ProductCuratedBadgeKey,
 } from "@/features/products/product-sales-badges";
+import {
+  mergePublicSizeChartIntoMetadata,
+  type ProductSizeChart,
+} from "@/features/products/product-size-chart";
 import { readProductEntryFromMetadata } from "@/features/products/product-entry-modes";
 
 export { createProductSaveTimer } from "@/features/products/product-save-timing";
@@ -168,6 +172,8 @@ export type ProductInput = {
   status?: ProductStatus;
   metadata?: Record<string, unknown> | null;
   curatedSalesBadges?: ProductCuratedBadgeKey[];
+  /** Merged into Product.metadata.publicSizeChart without replacing other keys. */
+  publicSizeChart?: ProductSizeChart | null;
   variants?: VariantInput[];
   options?: ProductOptionInput[];
   specifications?: ProductSpecificationInput[];
@@ -1004,15 +1010,26 @@ function buildProductCreateData(
   };
 }
 
-function resolveProductMetadataForSave(input: Pick<ProductInput, "metadata" | "curatedSalesBadges">) {
-  if (input.curatedSalesBadges !== undefined) {
-    const merged = mergeCuratedSalesBadgesIntoMetadata(input.metadata ?? null, input.curatedSalesBadges);
-    return Object.keys(merged).length > 0 ? merged : null;
+function resolveProductMetadataForSave(
+  input: Pick<ProductInput, "metadata" | "curatedSalesBadges" | "publicSizeChart">,
+) {
+  const patchesSizeChart = input.publicSizeChart !== undefined;
+  const patchesBadges = input.curatedSalesBadges !== undefined;
+  if (!patchesBadges && !patchesSizeChart) {
+    if (input.metadata) return input.metadata;
+    return undefined;
   }
-  if (input.metadata) {
-    return input.metadata;
+
+  let merged: Record<string, unknown> = input.metadata
+    ? { ...input.metadata }
+    : {};
+  if (patchesBadges) {
+    merged = mergeCuratedSalesBadgesIntoMetadata(merged, input.curatedSalesBadges!);
   }
-  return undefined;
+  if (patchesSizeChart) {
+    merged = mergePublicSizeChartIntoMetadata(merged, input.publicSizeChart ?? null);
+  }
+  return Object.keys(merged).length > 0 ? merged : null;
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────
@@ -1210,15 +1227,24 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
   if (input.supportsEmbroidery !== undefined) updateData.supportsEmbroidery = input.supportsEmbroidery;
   if (input.supportsOem !== undefined) updateData.supportsOem = input.supportsOem;
   if (input.tags !== undefined) updateData.tags = input.tags;
-  if (input.curatedSalesBadges !== undefined) {
+  if (input.curatedSalesBadges !== undefined || input.publicSizeChart !== undefined) {
     const existingMetadata = await prisma.product.findUnique({
       where: { id },
       select: { metadata: true },
     });
-    updateData.metadata = mergeCuratedSalesBadgesIntoMetadata(
-      existingMetadata?.metadata ?? null,
-      input.curatedSalesBadges,
-    ) as Prisma.InputJsonValue;
+    let merged: Record<string, unknown> =
+      existingMetadata?.metadata &&
+      typeof existingMetadata.metadata === "object" &&
+      !Array.isArray(existingMetadata.metadata)
+        ? { ...(existingMetadata.metadata as Record<string, unknown>) }
+        : {};
+    if (input.curatedSalesBadges !== undefined) {
+      merged = mergeCuratedSalesBadgesIntoMetadata(merged, input.curatedSalesBadges);
+    }
+    if (input.publicSizeChart !== undefined) {
+      merged = mergePublicSizeChartIntoMetadata(merged, input.publicSizeChart);
+    }
+    updateData.metadata = merged as Prisma.InputJsonValue;
   } else if (input.metadata !== undefined && input.metadata) {
     updateData.metadata = input.metadata as Prisma.InputJsonValue;
   }

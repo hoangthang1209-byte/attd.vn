@@ -149,6 +149,10 @@ export type ProductPublishQualityInput = {
   supportsOem?: boolean;
   quoteCtaEnabled?: boolean;
   noVariantConfirmed?: boolean;
+  /** Soft checklist only — does not block publish gate. */
+  warnMissingSizeChart?: boolean;
+  publicSizeChartEnabled?: boolean;
+  publicSizeChartRenderable?: boolean;
 };
 
 export type CategoryPublishQualityInput = {
@@ -421,6 +425,13 @@ export function buildProductPublishChecklist(
   };
   for (const [field, label] of Object.entries(MODE_CHECKLIST_LABELS)) {
     if (failed.has(field)) items.push({ key: field, label, complete: false });
+  }
+  if (input.warnMissingSizeChart) {
+    items.push({
+      key: "publicSizeChart",
+      label: "Nên có bảng size (khuyến nghị cho sản phẩm may mặc)",
+      complete: Boolean(input.publicSizeChartRenderable),
+    });
   }
   return items;
 }

@@ -1,4 +1,5 @@
 import type { ProductImageRecord } from "@/lib/productImages";
+import type { ProductSizeChart } from "@/features/products/product-size-chart";
 
 export type ProductOptionGroup = {
   id: string;
@@ -78,4 +79,6 @@ export type PublicProductDetail = {
   specifications: ProductSpecificationRow[];
   customizations: ProductCustomizationRow[];
   hasStructuredOptions: boolean;
+  /** Normalized public size chart when present and enabled; otherwise null. */
+  sizeChart: ProductSizeChart | null;
 };

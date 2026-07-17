@@ -5,6 +5,10 @@ import {
   type ProductCuratedBadgeKey,
 } from "@/features/products/product-sales-badges";
 import {
+  parsePublicSizeChartFromMetadata,
+  type ProductSizeChart,
+} from "@/features/products/product-size-chart";
+import {
   readProductEntryFromMetadata,
   type ProductEntryMode,
   type ProductPricingMode,
@@ -139,6 +143,7 @@ export type ProductAdminEditInitialData = {
   seoTitle: string;
   seoDescription: string;
   curatedSalesBadges: ProductCuratedBadgeKey[];
+  publicSizeChart: ProductSizeChart;
   productMode?: ProductEntryMode;
   productTemplateKey?: string;
   stockMode?: ProductStockMode;
@@ -337,6 +342,7 @@ export function buildProductAdminEditInitialData(
     seoTitle: product.seoTitle ?? "",
     seoDescription: product.seoDescription ?? "",
     curatedSalesBadges: parseCuratedSalesBadgeKeysFromMetadata(product.metadata),
+    publicSizeChart: parsePublicSizeChartFromMetadata(product.metadata),
     ...mapProductEntryMetaToInitialData(product.metadata),
   };
 }

@@ -37,6 +37,7 @@ export const PRODUCT_DETAIL_LEGACY_SELECT = {
   targetCustomers: true,
   featuredImage: true,
   gallery: true,
+  metadata: true,
   category: { select: { id: true, name: true, slug: true } },
   images: { orderBy: { sortOrder: "asc" as const } },
   variants: {

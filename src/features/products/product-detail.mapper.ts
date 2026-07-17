@@ -18,6 +18,10 @@ import type {
   PublicProductDetail,
   PublicProductVariantDetail,
 } from "@/features/products/product-detail.types";
+import {
+  isPublicSizeChartRenderable,
+  parsePublicSizeChartFromMetadata,
+} from "@/features/products/product-size-chart";
 
 type DbOptionValue = {
   id: string;
@@ -104,6 +108,7 @@ type DbProduct = {
     enabled: boolean;
   }[];
   variants: DbVariant[];
+  metadata?: unknown;
 };
 
 function getVariantSizeKey(v: DbVariant): string | null {
@@ -363,6 +368,9 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     })),
   }));
 
+  const parsedSizeChart = parsePublicSizeChartFromMetadata(product.metadata);
+  const sizeChart = isPublicSizeChartRenderable(parsedSizeChart) ? parsedSizeChart : null;
+
   return {
     id: product.id,
     slug: product.slug,
@@ -392,6 +400,7 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     specifications,
     customizations,
     hasStructuredOptions,
+    sizeChart,
   };
 }
 
