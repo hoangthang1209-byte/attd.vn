@@ -2,17 +2,21 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import {
   getHomepageCmsConfig,
+  upsertHomepageCompanyRealityConfig,
   upsertHomepageHeroConfig,
   upsertHomepageOemConfig,
   upsertHomepagePathwaysConfig,
   upsertHomepageProofConfig,
   upsertHomepageSectionsConfig,
+  upsertHomepageWorkshopGalleryConfig,
 } from "@/features/home/homepage.service";
 import type {
   HomepageCmsPanel,
+  HomepageCompanyRealityConfig,
   HomepageOemBannerConfig,
   HomepageProofItemConfig,
   HomepageSourcingPathwayConfig,
+  HomepageWorkshopGalleryConfig,
 } from "@/features/home/homepage.types";
 
 export async function GET() {
@@ -27,6 +31,8 @@ function parsePanel(body: Record<string, unknown>): HomepageCmsPanel | null {
     panel === "proof" ||
     panel === "pathways" ||
     panel === "oem" ||
+    panel === "companyReality" ||
+    panel === "workshopGallery" ||
     panel === "sections"
   ) {
     return panel;
@@ -107,6 +113,30 @@ export async function PATCH(request: Request) {
       revalidatePath("/");
       revalidatePath("/admin/settings/homepage");
       return NextResponse.json({ oemBanner: result.oemBanner, panel });
+    }
+
+    if (panel === "companyReality") {
+      const companyReality = body.companyReality as HomepageCompanyRealityConfig | undefined;
+      if (!companyReality) {
+        return NextResponse.json({ message: "Thiếu dữ liệu ATTD trong thực tế." }, { status: 400 });
+      }
+      const result = await upsertHomepageCompanyRealityConfig(companyReality);
+      if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
+      revalidatePath("/");
+      revalidatePath("/admin/settings/homepage");
+      return NextResponse.json({ companyReality: result.companyReality, panel });
+    }
+
+    if (panel === "workshopGallery") {
+      const workshopGallery = body.workshopGallery as HomepageWorkshopGalleryConfig | undefined;
+      if (!workshopGallery) {
+        return NextResponse.json({ message: "Thiếu dữ liệu Góc nhìn từ xưởng." }, { status: 400 });
+      }
+      const result = await upsertHomepageWorkshopGalleryConfig(workshopGallery);
+      if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
+      revalidatePath("/");
+      revalidatePath("/admin/settings/homepage");
+      return NextResponse.json({ workshopGallery: result.workshopGallery, panel });
     }
 
     if (panel === "sections") {

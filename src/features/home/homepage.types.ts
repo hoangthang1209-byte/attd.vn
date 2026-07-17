@@ -21,6 +21,66 @@ export type HomepageProofItemConfig = {
   sortOrder: number;
 };
 
+export type HomepageCompanyRealityLayout =
+  | "FEATURED_PLUS_SUPPORTING"
+  | "FOUR_EQUAL_ITEMS";
+
+export type HomepageCompanyRealityIcon =
+  | "TIMER"
+  | "PACKAGE"
+  | "BUILDING"
+  | "FACTORY"
+  | "SETTINGS"
+  | "USERS"
+  | "TRUCK";
+
+export type HomepageCompanyRealityItemConfig = {
+  itemKey: string;
+  title: string;
+  description: string;
+  iconKey: HomepageCompanyRealityIcon;
+  featured: boolean;
+  active: boolean;
+  sortOrder: number;
+};
+
+export type HomepageCompanyRealityConfig = {
+  enabled: boolean;
+  eyebrow: string;
+  title: string;
+  description: string;
+  layout: HomepageCompanyRealityLayout;
+  items: HomepageCompanyRealityItemConfig[];
+};
+
+export type HomepageWorkshopGalleryLayout =
+  | "EDITORIAL_GRID"
+  | "COMPACT_GRID"
+  | "HORIZONTAL_STRIP";
+
+export type HomepageWorkshopMediaConfig = {
+  id: string;
+  mediaAssetId: string;
+  imageUrl: string | null;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  altText: string | null;
+  featured: boolean;
+  active: boolean;
+  sortOrder: number;
+  href: string | null;
+};
+
+export type HomepageWorkshopGalleryConfig = {
+  enabled: boolean;
+  eyebrow: string;
+  title: string;
+  description: string;
+  layout: HomepageWorkshopGalleryLayout;
+  maxItems: number;
+  items: HomepageWorkshopMediaConfig[];
+};
+
 export type HomepageSourcingPathwayConfig = {
   slot: "STOCK" | "OEM" | "DEALER";
   microLabel: string;
@@ -69,6 +129,8 @@ export type HomepageCmsConfig = {
     items: HomepageSourcingPathwayConfig[];
   };
   oemBanner: HomepageOemBannerConfig;
+  companyReality: HomepageCompanyRealityConfig;
+  workshopGallery: HomepageWorkshopGalleryConfig;
 };
 
 /** Serializable homepage category row — parent CMS categories only. */
@@ -131,4 +193,6 @@ export type HomepageCmsPanel =
   | "proof"
   | "pathways"
   | "oem"
+  | "companyReality"
+  | "workshopGallery"
   | "sections";

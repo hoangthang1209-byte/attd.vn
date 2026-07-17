@@ -89,6 +89,7 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
     manufacturing,
     homepageOem,
     homepagePathways,
+    homepageWorkshop,
     salesReps,
     productionFiles,
     qcEvidence,
@@ -140,6 +141,11 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
     prisma.homepageSourcingPathway.findMany({
       where: { mediaAssetId: assetId },
       select: { id: true, title: true },
+      take: 50,
+    }),
+    prisma.homepageWorkshopMedia.findMany({
+      where: { mediaAssetId: assetId },
+      select: { id: true, caption: true },
       take: 50,
     }),
     prisma.salesRepresentative.findMany({
@@ -306,6 +312,17 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
       type: "HOMEPAGE",
       entityId: item.id,
       entityTitle: item.title || "Sourcing pathway",
+      field: "mediaAssetId",
+      route: "/admin/settings/homepage",
+      referenceMode: "RELATION",
+    });
+  }
+
+  for (const item of homepageWorkshop) {
+    refs.push({
+      type: "HOMEPAGE",
+      entityId: item.id,
+      entityTitle: item.caption || "Góc nhìn từ xưởng",
       field: "mediaAssetId",
       route: "/admin/settings/homepage",
       referenceMode: "RELATION",
@@ -522,6 +539,7 @@ export async function countMediaReferencesBatch(
     manufacturingGroups,
     homepageOem,
     homepagePathways,
+    homepageWorkshop,
     salesReps,
     productionFiles,
     qcEvidence,
@@ -550,6 +568,11 @@ export async function countMediaReferencesBatch(
       _count: { _all: true },
     }),
     prisma.homepageSourcingPathway.groupBy({
+      by: ["mediaAssetId"],
+      where: { mediaAssetId: { in: uniqueIds } },
+      _count: { _all: true },
+    }),
+    prisma.homepageWorkshopMedia.groupBy({
       by: ["mediaAssetId"],
       where: { mediaAssetId: { in: uniqueIds } },
       _count: { _all: true },
@@ -599,6 +622,7 @@ export async function countMediaReferencesBatch(
   for (const row of homepagePathways) {
     if (row.mediaAssetId) bump(row.mediaAssetId, row._count._all);
   }
+  for (const row of homepageWorkshop) bump(row.mediaAssetId, row._count._all);
   for (const row of salesReps) {
     if (row.avatarMediaAssetId) bump(row.avatarMediaAssetId, row._count._all);
   }

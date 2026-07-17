@@ -3,6 +3,8 @@ import HomepageHeroSettingsForm from "@/components/admin/HomepageHeroSettingsFor
 import HomepageProofSettingsForm from "@/components/admin/HomepageProofSettingsForm";
 import HomepagePathwaysSettingsForm from "@/components/admin/HomepagePathwaysSettingsForm";
 import HomepageOemSettingsForm from "@/components/admin/HomepageOemSettingsForm";
+import HomepageCompanyRealitySettingsForm from "@/components/admin/HomepageCompanyRealitySettingsForm";
+import HomepageWorkshopGallerySettingsForm from "@/components/admin/HomepageWorkshopGallerySettingsForm";
 import HomepageSectionsSettingsForm from "@/components/admin/HomepageSectionsSettingsForm";
 import { getHomepageCmsConfig } from "@/features/home/homepage.service";
 
@@ -16,6 +18,8 @@ export default async function HomepageSettingsPage() {
       <HomepageProofSettingsForm initial={cms.proofStrip.items} />
       <HomepagePathwaysSettingsForm initial={cms.sourcingPathways.items} />
       <HomepageOemSettingsForm initial={cms.oemBanner} />
+      <HomepageCompanyRealitySettingsForm initial={cms.companyReality} />
+      <HomepageWorkshopGallerySettingsForm initial={cms.workshopGallery} />
       <HomepageSectionsSettingsForm cms={cms} />
     </>
   );

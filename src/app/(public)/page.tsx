@@ -9,11 +9,11 @@ import MarketplaceFinalCta from "@/components/marketplace/MarketplaceFinalCta";
 import HomeCategoryGridSection from "@/components/home/HomeCategoryGridSection";
 import HomeProductDiscoverySection from "@/components/home/HomeProductDiscoverySection";
 import HomeBlogTeaserSection from "@/components/home/HomeBlogTeaserSection";
+import HomeWorkshopGallerySection from "@/components/home/HomeWorkshopGallerySection";
 import CompanyFacts from "@/components/public/company/CompanyFacts";
 import CustomerLogoStrip from "@/components/public/company/CustomerLogoStrip";
 import CompanyTrustMetrics from "@/components/public/company/CompanyTrustMetrics";
 import CaseStudySection from "@/components/public/CaseStudySection";
-import { ManufacturingHomepageSection } from "@/components/public/manufacturing/ManufacturingPublicSections";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -125,14 +125,6 @@ export default async function HomePage() {
 
       <PreCategoryEditorialSections cms={cms} />
 
-      <CompanyFacts className="home-company-facts" />
-
-      <ManufacturingHomepageSection
-        title="Góc nhìn từ xưởng"
-        limit={6}
-        className="home-manufacturing-evidence"
-      />
-
       <HomeCategoryGridSection
         categories={gridChildCategories}
         showViewAllCta={showGridCategoryViewAllCta}
@@ -207,6 +199,10 @@ export default async function HomePage() {
       <CustomerLogoStrip />
 
       <CaseStudySection />
+
+      <CompanyFacts className="home-company-facts" cms={cms.companyReality} />
+
+      <HomeWorkshopGallerySection gallery={cms.workshopGallery} />
 
       <MarketplaceFinalCta />
     </main>

@@ -14,6 +14,8 @@ import type {
   HomepageBlogPostItem,
   HomepageCategoryItem,
   HomepageCmsConfig,
+  HomepageCompanyRealityConfig,
+  HomepageCompanyRealityItemConfig,
   HomepageData,
   HomepageEditorialSectionsConfig,
   HomepageHeroConfig,
@@ -21,25 +23,35 @@ import type {
   HomepageProofItemConfig,
   HomepageProductItem,
   HomepageSourcingPathwayConfig,
+  HomepageWorkshopGalleryConfig,
+  HomepageWorkshopMediaConfig,
 } from "@/features/home/homepage.types";
 import {
+  DEFAULT_COMPANY_REALITY,
+  DEFAULT_COMPANY_REALITY_ITEMS,
   DEFAULT_OEM_BANNER,
   DEFAULT_PROOF_ITEMS,
   DEFAULT_SOURCING_PATHWAYS,
+  DEFAULT_WORKSHOP_GALLERY,
   getDefaultHomepageCmsConfig,
   mergeHeroWithDefaults,
   PATHWAY_SLOT_TO_FALLBACK,
 } from "@/features/home/homepage-cms-defaults";
 import {
+  validateCompanyRealityInput,
   validateEditorialSectionsInput,
   validateHomepageHeroInput,
   validateOemBannerInput,
   validatePathwaysInput,
   validateProofItemsInput,
+  validateWorkshopGalleryInput,
   type HomepageHeroInput,
 } from "@/features/home/homepage-cms-validation";
 import { prisma } from "@/lib/prisma";
-import type { HomepagePathwaySlot, HomepageProofIcon } from "@prisma/client";
+import type {
+  HomepagePathwaySlot,
+  HomepageProofIcon,
+} from "@prisma/client";
 
 const HOMEPAGE_ID = "default";
 
@@ -65,6 +77,16 @@ function resolveMediaImageUrl(asset: {
   return candidate;
 }
 
+function resolveMediaFullImageUrl(asset: {
+  url: string;
+  mimeType: string;
+} | null | undefined): string | null {
+  if (!asset) return null;
+  if (!asset.url || !isValidImageSrc(asset.url)) return null;
+  if (!asset.mimeType.startsWith("image/")) return null;
+  return asset.url;
+}
+
 function resolveImageAlt(
   explicit: string | null | undefined,
   fallbackTitle: string,
@@ -72,6 +94,48 @@ function resolveImageAlt(
   const trimmed = explicit?.trim();
   if (trimmed) return trimmed;
   return `Minh họa ${fallbackTitle}`;
+}
+
+function normalizeCompanyRealityItems(
+  items: HomepageCompanyRealityItemConfig[],
+): HomepageCompanyRealityItemConfig[] {
+  const sorted = items
+    .map((item, index) => ({
+      ...item,
+      itemKey: item.itemKey.trim() || `item-${index + 1}`,
+      title: item.title.trim(),
+      description: item.description.trim(),
+      sortOrder: index + 1,
+    }));
+
+  let featuredAssigned = false;
+  const withFeatured = sorted.map((item) => {
+    const featured = item.active && item.featured && !featuredAssigned;
+    if (featured) featuredAssigned = true;
+    return { ...item, featured };
+  });
+
+  return withFeatured.map((item, index) => ({ ...item, sortOrder: index + 1 }));
+}
+
+function normalizeWorkshopItems(
+  items: HomepageWorkshopMediaConfig[],
+): HomepageWorkshopMediaConfig[] {
+  let featuredAssigned = false;
+  return items
+    .filter((item) => item.mediaAssetId.trim())
+    .map((item, index) => {
+      const featured = item.active && item.featured && !featuredAssigned;
+      if (featured) featuredAssigned = true;
+      return {
+        ...item,
+        sortOrder: index + 1,
+        featured,
+        caption: item.caption?.trim() || null,
+        altText: item.altText?.trim() || null,
+        href: item.href?.trim() || null,
+      };
+    });
 }
 
 /** Admin-only: ensure child CMS rows exist before panel updates. */
@@ -123,6 +187,29 @@ async function ensureHomepageCmsSeededForAdmin() {
         ctaUrl: pathway.ctaUrl,
         enabled: pathway.enabled,
         sortOrder: pathway.sortOrder,
+      },
+      update: {},
+    });
+  }
+
+  for (const item of DEFAULT_COMPANY_REALITY_ITEMS) {
+    await prisma.homepageCompanyRealityItem.upsert({
+      where: {
+        homepageSettingsId_itemKey: {
+          homepageSettingsId: HOMEPAGE_ID,
+          itemKey: item.itemKey,
+        },
+      },
+      create: {
+        id: `hp-reality-${item.itemKey}`,
+        homepageSettingsId: HOMEPAGE_ID,
+        itemKey: item.itemKey,
+        title: item.title,
+        description: item.description,
+        iconKey: item.iconKey,
+        featured: item.featured,
+        active: item.active,
+        sortOrder: item.sortOrder,
       },
       update: {},
     });
@@ -209,6 +296,106 @@ function mapOemBanner(row: {
   };
 }
 
+function mapCompanyRealityItem(row: {
+  itemKey: string;
+  title: string;
+  description: string;
+  iconKey: HomepageCompanyRealityItemConfig["iconKey"];
+  featured: boolean;
+  active: boolean;
+  sortOrder: number;
+}): HomepageCompanyRealityItemConfig {
+  const fallback = DEFAULT_COMPANY_REALITY_ITEMS.find((item) => item.itemKey === row.itemKey);
+  return {
+    itemKey: row.itemKey,
+    title: row.title.trim() || fallback?.title || row.itemKey,
+    description: row.description.trim() || fallback?.description || "",
+    iconKey: row.iconKey,
+    featured: row.featured,
+    active: row.active,
+    sortOrder: row.sortOrder,
+  };
+}
+
+function mapCompanyReality(row: {
+  companyRealityEnabled: boolean | null;
+  companyRealityEyebrow: string | null;
+  companyRealityTitle: string | null;
+  companyRealityDescription: string | null;
+  companyRealityLayout: HomepageCompanyRealityConfig["layout"] | null;
+  companyRealityItems: Array<Parameters<typeof mapCompanyRealityItem>[0]>;
+}): HomepageCompanyRealityConfig {
+  const items =
+    row.companyRealityItems.length > 0
+      ? normalizeCompanyRealityItems(row.companyRealityItems.map(mapCompanyRealityItem))
+      : DEFAULT_COMPANY_REALITY_ITEMS;
+
+  return {
+    enabled: row.companyRealityEnabled ?? DEFAULT_COMPANY_REALITY.enabled,
+    eyebrow: row.companyRealityEyebrow?.trim() || DEFAULT_COMPANY_REALITY.eyebrow,
+    title: row.companyRealityTitle?.trim() || DEFAULT_COMPANY_REALITY.title,
+    description: row.companyRealityDescription?.trim() || DEFAULT_COMPANY_REALITY.description,
+    layout: row.companyRealityLayout ?? DEFAULT_COMPANY_REALITY.layout,
+    items,
+  };
+}
+
+function mapWorkshopMedia(row: {
+  id: string;
+  mediaAssetId: string;
+  caption: string | null;
+  altText: string | null;
+  featured: boolean;
+  active: boolean;
+  sortOrder: number;
+  href: string | null;
+  mediaAsset: {
+    url: string;
+    thumbnailUrl: string | null;
+    mimeType: string;
+    altText: string | null;
+    caption: string | null;
+    title: string | null;
+  };
+}): HomepageWorkshopMediaConfig {
+  const imageUrl = resolveMediaFullImageUrl(row.mediaAsset);
+  const thumbnailUrl = resolveMediaImageUrl(row.mediaAsset);
+  return {
+    id: row.id,
+    mediaAssetId: row.mediaAssetId,
+    imageUrl,
+    thumbnailUrl,
+    caption: row.caption?.trim() || row.mediaAsset.caption?.trim() || row.mediaAsset.title?.trim() || null,
+    altText: imageUrl
+      ? resolveImageAlt(row.altText ?? row.mediaAsset.altText, row.caption ?? row.mediaAsset.title ?? "xưởng ATTD")
+      : row.altText,
+    featured: row.featured,
+    active: row.active,
+    sortOrder: row.sortOrder,
+    href: row.href,
+  };
+}
+
+function mapWorkshopGallery(row: {
+  workshopGalleryEnabled: boolean | null;
+  workshopGalleryEyebrow: string | null;
+  workshopGalleryTitle: string | null;
+  workshopGalleryDescription: string | null;
+  workshopGalleryLayout: HomepageWorkshopGalleryConfig["layout"] | null;
+  workshopGalleryMaxItems: number | null;
+  workshopMedia: Array<Parameters<typeof mapWorkshopMedia>[0]>;
+}): HomepageWorkshopGalleryConfig {
+  return {
+    enabled: row.workshopGalleryEnabled ?? DEFAULT_WORKSHOP_GALLERY.enabled,
+    eyebrow: row.workshopGalleryEyebrow?.trim() || DEFAULT_WORKSHOP_GALLERY.eyebrow,
+    title: row.workshopGalleryTitle?.trim() || DEFAULT_WORKSHOP_GALLERY.title,
+    description: row.workshopGalleryDescription?.trim() || DEFAULT_WORKSHOP_GALLERY.description,
+    layout: row.workshopGalleryLayout ?? DEFAULT_WORKSHOP_GALLERY.layout,
+    maxItems: row.workshopGalleryMaxItems || DEFAULT_WORKSHOP_GALLERY.maxItems,
+    items: normalizeWorkshopItems(row.workshopMedia.map(mapWorkshopMedia)),
+  };
+}
+
 /** Load full homepage CMS configuration with safe defaults (read-only). */
 export async function getHomepageCmsConfig(): Promise<HomepageCmsConfig> {
   try {
@@ -226,6 +413,22 @@ export async function getHomepageCmsConfig(): Promise<HomepageCmsConfig> {
         },
         oemMediaAsset: {
           select: { url: true, thumbnailUrl: true, mimeType: true, altText: true },
+        },
+        companyRealityItems: { orderBy: { sortOrder: "asc" } },
+        workshopMedia: {
+          orderBy: { sortOrder: "asc" },
+          include: {
+            mediaAsset: {
+              select: {
+                url: true,
+                thumbnailUrl: true,
+                mimeType: true,
+                altText: true,
+                caption: true,
+                title: true,
+              },
+            },
+          },
         },
       },
     });
@@ -267,6 +470,8 @@ export async function getHomepageCmsConfig(): Promise<HomepageCmsConfig> {
           : DEFAULT_SOURCING_PATHWAYS,
       },
       oemBanner: mapOemBanner(row),
+      companyReality: mapCompanyReality(row),
+      workshopGallery: mapWorkshopGallery(row),
     };
   } catch {
     return getDefaultHomepageCmsConfig();
@@ -414,6 +619,135 @@ export async function upsertHomepageOemConfig(
 
   const cms = await getHomepageCmsConfig();
   return { oemBanner: cms.oemBanner };
+}
+
+export async function upsertHomepageCompanyRealityConfig(
+  input: HomepageCompanyRealityConfig,
+): Promise<{ companyReality: HomepageCompanyRealityConfig } | { error: string }> {
+  const normalized = {
+    ...input,
+    eyebrow: input.eyebrow.trim(),
+    title: input.title.trim(),
+    description: input.description.trim(),
+    items: normalizeCompanyRealityItems(input.items),
+  };
+  const validationError = validateCompanyRealityInput(normalized);
+  if (validationError) return { error: validationError };
+
+  await ensureHomepageCmsSeededForAdmin();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.homepageSettings.update({
+      where: { id: HOMEPAGE_ID },
+      data: {
+        companyRealityEnabled: normalized.enabled,
+        companyRealityEyebrow: normalized.eyebrow,
+        companyRealityTitle: normalized.title,
+        companyRealityDescription: normalized.description,
+        companyRealityLayout: normalized.layout,
+      },
+    });
+
+    const incomingKeys = normalized.items.map((item) => item.itemKey);
+    await tx.homepageCompanyRealityItem.deleteMany({
+      where: {
+        homepageSettingsId: HOMEPAGE_ID,
+        itemKey: { notIn: incomingKeys },
+      },
+    });
+
+    for (const item of normalized.items) {
+      await tx.homepageCompanyRealityItem.upsert({
+        where: {
+          homepageSettingsId_itemKey: {
+            homepageSettingsId: HOMEPAGE_ID,
+            itemKey: item.itemKey,
+          },
+        },
+        create: {
+          homepageSettingsId: HOMEPAGE_ID,
+          itemKey: item.itemKey,
+          title: item.title.trim(),
+          description: item.description.trim(),
+          iconKey: item.iconKey,
+          featured: item.featured,
+          active: item.active,
+          sortOrder: item.sortOrder,
+        },
+        update: {
+          title: item.title.trim(),
+          description: item.description.trim(),
+          iconKey: item.iconKey,
+          featured: item.featured,
+          active: item.active,
+          sortOrder: item.sortOrder,
+        },
+      });
+    }
+  });
+
+  const cms = await getHomepageCmsConfig();
+  return { companyReality: cms.companyReality };
+}
+
+export async function upsertHomepageWorkshopGalleryConfig(
+  input: HomepageWorkshopGalleryConfig,
+): Promise<{ workshopGallery: HomepageWorkshopGalleryConfig } | { error: string }> {
+  const normalized = {
+    ...input,
+    eyebrow: input.eyebrow.trim(),
+    title: input.title.trim(),
+    description: input.description.trim(),
+    maxItems: Math.max(1, Math.min(12, Number(input.maxItems) || DEFAULT_WORKSHOP_GALLERY.maxItems)),
+    items: normalizeWorkshopItems(input.items),
+  };
+  const validationError = validateWorkshopGalleryInput(normalized);
+  if (validationError) return { error: validationError };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.homepageSettings.upsert({
+      where: { id: HOMEPAGE_ID },
+      create: {
+        id: HOMEPAGE_ID,
+        workshopGalleryEnabled: normalized.enabled,
+        workshopGalleryEyebrow: normalized.eyebrow,
+        workshopGalleryTitle: normalized.title,
+        workshopGalleryDescription: normalized.description,
+        workshopGalleryLayout: normalized.layout,
+        workshopGalleryMaxItems: normalized.maxItems,
+      },
+      update: {
+        workshopGalleryEnabled: normalized.enabled,
+        workshopGalleryEyebrow: normalized.eyebrow,
+        workshopGalleryTitle: normalized.title,
+        workshopGalleryDescription: normalized.description,
+        workshopGalleryLayout: normalized.layout,
+        workshopGalleryMaxItems: normalized.maxItems,
+      },
+    });
+
+    await tx.homepageWorkshopMedia.deleteMany({
+      where: { homepageSettingsId: HOMEPAGE_ID },
+    });
+
+    if (normalized.items.length > 0) {
+      await tx.homepageWorkshopMedia.createMany({
+        data: normalized.items.map((item) => ({
+          homepageSettingsId: HOMEPAGE_ID,
+          mediaAssetId: item.mediaAssetId,
+          caption: item.caption?.trim() || null,
+          altText: item.altText?.trim() || null,
+          featured: item.featured,
+          active: item.active,
+          sortOrder: item.sortOrder,
+          href: item.href?.trim() || null,
+        })),
+      });
+    }
+  });
+
+  const cms = await getHomepageCmsConfig();
+  return { workshopGallery: cms.workshopGallery };
 }
 
 export async function upsertHomepageSectionsConfig(

@@ -341,6 +341,7 @@ async function countMediaAssetBusinessReferences(tx: Tx, mediaAssetId: string): 
     salesReps,
     pathways,
     homepageOem,
+    homepageWorkshop,
   ] = await Promise.all([
     tx.orderProductionFile.count({ where: { mediaAssetId } }),
     tx.orderQcEvidence.count({ where: { mediaAssetId } }),
@@ -350,6 +351,7 @@ async function countMediaAssetBusinessReferences(tx: Tx, mediaAssetId: string): 
     tx.salesRepresentative.count({ where: { avatarMediaAssetId: mediaAssetId } }),
     tx.homepageSourcingPathway.count({ where: { mediaAssetId } }),
     tx.homepageSettings.count({ where: { oemMediaAssetId: mediaAssetId } }),
+    tx.homepageWorkshopMedia.count({ where: { mediaAssetId } }),
   ]);
 
   return (
@@ -360,7 +362,8 @@ async function countMediaAssetBusinessReferences(tx: Tx, mediaAssetId: string): 
     orderItems +
     salesReps +
     pathways +
-    homepageOem
+    homepageOem +
+    homepageWorkshop
   );
 }
 

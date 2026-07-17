@@ -1,11 +1,15 @@
 import type { HomepagePathwaySlot, HomepageProofIcon } from "@prisma/client";
 import type {
   HomepageCmsConfig,
+  HomepageCompanyRealityConfig,
+  HomepageCompanyRealityIcon,
+  HomepageCompanyRealityItemConfig,
   HomepageEditorialSectionsConfig,
   HomepageHeroConfig,
   HomepageOemBannerConfig,
   HomepageProofItemConfig,
   HomepageSourcingPathwayConfig,
+  HomepageWorkshopGalleryConfig,
 } from "@/features/home/homepage.types";
 import { DEFAULT_HOMEPAGE_HERO } from "@/features/home/homepage-hero-defaults";
 
@@ -78,6 +82,70 @@ export const DEFAULT_OEM_BANNER: HomepageOemBannerConfig = {
   sectionOrder: 30,
 };
 
+export const DEFAULT_COMPANY_REALITY_ITEMS: HomepageCompanyRealityItemConfig[] = [
+  {
+    itemKey: "experience",
+    title: "14+ năm kinh nghiệm",
+    description:
+      "Phát triển từ nền tảng AOTHUNTHONGDIEP và nguồn hàng VietnamClothing trong ngành may mặc và đồng phục.",
+    iconKey: "TIMER",
+    featured: true,
+    active: true,
+    sortOrder: 1,
+  },
+  {
+    itemKey: "oem",
+    title: "OEM / Private Label",
+    description:
+      "Hỗ trợ sản xuất và hoàn thiện theo thương hiệu riêng cho đại lý, xưởng in và doanh nghiệp.",
+    iconKey: "PACKAGE",
+    featured: false,
+    active: true,
+    sortOrder: 2,
+  },
+  {
+    itemKey: "showroom",
+    title: "Showroom & Kho hàng",
+    description:
+      "Showroom và kho hàng tại TP. Hồ Chí Minh. Vui lòng liên hệ trước khi ghé thăm.",
+    iconKey: "BUILDING",
+    featured: false,
+    active: true,
+    sortOrder: 3,
+  },
+  {
+    itemKey: "manufacturing",
+    title: "Mạng lưới sản xuất",
+    description:
+      "Phối hợp sản xuất và gia công trên toàn quốc theo quy mô đơn hàng và yêu cầu triển khai.",
+    iconKey: "FACTORY",
+    featured: false,
+    active: true,
+    sortOrder: 4,
+  },
+];
+
+export const DEFAULT_COMPANY_REALITY: HomepageCompanyRealityConfig = {
+  enabled: true,
+  eyebrow: "Thông tin công ty",
+  title: "ATTD trong thực tế",
+  description:
+    "Những điểm cốt lõi giúp đối tác B2B đánh giá năng lực công ty trước khi hợp tác.",
+  layout: "FEATURED_PLUS_SUPPORTING",
+  items: DEFAULT_COMPANY_REALITY_ITEMS,
+};
+
+export const DEFAULT_WORKSHOP_GALLERY: HomepageWorkshopGalleryConfig = {
+  enabled: true,
+  eyebrow: "Hình ảnh vận hành",
+  title: "Góc nhìn từ xưởng",
+  description:
+    "Một vài hình ảnh thực tế từ kho, xưởng và quy trình chuẩn bị đơn hàng tại ATTD.",
+  layout: "EDITORIAL_GRID",
+  maxItems: 6,
+  items: [],
+};
+
 export const DEFAULT_EDITORIAL_SECTIONS: HomepageEditorialSectionsConfig = {
   proofStripEnabled: true,
   proofStripOrder: 10,
@@ -93,10 +161,30 @@ export const PATHWAY_SLOT_TO_FALLBACK: Record<HomepagePathwaySlot, "stock" | "oe
 
 export const PROOF_ICON_KEYS: HomepageProofIcon[] = ["PACKAGE", "SETTINGS", "USERS", "TRUCK"];
 
+export const COMPANY_REALITY_ICON_KEYS: HomepageCompanyRealityIcon[] = [
+  "TIMER",
+  "PACKAGE",
+  "BUILDING",
+  "FACTORY",
+  "SETTINGS",
+  "USERS",
+  "TRUCK",
+];
+
 export const PROOF_ICON_LABELS: Record<HomepageProofIcon, string> = {
   PACKAGE: "Kho hàng (Package)",
   SETTINGS: "Tùy chỉnh (Settings)",
   USERS: "Đại lý (Users)",
+  TRUCK: "Giao hàng (Truck)",
+};
+
+export const COMPANY_REALITY_ICON_LABELS: Record<HomepageCompanyRealityIcon, string> = {
+  TIMER: "Kinh nghiệm (Timer)",
+  PACKAGE: "OEM / Sản phẩm (Package)",
+  BUILDING: "Showroom / Kho (Building)",
+  FACTORY: "Sản xuất (Factory)",
+  SETTINGS: "Tùy chỉnh (Settings)",
+  USERS: "Đối tác (Users)",
   TRUCK: "Giao hàng (Truck)",
 };
 
@@ -127,5 +215,7 @@ export function getDefaultHomepageCmsConfig(): HomepageCmsConfig {
       items: DEFAULT_SOURCING_PATHWAYS,
     },
     oemBanner: DEFAULT_OEM_BANNER,
+    companyReality: DEFAULT_COMPANY_REALITY,
+    workshopGallery: DEFAULT_WORKSHOP_GALLERY,
   };
 }

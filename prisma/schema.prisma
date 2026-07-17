@@ -287,7 +287,7 @@ model Lead {
   productInterests    CRMProductInterest[]
   pricingCalculations PricingCalculation[]
   quotes              Quote[]
-  salesOpportunities    SalesOpportunity[]
+  salesOpportunities  SalesOpportunity[]
   dealerRfq           DealerRFQ?
 
   @@index([code])
@@ -333,50 +333,50 @@ model AdministrativeWard {
 }
 
 model Customer {
-  id                        String                           @id @default(cuid())
-  code                      String                           @unique
-  legacyType                CustomerLegacyType               @default(BUSINESS) @map("type")
-  customerTypeId            String?
-  name                      String
-  legalName                 String?
-  taxCode                   String?
-  phone                     String?
-  email                     String?
-  website                   String?
-  address                   String?
-  province                  String?
-  district                  String?
-  provinceId                String?
-  wardId                    String?
-  provinceNameSnapshot      String?
-  wardNameSnapshot          String?
-  addressLine1              String?
-  addressLine2              String?
-  representativeName        String?
-  representativeSalutation  CustomerRepresentativeSalutation?
-  representativeTitle       String?
-  authorizationDocumentNo   String?
-  status                    CustomerStatus                   @default(PROSPECT)
-  note                      String?                          @db.Text
-  internalNote              String?                          @db.Text
-  billingNote               String?                          @db.Text
-  createdAt                 DateTime                         @default(now())
-  updatedAt                 DateTime                         @updatedAt
-  provinceRef               AdministrativeProvince?          @relation(fields: [provinceId], references: [id], onDelete: SetNull)
-  wardRef                   AdministrativeWard?              @relation(fields: [wardId], references: [id], onDelete: SetNull)
-  customerType              CustomerType?                    @relation(fields: [customerTypeId], references: [id], onDelete: SetNull)
-  contacts                  Contact[]
-  leads                     Lead[]
-  activities                CRMActivity[]
-  productInterests          CRMProductInterest[]
-  pricingCalculations       PricingCalculation[]
-  quotes                    Quote[]
-  orders                    Order[]
-  techPacks                 TechPack[]
-  dealerCompanies           DealerCompany[]
-  dealerRfqs                DealerRFQ[]
-  salesOpportunities        SalesOpportunity[]
-  patterns                  Pattern[]
+  id                       String                            @id @default(cuid())
+  code                     String                            @unique
+  legacyType               CustomerLegacyType                @default(BUSINESS) @map("type")
+  customerTypeId           String?
+  name                     String
+  legalName                String?
+  taxCode                  String?
+  phone                    String?
+  email                    String?
+  website                  String?
+  address                  String?
+  province                 String?
+  district                 String?
+  provinceId               String?
+  wardId                   String?
+  provinceNameSnapshot     String?
+  wardNameSnapshot         String?
+  addressLine1             String?
+  addressLine2             String?
+  representativeName       String?
+  representativeSalutation CustomerRepresentativeSalutation?
+  representativeTitle      String?
+  authorizationDocumentNo  String?
+  status                   CustomerStatus                    @default(PROSPECT)
+  note                     String?                           @db.Text
+  internalNote             String?                           @db.Text
+  billingNote              String?                           @db.Text
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @updatedAt
+  provinceRef              AdministrativeProvince?           @relation(fields: [provinceId], references: [id], onDelete: SetNull)
+  wardRef                  AdministrativeWard?               @relation(fields: [wardId], references: [id], onDelete: SetNull)
+  customerType             CustomerType?                     @relation(fields: [customerTypeId], references: [id], onDelete: SetNull)
+  contacts                 Contact[]
+  leads                    Lead[]
+  activities               CRMActivity[]
+  productInterests         CRMProductInterest[]
+  pricingCalculations      PricingCalculation[]
+  quotes                   Quote[]
+  orders                   Order[]
+  techPacks                TechPack[]
+  dealerCompanies          DealerCompany[]
+  dealerRfqs               DealerRFQ[]
+  salesOpportunities       SalesOpportunity[]
+  patterns                 Pattern[]
 
   @@index([code])
   @@index([name])
@@ -792,46 +792,46 @@ model BlogCategory {
 }
 
 model BlogPost {
-  id               String             @id @default(cuid())
-  title            String
-  slug             String             @unique
-  excerpt          String?
-  content          String?            @db.Text
-  featuredImageUrl String?
-  metaTitle        String?
-  metaDescription  String?
-  canonicalUrl     String?
-  ogImageUrl       String?
-  status           BlogPostStatus     @default(DRAFT)
-  publishedAt      DateTime?
+  id                             String             @id @default(cuid())
+  title                          String
+  slug                           String             @unique
+  excerpt                        String?
+  content                        String?            @db.Text
+  featuredImageUrl               String?
+  metaTitle                      String?
+  metaDescription                String?
+  canonicalUrl                   String?
+  ogImageUrl                     String?
+  status                         BlogPostStatus     @default(DRAFT)
+  publishedAt                    DateTime?
   /// Sprint 11.6 — scheduling / publish traceability
-  scheduledAt                   DateTime?
-  lastPublishedAt               DateTime?
-  lastUnpublishedAt             DateTime?
-  publishedBy                   String?
-  scheduledBy                   String?
-  publishVersion                Int                 @default(0)
-  lastPublishedContentHash      String?
+  scheduledAt                    DateTime?
+  lastPublishedAt                DateTime?
+  lastUnpublishedAt              DateTime?
+  publishedBy                    String?
+  scheduledBy                    String?
+  publishVersion                 Int                @default(0)
+  lastPublishedContentHash       String?
   publishReadinessAcknowledgedAt DateTime?
   publishReadinessAcknowledgedBy String?
-  publishAckNote                String?             @db.Text
-  needsContentReview            Boolean             @default(false)
-  faqJson          Json               @default("[]")
-  tags             Json               @default("[]")
-  aiMetadata       Json?
+  publishAckNote                 String?            @db.Text
+  needsContentReview             Boolean            @default(false)
+  faqJson                        Json               @default("[]")
+  tags                           Json               @default("[]")
+  aiMetadata                     Json?
   /// Optional curated Media Bundle used as content-media source (explicit assignments are snapshots).
-  mediaBundleId    String?
+  mediaBundleId                  String?
   /// Sprint 11.5 — governed writing handoff traceability (admin-only).
-  sourceWritingDraftId      String?
-  sourceWritingDraftVersion Int?
-  sourceReviewSessionId     String?
-  sourceHandoffRecordId     String?
-  contentModifiedAfterHandoff Boolean           @default(false)
-  lastHandoffAt             DateTime?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  categories       BlogPostCategory[]
-  mediaBundle      MediaBundle?       @relation(fields: [mediaBundleId], references: [id], onDelete: SetNull)
+  sourceWritingDraftId           String?
+  sourceWritingDraftVersion      Int?
+  sourceReviewSessionId          String?
+  sourceHandoffRecordId          String?
+  contentModifiedAfterHandoff    Boolean            @default(false)
+  lastHandoffAt                  DateTime?
+  createdAt                      DateTime           @default(now())
+  updatedAt                      DateTime           @updatedAt
+  categories                     BlogPostCategory[]
+  mediaBundle                    MediaBundle?       @relation(fields: [mediaBundleId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([publishedAt])
@@ -987,42 +987,42 @@ model SeoTopicCluster {
 }
 
 model SeoTopic {
-  id               String              @id @default(cuid())
-  clusterId        String
-  title            String
-  slug             String?
-  description      String?             @db.Text
-  primaryKeyword   String
-  searchIntent     SeoSearchIntent
-  contentType      SeoContentType
-  funnelStage      SeoFunnelStage
-  priority         SeoTopicPriority    @default(NORMAL)
-  status           SeoTopicStatus      @default(IDEA)
-  targetAudience   String[]            @default([])
-  businessValue    Int                 @default(0)
-  relevanceScore   Int                 @default(0)
-  opportunityScore Int                 @default(0)
-  confidenceScore  Int                 @default(0)
-  targetEntityType SeoTargetEntityType @default(NONE)
-  targetEntityId   String?
-  targetUrl        String?
-  existingUrl      String?
-  canonicalUrl     String?
-  notes            String?             @db.Text
-  assignedTo       String?
-  dueDate          DateTime?
-  publishedAt      DateTime?
-  mediaBundleId    String?
-  mediaPlanScore   Int?
-  mediaPlanStatus  String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  cluster          SeoTopicCluster     @relation(fields: [clusterId], references: [id], onDelete: Cascade)
-  keywords         SeoKeyword[]
+  id                String                       @id @default(cuid())
+  clusterId         String
+  title             String
+  slug              String?
+  description       String?                      @db.Text
+  primaryKeyword    String
+  searchIntent      SeoSearchIntent
+  contentType       SeoContentType
+  funnelStage       SeoFunnelStage
+  priority          SeoTopicPriority             @default(NORMAL)
+  status            SeoTopicStatus               @default(IDEA)
+  targetAudience    String[]                     @default([])
+  businessValue     Int                          @default(0)
+  relevanceScore    Int                          @default(0)
+  opportunityScore  Int                          @default(0)
+  confidenceScore   Int                          @default(0)
+  targetEntityType  SeoTargetEntityType          @default(NONE)
+  targetEntityId    String?
+  targetUrl         String?
+  existingUrl       String?
+  canonicalUrl      String?
+  notes             String?                      @db.Text
+  assignedTo        String?
+  dueDate           DateTime?
+  publishedAt       DateTime?
+  mediaBundleId     String?
+  mediaPlanScore    Int?
+  mediaPlanStatus   String?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  cluster           SeoTopicCluster              @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  keywords          SeoKeyword[]
   internalLinksFrom SeoInternalLinkOpportunity[] @relation("SeoInternalLinkSource")
   internalLinksTo   SeoInternalLinkOpportunity[] @relation("SeoInternalLinkTarget")
-  brief            SeoContentBrief?
-  mediaBundle      MediaBundle?        @relation(fields: [mediaBundleId], references: [id], onDelete: SetNull)
+  brief             SeoContentBrief?
+  mediaBundle       MediaBundle?                 @relation(fields: [mediaBundleId], references: [id], onDelete: SetNull)
 
   @@index([clusterId, status, priority])
   @@index([searchIntent])
@@ -1044,12 +1044,12 @@ model SeoKeyword {
   source            String?
   searchVolume      Int?
   keywordDifficulty Decimal?         @db.Decimal(5, 2)
-  cpc               Decimal?           @db.Decimal(12, 2)
-  priority          Int                @default(0)
+  cpc               Decimal?         @db.Decimal(12, 2)
+  priority          Int              @default(0)
   notes             String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  topic             SeoTopic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  topic             SeoTopic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   @@unique([topicId, normalized])
   @@index([normalized])
@@ -1057,33 +1057,33 @@ model SeoKeyword {
 }
 
 model SeoContentBrief {
-  id                String    @id @default(cuid())
-  topicId           String    @unique
-  workingTitle      String?
-  proposedSlug      String?
-  metaTitle         String?
-  metaDescription   String?
-  searchIntentNotes String?   @db.Text
-  audienceNotes     String?   @db.Text
-  valueProposition  String?   @db.Text
-  outline           Json      @default("[]")
-  questions         Json      @default("[]")
-  entities          String[]  @default([])
-  requiredSections  String[]  @default([])
-  ctaType           String?
-  ctaText           String?
-  wordCountMin      Int?
-  wordCountMax      Int?
-  schemaTypes       String[]  @default([])
-  mediaRequirements Json?
-  editorNotes       String?   @db.Text
-  version           Int       @default(1)
-  approvedAt        DateTime?
-  approvedBy        String?
+  id                         String    @id @default(cuid())
+  topicId                    String    @unique
+  workingTitle               String?
+  proposedSlug               String?
+  metaTitle                  String?
+  metaDescription            String?
+  searchIntentNotes          String?   @db.Text
+  audienceNotes              String?   @db.Text
+  valueProposition           String?   @db.Text
+  outline                    Json      @default("[]")
+  questions                  Json      @default("[]")
+  entities                   String[]  @default([])
+  requiredSections           String[]  @default([])
+  ctaType                    String?
+  ctaText                    String?
+  wordCountMin               Int?
+  wordCountMax               Int?
+  schemaTypes                String[]  @default([])
+  mediaRequirements          Json?
+  editorNotes                String?   @db.Text
+  version                    Int       @default(1)
+  approvedAt                 DateTime?
+  approvedBy                 String?
   lastAppliedGenerationRunId String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  topic             SeoTopic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  topic                      SeoTopic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   @@index([lastAppliedGenerationRunId])
 }
@@ -1345,17 +1345,17 @@ model MediaRole {
 
 /// Project/campaign grouping of media assets. An asset may belong to many collections.
 model MediaCollection {
-  id             String              @id @default(cuid())
-  code           String?             @unique
+  id             String                 @id @default(cuid())
+  code           String?                @unique
   name           String
-  description    String?             @db.Text
+  description    String?                @db.Text
   color          String?
-  collectionType MediaCollectionType @default(OTHER)
-  sortOrder      Int                 @default(0)
-  isActive       Boolean             @default(true)
-  isSystem       Boolean             @default(false)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  collectionType MediaCollectionType    @default(OTHER)
+  sortOrder      Int                    @default(0)
+  isActive       Boolean                @default(true)
+  isSystem       Boolean                @default(false)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
   assets         MediaAssetCollection[]
 
   @@index([isActive, sortOrder])
@@ -1376,22 +1376,22 @@ model MediaAssetCollection {
 
 /// Managed semantic vocabulary for Asset Intelligence metadata.
 model MediaVocabularyTerm {
-  id                   String                 @id @default(cuid())
+  id                   String                  @id @default(cuid())
   type                 MediaVocabularyType
   code                 String?
   name                 String
-  aliases              String[]               @default([])
+  aliases              String[]                @default([])
   description          String?
-  sortOrder            Int                    @default(0)
-  isActive             Boolean                @default(true)
-  isSystem             Boolean                @default(false)
+  sortOrder            Int                     @default(0)
+  isActive             Boolean                 @default(true)
+  isSystem             Boolean                 @default(false)
   /// Source visibility for Knowledge Graph projection (Sprint 12.3). Default INTERNAL.
   visibility           KnowledgeBaseVisibility @default(INTERNAL)
   publicSafeReviewedAt DateTime?
   publicSafeReviewedBy String?
   publicSafeReason     String?
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
 
   @@unique([type, name])
   @@index([type, isActive, sortOrder])
@@ -1528,6 +1528,7 @@ model MediaAsset {
   manufacturingMedia       ManufacturingMedia[]
   homepageSourcingPathways HomepageSourcingPathway[] @relation("HomepagePathwayImage")
   homepageOemSettings      HomepageSettings[]        @relation("HomepageOemImage")
+  homepageWorkshopMedia    HomepageWorkshopMedia[]   @relation("HomepageWorkshopImage")
 
   @@index([folder])
   @@index([filename])
@@ -1844,31 +1845,44 @@ model BrandingSettings {
 }
 
 model HomepageSettings {
-  id                      String                    @id @default("default")
-  heroEyebrow             String                    @default("Nền tảng nguồn hàng B2B")
-  heroHeading             String                    @default("Nguồn hàng đồng phục & quà tặng cho doanh nghiệp")
-  heroDescription         String                    @default("Khám phá sản phẩm sẵn kho, đặt OEM theo yêu cầu và kết nối nguồn hàng phù hợp cho đơn vị của bạn.") @db.Text
-  heroPrimaryCtaLabel     String                    @default("Khám phá nguồn hàng")
-  heroPrimaryCtaUrl       String                    @default("#home-categories")
-  heroSecondaryCtaLabel   String                    @default("Liên hệ báo giá sỉ")
-  heroSecondaryCtaUrl     String                    @default("/lien-he")
-  proofStripEnabled       Boolean                   @default(true)
-  proofStripOrder         Int                       @default(10)
-  sourcingPathwaysEnabled Boolean                   @default(true)
-  sourcingPathwaysOrder   Int                       @default(20)
-  oemEyebrow              String                    @default("OEM & Private Label")
-  oemHeading              String                    @default("Phát triển nguồn hàng theo thương hiệu của bạn")
-  oemDescription          String                    @default("Từ sản phẩm sẵn có đến phương án phát triển riêng, ATTD hỗ trợ bạn xác định hướng nguồn hàng phù hợp với nhu cầu triển khai.") @db.Text
-  oemCtaLabel             String                    @default("Tìm hiểu dịch vụ OEM")
-  oemCtaUrl               String                    @default("/oem")
-  oemMediaAssetId         String?
-  oemImageAlt             String?
-  oemEnabled              Boolean                   @default(true)
-  oemSectionOrder         Int                       @default(30)
-  updatedAt               DateTime                  @updatedAt
-  proofItems              HomepageProofItem[]
-  sourcingPathways        HomepageSourcingPathway[]
-  oemMediaAsset           MediaAsset?               @relation("HomepageOemImage", fields: [oemMediaAssetId], references: [id], onDelete: SetNull)
+  id                         String                         @id @default("default")
+  heroEyebrow                String                         @default("Nền tảng nguồn hàng B2B")
+  heroHeading                String                         @default("Nguồn hàng đồng phục & quà tặng cho doanh nghiệp")
+  heroDescription            String                         @default("Khám phá sản phẩm sẵn kho, đặt OEM theo yêu cầu và kết nối nguồn hàng phù hợp cho đơn vị của bạn.") @db.Text
+  heroPrimaryCtaLabel        String                         @default("Khám phá nguồn hàng")
+  heroPrimaryCtaUrl          String                         @default("#home-categories")
+  heroSecondaryCtaLabel      String                         @default("Liên hệ báo giá sỉ")
+  heroSecondaryCtaUrl        String                         @default("/lien-he")
+  proofStripEnabled          Boolean                        @default(true)
+  proofStripOrder            Int                            @default(10)
+  sourcingPathwaysEnabled    Boolean                        @default(true)
+  sourcingPathwaysOrder      Int                            @default(20)
+  oemEyebrow                 String                         @default("OEM & Private Label")
+  oemHeading                 String                         @default("Phát triển nguồn hàng theo thương hiệu của bạn")
+  oemDescription             String                         @default("Từ sản phẩm sẵn có đến phương án phát triển riêng, ATTD hỗ trợ bạn xác định hướng nguồn hàng phù hợp với nhu cầu triển khai.") @db.Text
+  oemCtaLabel                String                         @default("Tìm hiểu dịch vụ OEM")
+  oemCtaUrl                  String                         @default("/oem")
+  oemMediaAssetId            String?
+  oemImageAlt                String?
+  oemEnabled                 Boolean                        @default(true)
+  oemSectionOrder            Int                            @default(30)
+  updatedAt                  DateTime                       @updatedAt
+  proofItems                 HomepageProofItem[]
+  sourcingPathways           HomepageSourcingPathway[]
+  companyRealityEnabled      Boolean?                       @default(true)
+  companyRealityEyebrow      String?                        @default("Thông tin công ty")
+  companyRealityTitle        String?                        @default("ATTD trong thực tế")
+  companyRealityDescription  String?                        @default("Những điểm cốt lõi giúp đối tác B2B đánh giá năng lực công ty trước khi hợp tác.") @db.Text
+  companyRealityLayout       HomepageCompanyRealityLayout?  @default(FEATURED_PLUS_SUPPORTING)
+  workshopGalleryEnabled     Boolean?                       @default(true)
+  workshopGalleryEyebrow     String?                        @default("Hình ảnh vận hành")
+  workshopGalleryTitle       String?                        @default("Góc nhìn từ xưởng")
+  workshopGalleryDescription String?                        @default("Một vài hình ảnh thực tế từ kho, xưởng và quy trình chuẩn bị đơn hàng tại ATTD.") @db.Text
+  workshopGalleryLayout      HomepageWorkshopGalleryLayout? @default(EDITORIAL_GRID)
+  workshopGalleryMaxItems    Int?                           @default(6)
+  companyRealityItems        HomepageCompanyRealityItem[]
+  workshopMedia              HomepageWorkshopMedia[]
+  oemMediaAsset              MediaAsset?                    @relation("HomepageOemImage", fields: [oemMediaAssetId], references: [id], onDelete: SetNull)
 }
 
 enum HomepageProofIcon {
@@ -1876,6 +1890,27 @@ enum HomepageProofIcon {
   SETTINGS
   USERS
   TRUCK
+}
+
+enum HomepageCompanyRealityLayout {
+  FEATURED_PLUS_SUPPORTING
+  FOUR_EQUAL_ITEMS
+}
+
+enum HomepageCompanyRealityIcon {
+  TIMER
+  PACKAGE
+  BUILDING
+  FACTORY
+  SETTINGS
+  USERS
+  TRUCK
+}
+
+enum HomepageWorkshopGalleryLayout {
+  EDITORIAL_GRID
+  COMPACT_GRID
+  HORIZONTAL_STRIP
 }
 
 enum HomepagePathwaySlot {
@@ -1897,6 +1932,39 @@ model HomepageProofItem {
 
   @@unique([homepageSettingsId, itemKey])
   @@index([homepageSettingsId, sortOrder])
+}
+
+model HomepageCompanyRealityItem {
+  id                 String                     @id @default(cuid())
+  homepageSettingsId String                     @default("default")
+  itemKey            String
+  title              String
+  description        String                     @db.Text
+  iconKey            HomepageCompanyRealityIcon
+  featured           Boolean                    @default(false)
+  active             Boolean                    @default(true)
+  sortOrder          Int
+  settings           HomepageSettings           @relation(fields: [homepageSettingsId], references: [id], onDelete: Cascade)
+
+  @@unique([homepageSettingsId, itemKey])
+  @@index([homepageSettingsId, sortOrder])
+}
+
+model HomepageWorkshopMedia {
+  id                 String           @id @default(cuid())
+  homepageSettingsId String           @default("default")
+  mediaAssetId       String
+  caption            String?
+  altText            String?
+  featured           Boolean          @default(false)
+  active             Boolean          @default(true)
+  sortOrder          Int
+  href               String?
+  settings           HomepageSettings @relation(fields: [homepageSettingsId], references: [id], onDelete: Cascade)
+  mediaAsset         MediaAsset       @relation("HomepageWorkshopImage", fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@index([homepageSettingsId, sortOrder])
+  @@index([mediaAssetId])
 }
 
 model HomepageSourcingPathway {
@@ -1944,22 +2012,22 @@ enum SiteNavCtaSlot {
 }
 
 model SiteNavigationSettings {
-  id                     String           @id @default("default")
-  utilityTagline         String           @default("Kho sỉ đồng phục & quà tặng doanh nghiệp")
-  megaMenuTriggerLabel   String           @default("Tất cả danh mục")
-  searchPlaceholder      String           @default("Tìm áo thun, áo polo, nón, quà tặng…")
-  useCategoryTreeMegaMenu Boolean         @default(true)
-  copyrightText          String           @default("ATTD.vn")
-  showCurrentYear        Boolean          @default(true)
-  showTaxCode              Boolean          @default(true)
-  originText               String           @default("Designed & Manufactured in Vietnam")
-  legalLinkLabel           String           @default("Chính sách đại lý")
-  legalLinkHref            String           @default("/chinh-sach-dai-ly")
-  showLegalLink            Boolean          @default(true)
-  updatedAt              DateTime         @updatedAt
-  items                  SiteNavItem[]
-  ctas                   SiteNavCta[]
-  socialLinks            SiteSocialLink[]
+  id                      String           @id @default("default")
+  utilityTagline          String           @default("Kho sỉ đồng phục & quà tặng doanh nghiệp")
+  megaMenuTriggerLabel    String           @default("Tất cả danh mục")
+  searchPlaceholder       String           @default("Tìm áo thun, áo polo, nón, quà tặng…")
+  useCategoryTreeMegaMenu Boolean          @default(true)
+  copyrightText           String           @default("ATTD.vn")
+  showCurrentYear         Boolean          @default(true)
+  showTaxCode             Boolean          @default(true)
+  originText              String           @default("Designed & Manufactured in Vietnam")
+  legalLinkLabel          String           @default("Chính sách đại lý")
+  legalLinkHref           String           @default("/chinh-sach-dai-ly")
+  showLegalLink           Boolean          @default(true)
+  updatedAt               DateTime         @updatedAt
+  items                   SiteNavItem[]
+  ctas                    SiteNavCta[]
+  socialLinks             SiteSocialLink[]
 }
 
 model SiteNavItem {
@@ -2420,32 +2488,32 @@ model KnowledgeBaseSource {
 }
 
 model KnowledgeBaseEntry {
-  id                      String                   @id @default(cuid())
+  id                      String                      @id @default(cuid())
   title                   String
-  slug                    String                   @unique
+  slug                    String                      @unique
   summary                 String?
-  content                 String?                  @db.Text
+  content                 String?                     @db.Text
   structuredData          Json?
   categoryId              String
-  category                KnowledgeBaseCategory    @relation(fields: [categoryId], references: [id])
+  category                KnowledgeBaseCategory       @relation(fields: [categoryId], references: [id])
   type                    KnowledgeBaseEntryType
-  status                  KnowledgeBaseEntryStatus @default(DRAFT)
-  priority                KnowledgeBasePriority    @default(MEDIUM)
+  status                  KnowledgeBaseEntryStatus    @default(DRAFT)
+  priority                KnowledgeBasePriority       @default(MEDIUM)
   sourceId                String?
-  source                  KnowledgeBaseSource?     @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-  tags                    String[]                 @default([])
-  aliases                 String[]                 @default([])
-  relatedProductIds       String[]                 @default([])
-  relatedLandingPageSlugs String[]                 @default([])
-  relatedBlogPostIds      String[]                 @default([])
-  relatedMediaBundleIds   String[]                 @default([])
-  relatedSeoTopicIds      String[]                 @default([])
-  relatedEntryIds         String[]                 @default([])
-  usageScope              String[]                 @default([])
-  visibility              KnowledgeBaseVisibility  @default(INTERNAL)
-  claimStatus             KnowledgeBaseClaimStatus @default(FACT)
-  confidence              KnowledgeBaseConfidence  @default(MEDIUM)
-  language                String                   @default("vi")
+  source                  KnowledgeBaseSource?        @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  tags                    String[]                    @default([])
+  aliases                 String[]                    @default([])
+  relatedProductIds       String[]                    @default([])
+  relatedLandingPageSlugs String[]                    @default([])
+  relatedBlogPostIds      String[]                    @default([])
+  relatedMediaBundleIds   String[]                    @default([])
+  relatedSeoTopicIds      String[]                    @default([])
+  relatedEntryIds         String[]                    @default([])
+  usageScope              String[]                    @default([])
+  visibility              KnowledgeBaseVisibility     @default(INTERNAL)
+  claimStatus             KnowledgeBaseClaimStatus    @default(FACT)
+  confidence              KnowledgeBaseConfidence     @default(MEDIUM)
+  language                String                      @default("vi")
   domain                  String?
   ownerId                 String?
   authorName              String?
@@ -2453,15 +2521,15 @@ model KnowledgeBaseEntry {
   approvedBy              String?
   approvedAt              DateTime?
   lastVerifiedAt          DateTime?
-  version                 Int                      @default(1)
+  version                 Int                         @default(1)
   reviewIntervalDays      Int?
   nextReviewAt            DateTime?
   expiresAt               DateTime?
-  isFeatured              Boolean                  @default(false)
-  isVerified              Boolean                  @default(false)
+  isFeatured              Boolean                     @default(false)
+  isVerified              Boolean                     @default(false)
   verifiedAt              DateTime?
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
   usageLogs               KnowledgeBaseUsageLog[]
   versions                KnowledgeBaseEntryVersion[]
 
@@ -2735,9 +2803,9 @@ model WritingDraftRecord {
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
-  writingPlan     WritingPlanRecord      @relation(fields: [writingPlanId], references: [id], onDelete: Cascade)
-  generationRuns  WritingGenerationRun[]
-  draftVersions   WritingDraftVersion[]
+  writingPlan    WritingPlanRecord      @relation(fields: [writingPlanId], references: [id], onDelete: Cascade)
+  generationRuns WritingGenerationRun[]
+  draftVersions  WritingDraftVersion[]
 
   @@index([writingPlanId, createdAt])
   @@index([status, createdAt])
@@ -2807,7 +2875,7 @@ model WritingGenerationRun {
   createdAt            DateTime                   @default(now())
   updatedAt            DateTime                   @updatedAt
 
-  writingDraft WritingDraftRecord?       @relation(fields: [writingDraftId], references: [id], onDelete: SetNull)
+  writingDraft WritingDraftRecord?        @relation(fields: [writingDraftId], references: [id], onDelete: SetNull)
   sections     WritingSectionGeneration[]
 
   @@index([writingPlanId, createdAt])
@@ -2853,14 +2921,14 @@ model WritingSectionGeneration {
 }
 
 model WritingDraftVersion {
-  id             String   @id @default(cuid())
-  writingDraftId String
-  version        Int
-  reason         String
+  id              String   @id @default(cuid())
+  writingDraftId  String
+  version         Int
+  reason          String
   structuredDraft Json
-  qaReport       Json?
-  createdBy      String?
-  createdAt      DateTime @default(now())
+  qaReport        Json?
+  createdBy       String?
+  createdAt       DateTime @default(now())
 
   writingDraft WritingDraftRecord @relation(fields: [writingDraftId], references: [id], onDelete: Cascade)
 
@@ -3291,21 +3359,21 @@ model KnowledgeGraphEvaluationRun {
 
 /// Evaluation-only annotations; never auto-mutate graph relationships.
 model KnowledgeGraphEvaluationAnnotation {
-  id             String                                  @id @default(cuid())
-  runId          String?
-  run            KnowledgeGraphEvaluationRun?            @relation(fields: [runId], references: [id], onDelete: SetNull)
-  benchmarkId    String
-  targetType     String
-  targetKey      String
-  label          KnowledgeGraphEvaluationAnnotationLabel
-  note           String?
-  createdBy      String?
-  createdAt      DateTime                                @default(now())
-  updatedAt      DateTime                                @updatedAt
+  id          String                                  @id @default(cuid())
+  runId       String?
+  run         KnowledgeGraphEvaluationRun?            @relation(fields: [runId], references: [id], onDelete: SetNull)
+  benchmarkId String
+  targetType  String
+  targetKey   String
+  label       KnowledgeGraphEvaluationAnnotationLabel
+  note        String?
+  createdBy   String?
+  createdAt   DateTime                                @default(now())
+  updatedAt   DateTime                                @updatedAt
 
+  @@unique([benchmarkId, targetType, targetKey, label])
   @@index([benchmarkId, targetType])
   @@index([runId, createdAt])
-  @@unique([benchmarkId, targetType, targetKey, label])
 }
 
 enum KnowledgeBaseImportJobStatus {
