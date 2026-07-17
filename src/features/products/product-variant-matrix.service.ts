@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import type { DbClient } from "@/features/products/product-relation-ownership";
 import { assertOptionValueIdsBelongToProduct } from "@/features/products/product-relation-ownership";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
-import { generateSku, ensureUniqueSku } from "@/features/products/product-sku-utils";
+import { generateSku, ensureUniqueSku, ProductSkuError } from "@/features/products/product-sku-utils";
 import {
   buildCartesianCombinations,
   buildCombinationPreviewText,
@@ -163,17 +163,11 @@ export function mapMatrixCombinationCreateError(
     errorMessage: error instanceof Error ? error.message : String(error),
   });
 
+  if (isSkuUniqueConstraintError(error)) {
+    return `SKU "${sku}" đã tồn tại.`;
+  }
+
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P2002") {
-      const target = error.meta?.target;
-      if (Array.isArray(target) && target.some((item) => String(item).includes("sku"))) {
-        return `SKU "${sku}" đã tồn tại.`;
-      }
-      if (typeof target === "string" && target.includes("sku")) {
-        return `SKU "${sku}" đã tồn tại.`;
-      }
-      return `SKU "${sku}" đã tồn tại.`;
-    }
     if (error.code === "P2003") {
       return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
     }
@@ -187,6 +181,22 @@ export function mapMatrixCombinationCreateError(
   }
 
   return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
+}
+
+export function isSkuUniqueConstraintError(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+    return false;
+  }
+  const target = error.meta?.target;
+  if (Array.isArray(target)) {
+    return target.some((item) => String(item).toLowerCase().includes("sku"));
+  }
+  if (typeof target === "string") {
+    return target.toLowerCase().includes("sku");
+  }
+  // Unique constraint failures without a clear target are treated as SKU conflicts —
+  // ProductVariant.sku is the only global unique business key written in this path.
+  return true;
 }
 
 async function assertMatrixCombinationReady(
@@ -291,6 +301,27 @@ export async function generateVariantMatrix(
   const createdVariants: Array<{ id: string; sku: string; displayLabel: string | null }> = [];
   const initialExistingCount = existingSignatures.size;
   let skipped = allCombinations.length - missing.length;
+  const productCode = product.productCode!.trim().toUpperCase();
+  const reservedSkus = new Set(
+    product.variants.map((variant) => variant.sku.trim().toUpperCase()).filter(Boolean),
+  );
+
+  const plannedSkus = missing.map((combo) => {
+    const suffix = buildMatrixCombinationSkuSuffix(groups, combo.valueIds);
+    const baseSku = suffix
+      ? `${productCode}-${suffix}`
+      : generateSku({
+          productCode,
+          ...mapCombinationToLegacyFields(groups, combo.valueIds),
+        });
+    return { displayLabel: combo.displayLabel, baseSku };
+  });
+  console.info("[variant-matrix] planned SKUs before create", {
+    productId,
+    productCode,
+    count: plannedSkus.length,
+    skus: plannedSkus.map((item) => item.baseSku),
+  });
 
   await prisma.$transaction(async (tx) => {
     for (const combo of missing) {
@@ -302,11 +333,20 @@ export async function generateVariantMatrix(
       await assertMatrixCombinationReady(tx, productId, groups, combo);
 
       const legacy = mapCombinationToLegacyFields(groups, combo.valueIds);
-      const suffix = buildMatrixCombinationSkuSuffix(groups, combo.valueIds);
+      let suffix = "";
+      try {
+        suffix = buildMatrixCombinationSkuSuffix(groups, combo.valueIds);
+      } catch {
+        throw new ProductAdminValidationError(
+          `Không thể tạo SKU cho tổ hợp "${combo.displayLabel}". Kiểm tra mã giá trị thuộc tính.`,
+          { variants: `Tổ hợp "${combo.displayLabel}": thiếu dữ liệu mã SKU.` },
+        );
+      }
+
       const baseSku = suffix
-        ? `${product.productCode!.trim().toUpperCase()}-${suffix}`
+        ? `${productCode}-${suffix}`
         : generateSku({
-            productCode: product.productCode!,
+            productCode,
             colorName: legacy.colorName,
             colorCode: legacy.colorCode,
             sizeName: legacy.sizeName,
@@ -314,7 +354,7 @@ export async function generateVariantMatrix(
             capacity: legacy.capacity,
           });
 
-      if (!suffix && baseSku.trim().toUpperCase() === product.productCode!.trim().toUpperCase()) {
+      if (!suffix && baseSku.trim().toUpperCase() === productCode) {
         throw new ProductAdminValidationError(
           "Không thể tạo SKU tự động vì sản phẩm hoặc danh mục thiếu mã.",
           {
@@ -332,48 +372,72 @@ export async function generateVariantMatrix(
 
       let sku: string;
       try {
-        sku = await ensureUniqueSku(baseSku, tx);
-      } catch {
+        sku = await ensureUniqueSku(baseSku, tx, reservedSkus);
+      } catch (error) {
+        const detail =
+          error instanceof ProductSkuError
+            ? error.message
+            : `Tổ hợp "${combo.displayLabel}": xung đột mã SKU.`;
         throw new ProductAdminValidationError(
           `Không thể tạo SKU duy nhất cho tổ hợp "${combo.displayLabel}".`,
-          { variants: `Tổ hợp "${combo.displayLabel}": xung đột mã SKU.` },
+          { variants: detail.startsWith("Tổ hợp") ? detail : `Tổ hợp "${combo.displayLabel}": xung đột mã SKU.` },
         );
       }
 
-      try {
-        const stock = normalizeVariantStockFields(0);
-        const variant = await tx.productVariant.create({
-          data: {
-            productId,
-            sku,
-            displayLabel: combo.displayLabel,
-            colorName: legacy.colorName ?? null,
-            colorCode: legacy.colorCode ?? null,
-            sizeName: legacy.sizeName ?? null,
-            dimensions: legacy.dimensions ?? null,
-            capacity: legacy.capacity ?? null,
-            stockQty: stock.stockQty,
-            stockStatus: stock.stockStatus,
-            variantStatus: "ACTIVE" satisfies VariantStatus,
-          },
-        });
+      const stock = normalizeVariantStockFields(0);
+      let created = false;
+      for (let attempt = 0; attempt < 5 && !created; attempt++) {
+        try {
+          const variant = await tx.productVariant.create({
+            data: {
+              productId,
+              sku,
+              displayLabel: combo.displayLabel,
+              colorName: legacy.colorName ?? null,
+              colorCode: legacy.colorCode ?? null,
+              sizeName: legacy.sizeName ?? null,
+              dimensions: legacy.dimensions ?? null,
+              capacity: legacy.capacity ?? null,
+              stockQty: stock.stockQty,
+              stockStatus: stock.stockStatus,
+              variantStatus: "ACTIVE" satisfies VariantStatus,
+            },
+          });
 
-        await tx.productVariantOptionValue.createMany({
-          data: combo.valueIds.map((optionValueId) => ({
-            variantId: variant.id,
-            optionValueId,
-          })),
-        });
+          await tx.productVariantOptionValue.createMany({
+            data: combo.valueIds.map((optionValueId) => ({
+              variantId: variant.id,
+              optionValueId,
+            })),
+          });
 
-        createdVariants.push({
-          id: variant.id,
-          sku: variant.sku,
-          displayLabel: variant.displayLabel,
-        });
-        existingSignatures.add(combo.signature);
-      } catch (error) {
-        const message = mapMatrixCombinationCreateError(error, combo, sku);
-        throwMatrixCombinationError(combo, message);
+          createdVariants.push({
+            id: variant.id,
+            sku: variant.sku,
+            displayLabel: variant.displayLabel,
+          });
+          existingSignatures.add(combo.signature);
+          created = true;
+        } catch (error) {
+          if (isSkuUniqueConstraintError(error) && attempt < 4) {
+            reservedSkus.add(sku.trim().toUpperCase());
+            try {
+              sku = await ensureUniqueSku(baseSku, tx, reservedSkus);
+              continue;
+            } catch {
+              throwMatrixCombinationError(
+                combo,
+                `xung đột mã SKU.`,
+              );
+            }
+          }
+          const message = mapMatrixCombinationCreateError(error, combo, sku);
+          throwMatrixCombinationError(combo, message);
+        }
+      }
+
+      if (!created) {
+        throwMatrixCombinationError(combo, "xung đột mã SKU.");
       }
     }
   });

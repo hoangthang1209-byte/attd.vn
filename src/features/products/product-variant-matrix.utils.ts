@@ -1,6 +1,6 @@
 import type { ProductOptionInput } from "@/features/products/product-admin-cms";
 import {
-  generateVariantCode,
+  getColorSkuCode,
   normalizeSkuPart,
 } from "@/features/products/product-sku-utils";
 
@@ -156,9 +156,24 @@ export function shortDeterministicOptionValueSuffix(optionValueId: string): stri
   return "V000";
 }
 
-export function resolveMatrixOptionValueSkuPart(value: MatrixOptionValue): string {
-  const fromCode = value.valueCode?.trim() ? normalizeSkuPart(value.valueCode).slice(0, 6) : "";
+/**
+ * Stable ASCII SKU segment for one option value.
+ * Color groups prefer managed valueCode, then Vietnamese/English color map, then label, then id.
+ */
+export function resolveMatrixOptionValueSkuPart(
+  value: MatrixOptionValue,
+  group?: Pick<MatrixOptionGroup, "slug" | "name"> | null,
+): string {
+  const fromCode = value.valueCode?.trim()
+    ? normalizeSkuPart(value.valueCode).slice(0, 6)
+    : "";
   if (fromCode) return fromCode;
+
+  if (group && isColorOptionGroup(group)) {
+    const mapped = getColorSkuCode(value.label);
+    if (mapped) return mapped;
+  }
+
   const fromLabel = normalizeSkuPart(value.label).slice(0, 6);
   if (fromLabel) return fromLabel;
   return shortDeterministicOptionValueSuffix(value.id);
@@ -198,24 +213,27 @@ export function validateMatrixCombinationForGeneration(
   return null;
 }
 
+/**
+ * SKU suffix includes every selected option value in sort order (e.g. RED-S, NVY-XS).
+ * Missing values throw so callers fail before create instead of emitting size-only collisions.
+ */
 export function buildMatrixCombinationSkuSuffix(
   groups: MatrixOptionGroup[],
   valueIds: string[],
 ): string {
-  const legacy = mapCombinationToLegacyFields(groups, valueIds);
-  const fromLegacy = generateVariantCode(legacy);
-  if (fromLegacy) return fromLegacy;
-
-  const parts: string[] = [];
   const sortedGroups = [...groups]
     .filter((group) => group.values.length > 0)
     .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const parts: string[] = [];
   for (const group of sortedGroups) {
     const value = group.values.find((item) => valueIds.includes(item.id));
-    if (!value) continue;
-    parts.push(resolveMatrixOptionValueSkuPart(value));
+    if (!value) {
+      throw new Error(`Missing option value for group "${group.name}"`);
+    }
+    parts.push(resolveMatrixOptionValueSkuPart(value, group));
   }
-  return parts.join("-");
+  return parts.filter(Boolean).join("-");
 }
 
 export function mapCombinationToLegacyFields(
@@ -244,7 +262,7 @@ export function mapCombinationToLegacyFields(
 
     if (isColorOptionGroup(group)) {
       fields.colorName = value.label;
-      fields.colorCode = value.valueCode ?? undefined;
+      fields.colorCode = value.valueCode?.trim() || getColorSkuCode(value.label) || undefined;
       continue;
     }
     if (slug.includes("size") || slug.includes("kich") || name.includes("kích thước")) {

@@ -27,6 +27,8 @@ const MATRIX_COLOR_LABELS = ["Den", "Xanh", "Trang", "Do"];
 const MATRIX_SIZE_LABELS = ["M", "L", "XL", "2XL", "3XL"];
 const NAVY_XS_COLOR_LABELS = ["Đen", "Navy", "Vàng", "Cam"];
 const NAVY_XS_SIZE_LABELS = ["XS", "S", "M", "L"];
+const HOODIE_COLOR_LABELS = ["Đỏ", "Navy", "Vàng", "Đen"];
+const HOODIE_SIZE_LABELS = ["XS", "S", "M", "L"];
 
 describeDb("variant matrix generation", () => {
   let prisma: PrismaClient;
@@ -218,6 +220,72 @@ describeDb("variant matrix generation", () => {
       (error: unknown) =>
         error instanceof ProductAdminValidationError &&
         error.message === "Tất cả tổ hợp biến thể đã tồn tại.",
+    );
+  });
+
+  it("Đỏ/Navy/Vàng/Đen × XS/S/M/L generates 16 unique color+size SKUs without conflict", async () => {
+    const product = await createMatrixProduct("9013", HOODIE_COLOR_LABELS, HOODIE_SIZE_LABELS);
+    const result = await generateVariantMatrix(product.id);
+    assert.equal(result.created, 16);
+
+    const variants = await prisma.productVariant.findMany({
+      where: { productId: product.id },
+      select: { sku: true, displayLabel: true },
+      orderBy: { sku: "asc" },
+    });
+    assert.equal(variants.length, 16);
+    assert.equal(new Set(variants.map((variant) => variant.sku)).size, 16);
+    assert.ok(variants.some((variant) => variant.sku.endsWith("-RED-S")));
+    assert.ok(variants.some((variant) => variant.sku.endsWith("-NVY-S")));
+    assert.ok(variants.some((variant) => variant.sku.endsWith("-YLW-S")));
+    assert.ok(variants.some((variant) => variant.sku.endsWith("-BLK-S")));
+    assert.ok(variants.every((variant) => /-(RED|NVY|YLW|BLK)-(XS|S|M|L)$/.test(variant.sku)));
+
+    const linkCount = await prisma.productVariantOptionValue.count({
+      where: { variant: { productId: product.id } },
+    });
+    assert.equal(linkCount, 32);
+
+    await assert.rejects(
+      () => generateVariantMatrix(product.id),
+      (error: unknown) =>
+        error instanceof ProductAdminValidationError &&
+        error.message === "Tất cả tổ hợp biến thể đã tồn tại.",
+    );
+  });
+
+  it("legacy orphan SKU conflict does not block matrix generation", async () => {
+    const product = await createMatrixProduct("9014", ["Đỏ"], ["S", "M"]);
+    await prisma.productVariant.create({
+      data: {
+        productId: product.id,
+        sku: `${product.productCode}-RED-S`,
+        displayLabel: "Legacy orphan",
+        stockQty: 0,
+        stockStatus: "OUT_OF_STOCK",
+        variantStatus: "ACTIVE",
+      },
+    });
+
+    const preview = await previewVariantMatrixGeneration(product.id);
+    assert.equal(preview.existingCount, 0);
+    assert.equal(preview.missingCount, 2);
+
+    const result = await generateVariantMatrix(product.id);
+    assert.equal(result.created, 2);
+
+    const variants = await prisma.productVariant.findMany({
+      where: { productId: product.id },
+      select: { sku: true, optionValues: { select: { optionValueId: true } } },
+    });
+    assert.equal(variants.length, 3);
+    const redS = variants.filter((variant) => variant.sku.startsWith(`${product.productCode}-RED-S`));
+    assert.ok(redS.some((variant) => variant.sku === `${product.productCode}-RED-S`));
+    assert.ok(redS.some((variant) => variant.sku === `${product.productCode}-RED-S-2`));
+    assert.ok(
+      variants
+        .filter((variant) => variant.optionValues.length > 0)
+        .every((variant) => variant.optionValues.length === 2),
     );
   });
 

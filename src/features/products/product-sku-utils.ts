@@ -177,10 +177,12 @@ const COLOR_CODES: Record<string, string> = {
   "xanh navy": "NVY", navy: "NVY",
   "xanh duong": "BLU", blue: "BLU",
   "xanh la": "GRN", green: "GRN",
+  // Bare "xanh" is ambiguous; keep a stable default used across catalog SKUs.
+  xanh: "BLU",
   xam: "GRY", grey: "GRY", gray: "GRY",
-  vang: "YEL", yellow: "YEL",
+  vang: "YLW", yellow: "YLW", ylw: "YLW", yel: "YLW",
   cam: "ORG", orange: "ORG",
-  be: "NT", natural: "NT", kem: "NT", beige: "NT",
+  be: "NT", natural: "NT", kem: "NT", beige: "NT", bei: "NT",
   hong: "PNK", pink: "PNK",
   tim: "PRP", purple: "PRP",
   nau: "BRN", brown: "BRN",
@@ -193,8 +195,10 @@ export function getColorSkuCode(colorName: string): string {
     .map((c) => VI_MAP[c] ?? c)
     .join("")
     .toLowerCase()
-    .trim();
-  return COLOR_CODES[normalized] ?? normalizeSkuPart(colorName).slice(0, 4);
+    .trim()
+    .replace(/\s+/g, " ");
+  if (COLOR_CODES[normalized]) return COLOR_CODES[normalized]!;
+  return normalizeSkuPart(colorName).slice(0, 4);
 }
 
 /** @deprecated Legacy fallback — do not use for new product ID generation */
@@ -455,19 +459,61 @@ export function buildVariantSkuExplanation(input: {
 
 // ─── Uniqueness enforcement ───────────────────────────────────────────────────
 
+function normalizeSkuCandidate(sku: string): string {
+  return sku.trim().toUpperCase();
+}
+
+/**
+ * Returns a SKU unused in the database and optional in-memory batch reservation set.
+ * Always reserves the returned SKU in `reservedSkus` when provided so matrix/batch
+ * generation cannot assign the same candidate twice before rows are visible.
+ */
 export async function ensureUniqueSku(
   baseSku: string,
   db: Pick<typeof prisma, "productVariant"> = prisma,
+  reservedSkus?: Set<string>,
 ): Promise<string> {
-  const existing = await db.productVariant.findUnique({ where: { sku: baseSku } });
-  if (!existing) return baseSku;
+  const normalizedBase = normalizeSkuCandidate(baseSku);
+  if (!normalizedBase) {
+    throw new ProductSkuError("Không thể tạo SKU duy nhất vì mã gốc trống.");
+  }
+
+  const isReserved = (candidate: string) =>
+    Boolean(reservedSkus?.has(normalizeSkuCandidate(candidate)));
+
+  const reserve = (candidate: string) => {
+    reservedSkus?.add(normalizeSkuCandidate(candidate));
+  };
+
+  const isTakenInDb = async (candidate: string) => {
+    const existing = await db.productVariant.findUnique({ where: { sku: candidate } });
+    return Boolean(existing);
+  };
+
+  if (!isReserved(normalizedBase) && !(await isTakenInDb(normalizedBase))) {
+    reserve(normalizedBase);
+    return normalizedBase;
+  }
 
   for (let i = 2; i <= 99; i++) {
-    const candidate = `${baseSku}-${i}`;
-    const dup = await db.productVariant.findUnique({ where: { sku: candidate } });
-    if (!dup) return candidate;
+    const candidate = `${normalizedBase}-${i}`;
+    if (isReserved(candidate)) continue;
+    if (!(await isTakenInDb(candidate))) {
+      reserve(candidate);
+      return candidate;
+    }
   }
-  return `${baseSku}-${Date.now()}`;
+
+  for (let i = 0; i < 20; i++) {
+    const candidate = `${normalizedBase}-${Date.now().toString(36).toUpperCase()}${i || ""}`;
+    if (isReserved(candidate)) continue;
+    if (!(await isTakenInDb(candidate))) {
+      reserve(candidate);
+      return candidate;
+    }
+  }
+
+  throw new ProductSkuError(`Không thể tạo SKU duy nhất từ "${baseSku}".`);
 }
 
 export async function isSkuTaken(

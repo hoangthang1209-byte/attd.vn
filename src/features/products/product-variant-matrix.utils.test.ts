@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildCartesianCombinations,
   buildMatrixCombinationSkuSuffix,
   resolveMatrixOptionValueSkuPart,
   shortDeterministicOptionValueSuffix,
   validateMatrixCombinationForGeneration,
+  type MatrixOptionGroup,
 } from "./product-variant-matrix.utils";
 
 const regressionGroups = [
@@ -62,6 +64,34 @@ const navyXsGroups = [
   },
 ];
 
+/** Fresh product fixture: Đỏ / Navy / Vàng / Đen × XS / S / M / L */
+const hoodieMatrixGroups: MatrixOptionGroup[] = [
+  {
+    id: "color",
+    name: "Màu sắc",
+    slug: "color",
+    sortOrder: 0,
+    values: [
+      { id: "c-do", label: "Đỏ", valueCode: null, sortOrder: 0 },
+      { id: "c-navy", label: "Navy", valueCode: null, sortOrder: 1 },
+      { id: "c-vang", label: "Vàng", valueCode: null, sortOrder: 2 },
+      { id: "c-den", label: "Đen", valueCode: null, sortOrder: 3 },
+    ],
+  },
+  {
+    id: "size",
+    name: "Kích thước",
+    slug: "size",
+    sortOrder: 1,
+    values: [
+      { id: "s-xs", label: "XS", valueCode: null, sortOrder: 0 },
+      { id: "s-s", label: "S", valueCode: null, sortOrder: 1 },
+      { id: "s-m", label: "M", valueCode: null, sortOrder: 2 },
+      { id: "s-l", label: "L", valueCode: null, sortOrder: 3 },
+    ],
+  },
+];
+
 describe("buildMatrixCombinationSkuSuffix", () => {
   it("uses value codes for generic option groups", () => {
     const groups = [
@@ -100,7 +130,10 @@ describe("buildMatrixCombinationSkuSuffix", () => {
 
   it("generates valid SKU suffix for Navy / XS with English color name", () => {
     assert.equal(buildMatrixCombinationSkuSuffix(navyXsGroups, ["c-navy", "s-xs"]), "NVY-XS");
-    assert.equal(resolveMatrixOptionValueSkuPart(navyXsGroups[0]!.values[1]!), "NVY");
+    assert.equal(
+      resolveMatrixOptionValueSkuPart(navyXsGroups[0]!.values[1]!, navyXsGroups[0]),
+      "NVY",
+    );
   });
 
   it("builds Navy suffix from label alone when valueCode is missing", () => {
@@ -124,6 +157,65 @@ describe("buildMatrixCombinationSkuSuffix", () => {
     const value = { id: "cmk9abc123xyz", label: "---", valueCode: null, sortOrder: 0 };
     assert.equal(resolveMatrixOptionValueSkuPart(value), shortDeterministicOptionValueSuffix(value.id));
     assert.equal(resolveMatrixOptionValueSkuPart(value).length, 4);
+  });
+
+  it("generates 16 unique color+size suffixes for Đỏ/Navy/Vàng/Đen × XS/S/M/L", () => {
+    const combos = buildCartesianCombinations(hoodieMatrixGroups);
+    assert.equal(combos.length, 16);
+
+    const suffixes = combos.map((combo) =>
+      buildMatrixCombinationSkuSuffix(hoodieMatrixGroups, combo.valueIds),
+    );
+    assert.equal(new Set(suffixes).size, 16);
+
+    assert.equal(buildMatrixCombinationSkuSuffix(hoodieMatrixGroups, ["c-do", "s-s"]), "RED-S");
+    assert.equal(buildMatrixCombinationSkuSuffix(hoodieMatrixGroups, ["c-navy", "s-s"]), "NVY-S");
+    assert.equal(buildMatrixCombinationSkuSuffix(hoodieMatrixGroups, ["c-vang", "s-s"]), "YLW-S");
+    assert.equal(buildMatrixCombinationSkuSuffix(hoodieMatrixGroups, ["c-den", "s-s"]), "BLK-S");
+
+    for (const suffix of suffixes) {
+      assert.match(suffix, /^[A-Z0-9]+-[A-Z0-9]+$/);
+    }
+  });
+
+  it("maps accented and unaccented Vietnamese color labels consistently", () => {
+    const colorGroup = hoodieMatrixGroups[0]!;
+    assert.equal(
+      resolveMatrixOptionValueSkuPart({ id: "1", label: "Đỏ", valueCode: null, sortOrder: 0 }, colorGroup),
+      "RED",
+    );
+    assert.equal(
+      resolveMatrixOptionValueSkuPart({ id: "2", label: "Do", valueCode: null, sortOrder: 0 }, colorGroup),
+      "RED",
+    );
+    assert.equal(
+      resolveMatrixOptionValueSkuPart({ id: "3", label: "Red", valueCode: null, sortOrder: 0 }, colorGroup),
+      "RED",
+    );
+    assert.equal(
+      resolveMatrixOptionValueSkuPart({ id: "4", label: "Đen", valueCode: null, sortOrder: 0 }, colorGroup),
+      "BLK",
+    );
+    assert.equal(
+      resolveMatrixOptionValueSkuPart({ id: "5", label: "Den", valueCode: null, sortOrder: 0 }, colorGroup),
+      "BLK",
+    );
+    assert.equal(
+      resolveMatrixOptionValueSkuPart({ id: "6", label: "Vàng", valueCode: null, sortOrder: 0 }, colorGroup),
+      "YLW",
+    );
+    assert.equal(
+      resolveMatrixOptionValueSkuPart({ id: "7", label: "Vang", valueCode: null, sortOrder: 0 }, colorGroup),
+      "YLW",
+    );
+    assert.equal(
+      resolveMatrixOptionValueSkuPart({ id: "8", label: "Trắng", valueCode: null, sortOrder: 0 }, colorGroup),
+      "WHT",
+    );
+    assert.equal(
+      resolveMatrixOptionValueSkuPart({ id: "9", label: "Trang", valueCode: null, sortOrder: 0 }, colorGroup),
+      "WHT",
+    );
   });
 });
 
