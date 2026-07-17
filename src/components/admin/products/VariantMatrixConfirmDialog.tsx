@@ -12,6 +12,7 @@ type Props = {
   requiresWarning: boolean;
   requiresConfirmation: boolean;
   submitting?: boolean;
+  submittingLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -26,6 +27,7 @@ export default function VariantMatrixConfirmDialog({
   requiresWarning,
   requiresConfirmation,
   submitting = false,
+  submittingLabel = "Đang tạo tổ hợp biến thể...",
   onCancel,
   onConfirm,
 }: Props) {
@@ -96,7 +98,7 @@ export default function VariantMatrixConfirmDialog({
             variant="primary"
             className="btn-primary"
             pending={submitting}
-            pendingLabel="Đang tạo biến thể..."
+            pendingLabel={submittingLabel}
             onClick={onConfirm}
           >
             {`Tạo ${missingCount} biến thể`}

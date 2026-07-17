@@ -29,8 +29,8 @@ describe("ensureUniqueSku", () => {
       },
     };
 
-    const first = await ensureUniqueSku("HOODIE001-RED-S", db, reserved);
-    const second = await ensureUniqueSku("HOODIE001-RED-S", db, reserved);
+    const first = await ensureUniqueSku("HOODIE001-RED-S", db as never, reserved);
+    const second = await ensureUniqueSku("HOODIE001-RED-S", db as never, reserved);
 
     assert.equal(first, "HOODIE001-RED-S");
     assert.equal(second, "HOODIE001-RED-S-2");
@@ -47,7 +47,7 @@ describe("ensureUniqueSku", () => {
       },
     };
 
-    const sku = await ensureUniqueSku("HOODIE001-NVY-S", db);
+    const sku = await ensureUniqueSku("HOODIE001-NVY-S", db as never);
     assert.equal(sku, "HOODIE001-NVY-S-3");
   });
 });

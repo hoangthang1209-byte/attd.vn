@@ -36,9 +36,9 @@ describe("one-screen product admin editor", () => {
   it("calls save-options-before-generate and applies persisted option IDs", () => {
     assert.match(source, /onBeforeMatrixGenerate=\{ensureOptionsSavedForMatrix\}/);
     assert.match(source, /async function ensureOptionsSavedForMatrix/);
-    assert.match(source, /body: JSON\.stringify\(\{ options: buildPayload\(\)\.options \}\)/);
-    assert.match(source, /mapOptionsToFormRows\(body\.options/);
-    assert.match(source, /Giá trị tuỳ chọn chưa được lưu đủ ID/);
+    assert.match(source, /buildPersistedOptionsPayload/);
+    assert.match(source, /formRef/);
+    assert.match(source, /OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR/);
     assert.match(source, /reloadProductFromServer/);
   });
 

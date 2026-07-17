@@ -148,6 +148,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
   const [matrixFilter, setMatrixFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [savingOptions, setSavingOptions] = useState(false);
   const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
   const [matrixConfirmOpen, setMatrixConfirmOpen] = useState(false);
   const [matrixConfirmLarge, setMatrixConfirmLarge] = useState(false);
@@ -197,17 +198,28 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
     [matrixGroups, structuredVariants],
   );
 
-  const hasPersistedOptionValues = useMemo(
-    () => optionGroups.some((group) => group.values.some((value) => Boolean(value.id))),
-    [optionGroups],
-  );
-
-  function openMatrixConfirm() {
+  async function openMatrixConfirm() {
     setMatrixMessage(null);
     if (!matrixPreview.canGenerate) {
       setMatrixMessage(matrixPreview.message ?? "Không có tổ hợp mới để tạo.");
       return;
     }
+
+    if (productId && onBeforeMatrixGenerate) {
+      setSavingOptions(true);
+      try {
+        const ready = await onBeforeMatrixGenerate();
+        if (!ready) {
+          setMatrixMessage(
+            "Không thể tạo biến thể vì nhóm tuỳ chọn chưa được lưu. Vui lòng lưu sản phẩm rồi thử lại.",
+          );
+          return;
+        }
+      } finally {
+        setSavingOptions(false);
+      }
+    }
+
     setMatrixConfirmLarge(false);
     setMatrixConfirmOpen(true);
   }
@@ -215,10 +227,9 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
   useImperativeHandle(ref, () => ({
     openMatrixConfirmation: () => {
       if (!productId) return;
-      if (optionGroups.length > 0 && !hasPersistedOptionValues) return;
-      openMatrixConfirm();
+      void openMatrixConfirm();
     },
-  }), [productId, optionGroups.length, hasPersistedOptionValues, matrixPreview.canGenerate, matrixPreview.message]);
+  }), [productId, matrixPreview.canGenerate, matrixPreview.message, onBeforeMatrixGenerate]);
 
   const variantUsageByValueId = useMemo(() => {
     const usage: Record<string, number> = {};
@@ -592,11 +603,19 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       return;
     }
 
+    // Re-save right before execute so matrix never runs on stale client IDs.
     if (onBeforeMatrixGenerate) {
-      const ready = await onBeforeMatrixGenerate();
-      if (!ready) {
-        setMatrixMessage("Lưu nhóm tuỳ chọn trước khi tạo tổ hợp.");
-        return;
+      setSavingOptions(true);
+      try {
+        const ready = await onBeforeMatrixGenerate();
+        if (!ready) {
+          setMatrixMessage(
+            "Không thể tạo biến thể vì nhóm tuỳ chọn chưa được lưu. Vui lòng lưu sản phẩm rồi thử lại.",
+          );
+          return;
+        }
+      } finally {
+        setSavingOptions(false);
       }
     }
 
@@ -706,10 +725,12 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
             <AdminLoadingButton
               variant="primary"
               className="btn-primary"
-              pending={generating}
-              pendingLabel="Đang tạo tổ hợp biến thể..."
-              disabled={!matrixPreview.canGenerate}
-              onClick={openMatrixConfirm}
+              pending={savingOptions || generating}
+              pendingLabel={
+                savingOptions ? "Đang lưu tuỳ chọn..." : "Đang tạo tổ hợp biến thể..."
+              }
+              disabled={!matrixPreview.canGenerate || savingOptions || generating}
+              onClick={() => void openMatrixConfirm()}
             >
               Tạo tổ hợp biến thể
             </AdminLoadingButton>
@@ -739,7 +760,10 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
         missingCombinations={matrixPreview.missingCombinations}
         requiresWarning={matrixPreview.requiresWarning}
         requiresConfirmation={matrixConfirmLarge || matrixPreview.requiresConfirmation}
-        submitting={generating}
+        submitting={savingOptions || generating}
+        submittingLabel={
+          savingOptions ? "Đang lưu tuỳ chọn..." : "Đang tạo tổ hợp biến thể..."
+        }
         onCancel={() => setMatrixConfirmOpen(false)}
         onConfirm={() => void confirmMatrixGeneration()}
       />

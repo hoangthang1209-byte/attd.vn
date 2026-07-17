@@ -68,8 +68,8 @@ function toMatrixGroups(
   }));
 }
 
-async function loadMatrixContext(productId: string) {
-  const product = await prisma.product.findUnique({
+async function loadMatrixContext(productId: string, db: DbClient = prisma) {
+  const product = await db.product.findUnique({
     where: { id: productId },
     select: {
       id: true,
@@ -286,33 +286,29 @@ export async function generateVariantMatrix(
     );
   }
 
-  const product = await loadMatrixContext(productId);
-  const groups = toMatrixGroups(product.options);
-  const allCombinations = buildCartesianCombinations(groups);
-  const existingSignatures = new Set(
-    product.variants
+  // Preview gate stays outside the write transaction; execute reloads option IDs
+  // inside the transaction so we never create links against stale/deleted values.
+  const previewProduct = await loadMatrixContext(productId);
+  const previewGroups = toMatrixGroups(previewProduct.options);
+  const previewCombinations = buildCartesianCombinations(previewGroups);
+  const previewExisting = new Set(
+    previewProduct.variants
       .filter((variant) => variant.optionValues.length > 0)
       .map((variant) =>
         combinationSignature(variant.optionValues.map((link) => link.optionValueId)),
       ),
   );
-
-  const missing = allCombinations.filter((combo) => !existingSignatures.has(combo.signature));
-  const createdVariants: Array<{ id: string; sku: string; displayLabel: string | null }> = [];
-  const initialExistingCount = existingSignatures.size;
-  let skipped = allCombinations.length - missing.length;
-  const productCode = product.productCode!.trim().toUpperCase();
-  const reservedSkus = new Set(
-    product.variants.map((variant) => variant.sku.trim().toUpperCase()).filter(Boolean),
+  const previewMissing = previewCombinations.filter(
+    (combo) => !previewExisting.has(combo.signature),
   );
-
-  const plannedSkus = missing.map((combo) => {
-    const suffix = buildMatrixCombinationSkuSuffix(groups, combo.valueIds);
+  const productCode = previewProduct.productCode!.trim().toUpperCase();
+  const plannedSkus = previewMissing.map((combo) => {
+    const suffix = buildMatrixCombinationSkuSuffix(previewGroups, combo.valueIds);
     const baseSku = suffix
       ? `${productCode}-${suffix}`
       : generateSku({
           productCode,
-          ...mapCombinationToLegacyFields(groups, combo.valueIds),
+          ...mapCombinationToLegacyFields(previewGroups, combo.valueIds),
         });
     return { displayLabel: combo.displayLabel, baseSku };
   });
@@ -323,7 +319,29 @@ export async function generateVariantMatrix(
     skus: plannedSkus.map((item) => item.baseSku),
   });
 
+  const createdVariants: Array<{ id: string; sku: string; displayLabel: string | null }> = [];
+  let skipped = 0;
+  let initialExistingCount = 0;
+
   await prisma.$transaction(async (tx) => {
+    const product = await loadMatrixContext(productId, tx);
+    const groups = toMatrixGroups(product.options);
+    const allCombinations = buildCartesianCombinations(groups);
+    const existingSignatures = new Set(
+      product.variants
+        .filter((variant) => variant.optionValues.length > 0)
+        .map((variant) =>
+          combinationSignature(variant.optionValues.map((link) => link.optionValueId)),
+        ),
+    );
+    initialExistingCount = existingSignatures.size;
+    const missing = allCombinations.filter((combo) => !existingSignatures.has(combo.signature));
+    skipped = allCombinations.length - missing.length;
+    const txProductCode = product.productCode!.trim().toUpperCase();
+    const reservedSkus = new Set(
+      product.variants.map((variant) => variant.sku.trim().toUpperCase()).filter(Boolean),
+    );
+
     for (const combo of missing) {
       if (existingSignatures.has(combo.signature)) {
         skipped += 1;
@@ -344,9 +362,9 @@ export async function generateVariantMatrix(
       }
 
       const baseSku = suffix
-        ? `${productCode}-${suffix}`
+        ? `${txProductCode}-${suffix}`
         : generateSku({
-            productCode,
+            productCode: txProductCode,
             colorName: legacy.colorName,
             colorCode: legacy.colorCode,
             sizeName: legacy.sizeName,
@@ -354,7 +372,7 @@ export async function generateVariantMatrix(
             capacity: legacy.capacity,
           });
 
-      if (!suffix && baseSku.trim().toUpperCase() === productCode) {
+      if (!suffix && baseSku.trim().toUpperCase() === txProductCode) {
         throw new ProductAdminValidationError(
           "Không thể tạo SKU tự động vì sản phẩm hoặc danh mục thiếu mã.",
           {
@@ -380,7 +398,11 @@ export async function generateVariantMatrix(
             : `Tổ hợp "${combo.displayLabel}": xung đột mã SKU.`;
         throw new ProductAdminValidationError(
           `Không thể tạo SKU duy nhất cho tổ hợp "${combo.displayLabel}".`,
-          { variants: detail.startsWith("Tổ hợp") ? detail : `Tổ hợp "${combo.displayLabel}": xung đột mã SKU.` },
+          {
+            variants: detail.startsWith("Tổ hợp")
+              ? detail
+              : `Tổ hợp "${combo.displayLabel}": xung đột mã SKU.`,
+          },
         );
       }
 
@@ -425,10 +447,7 @@ export async function generateVariantMatrix(
               sku = await ensureUniqueSku(baseSku, tx, reservedSkus);
               continue;
             } catch {
-              throwMatrixCombinationError(
-                combo,
-                `xung đột mã SKU.`,
-              );
+              throwMatrixCombinationError(combo, `xung đột mã SKU.`);
             }
           }
           const message = mapMatrixCombinationCreateError(error, combo, sku);

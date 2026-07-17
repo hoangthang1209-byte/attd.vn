@@ -45,6 +45,12 @@ import {
   resolveOptionValueRefFromGroups,
 } from "@/features/products/product-variant-matrix.utils";
 import {
+  buildPersistedOptionsPayload,
+  countActiveOptionValues,
+  optionGroupsMissingPersistedIds,
+  OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR,
+} from "@/features/products/product-option-persistence";
+import {
   fieldErrorInputClass,
   resolveTabForField,
   scrollToFirstFieldError,
@@ -222,6 +228,8 @@ export default function ProductCatalogForm({
   const [bulkOpInProgress, setBulkOpInProgress] = useState(false);
   const variantsSectionRef = useRef<ProductCatalogVariantsSectionHandle>(null);
   const matrixAutoOpenTriggeredRef = useRef(false);
+  const formRef = useRef(form);
+  formRef.current = form;
   const [exportDialog, setExportDialog] = useState<"export" | "clone" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -453,21 +461,29 @@ export default function ProductCatalogForm({
   }
 
   async function reloadProductFromServer(): Promise<boolean> {
-    if (!form.id) return false;
+    const productId = formRef.current.id;
+    if (!productId) return false;
     try {
-      const res = await fetch(`/api/admin/products/${form.id}`);
+      const res = await fetch(`/api/admin/products/${productId}`);
       if (!res.ok) return false;
       const product = (await res.json()) as {
         options: Parameters<typeof mapOptionsToFormRows>[0];
         variants: Parameters<typeof mapVariantsToFormRows>[0];
       };
+      const nextOptions = mapOptionsToFormRows(product.options ?? []);
+      const nextVariants = mapVariantsToFormRows(product.variants ?? []).filter(
+        (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
+      );
       setForm((prev) => ({
         ...prev,
-        options: mapOptionsToFormRows(product.options ?? []),
-        variants: mapVariantsToFormRows(product.variants ?? []).filter(
-          (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
-        ),
+        options: nextOptions,
+        variants: nextVariants,
       }));
+      formRef.current = {
+        ...formRef.current,
+        options: nextOptions,
+        variants: nextVariants,
+      };
       return true;
     } catch {
       return false;
@@ -558,10 +574,6 @@ export default function ProductCatalogForm({
   function tryOpenMatrixFromQueryParam() {
     if (searchParams.get("generateVariants") !== "1") return;
     if (!form.id || matrixAutoOpenTriggeredRef.current) return;
-    const hasPersistedOptionValues = form.options.some((group) =>
-      group.values.some((value) => Boolean(value.id)),
-    );
-    if (form.options.length > 0 && !hasPersistedOptionValues) return;
     matrixAutoOpenTriggeredRef.current = true;
     variantsSectionRef.current?.openMatrixConfirmation();
     consumeMatrixAutoOpenParam();
@@ -664,25 +676,7 @@ export default function ProductCatalogForm({
         customValue: row.useCustomValue ? row.customValue?.trim() || null : null,
         sortOrder: row.sortOrder ?? index,
       })),
-      options: form.options
-        .filter((group) => group.name.trim())
-        .map((group, index) => ({
-          id: group.id,
-          attributeId: group.attributeId,
-          name: group.name.trim(),
-          slug: group.slug.trim() || undefined,
-          sortOrder: group.sortOrder ?? index,
-          values: group.values
-            .filter((value) => value.label.trim())
-            .map((value, valueIndex) => ({
-              id: value.id,
-              attributeValueId: value.attributeValueId,
-              label: value.label.trim(),
-              valueCode: value.valueCode.trim() || undefined,
-              imageUrl: value.imageUrl.trim() || undefined,
-              sortOrder: value.sortOrder ?? valueIndex,
-            })),
-        })),
+      options: buildPersistedOptionsPayload(form.options),
       variants: form.variants.map((v) => ({
         id: v.id,
         clientKey: v.clientKey,
@@ -711,9 +705,16 @@ export default function ProductCatalogForm({
     };
   }
 
+  /**
+   * Persist current in-memory option groups before variant-matrix execute.
+   * Always reads latest form via formRef (not a stale render closure).
+   */
   async function ensureOptionsSavedForMatrix(): Promise<boolean> {
-    if (!form.id) return true;
-    const localErrors = validateProductDraftForMatrixGeneration(form);
+    const latest = formRef.current;
+    if (!latest.id) return true;
+
+    const expectedValueCount = countActiveOptionValues(latest.options);
+    const localErrors = validateProductDraftForMatrixGeneration(latest);
     const optionErrors = Object.fromEntries(
       Object.entries(localErrors).filter(([key]) => key.startsWith("options")),
     );
@@ -725,10 +726,11 @@ export default function ProductCatalogForm({
       return false;
     }
 
-    const res = await fetch(`/api/admin/products/${form.id}`, {
+    const optionsPayload = buildPersistedOptionsPayload(latest.options);
+    const res = await fetch(`/api/admin/products/${latest.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ options: buildPayload().options }),
+      body: JSON.stringify({ options: optionsPayload }),
     });
     const body = (await res.json()) as {
       message?: string;
@@ -753,36 +755,37 @@ export default function ProductCatalogForm({
         )
       : null;
 
-    if (!nextOptions) {
+    if (!nextOptions || optionGroupsMissingPersistedIds(nextOptions)) {
       const reloaded = await reloadProductFromServer();
       if (!reloaded) {
-        setError("Đã lưu nhóm tuỳ chọn nhưng không thể tải lại dữ liệu. Vui lòng tải lại trang.");
+        setError(OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR);
+        setFieldErrors({ options: OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR });
         return false;
       }
-      return true;
+      nextOptions = formRef.current.options;
+      nextVariants = formRef.current.variants;
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        options: nextOptions!,
+        variants: nextVariants ?? prev.variants,
+      }));
+      formRef.current = {
+        ...formRef.current,
+        options: nextOptions,
+        variants: nextVariants ?? formRef.current.variants,
+      };
     }
 
-    const missingPersistedIds = nextOptions.some(
-      (group) =>
-        group.name.trim() &&
-        group.values.some((value) => value.label.trim() && !value.id),
-    );
-    if (missingPersistedIds) {
-      const reloaded = await reloadProductFromServer();
-      if (!reloaded) {
-        setError(
-          "Giá trị tuỳ chọn chưa được lưu đủ ID. Vui lòng lưu sản phẩm rồi thử tạo tổ hợp lại.",
-        );
-        return false;
-      }
-      return true;
+    if (
+      optionGroupsMissingPersistedIds(nextOptions) ||
+      countActiveOptionValues(nextOptions) < expectedValueCount
+    ) {
+      setError(OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR);
+      setFieldErrors({ options: OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR });
+      return false;
     }
 
-    setForm((prev) => ({
-      ...prev,
-      options: nextOptions!,
-      variants: nextVariants ?? prev.variants,
-    }));
     return true;
   }
 
