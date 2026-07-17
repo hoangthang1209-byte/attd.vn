@@ -4,9 +4,10 @@ import { prisma } from "@/lib/prisma";
 import {
   generateSku,
   ensureUniqueSku,
-  ensureUniqueProductCode,
+  generateUniqueProductCode,
   ProductSkuError,
   CATEGORY_SKU_CODE_MISSING_ERROR,
+  PRODUCT_CODE_GENERATION_EXHAUSTED_ERROR,
   validateProductCodeForCategory,
   requireCategorySkuCode,
   isCategoryCodeTaken,
@@ -1055,10 +1056,11 @@ export async function createProductAdmin(input: ProductInput) {
 
   let productCode: string | null = null;
   try {
-    productCode = await ensureUniqueProductCode(
-      input.categoryId,
-      input.productCode?.trim() || undefined
-    );
+    productCode = await generateUniqueProductCode({
+      categoryId: input.categoryId,
+      categorySkuCode: category.skuCode,
+      explicitCode: input.productCode?.trim() || undefined,
+    });
   } catch (err) {
     if (err instanceof ProductSkuError) {
       const missingCategorySkuCode = err.message === CATEGORY_SKU_CODE_MISSING_ERROR;
@@ -1122,34 +1124,64 @@ export async function createProductAdmin(input: ProductInput) {
     return created;
   }
 
-  const product = await runProductSaveTransaction(async (tx) => {
-    const created = await tx.product.create({
-      data: buildProductCreateData(input, productCode, slug, systemCode, finalStatus),
-    });
-    const resolvedAssignments =
-      input.attributeAssignments !== undefined
-        ? await validateProductAttributeAssignments(input.attributeAssignments, tx)
-        : undefined;
-    const preparedVariantSkus = await prepareVariantSkusForInput(input.variants, productCode);
-    await writeProductDependentRelations(created.id, productCode, input, tx, {
-      preparedVariantSkus,
-      resolvedAssignments,
-      skipOwnershipVerify: true,
-    });
-    return created;
-  });
+  // Draft create: retry productCode allocation on unique-constraint races.
+  const explicitCode = input.productCode?.trim() || undefined;
+  let lastCreateError: unknown;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      if (attempt > 0 && !explicitCode) {
+        productCode = await generateUniqueProductCode({
+          categoryId: input.categoryId,
+          categorySkuCode: category.skuCode,
+        });
+      }
 
-  const created = await getProductAdminById(product.id);
-  if (!created) {
-    throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+      const product = await runProductSaveTransaction(async (tx) => {
+        const created = await tx.product.create({
+          data: buildProductCreateData(input, productCode, slug, systemCode, finalStatus),
+        });
+        const resolvedAssignments =
+          input.attributeAssignments !== undefined
+            ? await validateProductAttributeAssignments(input.attributeAssignments, tx)
+            : undefined;
+        const preparedVariantSkus = await prepareVariantSkusForInput(input.variants, productCode);
+        await writeProductDependentRelations(created.id, productCode, input, tx, {
+          preparedVariantSkus,
+          resolvedAssignments,
+          skipOwnershipVerify: true,
+        });
+        return created;
+      });
+
+      const created = await getProductAdminById(product.id);
+      if (!created) {
+        throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
+      }
+      await revalidatePublicProductCache({
+        productId: created.id,
+        slug: created.slug,
+        categoryId: created.categoryId,
+        affectsHomepage: created.status === "ACTIVE",
+      });
+      return created;
+    } catch (err) {
+      lastCreateError = err;
+      const isProductCodeConflict =
+        err instanceof PrismaClient.PrismaClientKnownRequestError &&
+        err.code === "P2002" &&
+        Array.isArray(err.meta?.target) &&
+        err.meta.target.some((item) => String(item).toLowerCase().includes("productcode"));
+      if (!isProductCodeConflict || explicitCode || attempt === 4) {
+        throw err;
+      }
+    }
   }
-  await revalidatePublicProductCache({
-    productId: created.id,
-    slug: created.slug,
-    categoryId: created.categoryId,
-    affectsHomepage: created.status === "ACTIVE",
-  });
-  return created;
+
+  throw lastCreateError instanceof Error
+    ? lastCreateError
+    : new ProductAdminValidationError(PRODUCT_CODE_GENERATION_EXHAUSTED_ERROR, {
+        categoryId: PRODUCT_CODE_GENERATION_EXHAUSTED_ERROR,
+      });
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────

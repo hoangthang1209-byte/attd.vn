@@ -6,7 +6,6 @@ import {
   buildDraftStarterPayload,
   validateDraftStarter,
 } from "@/features/products/product-draft-starter";
-import { FAST_CREATE_ROUTES } from "@/features/products/product-fast-create";
 
 function readRepoFile(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
@@ -27,7 +26,6 @@ describe("product draft starter", () => {
       categoryId: "cat_1",
       categoryName: "Áo Thun Regular",
       productMode: "WHOLESALE_AVAILABLE",
-      productTemplateKey: "tee",
     });
     assert.equal(payload.status, "DRAFT");
     assert.equal(payload.categoryId, "cat_1");
@@ -48,31 +46,28 @@ describe("new product route uses draft starter not full create form", () => {
     assert.doesNotMatch(newPage, /<ProductCatalogForm\s*\/>/);
   });
 
-  it("dashboard points Tạo sản phẩm mới to /admin/products/new", () => {
+  it("dashboard has one primary create CTA and no fast create", () => {
     const dashboard = readRepoFile("src/components/admin/products/ProductCatalogDashboard.tsx");
     assert.match(dashboard, /Tạo sản phẩm mới/);
     assert.match(dashboard, /href="\/admin\/products\/new"/);
-    assert.match(dashboard, /Tạo nhanh sản phẩm/);
-    assert.match(dashboard, /href="\/admin\/products\/new\/fast"/);
-    assert.doesNotMatch(dashboard, /Tạo nâng cao/);
+    assert.doesNotMatch(dashboard, /Tạo nhanh sản phẩm/);
+    assert.doesNotMatch(dashboard, /\/admin\/products\/new\/fast/);
   });
 
-  it("fast create still works and links to draft starter", () => {
-    assert.equal(FAST_CREATE_ROUTES.fast, "/admin/products/new/fast");
-    assert.equal(FAST_CREATE_ROUTES.advanced, "/admin/products/new");
+  it("/admin/products/new/fast redirects to canonical new page", () => {
     const fastPage = readRepoFile("src/app/(backend)/admin/products/new/fast/page.tsx");
-    assert.match(fastPage, /ProductFastCreateWizard/);
-    const wizard = readRepoFile("src/components/admin/products/ProductFastCreateWizard.tsx");
-    assert.match(wizard, /Tạo sản phẩm mới/);
-    assert.match(wizard, /router\.push\(`\/admin\/products\/\$\{saved\.id\}\/edit/);
+    assert.match(fastPage, /redirect\("\/admin\/products\/new"\)/);
+    assert.doesNotMatch(fastPage, /ProductFastCreateWizard/);
   });
 
-  it("draft starter redirects to edit after create", () => {
+  it("draft starter redirects to edit after create and has no fast create link", () => {
     const starter = readRepoFile("src/components/admin/products/ProductDraftStarter.tsx");
     assert.match(starter, /buildDraftStarterPayload/);
     assert.match(starter, /Tạo nháp và tiếp tục/);
     assert.match(starter, /router\.push\(`\/admin\/products\/\$\{saved\.id\}\/edit`\)/);
     assert.doesNotMatch(starter, /ProductCatalogForm/);
+    assert.doesNotMatch(starter, /Tạo nhanh sản phẩm/);
+    assert.doesNotMatch(starter, /\/admin\/products\/new\/fast/);
   });
 
   it("edit page remains one-screen editor with size chart, suggestions, matrix", () => {

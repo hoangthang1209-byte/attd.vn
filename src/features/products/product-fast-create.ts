@@ -21,8 +21,9 @@ export const FAST_CREATE_ALLOWS_INLINE_CATEGORY_CREATION = false;
 export const PRICING_CLARITY_HELPER =
   "Giá bán chính thức nên được cấu hình trong bảng giá theo số lượng để dùng cho báo giá và đại lý.";
 
+/** @deprecated Fast create UI was removed. Canonical create is /admin/products/new. */
 export const FAST_CREATE_ROUTES = {
-  fast: "/admin/products/new/fast",
+  fast: "/admin/products/new",
   advanced: "/admin/products/new",
 } as const;
 

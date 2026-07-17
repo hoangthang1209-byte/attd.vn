@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProductCategoryCascadingPicker from "@/components/admin/products/ProductCategoryCascadingPicker";
@@ -15,7 +14,6 @@ import {
   listProductTemplatesForMode,
   type ProductEntryMode,
 } from "@/features/products/product-entry-modes";
-import { FAST_CREATE_ROUTES } from "@/features/products/product-fast-create";
 import {
   buildDraftStarterPayload,
   validateDraftStarter,
@@ -87,12 +85,7 @@ export default function ProductDraftStarter({ categories }: Props) {
   return (
     <div className="admin-draft-starter" data-testid="product-draft-starter">
       <p className="admin-field-hint">
-        Tạo nháp nhanh rồi chuyển sang form chỉnh sửa đầy đủ (bảng size, gợi ý nội dung, biến thể). Cần tạo
-        nhanh có mẫu? Dùng{" "}
-        <Link href={FAST_CREATE_ROUTES.fast} className="admin-link">
-          Tạo nhanh sản phẩm
-        </Link>
-        .
+        Tạo nháp rồi chuyển sang form chỉnh sửa đầy đủ (bảng size, gợi ý nội dung, biến thể).
       </p>
 
       <section className="admin-card admin-draft-starter__card">

@@ -32,13 +32,16 @@ const VI_MAP: Record<string, string> = {
 };
 
 export const CATEGORY_SKU_CODE_MISSING_ERROR =
-  "Danh mục chưa có mã danh mục. Vui lòng cập nhật mã danh mục trước khi tạo sản phẩm.";
+  "Danh mục chưa có mã SKU. Vui lòng bổ sung mã danh mục trước khi tạo sản phẩm.";
 
 export const CATEGORY_CODE_DUPLICATE_ERROR =
   "Mã danh mục đã tồn tại. Vui lòng chọn mã khác.";
 
 export const CATEGORY_PRODUCT_CODE_LIMIT_ERROR =
   "Danh mục đã đạt giới hạn 9999 mã sản phẩm.";
+
+export const PRODUCT_CODE_GENERATION_EXHAUSTED_ERROR =
+  "Không thể tạo mã sản phẩm duy nhất. Vui lòng thử lại hoặc kiểm tra mã danh mục.";
 
 export class ProductSkuError extends Error {
   constructor(message: string) {
@@ -260,25 +263,39 @@ export function validateProductCodeForCategory(prefix: string, productCode: stri
   return upper;
 }
 
-export async function getMaxProductCodeSuffix(
-  categoryId: string,
-  prefix: string
+/**
+ * Highest #### suffix for a productCode prefix across ALL products.
+ * productCode is globally unique, so sequence must be global for the prefix —
+ * scoping by categoryId caused retries to regenerate the same colliding code
+ * when another category already held the next number.
+ */
+export async function getMaxProductCodeSuffixForPrefix(
+  prefix: string,
+  db: Pick<typeof prisma, "product"> = prisma,
 ): Promise<number> {
-  const products = await prisma.product.findMany({
-    where: {
-      categoryId,
-      productCode: { startsWith: prefix },
-    },
+  const normalizedPrefix = prefix.trim().toUpperCase();
+  if (!normalizedPrefix) return 0;
+
+  const products = await db.product.findMany({
+    where: { productCode: { startsWith: normalizedPrefix } },
     select: { productCode: true },
   });
 
   let maxSuffix = 0;
   for (const product of products) {
     if (!product.productCode) continue;
-    const suffix = parseProductCodeSuffix(prefix, product.productCode);
+    const suffix = parseProductCodeSuffix(normalizedPrefix, product.productCode);
     if (suffix !== null && suffix > maxSuffix) maxSuffix = suffix;
   }
   return maxSuffix;
+}
+
+/** @deprecated Prefer getMaxProductCodeSuffixForPrefix — productCode uniqueness is global. */
+export async function getMaxProductCodeSuffix(
+  _categoryId: string,
+  prefix: string,
+): Promise<number> {
+  return getMaxProductCodeSuffixForPrefix(prefix);
 }
 
 export type CategoryCodeCounter = {
@@ -293,7 +310,7 @@ export async function initCategoryCodeCounter(categoryId: string): Promise<Categ
     select: { skuCode: true },
   });
   const prefix = requireCategorySkuCode(category?.skuCode);
-  const maxSuffix = await getMaxProductCodeSuffix(categoryId, prefix);
+  const maxSuffix = await getMaxProductCodeSuffixForPrefix(prefix);
   return { categoryId, prefix, nextSuffix: maxSuffix + 1 };
 }
 
@@ -308,7 +325,7 @@ export function allocateProductCodeFromCounter(counter: CategoryCodeCounter): st
 
 export async function generateNextProductCode(
   categoryId: string,
-  options?: { explicitCode?: string; counter?: CategoryCodeCounter }
+  options?: { explicitCode?: string; counter?: CategoryCodeCounter },
 ): Promise<string> {
   if (options?.explicitCode?.trim()) {
     const category = await prisma.category.findUnique({
@@ -327,25 +344,60 @@ export async function generateNextProductCode(
   return allocateProductCodeFromCounter(counter);
 }
 
-export async function ensureUniqueProductCode(
-  categoryId: string,
-  explicitCode?: string
+export type GenerateUniqueProductCodeInput = {
+  categoryId: string;
+  categorySkuCode?: string | null;
+  explicitCode?: string;
+  db?: Pick<typeof prisma, "product" | "category">;
+};
+
+/**
+ * Central helper for draft create and product save.
+ * Uses global prefix sequence + advances on collision (never retries the same code).
+ */
+export async function generateUniqueProductCode(
+  input: GenerateUniqueProductCodeInput,
 ): Promise<string> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = await generateNextProductCode(
-      categoryId,
-      attempt === 0 && explicitCode ? { explicitCode } : undefined
-    );
-
-    const existing = await prisma.product.findUnique({ where: { productCode: code } });
-    if (!existing) return code;
-
-    if (explicitCode) {
-      throw new ProductSkuError("Mã sản phẩm đã tồn tại.");
-    }
+  const db = input.db ?? prisma;
+  let prefix = "";
+  if (input.categorySkuCode !== undefined) {
+    prefix = requireCategorySkuCode(input.categorySkuCode);
+  } else {
+    const category = await db.category.findUnique({
+      where: { id: input.categoryId },
+      select: { skuCode: true },
+    });
+    prefix = requireCategorySkuCode(category?.skuCode);
   }
 
-  throw new ProductSkuError("Không thể tạo mã sản phẩm duy nhất. Vui lòng thử lại.");
+  if (input.explicitCode?.trim()) {
+    const code = validateProductCodeForCategory(prefix, input.explicitCode);
+    const existing = await db.product.findUnique({ where: { productCode: code } });
+    if (existing) {
+      throw new ProductSkuError("Mã sản phẩm đã tồn tại.");
+    }
+    return code;
+  }
+
+  let suffix = (await getMaxProductCodeSuffixForPrefix(prefix, db)) + 1;
+  for (let attempt = 0; attempt < 64; attempt++) {
+    if (suffix > 9999) {
+      throw new ProductSkuError(CATEGORY_PRODUCT_CODE_LIMIT_ERROR);
+    }
+    const code = `${prefix}${String(suffix).padStart(4, "0")}`;
+    const existing = await db.product.findUnique({ where: { productCode: code } });
+    if (!existing) return code;
+    suffix += 1;
+  }
+
+  throw new ProductSkuError(PRODUCT_CODE_GENERATION_EXHAUSTED_ERROR);
+}
+
+export async function ensureUniqueProductCode(
+  categoryId: string,
+  explicitCode?: string,
+): Promise<string> {
+  return generateUniqueProductCode({ categoryId, explicitCode });
 }
 
 export function buildProductGroupKey(

@@ -206,9 +206,6 @@ export default function ProductCatalogDashboard() {
           <Link href="/admin/products/new" className="admin-btn admin-btn--primary">
             Tạo sản phẩm mới
           </Link>
-          <Link href="/admin/products/new/fast" className="admin-btn admin-btn--secondary">
-            Tạo nhanh sản phẩm
-          </Link>
           <Link href="/admin/products/import" className="admin-btn admin-btn--secondary">Nhập sản phẩm</Link>
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setExportOpen(true)}>
             Xuất dữ liệu
