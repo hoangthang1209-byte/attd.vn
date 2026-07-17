@@ -20,7 +20,7 @@ import type {
 } from "@/features/products/product-detail.types";
 import {
   isPublicSizeChartRenderable,
-  parsePublicSizeChartFromMetadata,
+  normalizeProductPublicMetadata,
 } from "@/features/products/product-size-chart";
 
 type DbOptionValue = {
@@ -368,8 +368,19 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     })),
   }));
 
-  const parsedSizeChart = parsePublicSizeChartFromMetadata(product.metadata);
-  const sizeChart = isPublicSizeChartRenderable(parsedSizeChart) ? parsedSizeChart : null;
+  let sizeChart = null;
+  try {
+    const { sizeChart: parsedSizeChart } = normalizeProductPublicMetadata(product.metadata);
+    sizeChart = isPublicSizeChartRenderable(parsedSizeChart) ? parsedSizeChart : null;
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[pdp] invalid publicSizeChart metadata; skipping size chart", {
+        productId: product.id,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+    sizeChart = null;
+  }
 
   return {
     id: product.id,
@@ -389,11 +400,11 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     highlightForm: highlights.form ?? null,
     defaultMoq: product.defaultMoq,
     leadTime: product.leadTime,
-    supportsPrinting: product.supportsPrinting,
-    supportsEmbroidery: product.supportsEmbroidery,
-    supportsOem: product.supportsOem,
-    useCases: product.useCases ?? [],
-    targetCustomers: product.targetCustomers ?? [],
+    supportsPrinting: Boolean(product.supportsPrinting),
+    supportsEmbroidery: Boolean(product.supportsEmbroidery),
+    supportsOem: Boolean(product.supportsOem),
+    useCases: Array.isArray(product.useCases) ? product.useCases : [],
+    targetCustomers: Array.isArray(product.targetCustomers) ? product.targetCustomers : [],
     images,
     optionGroups: scopedOptionGroups,
     variants: scopedVariants,

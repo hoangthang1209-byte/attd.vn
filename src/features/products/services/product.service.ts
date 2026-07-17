@@ -16,7 +16,8 @@ import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-c
 
 const PRODUCT_DETAIL_INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
-  metadata: true,
+  // Product.metadata is a scalar Json field — Prisma returns scalars with `include`.
+  // Putting `metadata: true` here throws PrismaClientValidationError and crashes PDP.
   images: { orderBy: { sortOrder: "asc" as const } },
   options: {
     orderBy: { sortOrder: "asc" as const },
@@ -69,14 +70,30 @@ export async function getProductDetailBySlug(slug: string): Promise<PublicProduc
     if (!product) return null;
     return mapFetchedProductToPublicDetail(product);
   } catch (error) {
-    if (!isPartialCatalogSchemaError(error)) throw error;
+    if (!isPartialCatalogSchemaError(error)) {
+      // Defensive fallback: never let optional relation/query shape crash an ACTIVE PDP.
+      console.error("[pdp] getProductDetailBySlug primary query failed; trying legacy select", {
+        slug,
+        errorName: error instanceof Error ? error.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
 
-    const legacy = await prisma.product.findUnique({
-      where: { slug, status: "ACTIVE" },
-      select: PRODUCT_DETAIL_LEGACY_SELECT,
-    });
-    if (!legacy) return null;
-    return mapFetchedProductToPublicDetail(normalizeLegacyProductRow(legacy));
+    try {
+      const legacy = await prisma.product.findUnique({
+        where: { slug, status: "ACTIVE" },
+        select: PRODUCT_DETAIL_LEGACY_SELECT,
+      });
+      if (!legacy) return null;
+      return mapFetchedProductToPublicDetail(normalizeLegacyProductRow(legacy));
+    } catch (legacyError) {
+      console.error("[pdp] getProductDetailBySlug legacy fallback failed", {
+        slug,
+        errorName: legacyError instanceof Error ? legacyError.name : typeof legacyError,
+        errorMessage: legacyError instanceof Error ? legacyError.message : String(legacyError),
+      });
+      throw legacyError;
+    }
   }
 }
 

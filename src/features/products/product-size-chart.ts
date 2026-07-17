@@ -145,6 +145,48 @@ export function parsePublicSizeChartFromMetadata(metadata: unknown): ProductSize
   return normalizeProductSizeChart(record[METADATA_PUBLIC_SIZE_CHART_KEY]);
 }
 
+/** Alias used by public PDP defensive metadata helpers. */
+export function normalizeProductSizeChartMetadata(raw: unknown): ProductSizeChart {
+  return normalizeProductSizeChart(raw);
+}
+
+/**
+ * Normalize optional product metadata for public PDP.
+ * Never throws; malformed values become empty/safe defaults.
+ */
+export function normalizeProductPublicMetadata(metadata: unknown): {
+  sizeChart: ProductSizeChart;
+  curatedSalesBadges: string[];
+} {
+  try {
+    const record = asRecord(metadata);
+    if (!record) {
+      return {
+        sizeChart: createEmptyProductSizeChart(),
+        curatedSalesBadges: [],
+      };
+    }
+    const badgesRaw = record.curatedSalesBadges;
+    const curatedSalesBadges = Array.isArray(badgesRaw)
+      ? badgesRaw.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : [];
+    return {
+      sizeChart: normalizeProductSizeChart(record[METADATA_PUBLIC_SIZE_CHART_KEY]),
+      curatedSalesBadges,
+    };
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[pdp] normalizeProductPublicMetadata failed", {
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return {
+      sizeChart: createEmptyProductSizeChart(),
+      curatedSalesBadges: [],
+    };
+  }
+}
+
 /** True when chart should render on public PDP. */
 export function isPublicSizeChartRenderable(chart: ProductSizeChart | null | undefined): boolean {
   if (!chart?.enabled) return false;
