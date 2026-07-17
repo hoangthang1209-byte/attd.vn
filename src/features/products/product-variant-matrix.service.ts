@@ -138,37 +138,55 @@ function throwMatrixCombinationError(
   );
 }
 
-function mapMatrixCombinationCreateError(
+export const MATRIX_OPTION_VALUE_OWNERSHIP_ERROR =
+  "Giá trị tuỳ chọn không tồn tại hoặc không thuộc sản phẩm này. Vui lòng lưu sản phẩm rồi thử lại.";
+
+/** Maps Prisma/runtime create failures to actionable Vietnamese messages. Exported for tests. */
+export function mapMatrixCombinationCreateError(
   error: unknown,
-  combo: Pick<MatrixCombination, "displayLabel">,
+  combo: Pick<MatrixCombination, "displayLabel" | "valueIds">,
   sku: string,
 ): string {
   if (error instanceof ProductAdminValidationError) {
     throw error;
   }
 
+  const prismaCode =
+    error instanceof Prisma.PrismaClientKnownRequestError ? error.code : undefined;
+
+  console.error("[variant-matrix] create combination failed", {
+    displayLabel: combo.displayLabel,
+    optionValueIds: combo.valueIds,
+    sku,
+    prismaCode,
+    errorName: error instanceof Error ? error.name : typeof error,
+    errorMessage: error instanceof Error ? error.message : String(error),
+  });
+
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
       const target = error.meta?.target;
-      if (Array.isArray(target) && target.includes("sku")) {
+      if (Array.isArray(target) && target.some((item) => String(item).includes("sku"))) {
         return `SKU "${sku}" đã tồn tại.`;
       }
-      return "Tổ hợp biến thể đã tồn tại.";
+      if (typeof target === "string" && target.includes("sku")) {
+        return `SKU "${sku}" đã tồn tại.`;
+      }
+      return `SKU "${sku}" đã tồn tại.`;
     }
     if (error.code === "P2003") {
-      return "Giá trị tuỳ chọn không tồn tại hoặc không thuộc sản phẩm này.";
+      return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
+    }
+    if (error.code === "P2025") {
+      return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
     }
   }
 
-  if (process.env.NODE_ENV !== "production") {
-    console.error("[variant-matrix] create combination failed", {
-      displayLabel: combo.displayLabel,
-      sku,
-      error,
-    });
+  if (error instanceof Prisma.PrismaClientValidationError) {
+    return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
   }
 
-  return "Dữ liệu tổ hợp không hợp lệ.";
+  return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
 }
 
 async function assertMatrixCombinationReady(
@@ -185,10 +203,7 @@ async function assertMatrixCombinationReady(
   try {
     await assertOptionValueIdsBelongToProduct(db, productId, combo.valueIds);
   } catch {
-    throwMatrixCombinationError(
-      combo,
-      "Giá trị tuỳ chọn không tồn tại hoặc không thuộc sản phẩm này.",
-    );
+    throwMatrixCombinationError(combo, MATRIX_OPTION_VALUE_OWNERSHIP_ERROR);
   }
 }
 

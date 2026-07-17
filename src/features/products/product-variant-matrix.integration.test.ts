@@ -25,6 +25,8 @@ const describeDb = shouldRunDatabaseBackedTests()
 
 const MATRIX_COLOR_LABELS = ["Den", "Xanh", "Trang", "Do"];
 const MATRIX_SIZE_LABELS = ["M", "L", "XL", "2XL", "3XL"];
+const NAVY_XS_COLOR_LABELS = ["Đen", "Navy", "Vàng", "Cam"];
+const NAVY_XS_SIZE_LABELS = ["XS", "S", "M", "L"];
 
 describeDb("variant matrix generation", () => {
   let prisma: PrismaClient;
@@ -65,7 +67,11 @@ describeDb("variant matrix generation", () => {
     await releaseDatabaseTestEnvironment();
   });
 
-  async function createMatrixProduct(productCodeSuffix: string) {
+  async function createMatrixProduct(
+    productCodeSuffix: string,
+    colors: string[] = MATRIX_COLOR_LABELS,
+    sizes: string[] = MATRIX_SIZE_LABELS,
+  ) {
     const key = uniqueTestKey("matrix");
     const productCode = `MTX${productCodeSuffix}`;
     const product = await prisma.product.create({
@@ -87,7 +93,7 @@ describeDb("variant matrix generation", () => {
         slug: "color",
         sortOrder: 0,
         values: {
-          create: MATRIX_COLOR_LABELS.map((label, sortOrder) => ({ label, sortOrder })),
+          create: colors.map((label, sortOrder) => ({ label, sortOrder })),
         },
       },
     });
@@ -98,7 +104,7 @@ describeDb("variant matrix generation", () => {
         slug: "size",
         sortOrder: 1,
         values: {
-          create: MATRIX_SIZE_LABELS.map((label, sortOrder) => ({ label, sortOrder })),
+          create: sizes.map((label, sortOrder) => ({ label, sortOrder })),
         },
       },
     });
@@ -177,5 +183,75 @@ describeDb("variant matrix generation", () => {
 
     const variantCount = await prisma.productVariant.count({ where: { productId: product.id } });
     assert.equal(variantCount, 20);
+  });
+
+  it("Navy/XS 4×4 fixture creates 16 variants and 32 links including Navy / XS", async () => {
+    const product = await createMatrixProduct("9010", NAVY_XS_COLOR_LABELS, NAVY_XS_SIZE_LABELS);
+    const preview = await previewVariantMatrixGeneration(product.id);
+    assert.equal(preview.theoreticalCount, 16);
+    assert.equal(preview.missingCount, 16);
+    assert.equal(preview.canGenerate, true);
+
+    const result = await generateVariantMatrix(product.id);
+    assert.equal(result.created, 16);
+    assert.ok(result.variants.some((variant) => variant.displayLabel === "Navy / XS"));
+
+    const variants = await prisma.productVariant.findMany({
+      where: { productId: product.id },
+      select: { displayLabel: true, stockQty: true, stockStatus: true, sku: true },
+    });
+    assert.equal(variants.length, 16);
+    assert.ok(variants.every((variant) => variant.stockQty === 0));
+    assert.ok(variants.every((variant) => variant.stockStatus === "OUT_OF_STOCK"));
+    assert.ok(variants.some((variant) => /NVY-XS$/i.test(variant.sku)));
+
+    const linkCount = await prisma.productVariantOptionValue.count({
+      where: { variant: { productId: product.id } },
+    });
+    assert.equal(linkCount, 32);
+
+    const secondPreview = await previewVariantMatrixGeneration(product.id);
+    assert.equal(secondPreview.missingCount, 0);
+    assert.equal(secondPreview.canGenerate, false);
+    await assert.rejects(
+      () => generateVariantMatrix(product.id),
+      (error: unknown) =>
+        error instanceof ProductAdminValidationError &&
+        error.message === "Tất cả tổ hợp biến thể đã tồn tại.",
+    );
+  });
+
+  it("rejects stale or foreign optionValueIds with actionable ownership message", async () => {
+    const product = await createMatrixProduct("9011", NAVY_XS_COLOR_LABELS, NAVY_XS_SIZE_LABELS);
+    const owned = await prisma.productOptionValue.findFirst({
+      where: { option: { productId: product.id } },
+      select: { id: true },
+    });
+    assert.ok(owned);
+
+    const other = await createMatrixProduct("9012", ["Đen"], ["M"]);
+    const foreign = await prisma.productOptionValue.findFirst({
+      where: { option: { productId: other.id } },
+      select: { id: true },
+    });
+    assert.ok(foreign);
+
+    const { assertOptionValueIdsBelongToProduct } = await import(
+      "@/features/products/product-relation-ownership"
+    );
+    const { MATRIX_OPTION_VALUE_OWNERSHIP_ERROR } = await import(
+      "@/features/products/product-variant-matrix.service"
+    );
+
+    await assert.rejects(
+      () => assertOptionValueIdsBelongToProduct(prisma, product.id, ["stale-missing-id", owned.id]),
+    );
+    await assert.rejects(
+      () => assertOptionValueIdsBelongToProduct(prisma, product.id, [foreign.id]),
+    );
+
+    // Execute path wraps ownership failures with the same actionable Vietnamese copy.
+    assert.match(MATRIX_OPTION_VALUE_OWNERSHIP_ERROR, /không tồn tại hoặc không thuộc sản phẩm này/);
+    assert.match(MATRIX_OPTION_VALUE_OWNERSHIP_ERROR, /Vui lòng lưu sản phẩm rồi thử lại/);
   });
 });

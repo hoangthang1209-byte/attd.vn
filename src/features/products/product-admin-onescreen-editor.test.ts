@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseProductInput } from "@/features/products/product-admin-input";
+import { mergePublicSizeChartIntoMetadata } from "@/features/products/product-size-chart";
 
 const FORM_PATH = join(
   process.cwd(),
@@ -31,9 +33,55 @@ describe("one-screen product admin editor", () => {
     assert.match(source, /publicSizeChart/);
   });
 
+  it("calls save-options-before-generate and applies persisted option IDs", () => {
+    assert.match(source, /onBeforeMatrixGenerate=\{ensureOptionsSavedForMatrix\}/);
+    assert.match(source, /async function ensureOptionsSavedForMatrix/);
+    assert.match(source, /body: JSON\.stringify\(\{ options: buildPayload\(\)\.options \}\)/);
+    assert.match(source, /mapOptionsToFormRows\(body\.options/);
+    assert.match(source, /Giá trị tuỳ chọn chưa được lưu đủ ID/);
+    assert.match(source, /reloadProductFromServer/);
+  });
+
   it("keeps sticky save actions", () => {
     assert.match(source, /admin-catalog-form__sticky-actions/);
     assert.match(source, /Lưu thay đổi/);
+  });
+});
+
+describe("size chart / content metadata updates do not remove product options", () => {
+  it("publicSizeChart merge preserves unrelated metadata keys and never touches options arrays", () => {
+    const merged = mergePublicSizeChartIntoMetadata(
+      {
+        curatedSalesBadges: ["NEW"],
+        productEntry: { mode: "FAST" },
+      },
+      {
+        enabled: true,
+        unit: "cm",
+        title: "Bảng size",
+        columns: [{ id: "chest", label: "Ngang ngực" }],
+        rows: [{ id: "m", size: "M", values: { chest: "50" } }],
+      },
+    );
+    assert.deepEqual(merged.curatedSalesBadges, ["NEW"]);
+    assert.ok(!("options" in merged));
+  });
+
+  it("parseProductInput update with only publicSizeChart omits options", () => {
+    const parsed = parseProductInput(
+      {
+        publicSizeChart: {
+          enabled: false,
+          unit: "cm",
+          title: "Bảng size",
+          columns: [],
+          rows: [],
+        },
+      },
+      "update",
+    );
+    assert.equal(parsed.options, undefined);
+    assert.ok(parsed.publicSizeChart !== undefined);
   });
 });
 

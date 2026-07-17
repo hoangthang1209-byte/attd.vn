@@ -35,6 +35,33 @@ const regressionGroups = [
   },
 ];
 
+const navyXsGroups = [
+  {
+    id: "color",
+    name: "Màu sắc",
+    slug: "color",
+    sortOrder: 0,
+    values: [
+      { id: "c-den", label: "Đen", valueCode: "BLK", sortOrder: 0 },
+      { id: "c-navy", label: "Navy", valueCode: "NVY", sortOrder: 1 },
+      { id: "c-vang", label: "Vàng", valueCode: "YLW", sortOrder: 2 },
+      { id: "c-cam", label: "Cam", valueCode: "ORG", sortOrder: 3 },
+    ],
+  },
+  {
+    id: "size",
+    name: "Kích thước",
+    slug: "size",
+    sortOrder: 1,
+    values: [
+      { id: "s-xs", label: "XS", valueCode: "XS", sortOrder: 0 },
+      { id: "s-s", label: "S", valueCode: "S", sortOrder: 1 },
+      { id: "s-m", label: "M", valueCode: "M", sortOrder: 2 },
+      { id: "s-l", label: "L", valueCode: "L", sortOrder: 3 },
+    ],
+  },
+];
+
 describe("buildMatrixCombinationSkuSuffix", () => {
   it("uses value codes for generic option groups", () => {
     const groups = [
@@ -69,6 +96,28 @@ describe("buildMatrixCombinationSkuSuffix", () => {
       buildMatrixCombinationSkuSuffix(regressionGroups, ["color-den", "size-m"]),
       "BLK-M",
     );
+  });
+
+  it("generates valid SKU suffix for Navy / XS with English color name", () => {
+    assert.equal(buildMatrixCombinationSkuSuffix(navyXsGroups, ["c-navy", "s-xs"]), "NVY-XS");
+    assert.equal(resolveMatrixOptionValueSkuPart(navyXsGroups[0]!.values[1]!), "NVY");
+  });
+
+  it("builds Navy suffix from label alone when valueCode is missing", () => {
+    const groups = [
+      {
+        ...navyXsGroups[0]!,
+        values: [{ id: "c-navy", label: "Navy", valueCode: null, sortOrder: 0 }],
+      },
+      {
+        ...navyXsGroups[1]!,
+        values: [{ id: "s-xs", label: "XS", valueCode: null, sortOrder: 0 }],
+      },
+    ];
+    const suffix = buildMatrixCombinationSkuSuffix(groups, ["c-navy", "s-xs"]);
+    assert.ok(suffix.length > 0);
+    assert.match(suffix, /NVY/i);
+    assert.match(suffix, /XS/i);
   });
 
   it("falls back to deterministic optionValueId suffix when code and label normalize empty", () => {

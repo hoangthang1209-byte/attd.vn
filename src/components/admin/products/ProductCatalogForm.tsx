@@ -705,23 +705,44 @@ export default function ProductCatalogForm({
       return false;
     }
 
-    setForm((prev) => ({
-      ...prev,
-      options: body.options ? mapOptionsToFormRows(body.options) : prev.options,
-      variants: body.variants
-        ? mapVariantsToFormRows(body.variants).filter(
-            (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
-          )
-        : prev.variants,
-    }));
+    // Prefer server-returned option groups with fresh IDs; otherwise force reload.
+    let nextOptions = body.options ? mapOptionsToFormRows(body.options) : null;
+    let nextVariants = body.variants
+      ? mapVariantsToFormRows(body.variants).filter(
+          (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
+        )
+      : null;
 
-    if (!body.options) {
+    if (!nextOptions) {
       const reloaded = await reloadProductFromServer();
       if (!reloaded) {
         setError("Đã lưu nhóm tuỳ chọn nhưng không thể tải lại dữ liệu. Vui lòng tải lại trang.");
         return false;
       }
+      return true;
     }
+
+    const missingPersistedIds = nextOptions.some(
+      (group) =>
+        group.name.trim() &&
+        group.values.some((value) => value.label.trim() && !value.id),
+    );
+    if (missingPersistedIds) {
+      const reloaded = await reloadProductFromServer();
+      if (!reloaded) {
+        setError(
+          "Giá trị tuỳ chọn chưa được lưu đủ ID. Vui lòng lưu sản phẩm rồi thử tạo tổ hợp lại.",
+        );
+        return false;
+      }
+      return true;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      options: nextOptions!,
+      variants: nextVariants ?? prev.variants,
+    }));
     return true;
   }
 
