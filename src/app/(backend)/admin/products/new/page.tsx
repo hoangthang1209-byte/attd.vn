@@ -1,31 +1,34 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import ProductCatalogForm from "@/components/admin/products/ProductCatalogForm";
+import ProductDraftStarter from "@/components/admin/products/ProductDraftStarter";
 import { SectionLoading } from "@/components/ui/loading/ContextLoading";
-import { FAST_CREATE_ROUTES } from "@/features/products/product-fast-create";
+import { listProductCategories } from "@/features/products/product-admin.service";
 
-export default function NewProductPage() {
+export default async function NewProductPage() {
+  const categories = await listProductCategories();
+  const starterCategories = categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    nameEn: c.nameEn,
+    slug: c.slug,
+    skuCode: c.skuCode,
+    parentId: c.parentId,
+    isActive: c.isActive,
+  }));
+
   return (
     <>
-      <AdminPageTitle title="Tạo nâng cao" />
-      <p className="admin-field-hint">
-        Cần tạo nhanh? Dùng{" "}
-        <Link href={FAST_CREATE_ROUTES.fast} className="admin-link">
-          Tạo nhanh sản phẩm
-        </Link>
-        .
-      </p>
+      <AdminPageTitle title="Tạo sản phẩm mới" />
       <Suspense
         fallback={
           <SectionLoading
-            title="Đang tải form sản phẩm..."
-            description="Hệ thống đang chuẩn bị biểu mẫu và dữ liệu catalog."
+            title="Đang tải form tạo nháp..."
+            description="Hệ thống đang chuẩn bị biểu mẫu tạo sản phẩm."
             tone="admin"
           />
         }
       >
-        <ProductCatalogForm />
+        <ProductDraftStarter categories={starterCategories} />
       </Suspense>
     </>
   );

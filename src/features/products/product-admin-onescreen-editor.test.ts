@@ -42,6 +42,14 @@ describe("one-screen product admin editor", () => {
     assert.match(source, /reloadProductFromServer/);
   });
 
+  it("includes size chart and content suggestion controls", () => {
+    assert.match(source, /id="section-size-chart"/);
+    assert.match(source, /ProductSizeChartEditor/);
+    assert.match(source, /ProductContentSuggestButton/);
+    assert.match(source, /suggestProductShortDescription/);
+    assert.match(source, /suggestProductLongDescription/);
+  });
+
   it("keeps sticky save actions", () => {
     assert.match(source, /admin-catalog-form__sticky-actions/);
     assert.match(source, /Lưu thay đổi/);

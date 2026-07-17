@@ -219,16 +219,18 @@ describe("P0.2A — Revenue Product Entry V1", () => {
 });
 
 describe("P0.2A acceptance hardening", () => {
-  it("navigation exposes fast-create and advanced create routes", () => {
+  it("navigation exposes fast-create and draft-starter create routes", () => {
     assert.equal(FAST_CREATE_ROUTES.fast, "/admin/products/new/fast");
     assert.equal(FAST_CREATE_ROUTES.advanced, "/admin/products/new");
     const dashboard = readRepoFile("src/components/admin/products/ProductCatalogDashboard.tsx");
     assert.ok(dashboard.includes('href="/admin/products/new/fast"'));
     assert.ok(dashboard.includes("Tạo nhanh sản phẩm"));
-    assert.ok(dashboard.includes("Tạo nâng cao"));
+    assert.ok(dashboard.includes("Tạo sản phẩm mới"));
+    assert.ok(dashboard.includes('href="/admin/products/new"'));
     const newPage = readRepoFile("src/app/(backend)/admin/products/new/page.tsx");
-    assert.ok(newPage.includes("Tạo nâng cao"));
-    assert.ok(newPage.includes("Tạo nhanh sản phẩm"));
+    assert.ok(newPage.includes("Tạo sản phẩm mới"));
+    assert.ok(newPage.includes("ProductDraftStarter"));
+    assert.ok(!newPage.includes("<ProductCatalogForm"));
     const fastPage = readRepoFile("src/app/(backend)/admin/products/new/fast/page.tsx");
     assert.ok(fastPage.includes("ProductFastCreateWizard"));
   });

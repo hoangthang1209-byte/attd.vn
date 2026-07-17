@@ -28,7 +28,19 @@ import ProductCatalogFormErrorSummary from "@/components/admin/products/ProductC
 import ProductCategoryCascadingPicker from "@/components/admin/products/ProductCategoryCascadingPicker";
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
 import ProductSizeChartEditor from "@/components/admin/products/ProductSizeChartEditor";
+import ProductContentSuggestButton from "@/components/admin/products/ProductContentSuggestButton";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
+import {
+  joinSuggestedTags,
+  suggestProductCustomizationNote,
+  suggestProductLongDescription,
+  suggestProductSeoDescription,
+  suggestProductSeoTitle,
+  suggestProductShortDescription,
+  suggestProductSizeChartNote,
+  suggestProductSpecificationSummary,
+  suggestProductTags,
+} from "@/features/products/product-content-suggestions";
 import {
   resolveOptionValueRefFromGroups,
 } from "@/features/products/product-variant-matrix.utils";
@@ -254,6 +266,34 @@ export default function ProductCatalogForm({
   const productPublishChecklist = useMemo(
     () => buildProductPublishChecklist(productPublishQualityInput),
     [productPublishQualityInput],
+  );
+
+  const selectedCategoryName = useMemo(
+    () => categories.find((category) => category.id === form.categoryId)?.name ?? null,
+    [categories, form.categoryId],
+  );
+
+  const contentSuggestionInput = useMemo(
+    () => ({
+      name: form.name,
+      categoryName: selectedCategoryName,
+      defaultMoq: form.defaultMoq,
+      leadTime: form.leadTime,
+      material: form.material,
+      useCases: form.useCases,
+      targetCustomers: form.targetCustomers,
+      supportsPrinting: form.supportsPrinting,
+      supportsEmbroidery: form.supportsEmbroidery,
+      supportsOem: form.supportsOem,
+      options: form.options,
+      variants: form.variants,
+      specifications: form.specifications,
+      customizations: form.customizations,
+      sizeChart: form.publicSizeChart,
+      shortDescription: form.shortDescription,
+      description: form.description,
+    }),
+    [form, selectedCategoryName],
   );
 
   const showProductPublishChecklist = form.status === "ACTIVE";
@@ -1106,11 +1146,29 @@ export default function ProductCatalogForm({
           </div>
         </div>
         <div className="admin-field">
-          <label className="admin-label">Mô tả ngắn</label>
+          <div className="admin-content-suggest-label-row">
+            <label className="admin-label">Mô tả ngắn</label>
+            <ProductContentSuggestButton
+              existingValue={form.shortDescription}
+              preferRetryLabel
+              onApply={() => suggestProductShortDescription(contentSuggestionInput)}
+              onFilled={(value) => setField("shortDescription", Array.isArray(value) ? value.join(", ") : value)}
+            />
+          </div>
           <textarea className="admin-textarea" rows={2} value={form.shortDescription} onChange={(e) => setField("shortDescription", e.target.value)} />
         </div>
         <div className="admin-field">
-          <label className="admin-label">Tags (cách nhau bởi dấu phẩy)</label>
+          <div className="admin-content-suggest-label-row">
+            <label className="admin-label">Tags (cách nhau bởi dấu phẩy)</label>
+            <ProductContentSuggestButton
+              existingValue={form.tags}
+              preferRetryLabel
+              onApply={() => suggestProductTags(contentSuggestionInput)}
+              onFilled={(value) =>
+                setField("tags", Array.isArray(value) ? joinSuggestedTags(value) : value)
+              }
+            />
+          </div>
           <input className="admin-input" value={form.tags} onChange={(e) => setField("tags", e.target.value)} placeholder="áo thun trơn, CVC, nguồn hàng sỉ" />
         </div>
       </fieldset>
@@ -1394,6 +1452,20 @@ export default function ProductCatalogForm({
         <p className="admin-field-hint" style={{ marginBottom: 10 }}>
           Bảng size riêng của sản phẩm — hiển thị trên trang chi tiết khi được bật.
         </p>
+        <div className="admin-content-suggest-section-actions" style={{ marginBottom: 10 }}>
+          <ProductContentSuggestButton
+            label="Gợi ý ghi chú bảng size"
+            existingValue={form.publicSizeChart.note ?? ""}
+            preferRetryLabel
+            onApply={() => suggestProductSizeChartNote(contentSuggestionInput)}
+            onFilled={(value) =>
+              setField("publicSizeChart", {
+                ...form.publicSizeChart,
+                note: Array.isArray(value) ? value.join(" ") : value,
+              })
+            }
+          />
+        </div>
         <ProductSizeChartEditor
           value={form.publicSizeChart}
           onChange={(publicSizeChart) => {
@@ -1409,7 +1481,15 @@ export default function ProductCatalogForm({
       <fieldset className="admin-catalog-fieldset" id="section-content">
         <legend>6. Nội dung chi tiết</legend>
         <div className="admin-field" data-field="description">
-          <label className="admin-label">Mô tả sản phẩm đầy đủ</label>
+          <div className="admin-content-suggest-label-row">
+            <label className="admin-label">Mô tả sản phẩm đầy đủ</label>
+            <ProductContentSuggestButton
+              existingValue={form.description}
+              preferRetryLabel
+              onApply={() => suggestProductLongDescription(contentSuggestionInput)}
+              onFilled={(value) => setField("description", Array.isArray(value) ? value.join("\n") : value)}
+            />
+          </div>
           <textarea
             className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.description))}`}
             rows={8}
@@ -1430,6 +1510,52 @@ export default function ProductCatalogForm({
           onRefreshSharedAttributes={loadSharedAttributes}
           sectionRef={attributeSectionRef}
         />
+        <div className="admin-content-suggest-section-actions">
+          <ProductContentSuggestButton
+            label="Gợi ý thông số"
+            existingValue={form.specifications.map((row) => `${row.label} ${row.value}`).join(" ")}
+            onApply={() => {
+              const rows = suggestProductSpecificationSummary(contentSuggestionInput);
+              if (!rows.length) return null;
+              return rows.map((row) => `${row.label}: ${row.value}`).join("\n");
+            }}
+            onFilled={() => {
+              const rows = suggestProductSpecificationSummary(contentSuggestionInput);
+              if (!rows.length) return;
+              setField(
+                "specifications",
+                rows.map((row, index) => ({
+                  clientKey: `spec-suggest-${index}`,
+                  label: row.label,
+                  value: row.value,
+                  sortOrder: index,
+                })),
+              );
+            }}
+          />
+          <ProductContentSuggestButton
+            label="Gợi ý tùy chỉnh"
+            existingValue={form.customizations.map((row) => row.label).join(" ")}
+            onApply={() => {
+              const note = suggestProductCustomizationNote(contentSuggestionInput);
+              return note?.label ?? null;
+            }}
+            onFilled={() => {
+              const note = suggestProductCustomizationNote(contentSuggestionInput);
+              if (!note?.label.trim()) return;
+              setField("customizations", [
+                ...form.customizations,
+                {
+                  clientKey: `cust-suggest-${Date.now()}`,
+                  label: note.label,
+                  description: note.description ?? "",
+                  enabled: true,
+                  sortOrder: form.customizations.length,
+                },
+              ]);
+            }}
+          />
+        </div>
         <ProductCatalogSpecificationsSection
           rows={form.specifications}
           fieldErrors={fieldErrors}
@@ -1447,7 +1573,15 @@ export default function ProductCatalogForm({
       <fieldset className="admin-catalog-fieldset" id="section-seo">
         <legend>7. SEO &amp; hiển thị website</legend>
         <div className="admin-field" data-field="seoTitle">
-          <label className="admin-label">SEO title</label>
+          <div className="admin-content-suggest-label-row">
+            <label className="admin-label">SEO title</label>
+            <ProductContentSuggestButton
+              existingValue={form.seoTitle}
+              preferRetryLabel
+              onApply={() => suggestProductSeoTitle(contentSuggestionInput)}
+              onFilled={(value) => setField("seoTitle", Array.isArray(value) ? value.join(" ") : value)}
+            />
+          </div>
           <input
             className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.seoTitle))}`}
             data-field="seoTitle"
@@ -1457,7 +1591,17 @@ export default function ProductCatalogForm({
           {fieldErrors.seoTitle && <p className="admin-field-error" role="alert">{fieldErrors.seoTitle}</p>}
         </div>
         <div className="admin-field" data-field="seoDescription">
-          <label className="admin-label">SEO description</label>
+          <div className="admin-content-suggest-label-row">
+            <label className="admin-label">SEO description</label>
+            <ProductContentSuggestButton
+              existingValue={form.seoDescription}
+              preferRetryLabel
+              onApply={() => suggestProductSeoDescription(contentSuggestionInput)}
+              onFilled={(value) =>
+                setField("seoDescription", Array.isArray(value) ? value.join(" ") : value)
+              }
+            />
+          </div>
           <textarea
             className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.seoDescription))}`}
             rows={3}

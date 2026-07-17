@@ -232,9 +232,9 @@ export default function ProductFastCreateWizard({ categories }: Props) {
   return (
     <div className="admin-fast-create">
       <p className="admin-field-hint">
-        Cần form đầy đủ? Dùng{" "}
+        Chỉ cần tạo nháp rồi chỉnh sửa đầy đủ? Dùng{" "}
         <Link href={FAST_CREATE_ROUTES.advanced} className="admin-link">
-          Tạo nâng cao
+          Tạo sản phẩm mới
         </Link>
         .
       </p>
