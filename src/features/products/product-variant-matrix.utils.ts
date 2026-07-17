@@ -1,4 +1,5 @@
 import type { ProductOptionInput } from "@/features/products/product-admin-cms";
+import { isPersistedProductRelationId } from "@/features/products/product-relation-ids";
 import {
   getColorSkuCode,
   normalizeSkuPart,
@@ -287,6 +288,7 @@ export function createClientKey(prefix: string): string {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** @deprecated Prefer isPersistedProductRelationId — Prisma uses cuid, not only UUID. */
 export function isUuid(value: string): boolean {
   return UUID_RE.test(value);
 }
@@ -309,7 +311,7 @@ export function resolveOptionValueRefFromGroups(
   for (const group of groups) {
     const value = group.values.find((item) => item.id === valueId || item.clientKey === valueId);
     if (!value) continue;
-    if (value.id && isUuid(value.id)) return value.id;
+    if (value.id && isPersistedProductRelationId(value.id)) return value.id;
     const slug =
       group.slug.trim() ||
       group.name

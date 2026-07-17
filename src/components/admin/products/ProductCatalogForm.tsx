@@ -45,6 +45,7 @@ import {
   resolveOptionValueRefFromGroups,
 } from "@/features/products/product-variant-matrix.utils";
 import {
+  buildOptionsFingerprint,
   buildPersistedOptionsPayload,
   countActiveOptionValues,
   optionGroupsMissingPersistedIds,
@@ -226,6 +227,7 @@ export default function ProductCatalogForm({
   });
   const [saving, setSaving] = useState(false);
   const [bulkOpInProgress, setBulkOpInProgress] = useState(false);
+  const [matrixBusy, setMatrixBusy] = useState(false);
   const variantsSectionRef = useRef<ProductCatalogVariantsSectionHandle>(null);
   const matrixAutoOpenTriggeredRef = useRef(false);
   const formRef = useRef(form);
@@ -706,12 +708,13 @@ export default function ProductCatalogForm({
   }
 
   /**
-   * Persist current in-memory option groups before variant-matrix execute.
+   * Persist current in-memory option groups once before server matrix preview.
    * Always reads latest form via formRef (not a stale render closure).
+   * Returns options fingerprint on success so execute can detect later edits.
    */
-  async function ensureOptionsSavedForMatrix(): Promise<boolean> {
+  async function ensureOptionsSavedForMatrix(): Promise<string | null> {
     const latest = formRef.current;
-    if (!latest.id) return true;
+    if (!latest.id) return buildOptionsFingerprint(latest.options);
 
     const expectedValueCount = countActiveOptionValues(latest.options);
     const localErrors = validateProductDraftForMatrixGeneration(latest);
@@ -723,7 +726,7 @@ export default function ProductCatalogForm({
         optionErrors,
         "Lưu nhóm biến thể trước khi tạo tổ hợp. Vui lòng sửa các trường được đánh dấu.",
       );
-      return false;
+      return null;
     }
 
     const optionsPayload = buildPersistedOptionsPayload(latest.options);
@@ -744,7 +747,7 @@ export default function ProductCatalogForm({
         body.fieldErrors ?? { options: body.error ?? body.message ?? "Không thể lưu nhóm tuỳ chọn." },
         body.error ?? body.message ?? "Không thể lưu nhóm tuỳ chọn.",
       );
-      return false;
+      return null;
     }
 
     // Prefer server-returned option groups with fresh IDs; otherwise force reload.
@@ -760,7 +763,7 @@ export default function ProductCatalogForm({
       if (!reloaded) {
         setError(OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR);
         setFieldErrors({ options: OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR });
-        return false;
+        return null;
       }
       nextOptions = formRef.current.options;
       nextVariants = formRef.current.variants;
@@ -783,13 +786,17 @@ export default function ProductCatalogForm({
     ) {
       setError(OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR);
       setFieldErrors({ options: OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR });
-      return false;
+      return null;
     }
 
-    return true;
+    return buildOptionsFingerprint(nextOptions);
   }
 
   async function saveProduct(stayOnVariants = false): Promise<boolean> {
+    if (matrixBusy) {
+      setError("Đang tạo tổ hợp biến thể. Vui lòng đợi hoàn tất rồi lưu sản phẩm.");
+      return false;
+    }
     setError(null);
     setErrorDetail(null);
     setFieldErrors({});
@@ -1441,6 +1448,8 @@ export default function ProductCatalogForm({
           onVariantsChange={(variants) => setField("variants", variants)}
           onReloadProduct={reloadProductFromServer}
           onBeforeMatrixGenerate={ensureOptionsSavedForMatrix}
+          productSaveInProgress={saving}
+          onMatrixBusyChange={setMatrixBusy}
           onSaveAndContinue={saveAndContinueForMatrix}
           onVariantDeleted={handleVariantDeleted}
           onBulkOperationChange={setBulkOpInProgress}
@@ -1633,8 +1642,15 @@ export default function ProductCatalogForm({
         <AdminLoadingButton
           type="submit"
           variant="primary"
-          pending={saving || bulkOpInProgress}
-          pendingLabel={saving ? "Đang lưu sản phẩm..." : "Đang cập nhật biến thể..."}
+          pending={saving || bulkOpInProgress || matrixBusy}
+          pendingLabel={
+            matrixBusy
+              ? "Đang tạo tổ hợp biến thể..."
+              : saving
+                ? "Đang lưu sản phẩm..."
+                : "Đang cập nhật biến thể..."
+          }
+          disabled={matrixBusy}
         >
           {form.id ? "Lưu thay đổi" : "Tạo sản phẩm"}
         </AdminLoadingButton>

@@ -4,7 +4,12 @@ import { Prisma } from "@prisma/client";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 import {
   mapMatrixCombinationCreateError,
+  MATRIX_FK_LINK_ERROR,
+  MATRIX_MISSING_RECORD_ERROR,
   MATRIX_OPTION_VALUE_OWNERSHIP_ERROR,
+  MATRIX_SKU_CONFLICT_RETRY_MESSAGE,
+  MATRIX_UNKNOWN_CREATE_ERROR,
+  MATRIX_VALIDATION_CREATE_ERROR,
 } from "@/features/products/product-variant-matrix.service";
 
 const combo = {
@@ -13,7 +18,7 @@ const combo = {
 };
 
 describe("mapMatrixCombinationCreateError", () => {
-  it("maps Prisma P2002 sku conflicts to actionable Vietnamese message", () => {
+  it("maps Prisma P2002 sku conflicts to retry-oriented Vietnamese message", () => {
     const error = new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
       code: "P2002",
       clientVersion: "6.9.0",
@@ -21,37 +26,51 @@ describe("mapMatrixCombinationCreateError", () => {
     });
     assert.equal(
       mapMatrixCombinationCreateError(error, combo, "PRRE0003-NVY-XS"),
-      'SKU "PRRE0003-NVY-XS" đã tồn tại.',
+      MATRIX_SKU_CONFLICT_RETRY_MESSAGE("PRRE0003-NVY-XS"),
     );
   });
 
-  it("maps Prisma P2003 foreign key failures to ownership message", () => {
+  it("maps Prisma P2003 foreign key failures to distinct link error", () => {
     const error = new Prisma.PrismaClientKnownRequestError("FK failed", {
       code: "P2003",
       clientVersion: "6.9.0",
       meta: { field_name: "optionValueId" },
     });
-    assert.equal(mapMatrixCombinationCreateError(error, combo, "PRRE0003-NVY-XS"), MATRIX_OPTION_VALUE_OWNERSHIP_ERROR);
-    assert.match(MATRIX_OPTION_VALUE_OWNERSHIP_ERROR, /Vui lòng lưu sản phẩm rồi thử lại/);
+    assert.equal(
+      mapMatrixCombinationCreateError(error, combo, "PRRE0003-NVY-XS"),
+      MATRIX_FK_LINK_ERROR,
+    );
+    assert.notEqual(MATRIX_FK_LINK_ERROR, MATRIX_OPTION_VALUE_OWNERSHIP_ERROR);
   });
 
-  it("maps Prisma validation errors to ownership message instead of generic invalid combo", () => {
+  it("maps Prisma P2025 to reload guidance", () => {
+    const error = new Prisma.PrismaClientKnownRequestError("Record not found", {
+      code: "P2025",
+      clientVersion: "6.9.0",
+    });
+    assert.equal(
+      mapMatrixCombinationCreateError(error, combo, "PRRE0003-NVY-XS"),
+      MATRIX_MISSING_RECORD_ERROR,
+    );
+  });
+
+  it("maps Prisma validation errors to distinct validation message", () => {
     const error = new Prisma.PrismaClientValidationError("Invalid `prisma.productVariant.create()`", {
       clientVersion: "6.9.0",
     });
     const message = mapMatrixCombinationCreateError(error, combo, "PRRE0003-NVY-XS");
-    assert.equal(message, MATRIX_OPTION_VALUE_OWNERSHIP_ERROR);
-    assert.doesNotMatch(message, /Dữ liệu tổ hợp không hợp lệ/);
+    assert.equal(message, MATRIX_VALIDATION_CREATE_ERROR);
+    assert.doesNotMatch(message, /Giá trị tuỳ chọn không tồn tại/);
   });
 
-  it("never returns the legacy generic combo invalid message", () => {
+  it("maps unknown errors to distinct system message", () => {
     const message = mapMatrixCombinationCreateError(new Error("unexpected"), combo, "SKU-1");
-    assert.equal(message, MATRIX_OPTION_VALUE_OWNERSHIP_ERROR);
-    assert.doesNotMatch(message, /Dữ liệu tổ hợp không hợp lệ/);
+    assert.equal(message, MATRIX_UNKNOWN_CREATE_ERROR);
+    assert.doesNotMatch(message, /Giá trị tuỳ chọn không tồn tại/);
   });
 
   it("rethrows ProductAdminValidationError unchanged", () => {
-    const error = new ProductAdminValidationError("Giá trị tuỳ chọn không tồn tại hoặc không thuộc sản phẩm này. Vui lòng lưu sản phẩm rồi thử lại.", {
+    const error = new ProductAdminValidationError(MATRIX_OPTION_VALUE_OWNERSHIP_ERROR, {
       variants: "stale",
     });
     assert.throws(

@@ -33,13 +33,16 @@ describe("one-screen product admin editor", () => {
     assert.match(source, /publicSizeChart/);
   });
 
-  it("calls save-options-before-generate and applies persisted option IDs", () => {
+  it("calls save-options-before-preview and applies persisted option IDs", () => {
     assert.match(source, /onBeforeMatrixGenerate=\{ensureOptionsSavedForMatrix\}/);
     assert.match(source, /async function ensureOptionsSavedForMatrix/);
     assert.match(source, /buildPersistedOptionsPayload/);
+    assert.match(source, /buildOptionsFingerprint/);
     assert.match(source, /formRef/);
     assert.match(source, /OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR/);
     assert.match(source, /reloadProductFromServer/);
+    assert.match(source, /onMatrixBusyChange=\{setMatrixBusy\}/);
+    assert.match(source, /productSaveInProgress=\{saving\}/);
   });
 
   it("includes size chart and content suggestion controls", () => {

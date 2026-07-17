@@ -41,7 +41,17 @@ import {
 import {
   computeFormMatrixPreview,
   formatVariantMatrixGenerationMessage,
+  type FormMatrixPreview,
 } from "@/features/products/product-variant-matrix-form-preview";
+import {
+  buildOptionsFingerprint,
+  MATRIX_PREVIEW_STALE_ERROR,
+  PRODUCT_SAVE_IN_PROGRESS_FOR_MATRIX_ERROR,
+} from "@/features/products/product-option-persistence";
+
+type ServerMatrixPreview = FormMatrixPreview & {
+  optionValueCount?: number;
+};
 
 function renderVariantStatusOptions() {
   return VARIANT_STATUS_OPTIONS.map((opt) => (
@@ -66,7 +76,14 @@ type Props = {
   onOptionGroupsChange: (groups: OptionGroupFormRow[]) => void;
   onVariantsChange: (variants: MatrixVariantFormRow[]) => void;
   onReloadProduct?: () => Promise<void | boolean>;
-  onBeforeMatrixGenerate?: () => Promise<boolean>;
+  /**
+   * Persist option groups once before server preview.
+   * Returns options fingerprint on success, null on failure.
+   */
+  onBeforeMatrixGenerate?: () => Promise<string | null>;
+  /** True while sticky product save is in flight — block matrix. */
+  productSaveInProgress?: boolean;
+  onMatrixBusyChange?: (busy: boolean) => void;
   onSaveAndContinue?: () => Promise<boolean>;
   onVariantDeleted?: (variantId: string) => void;
   onBulkOperationChange?: (inProgress: boolean) => void;
@@ -140,6 +157,8 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
   onVariantsChange,
   onReloadProduct,
   onBeforeMatrixGenerate,
+  productSaveInProgress = false,
+  onMatrixBusyChange,
   onSaveAndContinue,
   onVariantDeleted,
   onBulkOperationChange,
@@ -149,9 +168,12 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
   const [statusFilter, setStatusFilter] = useState("");
   const [generating, setGenerating] = useState(false);
   const [savingOptions, setSavingOptions] = useState(false);
+  const [previewingMatrix, setPreviewingMatrix] = useState(false);
   const [matrixMessage, setMatrixMessage] = useState<string | null>(null);
   const [matrixConfirmOpen, setMatrixConfirmOpen] = useState(false);
   const [matrixConfirmLarge, setMatrixConfirmLarge] = useState(false);
+  const [serverMatrixPreview, setServerMatrixPreview] = useState<ServerMatrixPreview | null>(null);
+  const [previewOptionsFingerprint, setPreviewOptionsFingerprint] = useState<string | null>(null);
   const [manualSkuKeys, setManualSkuKeys] = useState<Set<string>>(new Set());
   const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -198,6 +220,37 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
     [matrixGroups, structuredVariants],
   );
 
+  const matrixBusy = savingOptions || previewingMatrix || generating;
+
+  function clearServerPreview() {
+    setServerMatrixPreview(null);
+    setPreviewOptionsFingerprint(null);
+    setMatrixConfirmOpen(false);
+    setMatrixConfirmLarge(false);
+  }
+
+  function handleOptionGroupsChange(groups: OptionGroupFormRow[]) {
+    if (matrixConfirmOpen || serverMatrixPreview) {
+      clearServerPreview();
+      setMatrixMessage(MATRIX_PREVIEW_STALE_ERROR);
+    }
+    onOptionGroupsChange(groups);
+  }
+
+  async function fetchServerMatrixPreview(): Promise<ServerMatrixPreview | null> {
+    if (!productId) return null;
+    const response = await fetch(`/api/admin/products/${productId}/variant-matrix`);
+    const data = (await response.json()) as ServerMatrixPreview & {
+      message?: string;
+      error?: string;
+    };
+    if (!response.ok) {
+      setMatrixMessage(data.message ?? data.error ?? "Không thể kiểm tra tổ hợp biến thể.");
+      return null;
+    }
+    return data;
+  }
+
   async function openMatrixConfirm() {
     setMatrixMessage(null);
     if (!matrixPreview.canGenerate) {
@@ -205,11 +258,18 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       return;
     }
 
+    if (productSaveInProgress) {
+      setMatrixMessage(PRODUCT_SAVE_IN_PROGRESS_FOR_MATRIX_ERROR);
+      return;
+    }
+
     if (productId && onBeforeMatrixGenerate) {
       setSavingOptions(true);
+      onMatrixBusyChange?.(true);
+      let savedFingerprint: string | null = null;
       try {
-        const ready = await onBeforeMatrixGenerate();
-        if (!ready) {
+        savedFingerprint = await onBeforeMatrixGenerate();
+        if (!savedFingerprint) {
           setMatrixMessage(
             "Không thể tạo biến thể vì nhóm tuỳ chọn chưa được lưu. Vui lòng lưu sản phẩm rồi thử lại.",
           );
@@ -218,6 +278,25 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       } finally {
         setSavingOptions(false);
       }
+
+      setPreviewingMatrix(true);
+      try {
+        const preview = await fetchServerMatrixPreview();
+        if (!preview) return;
+        if (!preview.canGenerate) {
+          setMatrixMessage(preview.message ?? "Không có tổ hợp mới để tạo.");
+          clearServerPreview();
+          return;
+        }
+        setServerMatrixPreview(preview);
+        setPreviewOptionsFingerprint(savedFingerprint);
+        setMatrixConfirmLarge(Boolean(preview.requiresConfirmation));
+        setMatrixConfirmOpen(true);
+      } finally {
+        setPreviewingMatrix(false);
+        onMatrixBusyChange?.(false);
+      }
+      return;
     }
 
     setMatrixConfirmLarge(false);
@@ -229,7 +308,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       if (!productId) return;
       void openMatrixConfirm();
     },
-  }), [productId, matrixPreview.canGenerate, matrixPreview.message, onBeforeMatrixGenerate]);
+  }), [productId, matrixPreview.canGenerate, matrixPreview.message, onBeforeMatrixGenerate, productSaveInProgress, optionGroups]);
 
   const variantUsageByValueId = useMemo(() => {
     const usage: Record<string, number> = {};
@@ -603,23 +682,22 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       return;
     }
 
-    // Re-save right before execute so matrix never runs on stale client IDs.
-    if (onBeforeMatrixGenerate) {
-      setSavingOptions(true);
-      try {
-        const ready = await onBeforeMatrixGenerate();
-        if (!ready) {
-          setMatrixMessage(
-            "Không thể tạo biến thể vì nhóm tuỳ chọn chưa được lưu. Vui lòng lưu sản phẩm rồi thử lại.",
-          );
-          return;
-        }
-      } finally {
-        setSavingOptions(false);
-      }
+    if (productSaveInProgress) {
+      setMatrixMessage(PRODUCT_SAVE_IN_PROGRESS_FOR_MATRIX_ERROR);
+      return;
+    }
+
+    if (
+      previewOptionsFingerprint &&
+      previewOptionsFingerprint !== buildOptionsFingerprint(optionGroups)
+    ) {
+      clearServerPreview();
+      setMatrixMessage(MATRIX_PREVIEW_STALE_ERROR);
+      return;
     }
 
     setGenerating(true);
+    onMatrixBusyChange?.(true);
     setMatrixMessage(null);
     try {
       const response = await fetch(`/api/admin/products/${productId}/variant-matrix`, {
@@ -651,6 +729,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       const skipped = data.skipped ?? 0;
       const summary = formatVariantMatrixGenerationMessage(created, skipped);
       setMatrixMessage(summary);
+      clearServerPreview();
       if (created > 0) {
         toast.success(summary);
         if (onReloadProduct) {
@@ -661,17 +740,28 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       setMatrixMessage("Không thể kết nối máy chủ khi tạo biến thể.");
     } finally {
       setGenerating(false);
+      onMatrixBusyChange?.(false);
       setMatrixConfirmOpen(false);
     }
   }
 
   async function confirmMatrixGeneration() {
-    setMatrixConfirmOpen(false);
     if (!productId) {
+      setMatrixConfirmOpen(false);
       generateClientSideCombinations();
       return;
     }
-    await generateFromServer(matrixConfirmLarge || matrixPreview.requiresConfirmation);
+    if (
+      previewOptionsFingerprint &&
+      previewOptionsFingerprint !== buildOptionsFingerprint(optionGroups)
+    ) {
+      clearServerPreview();
+      setMatrixMessage(MATRIX_PREVIEW_STALE_ERROR);
+      return;
+    }
+    const confirmLarge =
+      matrixConfirmLarge || Boolean(serverMatrixPreview?.requiresConfirmation);
+    await generateFromServer(confirmLarge);
   }
 
   function addLegacyVariant() {
@@ -690,7 +780,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
         onRefreshSharedAttributes={onRefreshSharedAttributes}
         variantUsageByValueId={variantUsageByValueId}
         fieldErrors={fieldErrors}
-        onChange={onOptionGroupsChange}
+        onChange={handleOptionGroupsChange}
       />
 
       <section className="admin-product-section admin-product-section--step-3">
@@ -725,11 +815,15 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
             <AdminLoadingButton
               variant="primary"
               className="btn-primary"
-              pending={savingOptions || generating}
+              pending={matrixBusy}
               pendingLabel={
-                savingOptions ? "Đang lưu tuỳ chọn..." : "Đang tạo tổ hợp biến thể..."
+                savingOptions
+                  ? "Đang lưu tuỳ chọn..."
+                  : previewingMatrix
+                    ? "Đang kiểm tra tổ hợp..."
+                    : "Đang tạo tổ hợp biến thể..."
               }
-              disabled={!matrixPreview.canGenerate || savingOptions || generating}
+              disabled={!matrixPreview.canGenerate || matrixBusy || productSaveInProgress}
               onClick={() => void openMatrixConfirm()}
             >
               Tạo tổ hợp biến thể
@@ -738,7 +832,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
             <button
               type="button"
               className="btn-primary"
-              disabled={!onSaveAndContinue || !matrixPreview.canGenerate}
+              disabled={!onSaveAndContinue || !matrixPreview.canGenerate || matrixBusy}
               onClick={() => void onSaveAndContinue?.()}
             >
               Lưu sản phẩm và tạo tổ hợp
@@ -753,18 +847,32 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
 
       <VariantMatrixConfirmDialog
         open={matrixConfirmOpen}
-        previewText={matrixPreview.previewText}
-        theoreticalCount={matrixPreview.theoreticalCount}
-        existingCount={matrixPreview.existingCount}
-        missingCount={matrixPreview.missingCount}
-        missingCombinations={matrixPreview.missingCombinations}
-        requiresWarning={matrixPreview.requiresWarning}
-        requiresConfirmation={matrixConfirmLarge || matrixPreview.requiresConfirmation}
-        submitting={savingOptions || generating}
-        submittingLabel={
-          savingOptions ? "Đang lưu tuỳ chọn..." : "Đang tạo tổ hợp biến thể..."
+        previewText={serverMatrixPreview?.previewText ?? matrixPreview.previewText}
+        theoreticalCount={serverMatrixPreview?.theoreticalCount ?? matrixPreview.theoreticalCount}
+        existingCount={serverMatrixPreview?.existingCount ?? matrixPreview.existingCount}
+        missingCount={serverMatrixPreview?.missingCount ?? matrixPreview.missingCount}
+        missingCombinations={
+          serverMatrixPreview?.missingCombinations ?? matrixPreview.missingCombinations
         }
-        onCancel={() => setMatrixConfirmOpen(false)}
+        requiresWarning={
+          serverMatrixPreview?.requiresWarning ?? matrixPreview.requiresWarning
+        }
+        requiresConfirmation={
+          matrixConfirmLarge ||
+          Boolean(serverMatrixPreview?.requiresConfirmation ?? matrixPreview.requiresConfirmation)
+        }
+        submitting={matrixBusy}
+        submittingLabel={
+          savingOptions
+            ? "Đang lưu tuỳ chọn..."
+            : previewingMatrix
+              ? "Đang kiểm tra tổ hợp..."
+              : "Đang tạo tổ hợp biến thể..."
+        }
+        onCancel={() => {
+          if (matrixBusy) return;
+          clearServerPreview();
+        }}
         onConfirm={() => void confirmMatrixGeneration()}
       />
 

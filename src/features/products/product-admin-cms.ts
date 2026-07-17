@@ -23,9 +23,13 @@ import {
   validateOptionGroupNames,
   validateOptionValues,
   normalizeOptionName,
-  isUuid,
   buildOptionValueRef,
 } from "@/features/products/product-variant-matrix.utils";
+import {
+  findMatchingOptionGroup,
+  findMatchingOptionValue,
+} from "@/features/products/product-option-persistence";
+import { isPersistedProductRelationId } from "@/features/products/product-relation-ids";
 import type { ProductAttributeAssignmentInput } from "@/features/products/product-attribute-assignment.utils";
 import type { ExistingProductRelationState } from "@/features/products/product-save-relation-diff";
 import {
@@ -158,10 +162,10 @@ export function resolveOptionValueRefsFromLoadedOptions(
   if (!refs.length) return [];
   const { byId, byRef } = buildOptionValueRefMaps(options);
   return refs.map((ref) => {
-    if (isUuid(ref) && byId.has(ref)) return ref;
+    if (isPersistedProductRelationId(ref) && byId.has(ref)) return ref;
     const resolved = byRef.get(ref);
     if (resolved) return resolved;
-    if (isUuid(ref)) throwProductRelationOwnershipError();
+    if (isPersistedProductRelationId(ref)) throwProductRelationOwnershipError();
     return ref;
   });
 }
@@ -320,12 +324,66 @@ export async function syncProductCmsData(
       }
     }
 
-    const keepOptionIds = new Set(
-      data.options.map((o) => o.id).filter(Boolean) as string[],
-    );
+    // Resolve incoming groups to existing rows by id / slug / name BEFORE deleting,
+    // so options-only saves without client IDs stay idempotent (no delete+recreate).
+    const claimedOptionIds = new Set<string>();
+    const resolvedGroups: Array<{
+      incoming: (typeof data.options)[number];
+      optIndex: number;
+      slug: string;
+      existingGroup: (typeof existingOptions)[number] | undefined;
+      savedOptionId: string;
+    }> = [];
+
+    for (const [optIndex, option] of data.options.entries()) {
+      const slug = option.slug?.trim() || toOptionSlug(option.name, `option-${optIndex + 1}`);
+      const matched = findMatchingOptionGroup(
+        { id: option.id, name: option.name, slug },
+        existingOptions,
+        claimedOptionIds,
+      );
+      if (matched) claimedOptionIds.add(matched.id);
+
+      let savedOptionId = matched?.id;
+      const existingGroup = matched
+        ? existingOptionById.get(matched.id) ?? existingOptions.find((row) => row.id === matched.id)
+        : undefined;
+
+      if (matched) {
+        if (!existingGroup || optionGroupNeedsUpdate(option, existingGroup, optIndex)) {
+          await updateProductOptionOwned(db, productId, matched.id, {
+            name: option.name.trim(),
+            attributeId: option.attributeId ?? null,
+            slug,
+            sortOrder: option.sortOrder ?? optIndex,
+          });
+        }
+        savedOptionId = matched.id;
+      } else {
+        const created = await db.productOption.create({
+          data: {
+            productId,
+            attributeId: option.attributeId ?? null,
+            name: option.name.trim(),
+            slug,
+            sortOrder: option.sortOrder ?? optIndex,
+          },
+        });
+        savedOptionId = created.id;
+      }
+
+      resolvedGroups.push({
+        incoming: option,
+        optIndex,
+        slug,
+        existingGroup,
+        savedOptionId: savedOptionId!,
+      });
+    }
+
     const deleteOptionIds = existingOptions
-      .map((o) => o.id)
-      .filter((id) => !keepOptionIds.has(id));
+      .map((option) => option.id)
+      .filter((id) => !claimedOptionIds.has(id));
 
     if (deleteOptionIds.length) {
       await assertRemovedOptionsNotInUse(
@@ -338,41 +396,72 @@ export async function syncProductCmsData(
       await deleteProductOptionsOwned(db, productId, deleteOptionIds);
     }
 
-    for (const [optIndex, option] of data.options.entries()) {
-      const slug = option.slug?.trim() || toOptionSlug(option.name, `option-${optIndex + 1}`);
-      const existingGroup = option.id ? existingOptionById.get(option.id) : undefined;
-      if (option.id) {
-        if (
-          !existingGroup ||
-          optionGroupNeedsUpdate(option, existingGroup, optIndex)
-        ) {
-          await updateProductOptionOwned(db, productId, option.id, {
-            name: option.name.trim(),
-            attributeId: option.attributeId ?? null,
-            slug,
-            sortOrder: option.sortOrder ?? optIndex,
-          });
-        }
-      }
-      const savedOption = option.id
-        ? { id: option.id }
-        : await db.productOption.create({
-            data: {
-              productId,
-              attributeId: option.attributeId ?? null,
-              name: option.name.trim(),
-              slug,
-              sortOrder: option.sortOrder ?? optIndex,
-            },
-          });
-
+    for (const resolved of resolvedGroups) {
+      const { incoming: option, existingGroup, savedOptionId } = resolved;
       const existingValues = existingGroup?.values ?? [];
-      const keepValueIds = new Set(
-        option.values.map((v) => v.id).filter(Boolean) as string[],
-      );
+      const claimedValueIds = new Set<string>();
+      const valueUpdates: Array<Promise<void>> = [];
+      const valueCreates: Array<{
+        attributeValueId: string | null;
+        label: string;
+        valueCode: string | null;
+        imageUrl: string | null;
+        sortOrder: number;
+      }> = [];
+
+      for (const [valIndex, value] of option.values.entries()) {
+        const matchedValue = findMatchingOptionValue(
+          {
+            id: value.id,
+            label: value.label,
+            valueCode: value.valueCode,
+          },
+          existingValues,
+          claimedValueIds,
+        );
+
+        if (matchedValue) {
+          claimedValueIds.add(matchedValue.id);
+          const existingValue = existingValueById.get(matchedValue.id);
+          if (existingValue && !optionValueNeedsUpdate(value, existingValue, valIndex)) {
+            continue;
+          }
+          valueUpdates.push(
+            updateProductOptionValueOwned(db, productId, savedOptionId, matchedValue.id, {
+              label: value.label.trim(),
+              attributeValueId: value.attributeValueId ?? null,
+              valueCode: value.valueCode?.trim() || null,
+              imageUrl: value.imageUrl?.trim() || null,
+              sortOrder: value.sortOrder ?? valIndex,
+            }),
+          );
+          continue;
+        }
+
+        valueCreates.push({
+          attributeValueId: value.attributeValueId ?? null,
+          label: value.label.trim(),
+          valueCode: value.valueCode?.trim() || null,
+          imageUrl: value.imageUrl?.trim() || null,
+          sortOrder: value.sortOrder ?? valIndex,
+        });
+      }
+
+      if (valueUpdates.length) {
+        await Promise.all(valueUpdates);
+      }
+      if (valueCreates.length) {
+        await db.productOptionValue.createMany({
+          data: valueCreates.map((row) => ({
+            optionId: savedOptionId,
+            ...row,
+          })),
+        });
+      }
+
       const deleteValueIds = existingValues
-        .map((v) => v.id)
-        .filter((id) => !keepValueIds.has(id));
+        .map((value) => value.id)
+        .filter((id) => !claimedValueIds.has(id));
       if (deleteValueIds.length) {
         await assertRemovedOptionValuesNotInUse(
           db,
@@ -381,44 +470,7 @@ export async function syncProductCmsData(
             .filter((value) => deleteValueIds.includes(value.id))
             .map((value) => ({ id: value.id, label: value.label })),
         );
-        await deleteProductOptionValuesOwned(db, productId, savedOption.id, deleteValueIds);
-      }
-
-      const valueUpdates: Array<Promise<void>> = [];
-      for (const [valIndex, value] of option.values.entries()) {
-        if (!value.id) continue;
-        const existingValue = existingValueById.get(value.id);
-        if (existingValue && !optionValueNeedsUpdate(value, existingValue, valIndex)) {
-          continue;
-        }
-        valueUpdates.push(
-          updateProductOptionValueOwned(db, productId, savedOption.id, value.id, {
-            label: value.label.trim(),
-            attributeValueId: value.attributeValueId ?? null,
-            valueCode: value.valueCode?.trim() || null,
-            imageUrl: value.imageUrl?.trim() || null,
-            sortOrder: value.sortOrder ?? valIndex,
-          }),
-        );
-      }
-      if (valueUpdates.length) {
-        await Promise.all(valueUpdates);
-      }
-
-      const newValues = option.values
-        .map((value, valIndex) => ({ value, valIndex }))
-        .filter(({ value }) => !value.id);
-      if (newValues.length) {
-        await db.productOptionValue.createMany({
-          data: newValues.map(({ value, valIndex }) => ({
-            optionId: savedOption.id,
-            attributeValueId: value.attributeValueId ?? null,
-            label: value.label.trim(),
-            valueCode: value.valueCode?.trim() || null,
-            imageUrl: value.imageUrl?.trim() || null,
-            sortOrder: value.sortOrder ?? valIndex,
-          })),
-        });
+        await deleteProductOptionValuesOwned(db, productId, savedOptionId, deleteValueIds);
       }
     }
   }

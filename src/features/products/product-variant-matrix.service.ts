@@ -27,11 +27,15 @@ export type VariantMatrixPreview = {
   theoreticalCount: number;
   existingCount: number;
   missingCount: number;
+  missingCombinations: Array<{ displayLabel: string; signature: string }>;
+  optionValueCount: number;
   requiresConfirmation: boolean;
   requiresWarning: boolean;
   canGenerate: boolean;
   message?: string;
 };
+
+const PREVIEW_LIST_LIMIT = 24;
 
 export type VariantMatrixGenerationResult = {
   created: number;
@@ -141,11 +145,27 @@ function throwMatrixCombinationError(
 export const MATRIX_OPTION_VALUE_OWNERSHIP_ERROR =
   "Giá trị tuỳ chọn không tồn tại hoặc không thuộc sản phẩm này. Vui lòng lưu sản phẩm rồi thử lại.";
 
-/** Maps Prisma/runtime create failures to actionable Vietnamese messages. Exported for tests. */
+export const MATRIX_SKU_CONFLICT_RETRY_MESSAGE = (sku: string) =>
+  `SKU "${sku}" đã tồn tại. Hệ thống sẽ thử tạo mã khác.`;
+
+export const MATRIX_FK_LINK_ERROR =
+  "Không thể liên kết giá trị tuỳ chọn với biến thể. Vui lòng lưu sản phẩm rồi thử lại.";
+
+export const MATRIX_MISSING_RECORD_ERROR =
+  "Không tìm thấy dữ liệu tuỳ chọn cần tạo biến thể. Vui lòng tải lại trang rồi thử lại.";
+
+export const MATRIX_VALIDATION_CREATE_ERROR =
+  "Dữ liệu tạo biến thể chưa hợp lệ. Vui lòng tải lại trang và thử lại.";
+
+export const MATRIX_UNKNOWN_CREATE_ERROR =
+  "Không thể tạo biến thể do lỗi hệ thống. Vui lòng thử lại sau.";
+
+/** Maps Prisma/runtime create failures to distinct actionable Vietnamese messages. Exported for tests. */
 export function mapMatrixCombinationCreateError(
   error: unknown,
   combo: Pick<MatrixCombination, "displayLabel" | "valueIds">,
   sku: string,
+  context: { productId?: string } = {},
 ): string {
   if (error instanceof ProductAdminValidationError) {
     throw error;
@@ -155,6 +175,7 @@ export function mapMatrixCombinationCreateError(
     error instanceof Prisma.PrismaClientKnownRequestError ? error.code : undefined;
 
   console.error("[variant-matrix] create combination failed", {
+    productId: context.productId,
     displayLabel: combo.displayLabel,
     optionValueIds: combo.valueIds,
     sku,
@@ -164,23 +185,23 @@ export function mapMatrixCombinationCreateError(
   });
 
   if (isSkuUniqueConstraintError(error)) {
-    return `SKU "${sku}" đã tồn tại.`;
+    return MATRIX_SKU_CONFLICT_RETRY_MESSAGE(sku);
   }
 
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2003") {
-      return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
+      return MATRIX_FK_LINK_ERROR;
     }
     if (error.code === "P2025") {
-      return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
+      return MATRIX_MISSING_RECORD_ERROR;
     }
   }
 
   if (error instanceof Prisma.PrismaClientValidationError) {
-    return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
+    return MATRIX_VALIDATION_CREATE_ERROR;
   }
 
-  return MATRIX_OPTION_VALUE_OWNERSHIP_ERROR;
+  return MATRIX_UNKNOWN_CREATE_ERROR;
 }
 
 export function isSkuUniqueConstraintError(error: unknown): boolean {
@@ -226,12 +247,16 @@ export async function previewVariantMatrixGeneration(
   const previewText = buildCombinationPreviewText(groups);
   const validation = validateMatrixGroupsForGeneration(groups);
 
+  const optionValueCount = groups.reduce((total, group) => total + group.values.length, 0);
+
   if (!validation.ok) {
     return {
       previewText,
       theoreticalCount: 0,
       existingCount: 0,
       missingCount: 0,
+      missingCombinations: [],
+      optionValueCount,
       requiresConfirmation: false,
       requiresWarning: false,
       canGenerate: false,
@@ -248,15 +273,21 @@ export async function previewVariantMatrixGeneration(
       ),
   );
 
-  const missingCount = allCombinations.filter(
+  const missing = allCombinations.filter(
     (combo) => !existingSignatures.has(combo.signature),
-  ).length;
+  );
+  const missingCount = missing.length;
 
   return {
     previewText,
     theoreticalCount,
     existingCount: existingSignatures.size,
     missingCount,
+    missingCombinations: missing.slice(0, PREVIEW_LIST_LIMIT).map((combo) => ({
+      displayLabel: combo.displayLabel,
+      signature: combo.signature,
+    })),
+    optionValueCount,
     requiresWarning: theoreticalCount >= VARIANT_MATRIX_WARN_THRESHOLD,
     requiresConfirmation: missingCount >= VARIANT_MATRIX_CONFIRM_THRESHOLD,
     canGenerate: missingCount > 0,
@@ -450,7 +481,7 @@ export async function generateVariantMatrix(
               throwMatrixCombinationError(combo, `xung đột mã SKU.`);
             }
           }
-          const message = mapMatrixCombinationCreateError(error, combo, sku);
+          const message = mapMatrixCombinationCreateError(error, combo, sku, { productId });
           throwMatrixCombinationError(combo, message);
         }
       }

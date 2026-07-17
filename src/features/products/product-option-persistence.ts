@@ -1,12 +1,8 @@
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
+import { isPersistedProductRelationId } from "@/features/products/product-relation-ids";
+import { normalizeOptionName } from "@/features/products/product-variant-matrix.utils";
 
-/** Client-only keys from `createClientKey("opt"|"val"|…)`. Never send these as DB relation IDs. */
-const CLIENT_RELATION_KEY_RE = /^(opt|val|var|spec|cap|attr)-[a-z0-9]+$/i;
-
-export function isPersistedProductRelationId(id: string | undefined | null): boolean {
-  if (!id?.trim()) return false;
-  return !CLIENT_RELATION_KEY_RE.test(id.trim());
-}
+export { isPersistedProductRelationId } from "@/features/products/product-relation-ids";
 
 export type PersistedOptionValuePayload = {
   id?: string;
@@ -76,5 +72,102 @@ export function optionGroupsMissingPersistedIds(options: OptionGroupFormRow[]): 
   );
 }
 
+/** Stable fingerprint so matrix UI can detect option edits after server preview. */
+export function buildOptionsFingerprint(
+  options: Array<{
+    name: string;
+    slug?: string;
+    values: Array<{ label: string; valueCode?: string }>;
+  }>,
+): string {
+  return JSON.stringify(
+    options
+      .filter((group) => group.name.trim())
+      .map((group) => ({
+        name: normalizeOptionName(group.name),
+        slug: (group.slug ?? "").trim().toLowerCase(),
+        values: group.values
+          .filter((value) => value.label.trim())
+          .map((value) => ({
+            label: normalizeOptionName(value.label),
+            code: (value.valueCode ?? "").trim().toUpperCase(),
+          })),
+      })),
+  );
+}
+
+export type MatchableOptionGroup = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+export type MatchableOptionValue = {
+  id: string;
+  label: string;
+  valueCode: string | null;
+};
+
+/**
+ * Resolve an existing option group without requiring client-provided DB ids.
+ * Prefers explicit id, then slug, then normalized name. Skips already-claimed rows.
+ */
+export function findMatchingOptionGroup(
+  incoming: { id?: string; name: string; slug: string },
+  existing: MatchableOptionGroup[],
+  claimedIds: Set<string>,
+): MatchableOptionGroup | undefined {
+  if (incoming.id && isPersistedProductRelationId(incoming.id)) {
+    const byId = existing.find((row) => row.id === incoming.id);
+    if (byId && !claimedIds.has(byId.id)) return byId;
+  }
+
+  const bySlug = existing.find(
+    (row) => !claimedIds.has(row.id) && row.slug === incoming.slug,
+  );
+  if (bySlug) return bySlug;
+
+  const normalizedName = normalizeOptionName(incoming.name);
+  return existing.find(
+    (row) => !claimedIds.has(row.id) && normalizeOptionName(row.name) === normalizedName,
+  );
+}
+
+/**
+ * Resolve an existing option value without requiring client-provided DB ids.
+ * Prefers explicit id, then normalized label, then value code.
+ */
+export function findMatchingOptionValue(
+  incoming: { id?: string; label: string; valueCode?: string | null },
+  existing: MatchableOptionValue[],
+  claimedIds: Set<string>,
+): MatchableOptionValue | undefined {
+  if (incoming.id && isPersistedProductRelationId(incoming.id)) {
+    const byId = existing.find((row) => row.id === incoming.id);
+    if (byId && !claimedIds.has(byId.id)) return byId;
+  }
+
+  const normalizedLabel = normalizeOptionName(incoming.label);
+  const byLabel = existing.find(
+    (row) => !claimedIds.has(row.id) && normalizeOptionName(row.label) === normalizedLabel,
+  );
+  if (byLabel) return byLabel;
+
+  const code = incoming.valueCode?.trim().toUpperCase();
+  if (!code) return undefined;
+  return existing.find(
+    (row) =>
+      !claimedIds.has(row.id) &&
+      Boolean(row.valueCode?.trim()) &&
+      row.valueCode!.trim().toUpperCase() === code,
+  );
+}
+
 export const OPTIONS_NOT_PERSISTED_FOR_MATRIX_ERROR =
   "Không thể tạo biến thể vì nhóm tuỳ chọn chưa được lưu. Vui lòng lưu sản phẩm rồi thử lại.";
+
+export const PRODUCT_SAVE_IN_PROGRESS_FOR_MATRIX_ERROR =
+  "Sản phẩm đang được lưu. Vui lòng đợi hoàn tất rồi tạo biến thể.";
+
+export const MATRIX_PREVIEW_STALE_ERROR =
+  "Nhóm tuỳ chọn đã thay đổi sau khi xem trước. Vui lòng tạo tổ hợp lại.";
