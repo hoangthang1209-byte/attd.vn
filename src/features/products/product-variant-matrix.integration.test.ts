@@ -3,10 +3,6 @@ import { after, before, describe, it } from "node:test";
 import type { PrismaClient } from "@prisma/client";
 import { ProductAdminValidationError } from "@/features/products/product-admin-input";
 import {
-  generateVariantMatrix,
-  previewVariantMatrixGeneration,
-} from "@/features/products/product-variant-matrix.service";
-import {
   bootstrapDatabaseTestEnvironment,
   enforceDatabaseTestPrerequisites,
   getDatabaseTestsSkipReason,
@@ -32,12 +28,18 @@ const HOODIE_SIZE_LABELS = ["XS", "S", "M", "L"];
 
 describeDb("variant matrix generation", () => {
   let prisma: PrismaClient;
+  let generateVariantMatrix: typeof import("@/features/products/product-variant-matrix.service").generateVariantMatrix;
+  let previewVariantMatrixGeneration: typeof import("@/features/products/product-variant-matrix.service").previewVariantMatrixGeneration;
   let categoryId = "";
   const createdProductIds: string[] = [];
   const createdCategoryIds: string[] = [];
 
   before(async () => {
+    // Bootstrap must run before importing modules that bind @/lib/prisma.
     prisma = await bootstrapDatabaseTestEnvironment();
+    const matrix = await import("@/features/products/product-variant-matrix.service");
+    generateVariantMatrix = matrix.generateVariantMatrix;
+    previewVariantMatrixGeneration = matrix.previewVariantMatrixGeneration;
     const category = await prisma.category.create({
       data: {
         name: `Danh mục ma trận ${uniqueTestKey("cat")}`,
@@ -287,6 +289,31 @@ describeDb("variant matrix generation", () => {
         .filter((variant) => variant.optionValues.length > 0)
         .every((variant) => variant.optionValues.length === 2),
     );
+  });
+
+  it("2 colors × 6 sizes creates 12 variants including Đen / XL", async () => {
+    const product = await createMatrixProduct(
+      "9020",
+      ["Đen", "Trắng"],
+      ["S", "M", "L", "XL", "2XL", "3XL"],
+    );
+    const result = await generateVariantMatrix(product.id);
+    assert.equal(result.created, 12);
+    assert.ok(result.variants.some((variant) => variant.displayLabel === "Đen / XL"));
+
+    const second = await previewVariantMatrixGeneration(product.id);
+    assert.equal(second.missingCount, 0);
+    assert.equal(second.canGenerate, false);
+  });
+
+  it("3 colors × 3 sizes creates 9 variants", async () => {
+    const product = await createMatrixProduct("9021", ["Đỏ", "Xanh lá", "Navy"], ["S", "M", "L"]);
+    const result = await generateVariantMatrix(product.id);
+    assert.equal(result.created, 9);
+    const linkCount = await prisma.productVariantOptionValue.count({
+      where: { variant: { productId: product.id } },
+    });
+    assert.equal(linkCount, 18);
   });
 
   it("rejects stale or foreign optionValueIds with actionable ownership message", async () => {
