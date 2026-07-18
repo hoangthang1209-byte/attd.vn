@@ -13,6 +13,12 @@ import {
 } from "@/features/products/product-detail-compat";
 import { PUBLIC_IN_STOCK_VARIANT_FILTER } from "@/features/products/product-foundation-validation";
 import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
+import {
+  extractMediaIdsFromDescriptionBlocks,
+  hydratePublicDescriptionBlocks,
+  parseProductDescriptionBlocks,
+  type ProductDescriptionBlock,
+} from "@/features/products/product-description-blocks";
 
 const PRODUCT_DETAIL_INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
@@ -51,14 +57,45 @@ const PRODUCT_DETAIL_INCLUDE = {
   },
 } as const;
 
-function mapFetchedProductToPublicDetail(
+async function hydrateDetailDescriptionBlocks(
+  detail: PublicProductDetail,
+): Promise<PublicProductDetail> {
+  const rawBlocks = detail.descriptionBlocks;
+  if (!rawBlocks?.length) return detail;
+
+  let parsed: ProductDescriptionBlock[] | null = null;
+  try {
+    parsed = parseProductDescriptionBlocks(rawBlocks) ?? null;
+  } catch {
+    detail.descriptionBlocks = null;
+    return detail;
+  }
+  if (!parsed?.length) {
+    detail.descriptionBlocks = null;
+    return detail;
+  }
+
+  const ids = extractMediaIdsFromDescriptionBlocks(parsed);
+  const assets =
+    ids.length > 0
+      ? await prisma.mediaAsset.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, url: true },
+        })
+      : [];
+  const mediaById = new Map(assets.map((asset) => [asset.id, asset]));
+  detail.descriptionBlocks = hydratePublicDescriptionBlocks(parsed, mediaById);
+  return detail;
+}
+
+async function mapFetchedProductToPublicDetail(
   product: Parameters<typeof mapProductToPublicDetail>[0],
-): PublicProductDetail {
+): Promise<PublicProductDetail> {
   const detail = mapProductToPublicDetail(product);
   if (detail.customizations.length === 0) {
     detail.customizations = buildDefaultCustomizationsFromFlags(product);
   }
-  return detail;
+  return hydrateDetailDescriptionBlocks(detail);
 }
 
 export async function getProductDetailBySlug(slug: string): Promise<PublicProductDetail | null> {
@@ -68,7 +105,7 @@ export async function getProductDetailBySlug(slug: string): Promise<PublicProduc
       include: PRODUCT_DETAIL_INCLUDE,
     });
     if (!product) return null;
-    return mapFetchedProductToPublicDetail(product);
+    return await mapFetchedProductToPublicDetail(product);
   } catch (error) {
     if (!isPartialCatalogSchemaError(error)) {
       // Defensive fallback: never let optional relation/query shape crash an ACTIVE PDP.
@@ -85,7 +122,7 @@ export async function getProductDetailBySlug(slug: string): Promise<PublicProduc
         select: PRODUCT_DETAIL_LEGACY_SELECT,
       });
       if (!legacy) return null;
-      return mapFetchedProductToPublicDetail(normalizeLegacyProductRow(legacy));
+      return await mapFetchedProductToPublicDetail(normalizeLegacyProductRow(legacy));
     } catch (legacyError) {
       console.error("[pdp] getProductDetailBySlug legacy fallback failed", {
         slug,

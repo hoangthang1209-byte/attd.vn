@@ -29,7 +29,9 @@ import ProductCategoryCascadingPicker from "@/components/admin/products/ProductC
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
 import ProductSizeChartEditor from "@/components/admin/products/ProductSizeChartEditor";
 import ProductContentSuggestButton from "@/components/admin/products/ProductContentSuggestButton";
+import ProductDescriptionBlocksEditor from "@/components/admin/products/ProductDescriptionBlocksEditor";
 import type { OptionGroupFormRow } from "@/components/admin/products/ProductOptionGroupBuilder";
+import type { ProductDescriptionBlock } from "@/features/products/product-description-blocks";
 import {
   joinSuggestedTags,
   suggestProductCustomizationNote,
@@ -107,6 +109,7 @@ type ProductFormData = {
   categoryId: string;
   shortDescription: string;
   description: string;
+  descriptionBlocks: ProductDescriptionBlock[];
   seoTitle: string;
   seoDescription: string;
   material: string;
@@ -228,6 +231,7 @@ export default function ProductCatalogForm({
     categoryId: initialData?.categoryId ?? "",
     shortDescription: initialData?.shortDescription ?? "",
     description: initialData?.description ?? "",
+    descriptionBlocks: initialData?.descriptionBlocks ?? [],
     seoTitle: initialData?.seoTitle ?? "",
     seoDescription: initialData?.seoDescription ?? "",
     material: initialData?.material ?? "",
@@ -663,6 +667,7 @@ export default function ProductCatalogForm({
       categoryId: form.categoryId,
       shortDescription: form.shortDescription.trim() || undefined,
       description: form.description.trim() || undefined,
+      descriptionBlocks: form.descriptionBlocks,
       seoTitle: form.seoTitle.trim() || undefined,
       seoDescription: form.seoDescription.trim() || undefined,
       ...(legacyFitClearPending
@@ -1564,6 +1569,15 @@ export default function ProductCatalogForm({
             />
             {fieldErrors.description && <p className="admin-field-error" role="alert">{fieldErrors.description}</p>}
           </div>
+          <ProductDescriptionBlocksEditor
+            value={form.descriptionBlocks}
+            onChange={(descriptionBlocks) => {
+              setField("descriptionBlocks", descriptionBlocks);
+              clearFieldErrorKey("descriptionBlocks");
+            }}
+            error={fieldErrors.descriptionBlocks}
+            legacyDescription={form.description}
+          />
         </details>
 
         <details

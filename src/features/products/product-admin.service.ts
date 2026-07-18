@@ -14,6 +14,12 @@ import {
 } from "@/features/products/product-sku-utils";
 import { ProductAdminValidationError, isPrismaTransactionTimeoutError, PRODUCT_SAVE_TRANSACTION_TIMEOUT_MESSAGE } from "@/features/products/product-admin-input";
 import {
+  applyMediaLibraryUrlsToDescriptionBlocks,
+  extractMediaIdsFromDescriptionBlocks,
+  ProductDescriptionBlocksValidationError,
+  type ProductDescriptionBlock,
+} from "@/features/products/product-description-blocks";
+import {
   CATEGORY_SLUG_DUPLICATE_ERROR,
   validateCategoryParentSelection,
 } from "@/features/categories/category-tree-utils";
@@ -153,6 +159,8 @@ export type ProductInput = {
   categoryId: string;
   shortDescription?: string;
   description?: string;
+  /** Structured rich description; null clears the field. */
+  descriptionBlocks?: ProductDescriptionBlock[] | null;
   seoTitle?: string;
   seoDescription?: string;
   aiSummary?: string;
@@ -973,6 +981,35 @@ async function writeProductDependentRelations(
   }
 }
 
+/**
+ * Validate mediaIds against Media Library and overwrite imageUrl snapshots
+ * with the current library URL in one bounded query (not per-block).
+ */
+async function resolveDescriptionBlocksMediaFromLibrary(
+  blocks: ProductDescriptionBlock[] | null | undefined,
+): Promise<ProductDescriptionBlock[] | null | undefined> {
+  if (blocks === undefined) return undefined;
+  if (blocks === null || blocks.length === 0) return null;
+  const ids = extractMediaIdsFromDescriptionBlocks(blocks);
+  if (!ids.length) {
+    // Heading/paragraph/list-only rich descriptions need no Media Library lookup.
+    return blocks;
+  }
+  const assets = await prisma.mediaAsset.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, url: true },
+  });
+  const mediaById = new Map(assets.map((asset) => [asset.id, asset]));
+  try {
+    return applyMediaLibraryUrlsToDescriptionBlocks(blocks, mediaById);
+  } catch (err) {
+    if (err instanceof ProductDescriptionBlocksValidationError) {
+      throw new ProductAdminValidationError(err.message, err.fieldErrors);
+    }
+    throw err;
+  }
+}
+
 function buildProductCreateData(
   input: ProductInput,
   productCode: string | null,
@@ -989,6 +1026,14 @@ function buildProductCreateData(
     category: { connect: { id: input.categoryId } },
     shortDescription: input.shortDescription,
     description: input.description,
+    ...(input.descriptionBlocks !== undefined
+      ? {
+          descriptionBlocks:
+            input.descriptionBlocks === null
+              ? PrismaClient.DbNull
+              : (input.descriptionBlocks as Prisma.InputJsonValue),
+        }
+      : {}),
     seoTitle: input.seoTitle,
     seoDescription: input.seoDescription,
     aiSummary: input.aiSummary,
@@ -1041,6 +1086,10 @@ export async function createProductAdmin(input: ProductInput) {
 
   if (isPublishing) {
     assertNoRelationIdsOnCreate(input);
+  }
+
+  if (input.descriptionBlocks !== undefined) {
+    input.descriptionBlocks = await resolveDescriptionBlocksMediaFromLibrary(input.descriptionBlocks);
   }
 
   const category = await prisma.category.findUnique({
@@ -1198,6 +1247,10 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
     throw new ProductAdminValidationError("Không tìm thấy sản phẩm.", {}, "Không tìm thấy sản phẩm.");
   }
 
+  if (input.descriptionBlocks !== undefined) {
+    input.descriptionBlocks = await resolveDescriptionBlocksMediaFromLibrary(input.descriptionBlocks);
+  }
+
   const nextStatus = input.status ?? existingStatus.status;
   if (isProductPublishTransition(existingStatus.status, nextStatus)) {
     const snapshot = await loadProductPublishQualitySnapshot(id, input);
@@ -1245,6 +1298,12 @@ export async function updateProductAdmin(id: string, input: Partial<ProductInput
   if (input.categoryId !== undefined) updateData.category = { connect: { id: input.categoryId } };
   if (input.shortDescription !== undefined) updateData.shortDescription = input.shortDescription;
   if (input.description !== undefined) updateData.description = input.description;
+  if (input.descriptionBlocks !== undefined) {
+    updateData.descriptionBlocks =
+      input.descriptionBlocks === null
+        ? PrismaClient.DbNull
+        : (input.descriptionBlocks as Prisma.InputJsonValue);
+  }
   if (input.seoTitle !== undefined) updateData.seoTitle = input.seoTitle;
   if (input.seoDescription !== undefined) updateData.seoDescription = input.seoDescription;
   if (input.aiSummary !== undefined) updateData.aiSummary = input.aiSummary;

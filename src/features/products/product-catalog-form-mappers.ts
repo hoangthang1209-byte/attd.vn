@@ -14,6 +14,18 @@ import {
   type ProductPricingMode,
   type ProductStockMode,
 } from "@/features/products/product-entry-modes";
+import type { ProductDescriptionBlock } from "@/features/products/product-description-blocks";
+import { parseProductDescriptionBlocks } from "@/features/products/product-description-blocks";
+
+export function mapDescriptionBlocksToFormState(raw: unknown): ProductDescriptionBlock[] {
+  if (raw == null) return [];
+  try {
+    const parsed = parseProductDescriptionBlocks(raw);
+    return parsed ?? [];
+  } catch {
+    return [];
+  }
+}
 
 export type MatrixVariantFormRow = {
   id?: string;
@@ -110,6 +122,7 @@ export type ProductAdminEditInitialData = {
   categoryId: string;
   shortDescription: string;
   description: string;
+  descriptionBlocks: ProductDescriptionBlock[];
   material: string;
   form: string;
   fit: string;
@@ -259,6 +272,7 @@ type BuildProductAdminEditInitialDataInput = {
   categoryId: string;
   shortDescription: string | null;
   description: string | null;
+  descriptionBlocks?: unknown;
   material: string | null;
   form: string | null;
   fit: string | null;
@@ -309,6 +323,7 @@ export function buildProductAdminEditInitialData(
     categoryId: product.categoryId,
     shortDescription: product.shortDescription ?? "",
     description: product.description ?? "",
+    descriptionBlocks: mapDescriptionBlocksToFormState(product.descriptionBlocks),
     material: product.material ?? "",
     form: product.form ?? "",
     fit: product.fit ?? "",

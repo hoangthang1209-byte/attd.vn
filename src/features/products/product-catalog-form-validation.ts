@@ -109,6 +109,7 @@ export function resolveTabForField(
   if (
     field === "shortDescription" ||
     field === "description" ||
+    field === "descriptionBlocks" ||
     field.startsWith("specifications") ||
     field.startsWith("customizations")
   ) {

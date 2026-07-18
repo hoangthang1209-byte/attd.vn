@@ -1,4 +1,10 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import {
+  extractImageUrlsFromDescriptionBlocks,
+  extractMediaIdsFromDescriptionBlocks,
+  descriptionBlocksReferenceMediaAsset,
+} from "@/features/products/product-description-blocks";
 
 export type MediaReferenceType =
   | "PRODUCT"
@@ -500,6 +506,34 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
     });
   }
 
+  // Product rich description blocks store mediaAssetId + imageUrl in JSON.
+  const productsWithDescriptionBlocks = await prisma.product.findMany({
+    where: { descriptionBlocks: { not: Prisma.DbNull } },
+    select: {
+      id: true,
+      name: true,
+      productCode: true,
+      slug: true,
+      descriptionBlocks: true,
+    },
+    take: 500,
+  });
+  for (const product of productsWithDescriptionBlocks) {
+    if (!descriptionBlocksReferenceMediaAsset(product.descriptionBlocks, assetId, urls)) {
+      continue;
+    }
+    const byMediaId = extractMediaIdsFromDescriptionBlocks(product.descriptionBlocks).includes(assetId);
+    refs.push({
+      type: "PRODUCT",
+      entityId: product.id,
+      entityCode: product.productCode,
+      entityTitle: product.name,
+      field: "descriptionBlocks",
+      route: `/admin/products/${product.id}/edit`,
+      referenceMode: byMediaId ? "RELATION" : "URL_MATCH",
+    });
+  }
+
   return dedupe(refs);
 }
 
@@ -684,6 +718,25 @@ export async function countMediaReferencesBatch(
       if (!row.previewUrl) continue;
       for (const id of urlToAssetIds.get(row.previewUrl) ?? []) bump(id);
     }
+  }
+
+  const productsWithDescriptionBlocks = await prisma.product.findMany({
+    where: { descriptionBlocks: { not: Prisma.DbNull } },
+    select: { descriptionBlocks: true },
+    take: 2000,
+  });
+  for (const product of productsWithDescriptionBlocks) {
+    // Count at most once per asset per product (mediaId canonical; URL snapshot is fallback only).
+    const hitIds = new Set<string>();
+    for (const mediaId of extractMediaIdsFromDescriptionBlocks(product.descriptionBlocks)) {
+      if (counts[mediaId] !== undefined) hitIds.add(mediaId);
+    }
+    for (const url of extractImageUrlsFromDescriptionBlocks(product.descriptionBlocks)) {
+      for (const id of urlToAssetIds.get(url) ?? []) {
+        if (counts[id] !== undefined) hitIds.add(id);
+      }
+    }
+    for (const id of hitIds) bump(id);
   }
 
   return counts;

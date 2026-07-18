@@ -18,6 +18,10 @@ import {
   SeoPublishQualityGateError,
   formatSeoPublishQualityGateApiError,
 } from "@/lib/seo/publish-quality-gate";
+import {
+  parseProductDescriptionBlocks,
+  ProductDescriptionBlocksValidationError,
+} from "@/features/products/product-description-blocks";
 
 export class ProductAdminValidationError extends Error {
   fieldErrors: Record<string, string>;
@@ -340,6 +344,16 @@ export function parseProductInput(
   if (categoryId !== undefined) input.categoryId = categoryId;
   if (raw.shortDescription !== undefined) input.shortDescription = String(raw.shortDescription).trim() || undefined;
   if (raw.description !== undefined) input.description = String(raw.description).trim() || undefined;
+  if (raw.descriptionBlocks !== undefined) {
+    try {
+      input.descriptionBlocks = parseProductDescriptionBlocks(raw.descriptionBlocks);
+    } catch (err) {
+      if (err instanceof ProductDescriptionBlocksValidationError) {
+        throw new ProductAdminValidationError(err.message, err.fieldErrors);
+      }
+      throw err;
+    }
+  }
   if (raw.seoTitle !== undefined) input.seoTitle = String(raw.seoTitle).trim() || undefined;
   if (raw.seoDescription !== undefined) input.seoDescription = String(raw.seoDescription).trim() || undefined;
   if (raw.aiSummary !== undefined) input.aiSummary = String(raw.aiSummary).trim() || undefined;

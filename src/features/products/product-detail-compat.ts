@@ -22,6 +22,7 @@ export const PRODUCT_DETAIL_LEGACY_SELECT = {
   productCode: true,
   shortDescription: true,
   description: true,
+  // descriptionBlocks omitted on legacy path — partial DBs without the column stay compatible
   seoTitle: true,
   seoDescription: true,
   material: true,

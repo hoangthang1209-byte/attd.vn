@@ -22,6 +22,19 @@ import {
   isPublicSizeChartRenderable,
   normalizeProductPublicMetadata,
 } from "@/features/products/product-size-chart";
+import {
+  parseProductDescriptionBlocks,
+  toPublicDescriptionBlocks,
+  type PublicProductDescriptionBlock,
+} from "@/features/products/product-description-blocks";
+
+function mapPublicDescriptionBlocks(raw: unknown): PublicProductDescriptionBlock[] | null {
+  try {
+    return toPublicDescriptionBlocks(parseProductDescriptionBlocks(raw));
+  } catch {
+    return null;
+  }
+}
 
 type DbOptionValue = {
   id: string;
@@ -80,6 +93,7 @@ type DbProduct = {
   productCode: string | null;
   shortDescription: string | null;
   description: string | null;
+  descriptionBlocks?: unknown;
   seoTitle: string | null;
   seoDescription: string | null;
   material: string | null;
@@ -389,6 +403,7 @@ export function mapProductToPublicDetail(product: DbProduct): PublicProductDetai
     productCode: product.productCode,
     shortDescription: product.shortDescription,
     description: product.description,
+    descriptionBlocks: mapPublicDescriptionBlocks(product.descriptionBlocks),
     seoTitle: product.seoTitle,
     seoDescription: product.seoDescription,
     category: product.category,

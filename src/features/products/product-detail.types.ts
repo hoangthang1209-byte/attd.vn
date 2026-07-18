@@ -57,6 +57,7 @@ export type PublicProductDetail = {
   productCode?: string | null;
   shortDescription?: string | null;
   description?: string | null;
+  descriptionBlocks?: import("@/features/products/product-description-blocks").PublicProductDescriptionBlock[] | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
   category: { id: string; name: string; slug: string };

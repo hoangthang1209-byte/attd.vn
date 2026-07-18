@@ -48,6 +48,9 @@ model Product {
   slug                      String                           @unique
   shortDescription          String?
   description               String?
+  /// Structured rich description blocks (headings, paragraphs, lists, Media Library images).
+  /// When present with visible content, public PDP prefers this over plain `description`.
+  descriptionBlocks         Json?
   seoTitle                  String?
   seoDescription            String?
   aiSummary                 String?

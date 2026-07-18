@@ -67,6 +67,7 @@ const FIELD_LABELS: Record<string, string> = {
   publicSizeChart: "Bảng size",
   shortDescription: "Mô tả ngắn",
   description: "Mô tả",
+  descriptionBlocks: "Mô tả nâng cao",
   tags: "Tags",
   useCases: "Use cases",
   targetCustomers: "Khách hàng mục tiêu",
@@ -275,7 +276,7 @@ function resolveDescriptorMeta(
   const tab = resolveTabForField(fieldKey, context.form ? { form: context.form, sharedAttributes: context.sharedAttributes } : undefined) as ProductFormTabId;
   let section = "Thông tin cơ bản";
   if (fieldKey === "defaultMoq" || fieldKey === "leadTime") section = "B2B";
-  if (fieldKey === "shortDescription" || fieldKey === "description") section = "Nội dung";
+  if (fieldKey === "shortDescription" || fieldKey === "description" || fieldKey === "descriptionBlocks") section = "Nội dung";
   if (fieldKey.startsWith("seo")) section = "SEO";
 
   return {

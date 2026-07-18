@@ -22,6 +22,8 @@ import {
   type OptionSelectionState,
 } from "@/lib/productOptionSelection";
 import { formatPdpDescriptionContent } from "@/lib/formatPdpDescription";
+import ProductDescriptionBlocks from "@/components/marketplace/ProductDescriptionBlocks";
+import { hasVisibleDescriptionBlocks } from "@/features/products/product-description-blocks";
 import { resolveQuoteVariantId } from "@/features/products/product-pdp.utils";
 import { mergeGalleryWithVariantImage } from "@/lib/productVariants";
 import { getPrimaryProductImage } from "@/lib/productImages";
@@ -155,6 +157,11 @@ export default function ProductDetailInteractive({
     [variants, selectedVariant?.id],
   );
 
+  const richDescriptionBlocks = product.descriptionBlocks;
+  const hasRichDescription = hasVisibleDescriptionBlocks(richDescriptionBlocks);
+  const showDescriptionSection =
+    hasRichDescription || Boolean(displayContent) || Boolean(displayShortDescription);
+
   const anchorTabs = useMemo(() => {
     const tabs: { id: string; label: string }[] = [];
     if (specifications.length > 0) {
@@ -163,7 +170,7 @@ export default function ProductDetailInteractive({
     if (sizeChart) {
       tabs.push({ id: "mp-pdp-size-chart", label: "Bảng size" });
     }
-    if (displayContent || displayShortDescription) {
+    if (showDescriptionSection) {
       tabs.push({ id: "mp-pdp-desc", label: "Mô tả" });
     }
     if (customizations.length > 0) {
@@ -176,8 +183,7 @@ export default function ProductDetailInteractive({
     specifications.length,
     sizeChart,
     customizations.length,
-    displayContent,
-    displayShortDescription,
+    showDescriptionSection,
     showFaqTab,
     showRelatedTab,
   ]);
@@ -276,7 +282,7 @@ export default function ProductDetailInteractive({
   }, [product.customizations]);
 
   const descriptionContentBlocks = useMemo(() => {
-    if (!displayContent) return [];
+    if (hasRichDescription || !displayContent) return [];
 
     const blockKeys = displayContent
       .split("\n\n")
@@ -291,7 +297,7 @@ export default function ProductDetailInteractive({
       }
       return <Fragment key={key}>{node}</Fragment>;
     });
-  }, [displayContent]);
+  }, [displayContent, hasRichDescription]);
 
   const handleOptionSelect = useCallback((groupSlug: string, valueLabel: string) => {
     if (selection[groupSlug] === valueLabel) return;
@@ -485,7 +491,7 @@ export default function ProductDetailInteractive({
 
                 <ProductSizeChartSection chart={sizeChart} />
 
-                {(displayContent || displayShortDescription) && (
+                {showDescriptionSection && (
                   <section className="mp-section mp-pdp-section" id="mp-pdp-desc">
                     <div className="mp-pdp-desc">
                       <header className="mp-pdp-section-head">
@@ -495,13 +501,21 @@ export default function ProductDetailInteractive({
                         </p>
                       </header>
                       <div className="mp-pdp-desc-content">
-                        {displayShortDescription && !displayContent && (
-                          <p className="mp-pdp-desc-lead">{displayShortDescription}</p>
-                        )}
-                        {displayContent && (
+                        {hasRichDescription ? (
                           <div className="mp-pdp-desc-body">
-                            {descriptionContentBlocks}
+                            <ProductDescriptionBlocks blocks={richDescriptionBlocks} />
                           </div>
+                        ) : (
+                          <>
+                            {displayShortDescription && !displayContent && (
+                              <p className="mp-pdp-desc-lead">{displayShortDescription}</p>
+                            )}
+                            {displayContent && (
+                              <div className="mp-pdp-desc-body">
+                                {descriptionContentBlocks}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
