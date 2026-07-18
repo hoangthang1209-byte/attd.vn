@@ -139,6 +139,7 @@ export default function ProductDetailInteractive({
     getInitialSelection(optionGroups),
   );
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [quoteCtaAttentionKey, setQuoteCtaAttentionKey] = useState(0);
 
   const selectedVariant = useMemo(
     () => findVariantBySelection(variants, optionGroups, selection),
@@ -292,8 +293,10 @@ export default function ProductDetailInteractive({
   }, [displayContent]);
 
   const handleOptionSelect = useCallback((groupSlug: string, valueLabel: string) => {
+    if (selection[groupSlug] === valueLabel) return;
     setSelection((prev) => ({ ...prev, [groupSlug]: valueLabel }));
-  }, []);
+    setQuoteCtaAttentionKey((key) => key + 1);
+  }, [selection]);
 
   const skipInitialOptionsTrackingRef = useRef(true);
   useEffect(() => {
@@ -509,7 +512,11 @@ export default function ProductDetailInteractive({
         </div>
       </div>
 
-      <ProductPdpMobileBar productSlug={product.slug} onRequestQuote={openQuoteFromMobile} />
+      <ProductPdpMobileBar
+        productSlug={product.slug}
+        onRequestQuote={openQuoteFromMobile}
+        attentionKey={quoteCtaAttentionKey}
+      />
 
       <ProductQuoteDialog
         open={quoteOpen}

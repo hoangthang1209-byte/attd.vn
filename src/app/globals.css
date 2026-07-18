@@ -20030,6 +20030,87 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
+/* PDP mobile UX polish — calmer type and readable selected variants */
+.mp-pdp--b2b .mp-pdp-overview-title {
+  font-weight: 700;
+}
+
+.mp-pdp--b2b .mp-pdp-core-fact-value {
+  font-weight: 650;
+}
+
+.mp-pdp-options-title {
+  font-weight: 700;
+}
+
+.mp-pdp-options-summary {
+  font-weight: 550;
+}
+
+.mp-pdp-option-quote-feedback strong,
+.mp-pdp-conversion-fact--selected-options dd {
+  font-weight: 650;
+}
+
+.mp-pdp--b2b .mp-pdp-chip-label {
+  font-weight: 600;
+}
+
+.mp-pdp--b2b .mp-pdp-chip {
+  font-weight: 550;
+}
+
+.mp-pdp--b2b .mp-pdp-chip--active,
+.mp-pdp--b2b .mp-pdp-chip--active:hover:not(:disabled),
+.mp-pdp--b2b .mp-pdp-chip--active[aria-selected="true"],
+.mp-pdp--b2b .mp-pdp-chip--active[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: rgba(220, 38, 38, 0.055);
+  color: #991b1b;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.14);
+}
+
+.mp-pdp--b2b .mp-pdp-chip--active.mp-pdp-chip--disabled,
+.mp-pdp--b2b .mp-pdp-chip--active:disabled {
+  color: #7f1d1d;
+  background: rgba(220, 38, 38, 0.04);
+  border-color: rgba(220, 38, 38, 0.42);
+}
+
+.mp-pdp--b2b .mp-pdp-chip--active .mp-pdp-chip-dot,
+.mp-pdp--b2b .mp-pdp-chip--active .mp-pdp-chip-thumb {
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.18);
+}
+
+.pdp-mobile-action-bar__btn--quote {
+  transition:
+    transform 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.pdp-mobile-action-bar__btn--attention {
+  animation: pdp-mobile-quote-attention 850ms ease-out 1;
+}
+
+@keyframes pdp-mobile-quote-attention {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(220, 38, 38, 0);
+  }
+  36% {
+    transform: scale(1.02);
+    background-color: #ef2424;
+    box-shadow: 0 10px 24px rgba(220, 38, 38, 0.28);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
 .mp-pdp-conversion-card {
   gap: 16px;
   padding: 20px;
@@ -22104,11 +22185,16 @@ body:has(.mp-header--v271) {
   .mp-header *,
   .site-footer *,
   .floating-contact *,
-  .mobile-action-bar * {
+  .mobile-action-bar *,
+  .pdp-mobile-action-bar * {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+
+  .pdp-mobile-action-bar__btn--attention {
+    animation: none !important;
   }
 }
 
