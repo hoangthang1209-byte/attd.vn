@@ -126,8 +126,15 @@ export default function ProductSizeChartEditor({
     onChange(createEmptyProductSizeChart());
   }
 
+  const isEmptyChart = value.columns.length === 0 && value.rows.length === 0;
+  const showFullEditor = value.enabled || !isEmptyChart;
+
   return (
-    <div className="admin-size-chart" data-testid="product-size-chart-editor">
+    <div
+      className={`admin-size-chart${showFullEditor ? "" : " admin-size-chart--compact-empty"}`}
+      data-testid="product-size-chart-editor"
+      data-compact-empty={showFullEditor ? "false" : "true"}
+    >
       <div className="admin-size-chart__toolbar">
         <label className="admin-catalog-toggle">
           <input
@@ -144,136 +151,146 @@ export default function ProductSizeChartEditor({
           <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={addTeeColumns}>
             Thêm cột cơ bản áo thun
           </button>
-          <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={clearChart}>
-            Xóa bảng size
-          </button>
+          {showFullEditor && (
+            <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={clearChart}>
+              Xóa bảng size
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="admin-seo-brief-form-grid">
-        <div className="admin-field">
-          <label className="admin-label">Tiêu đề</label>
-          <input
-            className="admin-input"
-            value={value.title ?? ""}
-            onChange={(e) => patch({ title: e.target.value })}
-            placeholder="Bảng size"
-          />
-        </div>
-        <div className="admin-field">
-          <label className="admin-label">Đơn vị</label>
-          <select
-            className="admin-input"
-            value={value.unit}
-            onChange={(e) => patch({ unit: e.target.value as ProductSizeChartUnit })}
-          >
-            <option value="cm">cm</option>
-            <option value="inch">inch</option>
-          </select>
-        </div>
-      </div>
+      {!showFullEditor ? (
+        <p className="admin-field-hint admin-size-chart__empty-hint">
+          Bảng size đang tắt và trống. Bật hiển thị hoặc dùng các nút trên để bắt đầu.
+        </p>
+      ) : (
+        <>
+          <div className="admin-seo-brief-form-grid">
+            <div className="admin-field">
+              <label className="admin-label">Tiêu đề</label>
+              <input
+                className="admin-input"
+                value={value.title ?? ""}
+                onChange={(e) => patch({ title: e.target.value })}
+                placeholder="Bảng size"
+              />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Đơn vị</label>
+              <select
+                className="admin-input"
+                value={value.unit}
+                onChange={(e) => patch({ unit: e.target.value as ProductSizeChartUnit })}
+              >
+                <option value="cm">cm</option>
+                <option value="inch">inch</option>
+              </select>
+            </div>
+          </div>
 
-      <div className="admin-field">
-        <label className="admin-label">Ghi chú</label>
-        <textarea
-          className="admin-textarea"
-          rows={2}
-          value={value.note ?? ""}
-          onChange={(e) => patch({ note: e.target.value })}
-          placeholder="Thông số có thể chênh lệch ±1–2cm tùy chất liệu và phương pháp đo."
-        />
-      </div>
+          <div className="admin-field">
+            <label className="admin-label">Ghi chú</label>
+            <textarea
+              className="admin-textarea"
+              rows={2}
+              value={value.note ?? ""}
+              onChange={(e) => patch({ note: e.target.value })}
+              placeholder="Thông số có thể chênh lệch ±1–2cm tùy chất liệu và phương pháp đo."
+            />
+          </div>
 
-      <div className="admin-size-chart__table-wrap">
-        <table className="admin-size-chart__table">
-          <thead>
-            <tr>
-              <th scope="col">Size</th>
-              {value.columns.map((column) => (
-                <th key={column.id} scope="col">
-                  <div className="admin-size-chart__col-head">
-                    <input
-                      className="admin-input"
-                      value={column.label}
-                      onChange={(e) => updateColumnLabel(column.id, e.target.value)}
-                      placeholder="Cột đo"
-                      aria-label="Nhãn cột đo"
-                    />
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn--secondary admin-btn--xs"
-                      title="Xóa cột"
-                      onClick={() => removeColumn(column.id)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </th>
-              ))}
-              <th scope="col" className="admin-size-chart__row-actions">
-                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={addColumn}>
-                  + Cột
-                </button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {value.rows.length === 0 ? (
-              <tr>
-                <td colSpan={value.columns.length + 2}>
-                  <p className="admin-field-hint" style={{ margin: "8px 0" }}>
-                    Chưa có hàng size. Dùng “Tạo từ size biến thể” hoặc thêm hàng thủ công.
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              value.rows.map((row) => (
-                <tr key={row.id}>
-                  <th scope="row">
-                    <input
-                      className="admin-input"
-                      value={row.size}
-                      onChange={(e) => updateRowSize(row.id, e.target.value)}
-                      placeholder="M"
-                      aria-label="Size"
-                    />
-                  </th>
+          <div className="admin-size-chart__table-wrap">
+            <table className="admin-size-chart__table">
+              <thead>
+                <tr>
+                  <th scope="col">Size</th>
                   {value.columns.map((column) => (
-                    <td key={column.id}>
-                      <input
-                        className="admin-input"
-                        value={row.values[column.id] ?? ""}
-                        onChange={(e) => updateCell(row.id, column.id, e.target.value)}
-                        placeholder="50"
-                        aria-label={`${row.size || "Size"} ${column.label || column.id}`}
-                      />
-                    </td>
+                    <th key={column.id} scope="col">
+                      <div className="admin-size-chart__col-head">
+                        <input
+                          className="admin-input"
+                          value={column.label}
+                          onChange={(e) => updateColumnLabel(column.id, e.target.value)}
+                          placeholder="Cột đo"
+                          aria-label="Nhãn cột đo"
+                        />
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn--secondary admin-btn--xs"
+                          title="Xóa cột"
+                          onClick={() => removeColumn(column.id)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </th>
                   ))}
-                  <td className="admin-size-chart__row-actions">
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn--secondary admin-btn--xs"
-                      title="Xóa hàng"
-                      onClick={() => removeRow(row.id)}
-                    >
-                      ✕
+                  <th scope="col" className="admin-size-chart__row-actions">
+                    <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={addColumn}>
+                      + Cột
                     </button>
-                  </td>
+                  </th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {value.rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={value.columns.length + 2}>
+                      <p className="admin-field-hint" style={{ margin: "8px 0" }}>
+                        Chưa có hàng size. Dùng “Tạo từ size biến thể” hoặc thêm hàng thủ công.
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  value.rows.map((row) => (
+                    <tr key={row.id}>
+                      <th scope="row">
+                        <input
+                          className="admin-input"
+                          value={row.size}
+                          onChange={(e) => updateRowSize(row.id, e.target.value)}
+                          placeholder="M"
+                          aria-label="Size"
+                        />
+                      </th>
+                      {value.columns.map((column) => (
+                        <td key={column.id}>
+                          <input
+                            className="admin-input"
+                            value={row.values[column.id] ?? ""}
+                            onChange={(e) => updateCell(row.id, column.id, e.target.value)}
+                            placeholder="50"
+                            aria-label={`${row.size || "Size"} ${column.label || column.id}`}
+                          />
+                        </td>
+                      ))}
+                      <td className="admin-size-chart__row-actions">
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn--secondary admin-btn--xs"
+                          title="Xóa hàng"
+                          onClick={() => removeRow(row.id)}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-      <div className="admin-size-chart__footer-actions">
-        <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={addRow}>
-          + Thêm hàng size
-        </button>
-        <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={addColumn}>
-          + Thêm cột đo
-        </button>
-      </div>
+          <div className="admin-size-chart__footer-actions">
+            <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={addRow}>
+              + Thêm hàng size
+            </button>
+            <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={addColumn}>
+              + Thêm cột đo
+            </button>
+          </div>
+        </>
+      )}
 
       {error && (
         <p className="admin-field-error" role="alert" data-field="publicSizeChart">

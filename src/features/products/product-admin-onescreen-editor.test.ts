@@ -56,6 +56,13 @@ describe("one-screen product admin editor", () => {
   it("keeps sticky save actions", () => {
     assert.match(source, /admin-catalog-form__sticky-actions/);
     assert.match(source, /Lưu thay đổi/);
+    assert.match(source, /product-sticky-save-bar|padding-bottom/);
+  });
+
+  it("uses content accordions while keeping suggestion buttons", () => {
+    assert.match(source, /admin-catalog-accordion/);
+    assert.match(source, /ProductContentSuggestButton/);
+    assert.match(source, /product-material-accordion/);
   });
 });
 

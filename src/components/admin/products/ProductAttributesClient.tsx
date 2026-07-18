@@ -194,7 +194,7 @@ export default function ProductAttributesClient() {
   const { toast } = useAdminAction();
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showInactive, setShowInactive] = useState(true);
+  const [showInactive, setShowInactive] = useState(false);
   const [attributeForm, setAttributeForm] = useState<AttributeForm>(defaultAttributeForm());
   const [valueForm, setValueForm] = useState<ValueForm>(defaultValueForm());
   const [isSavingCreateAttribute, setIsSavingCreateAttribute] = useState(false);
@@ -204,6 +204,10 @@ export default function ProductAttributesClient() {
   const [createAttributeFieldErrors, setCreateAttributeFieldErrors] = useState<Record<string, string>>({});
   const [createValueFieldErrors, setCreateValueFieldErrors] = useState<Record<string, string>>({});
   const [presetDialogOpen, setPresetDialogOpen] = useState(false);
+  const [showCreateAttribute, setShowCreateAttribute] = useState(false);
+  const [showCreateValue, setShowCreateValue] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedAttributeIds, setExpandedAttributeIds] = useState<Record<string, boolean>>({});
 
   const [inlineAttributeEditId, setInlineAttributeEditId] = useState<string | null>(null);
   const [inlineAttributeDraft, setInlineAttributeDraft] = useState<InlineAttributeDraft | null>(null);
@@ -352,8 +356,26 @@ export default function ProductAttributesClient() {
   function manageValues(attribute: Attribute) {
     setValueForm(defaultValueForm(attribute.id));
     setCreateValueFieldErrors({});
-    valueFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setShowCreateValue(true);
+    setExpandedAttributeIds((current) => ({ ...current, [attribute.id]: true }));
+    window.setTimeout(() => {
+      valueFormRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 50);
   }
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredAttributes = attributes.filter((attribute) => {
+    if (!normalizedSearch) return true;
+    const haystack = [
+      attribute.name,
+      attribute.code,
+      attribute.slug,
+      ...attribute.values.map((value) => `${value.name} ${value.code}`),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(normalizedSearch);
+  });
 
   async function handlePresetSuccess(attributeId: string, successMessage: string) {
     setMessage(successMessage);
@@ -416,6 +438,7 @@ export default function ProductAttributesClient() {
         },
       ]));
       setAttributeForm(defaultAttributeForm());
+      setShowCreateAttribute(false);
       setMessage("Đã tạo thuộc tính.");
       toast.success("Đã tạo thuộc tính.");
     } catch {
@@ -676,181 +699,215 @@ export default function ProductAttributesClient() {
   }
 
   return (
-    <div className="admin-catalog-page">
-      <div className="admin-catalog-toolbar">
+    <div className="admin-catalog-page admin-attributes-page" data-testid="admin-attributes-page">
+      <p className="admin-field-hint admin-attributes-page__help">
+        Quản lý thuộc tính dùng chung cho biến thể và thông số sản phẩm. Danh sách bên dưới là nơi làm việc chính.
+      </p>
+
+      <div className="admin-catalog-toolbar admin-attributes-toolbar">
         <div className="admin-catalog-toolbar-left">
-          <button type="button" className="admin-btn admin-btn--primary" onClick={() => setPresetDialogOpen(true)}>
+          <button type="button" className="admin-btn admin-btn--primary admin-btn--xs" onClick={() => setPresetDialogOpen(true)}>
             Tạo từ bộ mặc định
           </button>
-          <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            data-testid="attributes-toggle-create"
+            onClick={() => setShowCreateAttribute((current) => !current)}
+          >
+            {showCreateAttribute ? "Đóng thêm thuộc tính" : "Thêm thuộc tính"}
+          </button>
+          <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void load()}>
             Làm mới danh sách
           </button>
         </div>
-        <label className="admin-catalog-toggle">
-          <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
-          Hiện thuộc tính ngừng sử dụng
-        </label>
+        <div className="admin-attributes-toolbar__filters">
+          <input
+            className="admin-input admin-attributes-search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm tên / mã / giá trị…"
+            aria-label="Tìm thuộc tính"
+            data-testid="attributes-search"
+          />
+          <label className="admin-catalog-toggle">
+            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
+            Hiện ngừng sử dụng
+          </label>
+        </div>
       </div>
-
-      <p className="admin-field-hint">
-        Thuộc tính đang hoạt động sẽ xuất hiện trong phần &quot;Thuộc tính &amp; biến thể&quot; khi tạo hoặc sửa sản phẩm.
-      </p>
-      <p className="admin-field-hint">
-        Thuộc tính có trạng thái hoạt động và được đánh dấu &quot;Dùng làm thông số&quot; sẽ xuất hiện trong phần &quot;Thông tin thuộc tính sản phẩm&quot; khi tạo hoặc sửa sản phẩm.
-      </p>
 
       {message && <p className="admin-success">{message}</p>}
       {error && <p className="admin-error" role="alert">{error}</p>}
 
-      <form className="admin-catalog-fieldset" onSubmit={(e) => void handleCreateAttributeSubmit(e)}>
-        <legend style={{ fontWeight: 600, fontSize: 14 }}>Thêm thuộc tính mới</legend>
-        <div className="admin-seo-brief-form-grid">
-          <div className="admin-field">
-            <label className="admin-label">Tên thuộc tính <span className="admin-required">*</span></label>
-            <input
-              className={`admin-input${errorClass(createAttributeFieldErrors, "name")}`}
-              value={attributeForm.name}
-              onChange={(e) => {
-                setCreateAttributeFieldErrors((current) => {
-                  if (!current.name) return current;
-                  const next = { ...current };
-                  delete next.name;
-                  return next;
-                });
-                setAttributeForm((form) => ({ ...form, name: e.target.value }));
-              }}
-              placeholder="Màu sắc, Kích thước, Form dáng…"
-            />
-            {createAttributeFieldErrors.name && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.name}</p>}
+      {showCreateAttribute && (
+        <form
+          className="admin-catalog-fieldset admin-catalog-fieldset--dense"
+          onSubmit={(e) => void handleCreateAttributeSubmit(e)}
+          data-testid="attributes-create-form"
+        >
+          <legend style={{ fontWeight: 600, fontSize: 14 }}>Thêm thuộc tính mới</legend>
+          <div className="admin-seo-brief-form-grid">
+            <div className="admin-field">
+              <label className="admin-label">Tên thuộc tính <span className="admin-required">*</span></label>
+              <input
+                className={`admin-input${errorClass(createAttributeFieldErrors, "name")}`}
+                value={attributeForm.name}
+                onChange={(e) => {
+                  setCreateAttributeFieldErrors((current) => {
+                    if (!current.name) return current;
+                    const next = { ...current };
+                    delete next.name;
+                    return next;
+                  });
+                  setAttributeForm((form) => ({ ...form, name: e.target.value }));
+                }}
+                placeholder="Màu sắc, Kích thước, Form dáng…"
+              />
+              {createAttributeFieldErrors.name && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.name}</p>}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Mã thuộc tính</label>
+              <input
+                className={`admin-input${errorClass(createAttributeFieldErrors, "code")}`}
+                value={attributeForm.code}
+                onChange={(e) => setAttributeForm((form) => ({ ...form, code: e.target.value.toUpperCase() }))}
+                placeholder="COLOR, SIZE, FIT…"
+              />
+              {createAttributeFieldErrors.code && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.code}</p>}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Slug</label>
+              <input
+                className={`admin-input${errorClass(createAttributeFieldErrors, "slug")}`}
+                value={attributeForm.slug}
+                onChange={(e) => setAttributeForm((form) => ({ ...form, slug: e.target.value }))}
+                placeholder="Tự sinh nếu bỏ trống"
+              />
+              {createAttributeFieldErrors.slug && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.slug}</p>}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Kiểu hiển thị</label>
+              <select className="admin-input" value={attributeForm.displayType} onChange={(e) => setAttributeForm((form) => ({ ...form, displayType: e.target.value as DisplayType }))}>
+                {Object.entries(DISPLAY_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Thứ tự sắp xếp</label>
+              <input className="admin-input" type="number" value={attributeForm.sortOrder} onChange={(e) => setAttributeForm((form) => ({ ...form, sortOrder: e.target.value }))} />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Trạng thái</label>
+              <select className="admin-input" value={attributeForm.status} onChange={(e) => setAttributeForm((form) => ({ ...form, status: e.target.value as Status }))}>
+                <option value="ACTIVE">Đang hoạt động</option>
+                <option value="INACTIVE">Ngừng sử dụng</option>
+              </select>
+            </div>
+          </div>
+          <div className="admin-catalog-toggle-grid">
+            <label className="admin-catalog-toggle">
+              <input type="checkbox" checked={attributeForm.isVariantAttribute} onChange={(e) => setAttributeForm((form) => ({ ...form, isVariantAttribute: e.target.checked }))} />
+              Dùng để tạo biến thể
+            </label>
+            <label className="admin-catalog-toggle">
+              <input type="checkbox" checked={attributeForm.isSpecificationAttribute} onChange={(e) => setAttributeForm((form) => ({ ...form, isSpecificationAttribute: e.target.checked }))} />
+              Dùng làm thông số sản phẩm
+            </label>
           </div>
           <div className="admin-field">
-            <label className="admin-label">Mã thuộc tính</label>
-            <input
-              className={`admin-input${errorClass(createAttributeFieldErrors, "code")}`}
-              value={attributeForm.code}
-              onChange={(e) => setAttributeForm((form) => ({ ...form, code: e.target.value.toUpperCase() }))}
-              placeholder="COLOR, SIZE, FIT…"
-            />
-            {createAttributeFieldErrors.code && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.code}</p>}
+            <label className="admin-label">Ghi chú nội bộ</label>
+            <textarea className="admin-textarea" rows={2} value={attributeForm.note} onChange={(e) => setAttributeForm((form) => ({ ...form, note: e.target.value }))} />
           </div>
-          <div className="admin-field">
-            <label className="admin-label">Slug</label>
-            <input
-              className={`admin-input${errorClass(createAttributeFieldErrors, "slug")}`}
-              value={attributeForm.slug}
-              onChange={(e) => setAttributeForm((form) => ({ ...form, slug: e.target.value }))}
-              placeholder="Tự sinh nếu bỏ trống"
-            />
-            {createAttributeFieldErrors.slug && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.slug}</p>}
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Kiểu hiển thị</label>
-            <select className="admin-input" value={attributeForm.displayType} onChange={(e) => setAttributeForm((form) => ({ ...form, displayType: e.target.value as DisplayType }))}>
-              {Object.entries(DISPLAY_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Thứ tự sắp xếp</label>
-            <input className="admin-input" type="number" value={attributeForm.sortOrder} onChange={(e) => setAttributeForm((form) => ({ ...form, sortOrder: e.target.value }))} />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Trạng thái</label>
-            <select className="admin-input" value={attributeForm.status} onChange={(e) => setAttributeForm((form) => ({ ...form, status: e.target.value as Status }))}>
-              <option value="ACTIVE">Đang hoạt động</option>
-              <option value="INACTIVE">Ngừng sử dụng</option>
-            </select>
-          </div>
-        </div>
-        <div className="admin-catalog-toggle-grid">
-          <label className="admin-catalog-toggle">
-            <input type="checkbox" checked={attributeForm.isVariantAttribute} onChange={(e) => setAttributeForm((form) => ({ ...form, isVariantAttribute: e.target.checked }))} />
-            Dùng để tạo biến thể
-          </label>
-          <label className="admin-catalog-toggle">
-            <input type="checkbox" checked={attributeForm.isSpecificationAttribute} onChange={(e) => setAttributeForm((form) => ({ ...form, isSpecificationAttribute: e.target.checked }))} />
-            Dùng làm thông số sản phẩm
-          </label>
-        </div>
-        <div className="admin-field">
-          <label className="admin-label">Ghi chú nội bộ</label>
-          <textarea className="admin-textarea" value={attributeForm.note} onChange={(e) => setAttributeForm((form) => ({ ...form, note: e.target.value }))} />
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <AdminLoadingButton
-            type="submit"
-            variant="primary"
-            pending={isSavingCreateAttribute}
-            pendingLabel="Đang thêm thuộc tính..."
-          >
-            Thêm thuộc tính
-          </AdminLoadingButton>
-        </div>
-      </form>
-
-      <form ref={valueFormRef} className="admin-catalog-fieldset" onSubmit={(e) => void handleCreateValueSubmit(e)}>
-        <legend style={{ fontWeight: 600, fontSize: 14 }}>Thêm giá trị thuộc tính</legend>
-        <div className="admin-seo-brief-form-grid">
-          <div className="admin-field">
-            <label className="admin-label">Thuộc tính cha <span className="admin-required">*</span></label>
-            <select
-              className={`admin-input${errorClass(createValueFieldErrors, "attributeId")}`}
-              value={valueForm.attributeId}
-              onChange={(e) => setValueForm((form) => ({ ...form, attributeId: e.target.value }))}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <AdminLoadingButton
+              type="submit"
+              variant="primary"
+              pending={isSavingCreateAttribute}
+              pendingLabel="Đang thêm thuộc tính..."
             >
-              <option value="">— Chọn thuộc tính —</option>
-              {attributes.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name} ({attribute.code})</option>)}
-            </select>
-            {createValueFieldErrors.attributeId && <p className="admin-field-error" role="alert">{createValueFieldErrors.attributeId}</p>}
+              Thêm thuộc tính
+            </AdminLoadingButton>
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setShowCreateAttribute(false)}>
+              Đóng
+            </button>
           </div>
-          <div className="admin-field">
-            <label className="admin-label">Tên hiển thị <span className="admin-required">*</span></label>
-            <input
-              className={`admin-input${errorClass(createValueFieldErrors, "name")}`}
-              value={valueForm.name}
-              onChange={(e) => setValueForm((form) => ({ ...form, name: e.target.value }))}
-              placeholder="Đen, Trắng, S, Regular fit…"
-            />
-            {createValueFieldErrors.name && <p className="admin-field-error" role="alert">{createValueFieldErrors.name}</p>}
+        </form>
+      )}
+
+      {showCreateValue && (
+        <form
+          ref={valueFormRef}
+          className="admin-catalog-fieldset admin-catalog-fieldset--dense"
+          onSubmit={(e) => void handleCreateValueSubmit(e)}
+          data-testid="attributes-create-value-form"
+        >
+          <legend style={{ fontWeight: 600, fontSize: 14 }}>Thêm giá trị thuộc tính</legend>
+          <div className="admin-seo-brief-form-grid">
+            <div className="admin-field">
+              <label className="admin-label">Thuộc tính cha <span className="admin-required">*</span></label>
+              <select
+                className={`admin-input${errorClass(createValueFieldErrors, "attributeId")}`}
+                value={valueForm.attributeId}
+                onChange={(e) => setValueForm((form) => ({ ...form, attributeId: e.target.value }))}
+              >
+                <option value="">— Chọn thuộc tính —</option>
+                {attributes.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name} ({attribute.code})</option>)}
+              </select>
+              {createValueFieldErrors.attributeId && <p className="admin-field-error" role="alert">{createValueFieldErrors.attributeId}</p>}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Tên hiển thị <span className="admin-required">*</span></label>
+              <input
+                className={`admin-input${errorClass(createValueFieldErrors, "name")}`}
+                value={valueForm.name}
+                onChange={(e) => setValueForm((form) => ({ ...form, name: e.target.value }))}
+                placeholder="Đen, Trắng, S, Regular fit…"
+              />
+              {createValueFieldErrors.name && <p className="admin-field-error" role="alert">{createValueFieldErrors.name}</p>}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Mã giá trị</label>
+              <input className="admin-input" value={valueForm.code} onChange={(e) => setValueForm((form) => ({ ...form, code: e.target.value.toUpperCase() }))} placeholder="BLK, WHT, S…" />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Slug</label>
+              <input className="admin-input" value={valueForm.slug} onChange={(e) => setValueForm((form) => ({ ...form, slug: e.target.value }))} placeholder="Tự sinh nếu bỏ trống" />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">HEX màu</label>
+              <input className="admin-input" value={valueForm.hexCode} onChange={(e) => setValueForm((form) => ({ ...form, hexCode: e.target.value }))} placeholder="#000000" />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Ảnh giá trị</label>
+              <input className="admin-input" value={valueForm.imageUrl} onChange={(e) => setValueForm((form) => ({ ...form, imageUrl: e.target.value }))} placeholder="URL ảnh nếu dùng image swatch" />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Thứ tự</label>
+              <input className="admin-input" type="number" value={valueForm.sortOrder} onChange={(e) => setValueForm((form) => ({ ...form, sortOrder: e.target.value }))} />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Trạng thái</label>
+              <select className="admin-input" value={valueForm.status} onChange={(e) => setValueForm((form) => ({ ...form, status: e.target.value as Status }))}>
+                <option value="ACTIVE">Đang hoạt động</option>
+                <option value="INACTIVE">Ngừng sử dụng</option>
+              </select>
+            </div>
           </div>
-          <div className="admin-field">
-            <label className="admin-label">Mã giá trị</label>
-            <input className="admin-input" value={valueForm.code} onChange={(e) => setValueForm((form) => ({ ...form, code: e.target.value.toUpperCase() }))} placeholder="BLK, WHT, S…" />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <AdminLoadingButton
+              type="submit"
+              variant="primary"
+              pending={isSavingCreateValue}
+              pendingLabel="Đang thêm giá trị..."
+            >
+              Thêm giá trị
+            </AdminLoadingButton>
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setShowCreateValue(false)}>
+              Đóng
+            </button>
           </div>
-          <div className="admin-field">
-            <label className="admin-label">Slug</label>
-            <input className="admin-input" value={valueForm.slug} onChange={(e) => setValueForm((form) => ({ ...form, slug: e.target.value }))} placeholder="Tự sinh nếu bỏ trống" />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">HEX màu</label>
-            <input className="admin-input" value={valueForm.hexCode} onChange={(e) => setValueForm((form) => ({ ...form, hexCode: e.target.value }))} placeholder="#000000" />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Ảnh giá trị</label>
-            <input className="admin-input" value={valueForm.imageUrl} onChange={(e) => setValueForm((form) => ({ ...form, imageUrl: e.target.value }))} placeholder="URL ảnh nếu dùng image swatch" />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Thứ tự</label>
-            <input className="admin-input" type="number" value={valueForm.sortOrder} onChange={(e) => setValueForm((form) => ({ ...form, sortOrder: e.target.value }))} />
-          </div>
-          <div className="admin-field">
-            <label className="admin-label">Trạng thái</label>
-            <select className="admin-input" value={valueForm.status} onChange={(e) => setValueForm((form) => ({ ...form, status: e.target.value as Status }))}>
-              <option value="ACTIVE">Đang hoạt động</option>
-              <option value="INACTIVE">Ngừng sử dụng</option>
-            </select>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <AdminLoadingButton
-            type="submit"
-            variant="primary"
-            pending={isSavingCreateValue}
-            pendingLabel="Đang thêm giá trị..."
-          >
-            Thêm giá trị
-          </AdminLoadingButton>
-        </div>
-      </form>
+        </form>
+      )}
 
       {loading ? (
         <TableLoading
@@ -859,14 +916,18 @@ export default function ProductAttributesClient() {
           tone="admin"
         />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {attributes.map((attribute) => {
+        <div className="admin-attributes-list" data-testid="attributes-list">
+          {filteredAttributes.length === 0 ? (
+            <p className="admin-field-hint">Không có thuộc tính phù hợp.</p>
+          ) : (
+            filteredAttributes.map((attribute) => {
             const isInlineEditingAttribute = inlineAttributeEditId === attribute.id && inlineAttributeDraft;
+            const valuesExpanded = expandedAttributeIds[attribute.id] ?? attribute.values.length > 0;
             return (
               <section
                 key={attribute.id}
                 ref={(node) => { attributeSectionRefs.current[attribute.id] = node; }}
-                className="admin-product-section"
+                className="admin-product-section admin-attribute-card"
               >
                 {isInlineEditingAttribute ? (
                   <div className="admin-attribute-inline-edit-panel">
@@ -1035,8 +1096,20 @@ export default function ProductAttributesClient() {
                       <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => openInlineAttributeEdit(attribute)}>
                         Sửa nhanh
                       </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--secondary admin-btn--xs"
+                        onClick={() =>
+                          setExpandedAttributeIds((current) => ({
+                            ...current,
+                            [attribute.id]: !(current[attribute.id] ?? attribute.values.length > 0),
+                          }))
+                        }
+                      >
+                        {valuesExpanded ? "Thu giá trị" : `Giá trị (${attribute.values.length})`}
+                      </button>
                       <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => manageValues(attribute)}>
-                        Quản lý giá trị
+                        Thêm giá trị
                       </button>
                       <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchAttributeStatus(attribute)}>
                         {attribute.status === "ACTIVE" ? "Ngừng sử dụng" : "Kích hoạt"}
@@ -1046,8 +1119,9 @@ export default function ProductAttributesClient() {
                   </div>
                 )}
 
+                {valuesExpanded && (
                 <div className="admin-catalog-table-wrap">
-                  <table className="admin-catalog-table">
+                  <table className="admin-catalog-table admin-catalog-table--dense">
                     <thead>
                       <tr>
                         <th>Tên hiển thị</th>
@@ -1234,15 +1308,17 @@ export default function ProductAttributesClient() {
                       })}
                       {attribute.values.length === 0 && (
                         <tr>
-                          <td colSpan={8}>Chưa có giá trị. Thêm giá trị ở biểu mẫu phía trên hoặc dùng &quot;Quản lý giá trị&quot;.</td>
+                          <td colSpan={8}>Chưa có giá trị. Bấm &quot;Thêm giá trị&quot; để mở biểu mẫu.</td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
+                )}
               </section>
             );
-          })}
+          })
+          )}
         </div>
       )}
 

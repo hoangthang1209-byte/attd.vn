@@ -1004,22 +1004,40 @@ export default function ProductCatalogForm({
       data-testid="product-catalog-form-onescreen"
     >
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-        <h2 className="admin-subtitle" style={{ margin: 0 }}>{form.id ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}</h2>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="admin-catalog-form__header" data-testid="product-catalog-form-header">
+        <div className="admin-catalog-form__header-main">
+          <h2 className="admin-catalog-form__title">
+            {form.id ? (form.name.trim() || "Chỉnh sửa sản phẩm") : "Thêm sản phẩm mới"}
+          </h2>
+          <div className="admin-catalog-form__meta">
+            {form.id && form.productCode && (
+              <code className="admin-catalog-code" data-testid="product-editor-code">{form.productCode}</code>
+            )}
+            <span className={`admin-kb-badge admin-catalog-form__status admin-catalog-form__status--${form.status.toLowerCase()}`}>
+              {form.status === "DRAFT"
+                ? "Nháp"
+                : form.status === "ACTIVE"
+                  ? "Đang bán"
+                  : form.status === "INACTIVE"
+                    ? "Tạm dừng"
+                    : "Lưu trữ"}
+            </span>
+          </div>
+        </div>
+        <div className="admin-catalog-form__header-actions">
           {form.id && (
             <>
               <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setExportDialog("export")}>
-                Xuất sản phẩm này
+                Xuất
               </button>
               <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => setExportDialog("clone")}>
-                Xuất mẫu để nhân bản
+                Nhân bản mẫu
               </button>
             </>
           )}
           {publicUrl && (
             <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary admin-btn--xs">
-              🔗 Xem trên website
+              Xem trên website
             </a>
           )}
         </div>
@@ -1064,7 +1082,7 @@ export default function ProductCatalogForm({
         ))}
       </nav>
 
-      <fieldset className="admin-catalog-fieldset" id="section-basic">
+      <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-basic">
         <legend>1. Thông tin cơ bản</legend>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field" data-field="name">
@@ -1183,91 +1201,74 @@ export default function ProductCatalogForm({
         </div>
       </fieldset>
 
-      {/* ── Hình ảnh sản phẩm ───────────────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset" id="section-media">
+      <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-media" data-testid="section-media">
         <legend>2. Hình ảnh sản phẩm</legend>
-        <p className="admin-field-hint">Ảnh nên tối ưu 200–300KB trước khi upload để website tải nhanh.</p>
+        <p className="admin-field-hint">Ảnh nên tối ưu 200–300KB trước khi upload.</p>
 
-        {/* Featured image */}
-        <div className="admin-field" data-field="featuredImage">
-          <label className="admin-label">Ảnh đại diện</label>
-          <MediaPicker
-            label="Ảnh đại diện"
-            value={form.featuredImage}
-            onChange={(url) => setField("featuredImage", url)}
-            folder="products"
-          />
-          <p className="admin-field-hint" style={{ marginTop: 6 }}>Hoặc nhập URL ảnh trực tiếp:</p>
-          <input
-            className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.featuredImage))}`}
-            value={form.featuredImage}
-            data-field="featuredImage"
-            onChange={(e) => setField("featuredImage", e.target.value)}
-            placeholder="https://… hoặc chọn từ thư viện ảnh phía trên"
-          />
-          {fieldErrors.featuredImage && (
-            <p className="admin-field-error" role="alert">{fieldErrors.featuredImage}</p>
-          )}
-        </div>
-
-        <div className="admin-field" data-field="curatedSalesBadges">
-          <label className="admin-label">Nhãn bán hàng trên ảnh đại diện</label>
-          <p className="admin-field-hint">
-            Các nhãn này sẽ hiển thị trên ảnh sản phẩm ở danh sách công khai.
-          </p>
-          <div className="admin-catalog-sales-badge-chips">
-            {PRODUCT_CURATED_BADGE_KEYS.map((key) => {
-              const selected = form.curatedSalesBadges.includes(key);
-              const disabled = !selected && curatedBadgeLimitReached;
-              return (
-                <label
-                  key={key}
-                  className={`admin-catalog-sales-badge-chip${selected ? " admin-catalog-sales-badge-chip--selected" : ""}${disabled ? " admin-catalog-sales-badge-chip--disabled" : ""}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    disabled={disabled}
-                    onChange={() => toggleCuratedSalesBadge(key)}
-                  />
-                  {PRODUCT_CURATED_BADGE_LABELS[key]}
-                </label>
-              );
-            })}
+        <div className="admin-catalog-media-grid">
+          <div className="admin-field" data-field="featuredImage">
+            <label className="admin-label">Ảnh đại diện</label>
+            <div className="admin-catalog-media-inline">
+              <MediaPicker
+                label="Ảnh đại diện"
+                value={form.featuredImage}
+                onChange={(url) => setField("featuredImage", url)}
+                folder="products"
+              />
+              <input
+                className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.featuredImage))}`}
+                value={form.featuredImage}
+                data-field="featuredImage"
+                onChange={(e) => setField("featuredImage", e.target.value)}
+                placeholder="URL ảnh hoặc chọn từ thư viện"
+              />
+            </div>
+            {fieldErrors.featuredImage && (
+              <p className="admin-field-error" role="alert">{fieldErrors.featuredImage}</p>
+            )}
           </div>
-          <p className="admin-field-hint" style={{ marginTop: 6 }}>
-            Đã chọn {form.curatedSalesBadges.length}/2
-          </p>
-          {fieldErrors.curatedSalesBadges && (
-            <p className="admin-field-error" role="alert">{fieldErrors.curatedSalesBadges}</p>
-          )}
 
-          <div className="admin-catalog-sales-badge-preview">
-            <p className="admin-label" style={{ marginBottom: 6 }}>Nhãn tự động dự kiến</p>
-            <p className="admin-field-hint" style={{ marginBottom: 8 }}>
-              Dựa trên dữ liệu sản phẩm (MOQ, in logo, OEM). Không thể nhập thủ công tại đây.
-            </p>
-            {automaticSalesBadgePreview.length > 0 ? (
-              <div className="admin-catalog-sales-badge-preview-list">
+          <div className="admin-field" data-field="curatedSalesBadges">
+            <label className="admin-label">Nhãn trên ảnh đại diện</label>
+            <div className="admin-catalog-sales-badge-chips">
+              {PRODUCT_CURATED_BADGE_KEYS.map((key) => {
+                const selected = form.curatedSalesBadges.includes(key);
+                const disabled = !selected && curatedBadgeLimitReached;
+                return (
+                  <label
+                    key={key}
+                    className={`admin-catalog-sales-badge-chip${selected ? " admin-catalog-sales-badge-chip--selected" : ""}${disabled ? " admin-catalog-sales-badge-chip--disabled" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      disabled={disabled}
+                      onChange={() => toggleCuratedSalesBadge(key)}
+                    />
+                    {PRODUCT_CURATED_BADGE_LABELS[key]}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="admin-field-hint">Đã chọn {form.curatedSalesBadges.length}/2</p>
+            {fieldErrors.curatedSalesBadges && (
+              <p className="admin-field-error" role="alert">{fieldErrors.curatedSalesBadges}</p>
+            )}
+            {automaticSalesBadgePreview.length > 0 && (
+              <div className="admin-catalog-sales-badge-preview-list" style={{ marginTop: 6 }}>
                 {automaticSalesBadgePreview.map((badge) => (
                   <span key={badge.key} className="admin-catalog-sales-badge-preview-item">
                     {badge.label}
                   </span>
                 ))}
               </div>
-            ) : (
-              <p className="admin-field-hint">Chưa có nhãn tự động từ dữ liệu hiện tại.</p>
             )}
           </div>
         </div>
 
-        {/* Gallery */}
-        <div className="admin-field">
-          <label className="admin-label">Thư viện ảnh (gallery)</label>
-          <p className="admin-field-hint" style={{ marginBottom: 8 }}>
-            Ảnh thứ hai sẽ hiển thị khi rê chuột vào card sản phẩm trên desktop.
-          </p>
+        <div className="admin-field admin-catalog-gallery-field" data-compact-empty={form.gallery.length === 0 ? "true" : "false"}>
           <div className="admin-catalog-gallery-picker">
+            <label className="admin-label" style={{ marginRight: 8 }}>Thư viện ảnh</label>
             <MediaPicker
               multiple={true}
               selectedUrls={form.gallery}
@@ -1280,45 +1281,48 @@ export default function ProductCatalogForm({
             />
             <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs"
               onClick={() => setField("gallery", [...form.gallery, ""])}>
-              + Thêm ảnh từ URL
+              + URL
             </button>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
-            {form.gallery.map((url, idx) => (
-              <div key={idx} className="admin-catalog-gallery-row">
-                {url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={url} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 4, border: "1px solid #e5e7eb", flexShrink: 0 }} />
-                )}
-                <input
-                  className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors[`gallery.${idx}`]))}`}
-                  value={url}
-                  data-field={`gallery.${idx}`}
-                  onChange={(e) => {
-                    const next = [...form.gallery];
-                    next[idx] = e.target.value;
-                    setField("gallery", next);
-                    clearFieldErrorKey(`gallery.${idx}`);
-                  }}
-                  placeholder="URL ảnh gallery"
-                />
-                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" title="Di chuyển lên" disabled={idx === 0} onClick={() => moveGallery(idx, -1)}>↑</button>
-                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" title="Di chuyển xuống" disabled={idx === form.gallery.length - 1} onClick={() => moveGallery(idx, 1)}>↓</button>
-                <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" title="Xóa ảnh" onClick={() => setField("gallery", form.gallery.filter((_, i) => i !== idx))}>✕</button>
-                {fieldErrors[`gallery.${idx}`] && (
-                  <p className="admin-field-error" role="alert" style={{ flex: "1 1 100%" }}>
-                    {fieldErrors[`gallery.${idx}`]}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-          {form.gallery.length === 0 && <p className="admin-field-hint">Chưa có ảnh gallery. Chọn từ thư viện hoặc nhập URL.</p>}
+          {form.gallery.length === 0 ? (
+            <p className="admin-field-hint admin-catalog-gallery-empty">Chưa có ảnh gallery.</p>
+          ) : (
+            <div className="admin-catalog-gallery-list">
+              {form.gallery.map((url, idx) => (
+                <div key={idx} className="admin-catalog-gallery-row">
+                  {url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={url} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, border: "1px solid #e5e7eb", flexShrink: 0 }} />
+                  )}
+                  <input
+                    className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors[`gallery.${idx}`]))}`}
+                    value={url}
+                    data-field={`gallery.${idx}`}
+                    onChange={(e) => {
+                      const next = [...form.gallery];
+                      next[idx] = e.target.value;
+                      setField("gallery", next);
+                      clearFieldErrorKey(`gallery.${idx}`);
+                    }}
+                    placeholder="URL ảnh gallery"
+                  />
+                  <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" title="Di chuyển lên" disabled={idx === 0} onClick={() => moveGallery(idx, -1)}>↑</button>
+                  <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" title="Di chuyển xuống" disabled={idx === form.gallery.length - 1} onClick={() => moveGallery(idx, 1)}>↓</button>
+                  <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" title="Xóa ảnh" onClick={() => setField("gallery", form.gallery.filter((_, i) => i !== idx))}>✕</button>
+                  {fieldErrors[`gallery.${idx}`] && (
+                    <p className="admin-field-error" role="alert" style={{ flex: "1 1 100%" }}>
+                      {fieldErrors[`gallery.${idx}`]}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </fieldset>
 
       {/* ── Thông tin B2B ───────────────────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset" id="section-b2b">
+      <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-b2b">
         <legend>3. Thông tin bán sỉ / B2B</legend>
         <div className="admin-seo-brief-form-grid">
           <ProductB2BSharedAttributeField
@@ -1429,7 +1433,7 @@ export default function ProductCatalogForm({
       </fieldset>
 
       {/* ── Biến thể ─────────────────────────────────────────────────────── */}
-      <fieldset className="admin-catalog-fieldset" id="section-variants">
+      <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-variants">
         <legend>4. Biến thể &amp; thuộc tính</legend>
         <ProductCatalogVariantsSection
           ref={variantsSectionRef}
@@ -1459,12 +1463,9 @@ export default function ProductCatalogForm({
         )}
       </fieldset>
 
-      <fieldset className="admin-catalog-fieldset" id="section-size-chart" data-field="publicSizeChart">
+      <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-size-chart" data-field="publicSizeChart">
         <legend>5. Bảng size</legend>
-        <p className="admin-field-hint" style={{ marginBottom: 10 }}>
-          Bảng size riêng của sản phẩm — hiển thị trên trang chi tiết khi được bật.
-        </p>
-        <div className="admin-content-suggest-section-actions" style={{ marginBottom: 10 }}>
+        <div className="admin-content-suggest-section-actions">
           <ProductContentSuggestButton
             label="Gợi ý ghi chú bảng size"
             existingValue={form.publicSizeChart.note ?? ""}
@@ -1490,138 +1491,169 @@ export default function ProductCatalogForm({
         />
       </fieldset>
 
-      <fieldset className="admin-catalog-fieldset" id="section-content">
+      <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-content">
         <legend>6. Nội dung chi tiết</legend>
-        <div className="admin-field" data-field="description">
-          <div className="admin-content-suggest-label-row">
-            <label className="admin-label">Mô tả sản phẩm đầy đủ</label>
+
+        <details className="admin-catalog-accordion" open data-testid="content-accordion-description">
+          <summary>Mô tả</summary>
+          <div className="admin-field" data-field="description">
+            <div className="admin-content-suggest-label-row">
+              <label className="admin-label">Mô tả sản phẩm đầy đủ</label>
+              <ProductContentSuggestButton
+                existingValue={form.description}
+                preferRetryLabel
+                onApply={() => suggestProductLongDescription(contentSuggestionInput)}
+                onFilled={(value) => setField("description", Array.isArray(value) ? value.join("\n") : value)}
+              />
+            </div>
+            <textarea
+              className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.description))}`}
+              rows={5}
+              data-field="description"
+              value={form.description}
+              onChange={(e) => setField("description", e.target.value)}
+            />
+            {fieldErrors.description && <p className="admin-field-error" role="alert">{fieldErrors.description}</p>}
+          </div>
+        </details>
+
+        <details
+          className="admin-catalog-accordion"
+          open={form.attributeAssignments.length > 0}
+          data-testid="content-accordion-attributes"
+        >
+          <summary>Thuộc tính sản phẩm ({form.attributeAssignments.length})</summary>
+          <ProductInformationAttributesSection
+            rows={form.attributeAssignments}
+            sharedAttributes={sharedAttributes}
+            sharedAttributesLoading={sharedAttributesLoading}
+            sharedAttributesError={sharedAttributesError}
+            fieldErrors={fieldErrors}
+            onChange={(attributeAssignments) => setField("attributeAssignments", attributeAssignments)}
+            onRefreshSharedAttributes={loadSharedAttributes}
+            sectionRef={attributeSectionRef}
+          />
+        </details>
+
+        <details
+          className="admin-catalog-accordion"
+          open={form.specifications.length > 0}
+          data-testid="content-accordion-specs"
+        >
+          <summary>Thông số nổi bật ({form.specifications.length})</summary>
+          <div className="admin-content-suggest-section-actions">
             <ProductContentSuggestButton
-              existingValue={form.description}
-              preferRetryLabel
-              onApply={() => suggestProductLongDescription(contentSuggestionInput)}
-              onFilled={(value) => setField("description", Array.isArray(value) ? value.join("\n") : value)}
+              label="Gợi ý thông số"
+              existingValue={form.specifications.map((row) => `${row.label} ${row.value}`).join(" ")}
+              onApply={() => {
+                const rows = suggestProductSpecificationSummary(contentSuggestionInput);
+                if (!rows.length) return null;
+                return rows.map((row) => `${row.label}: ${row.value}`).join("\n");
+              }}
+              onFilled={() => {
+                const rows = suggestProductSpecificationSummary(contentSuggestionInput);
+                if (!rows.length) return;
+                setField(
+                  "specifications",
+                  rows.map((row, index) => ({
+                    clientKey: `spec-suggest-${index}`,
+                    label: row.label,
+                    value: row.value,
+                    sortOrder: index,
+                  })),
+                );
+              }}
             />
           </div>
-          <textarea
-            className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.description))}`}
-            rows={8}
-            data-field="description"
-            value={form.description}
-            onChange={(e) => setField("description", e.target.value)}
+          <ProductCatalogSpecificationsSection
+            rows={form.specifications}
+            fieldErrors={fieldErrors}
+            onChange={(specifications) => setField("specifications", specifications)}
+            onFieldEdit={clearFieldErrorKey}
           />
-          {fieldErrors.description && <p className="admin-field-error" role="alert">{fieldErrors.description}</p>}
-          <p className="admin-field-hint">Nội dung văn bản an toàn — không dán HTML thô từ nguồn không tin cậy.</p>
-        </div>
-        <ProductInformationAttributesSection
-          rows={form.attributeAssignments}
-          sharedAttributes={sharedAttributes}
-          sharedAttributesLoading={sharedAttributesLoading}
-          sharedAttributesError={sharedAttributesError}
-          fieldErrors={fieldErrors}
-          onChange={(attributeAssignments) => setField("attributeAssignments", attributeAssignments)}
-          onRefreshSharedAttributes={loadSharedAttributes}
-          sectionRef={attributeSectionRef}
-        />
-        <div className="admin-content-suggest-section-actions">
-          <ProductContentSuggestButton
-            label="Gợi ý thông số"
-            existingValue={form.specifications.map((row) => `${row.label} ${row.value}`).join(" ")}
-            onApply={() => {
-              const rows = suggestProductSpecificationSummary(contentSuggestionInput);
-              if (!rows.length) return null;
-              return rows.map((row) => `${row.label}: ${row.value}`).join("\n");
-            }}
-            onFilled={() => {
-              const rows = suggestProductSpecificationSummary(contentSuggestionInput);
-              if (!rows.length) return;
-              setField(
-                "specifications",
-                rows.map((row, index) => ({
-                  clientKey: `spec-suggest-${index}`,
-                  label: row.label,
-                  value: row.value,
-                  sortOrder: index,
-                })),
-              );
-            }}
+        </details>
+
+        <details
+          className="admin-catalog-accordion"
+          open={form.customizations.length > 0}
+          data-testid="content-accordion-customizations"
+        >
+          <summary>Khả năng tùy chỉnh ({form.customizations.length})</summary>
+          <div className="admin-content-suggest-section-actions">
+            <ProductContentSuggestButton
+              label="Gợi ý tùy chỉnh"
+              existingValue={form.customizations.map((row) => row.label).join(" ")}
+              onApply={() => {
+                const note = suggestProductCustomizationNote(contentSuggestionInput);
+                return note?.label ?? null;
+              }}
+              onFilled={() => {
+                const note = suggestProductCustomizationNote(contentSuggestionInput);
+                if (!note?.label.trim()) return;
+                setField("customizations", [
+                  ...form.customizations,
+                  {
+                    clientKey: `cust-suggest-${Date.now()}`,
+                    label: note.label,
+                    description: note.description ?? "",
+                    enabled: true,
+                    sortOrder: form.customizations.length,
+                  },
+                ]);
+              }}
+            />
+          </div>
+          <ProductCatalogContentSection
+            rows={form.customizations}
+            fieldErrors={fieldErrors}
+            onChange={(customizations) => setField("customizations", customizations)}
+            onFieldEdit={clearFieldErrorKey}
           />
-          <ProductContentSuggestButton
-            label="Gợi ý tùy chỉnh"
-            existingValue={form.customizations.map((row) => row.label).join(" ")}
-            onApply={() => {
-              const note = suggestProductCustomizationNote(contentSuggestionInput);
-              return note?.label ?? null;
-            }}
-            onFilled={() => {
-              const note = suggestProductCustomizationNote(contentSuggestionInput);
-              if (!note?.label.trim()) return;
-              setField("customizations", [
-                ...form.customizations,
-                {
-                  clientKey: `cust-suggest-${Date.now()}`,
-                  label: note.label,
-                  description: note.description ?? "",
-                  enabled: true,
-                  sortOrder: form.customizations.length,
-                },
-              ]);
-            }}
-          />
-        </div>
-        <ProductCatalogSpecificationsSection
-          rows={form.specifications}
-          fieldErrors={fieldErrors}
-          onChange={(specifications) => setField("specifications", specifications)}
-          onFieldEdit={clearFieldErrorKey}
-        />
-        <ProductCatalogContentSection
-          rows={form.customizations}
-          fieldErrors={fieldErrors}
-          onChange={(customizations) => setField("customizations", customizations)}
-          onFieldEdit={clearFieldErrorKey}
-        />
+        </details>
       </fieldset>
 
-      <fieldset className="admin-catalog-fieldset" id="section-seo">
+      <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-seo">
         <legend>7. SEO &amp; hiển thị website</legend>
-        <div className="admin-field" data-field="seoTitle">
-          <div className="admin-content-suggest-label-row">
-            <label className="admin-label">SEO title</label>
-            <ProductContentSuggestButton
-              existingValue={form.seoTitle}
-              preferRetryLabel
-              onApply={() => suggestProductSeoTitle(contentSuggestionInput)}
-              onFilled={(value) => setField("seoTitle", Array.isArray(value) ? value.join(" ") : value)}
+        <div className="admin-seo-brief-form-grid">
+          <div className="admin-field" data-field="seoTitle">
+            <div className="admin-content-suggest-label-row">
+              <label className="admin-label">SEO title</label>
+              <ProductContentSuggestButton
+                existingValue={form.seoTitle}
+                preferRetryLabel
+                onApply={() => suggestProductSeoTitle(contentSuggestionInput)}
+                onFilled={(value) => setField("seoTitle", Array.isArray(value) ? value.join(" ") : value)}
+              />
+            </div>
+            <input
+              className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.seoTitle))}`}
+              data-field="seoTitle"
+              value={form.seoTitle}
+              onChange={(e) => setField("seoTitle", e.target.value)}
             />
+            {fieldErrors.seoTitle && <p className="admin-field-error" role="alert">{fieldErrors.seoTitle}</p>}
           </div>
-          <input
-            className={`admin-input${fieldErrorInputClass(Boolean(fieldErrors.seoTitle))}`}
-            data-field="seoTitle"
-            value={form.seoTitle}
-            onChange={(e) => setField("seoTitle", e.target.value)}
-          />
-          {fieldErrors.seoTitle && <p className="admin-field-error" role="alert">{fieldErrors.seoTitle}</p>}
-        </div>
-        <div className="admin-field" data-field="seoDescription">
-          <div className="admin-content-suggest-label-row">
-            <label className="admin-label">SEO description</label>
-            <ProductContentSuggestButton
-              existingValue={form.seoDescription}
-              preferRetryLabel
-              onApply={() => suggestProductSeoDescription(contentSuggestionInput)}
-              onFilled={(value) =>
-                setField("seoDescription", Array.isArray(value) ? value.join(" ") : value)
-              }
+          <div className="admin-field" data-field="seoDescription">
+            <div className="admin-content-suggest-label-row">
+              <label className="admin-label">SEO description</label>
+              <ProductContentSuggestButton
+                existingValue={form.seoDescription}
+                preferRetryLabel
+                onApply={() => suggestProductSeoDescription(contentSuggestionInput)}
+                onFilled={(value) =>
+                  setField("seoDescription", Array.isArray(value) ? value.join(" ") : value)
+                }
+              />
+            </div>
+            <textarea
+              className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.seoDescription))}`}
+              rows={2}
+              data-field="seoDescription"
+              value={form.seoDescription}
+              onChange={(e) => setField("seoDescription", e.target.value)}
             />
+            {fieldErrors.seoDescription && <p className="admin-field-error" role="alert">{fieldErrors.seoDescription}</p>}
           </div>
-          <textarea
-            className={`admin-textarea${fieldErrorInputClass(Boolean(fieldErrors.seoDescription))}`}
-            rows={3}
-            data-field="seoDescription"
-            value={form.seoDescription}
-            onChange={(e) => setField("seoDescription", e.target.value)}
-          />
-          {fieldErrors.seoDescription && <p className="admin-field-error" role="alert">{fieldErrors.seoDescription}</p>}
         </div>
         {publicUrl && (
           <p className="admin-field-hint">
@@ -1636,9 +1668,14 @@ export default function ProductCatalogForm({
         )}
       </fieldset>
 
-      {form.id && <ProductMaterialSection productId={form.id} />}
+      {form.id && (
+        <details className="admin-catalog-accordion admin-catalog-accordion--material" data-testid="product-material-accordion">
+          <summary>Vật tư / BOM &amp; costing nâng cao</summary>
+          <ProductMaterialSection productId={form.id} />
+        </details>
+      )}
 
-      <div className="admin-catalog-form__sticky-actions" id="section-save">
+      <div className="admin-catalog-form__sticky-actions" id="section-save" data-testid="product-sticky-save-bar">
         <AdminLoadingButton
           type="submit"
           variant="primary"
