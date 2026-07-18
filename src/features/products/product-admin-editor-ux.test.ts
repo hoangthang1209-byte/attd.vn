@@ -28,6 +28,7 @@ describe("product editor UX compaction", () => {
     assert.match(form, /href={`#\$\{section\.id\}`}/);
     assert.doesNotMatch(form, /role="tablist"/);
     assert.doesNotMatch(form, /hidden=\{activeTab !==/);
+    assert.match(form, /admin-catalog-section-help/);
   });
 
   it("does not duplicate product title in form header", () => {
@@ -38,11 +39,13 @@ describe("product editor UX compaction", () => {
     assert.doesNotMatch(form, /admin-catalog-form__title">\{form\.name\}/);
   });
 
-  it("scrolls sections with admin header offset and disables overlapping sticky pills", () => {
+  it("separates pill active/hover/focus and avoids sticky overlap", () => {
     assert.match(form, /admin-content-scroll/);
     assert.match(form, /headerOffset/);
     assert.match(css, /\.admin-catalog-section-nav\s*\{[\s\S]*?position:\s*static/);
-    assert.match(css, /admin-product-edit-dense/);
+    assert.match(css, /\.admin-catalog-section-nav__link:hover:not\(\.is-active\)/);
+    assert.match(css, /\.admin-catalog-section-nav__link:focus-visible/);
+    assert.match(css, /\.admin-catalog-section-nav__link\.is-active\s*\{/);
     assert.match(form, /admin-product-edit-dense/);
   });
 
@@ -66,19 +69,25 @@ describe("product editor UX compaction", () => {
     assert.match(css, /html\.admin-product-edit-dense[\s\S]*padding-bottom:\s*128px/);
   });
 
-  it("variant generate, attribute links, and content suggestion controls remain", () => {
+  it("supports select-all/clear, color management link, and safe quick create", () => {
     assert.match(form, /ProductCatalogVariantsSection/);
     assert.match(form, /onBeforeMatrixGenerate/);
     assert.match(form, /ProductContentSuggestButton/);
-    assert.match(form, /content-accordion-description/);
     assert.match(optionBuilder, /data-testid="manage-colors-link"/);
     assert.match(optionBuilder, /Quản lý màu sắc/);
     assert.match(optionBuilder, /href="\/admin\/attributes"/);
+    assert.match(optionBuilder, /data-testid="shared-values-select-all"/);
+    assert.match(optionBuilder, /Chọn tất cả/);
+    assert.match(optionBuilder, /data-testid="shared-values-clear-selection"/);
+    assert.match(optionBuilder, /Bỏ chọn/);
+    assert.match(optionBuilder, /product-editor-quick-value-create/);
   });
 });
 
 describe("attributes page UX compaction", () => {
   const source = read("src/components/admin/products/ProductAttributesClient.tsx");
+  const schema = read("prisma/schema.prisma");
+  const migration = read("prisma/migrations/0082_attribute_value_name_en/migration.sql");
 
   it("prioritizes attribute list and collapses create forms by default", () => {
     assert.match(source, /data-testid="admin-attributes-page"/);
@@ -89,28 +98,28 @@ describe("attributes page UX compaction", () => {
     assert.match(source, /showAdvancedValueForm &&/);
     assert.match(source, /Thêm giá trị nâng cao/);
     const listIdx = source.indexOf('data-testid="attributes-list"');
-    const createIdx = source.indexOf('data-testid="attributes-create-form"');
     const advancedIdx = source.indexOf('data-testid="attributes-create-value-form"');
     assert.ok(listIdx > 0);
-    assert.ok(createIdx > 0);
-    assert.ok(advancedIdx > listIdx, "advanced value form should appear after attribute list in source");
-    assert.match(source, /Thêm thuộc tính/);
+    assert.ok(advancedIdx > listIdx);
   });
 
-  it("expands inline value table with color columns and quick-add row", () => {
+  it("expands bilingual inline value table with color columns and quick-add row", () => {
     assert.match(source, /Quản lý giá trị/);
     assert.match(source, /manageValues/);
-    assert.match(source, /data-testid=\{`attribute-values-\$\{attribute\.id\}`\}/);
-    assert.match(source, /Tên màu/);
+    assert.match(source, /Tên tiếng Việt/);
+    assert.match(source, /Tên tiếng Anh/);
     assert.match(source, /HEX màu/);
     assert.match(source, /\+ Thêm màu mới/);
     assert.match(source, /\+ Thêm giá trị mới/);
     assert.match(source, /quick-add-row/);
     assert.match(source, /submitQuickAdd/);
-    assert.match(source, /suggestAttributeColorCode/);
+    assert.match(source, /suggestAttributeValueCode/);
     assert.match(source, /isValidHexColor/);
     assert.match(source, /ATTRIBUTE_VALUE_DUPLICATE_MESSAGE/);
     assert.match(source, /admin-attribute-swatch--light/);
+    assert.match(schema, /model ProductAttributeValue[\s\S]*nameEn\s+String\?/);
+    assert.match(schema, /model ProductAttribute \{[\s\S]*nameEn\s+String\?/);
+    assert.match(migration, /ADD COLUMN IF NOT EXISTS "nameEn"/);
   });
 
   it("keeps search, inactive toggle, and row value actions", () => {
@@ -118,6 +127,6 @@ describe("attributes page UX compaction", () => {
     assert.match(source, /Hiện ngừng sử dụng/);
     assert.match(source, /Sửa nhanh/);
     assert.match(source, /Tạo từ bộ mặc định/);
-    assert.match(source, /Ngừng sử dụng|Ngừng/);
+    assert.match(source, /Ngưng sử dụng|Ngừng/);
   });
 });

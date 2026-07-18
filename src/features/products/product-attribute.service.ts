@@ -350,6 +350,7 @@ export async function listSharedAttributes(options?: {
 
 export async function createSharedAttribute(raw: Record<string, unknown>) {
   const name = String(raw.name ?? "").trim();
+  const nameEn = raw.nameEn !== undefined ? String(raw.nameEn ?? "").trim() || null : null;
   const fieldErrors: Record<string, string> = {};
   if (!name) fieldErrors.name = "Tên thuộc tính là bắt buộc.";
   const displayType = String(raw.displayType ?? "TEXT").toUpperCase() as ProductAttributeDisplayType;
@@ -361,12 +362,14 @@ export async function createSharedAttribute(raw: Record<string, unknown>) {
   }
 
   await assertUniqueAttributeName(name);
-  const code = await ensureUniqueAttributeCode(String(raw.code ?? name));
-  const slug = await ensureUniqueAttributeSlug(String(raw.slug ?? name));
+  const codeSource = nameEn || name;
+  const code = await ensureUniqueAttributeCode(String(raw.code ?? codeSource));
+  const slug = await ensureUniqueAttributeSlug(String(raw.slug ?? codeSource));
 
   return prisma.productAttribute.create({
     data: {
       name,
+      nameEn,
       code,
       slug,
       displayType,
@@ -395,6 +398,10 @@ export async function updateSharedAttribute(id: string, raw: Record<string, unkn
     }
     await assertUniqueAttributeName(name, id);
     data.name = name;
+  }
+
+  if (raw.nameEn !== undefined) {
+    data.nameEn = String(raw.nameEn ?? "").trim() || null;
   }
 
   if (raw.code !== undefined) {
@@ -448,6 +455,7 @@ export async function createSharedAttributeValue(attributeId: string, raw: Recor
   }
 
   const name = String(raw.name ?? "").trim();
+  const nameEn = raw.nameEn !== undefined ? String(raw.nameEn ?? "").trim() || null : null;
   const fieldErrors: Record<string, string> = {};
   if (!name) fieldErrors.name = "Tên hiển thị là bắt buộc.";
   const hexCode = raw.hexCode ? String(raw.hexCode).trim() : null;
@@ -457,13 +465,15 @@ export async function createSharedAttributeValue(attributeId: string, raw: Recor
   }
 
   await assertUniqueValueName(attributeId, name);
-  const code = await ensureUniqueValueCode(attribute, name, raw.code ? String(raw.code) : undefined);
-  const slug = await ensureUniqueValueSlug(attributeId, String(raw.slug ?? name));
+  const codeSource = nameEn || name;
+  const code = await ensureUniqueValueCode(attribute, codeSource, raw.code ? String(raw.code) : undefined);
+  const slug = await ensureUniqueValueSlug(attributeId, String(raw.slug ?? codeSource));
 
   return prisma.productAttributeValue.create({
     data: {
       attributeId,
       name,
+      nameEn,
       code,
       slug,
       hexCode,
@@ -493,6 +503,10 @@ export async function updateSharedAttributeValue(id: string, raw: Record<string,
     }
     await assertUniqueValueName(existing.attributeId, name, id);
     data.name = name;
+  }
+
+  if (raw.nameEn !== undefined) {
+    data.nameEn = String(raw.nameEn ?? "").trim() || null;
   }
 
   if (raw.code !== undefined) {

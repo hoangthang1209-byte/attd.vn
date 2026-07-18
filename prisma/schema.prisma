@@ -2338,6 +2338,7 @@ enum SharedProductAttributeStatus {
 model ProductAttribute {
   id                       String                       @id @default(cuid())
   name                     String
+  nameEn                   String?
   code                     String                       @unique
   slug                     String                       @unique
   displayType              ProductAttributeDisplayType  @default(TEXT)
@@ -2378,6 +2379,7 @@ model ProductAttributeValue {
   id                 String                       @id @default(cuid())
   attributeId        String
   name               String
+  nameEn             String?
   code               String
   slug               String
   hexCode            String?

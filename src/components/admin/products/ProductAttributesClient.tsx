@@ -10,7 +10,8 @@ import {
   ATTRIBUTE_VALUE_DUPLICATE_MESSAGE,
   isColorAttribute,
   isValidHexColor,
-  suggestAttributeColorCode,
+  suggestAttributeCode,
+  suggestAttributeValueCode,
   suggestColorHex,
 } from "@/features/products/attribute-color-utils";
 
@@ -33,6 +34,7 @@ const UNSAVED_INLINE_CONFIRM = "Bạn có muốn bỏ thay đổi chưa lưu?";
 type AttributeValue = {
   id: string;
   name: string;
+  nameEn: string | null;
   code: string;
   slug: string;
   hexCode: string | null;
@@ -46,6 +48,7 @@ type AttributeValue = {
 type Attribute = {
   id: string;
   name: string;
+  nameEn: string | null;
   code: string;
   slug: string;
   displayType: DisplayType;
@@ -61,6 +64,7 @@ type Attribute = {
 
 type AttributeForm = {
   name: string;
+  nameEn: string;
   code: string;
   slug: string;
   displayType: DisplayType;
@@ -74,6 +78,7 @@ type AttributeForm = {
 type ValueForm = {
   attributeId: string;
   name: string;
+  nameEn: string;
   code: string;
   slug: string;
   hexCode: string;
@@ -84,6 +89,7 @@ type ValueForm = {
 
 type InlineAttributeDraft = {
   name: string;
+  nameEn: string;
   note: string;
   displayType: DisplayType;
   isVariantAttribute: boolean;
@@ -97,6 +103,7 @@ type InlineAttributeDraft = {
 
 type InlineValueDraft = {
   name: string;
+  nameEn: string;
   hexCode: string;
   imageUrl: string;
   sortOrder: string;
@@ -109,6 +116,7 @@ type InlineValueDraft = {
 type ApiAttributePatch = {
   id: string;
   name: string;
+  nameEn: string | null;
   code: string;
   slug: string;
   displayType: DisplayType;
@@ -122,6 +130,7 @@ type ApiAttributePatch = {
 type ApiValuePatch = {
   id: string;
   name: string;
+  nameEn: string | null;
   code: string;
   slug: string;
   hexCode: string | null;
@@ -132,6 +141,7 @@ type ApiValuePatch = {
 
 const defaultAttributeForm = (): AttributeForm => ({
   name: "",
+  nameEn: "",
   code: "",
   slug: "",
   displayType: "TEXT",
@@ -145,6 +155,7 @@ const defaultAttributeForm = (): AttributeForm => ({
 const defaultValueForm = (attributeId = ""): ValueForm => ({
   attributeId,
   name: "",
+  nameEn: "",
   code: "",
   slug: "",
   hexCode: "",
@@ -155,6 +166,7 @@ const defaultValueForm = (attributeId = ""): ValueForm => ({
 
 type QuickAddDraft = {
   name: string;
+  nameEn: string;
   code: string;
   hexCode: string;
   imageUrl: string;
@@ -169,6 +181,7 @@ type QuickAddDraft = {
 function defaultQuickAddDraft(sortOrder = "0"): QuickAddDraft {
   return {
     name: "",
+    nameEn: "",
     code: "",
     hexCode: "",
     imageUrl: "",
@@ -196,6 +209,7 @@ function sortValues(list: AttributeValue[]): AttributeValue[] {
 function inlineAttributeDraftFromAttribute(attribute: Attribute): InlineAttributeDraft {
   return {
     name: attribute.name,
+    nameEn: attribute.nameEn ?? "",
     note: attribute.note ?? "",
     displayType: attribute.displayType,
     isVariantAttribute: attribute.isVariantAttribute,
@@ -211,6 +225,7 @@ function inlineAttributeDraftFromAttribute(attribute: Attribute): InlineAttribut
 function inlineValueDraftFromValue(value: AttributeValue): InlineValueDraft {
   return {
     name: value.name,
+    nameEn: value.nameEn ?? "",
     hexCode: value.hexCode ?? "",
     imageUrl: value.imageUrl ?? "",
     sortOrder: String(value.sortOrder),
@@ -416,17 +431,29 @@ export default function ProductAttributesClient() {
     });
   }
 
-  function onQuickAddNameChange(attribute: Attribute, name: string) {
+  function onQuickAddNameChange(attribute: Attribute, patch: { name?: string; nameEn?: string }) {
     const previous = quickAddDrafts[attribute.id] ?? defaultQuickAddDraft();
+    const name = patch.name !== undefined ? patch.name : previous.name;
+    const nameEn = patch.nameEn !== undefined ? patch.nameEn : previous.nameEn;
     const isColor = isColorAttribute(attribute);
-    const suggestedCode = isColor ? suggestAttributeColorCode(name) : previous.code;
-    const nextCode = previous.codeTouched ? previous.code : suggestedCode;
+    const isSize = attribute.displayType === "SIZE" || attribute.code === "SIZE";
+    const existingCodes = attribute.values.map((value) => value.code);
+    const nextCode = previous.codeTouched
+      ? previous.code
+      : suggestAttributeValueCode({
+          nameVi: name,
+          nameEn,
+          isColor,
+          isSize,
+          existingCodes,
+        });
     const nextHex =
       isColor && !previous.hexTouched
-        ? suggestColorHex(nextCode || name)
+        ? suggestColorHex(nameEn || name || nextCode)
         : previous.hexCode;
     updateQuickAddDraft(attribute.id, {
       name,
+      nameEn,
       code: nextCode,
       hexCode: nextHex,
       error: null,
@@ -439,7 +466,7 @@ export default function ProductAttributesClient() {
     const name = draft.name.trim();
     if (!name) {
       updateQuickAddDraft(attribute.id, {
-        fieldErrors: { name: "Tên hiển thị là bắt buộc." },
+        fieldErrors: { name: "Tên tiếng Việt là bắt buộc." },
       });
       return;
     }
@@ -453,6 +480,8 @@ export default function ProductAttributesClient() {
     const duplicate = attribute.values.some(
       (value) =>
         value.name.trim().toLowerCase() === name.toLowerCase() ||
+        (draft.nameEn.trim() &&
+          (value.nameEn ?? "").trim().toLowerCase() === draft.nameEn.trim().toLowerCase()) ||
         (draft.code.trim() && value.code.trim().toUpperCase() === draft.code.trim().toUpperCase()),
     );
     if (duplicate) {
@@ -468,6 +497,7 @@ export default function ProductAttributesClient() {
     try {
       const payload = {
         name,
+        nameEn: draft.nameEn.trim() || undefined,
         code: draft.code.trim() || undefined,
         hexCode: draft.hexCode.trim() || undefined,
         imageUrl: draft.imageUrl.trim() || undefined,
@@ -505,6 +535,7 @@ export default function ProductAttributesClient() {
           {
             id: data.id,
             name: data.name,
+            nameEn: data.nameEn ?? null,
             code: data.code,
             slug: data.slug,
             hexCode: data.hexCode,
@@ -566,6 +597,7 @@ export default function ProductAttributesClient() {
     try {
       const payload = {
         name: attributeForm.name.trim(),
+        nameEn: attributeForm.nameEn.trim() || undefined,
         code: attributeForm.code.trim() || undefined,
         slug: attributeForm.slug.trim() || undefined,
         displayType: attributeForm.displayType,
@@ -593,6 +625,7 @@ export default function ProductAttributesClient() {
         {
           id: data.id,
           name: data.name,
+          nameEn: data.nameEn ?? null,
           code: data.code,
           slug: data.slug,
           displayType: data.displayType,
@@ -634,6 +667,7 @@ export default function ProductAttributesClient() {
     try {
       const payload = {
         name: valueForm.name.trim(),
+        nameEn: valueForm.nameEn.trim() || undefined,
         code: valueForm.code.trim() || undefined,
         slug: valueForm.slug.trim() || undefined,
         hexCode: valueForm.hexCode.trim() || undefined,
@@ -661,6 +695,7 @@ export default function ProductAttributesClient() {
           {
             id: data.id,
             name: data.name,
+            nameEn: data.nameEn ?? null,
             code: data.code,
             slug: data.slug,
             hexCode: data.hexCode,
@@ -694,6 +729,7 @@ export default function ProductAttributesClient() {
     try {
       const payload: Record<string, unknown> = {
         name: inlineAttributeDraft.name.trim(),
+        nameEn: inlineAttributeDraft.nameEn.trim() || null,
         displayType: inlineAttributeDraft.displayType,
         isVariantAttribute: inlineAttributeDraft.isVariantAttribute,
         isSpecificationAttribute: inlineAttributeDraft.isSpecificationAttribute,
@@ -723,6 +759,7 @@ export default function ProductAttributesClient() {
       updateAttributeInList(attribute.id, (current) => ({
         ...current,
         name: data.name,
+        nameEn: data.nameEn ?? null,
         code: data.code,
         slug: data.slug,
         displayType: data.displayType,
@@ -753,6 +790,7 @@ export default function ProductAttributesClient() {
     try {
       const payload: Record<string, unknown> = {
         name: inlineValueDraft.name.trim(),
+        nameEn: inlineValueDraft.nameEn.trim() || null,
         hexCode: inlineValueDraft.hexCode.trim() || undefined,
         imageUrl: inlineValueDraft.imageUrl.trim() || undefined,
         status: inlineValueDraft.status,
@@ -780,6 +818,7 @@ export default function ProductAttributesClient() {
       updateValueInList(attribute.id, value.id, (current) => ({
         ...current,
         name: data.name,
+        nameEn: data.nameEn ?? null,
         code: data.code,
         slug: data.slug,
         hexCode: data.hexCode,
@@ -918,7 +957,7 @@ export default function ProductAttributesClient() {
           <legend style={{ fontWeight: 600, fontSize: 14 }}>Thêm thuộc tính mới</legend>
           <div className="admin-seo-brief-form-grid">
             <div className="admin-field">
-              <label className="admin-label">Tên thuộc tính <span className="admin-required">*</span></label>
+              <label className="admin-label">Tên tiếng Việt <span className="admin-required">*</span></label>
               <input
                 className={`admin-input${errorClass(createAttributeFieldErrors, "name")}`}
                 value={attributeForm.name}
@@ -929,11 +968,32 @@ export default function ProductAttributesClient() {
                     delete next.name;
                     return next;
                   });
-                  setAttributeForm((form) => ({ ...form, name: e.target.value }));
+                  const name = e.target.value;
+                  setAttributeForm((form) => ({
+                    ...form,
+                    name,
+                    code: form.code || suggestAttributeCode(name, form.nameEn),
+                  }));
                 }}
                 placeholder="Màu sắc, Kích thước, Form dáng…"
               />
               {createAttributeFieldErrors.name && <p className="admin-field-error" role="alert">{createAttributeFieldErrors.name}</p>}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Tên tiếng Anh</label>
+              <input
+                className="admin-input"
+                value={attributeForm.nameEn}
+                onChange={(e) => {
+                  const nameEn = e.target.value;
+                  setAttributeForm((form) => ({
+                    ...form,
+                    nameEn,
+                    code: form.code || suggestAttributeCode(form.name, nameEn),
+                  }));
+                }}
+                placeholder="Color, Size, Fit…"
+              />
             </div>
             <div className="admin-field">
               <label className="admin-label">Mã thuộc tính</label>
@@ -1037,7 +1097,7 @@ export default function ProductAttributesClient() {
                     </div>
                     <div className="admin-attribute-inline-edit-grid">
                       <div className="admin-field">
-                        <label className="admin-label">Tên thuộc tính</label>
+                        <label className="admin-label">Tên tiếng Việt</label>
                         <input
                           className={`admin-input${errorClass(inlineAttributeFieldErrors, "name")}`}
                           value={inlineAttributeDraft.name}
@@ -1047,6 +1107,14 @@ export default function ProductAttributesClient() {
                           }}
                         />
                         {inlineAttributeFieldErrors.name && <p className="admin-field-error" role="alert">{inlineAttributeFieldErrors.name}</p>}
+                      </div>
+                      <div className="admin-field">
+                        <label className="admin-label">Tên tiếng Anh</label>
+                        <input
+                          className="admin-input"
+                          value={inlineAttributeDraft.nameEn}
+                          onChange={(e) => setInlineAttributeDraft((draft) => draft ? { ...draft, nameEn: e.target.value } : draft)}
+                        />
                       </div>
                       <div className="admin-field">
                         <label className="admin-label">Kiểu hiển thị</label>
@@ -1213,14 +1281,13 @@ export default function ProductAttributesClient() {
                   <table className="admin-catalog-table admin-catalog-table--dense">
                     <thead>
                       <tr>
-                        <th>{isColor ? "Tên màu" : "Tên hiển thị"}</th>
-                        <th>{isColor ? "Mã" : "Mã giá trị"}</th>
+                        <th>Tên tiếng Việt</th>
+                        <th>Tên tiếng Anh</th>
+                        <th>Mã</th>
                         {isColor && <th>HEX màu</th>}
-                        {isColor && <th>Ảnh/swatch</th>}
-                        {!isColor && <th>Slug</th>}
+                        {isColor && <th>Swatch</th>}
                         <th>Thứ tự</th>
                         <th>Trạng thái</th>
-                        <th>Sử dụng</th>
                         <th>Thao tác</th>
                       </tr>
                     </thead>
@@ -1237,7 +1304,7 @@ export default function ProductAttributesClient() {
                               <td colSpan={8}>
                                 <div className="admin-attribute-value-inline-fields">
                                   <div className="admin-field">
-                                    <label className="admin-label">Tên giá trị</label>
+                                    <label className="admin-label">Tên tiếng Việt</label>
                                     <input
                                       className={`admin-input${errorClass(inlineValueFieldErrors, "name")}`}
                                       value={inlineValueDraft.name}
@@ -1247,6 +1314,14 @@ export default function ProductAttributesClient() {
                                       }}
                                     />
                                     {inlineValueFieldErrors.name && <p className="admin-field-error" role="alert">{inlineValueFieldErrors.name}</p>}
+                                  </div>
+                                  <div className="admin-field">
+                                    <label className="admin-label">Tên tiếng Anh</label>
+                                    <input
+                                      className="admin-input"
+                                      value={inlineValueDraft.nameEn}
+                                      onChange={(e) => setInlineValueDraft((draft) => draft ? { ...draft, nameEn: e.target.value } : draft)}
+                                    />
                                   </div>
                                   <div className="admin-field">
                                     <label className="admin-label">HEX màu</label>
@@ -1368,6 +1443,7 @@ export default function ProductAttributesClient() {
                         return (
                           <tr key={value.id}>
                             <td>{value.name}</td>
+                            <td>{value.nameEn || "—"}</td>
                             <td><code className="admin-catalog-code">{value.code}</code></td>
                             {isColor && (
                               <td>
@@ -1378,22 +1454,28 @@ export default function ProductAttributesClient() {
                                       style={{ background: value.hexCode }}
                                       title={value.hexCode}
                                     />
-                                  ) : (
-                                    "—"
-                                  )}
+                                  ) : null}
                                   <span>{value.hexCode || "—"}</span>
                                 </span>
                               </td>
                             )}
-                            {isColor && <td>{value.imageUrl ? "Có ảnh" : "—"}</td>}
-                            {!isColor && <td>{value.slug}</td>}
+                            {isColor && (
+                              <td>
+                                {value.hexCode ? (
+                                  <span
+                                    className={`admin-attribute-swatch${/^#(?:fff|ffffff)$/i.test(value.hexCode) ? " admin-attribute-swatch--light" : ""}`}
+                                    style={{ background: value.hexCode }}
+                                    aria-hidden
+                                  />
+                                ) : value.imageUrl ? "Có ảnh" : "—"}
+                              </td>
+                            )}
                             <td>{value.sortOrder}</td>
                             <td>
                               <span className={`admin-kb-badge ${value.status === "ACTIVE" ? "admin-kb-badge--verified" : "admin-kb-badge--low"}`}>
                                 {value.status === "ACTIVE" ? "Đang hoạt động" : "Ngừng sử dụng"}
                               </span>
                             </td>
-                            <td>Đang dùng trong {value.usageCount} sản phẩm / biến thể</td>
                             <td>
                               <div className="admin-catalog-actions-cell">
                                 <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => openInlineValueEdit(attribute, value)}>
@@ -1410,7 +1492,7 @@ export default function ProductAttributesClient() {
                       })}
                       {attribute.values.length === 0 && (
                         <tr>
-                          <td colSpan={isColor ? 8 : 7}>Chưa có giá trị. Dùng dòng thêm bên dưới.</td>
+                          <td colSpan={isColor ? 8 : 6}>Chưa có giá trị. Dùng dòng thêm bên dưới.</td>
                         </tr>
                       )}
                       <tr className="admin-attribute-quick-add-row" data-testid={`quick-add-row-${attribute.id}`}>
@@ -1422,8 +1504,23 @@ export default function ProductAttributesClient() {
                             className={`admin-input${errorClass(quickDraft.fieldErrors, "name")}`}
                             value={quickDraft.name}
                             placeholder={isColor ? "+ Thêm màu mới" : "+ Thêm giá trị mới"}
-                            aria-label={isColor ? "Tên màu mới" : "Tên giá trị mới"}
-                            onChange={(e) => onQuickAddNameChange(attribute, e.target.value)}
+                            aria-label="Tên tiếng Việt"
+                            onChange={(e) => onQuickAddNameChange(attribute, { name: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void submitQuickAdd(attribute);
+                              }
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className="admin-input"
+                            value={quickDraft.nameEn}
+                            placeholder="English name"
+                            aria-label="Tên tiếng Anh"
+                            onChange={(e) => onQuickAddNameChange(attribute, { nameEn: e.target.value })}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
                                 e.preventDefault();
@@ -1480,15 +1577,17 @@ export default function ProductAttributesClient() {
                         )}
                         {isColor && (
                           <td>
-                            <input
-                              className="admin-input"
-                              value={quickDraft.imageUrl}
-                              placeholder="URL ảnh"
-                              onChange={(e) => updateQuickAddDraft(attribute.id, { imageUrl: e.target.value })}
-                            />
+                            {quickDraft.hexCode && isValidHexColor(quickDraft.hexCode) ? (
+                              <span
+                                className={`admin-attribute-swatch${/^#(?:fff|ffffff)$/i.test(quickDraft.hexCode) ? " admin-attribute-swatch--light" : ""}`}
+                                style={{ background: quickDraft.hexCode }}
+                                aria-hidden
+                              />
+                            ) : (
+                              "—"
+                            )}
                           </td>
                         )}
-                        {!isColor && <td>—</td>}
                         <td>
                           <input
                             className="admin-input"
@@ -1507,7 +1606,6 @@ export default function ProductAttributesClient() {
                             <option value="INACTIVE">Ngừng sử dụng</option>
                           </select>
                         </td>
-                        <td>—</td>
                         <td>
                           <AdminLoadingButton
                             type="button"
@@ -1523,7 +1621,7 @@ export default function ProductAttributesClient() {
                       </tr>
                       {(quickDraft.error || quickDraft.fieldErrors.name || quickDraft.fieldErrors.hexCode) && (
                         <tr>
-                          <td colSpan={isColor ? 8 : 7}>
+                          <td colSpan={isColor ? 8 : 6}>
                             <p className="admin-field-error" role="alert">
                               {quickDraft.error ||
                                 quickDraft.fieldErrors.name ||
@@ -1576,7 +1674,7 @@ export default function ProductAttributesClient() {
               {createValueFieldErrors.attributeId && <p className="admin-field-error" role="alert">{createValueFieldErrors.attributeId}</p>}
             </div>
             <div className="admin-field">
-              <label className="admin-label">Tên hiển thị <span className="admin-required">*</span></label>
+              <label className="admin-label">Tên tiếng Việt <span className="admin-required">*</span></label>
               <input
                 className={`admin-input${errorClass(createValueFieldErrors, "name")}`}
                 value={valueForm.name}
@@ -1584,6 +1682,15 @@ export default function ProductAttributesClient() {
                 placeholder="Đen, Trắng, S, Regular fit…"
               />
               {createValueFieldErrors.name && <p className="admin-field-error" role="alert">{createValueFieldErrors.name}</p>}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Tên tiếng Anh</label>
+              <input
+                className="admin-input"
+                value={valueForm.nameEn}
+                onChange={(e) => setValueForm((form) => ({ ...form, nameEn: e.target.value }))}
+                placeholder="Black, White, Small…"
+              />
             </div>
             <div className="admin-field">
               <label className="admin-label">Mã giá trị</label>

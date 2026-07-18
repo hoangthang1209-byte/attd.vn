@@ -3,10 +3,18 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import MediaPicker from "@/components/admin/media/MediaPicker";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import {
   generateOptionGroupSlug,
   generateOptionValueCode,
 } from "@/features/products/product-option-code.utils";
+import {
+  ATTRIBUTE_VALUE_DUPLICATE_MESSAGE,
+  isColorAttribute,
+  isValidHexColor,
+  suggestAttributeValueCode,
+  suggestColorHex,
+} from "@/features/products/attribute-color-utils";
 import {
   createClientKey,
   normalizeOptionName,
@@ -85,6 +93,13 @@ export default function ProductOptionGroupBuilder({
   const [selectedAttributeId, setSelectedAttributeId] = useState("");
   const [selectedSharedValueIds, setSelectedSharedValueIds] = useState<Set<string>>(new Set());
   const [valueSearch, setValueSearch] = useState("");
+  const [quickValueNameVi, setQuickValueNameVi] = useState("");
+  const [quickValueNameEn, setQuickValueNameEn] = useState("");
+  const [quickValueCode, setQuickValueCode] = useState("");
+  const [quickValueHex, setQuickValueHex] = useState("");
+  const [quickValueError, setQuickValueError] = useState<string | null>(null);
+  const [quickValueSaving, setQuickValueSaving] = useState(false);
+  const [quickValueCodeTouched, setQuickValueCodeTouched] = useState(false);
 
   const variantSharedAttributes = useMemo(
     () => sharedAttributes.filter((attribute) => attribute.isVariantAttribute === true),
@@ -167,6 +182,98 @@ export default function ProductOptionGroupBuilder({
       ]);
     }
     setSelectedSharedValueIds(new Set());
+  }
+
+  function resetQuickValueForm() {
+    setQuickValueNameVi("");
+    setQuickValueNameEn("");
+    setQuickValueCode("");
+    setQuickValueHex("");
+    setQuickValueError(null);
+    setQuickValueCodeTouched(false);
+  }
+
+  function onQuickValueNameChange(patch: { nameVi?: string; nameEn?: string }) {
+    if (!selectedAttribute) return;
+    const nameVi = patch.nameVi !== undefined ? patch.nameVi : quickValueNameVi;
+    const nameEn = patch.nameEn !== undefined ? patch.nameEn : quickValueNameEn;
+    const isColor = isColorAttribute(selectedAttribute);
+    const isSize = selectedAttribute.displayType === "SIZE" || selectedAttribute.code === "SIZE";
+    const code = quickValueCodeTouched
+      ? quickValueCode
+      : suggestAttributeValueCode({
+          nameVi,
+          nameEn,
+          isColor,
+          isSize,
+          existingCodes: selectedAttribute.values.map((value) => value.code),
+        });
+    setQuickValueNameVi(nameVi);
+    setQuickValueNameEn(nameEn);
+    setQuickValueCode(code);
+    if (isColor) {
+      setQuickValueHex(suggestColorHex(nameEn || nameVi || code));
+    }
+    setQuickValueError(null);
+  }
+
+  async function submitQuickSharedValue() {
+    if (!selectedAttribute || !onRefreshSharedAttributes) return;
+    const name = quickValueNameVi.trim();
+    if (!name) {
+      setQuickValueError("Tên tiếng Việt là bắt buộc.");
+      return;
+    }
+    if (quickValueHex.trim() && !isValidHexColor(quickValueHex)) {
+      setQuickValueError("Mã màu HEX không hợp lệ.");
+      return;
+    }
+    const duplicate = selectedAttribute.values.some(
+      (value) =>
+        value.name.trim().toLowerCase() === name.toLowerCase() ||
+        (quickValueCode.trim() && value.code.trim().toUpperCase() === quickValueCode.trim().toUpperCase()),
+    );
+    if (duplicate) {
+      setQuickValueError(ATTRIBUTE_VALUE_DUPLICATE_MESSAGE);
+      return;
+    }
+
+    setQuickValueSaving(true);
+    setQuickValueError(null);
+    try {
+      const res = await fetch(`/api/admin/attributes/${selectedAttribute.id}/values`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          nameEn: quickValueNameEn.trim() || undefined,
+          code: quickValueCode.trim() || undefined,
+          hexCode: quickValueHex.trim() || undefined,
+          status: "ACTIVE",
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        message?: string;
+        fieldErrors?: Record<string, string>;
+      } | null;
+      if (!res.ok || !data?.id) {
+        const message =
+          data?.fieldErrors?.name ||
+          data?.fieldErrors?.code ||
+          data?.message ||
+          "Không thể tạo giá trị.";
+        setQuickValueError(/đã tồn tại/i.test(message) ? ATTRIBUTE_VALUE_DUPLICATE_MESSAGE : message);
+        return;
+      }
+      resetQuickValueForm();
+      onRefreshSharedAttributes();
+      setSelectedSharedValueIds((prev) => new Set(prev).add(data.id!));
+    } catch {
+      setQuickValueError("Lỗi mạng khi tạo giá trị thuộc tính.");
+    } finally {
+      setQuickValueSaving(false);
+    }
   }
 
   function removeGroup(index: number) {
@@ -381,6 +488,29 @@ export default function ProductOptionGroupBuilder({
             onChange={(e) => setValueSearch(e.target.value)}
             placeholder="Tìm giá trị…"
           />
+          <div className="admin-shared-attribute-bulk-actions">
+            <button
+              type="button"
+              className="btn-tertiary btn-sm"
+              data-testid="shared-values-select-all"
+              disabled={!selectedAttribute.isVariantAttribute || activeValues.length === 0}
+              onClick={() => {
+                setSelectedSharedValueIds(new Set(activeValues.map((value) => value.id)));
+              }}
+            >
+              Chọn tất cả
+            </button>
+            <button
+              type="button"
+              className="btn-tertiary btn-sm"
+              data-testid="shared-values-clear-selection"
+              disabled={!selectedAttribute.isVariantAttribute || selectedSharedValueIds.size === 0}
+              onClick={() => setSelectedSharedValueIds(new Set())}
+            >
+              Bỏ chọn
+            </button>
+            <span className="admin-field-hint">Đã chọn {selectedSharedValueIds.size} / {activeValues.length} giá trị</span>
+          </div>
           <div className="admin-shared-attribute-values admin-shared-attribute-values--guided">
             {activeValues.map((value) => {
               const checked = selectedSharedValueIds.has(value.id);
@@ -413,7 +543,6 @@ export default function ProductOptionGroupBuilder({
               );
             })}
           </div>
-          <p className="admin-field-hint">Đã chọn {selectedSharedValueIds.size} giá trị</p>
           <button
             type="button"
             className="btn-secondary btn-sm"
@@ -422,6 +551,56 @@ export default function ProductOptionGroupBuilder({
           >
             Thêm giá trị đã chọn
           </button>
+
+          {onRefreshSharedAttributes && (
+            <div className="admin-shared-attribute-quick-create" data-testid="product-editor-quick-value-create">
+              <p className="admin-field-hint">Thêm nhanh giá trị cho thuộc tính đang chọn (dùng chung API thuộc tính).</p>
+              <div className="admin-shared-attribute-quick-create__row">
+                <input
+                  className="form-input"
+                  value={quickValueNameVi}
+                  placeholder="Tên tiếng Việt"
+                  onChange={(e) => onQuickValueNameChange({ nameVi: e.target.value })}
+                />
+                <input
+                  className="form-input"
+                  value={quickValueNameEn}
+                  placeholder="Tên tiếng Anh"
+                  onChange={(e) => onQuickValueNameChange({ nameEn: e.target.value })}
+                />
+                <input
+                  className="form-input"
+                  value={quickValueCode}
+                  placeholder="Mã"
+                  onChange={(e) => {
+                    setQuickValueCodeTouched(true);
+                    setQuickValueCode(e.target.value.toUpperCase());
+                  }}
+                />
+                {isColorAttribute(selectedAttribute) && (
+                  <input
+                    className="form-input"
+                    value={quickValueHex}
+                    placeholder="HEX"
+                    onChange={(e) => setQuickValueHex(e.target.value)}
+                  />
+                )}
+                <AdminLoadingButton
+                  type="button"
+                  variant="secondary"
+                  size="xs"
+                  pending={quickValueSaving}
+                  pendingLabel="Đang thêm..."
+                  onClick={() => void submitQuickSharedValue()}
+                >
+                  Thêm giá trị
+                </AdminLoadingButton>
+              </div>
+              {quickValueError && (
+                <p className="admin-field-error" role="alert">{quickValueError}</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -1105,6 +1105,7 @@ export default function ProductCatalogForm({
 
       <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-basic">
         <legend>1. Thông tin cơ bản</legend>
+        <p className="admin-catalog-section-help">Tên, danh mục, mã sản phẩm, trạng thái và mô tả ngắn.</p>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field" data-field="name">
             <label className="admin-label">Tên sản phẩm <span className="admin-required">*</span></label>
@@ -1224,6 +1225,7 @@ export default function ProductCatalogForm({
 
       <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-media" data-testid="section-media">
         <legend>2. Hình ảnh sản phẩm</legend>
+        <p className="admin-catalog-section-help">Ảnh chính và gallery hiển thị trên trang sản phẩm.</p>
         <p className="admin-field-hint">Ảnh nên tối ưu 200–300KB trước khi upload.</p>
 
         <div className="admin-catalog-media-grid">
@@ -1345,6 +1347,7 @@ export default function ProductCatalogForm({
       {/* ── Thông tin B2B ───────────────────────────────────────────────── */}
       <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-b2b">
         <legend>3. Thông tin bán sỉ / B2B</legend>
+        <p className="admin-catalog-section-help">Chất liệu, form, MOQ, lead time và tùy chọn hỗ trợ OEM/in/thêu.</p>
         <div className="admin-seo-brief-form-grid">
           <ProductB2BSharedAttributeField
             attributeCode="MATERIAL"
@@ -1456,6 +1459,7 @@ export default function ProductCatalogForm({
       {/* ── Biến thể ─────────────────────────────────────────────────────── */}
       <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-variants">
         <legend>4. Biến thể &amp; thuộc tính</legend>
+        <p className="admin-catalog-section-help">Chọn thuộc tính dùng chung, tạo tổ hợp biến thể. Quản lý màu sắc toàn cục tại trang thuộc tính.</p>
         <ProductCatalogVariantsSection
           ref={variantsSectionRef}
           productId={form.id}
@@ -1486,6 +1490,7 @@ export default function ProductCatalogForm({
 
       <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-size-chart" data-field="publicSizeChart">
         <legend>5. Bảng size</legend>
+        <p className="admin-catalog-section-help">Bật và chỉnh bảng size công khai khi cần hiển thị trên trang sản phẩm.</p>
         <div className="admin-content-suggest-section-actions">
           <ProductContentSuggestButton
             label="Gợi ý ghi chú bảng size"
@@ -1514,6 +1519,7 @@ export default function ProductCatalogForm({
 
       <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-content">
         <legend>6. Nội dung chi tiết</legend>
+        <p className="admin-catalog-section-help">Mô tả dài, thông số nổi bật và khả năng tùy chỉnh.</p>
 
         <details className="admin-catalog-accordion" open data-testid="content-accordion-description">
           <summary>Mô tả</summary>
@@ -1635,6 +1641,7 @@ export default function ProductCatalogForm({
 
       <fieldset className="admin-catalog-fieldset admin-catalog-fieldset--dense" id="section-seo">
         <legend>7. SEO &amp; hiển thị website</legend>
+        <p className="admin-catalog-section-help">Tiêu đề/mô tả SEO và tùy chọn hiển thị nâng cao.</p>
         <div className="admin-seo-brief-form-grid">
           <div className="admin-field" data-field="seoTitle">
             <div className="admin-content-suggest-label-row">
