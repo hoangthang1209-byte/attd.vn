@@ -6,6 +6,13 @@ import AttributePresetDialog from "@/components/admin/products/AttributePresetDi
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import { useAdminAction } from "@/hooks/useAdminAction";
+import {
+  ATTRIBUTE_VALUE_DUPLICATE_MESSAGE,
+  isColorAttribute,
+  isValidHexColor,
+  suggestAttributeColorCode,
+  suggestColorHex,
+} from "@/features/products/attribute-color-utils";
 
 type DisplayType = "TEXT" | "COLOR_SWATCH" | "SIZE" | "SELECT" | "IMAGE_SWATCH";
 type Status = "ACTIVE" | "INACTIVE";
@@ -146,6 +153,34 @@ const defaultValueForm = (attributeId = ""): ValueForm => ({
   sortOrder: "0",
 });
 
+type QuickAddDraft = {
+  name: string;
+  code: string;
+  hexCode: string;
+  imageUrl: string;
+  sortOrder: string;
+  status: Status;
+  codeTouched: boolean;
+  hexTouched: boolean;
+  error: string | null;
+  fieldErrors: Record<string, string>;
+};
+
+function defaultQuickAddDraft(sortOrder = "0"): QuickAddDraft {
+  return {
+    name: "",
+    code: "",
+    hexCode: "",
+    imageUrl: "",
+    sortOrder,
+    status: "ACTIVE",
+    codeTouched: false,
+    hexTouched: false,
+    error: null,
+    fieldErrors: {},
+  };
+}
+
 function errorClass(fieldErrors: Record<string, string>, field: string) {
   return fieldErrors[field] ? " admin-input--error" : "";
 }
@@ -205,9 +240,12 @@ export default function ProductAttributesClient() {
   const [createValueFieldErrors, setCreateValueFieldErrors] = useState<Record<string, string>>({});
   const [presetDialogOpen, setPresetDialogOpen] = useState(false);
   const [showCreateAttribute, setShowCreateAttribute] = useState(false);
-  const [showCreateValue, setShowCreateValue] = useState(false);
+  const [showAdvancedValueForm, setShowAdvancedValueForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedAttributeIds, setExpandedAttributeIds] = useState<Record<string, boolean>>({});
+  const [quickAddDrafts, setQuickAddDrafts] = useState<Record<string, QuickAddDraft>>({});
+  const [savingQuickAddId, setSavingQuickAddId] = useState<string | null>(null);
+  const quickAddNameRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [inlineAttributeEditId, setInlineAttributeEditId] = useState<string | null>(null);
   const [inlineAttributeDraft, setInlineAttributeDraft] = useState<InlineAttributeDraft | null>(null);
@@ -356,11 +394,142 @@ export default function ProductAttributesClient() {
   function manageValues(attribute: Attribute) {
     setValueForm(defaultValueForm(attribute.id));
     setCreateValueFieldErrors({});
-    setShowCreateValue(true);
     setExpandedAttributeIds((current) => ({ ...current, [attribute.id]: true }));
+    setQuickAddDrafts((current) => ({
+      ...current,
+      [attribute.id]:
+        current[attribute.id] ??
+        defaultQuickAddDraft(String(attribute.values.length)),
+    }));
     window.setTimeout(() => {
-      valueFormRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      quickAddNameRefs.current[attribute.id]?.focus();
     }, 50);
+  }
+
+  function updateQuickAddDraft(attributeId: string, patch: Partial<QuickAddDraft>) {
+    setQuickAddDrafts((current) => {
+      const previous = current[attributeId] ?? defaultQuickAddDraft();
+      return {
+        ...current,
+        [attributeId]: { ...previous, ...patch },
+      };
+    });
+  }
+
+  function onQuickAddNameChange(attribute: Attribute, name: string) {
+    const previous = quickAddDrafts[attribute.id] ?? defaultQuickAddDraft();
+    const isColor = isColorAttribute(attribute);
+    const suggestedCode = isColor ? suggestAttributeColorCode(name) : previous.code;
+    const nextCode = previous.codeTouched ? previous.code : suggestedCode;
+    const nextHex =
+      isColor && !previous.hexTouched
+        ? suggestColorHex(nextCode || name)
+        : previous.hexCode;
+    updateQuickAddDraft(attribute.id, {
+      name,
+      code: nextCode,
+      hexCode: nextHex,
+      error: null,
+      fieldErrors: {},
+    });
+  }
+
+  async function submitQuickAdd(attribute: Attribute) {
+    const draft = quickAddDrafts[attribute.id] ?? defaultQuickAddDraft();
+    const name = draft.name.trim();
+    if (!name) {
+      updateQuickAddDraft(attribute.id, {
+        fieldErrors: { name: "Tên hiển thị là bắt buộc." },
+      });
+      return;
+    }
+    if (isColorAttribute(attribute) && draft.hexCode.trim() && !isValidHexColor(draft.hexCode)) {
+      updateQuickAddDraft(attribute.id, {
+        fieldErrors: { hexCode: "Mã màu HEX không hợp lệ." },
+      });
+      return;
+    }
+
+    const duplicate = attribute.values.some(
+      (value) =>
+        value.name.trim().toLowerCase() === name.toLowerCase() ||
+        (draft.code.trim() && value.code.trim().toUpperCase() === draft.code.trim().toUpperCase()),
+    );
+    if (duplicate) {
+      updateQuickAddDraft(attribute.id, {
+        error: ATTRIBUTE_VALUE_DUPLICATE_MESSAGE,
+        fieldErrors: { name: ATTRIBUTE_VALUE_DUPLICATE_MESSAGE },
+      });
+      return;
+    }
+
+    setSavingQuickAddId(attribute.id);
+    setError(null);
+    try {
+      const payload = {
+        name,
+        code: draft.code.trim() || undefined,
+        hexCode: draft.hexCode.trim() || undefined,
+        imageUrl: draft.imageUrl.trim() || undefined,
+        status: draft.status,
+        sortOrder: draft.sortOrder || String(attribute.values.length),
+      };
+      const res = await fetch(`/api/admin/attributes/${attribute.id}/values`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | (ApiValuePatch & { message?: string; fieldErrors?: Record<string, string> })
+        | null;
+      if (!res.ok || !data) {
+        const message =
+          data?.fieldErrors?.name ||
+          data?.fieldErrors?.code ||
+          data?.message ||
+          "Không thể lưu giá trị thuộc tính.";
+        const isDuplicate =
+          /đã tồn tại/i.test(message) ||
+          Boolean(data?.fieldErrors?.name || data?.fieldErrors?.code);
+        updateQuickAddDraft(attribute.id, {
+          error: isDuplicate ? ATTRIBUTE_VALUE_DUPLICATE_MESSAGE : message,
+          fieldErrors: data?.fieldErrors ?? { name: message },
+        });
+        return;
+      }
+
+      updateAttributeInList(attribute.id, (current) => ({
+        ...current,
+        values: sortValues([
+          ...current.values,
+          {
+            id: data.id,
+            name: data.name,
+            code: data.code,
+            slug: data.slug,
+            hexCode: data.hexCode,
+            imageUrl: data.imageUrl,
+            status: data.status,
+            sortOrder: data.sortOrder,
+            usageCount: 0,
+            isReferenced: false,
+          },
+        ]),
+      }));
+      setQuickAddDrafts((current) => ({
+        ...current,
+        [attribute.id]: defaultQuickAddDraft(String(attribute.values.length + 1)),
+      }));
+      setMessage("Đã tạo giá trị.");
+      toast.success("Đã tạo giá trị.");
+      window.setTimeout(() => quickAddNameRefs.current[attribute.id]?.focus(), 30);
+    } catch {
+      updateQuickAddDraft(attribute.id, {
+        error: "Lỗi mạng hoặc lỗi không xác định khi lưu giá trị thuộc tính.",
+      });
+    } finally {
+      setSavingQuickAddId(null);
+    }
   }
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -834,81 +1003,6 @@ export default function ProductAttributesClient() {
         </form>
       )}
 
-      {showCreateValue && (
-        <form
-          ref={valueFormRef}
-          className="admin-catalog-fieldset admin-catalog-fieldset--dense"
-          onSubmit={(e) => void handleCreateValueSubmit(e)}
-          data-testid="attributes-create-value-form"
-        >
-          <legend style={{ fontWeight: 600, fontSize: 14 }}>Thêm giá trị thuộc tính</legend>
-          <div className="admin-seo-brief-form-grid">
-            <div className="admin-field">
-              <label className="admin-label">Thuộc tính cha <span className="admin-required">*</span></label>
-              <select
-                className={`admin-input${errorClass(createValueFieldErrors, "attributeId")}`}
-                value={valueForm.attributeId}
-                onChange={(e) => setValueForm((form) => ({ ...form, attributeId: e.target.value }))}
-              >
-                <option value="">— Chọn thuộc tính —</option>
-                {attributes.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name} ({attribute.code})</option>)}
-              </select>
-              {createValueFieldErrors.attributeId && <p className="admin-field-error" role="alert">{createValueFieldErrors.attributeId}</p>}
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Tên hiển thị <span className="admin-required">*</span></label>
-              <input
-                className={`admin-input${errorClass(createValueFieldErrors, "name")}`}
-                value={valueForm.name}
-                onChange={(e) => setValueForm((form) => ({ ...form, name: e.target.value }))}
-                placeholder="Đen, Trắng, S, Regular fit…"
-              />
-              {createValueFieldErrors.name && <p className="admin-field-error" role="alert">{createValueFieldErrors.name}</p>}
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Mã giá trị</label>
-              <input className="admin-input" value={valueForm.code} onChange={(e) => setValueForm((form) => ({ ...form, code: e.target.value.toUpperCase() }))} placeholder="BLK, WHT, S…" />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Slug</label>
-              <input className="admin-input" value={valueForm.slug} onChange={(e) => setValueForm((form) => ({ ...form, slug: e.target.value }))} placeholder="Tự sinh nếu bỏ trống" />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">HEX màu</label>
-              <input className="admin-input" value={valueForm.hexCode} onChange={(e) => setValueForm((form) => ({ ...form, hexCode: e.target.value }))} placeholder="#000000" />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Ảnh giá trị</label>
-              <input className="admin-input" value={valueForm.imageUrl} onChange={(e) => setValueForm((form) => ({ ...form, imageUrl: e.target.value }))} placeholder="URL ảnh nếu dùng image swatch" />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Thứ tự</label>
-              <input className="admin-input" type="number" value={valueForm.sortOrder} onChange={(e) => setValueForm((form) => ({ ...form, sortOrder: e.target.value }))} />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Trạng thái</label>
-              <select className="admin-input" value={valueForm.status} onChange={(e) => setValueForm((form) => ({ ...form, status: e.target.value as Status }))}>
-                <option value="ACTIVE">Đang hoạt động</option>
-                <option value="INACTIVE">Ngừng sử dụng</option>
-              </select>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <AdminLoadingButton
-              type="submit"
-              variant="primary"
-              pending={isSavingCreateValue}
-              pendingLabel="Đang thêm giá trị..."
-            >
-              Thêm giá trị
-            </AdminLoadingButton>
-            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setShowCreateValue(false)}>
-              Đóng
-            </button>
-          </div>
-        </form>
-      )}
-
       {loading ? (
         <TableLoading
           title="Đang tải thuộc tính..."
@@ -922,7 +1016,9 @@ export default function ProductAttributesClient() {
           ) : (
             filteredAttributes.map((attribute) => {
             const isInlineEditingAttribute = inlineAttributeEditId === attribute.id && inlineAttributeDraft;
-            const valuesExpanded = expandedAttributeIds[attribute.id] ?? attribute.values.length > 0;
+            const valuesExpanded = expandedAttributeIds[attribute.id] === true;
+            const isColor = isColorAttribute(attribute);
+            const quickDraft = quickAddDrafts[attribute.id] ?? defaultQuickAddDraft(String(attribute.values.length));
             return (
               <section
                 key={attribute.id}
@@ -1099,17 +1195,10 @@ export default function ProductAttributesClient() {
                       <button
                         type="button"
                         className="admin-btn admin-btn--secondary admin-btn--xs"
-                        onClick={() =>
-                          setExpandedAttributeIds((current) => ({
-                            ...current,
-                            [attribute.id]: !(current[attribute.id] ?? attribute.values.length > 0),
-                          }))
-                        }
+                        data-testid={`manage-values-${attribute.id}`}
+                        onClick={() => manageValues(attribute)}
                       >
-                        {valuesExpanded ? "Thu giá trị" : `Giá trị (${attribute.values.length})`}
-                      </button>
-                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => manageValues(attribute)}>
-                        Thêm giá trị
+                        Quản lý giá trị
                       </button>
                       <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void patchAttributeStatus(attribute)}>
                         {attribute.status === "ACTIVE" ? "Ngừng sử dụng" : "Kích hoạt"}
@@ -1120,14 +1209,15 @@ export default function ProductAttributesClient() {
                 )}
 
                 {valuesExpanded && (
-                <div className="admin-catalog-table-wrap">
+                <div className="admin-catalog-table-wrap" data-testid={`attribute-values-${attribute.id}`}>
                   <table className="admin-catalog-table admin-catalog-table--dense">
                     <thead>
                       <tr>
-                        <th>Tên hiển thị</th>
-                        <th>Mã</th>
-                        <th>Slug</th>
-                        <th>Màu/ảnh</th>
+                        <th>{isColor ? "Tên màu" : "Tên hiển thị"}</th>
+                        <th>{isColor ? "Mã" : "Mã giá trị"}</th>
+                        {isColor && <th>HEX màu</th>}
+                        {isColor && <th>Ảnh/swatch</th>}
+                        {!isColor && <th>Slug</th>}
                         <th>Thứ tự</th>
                         <th>Trạng thái</th>
                         <th>Sử dụng</th>
@@ -1279,12 +1369,24 @@ export default function ProductAttributesClient() {
                           <tr key={value.id}>
                             <td>{value.name}</td>
                             <td><code className="admin-catalog-code">{value.code}</code></td>
-                            <td>{value.slug}</td>
-                            <td>
-                              {value.hexCode
-                                ? <span style={{ display: "inline-block", width: 16, height: 16, borderRadius: 4, background: value.hexCode, border: "1px solid #d1d5db" }} title={value.hexCode} />
-                                : value.imageUrl ? "Có ảnh" : "—"}
-                            </td>
+                            {isColor && (
+                              <td>
+                                <span className="admin-attribute-swatch-cell">
+                                  {value.hexCode ? (
+                                    <span
+                                      className={`admin-attribute-swatch${/^#(?:fff|ffffff)$/i.test(value.hexCode) ? " admin-attribute-swatch--light" : ""}`}
+                                      style={{ background: value.hexCode }}
+                                      title={value.hexCode}
+                                    />
+                                  ) : (
+                                    "—"
+                                  )}
+                                  <span>{value.hexCode || "—"}</span>
+                                </span>
+                              </td>
+                            )}
+                            {isColor && <td>{value.imageUrl ? "Có ảnh" : "—"}</td>}
+                            {!isColor && <td>{value.slug}</td>}
                             <td>{value.sortOrder}</td>
                             <td>
                               <span className={`admin-kb-badge ${value.status === "ACTIVE" ? "admin-kb-badge--verified" : "admin-kb-badge--low"}`}>
@@ -1308,7 +1410,126 @@ export default function ProductAttributesClient() {
                       })}
                       {attribute.values.length === 0 && (
                         <tr>
-                          <td colSpan={8}>Chưa có giá trị. Bấm &quot;Thêm giá trị&quot; để mở biểu mẫu.</td>
+                          <td colSpan={isColor ? 8 : 7}>Chưa có giá trị. Dùng dòng thêm bên dưới.</td>
+                        </tr>
+                      )}
+                      <tr className="admin-attribute-quick-add-row" data-testid={`quick-add-row-${attribute.id}`}>
+                        <td>
+                          <input
+                            ref={(node) => {
+                              quickAddNameRefs.current[attribute.id] = node;
+                            }}
+                            className={`admin-input${errorClass(quickDraft.fieldErrors, "name")}`}
+                            value={quickDraft.name}
+                            placeholder={isColor ? "+ Thêm màu mới" : "+ Thêm giá trị mới"}
+                            aria-label={isColor ? "Tên màu mới" : "Tên giá trị mới"}
+                            onChange={(e) => onQuickAddNameChange(attribute, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void submitQuickAdd(attribute);
+                              }
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            className={`admin-input${errorClass(quickDraft.fieldErrors, "code")}`}
+                            value={quickDraft.code}
+                            placeholder="Mã"
+                            onChange={(e) =>
+                              updateQuickAddDraft(attribute.id, {
+                                code: e.target.value.toUpperCase(),
+                                codeTouched: true,
+                                hexCode:
+                                  isColor && !quickDraft.hexTouched
+                                    ? suggestColorHex(e.target.value.toUpperCase())
+                                    : quickDraft.hexCode,
+                              })
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void submitQuickAdd(attribute);
+                              }
+                            }}
+                          />
+                        </td>
+                        {isColor && (
+                          <td>
+                            <input
+                              className={`admin-input${errorClass(quickDraft.fieldErrors, "hexCode")}`}
+                              value={quickDraft.hexCode}
+                              placeholder="#000000"
+                              onChange={(e) =>
+                                updateQuickAddDraft(attribute.id, {
+                                  hexCode: e.target.value,
+                                  hexTouched: true,
+                                  fieldErrors: {},
+                                  error: null,
+                                })
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  void submitQuickAdd(attribute);
+                                }
+                              }}
+                            />
+                          </td>
+                        )}
+                        {isColor && (
+                          <td>
+                            <input
+                              className="admin-input"
+                              value={quickDraft.imageUrl}
+                              placeholder="URL ảnh"
+                              onChange={(e) => updateQuickAddDraft(attribute.id, { imageUrl: e.target.value })}
+                            />
+                          </td>
+                        )}
+                        {!isColor && <td>—</td>}
+                        <td>
+                          <input
+                            className="admin-input"
+                            type="number"
+                            value={quickDraft.sortOrder}
+                            onChange={(e) => updateQuickAddDraft(attribute.id, { sortOrder: e.target.value })}
+                          />
+                        </td>
+                        <td>
+                          <select
+                            className="admin-input"
+                            value={quickDraft.status}
+                            onChange={(e) => updateQuickAddDraft(attribute.id, { status: e.target.value as Status })}
+                          >
+                            <option value="ACTIVE">Đang hoạt động</option>
+                            <option value="INACTIVE">Ngừng sử dụng</option>
+                          </select>
+                        </td>
+                        <td>—</td>
+                        <td>
+                          <AdminLoadingButton
+                            type="button"
+                            variant="primary"
+                            size="xs"
+                            pending={savingQuickAddId === attribute.id}
+                            pendingLabel="Đang thêm..."
+                            onClick={() => void submitQuickAdd(attribute)}
+                          >
+                            Thêm
+                          </AdminLoadingButton>
+                        </td>
+                      </tr>
+                      {(quickDraft.error || quickDraft.fieldErrors.name || quickDraft.fieldErrors.hexCode) && (
+                        <tr>
+                          <td colSpan={isColor ? 8 : 7}>
+                            <p className="admin-field-error" role="alert">
+                              {quickDraft.error ||
+                                quickDraft.fieldErrors.name ||
+                                quickDraft.fieldErrors.hexCode}
+                            </p>
+                          </td>
                         </tr>
                       )}
                     </tbody>
@@ -1320,6 +1541,92 @@ export default function ProductAttributesClient() {
           })
           )}
         </div>
+      )}
+
+      <div className="admin-attributes-advanced-toggle">
+        <button
+          type="button"
+          className="admin-btn admin-btn--secondary admin-btn--xs"
+          data-testid="attributes-advanced-value-toggle"
+          onClick={() => setShowAdvancedValueForm((current) => !current)}
+        >
+          {showAdvancedValueForm ? "Ẩn thêm giá trị nâng cao" : "Thêm giá trị nâng cao"}
+        </button>
+      </div>
+
+      {showAdvancedValueForm && (
+        <form
+          ref={valueFormRef}
+          className="admin-catalog-fieldset admin-catalog-fieldset--dense"
+          onSubmit={(e) => void handleCreateValueSubmit(e)}
+          data-testid="attributes-create-value-form"
+        >
+          <legend style={{ fontWeight: 600, fontSize: 14 }}>Thêm giá trị nâng cao</legend>
+          <div className="admin-seo-brief-form-grid">
+            <div className="admin-field">
+              <label className="admin-label">Thuộc tính cha <span className="admin-required">*</span></label>
+              <select
+                className={`admin-input${errorClass(createValueFieldErrors, "attributeId")}`}
+                value={valueForm.attributeId}
+                onChange={(e) => setValueForm((form) => ({ ...form, attributeId: e.target.value }))}
+              >
+                <option value="">— Chọn thuộc tính —</option>
+                {attributes.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name} ({attribute.code})</option>)}
+              </select>
+              {createValueFieldErrors.attributeId && <p className="admin-field-error" role="alert">{createValueFieldErrors.attributeId}</p>}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Tên hiển thị <span className="admin-required">*</span></label>
+              <input
+                className={`admin-input${errorClass(createValueFieldErrors, "name")}`}
+                value={valueForm.name}
+                onChange={(e) => setValueForm((form) => ({ ...form, name: e.target.value }))}
+                placeholder="Đen, Trắng, S, Regular fit…"
+              />
+              {createValueFieldErrors.name && <p className="admin-field-error" role="alert">{createValueFieldErrors.name}</p>}
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Mã giá trị</label>
+              <input className="admin-input" value={valueForm.code} onChange={(e) => setValueForm((form) => ({ ...form, code: e.target.value.toUpperCase() }))} placeholder="BLK, WHT, S…" />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Slug</label>
+              <input className="admin-input" value={valueForm.slug} onChange={(e) => setValueForm((form) => ({ ...form, slug: e.target.value }))} placeholder="Tự sinh nếu bỏ trống" />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">HEX màu</label>
+              <input className="admin-input" value={valueForm.hexCode} onChange={(e) => setValueForm((form) => ({ ...form, hexCode: e.target.value }))} placeholder="#000000" />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Ảnh giá trị</label>
+              <input className="admin-input" value={valueForm.imageUrl} onChange={(e) => setValueForm((form) => ({ ...form, imageUrl: e.target.value }))} placeholder="URL ảnh nếu dùng image swatch" />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Thứ tự</label>
+              <input className="admin-input" type="number" value={valueForm.sortOrder} onChange={(e) => setValueForm((form) => ({ ...form, sortOrder: e.target.value }))} />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Trạng thái</label>
+              <select className="admin-input" value={valueForm.status} onChange={(e) => setValueForm((form) => ({ ...form, status: e.target.value as Status }))}>
+                <option value="ACTIVE">Đang hoạt động</option>
+                <option value="INACTIVE">Ngừng sử dụng</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <AdminLoadingButton
+              type="submit"
+              variant="primary"
+              pending={isSavingCreateValue}
+              pendingLabel="Đang thêm giá trị..."
+            >
+              Thêm giá trị
+            </AdminLoadingButton>
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setShowAdvancedValueForm(false)}>
+              Đóng
+            </button>
+          </div>
+        </form>
       )}
 
       <AttributePresetDialog

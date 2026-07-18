@@ -305,6 +305,12 @@ export default function ProductOptionGroupBuilder({
               Làm mới danh sách thuộc tính
             </button>
           )}
+          <Link href="/admin/attributes" className="btn-tertiary btn-sm" data-testid="manage-colors-link">
+            Quản lý màu sắc
+          </Link>
+          <Link href="/admin/attributes" className="btn-tertiary btn-sm">
+            Quản lý thuộc tính sản phẩm
+          </Link>
         </div>
         <p className="admin-field-hint">
           Thuộc tính riêng chỉ dùng cho sản phẩm này và không xuất hiện trong danh mục thuộc tính chung.

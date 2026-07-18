@@ -179,7 +179,24 @@ export default function ProductCatalogForm({
   const scrollToFormSection = useCallback((sectionId: string) => {
     const el = document.getElementById(sectionId);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const scroller = document.getElementById("admin-content-scroll");
+    if (!(scroller instanceof HTMLElement)) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    const header = scroller.querySelector("header");
+    const headerOffset = header instanceof HTMLElement ? header.offsetHeight + 8 : 8;
+    const top =
+      el.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top +
+      scroller.scrollTop -
+      headerOffset;
+    scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.add("admin-product-edit-dense");
+    return () => document.documentElement.classList.remove("admin-product-edit-dense");
   }, []);
 
   const focusFormTabSection = useCallback((tab: FormTabId) => {
@@ -225,6 +242,8 @@ export default function ProductCatalogForm({
     curatedSalesBadges: initialData?.curatedSalesBadges ?? [],
     publicSizeChart: initialData?.publicSizeChart ?? createEmptyProductSizeChart(),
   });
+  const [savedFormSnapshot, setSavedFormSnapshot] = useState(() => JSON.stringify(form));
+  const isFormDirty = useMemo(() => JSON.stringify(form) !== savedFormSnapshot, [form, savedFormSnapshot]);
   const [saving, setSaving] = useState(false);
   const [bulkOpInProgress, setBulkOpInProgress] = useState(false);
   const [matrixBusy, setMatrixBusy] = useState(false);
@@ -866,18 +885,22 @@ export default function ProductCatalogForm({
       },
       onSuccess: (product) => {
         if (stayOnVariants && product?.id) {
-          setForm((prev) => ({
-            ...prev,
-            id: product.id,
-            productCode: product.productCode ?? prev.productCode,
-            slug: product.slug ?? prev.slug,
-            options: product.options ? mapOptionsToFormRows(product.options) : prev.options,
-            variants: product.variants
-              ? mapVariantsToFormRows(product.variants).filter(
-                  (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
-                )
-              : prev.variants,
-          }));
+          setForm((prev) => {
+            const next = {
+              ...prev,
+              id: product.id,
+              productCode: product.productCode ?? prev.productCode,
+              slug: product.slug ?? prev.slug,
+              options: product.options ? mapOptionsToFormRows(product.options) : prev.options,
+              variants: product.variants
+                ? mapVariantsToFormRows(product.variants).filter(
+                    (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
+                  )
+                : prev.variants,
+            };
+            queueMicrotask(() => setSavedFormSnapshot(JSON.stringify(next)));
+            return next;
+          });
           focusFormTabSection("variants");
           if (!form.id) {
             router.replace(`/admin/products/${product.id}/edit`);
@@ -1003,12 +1026,10 @@ export default function ProductCatalogForm({
       onSubmit={(e) => void handleSubmit(e)}
       data-testid="product-catalog-form-onescreen"
     >
-      {/* Header */}
+      {/* Header — shell already shows product title; keep compact meta only */}
       <div className="admin-catalog-form__header" data-testid="product-catalog-form-header">
         <div className="admin-catalog-form__header-main">
-          <h2 className="admin-catalog-form__title">
-            {form.id ? (form.name.trim() || "Chỉnh sửa sản phẩm") : "Thêm sản phẩm mới"}
-          </h2>
+          {!form.id && <h2 className="admin-catalog-form__title">Thêm sản phẩm mới</h2>}
           <div className="admin-catalog-form__meta">
             {form.id && form.productCode && (
               <code className="admin-catalog-code" data-testid="product-editor-code">{form.productCode}</code>
@@ -1698,6 +1719,15 @@ export default function ProductCatalogForm({
           <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary">
             Xem trên website ↗
           </a>
+        )}
+        {form.id && (
+          <span
+            className={`admin-catalog-form__dirty-hint${isFormDirty ? " is-dirty" : ""}`}
+            data-testid="product-editor-dirty-state"
+            aria-live="polite"
+          >
+            {isFormDirty ? "Có thay đổi chưa lưu" : "Đã đồng bộ"}
+          </span>
         )}
       </div>
     </form>

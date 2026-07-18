@@ -37,7 +37,7 @@ describe("legacy admin san-pham routes redirect to catalog", () => {
   it("dashboard create buttons use canonical product routes", () => {
     const dashboard = readRepoFile("src/components/admin/products/ProductCatalogDashboard.tsx");
     assert.match(dashboard, /href="\/admin\/products\/new"/);
-    assert.match(dashboard, /href="\/admin\/products\/new\/fast"/);
+    assert.doesNotMatch(dashboard, /href="\/admin\/products\/new\/fast"/);
     assert.doesNotMatch(dashboard, /\/admin\/san-pham/);
   });
 });

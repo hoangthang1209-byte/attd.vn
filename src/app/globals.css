@@ -13569,16 +13569,16 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   flex-wrap: wrap;
 }
 .admin-catalog-section-nav {
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  /* Non-sticky: avoids overlap with AdminShell sticky header inside #admin-content-scroll */
+  position: static;
+  z-index: auto;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   margin: 0 0 8px;
   padding: 6px 0;
-  background: color-mix(in srgb, var(--admin-bg, #f8fafc) 94%, transparent);
-  backdrop-filter: blur(6px);
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 .admin-catalog-section-nav__link {
   border: 1px solid var(--border);
@@ -13606,9 +13606,22 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   align-items: center;
   flex-wrap: wrap;
   margin-top: 8px;
-  padding: 10px 0 12px;
-  background: linear-gradient(180deg, transparent, #f8fafc 24%);
+  padding: 10px 12px 12px;
+  background: #f8fafc;
   border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.06);
+}
+.admin-catalog-form__dirty-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: #6b7280;
+}
+.admin-catalog-form__dirty-hint.is-dirty {
+  color: #b45309;
+  font-weight: 600;
+}
+.admin-catalog-form--onescreen .admin-catalog-fieldset {
+  scroll-margin-top: 96px;
 }
 .admin-catalog-media-grid {
   display: grid;
@@ -26682,9 +26695,54 @@ body:has(.mp-header--v271) {
   border-radius: 8px;
   background: #fff;
 }
+.admin-attribute-swatch-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-attribute-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  flex-shrink: 0;
+}
+.admin-attribute-swatch--light {
+  border-color: #9ca3af;
+  box-shadow: inset 0 0 0 1px #e5e7eb;
+}
+.admin-attribute-quick-add-row td {
+  background: #f8fafc;
+  vertical-align: middle;
+}
+.admin-attribute-quick-add-row .admin-input {
+  min-width: 0;
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+.admin-attributes-advanced-toggle {
+  margin-top: 4px;
+}
 .admin-catalog-table--dense th,
 .admin-catalog-table--dense td {
   padding: 6px 8px;
+}
+
+/* Product edit: denser shell header + no overlap under sticky admin chrome */
+html.admin-product-edit-dense .admin-content-scroll > header {
+  padding: 14px 40px 12px;
+  background: #f8fafc;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.admin-product-edit-dense .admin-content-scroll > header p {
+  display: none;
+}
+html.admin-product-edit-dense .admin-catalog-form--onescreen {
+  gap: 10px;
+  padding-bottom: 128px;
 }
 .admin-chip { padding: 4px 10px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; font-size: 12px; cursor: pointer; }
 .admin-chip:hover { border-color: #2563eb; color: #2563eb; }

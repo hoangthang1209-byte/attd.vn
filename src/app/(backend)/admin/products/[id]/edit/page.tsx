@@ -29,7 +29,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <AdminPageTitle title={`Sửa: ${product.name}`} />
+      <AdminPageTitle title={product.name} />
       <Suspense
         fallback={
           <SectionLoading
