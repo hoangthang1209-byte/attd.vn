@@ -169,7 +169,7 @@ export default function ProductDetailInteractive({
     if (customizations.length > 0) {
       tabs.push({ id: "mp-pdp-custom", label: "Tùy chỉnh" });
     }
-    if (showFaqTab) tabs.push({ id: "mp-pdp-faq", label: "FAQ" });
+    if (showFaqTab) tabs.push({ id: "mp-pdp-faq", label: "Hỏi đáp" });
     if (showRelatedTab) tabs.push({ id: "mp-pdp-related", label: "Liên quan" });
     return tabs;
   }, [
@@ -221,6 +221,7 @@ export default function ProductDetailInteractive({
 
   const effectiveMoq = selectedVariant?.moq ?? product.defaultMoq;
   const effectiveLeadTime = selectedVariant?.leadTime ?? product.leadTime;
+  const hasCoreFacts = isPublicMoq(effectiveMoq) || Boolean(effectiveLeadTime);
   const displayedCode = selectedVariant?.sku ?? product.productCode ?? null;
   const stockLabel = selectedVariant
     ? STOCK_LABELS[selectedVariant.stockStatus]
@@ -294,9 +295,13 @@ export default function ProductDetailInteractive({
 
   const handleOptionSelect = useCallback((groupSlug: string, valueLabel: string) => {
     if (selection[groupSlug] === valueLabel) return;
-    setSelection((prev) => ({ ...prev, [groupSlug]: valueLabel }));
-    setQuoteCtaAttentionKey((key) => key + 1);
-  }, [selection]);
+    const nextSelection = { ...selection, [groupSlug]: valueLabel };
+    const nextVariant = findVariantBySelection(variants, optionGroups, nextSelection);
+    setSelection(nextSelection);
+    if (nextVariant) {
+      setQuoteCtaAttentionKey((key) => key + 1);
+    }
+  }, [optionGroups, selection, variants]);
 
   const skipInitialOptionsTrackingRef = useRef(true);
   useEffect(() => {
@@ -359,6 +364,9 @@ export default function ProductDetailInteractive({
       optionSummary={selectedOptionSummary}
       capabilities={capabilityItems}
       onRequestQuote={openQuoteFromPanel}
+      showFacts={false}
+      showCapabilities={false}
+      className="mp-pdp-hero-conversion"
     />
   );
 
@@ -377,7 +385,7 @@ export default function ProductDetailInteractive({
                   />
                 </div>
 
-                <div className="product-detail-center">
+                <div className="product-detail-center mp-pdp-hero-summary">
                   <header className="product-detail-head">
                     <div className="mp-pdp-overview-meta">
                       <Link href={`/${product.category?.slug ?? ""}`} className="mp-pdp-overview-cat">
@@ -392,8 +400,10 @@ export default function ProductDetailInteractive({
                       <p className="mp-pdp-overview-summary">{displayShortDescription}</p>
                     )}
                   </header>
+                </div>
 
-                  <div className="mp-pdp-core-facts">
+                {hasCoreFacts && (
+                  <div className="mp-pdp-core-facts mp-pdp-hero-facts">
                     {isPublicMoq(effectiveMoq) && (
                       <div className="mp-pdp-core-fact">
                         <span className="mp-pdp-core-fact-label">MOQ</span>
@@ -407,61 +417,63 @@ export default function ProductDetailInteractive({
                       </div>
                     )}
                   </div>
+                )}
 
-                  <ProductPdpCapabilityGrid
-                    capabilities={capabilityItems}
-                    className="mp-pdp-mobile-capabilities"
-                  />
-
-                  {showVariantSelector && (
-                    <div className="mp-pdp-options-card product-detail-options">
-                      <div className="mp-pdp-options-head">
-                        <h2 className="mp-pdp-options-title">Tùy chọn sản phẩm</h2>
-                        {variantSummary && (
-                          <p className="mp-pdp-options-summary">{variantSummary}</p>
-                        )}
-                      </div>
-                      <ProductDynamicOptionSelector
-                        optionGroups={optionGroups}
-                        variants={variants}
-                        selection={selection}
-                        onSelect={handleOptionSelect}
-                        allowedImageUrls={productImageUrls}
-                      />
-                      <div
-                        className={[
-                          "mp-pdp-option-quote-feedback",
-                          selectedOptionSummary ? "mp-pdp-option-quote-feedback--selected" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        role="status"
-                        aria-live="polite"
-                      >
-                        {selectedOptionSummary ? (
-                          <>
-                            <span>Đã thêm vào yêu cầu báo giá</span>
-                            <strong>Đang chọn: {selectedOptionSummary}</strong>
-                          </>
-                        ) : (
-                          <span>Chọn màu/size để ATTD tư vấn báo giá chính xác hơn.</span>
-                        )}
-                      </div>
+                {showVariantSelector && (
+                  <div className="mp-pdp-options-card product-detail-options">
+                    <div className="mp-pdp-options-head">
+                      <h2 className="mp-pdp-options-title">Tùy chọn sản phẩm</h2>
+                      {variantSummary && (
+                        <p className="mp-pdp-options-summary">{variantSummary}</p>
+                      )}
                     </div>
-                  )}
-
-                  {optionGroups.length > 0 && !hasActiveVariants && (
-                    <p className="mp-pdp-no-variants-hint" role="status">
-                      Hiện không có phân loại đang bán. Vui lòng liên hệ để được tư vấn và báo giá.
-                    </p>
-                  )}
-
-                  {specifications.length > 0 && (
-                    <div className="mp-pdp-spec-below-options">
-                      <ProductSpecificationsSection rows={specifications} preview />
+                    <ProductDynamicOptionSelector
+                      optionGroups={optionGroups}
+                      variants={variants}
+                      selection={selection}
+                      onSelect={handleOptionSelect}
+                      allowedImageUrls={productImageUrls}
+                    />
+                    <div
+                      className={[
+                        "mp-pdp-option-quote-feedback",
+                        selectedOptionSummary ? "mp-pdp-option-quote-feedback--selected" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {selectedOptionSummary ? (
+                        <>
+                          <span>Đã thêm vào yêu cầu báo giá</span>
+                          <strong>Đang chọn: {selectedOptionSummary}</strong>
+                        </>
+                      ) : (
+                        <span>Chọn màu/size để ATTD tư vấn báo giá chính xác hơn.</span>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {optionGroups.length > 0 && !hasActiveVariants && (
+                  <p className="mp-pdp-no-variants-hint" role="status">
+                    Hiện không có phân loại đang bán. Vui lòng liên hệ để được tư vấn và báo giá.
+                  </p>
+                )}
+
+                <ProductPdpCapabilityGrid
+                  capabilities={capabilityItems}
+                  className="mp-pdp-hero-capabilities"
+                />
+
+                {conversionPanel}
+
+                {specifications.length > 0 && (
+                  <div className="mp-pdp-spec-below-options">
+                    <ProductSpecificationsSection rows={specifications} preview />
+                  </div>
+                )}
               </div>
 
               <div className="mp-pdp-shell-content">
@@ -506,8 +518,6 @@ export default function ProductDetailInteractive({
                 />
               </div>
             </div>
-
-            <div className="mp-pdp-sticky-layout__aside">{conversionPanel}</div>
           </div>
         </div>
       </div>
@@ -516,6 +526,7 @@ export default function ProductDetailInteractive({
         productSlug={product.slug}
         onRequestQuote={openQuoteFromMobile}
         attentionKey={quoteCtaAttentionKey}
+        isQuoteReady={Boolean(selectedVariant)}
       />
 
       <ProductQuoteDialog

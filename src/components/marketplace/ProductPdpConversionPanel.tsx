@@ -23,6 +23,9 @@ type Props = {
   optionSummary?: string | null;
   capabilities?: ProductPdpCapability[];
   onRequestQuote: () => void;
+  showFacts?: boolean;
+  showCapabilities?: boolean;
+  className?: string;
 };
 
 export default function ProductPdpConversionPanel({
@@ -36,9 +39,15 @@ export default function ProductPdpConversionPanel({
   optionSummary,
   capabilities = [],
   onRequestQuote,
+  showFacts = true,
+  showCapabilities = true,
+  className,
 }: Props) {
   return (
-    <aside className="product-detail-right mp-pdp-conversion-aside" aria-label="Yêu cầu báo giá">
+    <aside
+      className={["product-detail-right mp-pdp-conversion-aside", className].filter(Boolean).join(" ")}
+      aria-label="Yêu cầu báo giá"
+    >
       <div className="mp-pdp-conversion-card">
         <div className="mp-pdp-conversion-head">
           <p className="mp-pdp-conversion-kicker">Báo giá B2B</p>
@@ -48,50 +57,52 @@ export default function ProductPdpConversionPanel({
           </p>
         </div>
 
-        <dl className="mp-pdp-conversion-facts">
-          <div className="mp-pdp-conversion-fact">
-            <dt>Sản phẩm</dt>
-            <dd>{productName}</dd>
-          </div>
-          {variantLabel && (
+        {showFacts && (
+          <dl className="mp-pdp-conversion-facts">
             <div className="mp-pdp-conversion-fact">
-              <dt>Biến thể</dt>
-              <dd>{variantLabel}</dd>
+              <dt>Sản phẩm</dt>
+              <dd>{productName}</dd>
             </div>
-          )}
-          {productCode && (
-            <div className="mp-pdp-conversion-fact">
-              <dt>Mã / SKU</dt>
-              <dd>{productCode}</dd>
-            </div>
-          )}
-          {optionSummary && (
-            <div className="mp-pdp-conversion-fact mp-pdp-conversion-fact--selected-options">
-              <dt>Đang chọn</dt>
-              <dd>{optionSummary}</dd>
-            </div>
-          )}
-          {isPublicMoq(moq) && (
-            <div className="mp-pdp-conversion-fact">
-              <dt>MOQ</dt>
-              <dd>{formatPdpMoqValue(moq)}</dd>
-            </div>
-          )}
-          {leadTime && (
-            <div className="mp-pdp-conversion-fact">
-              <dt>Thời gian sản xuất</dt>
-              <dd>{leadTime}</dd>
-            </div>
-          )}
-          {stockLabel && (
-            <div className="mp-pdp-conversion-fact">
-              <dt>Tình trạng hàng</dt>
-              <dd style={{ color: stockColor }}>{stockLabel}</dd>
-            </div>
-          )}
-        </dl>
+            {variantLabel && (
+              <div className="mp-pdp-conversion-fact">
+                <dt>Biến thể</dt>
+                <dd>{variantLabel}</dd>
+              </div>
+            )}
+            {productCode && (
+              <div className="mp-pdp-conversion-fact">
+                <dt>Mã / SKU</dt>
+                <dd>{productCode}</dd>
+              </div>
+            )}
+            {optionSummary && (
+              <div className="mp-pdp-conversion-fact mp-pdp-conversion-fact--selected-options">
+                <dt>Đang chọn</dt>
+                <dd>{optionSummary}</dd>
+              </div>
+            )}
+            {isPublicMoq(moq) && (
+              <div className="mp-pdp-conversion-fact">
+                <dt>MOQ</dt>
+                <dd>{formatPdpMoqValue(moq)}</dd>
+              </div>
+            )}
+            {leadTime && (
+              <div className="mp-pdp-conversion-fact">
+                <dt>Thời gian sản xuất</dt>
+                <dd>{leadTime}</dd>
+              </div>
+            )}
+            {stockLabel && (
+              <div className="mp-pdp-conversion-fact">
+                <dt>Tình trạng hàng</dt>
+                <dd style={{ color: stockColor }}>{stockLabel}</dd>
+              </div>
+            )}
+          </dl>
+        )}
 
-        <ProductPdpCapabilityGrid capabilities={capabilities} />
+        {showCapabilities && <ProductPdpCapabilityGrid capabilities={capabilities} />}
 
         <div className="mp-pdp-conversion-actions">
           <button

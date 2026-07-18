@@ -9,7 +9,7 @@ export default function ProductSpecificationsSection({ rows, preview = false }: 
   const visible = rows.filter((row) => row.label.trim() && row.value.trim());
   if (!visible.length) return null;
 
-  const list = preview ? visible.slice(0, 4) : visible;
+  const list = preview ? selectPreviewRows(visible) : visible;
   const Wrapper = preview ? "div" : "section";
   const wrapperProps = preview
     ? { className: "mp-pdp-spec-preview-card" }
@@ -20,7 +20,7 @@ export default function ProductSpecificationsSection({ rows, preview = false }: 
       <div className={preview ? undefined : "container"}>
         <header className={preview ? "mp-pdp-spec-preview-head" : "mp-pdp-section-head"}>
           <h2 className={preview ? "mp-pdp-spec-preview-title" : "mp-pdp-section-title"}>
-            {preview ? "Thông số nổi bật" : "Thông số sản phẩm"}
+            {preview ? "Tóm tắt kỹ thuật" : "Thông số sản phẩm"}
           </h2>
           {!preview && (
             <p className="mp-pdp-section-subtitle">
@@ -59,4 +59,13 @@ export default function ProductSpecificationsSection({ rows, preview = false }: 
       </div>
     </Wrapper>
   );
+}
+
+function selectPreviewRows(rows: ProductSpecificationRow[]) {
+  const lowerPriorityLabels = [/chất liệu/i, /form/i, /kiểu dáng/i];
+  const prioritized = rows.filter(
+    (row) => !lowerPriorityLabels.some((pattern) => pattern.test(row.label)),
+  );
+  const source = prioritized.length >= 2 ? prioritized : rows;
+  return source.slice(0, 4);
 }

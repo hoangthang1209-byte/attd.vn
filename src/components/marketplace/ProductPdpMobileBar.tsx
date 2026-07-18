@@ -12,9 +12,15 @@ type Props = {
   productSlug: string;
   onRequestQuote: () => void;
   attentionKey?: number;
+  isQuoteReady?: boolean;
 };
 
-export default function ProductPdpMobileBar({ productSlug, onRequestQuote, attentionKey = 0 }: Props) {
+export default function ProductPdpMobileBar({
+  productSlug,
+  onRequestQuote,
+  attentionKey = 0,
+  isQuoteReady = false,
+}: Props) {
   const [isQuoteHighlighted, setIsQuoteHighlighted] = useState(false);
 
   useEffect(() => {
@@ -34,6 +40,7 @@ export default function ProductPdpMobileBar({ productSlug, onRequestQuote, atten
         type="button"
         className={[
           "pdp-mobile-action-bar__btn pdp-mobile-action-bar__btn--quote",
+          isQuoteReady ? "pdp-mobile-action-bar__btn--quote-active" : "",
           isQuoteHighlighted ? "pdp-mobile-action-bar__btn--attention" : "",
         ]
           .filter(Boolean)
