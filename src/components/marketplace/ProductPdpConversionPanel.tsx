@@ -4,7 +4,6 @@ import TrackedLink from "@/components/analytics/TrackedLink";
 import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
 import { CTA } from "@/lib/ctaConfig";
 import { BadgeCheck, Calculator, PackageCheck, Printer, Scissors } from "lucide-react";
-import PublicContactChannels from "@/components/public/PublicContactChannels";
 
 export type ProductPdpCapability = {
   key: string;
@@ -122,7 +121,6 @@ export default function ProductPdpConversionPanel({
           </TrackedLink>
         </div>
 
-        <PublicContactChannels compact className="mp-pdp-conversion-contact" source="pdp_conversion_panel" />
       </div>
     </aside>
   );
