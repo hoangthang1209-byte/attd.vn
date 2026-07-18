@@ -354,3 +354,34 @@ export async function getCrossSellProducts(
     take: limit,
   });
 }
+
+export async function getPublicProductsBySlugs(slugs: string[], limit = 12) {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const value of slugs) {
+    const slug = value.trim();
+    if (!slug || slug.length > 120 || !/^[a-z0-9][a-z0-9-]*$/i.test(slug) || seen.has(slug)) {
+      continue;
+    }
+    seen.add(slug);
+    normalized.push(slug);
+    if (normalized.length >= limit) break;
+  }
+
+  if (!normalized.length) return [];
+
+  const products = await prisma.product.findMany({
+    where: {
+      slug: { in: normalized },
+      status: "ACTIVE",
+    },
+    select: PUBLIC_PRODUCT_CARD_SELECT,
+  });
+
+  const bySlug = new Map(products.map((product) => [product.slug, product]));
+  return normalized.flatMap((slug) => {
+    const product = bySlug.get(slug);
+    return product ? [product] : [];
+  });
+}

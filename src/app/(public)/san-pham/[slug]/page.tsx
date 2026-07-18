@@ -2,13 +2,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
+  getCrossSellProducts,
   getProductDetailBySlug,
   getRelatedProducts,
 } from "@/features/products/services/product.service";
-import ProductCard from "@/components/public/ProductCard";
-import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
-import { mapProductCardAvailableColors } from "@/features/products/product-card-color-swatches";
 import ProductDetailInteractive from "@/components/marketplace/ProductDetailInteractive";
+import ProductDiscoveryRail from "@/components/marketplace/ProductDiscoveryRail";
+import RecentlyViewedProducts from "@/components/marketplace/RecentlyViewedProducts";
 import ProductFaqList from "@/components/public/ProductFaqList";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import FaqSchema from "@/components/seo/FaqSchema";
@@ -20,8 +20,11 @@ import {
 } from "@/lib/seo";
 import { getCatalogProduct } from "@/lib/productCatalog";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
-import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
 import { getManufacturingEvidenceForProduct } from "@/lib/manufacturing-library.server";
+import {
+  dedupeProductRailSlugs,
+  mapProductToDiscoveryCard,
+} from "@/features/products/product-discovery";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -80,9 +83,19 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const displayShortDescription = catalog?.shortDescription ?? product.shortDescription;
   const displayContent = catalog?.content ?? product.description;
 
-  const relatedProducts = product.category?.id
-    ? await getRelatedProducts(product.category.id, product.id, 4)
-    : [];
+  const [relatedProductsRaw, recommendedProductsRaw] = product.category?.id
+    ? await Promise.all([
+        getRelatedProducts(product.category.id, product.id, 4),
+        getCrossSellProducts(product.id, product.category.id, 8),
+      ])
+    : [[], []];
+  const relatedProducts = dedupeProductRailSlugs(relatedProductsRaw, [product.slug]).slice(0, 4);
+  const recommendedProducts = dedupeProductRailSlugs(
+    recommendedProductsRaw,
+    [product.slug, ...relatedProducts.map((item) => item.slug)],
+  ).slice(0, 4);
+  const relatedDiscoveryCards = relatedProducts.map(mapProductToDiscoveryCard);
+  const recommendedDiscoveryCards = recommendedProducts.map(mapProductToDiscoveryCard);
   const manufacturingEvidenceItems = await getManufacturingEvidenceForProduct({
     productId: product.id,
     categoryId: product.category?.id,
@@ -171,6 +184,29 @@ export default async function ProductDetailPage({ params }: PageProps) {
         manufacturingEvidenceItems={manufacturingEvidenceItems}
       />
 
+      <ProductDiscoveryRail
+        id="mp-pdp-related"
+        title="Sản phẩm liên quan"
+        description="Cùng nhóm sản phẩm để bạn so sánh nhanh chất liệu, MOQ và tiến độ."
+        products={relatedDiscoveryCards}
+        action={
+          <Link href={`/${product.category?.slug ?? "san-pham"}`} className="link-chip">
+            Xem tất cả {product.category?.name ?? "danh mục"}
+            <span aria-hidden style={{ color: "#9ca3af" }}>
+              →
+            </span>
+          </Link>
+        }
+      />
+
+      <ProductDiscoveryRail
+        title="Có thể bạn quan tâm"
+        description="Một số lựa chọn B2B khác phù hợp khi cần mở rộng danh mục nguồn hàng."
+        products={recommendedDiscoveryCards}
+      />
+
+      <RecentlyViewedProducts currentSlug={product.slug} />
+
       <section className="mp-section mp-pdp-section mp-pdp-section--alt" id="mp-pdp-faq">
         <div className="container mp-pdp-faq">
           <header className="mp-pdp-section-head">
@@ -182,44 +218,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
           <ProductFaqList items={faqItems} />
         </div>
       </section>
-
-      <div id="mp-pdp-related">
-        {relatedProducts.length > 0 && (
-          <section className="mp-section mp-pdp-section">
-            <div className="container">
-              <header className="mp-pdp-section-head">
-                <h2 className="mp-pdp-section-title">Sản phẩm liên quan</h2>
-              </header>
-              <div className="mp-product-grid mp-product-grid--compact">
-                {relatedProducts.map((related) => (
-                  <ProductCard
-                    key={related.id}
-                    id={related.id}
-                    slug={related.slug}
-                    name={related.name}
-                    category={product.category?.name ?? ""}
-                    imageUrl={getPrimaryProductImageFromProduct(related)}
-                    hoverImageUrl={getProductCardHoverImageFromProduct(related)}
-                    moq={related.defaultMoq}
-                    leadTime={related.leadTime}
-                    compact
-                    salesBadges={mapPublicProductCardSalesBadges(related)}
-                    availableColors={mapProductCardAvailableColors(related)}
-                  />
-                ))}
-              </div>
-              <div className="mp-pdp-related-more">
-                <Link href={`/${product.category?.slug ?? "san-pham"}`} className="link-chip">
-                  Xem tất cả {product.category?.name ?? "danh mục"}
-                  <span aria-hidden style={{ color: "#9ca3af" }}>
-                    →
-                  </span>
-                </Link>
-              </div>
-            </div>
-          </section>
-        )}
-      </div>
     </main>
   );
 }
