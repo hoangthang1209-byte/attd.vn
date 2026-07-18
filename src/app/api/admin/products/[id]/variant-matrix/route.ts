@@ -9,6 +9,9 @@ import {
 } from "@/features/products/product-variant-matrix.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
+/** Large matrices (100+) need enough headroom beyond chunked DB work. */
+export const maxDuration = 60;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -55,7 +58,14 @@ export async function POST(
   } catch (err) {
     if (err instanceof ProductAdminValidationError) {
       const formatted = formatProductAdminApiError(err);
-      return NextResponse.json({ ...formatted, message: formatted.error }, { status: formatted.status });
+      return NextResponse.json(
+        {
+          ...formatted,
+          message: formatted.error,
+          matrixNeedsRefetch: Boolean(err.fieldErrors.matrixNeedsRefetch),
+        },
+        { status: formatted.status },
+      );
     }
     const formatted = formatProductAdminApiError(err);
     return NextResponse.json({ ...formatted, message: formatted.error }, { status: formatted.status });

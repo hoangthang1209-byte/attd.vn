@@ -696,9 +696,14 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       return;
     }
 
+    const expectedCreateCount = matrixPreview.missingCount;
     setGenerating(true);
     onMatrixBusyChange?.(true);
-    setMatrixMessage(null);
+    setMatrixMessage(
+      expectedCreateCount > 0
+        ? `Đang tạo ${expectedCreateCount} biến thể...`
+        : "Đang tạo tổ hợp biến thể...",
+    );
     try {
       const response = await fetch(`/api/admin/products/${productId}/variant-matrix`, {
         method: "POST",
@@ -712,6 +717,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
         preserved?: number;
         error?: string;
         fieldErrors?: Record<string, string>;
+        matrixNeedsRefetch?: boolean;
       };
 
       if (!response.ok) {
@@ -720,6 +726,48 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
           setMatrixConfirmOpen(true);
           return;
         }
+
+        const needsRefetch =
+          Boolean(data.matrixNeedsRefetch) ||
+          Boolean(data.fieldErrors?.matrixNeedsRefetch) ||
+          /kiểm tra lại trạng thái biến thể/i.test(data.message ?? "") ||
+          /kiểm tra lại trạng thái biến thể/i.test(data.fieldErrors?.variants ?? "");
+
+        if (needsRefetch) {
+          setMatrixMessage(
+            "Thao tác tạo biến thể mất nhiều thời gian hơn dự kiến. Hệ thống sẽ kiểm tra lại trạng thái biến thể.",
+          );
+          const beforeExisting = matrixPreview.existingCount;
+          const theoretical = matrixPreview.theoreticalCount;
+          try {
+            const refreshed = await fetchServerMatrixPreview();
+            if (refreshed) {
+              setServerMatrixPreview(refreshed);
+              setPreviewOptionsFingerprint(buildOptionsFingerprint(optionGroups));
+              if (refreshed.missingCount === 0 && refreshed.existingCount >= theoretical) {
+                setMatrixMessage("Biến thể đã được tạo thành công. Đã cập nhật lại ma trận.");
+                if (onReloadProduct) await onReloadProduct();
+              } else if (refreshed.existingCount > beforeExisting) {
+                setMatrixMessage("Một số biến thể đã được tạo. Đã cập nhật lại ma trận.");
+                if (onReloadProduct) await onReloadProduct();
+              } else {
+                setMatrixMessage(
+                  "Chưa có biến thể mới được tạo. Vui lòng thử lại hoặc giảm số lượng tổ hợp.",
+                );
+              }
+            } else {
+              setMatrixMessage(
+                "Chưa xác định được trạng thái tạo biến thể. Vui lòng tải lại trang để kiểm tra.",
+              );
+            }
+          } catch {
+            setMatrixMessage(
+              "Chưa xác định được trạng thái tạo biến thể. Vui lòng tải lại trang để kiểm tra.",
+            );
+          }
+          return;
+        }
+
         const comboError = data.fieldErrors?.variants;
         setMatrixMessage(comboError ?? data.message ?? data.error ?? "Không thể tạo biến thể.");
         return;
@@ -730,14 +778,42 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       const summary = formatVariantMatrixGenerationMessage(created, skipped);
       setMatrixMessage(summary);
       clearServerPreview();
-      if (created > 0) {
-        toast.success(summary);
+      if (created > 0 || skipped > 0) {
+        if (created > 0) toast.success(summary);
         if (onReloadProduct) {
           await onReloadProduct();
         }
       }
     } catch {
-      setMatrixMessage("Không thể kết nối máy chủ khi tạo biến thể.");
+      setMatrixMessage(
+        "Thao tác tạo biến thể mất nhiều thời gian hơn dự kiến. Hệ thống sẽ kiểm tra lại trạng thái biến thể.",
+      );
+      try {
+        const refreshed = await fetchServerMatrixPreview();
+        if (refreshed) {
+          setServerMatrixPreview(refreshed);
+          setPreviewOptionsFingerprint(buildOptionsFingerprint(optionGroups));
+          if (refreshed.missingCount === 0) {
+            setMatrixMessage("Biến thể đã được tạo thành công. Đã cập nhật lại ma trận.");
+            if (onReloadProduct) await onReloadProduct();
+          } else if (refreshed.existingCount > 0) {
+            setMatrixMessage("Một số biến thể đã được tạo. Đã cập nhật lại ma trận.");
+            if (onReloadProduct) await onReloadProduct();
+          } else {
+            setMatrixMessage(
+              "Chưa có biến thể mới được tạo. Vui lòng thử lại hoặc giảm số lượng tổ hợp.",
+            );
+          }
+        } else {
+          setMatrixMessage(
+            "Chưa xác định được trạng thái tạo biến thể. Vui lòng tải lại trang để kiểm tra.",
+          );
+        }
+      } catch {
+        setMatrixMessage(
+          "Chưa xác định được trạng thái tạo biến thể. Vui lòng tải lại trang để kiểm tra.",
+        );
+      }
     } finally {
       setGenerating(false);
       onMatrixBusyChange?.(false);
@@ -807,7 +883,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
         </dl>
         {matrixPreview.requiresWarning && (
           <p className="admin-kb-warning-list" role="status">
-            Ma trận lớn: {matrixPreview.theoreticalCount} tổ hợp lý thuyết. Hãy kiểm tra trước khi tạo hàng loạt.
+            Ma trận lớn: {matrixPreview.theoreticalCount} biến thể. Quá trình tạo có thể mất vài giây.
           </p>
         )}
         <div className="admin-variant-matrix-actions">
@@ -821,7 +897,9 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
                   ? "Đang lưu tuỳ chọn..."
                   : previewingMatrix
                     ? "Đang kiểm tra tổ hợp..."
-                    : "Đang tạo tổ hợp biến thể..."
+                    : generating && matrixPreview.missingCount > 0
+                      ? `Đang tạo ${matrixPreview.missingCount} biến thể...`
+                      : "Đang tạo tổ hợp biến thể..."
               }
               disabled={!matrixPreview.canGenerate || matrixBusy || productSaveInProgress}
               onClick={() => void openMatrixConfirm()}

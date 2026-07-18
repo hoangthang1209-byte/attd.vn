@@ -42,4 +42,13 @@ describe("ProductCatalogVariantsSection matrix save-before-preview", () => {
     assert.match(source, /productSaveInProgress/);
     assert.match(source, /onMatrixBusyChange/);
   });
+
+  it("shows large-matrix warning and does not claim zero created before refetch", () => {
+    assert.match(source, /Ma trận lớn:.*biến thể\. Quá trình tạo có thể mất vài giây/);
+    assert.match(source, /Đang tạo \$\{expectedCreateCount\} biến thể/);
+    assert.match(source, /matrixNeedsRefetch/);
+    assert.match(source, /kiểm tra lại trạng thái biến thể/);
+    assert.match(source, /fetchServerMatrixPreview/);
+    assert.doesNotMatch(source, /Không có biến thể nào được tạo/);
+  });
 });

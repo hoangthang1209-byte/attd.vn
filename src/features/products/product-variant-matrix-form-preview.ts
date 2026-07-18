@@ -29,10 +29,10 @@ export function formatVariantMatrixGenerationMessage(created: number, skipped: n
     return "Tất cả tổ hợp biến thể đã tồn tại.";
   }
   if (created > 0 && skipped > 0) {
-    return `Đã tạo ${created} tổ hợp mới. Bỏ qua ${skipped} tổ hợp đã tồn tại.`;
+    return `Đã tạo ${created} biến thể mới, bỏ qua ${skipped} biến thể đã có.`;
   }
   if (created > 0) {
-    return `Đã tạo ${created} tổ hợp biến thể.`;
+    return `Đã tạo ${created} biến thể mới.`;
   }
   return "Không có tổ hợp mới để tạo.";
 }

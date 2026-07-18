@@ -8,7 +8,7 @@ import {
   isPrismaTransactionTimeoutError,
   ProductAdminValidationError,
 } from "@/features/products/product-admin-input";
-import { generateSku, ensureUniqueSku, ProductSkuError } from "@/features/products/product-sku-utils";
+import { generateSku, ProductSkuError } from "@/features/products/product-sku-utils";
 import {
   buildCartesianCombinations,
   buildCombinationPreviewText,
@@ -25,8 +25,9 @@ import {
   type MatrixOptionGroup,
 } from "@/features/products/product-variant-matrix.utils";
 
-/** Interactive txn must cover many sequential creates on remote DBs (default 5s is too low). */
-const MATRIX_TRANSACTION_OPTIONS = {
+/** Chunked writes keep each interactive txn short on remote DBs. */
+const MATRIX_CHUNK_SIZE = 40;
+const MATRIX_CHUNK_TRANSACTION_OPTIONS = {
   maxWait: 10_000,
   timeout: 60_000,
 } as const;
@@ -171,11 +172,26 @@ export const MATRIX_UNKNOWN_CREATE_DIAGNOSTIC = "MATRIX_UNKNOWN_CREATE_ERROR";
 export const MATRIX_UNKNOWN_CREATE_ERROR =
   `Không thể tạo biến thể do lỗi hệ thống. Mã lỗi: ${MATRIX_UNKNOWN_CREATE_DIAGNOSTIC}.`;
 
+/** Timeout / long-running failure — do not claim zero created; client must refetch. */
 export const MATRIX_TRANSACTION_TIMEOUT_ERROR =
-  "Không thể tạo tổ hợp biến thể vì thao tác quá lâu. Không có biến thể nào được tạo. Vui lòng thử lại.";
+  "Thao tác tạo biến thể mất nhiều thời gian hơn dự kiến. Hệ thống sẽ kiểm tra lại trạng thái biến thể.";
+
+export const MATRIX_GENERATION_NEEDS_REFETCH = "MATRIX_GENERATION_NEEDS_REFETCH";
 
 export const MATRIX_TX_SERIALIZATION_ERROR =
   "Không thể tạo biến thể do xung đột giao dịch. Vui lòng thử lại.";
+
+export const MATRIX_ZERO_CREATED_AFTER_CHECK =
+  "Chưa có biến thể mới được tạo. Vui lòng thử lại hoặc giảm số lượng tổ hợp.";
+
+export const MATRIX_PARTIAL_CREATED_AFTER_CHECK =
+  "Một số biến thể đã được tạo. Đã cập nhật lại ma trận.";
+
+export const MATRIX_ALL_CREATED_AFTER_CHECK =
+  "Biến thể đã được tạo thành công. Đã cập nhật lại ma trận.";
+
+export const MATRIX_STATUS_UNKNOWN_AFTER_ERROR =
+  "Chưa xác định được trạng thái tạo biến thể. Vui lòng tải lại trang để kiểm tra.";
 
 type MatrixCreateLogContext = {
   productId?: string;
@@ -382,6 +398,64 @@ async function assertMatrixCombinationReady(
   }
 }
 
+/** @deprecated Kept for focused ownership checks in tests; generation uses bulk dry-run. */
+export async function assertMatrixCombinationReadyForTests(
+  db: DbClient,
+  productId: string,
+  groups: MatrixOptionGroup[],
+  combo: MatrixCombination,
+): Promise<void> {
+  return assertMatrixCombinationReady(db, productId, groups, combo);
+}
+
+/** Resolve SKU uniqueness in memory against a prefetched reserved set (no per-variant DB lookup). */
+export function allocateUniqueSkuInMemory(baseSku: string, reservedSkus: Set<string>): string {
+  const normalizedBase = baseSku.trim().toUpperCase();
+  if (!normalizedBase) {
+    throw new ProductSkuError("Không thể tạo SKU duy nhất vì mã gốc trống.");
+  }
+
+  const tryCandidate = (candidate: string): string | null => {
+    const key = candidate.trim().toUpperCase();
+    if (reservedSkus.has(key)) return null;
+    reservedSkus.add(key);
+    return key;
+  };
+
+  const first = tryCandidate(normalizedBase);
+  if (first) return first;
+
+  for (let i = 2; i <= 99; i++) {
+    const next = tryCandidate(`${normalizedBase}-${i}`);
+    if (next) return next;
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const next = tryCandidate(
+      `${normalizedBase}-${Date.now().toString(36).toUpperCase()}${i || ""}`,
+    );
+    if (next) return next;
+  }
+
+  throw new ProductSkuError(`Không thể tạo SKU duy nhất cho mã gốc "${normalizedBase}".`);
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  if (size <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+function throwMatrixTimeoutNeedsRefetch(): never {
+  throw new ProductAdminValidationError(MATRIX_TRANSACTION_TIMEOUT_ERROR, {
+    variants: MATRIX_TRANSACTION_TIMEOUT_ERROR,
+    matrixNeedsRefetch: MATRIX_GENERATION_NEEDS_REFETCH,
+  });
+}
+
 export async function previewVariantMatrixGeneration(
   productId: string,
 ): Promise<VariantMatrixPreview> {
@@ -442,6 +516,127 @@ export async function previewVariantMatrixGeneration(
   };
 }
 
+type PreparedMatrixRow = PlannedMatrixCombination & { sku: string };
+
+async function createMatrixChunk(
+  productId: string,
+  chunk: PreparedMatrixRow[],
+): Promise<Array<{ id: string; sku: string; displayLabel: string | null }>> {
+  if (chunk.length === 0) return [];
+
+  return prisma.$transaction(async (tx) => {
+    const product = await loadMatrixContext(productId, tx);
+    const existingSignatures = new Set(
+      product.variants
+        .filter((variant) => variant.optionValues.length > 0)
+        .map((variant) =>
+          combinationSignature(variant.optionValues.map((link) => link.optionValueId)),
+        ),
+    );
+
+    const stillMissing = chunk.filter((row) => !existingSignatures.has(row.combo.signature));
+    if (stillMissing.length === 0) return [];
+
+    // Ownership already validated in dry-run; re-check once per chunk for safety.
+    const allValueIds = [...new Set(stillMissing.flatMap((row) => row.combo.valueIds))];
+    try {
+      await assertOptionValueIdsBelongToProduct(tx, productId, allValueIds);
+    } catch {
+      throw new ProductAdminValidationError(MATRIX_OPTION_VALUE_OWNERSHIP_ERROR, {
+        variants: MATRIX_OPTION_VALUE_OWNERSHIP_ERROR,
+      });
+    }
+
+    const stock = normalizeVariantStockFields(0);
+    const variantRows = stillMissing.map((row) => ({
+      productId,
+      sku: row.sku,
+      displayLabel: row.combo.displayLabel,
+      colorName: row.legacy.colorName ?? null,
+      colorCode: row.legacy.colorCode ?? null,
+      sizeName: row.legacy.sizeName ?? null,
+      dimensions: row.legacy.dimensions ?? null,
+      capacity: row.legacy.capacity ?? null,
+      stockQty: stock.stockQty,
+      stockStatus: stock.stockStatus,
+      variantStatus: "ACTIVE" as VariantStatus,
+    }));
+
+    try {
+      await tx.productVariant.createMany({
+        data: variantRows,
+        skipDuplicates: true,
+      });
+    } catch (error) {
+      if (isPrismaTransactionTimeoutError(error) || getPrismaErrorCode(error) === "P2028") {
+        throwMatrixTimeoutNeedsRefetch();
+      }
+      const first = stillMissing[0]!;
+      const message = mapMatrixCombinationCreateError(error, first.combo, first.sku, {
+        productId,
+      });
+      throwMatrixCombinationError(first.combo, message);
+    }
+
+    const skus = stillMissing.map((row) => row.sku);
+    const createdVariants = await tx.productVariant.findMany({
+      where: { productId, sku: { in: skus } },
+      select: {
+        id: true,
+        sku: true,
+        displayLabel: true,
+        optionValues: { select: { optionValueId: true } },
+      },
+    });
+
+    const skuToValueIds = new Map(
+      stillMissing.map((row) => [row.sku.toUpperCase(), row.combo.valueIds] as const),
+    );
+
+    const linkRows: Array<{ variantId: string; optionValueId: string }> = [];
+    for (const variant of createdVariants) {
+      if (variant.optionValues.length > 0) continue;
+      const valueIds = skuToValueIds.get(variant.sku.toUpperCase()) ?? [];
+      for (const optionValueId of valueIds) {
+        linkRows.push({ variantId: variant.id, optionValueId });
+      }
+    }
+
+    if (linkRows.length > 0) {
+      try {
+        await tx.productVariantOptionValue.createMany({
+          data: linkRows,
+          skipDuplicates: true,
+        });
+      } catch (error) {
+        if (isPrismaTransactionTimeoutError(error) || getPrismaErrorCode(error) === "P2028") {
+          throwMatrixTimeoutNeedsRefetch();
+        }
+        const first = stillMissing[0]!;
+        const message = mapMatrixCombinationCreateError(error, first.combo, first.sku, {
+          productId,
+        });
+        throwMatrixCombinationError(first.combo, message);
+      }
+    }
+
+    // Return prepared rows that now exist as structured variants (including recovered orphans).
+    return stillMissing
+      .map((row) => {
+        const variant = createdVariants.find(
+          (item) => item.sku.trim().toUpperCase() === row.sku.toUpperCase(),
+        );
+        if (!variant) return null;
+        return {
+          id: variant.id,
+          sku: variant.sku,
+          displayLabel: variant.displayLabel,
+        };
+      })
+      .filter((row): row is { id: string; sku: string; displayLabel: string | null } => Boolean(row));
+  }, MATRIX_CHUNK_TRANSACTION_OPTIONS);
+}
+
 export async function generateVariantMatrix(
   productId: string,
   input: { confirmLarge?: boolean } = {},
@@ -461,8 +656,6 @@ export async function generateVariantMatrix(
     );
   }
 
-  // Preview gate stays outside the write transaction; execute reloads option IDs
-  // inside the transaction so we never create links against stale/deleted values.
   const previewProduct = await loadMatrixContext(productId);
   const previewGroups = toMatrixGroups(previewProduct.options);
   const previewCombinations = buildCartesianCombinations(previewGroups);
@@ -477,8 +670,9 @@ export async function generateVariantMatrix(
     (combo) => !previewExisting.has(combo.signature),
   );
   const productCode = previewProduct.productCode!.trim().toUpperCase();
+  const initialExistingCount = previewExisting.size;
+  const skippedBaseline = previewCombinations.length - previewMissing.length;
 
-  // Dry-run all planned combinations before any writes — fail closed on first invalid combo.
   const dryRunPlan = await dryRunVariantMatrixCombinations(
     productId,
     previewGroups,
@@ -492,160 +686,76 @@ export async function generateVariantMatrix(
     skus: dryRunPlan.map((item) => item.baseSku),
   });
 
+  // Prefetch SKUs once for this product prefix — resolve collisions in memory.
+  const existingSkuRows = await prisma.productVariant.findMany({
+    where: {
+      OR: [
+        { productId },
+        { sku: { startsWith: `${productCode}-` } },
+        { sku: { in: dryRunPlan.map((item) => item.baseSku) } },
+      ],
+    },
+    select: { sku: true },
+  });
+  const reservedSkus = new Set(
+    existingSkuRows.map((row) => row.sku.trim().toUpperCase()).filter(Boolean),
+  );
+
+  const prepared: PreparedMatrixRow[] = dryRunPlan.map((plan) => {
+    try {
+      return {
+        ...plan,
+        sku: allocateUniqueSkuInMemory(plan.baseSku, reservedSkus),
+      };
+    } catch (error) {
+      const detail =
+        error instanceof ProductSkuError
+          ? error.message
+          : `Tổ hợp "${plan.combo.displayLabel}": xung đột mã SKU.`;
+      throw new ProductAdminValidationError(
+        `Không thể tạo SKU duy nhất cho tổ hợp "${plan.combo.displayLabel}".`,
+        {
+          variants: detail.startsWith("Tổ hợp")
+            ? detail
+            : `Tổ hợp "${plan.combo.displayLabel}": xung đột mã SKU.`,
+        },
+      );
+    }
+  });
+
   const createdVariants: Array<{ id: string; sku: string; displayLabel: string | null }> = [];
-  let skipped = 0;
-  let initialExistingCount = 0;
+  const chunks = chunkArray(prepared, MATRIX_CHUNK_SIZE);
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const product = await loadMatrixContext(productId, tx);
-      const groups = toMatrixGroups(product.options);
-      const allCombinations = buildCartesianCombinations(groups);
-      const existingSignatures = new Set(
-        product.variants
-          .filter((variant) => variant.optionValues.length > 0)
-          .map((variant) =>
-            combinationSignature(variant.optionValues.map((link) => link.optionValueId)),
-          ),
-      );
-      initialExistingCount = existingSignatures.size;
-      const missing = allCombinations.filter((combo) => !existingSignatures.has(combo.signature));
-      skipped = allCombinations.length - missing.length;
-      const txProductCode = product.productCode!.trim().toUpperCase();
-      const reservedSkus = new Set(
-        product.variants.map((variant) => variant.sku.trim().toUpperCase()).filter(Boolean),
-      );
-
-      // Re-validate inside the transaction against the latest option IDs.
-      const planned = await dryRunVariantMatrixCombinations(
-        productId,
-        groups,
-        missing,
-        txProductCode,
-        tx,
-      );
-
-      for (const plan of planned) {
-        const { combo, baseSku, legacy } = plan;
-        if (existingSignatures.has(combo.signature)) {
-          skipped += 1;
-          continue;
-        }
-
-        await assertMatrixCombinationReady(tx, productId, groups, combo);
-
-        let sku: string;
-        try {
-          sku = await ensureUniqueSku(baseSku, tx, reservedSkus);
-        } catch (error) {
-          const detail =
-            error instanceof ProductSkuError
-              ? error.message
-              : `Tổ hợp "${combo.displayLabel}": xung đột mã SKU.`;
-          throw new ProductAdminValidationError(
-            `Không thể tạo SKU duy nhất cho tổ hợp "${combo.displayLabel}".`,
-            {
-              variants: detail.startsWith("Tổ hợp")
-                ? detail
-                : `Tổ hợp "${combo.displayLabel}": xung đột mã SKU.`,
-            },
-          );
-        }
-
-        const stock = normalizeVariantStockFields(0);
-        let created = false;
-        for (let attempt = 0; attempt < 5 && !created; attempt++) {
-          const createPayload = {
-            productId,
-            sku,
-            displayLabel: combo.displayLabel,
-            colorName: legacy.colorName ?? null,
-            colorCode: legacy.colorCode ?? null,
-            sizeName: legacy.sizeName ?? null,
-            dimensions: legacy.dimensions ?? null,
-            capacity: legacy.capacity ?? null,
-            stockQty: stock.stockQty,
-            stockStatus: stock.stockStatus,
-            variantStatus: "ACTIVE" satisfies VariantStatus,
-            optionValueIds: combo.valueIds,
-          };
-          try {
-            const variant = await tx.productVariant.create({
-              data: {
-                productId,
-                sku,
-                displayLabel: combo.displayLabel,
-                colorName: legacy.colorName ?? null,
-                colorCode: legacy.colorCode ?? null,
-                sizeName: legacy.sizeName ?? null,
-                dimensions: legacy.dimensions ?? null,
-                capacity: legacy.capacity ?? null,
-                stockQty: stock.stockQty,
-                stockStatus: stock.stockStatus,
-                variantStatus: "ACTIVE" satisfies VariantStatus,
-                optionValues: {
-                  create: combo.valueIds.map((optionValueId) => ({ optionValueId })),
-                },
-              },
-            });
-
-            createdVariants.push({
-              id: variant.id,
-              sku: variant.sku,
-              displayLabel: variant.displayLabel,
-            });
-            existingSignatures.add(combo.signature);
-            created = true;
-          } catch (error) {
-            if (isPrismaTransactionTimeoutError(error) || getPrismaErrorCode(error) === "P2028") {
-              logMatrixCombinationCreateFailure(error, combo, sku, {
-                productId,
-                createPayload,
-              });
-              throw new ProductAdminValidationError(MATRIX_TRANSACTION_TIMEOUT_ERROR, {
-                variants: MATRIX_TRANSACTION_TIMEOUT_ERROR,
-              });
-            }
-            if (isSkuUniqueConstraintError(error) && attempt < 4) {
-              reservedSkus.add(sku.trim().toUpperCase());
-              try {
-                sku = await ensureUniqueSku(baseSku, tx, reservedSkus);
-                continue;
-              } catch {
-                throwMatrixCombinationError(combo, `xung đột mã SKU.`);
-              }
-            }
-            const message = mapMatrixCombinationCreateError(error, combo, sku, {
-              productId,
-              createPayload,
-            });
-            throwMatrixCombinationError(combo, message);
-          }
-        }
-
-        if (!created) {
-          throwMatrixCombinationError(combo, "xung đột mã SKU.");
-        }
-      }
-    }, MATRIX_TRANSACTION_OPTIONS);
+    for (const chunk of chunks) {
+      const created = await createMatrixChunk(productId, chunk);
+      createdVariants.push(...created);
+    }
   } catch (error) {
     if (error instanceof ProductAdminValidationError) {
+      // Timeout / needs-refetch already set fieldErrors.matrixNeedsRefetch.
+      if (
+        error.fieldErrors.matrixNeedsRefetch === MATRIX_GENERATION_NEEDS_REFETCH ||
+        error.message === MATRIX_TRANSACTION_TIMEOUT_ERROR
+      ) {
+        throw error;
+      }
       throw error;
     }
     if (isPrismaTransactionTimeoutError(error) || getPrismaErrorCode(error) === "P2028") {
       console.error("[variant-matrix] transaction timeout", {
         productId,
         plannedCount: dryRunPlan.length,
+        createdBeforeTimeout: createdVariants.length,
         errorMessage: error instanceof Error ? error.message : String(error),
         diagnosticCode: MATRIX_UNKNOWN_CREATE_DIAGNOSTIC,
       });
-      throw new ProductAdminValidationError(MATRIX_TRANSACTION_TIMEOUT_ERROR, {
-        variants: MATRIX_TRANSACTION_TIMEOUT_ERROR,
-      });
+      throwMatrixTimeoutNeedsRefetch();
     }
     console.error("[variant-matrix] generate failed", {
       productId,
       plannedCount: dryRunPlan.length,
+      createdBeforeFailure: createdVariants.length,
       prismaCode: getPrismaErrorCode(error),
       prismaMeta: getPrismaErrorMeta(error),
       errorName: error instanceof Error ? error.name : typeof error,
@@ -655,7 +765,7 @@ export async function generateVariantMatrix(
     throw error;
   }
 
-  if (createdVariants.length === 0 && skipped > 0) {
+  if (createdVariants.length === 0 && dryRunPlan.length === 0 && skippedBaseline > 0) {
     throw new ProductAdminValidationError("Tất cả tổ hợp biến thể đã tồn tại.", {
       variants: "Tất cả tổ hợp biến thể đã tồn tại.",
     });
@@ -663,7 +773,7 @@ export async function generateVariantMatrix(
 
   return {
     created: createdVariants.length,
-    skipped,
+    skipped: skippedBaseline,
     preserved: initialExistingCount,
     variants: createdVariants,
   };

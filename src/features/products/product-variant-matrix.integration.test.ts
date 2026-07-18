@@ -316,6 +316,82 @@ describeDb("variant matrix generation", () => {
     assert.equal(linkCount, 18);
   });
 
+  it("2 colors × 2 sizes creates 4 variants", async () => {
+    const product = await createMatrixProduct("9040", ["Đen", "Trắng"], ["S", "M"]);
+    const preview = await previewVariantMatrixGeneration(product.id);
+    assert.equal(preview.theoreticalCount, 4);
+    assert.equal(preview.missingCount, 4);
+
+    const result = await generateVariantMatrix(product.id);
+    assert.equal(result.created, 4);
+    assert.equal(result.skipped, 0);
+
+    const secondPreview = await previewVariantMatrixGeneration(product.id);
+    assert.equal(secondPreview.existingCount, 4);
+    assert.equal(secondPreview.missingCount, 0);
+    await assert.rejects(
+      () => generateVariantMatrix(product.id),
+      (error: unknown) =>
+        error instanceof ProductAdminValidationError &&
+        error.message === "Tất cả tổ hợp biến thể đã tồn tại.",
+    );
+  });
+
+  it("13 colors × 8 sizes creates 104 variants and second run is idempotent", async () => {
+    const colors = [
+      "Đen",
+      "Trắng",
+      "Đỏ",
+      "Xanh lá",
+      "Xanh dương",
+      "Navy",
+      "Vàng",
+      "Cam",
+      "Tím",
+      "Hồng",
+      "Xám",
+      "Be",
+      "Nâu",
+    ];
+    const sizes = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "Free size"];
+    const product = await createMatrixProduct("9104", colors, sizes);
+
+    const preview = await previewVariantMatrixGeneration(product.id);
+    assert.equal(preview.theoreticalCount, 104);
+    assert.equal(preview.existingCount, 0);
+    assert.equal(preview.missingCount, 104);
+    assert.equal(preview.requiresWarning, true);
+
+    const result = await generateVariantMatrix(product.id);
+    assert.equal(result.created, 104);
+    assert.equal(result.skipped, 0);
+
+    const variants = await prisma.productVariant.findMany({
+      where: { productId: product.id },
+      select: { id: true, sku: true, optionValues: { select: { optionValueId: true } } },
+    });
+    assert.equal(variants.length, 104);
+    assert.equal(new Set(variants.map((variant) => variant.sku)).size, 104);
+    assert.ok(variants.every((variant) => variant.optionValues.length === 2));
+
+    const linkCount = await prisma.productVariantOptionValue.count({
+      where: { variant: { productId: product.id } },
+    });
+    assert.equal(linkCount, 208);
+
+    const secondPreview = await previewVariantMatrixGeneration(product.id);
+    assert.equal(secondPreview.existingCount, 104);
+    assert.equal(secondPreview.missingCount, 0);
+    assert.equal(secondPreview.canGenerate, false);
+
+    await assert.rejects(
+      () => generateVariantMatrix(product.id),
+      (error: unknown) =>
+        error instanceof ProductAdminValidationError &&
+        error.message === "Tất cả tổ hợp biến thể đã tồn tại.",
+    );
+  });
+
   it("rejects stale or foreign optionValueIds with actionable ownership message", async () => {
     const product = await createMatrixProduct("9011", NAVY_XS_COLOR_LABELS, NAVY_XS_SIZE_LABELS);
     const owned = await prisma.productOptionValue.findFirst({

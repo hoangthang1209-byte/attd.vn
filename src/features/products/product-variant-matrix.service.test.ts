@@ -71,7 +71,7 @@ describe("mapMatrixCombinationCreateError", () => {
     );
   });
 
-  it("maps interactive transaction timeout to precise Vietnamese message", () => {
+  it("maps interactive transaction timeout to refetch guidance without claiming zero created", () => {
     const error = new Error(
       "Transaction API error: Transaction already closed: The timeout for this transaction was 5000 ms.",
     );
@@ -79,6 +79,8 @@ describe("mapMatrixCombinationCreateError", () => {
       mapMatrixCombinationCreateError(error, combo, "PRRE0004-BLK-XL"),
       MATRIX_TRANSACTION_TIMEOUT_ERROR,
     );
+    assert.match(MATRIX_TRANSACTION_TIMEOUT_ERROR, /kiểm tra lại trạng thái/);
+    assert.doesNotMatch(MATRIX_TRANSACTION_TIMEOUT_ERROR, /Không có biến thể nào được tạo/);
   });
 
   it("maps P2028 and P2034 to precise transaction messages", () => {
@@ -125,5 +127,18 @@ describe("mapMatrixCombinationCreateError", () => {
       () => mapMatrixCombinationCreateError(error, combo, "SKU-1"),
       (err: unknown) => err instanceof ProductAdminValidationError,
     );
+  });
+});
+
+describe("allocateUniqueSkuInMemory", () => {
+  it("allocates base SKU then deterministic suffixes without DB lookups", async () => {
+    const { allocateUniqueSkuInMemory } = await import(
+      "@/features/products/product-variant-matrix.service"
+    );
+    const reserved = new Set<string>(["PRRE0001-BLK-M"]);
+    assert.equal(allocateUniqueSkuInMemory("PRRE0001-BLK-M", reserved), "PRRE0001-BLK-M-2");
+    assert.equal(allocateUniqueSkuInMemory("PRRE0001-BLK-M", reserved), "PRRE0001-BLK-M-3");
+    assert.equal(allocateUniqueSkuInMemory("PRRE0001-NVY-S", reserved), "PRRE0001-NVY-S");
+    assert.ok(reserved.has("PRRE0001-NVY-S"));
   });
 });

@@ -83,9 +83,9 @@ describe("formatVariantMatrixGenerationMessage", () => {
   it("formats partial and full creation summaries", () => {
     assert.equal(
       formatVariantMatrixGenerationMessage(3, 2),
-      "Đã tạo 3 tổ hợp mới. Bỏ qua 2 tổ hợp đã tồn tại.",
+      "Đã tạo 3 biến thể mới, bỏ qua 2 biến thể đã có.",
     );
-    assert.equal(formatVariantMatrixGenerationMessage(9, 0), "Đã tạo 9 tổ hợp biến thể.");
+    assert.equal(formatVariantMatrixGenerationMessage(9, 0), "Đã tạo 9 biến thể mới.");
     assert.equal(
       formatVariantMatrixGenerationMessage(0, 9),
       "Tất cả tổ hợp biến thể đã tồn tại.",
