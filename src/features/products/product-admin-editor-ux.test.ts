@@ -39,6 +39,22 @@ describe("product editor UX compaction", () => {
     assert.doesNotMatch(form, /admin-catalog-form__title">\{form\.name\}/);
   });
 
+  it("activates section pills by section id to avoid dual highlight", () => {
+    assert.match(form, /activeSectionId === section\.id/);
+    assert.match(form, /setActiveSectionId/);
+    assert.doesNotMatch(
+      form,
+      /className=\{`admin-catalog-section-nav__link\$\{activeTab === section\.tab/,
+    );
+  });
+
+  it("clears dirty snapshot after matrix stay-saves", () => {
+    assert.match(form, /ensureOptionsSavedForMatrix/);
+    assert.match(form, /saveProductForMatrixGeneration/);
+    assert.match(form, /queueMicrotask\(\(\) => setSavedFormSnapshot\(JSON\.stringify\(formRef\.current\)\)\)/);
+    assert.match(form, /queueMicrotask\(\(\) => setSavedFormSnapshot\(JSON\.stringify\(next\)\)\)/);
+  });
+
   it("separates pill active/hover/focus and avoids sticky overlap", () => {
     assert.match(form, /admin-content-scroll/);
     assert.match(form, /headerOffset/);

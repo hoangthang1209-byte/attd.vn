@@ -7981,6 +7981,22 @@ body:has(.mp-pdp--b2b) .floating-contact {
 .admin-catalog-kpi--danger strong { color: #dc2626; }
 .admin-catalog-kpi--ok strong { color: #059669; }
 
+.admin-product-readiness-summary {
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+  padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff;
+}
+.admin-product-readiness-summary__hint { margin: 0; flex-basis: 100%; }
+.admin-product-readiness-badges {
+  display: flex; flex-wrap: wrap; gap: 4px; max-width: 220px;
+}
+.admin-product-readiness-badge {
+  display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.admin-product-readiness-badge--ready { background: #d1fae5; color: #065f46; }
+.admin-product-readiness-badge--warn { background: #fef3c7; color: #92400e; }
+.admin-product-readiness-badge--muted { background: #f3f4f6; color: #4b5563; }
+
 /* Toolbar */
 .admin-catalog-toolbar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;

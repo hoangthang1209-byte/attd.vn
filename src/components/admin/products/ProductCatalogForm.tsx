@@ -175,8 +175,12 @@ export default function ProductCatalogForm({
   const [activeTab, setActiveTab] = useState<FormTabId>(() =>
     searchParams.get("generateVariants") === "1" ? "variants" : "basic",
   );
+  const [activeSectionId, setActiveSectionId] = useState<string>(() =>
+    searchParams.get("generateVariants") === "1" ? "section-variants" : "section-basic",
+  );
 
   const scrollToFormSection = useCallback((sectionId: string) => {
+    setActiveSectionId(sectionId);
     const el = document.getElementById(sectionId);
     if (!el) return;
     const scroller = document.getElementById("admin-content-scroll");
@@ -208,7 +212,9 @@ export default function ProductCatalogForm({
       content: "section-content",
       seo: "section-seo",
     };
-    requestAnimationFrame(() => scrollToFormSection(sectionByTab[tab] ?? "section-basic"));
+    const sectionId = sectionByTab[tab] ?? "section-basic";
+    setActiveSectionId(sectionId);
+    requestAnimationFrame(() => scrollToFormSection(sectionId));
   }, [scrollToFormSection]);
   const [form, setForm] = useState<ProductFormData>({
     id: initialData?.id,
@@ -799,6 +805,8 @@ export default function ProductCatalogForm({
       };
     }
 
+    queueMicrotask(() => setSavedFormSnapshot(JSON.stringify(formRef.current)));
+
     if (
       optionGroupsMissingPersistedIds(nextOptions) ||
       countActiveOptionValues(nextOptions) < expectedValueCount
@@ -984,19 +992,24 @@ export default function ProductCatalogForm({
       },
       onSuccess: (product) => {
         if (!product?.id) return;
-        setForm((prev) => ({
-          ...prev,
-          id: product.id,
-          productCode: product.productCode ?? prev.productCode,
-          slug: product.slug ?? prev.slug,
-          options: product.options ? mapOptionsToFormRows(product.options) : prev.options,
-          variants: product.variants
-            ? mapVariantsToFormRows(product.variants).filter(
-                (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
-              )
-            : [],
-        }));
+        setForm((prev) => {
+          const next = {
+            ...prev,
+            id: product.id,
+            productCode: product.productCode ?? prev.productCode,
+            slug: product.slug ?? prev.slug,
+            options: product.options ? mapOptionsToFormRows(product.options) : prev.options,
+            variants: product.variants
+              ? mapVariantsToFormRows(product.variants).filter(
+                  (variant) => !variant.id || !deletedVariantIdsRef.current.has(variant.id),
+                )
+              : [],
+          };
+          queueMicrotask(() => setSavedFormSnapshot(JSON.stringify(next)));
+          return next;
+        });
         setActiveTab("variants");
+        setActiveSectionId("section-variants");
         matrixAutoOpenTriggeredRef.current = false;
         router.replace(`/admin/products/${product.id}/edit?generateVariants=1`);
         router.refresh();
@@ -1086,10 +1099,11 @@ export default function ProductCatalogForm({
           <a
             key={section.id}
             href={`#${section.id}`}
-            className={`admin-catalog-section-nav__link${activeTab === section.tab ? " is-active" : ""}`}
+            className={`admin-catalog-section-nav__link${activeSectionId === section.id ? " is-active" : ""}`}
             onClick={(e) => {
               e.preventDefault();
               setActiveTab(section.tab);
+              setActiveSectionId(section.id);
               scrollToFormSection(section.id);
             }}
           >

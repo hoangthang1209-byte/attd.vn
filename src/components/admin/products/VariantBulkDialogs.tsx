@@ -62,6 +62,7 @@ export default function VariantBulkDialogs({
     "wholesalePrice",
   );
   const [priceError, setPriceError] = useState<string | null>(null);
+  const [stockError, setStockError] = useState<string | null>(null);
   const [moqMode, setMoqMode] = useState<"set" | "clear">("set");
   const [moqValue, setMoqValue] = useState("");
   const [leadTimeMode, setLeadTimeMode] = useState<"set" | "clear">("set");
@@ -82,6 +83,7 @@ export default function VariantBulkDialogs({
       cancelRef.current?.focus();
       setConfirmLargeUpdate(false);
       setPriceError(null);
+      setStockError(null);
     }
   }, [open, kind]);
 
@@ -124,8 +126,12 @@ export default function VariantBulkDialogs({
   function submitStock() {
     const quantity = Number(stockQty);
     if (!Number.isFinite(quantity) || quantity < 0 || !Number.isInteger(quantity)) {
+      setStockError(
+        quantity < 0 ? "Tồn kho không được âm." : "Giá trị nhập không hợp lệ.",
+      );
       return;
     }
+    setStockError(null);
     onSubmit({
       operation: "stock",
       stock: {
@@ -320,9 +326,17 @@ export default function VariantBulkDialogs({
                 min="0"
                 step="1"
                 value={stockQty}
-                onChange={(e) => setStockQty(e.target.value)}
+                onChange={(e) => {
+                  setStockQty(e.target.value);
+                  setStockError(null);
+                }}
               />
               <p className="admin-field-hint">Tồn kho không được âm.</p>
+              {stockError && (
+                <p className="admin-field-error" role="alert">
+                  {stockError}
+                </p>
+              )}
             </div>
             <div className="admin-spec-row">
               <label className="admin-label">Trạng thái tồn kho (tuỳ chọn)</label>
