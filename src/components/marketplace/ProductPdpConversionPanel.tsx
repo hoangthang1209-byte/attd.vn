@@ -3,12 +3,14 @@
 import TrackedLink from "@/components/analytics/TrackedLink";
 import { formatPdpMoqValue, isPublicMoq } from "@/lib/formatMoq";
 import { CTA } from "@/lib/ctaConfig";
-import ManufacturingEvidenceStrip from "@/components/public/manufacturing/ManufacturingEvidenceStrip";
+import { BadgeCheck, Calculator, PackageCheck, Printer, Scissors } from "lucide-react";
 import PublicContactChannels from "@/components/public/PublicContactChannels";
-import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
-import { PDP_CONVERSION_POINTS } from "@/lib/b2b-trust-v2-copy";
-import { getManufacturingEvidenceForSurface } from "@/lib/manufacturing-library.config";
-import type { ManufacturingEvidenceItem } from "@/lib/manufacturing-library.types";
+
+export type ProductPdpCapability = {
+  key: string;
+  title: string;
+  description: string;
+};
 
 type Props = {
   productName: string;
@@ -19,8 +21,8 @@ type Props = {
   stockLabel?: string | null;
   stockColor?: string;
   optionSummary?: string | null;
+  capabilities?: ProductPdpCapability[];
   onRequestQuote: () => void;
-  manufacturingEvidenceItems?: readonly ManufacturingEvidenceItem[];
 };
 
 export default function ProductPdpConversionPanel({
@@ -32,13 +34,9 @@ export default function ProductPdpConversionPanel({
   stockLabel,
   stockColor = "#16a34a",
   optionSummary,
+  capabilities = [],
   onRequestQuote,
-  manufacturingEvidenceItems,
 }: Props) {
-  const pdpEvidence =
-    manufacturingEvidenceItems ??
-    getManufacturingEvidenceForSurface("pdp", { limit: 2 });
-
   return (
     <aside className="product-detail-right mp-pdp-conversion-aside" aria-label="Yêu cầu báo giá">
       <div className="mp-pdp-conversion-card">
@@ -93,6 +91,8 @@ export default function ProductPdpConversionPanel({
           )}
         </dl>
 
+        <ProductPdpCapabilityGrid capabilities={capabilities} />
+
         <div className="mp-pdp-conversion-actions">
           <button
             type="button"
@@ -111,21 +111,51 @@ export default function ProductPdpConversionPanel({
           </TrackedLink>
         </div>
 
-        <ProcessTrustBlock
-          steps={PDP_CONVERSION_POINTS}
-          ordered={false}
-          variant="compact"
-          className="mp-pdp-conversion-trust"
-        />
-
         <PublicContactChannels compact className="mp-pdp-conversion-contact" source="pdp_conversion_panel" />
-
-        <ManufacturingEvidenceStrip
-          title="Tại ATTD"
-          items={pdpEvidence}
-          className="mp-pdp-manufacturing-gallery"
-        />
       </div>
     </aside>
   );
+}
+
+export function ProductPdpCapabilityGrid({
+  capabilities,
+  className,
+}: {
+  capabilities: ProductPdpCapability[];
+  className?: string;
+}) {
+  if (capabilities.length === 0) return null;
+
+  return (
+    <section
+      className={["mp-pdp-conversion-capabilities", className].filter(Boolean).join(" ")}
+      aria-label="Khả năng sản phẩm"
+    >
+      {capabilities.map((capability) => {
+        const Icon = resolveCapabilityIcon(capability.title);
+        return (
+          <div key={capability.key} className="mp-pdp-conversion-capability">
+            <Icon className="mp-pdp-conversion-capability-icon" aria-hidden="true" />
+            <div>
+              <h3>{capability.title}</h3>
+              <p>{capability.description}</p>
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function resolveCapabilityIcon(title: string) {
+  const normalized = title.toLowerCase();
+  if (normalized.includes("thêu")) return Scissors;
+  if (normalized.includes("oem") || normalized.includes("private") || normalized.includes("label")) {
+    return PackageCheck;
+  }
+  if (normalized.includes("giá") || normalized.includes("moq") || normalized.includes("số lượng")) {
+    return Calculator;
+  }
+  if (normalized.includes("in") || normalized.includes("logo")) return Printer;
+  return BadgeCheck;
 }

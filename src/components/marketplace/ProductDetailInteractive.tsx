@@ -4,7 +4,10 @@ import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useMemo
 import Link from "next/link";
 import ProductGallery from "@/components/marketplace/ProductGallery";
 import ProductDynamicOptionSelector from "@/components/marketplace/ProductDynamicOptionSelector";
-import ProductPdpConversionPanel from "@/components/marketplace/ProductPdpConversionPanel";
+import ProductPdpConversionPanel, {
+  ProductPdpCapabilityGrid,
+  type ProductPdpCapability,
+} from "@/components/marketplace/ProductPdpConversionPanel";
 import ProductPdpMobileBar from "@/components/marketplace/ProductPdpMobileBar";
 import ProductSpecificationsSection from "@/components/marketplace/ProductSpecificationsSection";
 import ProductCustomizationsSection from "@/components/marketplace/ProductCustomizationsSection";
@@ -43,12 +46,6 @@ const STOCK_COLORS: Record<string, string> = {
   OUT_OF_STOCK: "#dc2626",
 };
 
-type CapabilityItem = {
-  key: string;
-  title: string;
-  description: string;
-};
-
 function buildSelectedOptionEntries(
   optionGroups: PublicProductDetail["optionGroups"],
   selection: OptionSelectionState,
@@ -63,6 +60,53 @@ function buildSelectedOptionEntries(
       };
     })
     .filter((entry): entry is { label: string; value: string } => Boolean(entry));
+}
+
+const DEFAULT_PDP_CAPABILITIES: ProductPdpCapability[] = [
+  {
+    key: "default-printing",
+    title: "In logo",
+    description: "Tư vấn kỹ thuật in phù hợp chất liệu và số lượng.",
+  },
+  {
+    key: "default-embroidery",
+    title: "Thêu logo",
+    description: "Phù hợp đồng phục cần độ bền và cảm giác cao cấp.",
+  },
+  {
+    key: "default-oem",
+    title: "OEM / Private Label",
+    description: "Hỗ trợ phát triển sản phẩm theo nhận diện thương hiệu.",
+  },
+  {
+    key: "default-tiered-quote",
+    title: "Báo giá theo số lượng",
+    description: "Báo giá theo MOQ, tiến độ và yêu cầu hoàn thiện.",
+  },
+];
+
+function normalizeCapabilityTitle(label: string) {
+  const trimmed = label.trim();
+  if (/^in logo\s*\/\s*in hình$/i.test(trimmed)) return "In logo";
+  if (/^oem\s*\/\s*private label$/i.test(trimmed)) return "OEM / Private Label";
+  return trimmed;
+}
+
+function resolveCapabilityDescription(label: string) {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("thêu")) {
+    return "Phù hợp đồng phục cần độ bền và cảm giác cao cấp.";
+  }
+  if (normalized.includes("oem") || normalized.includes("private") || normalized.includes("label")) {
+    return "Hỗ trợ phát triển sản phẩm theo nhận diện thương hiệu.";
+  }
+  if (normalized.includes("giá") || normalized.includes("moq") || normalized.includes("số lượng")) {
+    return "Báo giá theo MOQ, tiến độ và yêu cầu hoàn thiện.";
+  }
+  if (normalized.includes("in") || normalized.includes("logo")) {
+    return "Tư vấn kỹ thuật in phù hợp chất liệu và số lượng.";
+  }
+  return null;
 }
 
 type Props = {
@@ -211,36 +255,23 @@ export default function ProductDetailInteractive({
     ? selectedOptionEntries.map((entry) => `${entry.label}: ${entry.value}`).join(" · ")
     : null;
 
-  const capabilityItems = useMemo<CapabilityItem[]>(() => {
-    const items: CapabilityItem[] = [];
-    if (product.supportsPrinting) {
-      items.push({
-        key: "printing",
-        title: "In logo",
-        description: "Tư vấn kỹ thuật in phù hợp chất liệu và số lượng.",
-      });
-    }
-    if (product.supportsEmbroidery) {
-      items.push({
-        key: "embroidery",
-        title: "Thêu logo",
-        description: "Phù hợp đồng phục cần độ bền và cảm giác cao cấp.",
-      });
-    }
-    if (product.supportsOem) {
-      items.push({
-        key: "oem",
-        title: "OEM/private label",
-        description: "Hỗ trợ phát triển sản phẩm theo nhận diện thương hiệu.",
-      });
-    }
-    items.push({
-      key: "tiered-quote",
-      title: "Báo giá theo số lượng",
-      description: "Báo giá theo MOQ, tiến độ và yêu cầu hoàn thiện.",
-    });
-    return items.slice(0, 4);
-  }, [product.supportsEmbroidery, product.supportsOem, product.supportsPrinting]);
+  const capabilityItems = useMemo<ProductPdpCapability[]>(() => {
+    const storedCapabilities = product.customizations.filter((item) => !item.id.startsWith("flag-"));
+    const productCapabilities = storedCapabilities
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((item) => ({
+        key: item.id,
+        title: normalizeCapabilityTitle(item.label),
+        description:
+          item.description?.trim() ||
+          resolveCapabilityDescription(item.label) ||
+          "ATTD tư vấn phương án phù hợp chất liệu, số lượng và mục tiêu sử dụng.",
+      }))
+      .filter((item) => item.title.trim());
+
+    return (productCapabilities.length > 0 ? productCapabilities : DEFAULT_PDP_CAPABILITIES).slice(0, 4);
+  }, [product.customizations]);
 
   const descriptionContentBlocks = useMemo(() => {
     if (!displayContent) return [];
@@ -323,8 +354,8 @@ export default function ProductDetailInteractive({
       stockLabel={stockLabel}
       stockColor={stockColor}
       optionSummary={selectedOptionSummary}
+      capabilities={capabilityItems}
       onRequestQuote={openQuoteFromPanel}
-      manufacturingEvidenceItems={manufacturingEvidenceItems}
     />
   );
 
@@ -374,16 +405,10 @@ export default function ProductDetailInteractive({
                     )}
                   </div>
 
-                  {capabilityItems.length > 0 && (
-                    <div className="mp-pdp-capability-block" aria-label="Khả năng B2B">
-                      {capabilityItems.map((item) => (
-                        <div key={item.key} className="mp-pdp-capability-item">
-                          <strong>{item.title}</strong>
-                          <span>{item.description}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <ProductPdpCapabilityGrid
+                    capabilities={capabilityItems}
+                    className="mp-pdp-mobile-capabilities"
+                  />
 
                   {showVariantSelector && (
                     <div className="mp-pdp-options-card product-detail-options">

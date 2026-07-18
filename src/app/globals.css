@@ -20032,6 +20032,64 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   text-underline-offset: 3px;
 }
 
+.mp-pdp-conversion-capabilities {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.mp-pdp-conversion-capability {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+
+.mp-pdp-conversion-capability-icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--primary);
+  stroke-width: 1.8;
+}
+
+.mp-pdp-conversion-capability h3 {
+  margin: 0 0 4px;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.mp-pdp-conversion-capability p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.mp-pdp-mobile-capabilities {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  .mp-pdp-mobile-capabilities {
+    display: grid;
+    margin-top: 2px;
+    padding-bottom: 16px;
+  }
+}
+
+@media (max-width: 374px) {
+  .mp-pdp-conversion-capabilities {
+    grid-template-columns: 1fr;
+  }
+}
+
 .pdp-mobile-action-bar {
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.75fr) minmax(0, 0.75fr);
 }
@@ -22620,18 +22678,6 @@ body:has(.mp-header--v271) {
   flex: 0 0 auto;
 }
 
-.mp-pdp-conversion-trust {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(17, 24, 39, 0.08);
-}
-
-.mp-pdp-conversion-trust .b2b-trust-signals__item {
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 650;
-}
-
 .dealer-final-panel .b2b-trust-signals {
   margin: 28px 0;
 }
@@ -23174,12 +23220,6 @@ body:has(.mp-header--v271) {
   font-size: clamp(18px, 2vw, 22px);
 }
 
-.mp-pdp-manufacturing-gallery.manufacturing-gallery--inline {
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(15, 23, 42, 0.06);
-}
-
 @media (min-width: 640px) {
   .manufacturing-gallery--mosaic .manufacturing-gallery__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -23373,13 +23413,6 @@ body:has(.mp-header--v271) {
 
 .manufacturing-evidence-card--compact .manufacturing-evidence-card__title {
   min-height: auto;
-}
-
-.mp-pdp-manufacturing-gallery .manufacturing-gallery__title {
-  color: #64748b;
-  font-size: 12px;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
 }
 
 .manufacturing-workflow-timeline {
