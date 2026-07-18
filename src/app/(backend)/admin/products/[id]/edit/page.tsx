@@ -39,8 +39,10 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
           />
         }
       >
-        <ProductSetupChecklist input={checklistInput} />
-        <ProductCatalogForm initialData={initialData} categories={cats} />
+        <div className="product-admin-shell product-admin-edit-page">
+          <ProductSetupChecklist input={checklistInput} />
+          <ProductCatalogForm initialData={initialData} categories={cats} />
+        </div>
       </Suspense>
     </>
   );

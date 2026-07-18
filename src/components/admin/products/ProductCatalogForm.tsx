@@ -189,7 +189,11 @@ export default function ProductCatalogForm({
       return;
     }
     const header = scroller.querySelector("header");
-    const headerOffset = header instanceof HTMLElement ? header.offsetHeight + 8 : 8;
+    const nav = scroller.querySelector(".admin-catalog-section-nav");
+    const headerOffset =
+      (header instanceof HTMLElement ? header.offsetHeight : 0) +
+      (nav instanceof HTMLElement ? nav.offsetHeight : 0) +
+      8;
     const top =
       el.getBoundingClientRect().top -
       scroller.getBoundingClientRect().top +
@@ -1035,7 +1039,7 @@ export default function ProductCatalogForm({
 
   return (
     <form
-      className="admin-catalog-form admin-catalog-form--onescreen"
+      className="admin-catalog-form admin-catalog-form--onescreen product-admin-form"
       onSubmit={(e) => void handleSubmit(e)}
       data-testid="product-catalog-form-onescreen"
     >
@@ -1094,7 +1098,11 @@ export default function ProductCatalogForm({
         onFocusError={(descriptor) => void handleFocusError(descriptor)}
       />
 
-      <nav className="admin-catalog-section-nav" aria-label="Mục biểu mẫu sản phẩm">
+      <nav
+        className="admin-catalog-section-nav product-admin-section-nav"
+        aria-label="Mục biểu mẫu sản phẩm"
+        data-testid="product-section-nav"
+      >
         {FORM_SECTIONS.map((section) => (
           <a
             key={section.id}
@@ -1733,11 +1741,11 @@ export default function ProductCatalogForm({
         >
           {form.id ? "Lưu thay đổi" : "Tạo sản phẩm"}
         </AdminLoadingButton>
-        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => router.push("/admin/products")}>
+        <button type="button" className="admin-btn admin-btn--secondary product-admin-btn" onClick={() => router.push("/admin/products")}>
           Hủy
         </button>
         {publicUrl && (
-          <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary">
+          <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary product-admin-btn">
             Xem trên website ↗
           </a>
         )}

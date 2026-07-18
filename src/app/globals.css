@@ -7961,6 +7961,233 @@ body:has(.mp-pdp--b2b) .floating-contact {
   line-height: 1.6;
 }
 
+/* ─── Product Admin layout system (scoped) ───────────────────────────────── */
+.product-admin-shell {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.product-admin-list-page,
+.product-admin-edit-page,
+.product-admin-attributes-page {
+  gap: 12px;
+}
+.product-admin-btn,
+.product-admin-shell .admin-btn.product-admin-btn,
+.product-admin-toolbar .admin-btn,
+.product-admin-filters .admin-btn {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 6px;
+  line-height: 1.25;
+}
+.product-admin-btn-row,
+.product-admin-row-actions .admin-btn {
+  min-height: 30px;
+  padding: 3px 8px;
+  font-size: 12px;
+  border-radius: 5px;
+}
+.product-admin-input,
+.product-admin-filters .admin-input {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.product-admin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+@media (max-width: 1100px) {
+  .product-admin-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .product-admin-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.product-admin-summary-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+.product-admin-summary-card strong {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.1;
+}
+.product-admin-summary-card span {
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1.2;
+}
+.product-admin-summary-card--warn strong { color: #d97706; }
+.product-admin-summary-card--danger strong { color: #dc2626; }
+.product-admin-list.admin-catalog-page { gap: 10px; }
+.product-admin-toolbar { gap: 8px; }
+.product-admin-filters { gap: 6px; }
+.product-admin-filters .admin-input {
+  min-width: 120px;
+  max-width: 180px;
+}
+.product-admin-table th,
+.product-admin-table td {
+  padding: 6px 8px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.product-admin-table .admin-catalog-thumb {
+  width: 40px;
+  height: 40px;
+}
+.product-admin-row-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+}
+.product-admin-action-menu {
+  position: relative;
+}
+.product-admin-action-menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.product-admin-action-menu > summary::-webkit-details-marker { display: none; }
+.product-admin-action-menu__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  min-width: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+.product-admin-action-menu__panel a,
+.product-admin-action-menu__panel button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: #334155;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.product-admin-action-menu__panel a:hover,
+.product-admin-action-menu__panel button:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+.product-admin-action-menu__panel button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.product-admin-form.admin-catalog-form,
+.product-admin-edit-page .admin-catalog-form--onescreen {
+  max-width: 100%;
+  width: 100%;
+  gap: 12px;
+}
+.product-admin-edit-page .admin-setup-checklist {
+  max-width: 100%;
+}
+.product-admin-edit-page .admin-catalog-fieldset,
+.product-admin-form .admin-catalog-fieldset {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  gap: 10px;
+}
+.product-admin-form .admin-seo-brief-form-grid {
+  gap: 10px 12px;
+}
+.product-admin-form #section-b2b .admin-seo-brief-form-grid {
+  grid-template-columns: 1fr 1fr;
+}
+.product-admin-form .admin-catalog-toggles {
+  gap: 10px 14px;
+}
+.product-admin-form .admin-variant-matrix-section {
+  gap: 10px;
+}
+.product-admin-form .admin-variant-bulk-toolbar {
+  padding: 8px 10px;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.product-admin-form .admin-size-chart__toolbar {
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.product-admin-form .admin-size-chart__table th,
+.product-admin-form .admin-size-chart__table td {
+  padding: 4px 6px;
+}
+.product-admin-form .admin-size-chart__table .admin-input {
+  min-height: 30px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+html.admin-product-edit-dense .product-admin-section-nav.admin-catalog-section-nav {
+  position: sticky;
+  top: 64px;
+  z-index: 20;
+  margin: 0 0 8px;
+  padding: 6px 0 8px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+}
+html.admin-product-edit-dense .product-admin-section-nav .admin-catalog-section-nav__link {
+  padding: 4px 10px;
+  font-size: 12px;
+  min-height: 28px;
+}
+html.admin-product-edit-dense .product-admin-form .admin-catalog-fieldset {
+  scroll-margin-top: 120px;
+}
+html.admin-product-edit-dense .product-admin-form.admin-catalog-form--onescreen {
+  gap: 12px;
+  padding-bottom: 120px;
+}
+html.admin-product-edit-dense .product-admin-form .admin-catalog-form__sticky-actions {
+  padding: 8px 10px;
+  gap: 8px;
+}
+html.admin-product-edit-dense .product-admin-form .admin-catalog-form__sticky-actions .admin-btn,
+html.admin-product-edit-dense .product-admin-form .admin-catalog-form__sticky-actions .admin-loading-button {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.product-admin-attributes-page .admin-attributes-page {
+  max-width: 100%;
+  gap: 12px;
+}
+
 /* ─── Sprint 24.9.2: Product Catalog ──────────────────────────────────────── */
 
 .admin-catalog-page { display: flex; flex-direction: column; gap: 16px; }
@@ -8033,7 +8260,7 @@ body:has(.mp-pdp--b2b) .floating-contact {
 .admin-catalog-actions-cell { display: flex; gap: 6px; }
 
 /* Form */
-.admin-catalog-form { display: flex; flex-direction: column; gap: 24px; max-width: 900px; }
+.admin-catalog-form { display: flex; flex-direction: column; gap: 24px; max-width: 1280px; }
 .admin-catalog-fieldset {
   border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; display: flex;
   flex-direction: column; gap: 16px;
@@ -13561,7 +13788,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   margin: 0 0 16px;
 }
 .admin-catalog-form--onescreen {
-  max-width: min(1100px, 100%);
+  max-width: min(1280px, 100%);
   padding-bottom: 112px;
 }
 .admin-catalog-form__header {

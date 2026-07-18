@@ -3,9 +3,9 @@ import ProductAttributesClient from "@/components/admin/products/ProductAttribut
 
 export default function AdminAttributesPage() {
   return (
-    <>
+    <div className="product-admin-shell product-admin-attributes-page">
       <AdminPageTitle title="Thuộc tính sản phẩm" />
       <ProductAttributesClient />
-    </>
+    </div>
   );
 }

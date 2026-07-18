@@ -9,6 +9,8 @@ function read(path: string) {
 
 describe("product admin list readiness UX", () => {
   const dashboard = read("src/components/admin/products/ProductCatalogDashboard.tsx");
+  const listPage = read("src/app/(backend)/admin/products/page.tsx");
+  const css = read("src/app/globals.css");
 
   it("renders readiness badges, filter, summary, and Hoàn thiện link", () => {
     assert.match(dashboard, /product-readiness-summary/);
@@ -25,5 +27,14 @@ describe("product admin list readiness UX", () => {
     assert.match(dashboard, /Tất cả danh mục/);
     assert.match(dashboard, /Tất cả trạng thái/);
     assert.match(dashboard, /Tất cả tồn kho/);
+  });
+
+  it("uses compact product-admin list layout and action menu", () => {
+    assert.match(listPage, /product-admin-shell/);
+    assert.match(dashboard, /product-admin-summary-grid/);
+    assert.match(dashboard, /product-admin-action-menu/);
+    assert.match(dashboard, /Thao tác/);
+    assert.match(css, /\.product-admin-summary-grid/);
+    assert.match(css, /\.product-admin-btn/);
   });
 });

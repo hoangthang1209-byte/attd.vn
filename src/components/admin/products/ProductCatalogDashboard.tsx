@@ -233,75 +233,63 @@ export default function ProductCatalogDashboard() {
   const kpis = data?.kpis;
 
   return (
-    <div className="admin-catalog-page" data-testid="admin-products-dashboard">
-      {kpis && (
-        <div className="admin-catalog-kpi-bar">
-          <div className="admin-catalog-kpi">
-            <strong>{kpis.totalProducts}</strong>
-            <span>Tổng sản phẩm</span>
-          </div>
-          <div className="admin-catalog-kpi">
-            <strong>{kpis.activeProducts}</strong>
-            <span>Đang bán</span>
-          </div>
-          <div className="admin-catalog-kpi">
-            <strong>{kpis.totalVariants}</strong>
-            <span>Tổng SKU</span>
-          </div>
-          <div className="admin-catalog-kpi admin-catalog-kpi--warn">
-            <strong>{kpis.lowStockVariants}</strong>
-            <span>Sắp hết hàng</span>
-          </div>
-          <div className="admin-catalog-kpi admin-catalog-kpi--danger">
-            <strong>{kpis.outOfStockVariants}</strong>
-            <span>Hết hàng</span>
-          </div>
-          <div className="admin-catalog-kpi">
-            <strong>{kpis.preorderVariants}</strong>
-            <span>Đặt trước</span>
-          </div>
-        </div>
-      )}
-
-      <div className="admin-product-readiness-summary" data-testid="product-readiness-summary">
-        <div className="admin-catalog-kpi">
-          <strong>{data?.total ?? readinessSummary.total}</strong>
+    <div className="admin-catalog-page product-admin-list" data-testid="admin-products-dashboard">
+      <div
+        className="product-admin-summary-grid"
+        data-testid="product-readiness-summary"
+      >
+        <div className="product-admin-summary-card">
+          <strong>{kpis?.totalProducts ?? data?.total ?? 0}</strong>
           <span>Tổng sản phẩm</span>
         </div>
-        <div className="admin-catalog-kpi">
+        <div className="product-admin-summary-card">
+          <strong>{kpis?.activeProducts ?? 0}</strong>
+          <span>Đang bán</span>
+        </div>
+        <div className="product-admin-summary-card">
           <strong>{readinessSummary.ready}</strong>
           <span>Sẵn sàng</span>
         </div>
-        <div className="admin-catalog-kpi admin-catalog-kpi--warn">
+        <div className="product-admin-summary-card product-admin-summary-card--warn">
           <strong>{readinessSummary.needsAttention}</strong>
           <span>Cần bổ sung</span>
         </div>
-        <div className="admin-catalog-kpi">
+        <div className="product-admin-summary-card">
           <strong>{readinessSummary.unpublished}</strong>
           <span>Chưa publish</span>
         </div>
-        <p className="admin-field-hint admin-product-readiness-summary__hint">
-          Chỉ số sẵn sàng tính trên trang kết quả hiện tại.
-        </p>
+        <div className="product-admin-summary-card">
+          <strong>{kpis?.totalVariants ?? 0}</strong>
+          <span>Tổng SKU</span>
+        </div>
+        <div className="product-admin-summary-card product-admin-summary-card--warn">
+          <strong>{kpis?.lowStockVariants ?? 0}</strong>
+          <span>Sắp hết</span>
+        </div>
+        <div className="product-admin-summary-card product-admin-summary-card--danger">
+          <strong>{kpis?.outOfStockVariants ?? 0}</strong>
+          <span>Hết hàng</span>
+        </div>
       </div>
 
-      <div className="admin-catalog-toolbar">
+      <div className="admin-catalog-toolbar product-admin-toolbar">
         <div className="admin-catalog-toolbar-left">
-          <Link href="/admin/products/new" className="admin-btn admin-btn--primary">
+          <Link href="/admin/products/new" className="admin-btn admin-btn--primary product-admin-btn">
             Tạo sản phẩm mới
           </Link>
-          <Link href="/admin/products/import" className="admin-btn admin-btn--secondary">
+          <Link href="/admin/products/import" className="admin-btn admin-btn--secondary product-admin-btn">
             Nhập sản phẩm
           </Link>
           <button
             type="button"
-            className="admin-btn admin-btn--secondary"
+            className="admin-btn admin-btn--secondary product-admin-btn"
             onClick={() => setExportOpen(true)}
           >
             Xuất dữ liệu
           </button>
           <AdminLoadingButton
             variant="secondary"
+            className="product-admin-btn"
             pending={seeding}
             pendingLabel="Đang tạo dữ liệu mẫu..."
             onClick={() => void seedSampleData()}
@@ -327,14 +315,14 @@ export default function ProductCatalogDashboard() {
       />
 
       {seedMsg && (
-        <p className="admin-kb-warning admin-kb-badge--verified" style={{ marginBottom: 12 }}>
+        <p className="admin-kb-warning admin-kb-badge--verified" style={{ marginBottom: 8 }}>
           {seedMsg}
         </p>
       )}
 
-      <div className="admin-catalog-filters">
+      <div className="admin-catalog-filters product-admin-filters">
         <input
-          className="admin-input"
+          className="admin-input product-admin-input"
           placeholder="Tìm tên sản phẩm, mã hàng, SKU…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -343,7 +331,7 @@ export default function ProductCatalogDashboard() {
           }}
         />
         <select
-          className="admin-input"
+          className="admin-input product-admin-input"
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
         >
@@ -354,7 +342,11 @@ export default function ProductCatalogDashboard() {
             </option>
           ))}
         </select>
-        <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select
+          className="admin-input product-admin-input"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+        >
           <option value="">Tất cả trạng thái</option>
           <option value="ACTIVE">Đang bán</option>
           <option value="DRAFT">Nháp</option>
@@ -362,7 +354,7 @@ export default function ProductCatalogDashboard() {
           <option value="ARCHIVED">Lưu trữ</option>
         </select>
         <select
-          className="admin-input"
+          className="admin-input product-admin-input"
           value={stockStatus}
           onChange={(e) => setStockStatus(e.target.value)}
         >
@@ -373,7 +365,7 @@ export default function ProductCatalogDashboard() {
           <option value="PREORDER">Đặt trước</option>
         </select>
         <select
-          className="admin-input"
+          className="admin-input product-admin-input"
           value={readinessFilter}
           onChange={(e) => setReadinessFilter(e.target.value as ProductReadinessFilter)}
           aria-label="Lọc mức sẵn sàng"
@@ -387,7 +379,7 @@ export default function ProductCatalogDashboard() {
         </select>
         <button
           type="button"
-          className="admin-btn admin-btn--secondary"
+          className="admin-btn admin-btn--secondary product-admin-btn"
           onClick={() => void fetchProducts()}
         >
           Lọc
@@ -401,8 +393,8 @@ export default function ProductCatalogDashboard() {
           tone="admin"
         />
       ) : (
-        <div className="admin-catalog-table-wrap">
-          <table className="admin-catalog-table">
+        <div className="admin-catalog-table-wrap product-admin-table-wrap">
+          <table className="admin-catalog-table admin-catalog-table--dense product-admin-table">
             <thead>
               <tr>
                 <th>
@@ -523,59 +515,51 @@ export default function ProductCatalogDashboard() {
                       </span>
                     </td>
                     <td>
-                      <div className="admin-catalog-actions-cell">
-                        {!readiness.isReady && (
-                          <Link
-                            href={`/admin/products/${p.id}/edit`}
-                            className="admin-btn admin-btn--primary admin-btn--xs"
-                            data-testid={`product-complete-${p.id}`}
-                          >
-                            Hoàn thiện
-                          </Link>
-                        )}
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--secondary admin-btn--xs"
-                          onClick={() => router.push(`/admin/products/${p.id}/edit`)}
+                      <div className="admin-catalog-actions-cell product-admin-row-actions">
+                        <Link
+                          href={`/admin/products/${p.id}/edit`}
+                          className="admin-btn admin-btn--primary admin-btn--xs product-admin-btn-row"
+                          data-testid={`product-complete-${p.id}`}
                         >
-                          Sửa
-                        </button>
-                        {p.slug ? (
-                          <a
-                            href={`/san-pham/${p.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="admin-btn admin-btn--secondary admin-btn--xs"
-                          >
-                            Xem
-                          </a>
-                        ) : (
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--secondary admin-btn--xs"
-                            disabled
-                            title="Sản phẩm chưa có slug"
-                          >
-                            Xem
-                          </button>
-                        )}
-                        {p.status === "ARCHIVED" ? (
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--secondary admin-btn--xs"
-                            onClick={() => void restoreProduct(p.id)}
-                          >
-                            Khôi phục
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--secondary admin-btn--xs"
-                            onClick={() => void archiveProduct(p.id)}
-                          >
-                            Lưu trữ
-                          </button>
-                        )}
+                          {readiness.isReady ? "Sửa" : "Hoàn thiện"}
+                        </Link>
+                        <details className="product-admin-action-menu">
+                          <summary className="admin-btn admin-btn--secondary admin-btn--xs product-admin-btn-row">
+                            Thao tác
+                          </summary>
+                          <div className="product-admin-action-menu__panel" role="menu">
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => router.push(`/admin/products/${p.id}/edit`)}
+                            >
+                              Sửa
+                            </button>
+                            {p.slug ? (
+                              <a
+                                href={`/san-pham/${p.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                role="menuitem"
+                              >
+                                Xem
+                              </a>
+                            ) : (
+                              <button type="button" role="menuitem" disabled title="Sản phẩm chưa có slug">
+                                Xem
+                              </button>
+                            )}
+                            {p.status === "ARCHIVED" ? (
+                              <button type="button" role="menuitem" onClick={() => void restoreProduct(p.id)}>
+                                Khôi phục
+                              </button>
+                            ) : (
+                              <button type="button" role="menuitem" onClick={() => void archiveProduct(p.id)}>
+                                Lưu trữ
+                              </button>
+                            )}
+                          </div>
+                        </details>
                       </div>
                     </td>
                   </tr>
@@ -584,7 +568,7 @@ export default function ProductCatalogDashboard() {
             </tbody>
           </table>
           {visibleProducts.length === 0 && (
-            <p className="admin-field-hint" style={{ padding: "24px 0", textAlign: "center" }}>
+            <p className="admin-field-hint" style={{ padding: "16px 0", textAlign: "center" }}>
               Không tìm thấy sản phẩm. Thử tạo dữ liệu mẫu hoặc thêm sản phẩm mới.
             </p>
           )}

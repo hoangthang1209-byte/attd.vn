@@ -55,14 +55,23 @@ describe("product editor UX compaction", () => {
     assert.match(form, /queueMicrotask\(\(\) => setSavedFormSnapshot\(JSON\.stringify\(next\)\)\)/);
   });
 
-  it("separates pill active/hover/focus and avoids sticky overlap", () => {
+  it("separates pill active/hover/focus and sticky section nav under shell header", () => {
     assert.match(form, /admin-content-scroll/);
     assert.match(form, /headerOffset/);
-    assert.match(css, /\.admin-catalog-section-nav\s*\{[\s\S]*?position:\s*static/);
+    assert.match(form, /product-admin-section-nav|product-section-nav/);
+    assert.match(css, /\.product-admin-section-nav\.admin-catalog-section-nav\s*\{[\s\S]*?position:\s*sticky/);
     assert.match(css, /\.admin-catalog-section-nav__link:hover:not\(\.is-active\)/);
     assert.match(css, /\.admin-catalog-section-nav__link:focus-visible/);
     assert.match(css, /\.admin-catalog-section-nav__link\.is-active\s*\{/);
     assert.match(form, /admin-product-edit-dense/);
+    assert.match(css, /scroll-margin-top:\s*120px/);
+  });
+
+  it("uses consistent product-admin shell width for edit sections", () => {
+    assert.match(editPage, /product-admin-shell/);
+    assert.match(form, /product-admin-form/);
+    assert.match(css, /\.product-admin-shell\s*\{[\s\S]*?max-width:\s*1280px/);
+    assert.match(css, /\.product-admin-form\.admin-catalog-form[\s\S]*?max-width:\s*100%/);
   });
 
   it("checklist collapses with summary toggle", () => {
