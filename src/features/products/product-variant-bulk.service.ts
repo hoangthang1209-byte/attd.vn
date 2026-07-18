@@ -7,7 +7,12 @@ import {
   hasProtectedVariantDependencies,
 } from "@/features/products/product-variant-lifecycle.service";
 import { ensureUniqueSku, isSkuTaken } from "@/features/products/product-sku-utils";
-import { normalizeVariantStockFields } from "@/features/products/product-foundation-validation";
+import {
+  NEGATIVE_STOCK_ERROR,
+  NEGATIVE_VARIANT_PRICE_ERROR,
+  normalizeVariantStockFields,
+  validateVariantPriceFields,
+} from "@/features/products/product-foundation-validation";
 
 export type BulkOperationType =
   | "archive"
@@ -15,10 +20,20 @@ export type BulkOperationType =
   | "delete"
   | "status"
   | "stock"
+  | "price"
   | "moq"
   | "leadTime"
   | "sku"
   | "image";
+
+export type BulkPriceMode =
+  | "set"
+  | "increase_amount"
+  | "decrease_amount"
+  | "increase_percent"
+  | "decrease_percent";
+
+export type BulkPriceField = "wholesalePrice" | "dealerPrice" | "both";
 
 export type BulkVariantRecord = {
   id: string;
@@ -29,6 +44,8 @@ export type BulkVariantRecord = {
   stockStatus: StockStatus;
   moqOverride: number | null;
   leadTimeOverride: string | null;
+  wholesalePrice: number | null;
+  dealerPrice: number | null;
   imageUrl: string | null;
   colorName: string | null;
   colorCode: string | null;
@@ -37,6 +54,43 @@ export type BulkVariantRecord = {
   capacity: string | null;
   optionValueIds: string[];
 };
+
+const BULK_UPDATE_CHUNK = 40;
+
+/** Client-only / unsaved row keys must never be accepted by the bulk API. */
+export function isClientTempVariantId(id: string): boolean {
+  const trimmed = id.trim();
+  if (!trimmed) return true;
+  return /^(tmp|temp|client|local|new|var|legacy)[-_]/i.test(trimmed);
+}
+
+export function computeBulkNextStockQty(
+  currentQty: number,
+  mode: "set" | "increase" | "decrease",
+  quantity: number,
+): number {
+  const amount = Math.floor(quantity);
+  if (mode === "set") return amount;
+  if (mode === "increase") return currentQty + amount;
+  return currentQty - amount;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export function computeBulkNextPrice(
+  current: number | null,
+  mode: BulkPriceMode,
+  value: number,
+): number {
+  const base = current ?? 0;
+  if (mode === "set") return roundMoney(value);
+  if (mode === "increase_amount") return roundMoney(base + value);
+  if (mode === "decrease_amount") return roundMoney(base - value);
+  if (mode === "increase_percent") return roundMoney(base * (1 + value / 100));
+  return roundMoney(base * (1 - value / 100));
+}
 
 export type BulkBlockedItem = {
   id: string;
@@ -67,6 +121,8 @@ const VARIANT_SELECT = {
   stockStatus: true,
   moqOverride: true,
   leadTimeOverride: true,
+  wholesalePrice: true,
+  dealerPrice: true,
   imageUrl: true,
   colorName: true,
   colorCode: true,
@@ -78,6 +134,11 @@ const VARIANT_SELECT = {
 
 type DbVariant = Prisma.ProductVariantGetPayload<{ select: typeof VARIANT_SELECT }>;
 
+function decimalToNumber(value: { toNumber(): number } | number | null): number | null {
+  if (value == null) return null;
+  return typeof value === "number" ? value : value.toNumber();
+}
+
 function mapVariantRecord(variant: DbVariant): BulkVariantRecord {
   return {
     id: variant.id,
@@ -88,6 +149,8 @@ function mapVariantRecord(variant: DbVariant): BulkVariantRecord {
     stockStatus: variant.stockStatus,
     moqOverride: variant.moqOverride,
     leadTimeOverride: variant.leadTimeOverride,
+    wholesalePrice: decimalToNumber(variant.wholesalePrice),
+    dealerPrice: decimalToNumber(variant.dealerPrice),
     imageUrl: variant.imageUrl,
     colorName: variant.colorName,
     colorCode: variant.colorCode,
@@ -102,6 +165,22 @@ function dedupeIds(variantIds: string[]): string[] {
   return [...new Set(variantIds.map((id) => id.trim()).filter(Boolean))];
 }
 
+async function applyChunkedVariantUpdates(
+  updates: Array<{ id: string; data: Prisma.ProductVariantUpdateInput }>,
+): Promise<void> {
+  for (let i = 0; i < updates.length; i += BULK_UPDATE_CHUNK) {
+    const chunk = updates.slice(i, i + BULK_UPDATE_CHUNK);
+    await prisma.$transaction(
+      chunk.map((item) =>
+        prisma.productVariant.update({
+          where: { id: item.id },
+          data: item.data,
+        }),
+      ),
+    );
+  }
+}
+
 async function loadVariantsForProduct(
   productId: string,
   variantIds: string[],
@@ -109,8 +188,15 @@ async function loadVariantsForProduct(
   const ids = dedupeIds(variantIds);
   if (!ids.length) {
     throw new ProductAdminValidationError(
-      "Vui lòng chọn ít nhất một biến thể.",
+      "Vui lòng chọn ít nhất 1 biến thể.",
       { variants: "Danh sách biến thể trống." },
+    );
+  }
+
+  if (ids.some(isClientTempVariantId)) {
+    throw new ProductAdminValidationError(
+      "Không thể cập nhật biến thể chưa lưu trên hệ thống.",
+      { variants: "ID biến thể tạm thời không hợp lệ." },
     );
   }
 
@@ -190,6 +276,11 @@ export type BulkVariantInput = {
     quantity: number;
     stockStatus?: StockStatus;
   };
+  price?: {
+    mode: BulkPriceMode;
+    value: number;
+    field?: BulkPriceField;
+  };
   moq?: {
     mode: "set" | "clear";
     value?: number | null;
@@ -229,6 +320,8 @@ export async function performBulkVariantOperation(
       return bulkStatus(productId, variants, input.status);
     case "stock":
       return bulkStock(productId, variants, input.stock, input.previewOnly);
+    case "price":
+      return bulkPrice(productId, variants, input.price);
     case "moq":
       return bulkMoq(productId, variants, input.moq);
     case "leadTime":
@@ -418,18 +511,21 @@ async function bulkStock(
     );
   }
 
-  if (!Number.isFinite(stock.quantity) || stock.quantity < 0) {
+  if (!Number.isFinite(stock.quantity) || !Number.isInteger(stock.quantity) || stock.quantity < 0) {
     throw new ProductAdminValidationError(
-      "Số lượng tồn kho phải là số không âm.",
+      "Giá trị nhập không hợp lệ.",
       { variants: "Số lượng không hợp lệ." },
     );
   }
 
   const updates = variants.map((variant) => {
-    let nextQty = variant.stockQty;
-    if (stock.mode === "set") nextQty = Math.floor(stock.quantity);
-    if (stock.mode === "increase") nextQty = variant.stockQty + Math.floor(stock.quantity);
-    if (stock.mode === "decrease") nextQty = Math.max(0, variant.stockQty - Math.floor(stock.quantity));
+    const nextQty = computeBulkNextStockQty(variant.stockQty, stock.mode, stock.quantity);
+    if (nextQty < 0) {
+      throw new ProductAdminValidationError(
+        NEGATIVE_STOCK_ERROR,
+        { variants: NEGATIVE_STOCK_ERROR },
+      );
+    }
     const normalized = normalizeVariantStockFields(
       nextQty,
       stock.stockStatus ?? variant.stockStatus,
@@ -454,17 +550,15 @@ async function bulkStock(
     };
   }
 
-  await prisma.$transaction(async (tx) => {
-    for (const item of updates) {
-      await tx.productVariant.update({
-        where: { id: item.id },
-        data: {
-          stockQty: item.stockQty,
-          stockStatus: item.stockStatus,
-        },
-      });
-    }
-  });
+  await applyChunkedVariantUpdates(
+    updates.map((item) => ({
+      id: item.id,
+      data: {
+        stockQty: item.stockQty,
+        stockStatus: item.stockStatus,
+      },
+    })),
+  );
 
   const updated = await reloadVariants(productId, variants.map((v) => v.id));
   return {
@@ -473,7 +567,91 @@ async function bulkStock(
     skippedCount: 0,
     blockedCount: 0,
     deletedIds: [],
-    message: `Đã cập nhật tồn kho cho ${updates.length} biến thể.`,
+    message: `Đã cập nhật ${updates.length} biến thể.`,
+    variants: updated.map(mapVariantRecord),
+  };
+}
+
+async function bulkPrice(
+  productId: string,
+  variants: DbVariant[],
+  price?: BulkVariantInput["price"],
+): Promise<BulkVariantResult> {
+  if (!price) {
+    throw new ProductAdminValidationError(
+      "Thiếu dữ liệu cập nhật giá.",
+      { variants: "Dữ liệu giá không hợp lệ." },
+    );
+  }
+
+  const validModes: BulkPriceMode[] = [
+    "set",
+    "increase_amount",
+    "decrease_amount",
+    "increase_percent",
+    "decrease_percent",
+  ];
+  if (!validModes.includes(price.mode)) {
+    throw new ProductAdminValidationError(
+      "Kiểu cập nhật giá không hợp lệ.",
+      { variants: "Giá không hợp lệ." },
+    );
+  }
+
+  if (!Number.isFinite(price.value) || price.value < 0) {
+    throw new ProductAdminValidationError(
+      "Giá không được âm.",
+      { variants: "Giá trị nhập không hợp lệ." },
+    );
+  }
+
+  const field: BulkPriceField = price.field ?? "wholesalePrice";
+  const updates = variants.map((variant) => {
+    const wholesale =
+      field === "dealerPrice"
+        ? decimalToNumber(variant.wholesalePrice)
+        : computeBulkNextPrice(decimalToNumber(variant.wholesalePrice), price.mode, price.value);
+    const dealer =
+      field === "wholesalePrice"
+        ? decimalToNumber(variant.dealerPrice)
+        : computeBulkNextPrice(decimalToNumber(variant.dealerPrice), price.mode, price.value);
+
+    validateVariantPriceFields({ wholesalePrice: wholesale, dealerPrice: dealer });
+    if (
+      (field !== "dealerPrice" && wholesale != null && wholesale < 0) ||
+      (field !== "wholesalePrice" && dealer != null && dealer < 0)
+    ) {
+      throw new ProductAdminValidationError(
+        NEGATIVE_VARIANT_PRICE_ERROR,
+        { variants: "Giá không được âm." },
+      );
+    }
+
+    return {
+      id: variant.id,
+      wholesalePrice: wholesale,
+      dealerPrice: dealer,
+    };
+  });
+
+  await applyChunkedVariantUpdates(
+    updates.map((item) => ({
+      id: item.id,
+      data: {
+        ...(field !== "dealerPrice" ? { wholesalePrice: item.wholesalePrice } : {}),
+        ...(field !== "wholesalePrice" ? { dealerPrice: item.dealerPrice } : {}),
+      },
+    })),
+  );
+
+  const updated = await reloadVariants(productId, variants.map((v) => v.id));
+  return {
+    operation: "price",
+    successCount: updates.length,
+    skippedCount: 0,
+    blockedCount: 0,
+    deletedIds: [],
+    message: `Đã cập nhật ${updates.length} biến thể.`,
     variants: updated.map(mapVariantRecord),
   };
 }

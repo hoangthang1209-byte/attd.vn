@@ -10,6 +10,7 @@ import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 export type BulkDialogKind =
   | "status"
   | "stock"
+  | "price"
   | "moq"
   | "leadTime"
   | "sku"
@@ -53,6 +54,14 @@ export default function VariantBulkDialogs({
   const [stockMode, setStockMode] = useState<"set" | "increase" | "decrease">("set");
   const [stockQty, setStockQty] = useState("0");
   const [stockStatus, setStockStatus] = useState("");
+  const [priceMode, setPriceMode] = useState<
+    "set" | "increase_amount" | "decrease_amount" | "increase_percent" | "decrease_percent"
+  >("set");
+  const [priceValue, setPriceValue] = useState("");
+  const [priceField, setPriceField] = useState<"wholesalePrice" | "dealerPrice" | "both">(
+    "wholesalePrice",
+  );
+  const [priceError, setPriceError] = useState<string | null>(null);
   const [moqMode, setMoqMode] = useState<"set" | "clear">("set");
   const [moqValue, setMoqValue] = useState("");
   const [leadTimeMode, setLeadTimeMode] = useState<"set" | "clear">("set");
@@ -66,22 +75,35 @@ export default function VariantBulkDialogs({
   const [imageMode, setImageMode] = useState<"set" | "clear">("set");
   const [imageUrl, setImageUrl] = useState("");
   const [imageError, setImageError] = useState<string | null>(null);
+  const [confirmLargeUpdate, setConfirmLargeUpdate] = useState(false);
 
   useEffect(() => {
-    if (open) cancelRef.current?.focus();
+    if (open) {
+      cancelRef.current?.focus();
+      setConfirmLargeUpdate(false);
+      setPriceError(null);
+    }
   }, [open, kind]);
 
   if (!open || !kind) return null;
 
+  const requiresLargeConfirm = persistedCount > 20;
   const titleMap: Record<BulkDialogKind, string> = {
     status: "Cập nhật trạng thái",
     stock: "Cập nhật tồn kho",
+    price: "Cập nhật giá",
     moq: "Cập nhật MOQ",
     leadTime: "Cập nhật thời gian sản xuất",
     sku: "Cập nhật SKU",
-    image: "Gán ảnh biến thể",
+    image: "Cập nhật ảnh",
     lifecycle: "Quản lý trạng thái",
   };
+
+  function canSubmit(): boolean {
+    if (persistedCount === 0) return false;
+    if (requiresLargeConfirm && !confirmLargeUpdate) return false;
+    return true;
+  }
 
   function submitLifecycle() {
     if (lifecycleMode === "delete") {
@@ -100,12 +122,33 @@ export default function VariantBulkDialogs({
   }
 
   function submitStock() {
+    const quantity = Number(stockQty);
+    if (!Number.isFinite(quantity) || quantity < 0 || !Number.isInteger(quantity)) {
+      return;
+    }
     onSubmit({
       operation: "stock",
       stock: {
         mode: stockMode,
-        quantity: Number(stockQty),
+        quantity,
         ...(stockStatus ? { stockStatus } : {}),
+      },
+    });
+  }
+
+  function submitPrice() {
+    const value = Number(priceValue);
+    if (!Number.isFinite(value) || value < 0) {
+      setPriceError("Giá không được âm.");
+      return;
+    }
+    setPriceError(null);
+    onSubmit({
+      operation: "price",
+      price: {
+        mode: priceMode,
+        value,
+        field: priceField,
       },
     });
   }
@@ -183,6 +226,22 @@ export default function VariantBulkDialogs({
           Đã chọn {selectedCount} biến thể ({persistedCount} đã lưu trên hệ thống).
         </p>
 
+        {requiresLargeConfirm && (
+          <div className="admin-spec-row">
+            <p className="admin-field-hint" role="status">
+              Bạn sắp cập nhật {persistedCount} biến thể. Thao tác này sẽ áp dụng cho toàn bộ biến thể đã chọn.
+            </p>
+            <label className="admin-checkbox-label">
+              <input
+                type="checkbox"
+                checked={confirmLargeUpdate}
+                onChange={(e) => setConfirmLargeUpdate(e.target.checked)}
+              />{" "}
+              Tôi xác nhận cập nhật {persistedCount} biến thể
+            </label>
+          </div>
+        )}
+
         {error && (
           <p className="admin-field-error" role="alert">
             {error}
@@ -248,9 +307,9 @@ export default function VariantBulkDialogs({
                 value={stockMode}
                 onChange={(e) => setStockMode(e.target.value as typeof stockMode)}
               >
-                <option value="set">Đặt số lượng cố định</option>
-                <option value="increase">Tăng thêm</option>
-                <option value="decrease">Giảm bớt</option>
+                <option value="set">Đặt tồn kho bằng</option>
+                <option value="increase">Cộng thêm</option>
+                <option value="decrease">Trừ đi</option>
               </select>
             </div>
             <div className="admin-spec-row">
@@ -259,9 +318,11 @@ export default function VariantBulkDialogs({
                 className="form-input"
                 type="number"
                 min="0"
+                step="1"
                 value={stockQty}
                 onChange={(e) => setStockQty(e.target.value)}
               />
+              <p className="admin-field-hint">Tồn kho không được âm.</p>
             </div>
             <div className="admin-spec-row">
               <label className="admin-label">Trạng thái tồn kho (tuỳ chọn)</label>
@@ -276,6 +337,59 @@ export default function VariantBulkDialogs({
                 <option value="OUT_OF_STOCK">Hết hàng</option>
                 <option value="PREORDER">Đặt trước</option>
               </select>
+            </div>
+          </>
+        )}
+
+        {kind === "price" && (
+          <>
+            <div className="admin-spec-row">
+              <label className="admin-label">Trường giá</label>
+              <select
+                className="form-input"
+                value={priceField}
+                onChange={(e) => setPriceField(e.target.value as typeof priceField)}
+              >
+                <option value="wholesalePrice">Giá sỉ</option>
+                <option value="dealerPrice">Giá đại lý</option>
+                <option value="both">Cả giá sỉ và giá đại lý</option>
+              </select>
+            </div>
+            <div className="admin-spec-row">
+              <label className="admin-label">Kiểu cập nhật</label>
+              <select
+                className="form-input"
+                value={priceMode}
+                onChange={(e) => setPriceMode(e.target.value as typeof priceMode)}
+              >
+                <option value="set">Đặt giá bằng</option>
+                <option value="increase_amount">Tăng theo số tiền</option>
+                <option value="decrease_amount">Giảm theo số tiền</option>
+                <option value="increase_percent">Tăng theo %</option>
+                <option value="decrease_percent">Giảm theo %</option>
+              </select>
+            </div>
+            <div className="admin-spec-row">
+              <label className="admin-label">
+                {priceMode.includes("percent") ? "Phần trăm (%)" : "Giá trị"}
+              </label>
+              <input
+                className="form-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={priceValue}
+                onChange={(e) => {
+                  setPriceValue(e.target.value);
+                  setPriceError(null);
+                }}
+              />
+              <p className="admin-field-hint">Giá không được âm.</p>
+              {priceError && (
+                <p className="admin-field-error" role="alert">
+                  {priceError}
+                </p>
+              )}
             </div>
           </>
         )}
@@ -413,7 +527,7 @@ export default function VariantBulkDialogs({
                 onChange={(e) => setImageMode(e.target.value as typeof imageMode)}
               >
                 <option value="set">Ảnh riêng của biến thể</option>
-                <option value="clear">Dùng ảnh sản phẩm</option>
+                <option value="clear">Xóa ảnh biến thể</option>
               </select>
             </div>
             {imageMode === "set" && (
@@ -461,12 +575,13 @@ export default function VariantBulkDialogs({
             variant="primary"
             className="btn-primary"
             pending={submitting}
-            pendingLabel="Đang áp dụng thay đổi..."
-            disabled={persistedCount === 0}
+            pendingLabel={`Đang cập nhật ${persistedCount} biến thể...`}
+            disabled={!canSubmit()}
             onClick={() => {
               if (kind === "lifecycle") submitLifecycle();
               else if (kind === "status") submitStatus();
               else if (kind === "stock") submitStock();
+              else if (kind === "price") submitPrice();
               else if (kind === "moq") submitMoq();
               else if (kind === "leadTime") submitLeadTime();
               else if (kind === "sku") submitSku(false);

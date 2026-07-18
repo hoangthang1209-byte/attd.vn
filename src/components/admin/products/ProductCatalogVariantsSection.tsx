@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import ProductOptionGroupBuilder, {
   type OptionGroupFormRow,
@@ -178,6 +178,10 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
   const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [bulkDialog, setBulkDialog] = useState<BulkDialogKind | null>(null);
+
+  useEffect(() => {
+    setSelectedKeys(new Set());
+  }, [productId]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [bulkBlocked, setBulkBlocked] = useState<
@@ -407,7 +411,7 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
 
   async function runBulkOperation(payload: Record<string, unknown>, previewOnly = false) {
     if (!productId || !selectedPersistedIds.length) {
-      setBulkError("Chỉ áp dụng cho biến thể đã lưu trên hệ thống.");
+      setBulkError("Vui lòng chọn ít nhất 1 biến thể.");
       return;
     }
 
@@ -434,7 +438,12 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
       };
 
       if (!response.ok) {
-        setBulkError(data.message ?? data.error ?? data.detail ?? "Không thể thực hiện thao tác hàng loạt.");
+        setBulkError(
+          data.message ??
+            data.error ??
+            data.detail ??
+            "Không thể cập nhật biến thể hàng loạt. Vui lòng thử lại.",
+        );
         if (data.blocked?.length) setBulkBlocked(data.blocked);
         return;
       }
@@ -981,12 +990,28 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
         </div>
 
         {selectedKeys.size > 0 && (
-          <p className="admin-field-hint" role="status">
-            Đã chọn {selectedKeys.size} biến thể
-            {selectedPersistedIds.length < selectedKeys.size
-              ? ` (${selectedPersistedIds.length} đã lưu)`
-              : ""}
-          </p>
+          <div className="admin-variant-selection-bar">
+            <p className="admin-field-hint" role="status">
+              Đã chọn {selectedKeys.size} biến thể
+              {selectedPersistedIds.length < selectedKeys.size
+                ? ` (${selectedPersistedIds.length} đã lưu)`
+                : ""}
+            </p>
+            <div className="admin-variant-selection-actions">
+              <button
+                type="button"
+                className="btn-tertiary btn-sm"
+                onClick={() => toggleSelectAllVisible(true)}
+              >
+                {matrixFilter.trim() || statusFilter
+                  ? "Chọn tất cả kết quả lọc"
+                  : "Chọn tất cả"}
+              </button>
+              <button type="button" className="btn-tertiary btn-sm" onClick={clearSelection}>
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
         )}
 
         {variantRowErrors.length > 0 && (
@@ -1009,12 +1034,21 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
         )}
 
         {selectedPersistedIds.length > 0 && (
-          <div className="admin-variant-bulk-toolbar" role="toolbar" aria-label="Thao tác hàng loạt">
+          <div className="admin-variant-bulk-toolbar" role="toolbar" aria-label="Cập nhật hàng loạt">
+            <span className="admin-field-hint">
+              Cập nhật hàng loạt · {selectedPersistedIds.length} biến thể đã lưu
+            </span>
             <button type="button" className="btn-secondary btn-sm" onClick={() => openBulkDialog("status")}>
               Cập nhật trạng thái
             </button>
             <button type="button" className="btn-secondary btn-sm" onClick={() => openBulkDialog("stock")}>
               Cập nhật tồn kho
+            </button>
+            <button type="button" className="btn-secondary btn-sm" onClick={() => openBulkDialog("price")}>
+              Cập nhật giá
+            </button>
+            <button type="button" className="btn-secondary btn-sm" onClick={() => openBulkDialog("image")}>
+              Cập nhật ảnh
             </button>
             <button type="button" className="btn-secondary btn-sm" onClick={() => openBulkDialog("moq")}>
               Cập nhật MOQ
@@ -1024,9 +1058,6 @@ export default forwardRef<ProductCatalogVariantsSectionHandle, Props>(function P
             </button>
             <button type="button" className="btn-secondary btn-sm" onClick={() => openBulkDialog("sku")}>
               Cập nhật SKU
-            </button>
-            <button type="button" className="btn-secondary btn-sm" onClick={() => openBulkDialog("image")}>
-              Gán ảnh
             </button>
             <button type="button" className="btn-secondary btn-sm" onClick={() => openBulkDialog("lifecycle")}>
               Quản lý trạng thái

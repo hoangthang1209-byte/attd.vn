@@ -8,6 +8,8 @@ import {
   performBulkVariantOperation,
   preflightBulkDelete,
   type BulkOperationType,
+  type BulkPriceField,
+  type BulkPriceMode,
   type BulkVariantInput,
 } from "@/features/products/product-variant-bulk.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
@@ -18,6 +20,7 @@ const VALID_OPERATIONS = new Set<BulkOperationType>([
   "delete",
   "status",
   "stock",
+  "price",
   "moq",
   "leadTime",
   "sku",
@@ -31,6 +34,14 @@ const VALID_STOCK_STATUSES = new Set<StockStatus>([
   "OUT_OF_STOCK",
   "PREORDER",
 ]);
+const VALID_PRICE_MODES = new Set([
+  "set",
+  "increase_amount",
+  "decrease_amount",
+  "increase_percent",
+  "decrease_percent",
+]);
+const VALID_PRICE_FIELDS = new Set(["wholesalePrice", "dealerPrice", "both"]);
 
 function parseBody(raw: Record<string, unknown>): BulkVariantInput {
   const operation = raw.operation;
@@ -85,6 +96,30 @@ function parseBody(raw: Record<string, unknown>): BulkVariantInput {
       stockStatus = parsed;
     }
     input.stock = { mode, quantity, stockStatus };
+  }
+
+  if (raw.price && typeof raw.price === "object") {
+    const price = raw.price as Record<string, unknown>;
+    const mode = String(price.mode ?? "");
+    if (!VALID_PRICE_MODES.has(mode)) {
+      throw new ProductAdminValidationError(
+        "Kiểu cập nhật giá không hợp lệ.",
+        { variants: "Giá không hợp lệ." },
+      );
+    }
+    const value = Number(price.value);
+    const fieldRaw = price.field == null || price.field === "" ? "wholesalePrice" : String(price.field);
+    if (!VALID_PRICE_FIELDS.has(fieldRaw)) {
+      throw new ProductAdminValidationError(
+        "Trường giá không hợp lệ.",
+        { variants: "Giá không hợp lệ." },
+      );
+    }
+    input.price = {
+      mode: mode as BulkPriceMode,
+      value,
+      field: fieldRaw as BulkPriceField,
+    };
   }
 
   if (raw.moq && typeof raw.moq === "object") {

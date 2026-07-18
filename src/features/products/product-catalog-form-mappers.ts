@@ -230,6 +230,8 @@ export function applyBulkResultToVariants(
       stockStatus: updated.stockStatus,
       moqOverride: updated.moqOverride != null ? String(updated.moqOverride) : "",
       leadTimeOverride: updated.leadTimeOverride ?? "",
+      wholesalePrice: updated.wholesalePrice != null ? String(updated.wholesalePrice) : "",
+      dealerPrice: updated.dealerPrice != null ? String(updated.dealerPrice) : "",
       imageUrl: updated.imageUrl ?? "",
       colorName: updated.colorName ?? row.colorName,
       colorCode: updated.colorCode ?? row.colorCode,
