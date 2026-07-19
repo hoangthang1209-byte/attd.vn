@@ -17,46 +17,44 @@ export default function ProductSpecificationsSection({ rows, preview = false }: 
 
   return (
     <Wrapper {...wrapperProps}>
-      <div className={preview ? undefined : "container"}>
-        <header className={preview ? "mp-pdp-spec-preview-head" : "mp-pdp-section-head"}>
-          <h2 className={preview ? "mp-pdp-spec-preview-title" : "mp-pdp-section-title"}>
-            {preview ? "Tóm tắt kỹ thuật" : "Thông số sản phẩm"}
-          </h2>
-          {!preview && (
-            <p className="mp-pdp-section-subtitle">
-              Thông tin kỹ thuật và quy cách sản phẩm cho đối tác B2B.
-            </p>
-          )}
-        </header>
+      <header className={preview ? "mp-pdp-spec-preview-head" : "mp-pdp-section-head"}>
+        <h2 className={preview ? "mp-pdp-spec-preview-title" : "mp-pdp-section-title"}>
+          {preview ? "Tóm tắt kỹ thuật" : "Thông số sản phẩm"}
+        </h2>
+        {!preview && (
+          <p className="mp-pdp-section-subtitle">
+            Thông tin kỹ thuật và quy cách sản phẩm cho đối tác B2B.
+          </p>
+        )}
+      </header>
 
-        {preview ? (
-          <dl className="mp-pdp-spec-preview-grid">
+      {preview ? (
+        <dl className="mp-pdp-spec-preview-grid">
+          {list.map((row) => (
+            <div key={row.id} className="mp-pdp-spec-preview-grid-item">
+              <dt>{row.label}</dt>
+              <dd>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <div className="mp-pdp-spec-table">
+          <dl className="mp-pdp-spec-grid">
             {list.map((row) => (
-              <div key={row.id} className="mp-pdp-spec-preview-grid-item">
+              <div key={row.id} className="mp-pdp-spec-row">
                 <dt>{row.label}</dt>
                 <dd>{row.value}</dd>
               </div>
             ))}
           </dl>
-        ) : (
-          <div className="mp-pdp-spec-table">
-            <dl className="mp-pdp-spec-grid">
-              {list.map((row) => (
-                <div key={row.id} className="mp-pdp-spec-row">
-                  <dt>{row.label}</dt>
-                  <dd>{row.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        )}
+        </div>
+      )}
 
-        {preview && (
-          <p className="mp-pdp-spec-more">
-            <a href="#mp-pdp-specs">Xem đầy đủ thông số</a>
-          </p>
-        )}
-      </div>
+      {preview && (
+        <p className="mp-pdp-spec-more">
+          <a href="#mp-pdp-specs">Xem đầy đủ thông số</a>
+        </p>
+      )}
     </Wrapper>
   );
 }

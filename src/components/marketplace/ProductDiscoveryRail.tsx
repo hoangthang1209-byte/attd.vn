@@ -17,7 +17,7 @@ export default function ProductDiscoveryRail({ id, title, description, products,
 
   return (
     <section className="mp-section mp-pdp-section mp-pdp-discovery" id={id}>
-      <div className="container">
+      <div className="mp-pdp-content-container">
         <header className="mp-pdp-section-head mp-pdp-discovery__head">
           <div>
             <h2 className="mp-pdp-section-title">{title}</h2>

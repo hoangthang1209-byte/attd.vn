@@ -182,7 +182,19 @@ export default async function ProductDetailPage({ params }: PageProps) {
         displayContent={displayContent}
         showRelatedTab={relatedProducts.length > 0}
         manufacturingEvidenceItems={manufacturingEvidenceItems}
-      />
+      >
+        <section className="mp-section mp-pdp-section mp-pdp-section--alt" id="mp-pdp-faq">
+          <div className="mp-pdp-content-container mp-pdp-faq">
+            <header className="mp-pdp-section-head">
+              <h2 className="mp-pdp-section-title">Hỏi đáp thường gặp</h2>
+              <p className="mp-pdp-section-subtitle">
+                Câu hỏi phổ biến từ đối tác B2B và đại lý đồng phục.
+              </p>
+            </header>
+            <ProductFaqList items={faqItems} />
+          </div>
+        </section>
+      </ProductDetailInteractive>
 
       <ProductDiscoveryRail
         id="mp-pdp-related"
@@ -206,18 +218,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
       />
 
       <RecentlyViewedProducts currentSlug={product.slug} />
-
-      <section className="mp-section mp-pdp-section mp-pdp-section--alt" id="mp-pdp-faq">
-        <div className="container mp-pdp-faq">
-          <header className="mp-pdp-section-head">
-            <h2 className="mp-pdp-section-title">Hỏi đáp thường gặp</h2>
-            <p className="mp-pdp-section-subtitle">
-              Câu hỏi phổ biến từ đối tác B2B và đại lý đồng phục.
-            </p>
-          </header>
-          <ProductFaqList items={faqItems} />
-        </div>
-      </section>
     </main>
   );
 }

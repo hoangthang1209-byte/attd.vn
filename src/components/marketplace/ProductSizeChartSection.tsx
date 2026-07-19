@@ -16,8 +16,10 @@ export default function ProductSizeChartSection({ chart }: Props) {
 
   return (
     <section className="mp-section mp-pdp-section mp-pdp-size-chart" id="mp-pdp-size-chart">
-      <h2 className="mp-section-title">{title}</h2>
-      <p className="mp-pdp-size-chart__unit">Đơn vị: {unitLabel}</p>
+      <header className="mp-pdp-section-head">
+        <h2 className="mp-pdp-section-title">{title}</h2>
+        <p className="mp-pdp-section-subtitle">Đơn vị: {unitLabel}</p>
+      </header>
       <div className="mp-pdp-size-chart__table-wrap">
         <table className="mp-pdp-size-chart__table">
           <thead>

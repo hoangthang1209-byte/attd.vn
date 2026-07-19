@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import ProductGallery from "@/components/marketplace/ProductGallery";
 import ProductDynamicOptionSelector from "@/components/marketplace/ProductDynamicOptionSelector";
@@ -119,6 +119,7 @@ type Props = {
   showFaqTab?: boolean;
   showRelatedTab?: boolean;
   manufacturingEvidenceItems?: readonly ManufacturingEvidenceItem[];
+  children?: ReactNode;
 };
 
 export default function ProductDetailInteractive({
@@ -129,6 +130,7 @@ export default function ProductDetailInteractive({
   showFaqTab = true,
   showRelatedTab = false,
   manufacturingEvidenceItems,
+  children,
 }: Props) {
   const optionGroups = product.optionGroups ?? [];
   const variants = product.variants ?? [];
@@ -379,7 +381,7 @@ export default function ProductDetailInteractive({
   return (
     <>
       <div className="mp-pdp-shell">
-        <div className="container">
+        <div className="container mp-pdp-content-container">
           <div className="mp-pdp-sticky-layout">
             <div className="mp-pdp-sticky-layout__cluster">
               <div className="mp-pdp-shell-hero">
@@ -481,59 +483,63 @@ export default function ProductDetailInteractive({
                   </div>
                 )}
               </div>
-
-              <div className="mp-pdp-shell-content">
-                <ProductDetailTabs tabs={anchorTabs} />
-
-                {specifications.length > 0 && (
-                  <ProductSpecificationsSection rows={specifications} />
-                )}
-
-                <ProductSizeChartSection chart={sizeChart} />
-
-                {showDescriptionSection && (
-                  <section className="mp-section mp-pdp-section" id="mp-pdp-desc">
-                    <div className="mp-pdp-desc">
-                      <header className="mp-pdp-section-head">
-                        <h2 className="mp-pdp-section-title">Mô tả sản phẩm</h2>
-                        <p className="mp-pdp-section-subtitle">
-                          Thông tin chi tiết về chất liệu, ứng dụng và khả năng cung ứng B2B.
-                        </p>
-                      </header>
-                      <div className="mp-pdp-desc-content">
-                        {hasRichDescription ? (
-                          <div className="mp-pdp-desc-body">
-                            <ProductDescriptionBlocks blocks={richDescriptionBlocks} />
-                          </div>
-                        ) : (
-                          <>
-                            {displayShortDescription && !displayContent && (
-                              <p className="mp-pdp-desc-lead">{displayShortDescription}</p>
-                            )}
-                            {displayContent && (
-                              <div className="mp-pdp-desc-body">
-                                {descriptionContentBlocks}
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-                )}
-
-                <ProductCustomizationsSection items={customizations} onRequestQuote={openQuoteFromCustomizations} />
-
-                <ManufacturingGallery
-                  title="Quy trình sản xuất"
-                  items={manufacturingEvidenceItems ?? []}
-                  layout="mosaic"
-                  className="mp-pdp-section mp-pdp-factory-gallery"
-                />
-              </div>
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mp-pdp-below-fold">
+        <ProductDetailTabs tabs={anchorTabs} />
+
+        <div className="mp-pdp-content-container">
+          {specifications.length > 0 && (
+            <ProductSpecificationsSection rows={specifications} />
+          )}
+
+          <ProductSizeChartSection chart={sizeChart} />
+
+          {showDescriptionSection && (
+            <section className="mp-section mp-pdp-section" id="mp-pdp-desc">
+              <header className="mp-pdp-section-head">
+                <h2 className="mp-pdp-section-title">Mô tả sản phẩm</h2>
+                <p className="mp-pdp-section-subtitle">
+                  Thông tin chi tiết về chất liệu, ứng dụng và khả năng cung ứng B2B.
+                </p>
+              </header>
+              <div className="mp-pdp-desc">
+                <div className="mp-pdp-desc-content">
+                  {hasRichDescription ? (
+                    <div className="mp-pdp-desc-body">
+                      <ProductDescriptionBlocks blocks={richDescriptionBlocks} />
+                    </div>
+                  ) : (
+                    <>
+                      {displayShortDescription && !displayContent && (
+                        <p className="mp-pdp-desc-lead">{displayShortDescription}</p>
+                      )}
+                      {displayContent && (
+                        <div className="mp-pdp-desc-body">
+                          {descriptionContentBlocks}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          <ProductCustomizationsSection items={customizations} onRequestQuote={openQuoteFromCustomizations} />
+
+          <ManufacturingGallery
+            title="Quy trình sản xuất"
+            items={manufacturingEvidenceItems ?? []}
+            layout="mosaic"
+            className="mp-pdp-section mp-pdp-factory-gallery"
+          />
+        </div>
+
+        {children}
       </div>
 
       <ProductPdpMobileBar

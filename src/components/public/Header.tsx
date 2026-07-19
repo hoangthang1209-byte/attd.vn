@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Menu, Search, X, LayoutGrid } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
@@ -122,14 +122,17 @@ export default function Header({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const headerEl = headerRef.current;
     if (!headerEl) return;
 
     function syncHeaderStackHeight() {
       const el = headerRef.current;
       if (!el) return;
-      el.style.setProperty("--mp-header-stack-height", `${el.offsetHeight}px`);
+      // Publish on :root so PDP sticky tabs / scroll-margin (siblings of header) inherit the live height.
+      const height = `${el.offsetHeight}px`;
+      el.style.setProperty("--mp-header-stack-height", height);
+      document.documentElement.style.setProperty("--mp-header-stack-height", height);
     }
 
     syncHeaderStackHeight();
@@ -142,6 +145,12 @@ export default function Header({
       window.removeEventListener("resize", syncHeaderStackHeight);
     };
   }, [mobileSearchOpen, showMobileCategoryTrigger]);
+
+  useEffect(() => {
+    return () => {
+      document.documentElement.style.removeProperty("--mp-header-stack-height");
+    };
+  }, []);
 
   useEffect(() => {
     if (!mobileSearchOpen) return;

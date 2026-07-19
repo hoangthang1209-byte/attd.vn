@@ -18,6 +18,10 @@
   --shadow-lg: 0 12px 32px rgba(17, 24, 39, 0.08);
   --shadow-glow: 0 0 0 1px rgba(220, 38, 38, 0.08), 0 8px 24px rgba(17, 24, 39, 0.06);
   --header-height: 112px;
+  /* Public header stack fallbacks (live value: --mp-header-stack-height on :root from Header). */
+  --mp-public-header-height-mobile: 62px;
+  --mp-public-header-height-tablet: 148px;
+  --mp-public-header-height-desktop: 146px;
   --font-sans-stack: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono-stack: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
@@ -13536,13 +13540,14 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 }
 .mp-supplier-card-link { font-size: 13px; font-weight: 700; color: var(--primary); text-decoration: none; }
 
-/* Sticky tabs */
+/* Sticky tabs — canonical offsets live under .mp-pdp--b2b (see PDP layout tokens) */
 .mp-pdp-tabs {
-  position: sticky; top: var(--header-height, 112px); z-index: 40;
-  background: rgba(255,255,255,.96);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: var(--mp-header-stack-height, var(--header-height, 112px));
+  z-index: 150;
+  background: #fff;
+  border-top: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
 }
 .mp-pdp-tabs-scroll {
   display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
@@ -13607,8 +13612,10 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 .mp-option-table-thumb--empty { background: #f3f4f6; }
 .mp-option-table-thumb img { object-fit: cover; }
 
-/* Description */
-.mp-pdp-desc { max-width: 860px; }
+/* Description — outer section stays full aligned width; readable column is inner-only */
+.mp-pdp-desc { max-width: none; width: 100%; }
+.mp-pdp-desc-lead,
+.mp-pdp-desc-body { max-width: min(860px, 100%); }
 .mp-pdp-desc-placeholder { margin: 0; font-size: 15px; color: #6b7280; line-height: 1.65; }
 .mp-pdp-desc-gallery {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 24px;
@@ -19104,19 +19111,21 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 .mp-pdp--b2b .mp-pdp-tabs {
   position: sticky;
-  top: calc(var(--header-height, 112px) - 1px);
-  z-index: 35;
+  top: var(--mp-pdp-tabs-sticky-top);
+  z-index: 150;
   margin-top: 28px;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  background: #fff;
+  border-top: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: none;
+  transform: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .mp-pdp-tabs-inner {
-  max-width: var(--container-max, 1280px);
-  margin: 0 auto;
-  padding: 0 16px;
+  /* Horizontal alignment for .mp-pdp--b2b is set in the PDP layout block. */
+  margin: 0;
 }
 
 .mp-pdp--b2b .mp-pdp-tabs-scroll {
@@ -19498,10 +19507,13 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 .mp-pdp-tabs--in-shell {
   position: sticky;
-  top: calc(var(--mp-header-stack-height, var(--header-height, 112px)) - 1px);
-  z-index: 30;
+  top: var(--mp-pdp-tabs-sticky-top, var(--mp-header-stack-height, var(--header-height, 112px)));
+  z-index: 150;
   margin: 0 0 8px;
-  border-radius: 12px;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+  transform: none;
 }
 
 .mp-pdp-shell-content .mp-pdp-section {
@@ -19665,39 +19677,7 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   max-width: 68ch;
 }
 
-.mp-pdp--b2b .mp-pdp-tabs--in-shell {
-  margin-bottom: 4px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-}
-
-.mp-pdp--b2b .mp-pdp-tabs-inner {
-  padding: 0;
-  background: transparent;
-  border-bottom: 1px solid #e5e7eb;
-  border-radius: 0;
-}
-
-.mp-pdp--b2b .mp-pdp-tabs-scroll {
-  gap: 4px;
-  padding: 0 0 10px;
-}
-
-.mp-pdp--b2b .mp-pdp-tab {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: transparent;
-  font-size: 13px;
-}
-
-.mp-pdp--b2b .mp-pdp-tab--active {
-  background: #0f172a;
-  color: #fff;
-  border-color: #0f172a;
-}
+/* Tab chrome for .mp-pdp--b2b is defined once in the PDP layout block below. */
 
 .mp-pdp--b2b .mp-pdp-spec-row {
   border-bottom: 1px solid #eef2f6;
@@ -28126,12 +28106,62 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
   align-self: start;
 }
 
-/* ─── PDP launch readiness — mobile rhythm, tabs, cards and bottom CTA ─────── */
+/* ─── PDP layout — shared content edge, sticky tabs, scroll offsets ─────────── */
 
 .mp-pdp--b2b {
-  --pdp-sticky-tabs-top: calc(var(--mp-header-stack-height, var(--header-height, 72px)) - 1px);
-  --pdp-anchor-offset: calc(var(--pdp-sticky-tabs-top) + 58px);
-  --pdp-mobile-bottom-space: calc(96px + env(safe-area-inset-bottom, 0px));
+  --mp-pdp-content-max: 1180px;
+  --mp-pdp-content-pad-mobile: 20px;
+  --mp-pdp-content-pad-tablet: 28px;
+  --mp-pdp-content-pad-desktop: 32px;
+  --mp-pdp-tabs-height: 56px;
+  --mp-pdp-tabs-sticky-top: var(
+    --mp-header-stack-height,
+    var(--mp-public-header-height-desktop, var(--header-height, 146px))
+  );
+  --mp-pdp-anchor-breathing: 20px;
+  --pdp-anchor-offset: calc(
+    var(--mp-pdp-tabs-sticky-top) + var(--mp-pdp-tabs-height) + var(--mp-pdp-anchor-breathing)
+  );
+  --pdp-mobile-bottom-space: calc(82px + env(safe-area-inset-bottom, 0px));
+}
+
+.mp-pdp--b2b .mp-pdp-content-container,
+.mp-pdp--b2b .mp-pdp-shell > .container.mp-pdp-content-container {
+  width: 100%;
+  max-width: var(--mp-pdp-content-max);
+  margin-inline: auto;
+  padding-inline: var(--mp-pdp-content-pad-mobile);
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .mp-pdp--b2b {
+    --mp-pdp-tabs-sticky-top: var(
+      --mp-header-stack-height,
+      var(--mp-public-header-height-tablet, 148px)
+    );
+  }
+
+  .mp-pdp--b2b .mp-pdp-content-container,
+  .mp-pdp--b2b .mp-pdp-shell > .container.mp-pdp-content-container {
+    padding-inline: var(--mp-pdp-content-pad-tablet);
+  }
+}
+
+@media (min-width: 1024px) {
+  .mp-pdp--b2b {
+    --mp-pdp-tabs-height: 59px;
+    --mp-pdp-anchor-breathing: 24px;
+    --mp-pdp-tabs-sticky-top: var(
+      --mp-header-stack-height,
+      var(--mp-public-header-height-desktop, 146px)
+    );
+  }
+
+  .mp-pdp--b2b .mp-pdp-content-container,
+  .mp-pdp--b2b .mp-pdp-shell > .container.mp-pdp-content-container {
+    padding-inline: var(--mp-pdp-content-pad-desktop);
+  }
 }
 
 .mp-pdp--b2b #mp-pdp-overview,
@@ -28144,27 +28174,44 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
   scroll-margin-top: var(--pdp-anchor-offset);
 }
 
+/* Sticky tabs — opaque bar flush under full header, above page content.
+   Nav is full-bleed within .mp-pdp-below-fold; inner uses shared content container. */
 .mp-pdp--b2b .mp-pdp-tabs--in-shell {
   position: sticky;
-  top: var(--pdp-sticky-tabs-top);
-  z-index: 48;
+  top: var(--mp-pdp-tabs-sticky-top);
+  z-index: 150;
   margin: 28px 0 0;
   padding: 0;
   border: 0;
+  border-radius: 0;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: none;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
   transform: none;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .mp-pdp--b2b .mp-pdp-tabs-inner {
-  max-width: var(--container-max, 1280px);
-  margin: 0 auto;
-  padding: 0;
+  max-width: var(--mp-pdp-content-max);
+  width: 100%;
+  margin-inline: auto;
+  padding-inline: var(--mp-pdp-content-pad-mobile);
   border: 0;
   background: transparent;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .mp-pdp--b2b .mp-pdp-tabs-inner {
+    padding-inline: var(--mp-pdp-content-pad-tablet);
+  }
+}
+
+@media (min-width: 1024px) {
+  .mp-pdp--b2b .mp-pdp-tabs-inner {
+    padding-inline: var(--mp-pdp-content-pad-desktop);
+  }
 }
 
 .mp-pdp--b2b .mp-pdp-tabs-scroll {
@@ -28236,17 +28283,25 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
   padding-bottom: 12px;
 }
 
-.mp-pdp--b2b .mp-pdp-section {
-  padding: 48px 0;
+/* Tall sticky containing block so tabs remain sticky through rails + FAQ */
+.mp-pdp-below-fold {
+  position: relative;
+  overflow: visible;
+  transform: none;
+  filter: none;
+  contain: none;
+  perspective: none;
 }
 
-.mp-pdp--b2b .mp-pdp-shell-content .mp-pdp-section {
-  padding-top: 48px;
-}
-
+.mp-pdp--b2b .mp-pdp-section,
+.mp-pdp--b2b .mp-pdp-shell-content .mp-pdp-section,
 .mp-pdp--b2b .mp-pdp-section--alt.mp-pdp-section {
   padding-top: 48px;
   padding-bottom: 48px;
+}
+
+.mp-pdp--b2b .mp-pdp-section + .mp-pdp-section {
+  margin-top: 0;
 }
 
 .mp-pdp--b2b .mp-pdp-section-head {
@@ -28305,6 +28360,7 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
 }
 
 .mp-pdp--b2b .mp-pdp-spec-table {
+  width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -28317,8 +28373,14 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
 }
 
 .mp-pdp--b2b .mp-pdp-desc-content {
-  max-width: 76ch;
+  max-width: none;
+  width: 100%;
   padding: 20px;
+}
+
+.mp-pdp--b2b .mp-pdp-desc-lead,
+.mp-pdp--b2b .mp-pdp-desc-body {
+  max-width: min(76ch, 100%);
 }
 
 .mp-pdp--b2b .mp-pdp-custom-grid {
@@ -28349,6 +28411,7 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
 }
 
 .mp-pdp--b2b .mp-pdp-size-chart__table-wrap {
+  width: 100%;
   overflow-x: auto;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 16px;
@@ -28357,6 +28420,7 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
 }
 
 .mp-pdp--b2b .mp-pdp-size-chart__table {
+  width: 100%;
   min-width: 560px;
   border-collapse: collapse;
 }
@@ -28374,7 +28438,8 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
 }
 
 .mp-pdp--b2b .mp-pdp-faq .faq-list {
-  max-width: 820px;
+  max-width: none;
+  width: 100%;
 }
 
 .mp-pdp--b2b .mp-pdp-faq .faq-item + .faq-item {
@@ -28412,151 +28477,6 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
   margin: 0;
 }
 
-.pdp-mobile-action-bar {
-  grid-template-columns: minmax(0, 1.26fr) minmax(0, 0.74fr) minmax(0, 0.74fr);
-  gap: 8px;
-  min-height: calc(78px + env(safe-area-inset-bottom, 0px));
-  padding: 10px max(14px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px));
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 -10px 28px rgba(15, 23, 42, 0.08);
-}
-
-.pdp-mobile-action-bar__btn {
-  min-height: 50px;
-  border-radius: 14px;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.pdp-mobile-action-bar__btn--quote {
-  font-size: 14px;
-}
-
-body:has(.pdp-mobile-action-bar) .floating-contact {
-  bottom: calc(104px + env(safe-area-inset-bottom, 0px));
-}
-
-@media (min-width: 1024px) {
-  .mp-pdp--b2b {
-    --pdp-anchor-offset: calc(var(--pdp-sticky-tabs-top) + 64px);
-  }
-
-  .mp-pdp--b2b .mp-pdp-section-title,
-  .mp-pdp--b2b .mp-section-title {
-    font-size: clamp(28px, 2.5vw, 34px);
-  }
-
-  .mp-pdp--b2b .mp-pdp-custom-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 899px) {
-  .mp-pdp--b2b {
-    --pdp-sticky-tabs-top: calc(var(--mp-header-stack-height, var(--header-height, 64px)) - 1px);
-    --pdp-anchor-offset: calc(var(--pdp-sticky-tabs-top) + 54px);
-    padding-bottom: var(--pdp-mobile-bottom-space);
-  }
-
-  .mp-pdp--b2b .container {
-    padding-left: 20px;
-    padding-right: 20px;
-  }
-
-  .mp-pdp--b2b .mp-pdp-shell {
-    padding-top: 12px;
-  }
-
-  .mp-pdp--b2b .mp-pdp-overview-title {
-    font-size: clamp(32px, 9vw, 36px);
-    line-height: 1.1;
-  }
-
-  .mp-pdp--b2b .mp-pdp-tabs--in-shell {
-    margin-top: 24px;
-  }
-
-  .mp-pdp--b2b .mp-pdp-tabs-inner {
-    padding: 0 20px;
-  }
-
-  .mp-pdp--b2b .mp-pdp-tabs-scroll {
-    gap: 6px;
-    padding: 8px 0;
-  }
-
-  .mp-pdp--b2b .mp-pdp-tab {
-    min-height: 36px;
-    padding: 8px 12px;
-    font-size: 13px;
-  }
-
-  .mp-pdp--b2b .mp-pdp-section,
-  .mp-pdp--b2b .mp-pdp-shell-content .mp-pdp-section,
-  .mp-pdp--b2b .mp-pdp-section--alt.mp-pdp-section {
-    padding-top: 48px;
-    padding-bottom: 48px;
-  }
-
-  .mp-pdp--b2b #mp-pdp-faq {
-    padding-bottom: calc(32px + var(--pdp-mobile-bottom-space));
-  }
-
-  .mp-pdp--b2b .mp-pdp-section-head {
-    margin-bottom: 22px;
-  }
-
-  .mp-pdp--b2b .mp-pdp-spec-preview-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .mp-pdp--b2b .mp-pdp-spec-row {
-    grid-template-columns: minmax(104px, 38%) minmax(0, 1fr);
-    padding: 12px 14px;
-  }
-
-  .mp-pdp--b2b .mp-pdp-desc-content {
-    padding: 18px;
-  }
-
-  .mp-pdp--b2b .mp-pdp-custom-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .mp-pdp--b2b .mp-pdp-faq .faq-item summary {
-    min-height: 54px;
-    padding: 17px 18px;
-    font-size: 17px;
-  }
-}
-
-@media (max-width: 374px) {
-  .pdp-mobile-action-bar {
-    gap: 6px;
-    padding-left: max(10px, env(safe-area-inset-left, 0px));
-    padding-right: max(10px, env(safe-area-inset-right, 0px));
-  }
-
-  .pdp-mobile-action-bar__btn {
-    min-height: 48px;
-    border-radius: 12px;
-    font-size: 12px;
-  }
-
-  .pdp-mobile-action-bar__btn--quote {
-    font-size: 13px;
-  }
-}
-
-/* ─── PDP final launch audit — canonical gallery/CTA/discovery overrides ───── */
-
-.mp-pdp--b2b {
-  --pdp-sticky-tabs-top-desktop: calc(var(--mp-header-stack-height, var(--header-height, 112px)) - 1px);
-  --pdp-sticky-tabs-top-mobile: calc(var(--mp-header-stack-height, var(--header-height, 64px)) - 1px);
-  --pdp-mobile-bottom-space: calc(82px + env(safe-area-inset-bottom, 0px));
-}
-
 .mp-pdp--b2b .mp-pdp-gallery-thumb {
   border: 1px solid rgba(15, 23, 42, 0.1);
   background: #fff;
@@ -28584,25 +28504,6 @@ body:has(.pdp-mobile-action-bar) .floating-contact {
   box-shadow: none;
 }
 
-.mp-pdp--b2b .mp-pdp-tabs--in-shell {
-  top: var(--pdp-sticky-tabs-top-desktop);
-  z-index: 48;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: none;
-  transform: none;
-}
-
-.mp-pdp--b2b #mp-pdp-overview,
-.mp-pdp--b2b #mp-pdp-specs,
-.mp-pdp--b2b #mp-pdp-size-chart,
-.mp-pdp--b2b #mp-pdp-desc,
-.mp-pdp--b2b #mp-pdp-custom,
-.mp-pdp--b2b #mp-pdp-related,
-.mp-pdp--b2b #mp-pdp-faq {
-  scroll-margin-top: calc(var(--pdp-sticky-tabs-top-desktop) + 66px);
-}
-
 .mp-pdp--b2b .mp-pdp-conversion-card {
   gap: 14px;
   padding: 20px;
@@ -28614,17 +28515,6 @@ body:has(.pdp-mobile-action-bar) .floating-contact {
 
 .mp-pdp--b2b .mp-pdp-conversion-contact {
   display: none;
-}
-
-.mp-pdp--b2b .mp-pdp-section,
-.mp-pdp--b2b .mp-pdp-shell-content .mp-pdp-section,
-.mp-pdp--b2b .mp-pdp-section--alt.mp-pdp-section {
-  padding-top: 48px;
-  padding-bottom: 48px;
-}
-
-.mp-pdp--b2b .mp-pdp-section + .mp-pdp-section {
-  margin-top: 0;
 }
 
 .mp-pdp-discovery {
@@ -28667,9 +28557,11 @@ body:has(.pdp-mobile-action-bar) .floating-contact {
   min-height: 54px;
   border-radius: 15px;
   font-size: 13px;
+  font-weight: 650;
 }
 
 .pdp-mobile-action-bar__btn--quote {
+  font-size: 14px;
   box-shadow: 0 4px 14px rgba(220, 38, 38, 0.08);
 }
 
@@ -28681,23 +28573,50 @@ body:has(.pdp-mobile-action-bar) .floating-contact {
   bottom: calc(92px + env(safe-area-inset-bottom, 0px));
 }
 
+@media (min-width: 1024px) {
+  .mp-pdp--b2b .mp-pdp-section-title,
+  .mp-pdp--b2b .mp-section-title {
+    font-size: clamp(28px, 2.5vw, 34px);
+  }
+
+  .mp-pdp--b2b .mp-pdp-custom-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 899px) {
   .mp-pdp--b2b {
+    --mp-pdp-tabs-height: 55px;
+    --mp-pdp-anchor-breathing: 16px;
+    --mp-pdp-tabs-sticky-top: var(
+      --mp-header-stack-height,
+      var(--mp-public-header-height-mobile, 62px)
+    );
     padding-bottom: 0;
   }
 
-  .mp-pdp--b2b .mp-pdp-tabs--in-shell {
-    top: var(--pdp-sticky-tabs-top-mobile);
+  .mp-pdp--b2b .mp-pdp-shell {
+    padding-top: 12px;
   }
 
-  .mp-pdp--b2b #mp-pdp-overview,
-  .mp-pdp--b2b #mp-pdp-specs,
-  .mp-pdp--b2b #mp-pdp-size-chart,
-  .mp-pdp--b2b #mp-pdp-desc,
-  .mp-pdp--b2b #mp-pdp-custom,
-  .mp-pdp--b2b #mp-pdp-related,
-  .mp-pdp--b2b #mp-pdp-faq {
-    scroll-margin-top: calc(var(--pdp-sticky-tabs-top-mobile) + 56px);
+  .mp-pdp--b2b .mp-pdp-overview-title {
+    font-size: clamp(32px, 9vw, 36px);
+    line-height: 1.1;
+  }
+
+  .mp-pdp--b2b .mp-pdp-tabs--in-shell {
+    margin-top: 24px;
+  }
+
+  .mp-pdp--b2b .mp-pdp-tabs-scroll {
+    gap: 6px;
+    padding: 8px 0;
+  }
+
+  .mp-pdp--b2b .mp-pdp-tab {
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: 13px;
   }
 
   .mp-pdp--b2b .mp-pdp-section,
@@ -28711,6 +28630,33 @@ body:has(.pdp-mobile-action-bar) .floating-contact {
     padding-bottom: calc(28px + var(--pdp-mobile-bottom-space));
   }
 
+  .mp-pdp--b2b .mp-pdp-section-head {
+    margin-bottom: 22px;
+  }
+
+  .mp-pdp--b2b .mp-pdp-spec-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mp-pdp--b2b .mp-pdp-spec-row {
+    grid-template-columns: minmax(104px, 38%) minmax(0, 1fr);
+    padding: 12px 14px;
+  }
+
+  .mp-pdp--b2b .mp-pdp-desc-content {
+    padding: 18px;
+  }
+
+  .mp-pdp--b2b .mp-pdp-custom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mp-pdp--b2b .mp-pdp-faq .faq-item summary {
+    min-height: 54px;
+    padding: 17px 18px;
+    font-size: 17px;
+  }
+
   .mp-pdp-discovery__head {
     align-items: flex-start;
     flex-direction: column;
@@ -28720,8 +28666,8 @@ body:has(.pdp-mobile-action-bar) .floating-contact {
   .mp-pdp-product-rail {
     display: flex;
     gap: 12px;
-    margin-inline: -20px;
-    padding-inline: 20px;
+    margin-inline: calc(-1 * var(--mp-pdp-content-pad-mobile));
+    padding-inline: var(--mp-pdp-content-pad-mobile);
     overflow-x: auto;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
@@ -28736,7 +28682,6 @@ body:has(.pdp-mobile-action-bar) .floating-contact {
     flex: 0 0 min(76vw, 260px);
     scroll-snap-align: start;
   }
-
 }
 
 @media (min-width: 900px) and (max-width: 1279px) {
@@ -28747,11 +28692,20 @@ body:has(.pdp-mobile-action-bar) .floating-contact {
 
 @media (max-width: 374px) {
   .pdp-mobile-action-bar {
+    gap: 6px;
     min-height: calc(68px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
   }
 
   .pdp-mobile-action-bar__btn {
     min-height: 52px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  .pdp-mobile-action-bar__btn--quote {
+    font-size: 13px;
   }
 }
 
