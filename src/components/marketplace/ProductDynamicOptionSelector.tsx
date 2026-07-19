@@ -10,6 +10,10 @@ import type { PublicProductVariantDetail } from "@/features/products/product-det
 import Image from "next/image";
 import { isValidImageSrc } from "@/lib/imagePaths";
 import { isProductScopedImageUrl } from "@/lib/productImageScope";
+import {
+  isLightColorSwatch,
+  resolveStructuredSwatchHex,
+} from "@/features/products/product-card-color-swatches";
 
 type Props = {
   optionGroups: ProductOptionGroup[];
@@ -66,6 +70,10 @@ export default function ProductDynamicOptionSelector({
                   (!allowedImageUrls || isProductScopedImageUrl(value.imageUrl, allowedImageUrls))
                     ? value.imageUrl
                     : null;
+                const swatchHex = colorGroup
+                  ? resolveStructuredSwatchHex(value.swatchHex)
+                  : null;
+                const lightSwatch = swatchHex ? isLightColorSwatch(swatchHex) : false;
 
                 return (
                   <button
@@ -86,15 +94,15 @@ export default function ProductDynamicOptionSelector({
                         <Image
                           src={swatchUrl}
                           alt=""
-                          width={20}
-                          height={20}
+                          fill
+                          sizes="48px"
                           className="mp-pdp-chip-thumb-img"
                         />
                       </span>
-                    ) : colorGroup && value.valueCode ? (
+                    ) : colorGroup && swatchHex ? (
                       <span
-                        className="mp-pdp-chip-dot"
-                        style={{ backgroundColor: value.valueCode }}
+                        className={`mp-pdp-chip-dot${lightSwatch ? " mp-pdp-chip-dot--light" : ""}`}
+                        style={{ backgroundColor: swatchHex }}
                         aria-hidden
                       />
                     ) : null}

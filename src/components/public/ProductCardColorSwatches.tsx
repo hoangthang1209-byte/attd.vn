@@ -1,7 +1,7 @@
 import type { ProductCardColorSwatch } from "@/features/products/product-card-color-swatches";
 import {
   isLightColorSwatch,
-  sanitizeCssHexColor,
+  resolveStructuredSwatchHex,
   splitVisibleColorSwatches,
 } from "@/features/products/product-card-color-swatches";
 
@@ -23,30 +23,23 @@ export default function ProductCardColorSwatches({ colors, compact = false }: Pr
       aria-label="Màu sắc có sẵn"
     >
       {visible.map((color) => {
-        const hex = sanitizeCssHexColor(color.hex);
-        const needsBorder = !hex || isLightColorSwatch(hex);
-        const initial = color.name.trim().charAt(0).toLocaleUpperCase("vi-VN") || "?";
+        const hex = resolveStructuredSwatchHex(color.hex);
+        const needsBorder = isLightColorSwatch(hex);
 
         return (
           <li key={color.id} className="product-card-colors__item">
             <span
               className={[
                 "product-card-swatch",
-                hex ? "product-card-swatch--filled" : "product-card-swatch--fallback",
+                "product-card-swatch--filled",
                 needsBorder ? "product-card-swatch--bordered" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
-              style={hex ? { backgroundColor: hex } : undefined}
+              style={{ backgroundColor: hex }}
               title={`Màu ${color.name}`}
               aria-label={`Màu ${color.name}`}
-            >
-              {!hex && (
-                <span className="product-card-swatch__initial" aria-hidden="true">
-                  {initial}
-                </span>
-              )}
-            </span>
+            />
           </li>
         );
       })}

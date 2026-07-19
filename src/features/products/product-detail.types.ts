@@ -13,6 +13,8 @@ export type ProductOptionValueView = {
   id: string;
   label: string;
   valueCode?: string | null;
+  /** Public-safe structured swatch from AttributeValue.hexCode / Color.hex only. */
+  swatchHex?: string | null;
   imageUrl?: string | null;
   sortOrder: number;
 };

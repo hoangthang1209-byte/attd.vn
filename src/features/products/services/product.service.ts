@@ -28,7 +28,12 @@ const PRODUCT_DETAIL_INCLUDE = {
   options: {
     orderBy: { sortOrder: "asc" as const },
     include: {
-      values: { orderBy: { sortOrder: "asc" as const } },
+      values: {
+        orderBy: { sortOrder: "asc" as const },
+        include: {
+          attributeValue: { select: { hexCode: true, code: true } },
+        },
+      },
     },
   },
   specifications: { orderBy: { sortOrder: "asc" as const } },
@@ -43,7 +48,7 @@ const PRODUCT_DETAIL_INCLUDE = {
   variants: {
     where: { variantStatus: "ACTIVE" },
     include: {
-      color: { select: { name: true } },
+      color: { select: { name: true, hex: true } },
       size: { select: { name: true } },
       optionValues: {
         include: {

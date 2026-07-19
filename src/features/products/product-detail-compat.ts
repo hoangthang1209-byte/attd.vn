@@ -54,7 +54,7 @@ export const PRODUCT_DETAIL_LEGACY_SELECT = {
       stockStatus: true,
       stockQty: true,
       imageUrl: true,
-      color: { select: { name: true } },
+      color: { select: { name: true, hex: true } },
       size: { select: { name: true } },
     },
     orderBy: { createdAt: "asc" as const },

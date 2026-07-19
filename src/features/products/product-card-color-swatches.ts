@@ -1,6 +1,7 @@
 /**
- * Public product-card color swatches — extract, normalize, and display helpers.
- * Centralized so listing/homepage/PDP related cards share one source of truth.
+ * Public product-card / PDP color swatches — extract and display helpers.
+ * Appearance comes only from structured hex (AttributeValue.hexCode / Color.hex).
+ * Never infer fill color from Vietnamese/English labels.
  */
 
 import type { StockStatus } from "@prisma/client";
@@ -20,6 +21,9 @@ export type ProductCardColorSwatch = {
 };
 
 export const PRODUCT_CARD_MAX_VISIBLE_COLOR_SWATCHES = 6;
+
+/** Neutral fill when no structured hex is available. */
+export const NEUTRAL_COLOR_SWATCH_HEX = "#9ca3af";
 
 /** Prisma select fragment for variant color data on public product cards (no N+1). */
 export const PRODUCT_CARD_COLOR_VARIANT_SELECT = {
@@ -86,12 +90,10 @@ export type ProductCardColorProductInput = {
   variants?: ProductCardColorVariantInput[] | null;
 };
 
-type CanonicalColor = {
-  name: string;
-  hex: string;
-};
-
-/** Accent-stripped lowercase key for Vietnamese/ASCII color names. */
+/**
+ * Accent-stripped lowercase key for deduplicating color labels only.
+ * Must not be used to invent hex/appearance.
+ */
 export function normalizeColorNameKey(value: string): string {
   return value
     .trim()
@@ -101,39 +103,6 @@ export function normalizeColorNameKey(value: string): string {
     .replace(/đ/g, "d")
     .replace(/\s+/g, " ");
 }
-
-const CANONICAL_COLORS: Record<string, CanonicalColor> = {
-  den: { name: "Đen", hex: "#111827" },
-  black: { name: "Đen", hex: "#111827" },
-  trang: { name: "Trắng", hex: "#ffffff" },
-  white: { name: "Trắng", hex: "#ffffff" },
-  do: { name: "Đỏ", hex: "#dc2626" },
-  red: { name: "Đỏ", hex: "#dc2626" },
-  "xanh navy": { name: "Xanh navy", hex: "#1e3a5f" },
-  navy: { name: "Xanh navy", hex: "#1e3a5f" },
-  "xanh duong": { name: "Xanh", hex: "#2563eb" },
-  blue: { name: "Xanh", hex: "#2563eb" },
-  xanh: { name: "Xanh", hex: "#2563eb" },
-  "xanh la": { name: "Xanh lá", hex: "#16a34a" },
-  green: { name: "Xanh lá", hex: "#16a34a" },
-  vang: { name: "Vàng", hex: "#eab308" },
-  yellow: { name: "Vàng", hex: "#eab308" },
-  cam: { name: "Cam", hex: "#ea580c" },
-  orange: { name: "Cam", hex: "#ea580c" },
-  tim: { name: "Tím", hex: "#7c3aed" },
-  purple: { name: "Tím", hex: "#7c3aed" },
-  hong: { name: "Hồng", hex: "#ec4899" },
-  pink: { name: "Hồng", hex: "#ec4899" },
-  xam: { name: "Xám", hex: "#6b7280" },
-  grey: { name: "Xám", hex: "#6b7280" },
-  gray: { name: "Xám", hex: "#6b7280" },
-  be: { name: "Be", hex: "#d6c3a5" },
-  beige: { name: "Be", hex: "#d6c3a5" },
-  kem: { name: "Be", hex: "#d6c3a5" },
-  natural: { name: "Be", hex: "#d6c3a5" },
-  nau: { name: "Nâu", hex: "#92400e" },
-  brown: { name: "Nâu", hex: "#92400e" },
-};
 
 const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
@@ -149,27 +118,24 @@ export function sanitizeCssHexColor(value: string | null | undefined): string | 
   return trimmed.toLowerCase();
 }
 
-export function resolveCanonicalColor(name: string): CanonicalColor | null {
-  const key = normalizeColorNameKey(name);
-  if (!key) return null;
-  if (CANONICAL_COLORS[key]) return CANONICAL_COLORS[key];
-  // Longest prefix/contains match for compound names (e.g. "xanh navy dam")
-  const sortedKeys = Object.keys(CANONICAL_COLORS).sort((a, b) => b.length - a.length);
-  for (const candidate of sortedKeys) {
-    if (key === candidate || key.includes(candidate)) {
-      return CANONICAL_COLORS[candidate];
-    }
-  }
-  return null;
+/**
+ * Resolve a renderable swatch fill from structured hex only.
+ * Invalid/missing → neutral gray (never transparent / never name-inferred).
+ */
+export function resolveStructuredSwatchHex(hex?: string | null): string {
+  return sanitizeCssHexColor(hex) ?? NEUTRAL_COLOR_SWATCH_HEX;
 }
 
+/**
+ * Returns sanitized structured hex, or null when absent/invalid.
+ * Does not inspect labels.
+ */
 export function resolveColorSwatchHex(input: {
-  name: string;
   hex?: string | null;
+  /** @deprecated Ignored — appearance must come from structured hex only. */
+  name?: string;
 }): string | null {
-  const explicit = sanitizeCssHexColor(input.hex);
-  if (explicit) return explicit;
-  return resolveCanonicalColor(input.name)?.hex ?? null;
+  return sanitizeCssHexColor(input.hex);
 }
 
 export function isColorOptionGroupRef(group: ColorOptionGroupRef | null | undefined): boolean {
@@ -243,15 +209,14 @@ function pushCandidate(
   if (!key) return;
   const existing = bucket.get(key);
   if (!existing) {
-    const canonical = resolveCanonicalColor(candidate.name);
     bucket.set(key, {
       ...candidate,
-      name: canonical?.name ?? candidate.name.trim(),
-      hex: sanitizeCssHexColor(candidate.hex) ?? canonical?.hex ?? null,
+      name: candidate.name.trim(),
+      hex: sanitizeCssHexColor(candidate.hex),
     });
     return;
   }
-  // Prefer explicit hex / richer code; keep availability if any variant is sellable.
+  // Prefer explicit structured hex / richer code; keep availability if any variant is sellable.
   if (!existing.hex && candidate.hex) {
     existing.hex = sanitizeCssHexColor(candidate.hex);
   }
@@ -308,6 +273,7 @@ function extractLegacyColorCandidate(
 /**
  * Extract unique available colors for a public product card.
  * Prefer structured ProductOptionValue color links; fall back to legacy color fields.
+ * Hex comes only from AttributeValue.hexCode or Color.hex — never from labels.
  */
 export function extractProductCardColorSwatches(
   product: ProductCardColorProductInput,
@@ -350,6 +316,7 @@ export function splitVisibleColorSwatches(
   };
 }
 
+/** White / very light structured hex needs a visible border on white UI. */
 export function isLightColorSwatch(hex: string | null | undefined): boolean {
   const safe = sanitizeCssHexColor(hex);
   if (!safe) return false;
@@ -357,7 +324,6 @@ export function isLightColorSwatch(hex: string | null | undefined): boolean {
   const r = parseInt(raw.slice(0, 2), 16);
   const g = parseInt(raw.slice(2, 4), 16);
   const b = parseInt(raw.slice(4, 6), 16);
-  // Relative luminance threshold — white/beige need a visible border.
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance >= 0.82;
 }

@@ -4,6 +4,11 @@ import Image from "next/image";
 import { isValidImageSrc } from "@/lib/imagePaths";
 import type { ColorOption, PublicVariantRow } from "@/lib/productVariants";
 import { getSizeOptions, isSizeAvailable } from "@/lib/productVariants";
+import {
+  isLightColorSwatch,
+  resolveStructuredSwatchHex,
+  sanitizeCssHexColor,
+} from "@/features/products/product-card-color-swatches";
 
 type ProductOptionSelectorProps = {
   variants: PublicVariantRow[];
@@ -39,6 +44,9 @@ export default function ProductOptionSelector({
             {colorOptions.map((color) => {
               const isActive = selectedColor === color.name;
               const hasImg = color.imageUrl && isValidImageSrc(color.imageUrl);
+              // Only accept structured hex in colorCode; SKU tokens become neutral gray.
+              const swatchHex = resolveStructuredSwatchHex(sanitizeCssHexColor(color.colorCode));
+              const lightSwatch = isLightColorSwatch(swatchHex);
 
               return (
                 <button
@@ -57,21 +65,17 @@ export default function ProductOptionSelector({
                         src={color.imageUrl!}
                         alt={color.name}
                         fill
-                        sizes="40px"
+                        sizes="48px"
                         className="mp-pdp-chip-thumb-img"
                       />
                     </span>
-                  ) : color.colorCode ? (
+                  ) : (
                     <span
-                      className="mp-pdp-chip-dot"
-                      style={{
-                        background: color.colorCode.startsWith("#")
-                          ? color.colorCode
-                          : undefined,
-                      }}
+                      className={`mp-pdp-chip-dot${lightSwatch ? " mp-pdp-chip-dot--light" : ""}`}
+                      style={{ backgroundColor: swatchHex }}
                       aria-hidden
                     />
-                  ) : null}
+                  )}
                   <span>{color.name}</span>
                 </button>
               );

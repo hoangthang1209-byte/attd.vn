@@ -27,6 +27,7 @@ import {
   toPublicDescriptionBlocks,
   type PublicProductDescriptionBlock,
 } from "@/features/products/product-description-blocks";
+import { sanitizeCssHexColor } from "@/features/products/product-card-color-swatches";
 
 function mapPublicDescriptionBlocks(raw: unknown): PublicProductDescriptionBlock[] | null {
   try {
@@ -42,7 +43,18 @@ type DbOptionValue = {
   valueCode: string | null;
   imageUrl: string | null;
   sortOrder: number;
+  attributeValue?: {
+    hexCode?: string | null;
+    code?: string | null;
+  } | null;
 };
+
+function mapPublicSwatchHex(
+  attributeHex?: string | null,
+  linkedColorHex?: string | null,
+): string | null {
+  return sanitizeCssHexColor(attributeHex) ?? sanitizeCssHexColor(linkedColorHex);
+}
 
 type DbOption = {
   id: string;
@@ -73,7 +85,7 @@ type DbVariant = {
   moqOverride: number | null;
   leadTimeOverride: string | null;
   materialOverride: string | null;
-  color: { name: string } | null;
+  color: { name: string; hex?: string | null } | null;
   size: { name: string } | null;
   optionValues: DbVariantOptionLink[];
 };
@@ -141,7 +153,10 @@ function buildVariantLabel(v: DbVariant, selections: Record<string, string>): st
 function buildLegacyOptionGroups(variants: DbVariant[]): ProductOptionGroup[] {
   const groups: ProductOptionGroup[] = [];
 
-  const colorMap = new Map<string, { label: string; valueCode: string | null; imageUrl: string | null }>();
+  const colorMap = new Map<
+    string,
+    { label: string; valueCode: string | null; swatchHex: string | null; imageUrl: string | null }
+  >();
   for (const v of variants) {
     const name = v.colorName ?? v.color?.name;
     if (!name) continue;
@@ -149,6 +164,7 @@ function buildLegacyOptionGroups(variants: DbVariant[]): ProductOptionGroup[] {
     colorMap.set(name, {
       label: name,
       valueCode: v.colorCode ?? prev?.valueCode ?? null,
+      swatchHex: mapPublicSwatchHex(null, v.color?.hex) ?? prev?.swatchHex ?? null,
       imageUrl: v.imageUrl ?? prev?.imageUrl ?? null,
     });
   }
@@ -162,6 +178,7 @@ function buildLegacyOptionGroups(variants: DbVariant[]): ProductOptionGroup[] {
         id: `legacy-color-${index}`,
         label,
         valueCode: meta.valueCode,
+        swatchHex: meta.swatchHex,
         imageUrl: meta.imageUrl,
         sortOrder: index,
       })),
@@ -227,6 +244,8 @@ function mapStructuredOptionGroups(options: DbOption[]): ProductOptionGroup[] {
           id: val.id,
           label: val.label,
           valueCode: val.valueCode,
+          // Appearance: AttributeValue.hexCode only — never invent from labels/valueCode.
+          swatchHex: mapPublicSwatchHex(val.attributeValue?.hexCode),
           imageUrl: val.imageUrl,
           sortOrder: val.sortOrder,
         })),

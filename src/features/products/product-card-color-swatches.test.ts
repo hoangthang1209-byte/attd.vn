@@ -6,8 +6,10 @@ import {
   extractProductCardColorSwatches,
   isLightColorSwatch,
   mapProductCardAvailableColors,
+  NEUTRAL_COLOR_SWATCH_HEX,
   normalizeColorNameKey,
   resolveColorSwatchHex,
+  resolveStructuredSwatchHex,
   sanitizeCssHexColor,
   splitVisibleColorSwatches,
 } from "./product-card-color-swatches";
@@ -18,13 +20,14 @@ function colorOptionValue(
   id: string,
   label: string,
   option: { name: string; slug: string } = { name: "Màu sắc", slug: "color" },
+  hexCode: string | null = null,
 ) {
   return {
     optionValue: {
       id,
       label,
       valueCode: null,
-      attributeValue: null,
+      attributeValue: hexCode ? { name: label, code: null, hexCode } : null,
       option,
     },
   };
@@ -39,50 +42,70 @@ describe("product-card-color-swatches", () => {
           variantStatus: "ACTIVE",
           stockStatus: "IN_STOCK",
           stockQty: 10,
-          optionValues: [colorOptionValue("c-den", "Den"), colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" })],
+          optionValues: [
+            colorOptionValue("c-den", "Den", undefined, "#111827"),
+            colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" }),
+          ],
         },
         {
           id: "v2",
           variantStatus: "ACTIVE",
           stockStatus: "IN_STOCK",
           stockQty: 8,
-          optionValues: [colorOptionValue("c-den", "Den"), colorOptionValue("s-l", "L", { name: "Kích thước", slug: "size" })],
+          optionValues: [
+            colorOptionValue("c-den", "Den", undefined, "#111827"),
+            colorOptionValue("s-l", "L", { name: "Kích thước", slug: "size" }),
+          ],
         },
         {
           id: "v3",
           variantStatus: "ACTIVE",
           stockStatus: "IN_STOCK",
           stockQty: 5,
-          optionValues: [colorOptionValue("c-xanh", "Xanh"), colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" })],
+          optionValues: [
+            colorOptionValue("c-xanh", "Xanh", undefined, "#2563eb"),
+            colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" }),
+          ],
         },
         {
           id: "v4",
           variantStatus: "ACTIVE",
           stockStatus: "IN_STOCK",
           stockQty: 4,
-          optionValues: [colorOptionValue("c-xanh", "Xanh"), colorOptionValue("s-l", "L", { name: "Kích thước", slug: "size" })],
+          optionValues: [
+            colorOptionValue("c-xanh", "Xanh", undefined, "#2563eb"),
+            colorOptionValue("s-l", "L", { name: "Kích thước", slug: "size" }),
+          ],
         },
         {
           id: "v5",
           variantStatus: "ACTIVE",
           stockStatus: "OUT_OF_STOCK",
           stockQty: 0,
-          optionValues: [colorOptionValue("c-trang", "Trang"), colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" })],
+          optionValues: [
+            colorOptionValue("c-trang", "Trang", undefined, "#ffffff"),
+            colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" }),
+          ],
         },
         {
           id: "v6",
           variantStatus: "ACTIVE",
           stockStatus: "IN_STOCK",
           stockQty: 2,
-          optionValues: [colorOptionValue("c-do", "Do"), colorOptionValue("s-xl", "XL", { name: "Kích thước", slug: "size" })],
+          optionValues: [
+            colorOptionValue("c-do", "Do", undefined, "#dc2626"),
+            colorOptionValue("s-xl", "XL", { name: "Kích thước", slug: "size" }),
+          ],
         },
       ],
     });
 
     assert.deepEqual(
       colors.map((c) => c.name).sort(),
-      ["Trắng", "Xanh", "Đen", "Đỏ"].sort(),
+      ["Den", "Do", "Trang", "Xanh"].sort(),
     );
+    assert.equal(colors.find((c) => c.name === "Den")?.hex, "#111827");
+    assert.equal(colors.find((c) => c.name === "Xanh")?.hex, "#2563eb");
   });
 
   it("1b active variants with stockQty=0 / OUT_OF_STOCK still show configured colors", () => {
@@ -94,42 +117,42 @@ describe("product-card-color-swatches", () => {
           variantStatus: "ACTIVE",
           stockStatus: "OUT_OF_STOCK",
           stockQty: 0,
-          optionValues: [colorOptionValue("c-den", "Den"), colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" })],
+          optionValues: [colorOptionValue("c-den", "Den", undefined, "#111827")],
         },
         {
           id: "v2",
           variantStatus: "ACTIVE",
           stockStatus: "OUT_OF_STOCK",
           stockQty: 0,
-          optionValues: [colorOptionValue("c-den", "Den"), colorOptionValue("s-l", "L", { name: "Kích thước", slug: "size" })],
+          optionValues: [colorOptionValue("c-den", "Den", undefined, "#111827")],
         },
         {
           id: "v3",
           variantStatus: "ACTIVE",
           stockStatus: "OUT_OF_STOCK",
           stockQty: 0,
-          optionValues: [colorOptionValue("c-xanh", "Xanh"), colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" })],
+          optionValues: [colorOptionValue("c-xanh", "Xanh", undefined, "#2563eb")],
         },
         {
           id: "v4",
           variantStatus: "ACTIVE",
           stockStatus: "OUT_OF_STOCK",
           stockQty: 0,
-          optionValues: [colorOptionValue("c-xanh", "Xanh"), colorOptionValue("s-l", "L", { name: "Kích thước", slug: "size" })],
+          optionValues: [colorOptionValue("c-xanh", "Xanh", undefined, "#2563eb")],
         },
         {
           id: "v5",
           variantStatus: "ACTIVE",
           stockStatus: "OUT_OF_STOCK",
           stockQty: 0,
-          optionValues: [colorOptionValue("c-trang", "Trang"), colorOptionValue("s-m", "M", { name: "Kích thước", slug: "size" })],
+          optionValues: [colorOptionValue("c-trang", "Trang", undefined, "#ffffff")],
         },
         {
           id: "v6",
           variantStatus: "ACTIVE",
           stockStatus: "OUT_OF_STOCK",
           stockQty: 0,
-          optionValues: [colorOptionValue("c-do", "Do"), colorOptionValue("s-xl", "XL", { name: "Kích thước", slug: "size" })],
+          optionValues: [colorOptionValue("c-do", "Do", undefined, "#dc2626")],
         },
       ],
     });
@@ -137,7 +160,7 @@ describe("product-card-color-swatches", () => {
     assert.equal(colors.length, 4);
     assert.deepEqual(
       colors.map((c) => c.name).sort(),
-      ["Trắng", "Xanh", "Đen", "Đỏ"].sort(),
+      ["Den", "Do", "Trang", "Xanh"].sort(),
     );
   });
 
@@ -149,19 +172,26 @@ describe("product-card-color-swatches", () => {
           variantStatus: "ACTIVE",
           stockStatus: "IN_STOCK",
           stockQty: 1,
-          optionValues: [colorOptionValue("c1", "Đen"), colorOptionValue("s1", "M", { name: "Kích thước", slug: "size" })],
+          optionValues: [
+            colorOptionValue("c1", "Đen", undefined, "#111827"),
+            colorOptionValue("s1", "M", { name: "Kích thước", slug: "size" }),
+          ],
         },
         {
           id: "v2",
           variantStatus: "ACTIVE",
           stockStatus: "IN_STOCK",
           stockQty: 1,
-          optionValues: [colorOptionValue("c1", "Đen"), colorOptionValue("s2", "L", { name: "Kích thước", slug: "size" })],
+          optionValues: [
+            colorOptionValue("c1", "Đen", undefined, "#111827"),
+            colorOptionValue("s2", "L", { name: "Kích thước", slug: "size" }),
+          ],
         },
       ],
     });
     assert.equal(colors.length, 1);
     assert.equal(colors[0].name, "Đen");
+    assert.equal(colors[0].hex, "#111827");
   });
 
   it("3 uses ProductVariantOptionValue / ProductOptionValue as source of truth", () => {
@@ -173,13 +203,14 @@ describe("product-card-color-swatches", () => {
           stockStatus: "IN_STOCK",
           stockQty: 3,
           colorName: "ShouldNotWin",
-          optionValues: [colorOptionValue("opt-blue", "Xanh navy")],
+          optionValues: [colorOptionValue("opt-blue", "Xanh navy", undefined, "#1e3a5f")],
         },
       ],
     });
     assert.equal(colors.length, 1);
     assert.equal(colors[0].id, "opt-blue");
     assert.equal(colors[0].name, "Xanh navy");
+    assert.equal(colors[0].hex, "#1e3a5f");
   });
 
   it("4 falls back to legacy colorName when structured option links are absent", () => {
@@ -192,6 +223,7 @@ describe("product-card-color-swatches", () => {
           stockQty: 2,
           colorName: "Đỏ",
           colorCode: "RED",
+          color: { id: "color-red", name: "Đỏ", hex: "#dc2626" },
         },
       ],
     });
@@ -201,7 +233,7 @@ describe("product-card-color-swatches", () => {
     assert.equal(colors[0].hex, "#dc2626");
   });
 
-  it("5 maps Den and Đen to the same black swatch", () => {
+  it("5 dedupes Den and Đen by label key without inventing hex from names", () => {
     assert.equal(normalizeColorNameKey("Den"), normalizeColorNameKey("Đen"));
     const colors = extractProductCardColorSwatches({
       variants: [
@@ -222,18 +254,20 @@ describe("product-card-color-swatches", () => {
       ],
     });
     assert.equal(colors.length, 1);
-    assert.equal(colors[0].name, "Đen");
-    assert.equal(colors[0].hex, "#111827");
+    assert.equal(colors[0].name, "Den");
+    assert.equal(colors[0].hex, null);
+    assert.equal(resolveStructuredSwatchHex(colors[0].hex), NEUTRAL_COLOR_SWATCH_HEX);
   });
 
-  it("6 white swatch resolves to light hex requiring visible border", () => {
-    const hex = resolveColorSwatchHex({ name: "Trắng" });
-    assert.equal(hex, "#ffffff");
-    assert.equal(isLightColorSwatch(hex), true);
-    assert.equal(isLightColorSwatch(resolveColorSwatchHex({ name: "Trang" })), true);
+  it("6 white structured hex requires visible border; names alone do not invent white", () => {
+    assert.equal(resolveColorSwatchHex({ name: "Trắng" }), null);
+    assert.equal(resolveColorSwatchHex({ hex: "#ffffff" }), "#ffffff");
+    assert.equal(isLightColorSwatch("#ffffff"), true);
+    assert.equal(isLightColorSwatch("#fff"), true);
+    assert.equal(isLightColorSwatch(NEUTRAL_COLOR_SWATCH_HEX), false);
   });
 
-  it("7 unknown color renders safely without invalid CSS", () => {
+  it("7 unknown color renders safely without invalid CSS or name inference", () => {
     assert.equal(sanitizeCssHexColor("red"), null);
     assert.equal(sanitizeCssHexColor("javascript:alert(1)"), null);
     assert.equal(sanitizeCssHexColor("#gghhii"), null);
@@ -255,6 +289,7 @@ describe("product-card-color-swatches", () => {
     assert.equal(colors.length, 1);
     assert.equal(colors[0].name, "Coral Mist");
     assert.equal(colors[0].hex, null);
+    assert.equal(resolveStructuredSwatchHex(colors[0].hex), NEUTRAL_COLOR_SWATCH_HEX);
   });
 
   it("8 displays at most 6 swatches and +n overflow", () => {
@@ -339,7 +374,6 @@ describe("product-card-color-swatches", () => {
       "swatches stay in body, not under media-only placement before title",
     );
 
-    // Swatches must not be the first child of product-card-body (no longer under image).
     const bodyStart = cardSource.indexOf('<div className="product-card-body">');
     const bodySlice = cardSource.slice(bodyStart, bodyStart + 280);
     assert.ok(
@@ -353,6 +387,7 @@ describe("product-card-color-swatches", () => {
     );
     assert.ok(swatchSource.includes('className={["product-card-colors"'));
     assert.ok(swatchSource.includes("if (!colors.length) return null"));
+    assert.ok(swatchSource.includes("resolveStructuredSwatchHex"));
   });
 
   it("10c swatch CSS class is present and not hidden", () => {
@@ -395,6 +430,7 @@ describe("product-card-color-swatches", () => {
     });
     assert.equal(colors.length, 1);
     assert.equal(colors[0].name, "Đen");
+    assert.equal(colors[0].hex, null);
   });
 
   it("12 product cards still link normally when swatches are present", () => {
@@ -402,7 +438,7 @@ describe("product-card-color-swatches", () => {
       resolve(repoRoot, "components/public/ProductCard.tsx"),
       "utf8",
     );
-    assert.ok(cardSource.includes('href={productHref}'));
+    assert.ok(cardSource.includes("href={productHref}"));
     assert.ok(cardSource.includes("product-card-media-link"));
     assert.ok(cardSource.includes("Xem chi tiết"));
 
@@ -424,20 +460,46 @@ describe("product-card-color-swatches", () => {
           variantStatus: "ACTIVE",
           stockStatus: "OUT_OF_STOCK",
           stockQty: 0,
-          optionValues: [colorOptionValue("c-den", "Den")],
+          optionValues: [colorOptionValue("c-den", "Den", undefined, "#111827")],
         },
         {
           id: "v2",
           variantStatus: "ACTIVE",
           stockStatus: "OUT_OF_STOCK",
           stockQty: 0,
-          optionValues: [colorOptionValue("c-trang", "Trang")],
+          optionValues: [colorOptionValue("c-trang", "Trang", undefined, "#ffffff")],
         },
       ],
     });
     assert.deepEqual(
       colors.map((c) => c.name).sort(),
-      ["Trắng", "Đen"].sort(),
+      ["Den", "Trang"].sort(),
     );
+    assert.equal(colors.find((c) => c.name === "Trang")?.hex, "#ffffff");
+  });
+
+  it("never invents hex from Vietnamese labels alone", () => {
+    const colors = extractProductCardColorSwatches({
+      variants: [
+        {
+          id: "v1",
+          variantStatus: "ACTIVE",
+          stockStatus: "IN_STOCK",
+          stockQty: 1,
+          optionValues: [colorOptionValue("c1", "Xanh lá")],
+        },
+        {
+          id: "v2",
+          variantStatus: "ACTIVE",
+          stockStatus: "IN_STOCK",
+          stockQty: 1,
+          optionValues: [colorOptionValue("c2", "Tím than")],
+        },
+      ],
+    });
+    assert.equal(colors.length, 2);
+    assert.ok(colors.every((c) => c.hex == null));
+    assert.equal(resolveColorSwatchHex({ name: "Xanh lá" }), null);
+    assert.equal(resolveColorSwatchHex({ name: "Đỏ", hex: null }), null);
   });
 });

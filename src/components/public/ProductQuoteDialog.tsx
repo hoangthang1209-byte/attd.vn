@@ -4,12 +4,6 @@ import Image from "next/image";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
-import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
-import {
-  PDP_QUOTE_PROCESS_STEPS,
-  TRUST_REASSURANCE_PRIVACY,
-} from "@/lib/b2b-trust-v2-copy";
 import ProductMediaFrame from "@/components/public/ProductMediaFrame";
 import type { ProductQuoteContext } from "@/components/public/product-quote.types";
 import { formatPdpMoqText, isPublicMoq } from "@/lib/formatMoq";
@@ -434,16 +428,6 @@ export default function ProductQuoteDialog({
                     )}
                   </button>
                 </div>
-
-                <ProcessTrustBlock
-                  title="Sau khi gửi yêu cầu"
-                  steps={PDP_QUOTE_PROCESS_STEPS}
-                  variant="compact"
-                  className="product-quote-dialog__process"
-                />
-                <TrustReassuranceLine className="product-quote-dialog__reassurance">
-                  {TRUST_REASSURANCE_PRIVACY}
-                </TrustReassuranceLine>
               </form>
             </div>
 
