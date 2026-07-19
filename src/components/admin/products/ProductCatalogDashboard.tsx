@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ProductExportDialog from "@/components/admin/products/ProductExportDialog";
+import ProductBulkDialogs, {
+  type ProductBulkDialogKind,
+} from "@/components/admin/products/ProductBulkDialogs";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import {
@@ -15,6 +18,8 @@ import {
   type ProductReadinessBadge,
   type ProductReadinessFilter,
 } from "@/features/products/product-admin-readiness";
+
+const SHOW_SAMPLE_DATA_BUTTON = process.env.NODE_ENV === "development";
 
 type ProductVariantRow = {
   id: string;
@@ -103,6 +108,10 @@ export default function ProductCatalogDashboard() {
   const [seedMsg, setSeedMsg] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
+  const [bulkDialogKind, setBulkDialogKind] = useState<ProductBulkDialogKind | null>(null);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -219,6 +228,60 @@ export default function ProductCatalogDashboard() {
     });
   }
 
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  function openBulkDialog(kind: ProductBulkDialogKind) {
+    if (selectedIds.size === 0) {
+      setBulkError("Vui lòng chọn ít nhất 1 sản phẩm.");
+      return;
+    }
+    setBulkError(null);
+    setBulkMsg(null);
+    setBulkDialogKind(kind);
+  }
+
+  async function runBulkOperation(payload: Record<string, unknown>) {
+    if (selectedIds.size === 0) {
+      setBulkError("Vui lòng chọn ít nhất 1 sản phẩm.");
+      return;
+    }
+    setBulkSubmitting(true);
+    setBulkError(null);
+    setBulkMsg(`Đang cập nhật ${selectedIds.size} sản phẩm...`);
+    try {
+      const res = await fetch("/api/admin/products/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          productIds: [...selectedIds],
+        }),
+      });
+      const json = (await res.json()) as {
+        message?: string;
+        error?: string;
+        successCount?: number;
+        skippedCount?: number;
+      };
+      if (!res.ok) {
+        setBulkError(json.message ?? json.error ?? "Không thể cập nhật sản phẩm.");
+        setBulkMsg(null);
+        return;
+      }
+      setBulkMsg(json.message ?? `Đã cập nhật ${json.successCount ?? selectedIds.size} sản phẩm.`);
+      setBulkDialogKind(null);
+      clearSelection();
+      await fetchProducts();
+    } catch {
+      setBulkError("Không thể cập nhật sản phẩm.");
+      setBulkMsg(null);
+    } finally {
+      setBulkSubmitting(false);
+    }
+  }
+
   const activeFilters = {
     search: search || undefined,
     categoryId: categoryId || undefined,
@@ -287,23 +350,103 @@ export default function ProductCatalogDashboard() {
           >
             Xuất dữ liệu
           </button>
-          <AdminLoadingButton
-            variant="secondary"
-            className="product-admin-btn"
-            pending={seeding}
-            pendingLabel="Đang tạo dữ liệu mẫu..."
-            onClick={() => void seedSampleData()}
-          >
-            Tạo dữ liệu mẫu
-          </AdminLoadingButton>
+          {SHOW_SAMPLE_DATA_BUTTON && (
+            <AdminLoadingButton
+              variant="secondary"
+              className="product-admin-btn"
+              pending={seeding}
+              pendingLabel="Đang tạo dữ liệu mẫu..."
+              onClick={() => void seedSampleData()}
+              data-testid="product-seed-sample-button"
+            >
+              Tạo dữ liệu mẫu
+            </AdminLoadingButton>
+          )}
         </div>
         <div className="admin-catalog-toolbar-right">
           {selectedIds.size > 0 && (
-            <span className="admin-field-hint">Đã chọn {selectedIds.size} sản phẩm</span>
+            <span className="admin-field-hint" data-testid="product-bulk-selection-count">
+              Đã chọn {selectedIds.size} sản phẩm
+            </span>
           )}
           <span className="admin-field-hint">{data?.total ?? 0} sản phẩm</span>
         </div>
       </div>
+
+      {selectedIds.size > 0 && (
+        <div
+          className="admin-variant-bulk-toolbar product-admin-bulk-toolbar"
+          role="toolbar"
+          aria-label="Cập nhật hàng loạt sản phẩm"
+          data-testid="product-bulk-toolbar"
+        >
+          <span className="admin-field-hint">Đã chọn {selectedIds.size} sản phẩm</span>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => openBulkDialog("status")}
+          >
+            Cập nhật trạng thái
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => openBulkDialog("publish")}
+          >
+            Publish
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => openBulkDialog("unpublish")}
+          >
+            Chuyển về nháp
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => openBulkDialog("archive")}
+          >
+            Lưu trữ
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => openBulkDialog("moq")}
+          >
+            Cập nhật MOQ
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => openBulkDialog("leadTime")}
+          >
+            Cập nhật lead-time
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => openBulkDialog("capabilities")}
+          >
+            Tính năng
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => toggleSelectAllVisible(true)}
+          >
+            Chọn tất cả
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--tertiary admin-btn--xs"
+            onClick={clearSelection}
+            data-testid="product-bulk-clear-selection"
+          >
+            Bỏ chọn
+          </button>
+        </div>
+      )}
 
       <ProductExportDialog
         open={exportOpen}
@@ -314,9 +457,40 @@ export default function ProductCatalogDashboard() {
         selectedCount={selectedIds.size}
       />
 
-      {seedMsg && (
+      <ProductBulkDialogs
+        open={bulkDialogKind != null}
+        kind={bulkDialogKind}
+        selectedCount={selectedIds.size}
+        submitting={bulkSubmitting}
+        error={bulkError}
+        onClose={() => {
+          if (!bulkSubmitting) {
+            setBulkDialogKind(null);
+            setBulkError(null);
+          }
+        }}
+        onSubmit={(payload) => void runBulkOperation(payload)}
+      />
+
+      {SHOW_SAMPLE_DATA_BUTTON && seedMsg && (
         <p className="admin-kb-warning admin-kb-badge--verified" style={{ marginBottom: 8 }}>
           {seedMsg}
+        </p>
+      )}
+
+      {bulkMsg && (
+        <p
+          className="admin-kb-warning admin-kb-badge--verified"
+          style={{ marginBottom: 8 }}
+          data-testid="product-bulk-message"
+        >
+          {bulkMsg}
+        </p>
+      )}
+
+      {bulkError && !bulkDialogKind && (
+        <p className="admin-kb-warning" style={{ marginBottom: 8 }} role="alert">
+          {bulkError}
         </p>
       )}
 
