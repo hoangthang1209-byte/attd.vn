@@ -26,12 +26,13 @@ describe("product bulk id validation", () => {
   it("rejects temp IDs", () => {
     assert.equal(isClientTempProductId("tmp_123"), true);
     assert.equal(isClientTempProductId("client-product"), true);
+    assert.equal(isClientTempProductId("prod_legacy"), false);
+    assert.equal(isClientTempProductId("cmqfmcrph003fk0044ki1ihbr"), false);
     assert.throws(
       () => validateProductBulkIds(["tmp_123", "cm1234567890abcdefghijkl"]),
       ProductAdminValidationError,
     );
   });
-
   it("allows persisted cuid-like IDs and supports 200 products", () => {
     const ids = Array.from({ length: 200 }, (_, index) => `cm1234567890abcdefghij${String(index).padStart(2, "0")}`);
     assert.equal(validateProductBulkIds(ids).length, 200);

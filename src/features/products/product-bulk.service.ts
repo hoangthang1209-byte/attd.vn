@@ -71,7 +71,8 @@ const PUBLISH_QUALITY_INCLUDE = {
 export function isClientTempProductId(id: string): boolean {
   const trimmed = id.trim();
   if (!trimmed) return true;
-  return /^(tmp|temp|client|local|new|prod|product|row)[-_]/i.test(trimmed);
+  // Keep this narrow: never reject valid cuid / uuid / legacy persisted IDs.
+  return /^(tmp|temp|client|local|row)[-_]/i.test(trimmed);
 }
 
 export function dedupeProductIds(productIds: string[]): string[] {
@@ -201,28 +202,6 @@ type LoadedProduct = {
   categoryId: string;
 };
 
-async function loadSelectedProducts(ids: string[]): Promise<LoadedProduct[]> {
-  const products = await prisma.product.findMany({
-    where: { id: { in: ids } },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      productCode: true,
-      status: true,
-      categoryId: true,
-    },
-  });
-
-  if (!products.length) {
-    throw new ProductAdminValidationError("Không tìm thấy sản phẩm đã chọn.", {
-      products: "Không có sản phẩm hợp lệ.",
-    });
-  }
-
-  return products;
-}
-
 async function revalidateUpdatedProducts(
   products: LoadedProduct[],
   nextStatusById: Map<string, ProductStatus>,
@@ -263,19 +242,72 @@ function buildResult(
 
 async function bulkArchive(products: LoadedProduct[]): Promise<ProductBulkResult> {
   const targets = products.filter((product) => product.status !== "ARCHIVED");
+  const alreadyArchived = products.filter((product) => product.status === "ARCHIVED");
+  const skipped: ProductBulkSkippedItem[] = alreadyArchived.map((product) => ({
+    id: product.id,
+    name: product.name,
+    productCode: product.productCode,
+    reason: "Sản phẩm đã được lưu trữ.",
+  }));
+
+  let successCount = 0;
   if (targets.length) {
-    await prisma.product.updateMany({
-      where: { id: { in: targets.map((product) => product.id) } },
+    const updated = await prisma.product.updateMany({
+      where: {
+        id: { in: targets.map((product) => product.id) },
+        status: { not: "ARCHIVED" },
+      },
       data: { status: "ARCHIVED" },
     });
+    successCount = updated.count;
+    if (updated.count === 0) {
+      return {
+        operation: "archive",
+        successCount: 0,
+        skippedCount: skipped.length + targets.length,
+        failedCount: targets.length,
+        message: "Không cập nhật được sản phẩm đã chọn. Vui lòng tải lại danh sách và thử lại.",
+        skipped: [
+          ...skipped,
+          ...targets.map((product) => ({
+            id: product.id,
+            name: product.name,
+            productCode: product.productCode,
+            reason: "DB không thay đổi trạng thái lưu trữ.",
+          })),
+        ],
+      };
+    }
+    if (updated.count < targets.length) {
+      const unchanged = targets.length - updated.count;
+      skipped.push({
+        id: "bulk",
+        name: "Một số sản phẩm",
+        productCode: null,
+        reason: `${unchanged} sản phẩm không đổi trạng thái sau updateMany.`,
+      });
+    }
   }
+
   const nextStatus = new Map(products.map((product) => [product.id, "ARCHIVED" as ProductStatus]));
   await revalidateUpdatedProducts(products, nextStatus);
+
+  if (successCount === 0 && skipped.length > 0) {
+    return {
+      operation: "archive",
+      successCount: 0,
+      skippedCount: skipped.length,
+      failedCount: 0,
+      message: `Không có sản phẩm nào cần lưu trữ. Bỏ qua ${skipped.length} sản phẩm.`,
+      skipped,
+    };
+  }
+
   return buildResult(
     "archive",
-    targets.length,
-    [],
-    `Đã lưu trữ ${targets.length} sản phẩm.`,
+    successCount,
+    skipped,
+    `Đã lưu trữ ${successCount} sản phẩm.`,
   );
 }
 
@@ -288,15 +320,47 @@ async function bulkSetStatus(
   }
 
   const targets = products.filter((product) => product.status !== status);
+  const unchanged = products.filter((product) => product.status === status);
+  const skipped: ProductBulkSkippedItem[] = unchanged.map((product) => ({
+    id: product.id,
+    name: product.name,
+    productCode: product.productCode,
+    reason: `Sản phẩm đã ở trạng thái ${status}.`,
+  }));
+
+  let successCount = 0;
   if (targets.length) {
-    await prisma.product.updateMany({
-      where: { id: { in: targets.map((product) => product.id) } },
+    const updated = await prisma.product.updateMany({
+      where: {
+        id: { in: targets.map((product) => product.id) },
+        status: { not: status },
+      },
       data: { status },
     });
+    successCount = updated.count;
+    if (updated.count === 0) {
+      return {
+        operation: "status",
+        successCount: 0,
+        skippedCount: skipped.length + targets.length,
+        failedCount: targets.length,
+        message: "Không cập nhật được trạng thái sản phẩm đã chọn.",
+        skipped: [
+          ...skipped,
+          ...targets.map((product) => ({
+            id: product.id,
+            name: product.name,
+            productCode: product.productCode,
+            reason: "DB không thay đổi trạng thái.",
+          })),
+        ],
+      };
+    }
   }
+
   const nextStatus = new Map(products.map((product) => [product.id, status]));
   await revalidateUpdatedProducts(products, nextStatus);
-  return buildResult("status", targets.length, [], `Đã cập nhật ${targets.length} sản phẩm.`);
+  return buildResult("status", successCount, skipped, `Đã cập nhật ${successCount} sản phẩm.`);
 }
 
 async function bulkPublish(products: LoadedProduct[]): Promise<ProductBulkResult> {
@@ -424,39 +488,62 @@ export async function performBulkProductOperation(
   input: ProductBulkInput,
 ): Promise<ProductBulkResult> {
   const ids = validateProductBulkIds(input.productIds);
-  const products = await loadSelectedProducts(ids);
+  const products = await prisma.product.findMany({
+    where: { id: { in: ids } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      productCode: true,
+      status: true,
+      categoryId: true,
+    },
+  });
 
-  // Preserve caller order for stable messaging; only update known IDs.
   const byId = new Map(products.map((product) => [product.id, product]));
   const ordered = ids.map((id) => byId.get(id)).filter(Boolean) as LoadedProduct[];
+  const missingIds = ids.filter((id) => !byId.has(id));
+  const missingSkipped: ProductBulkSkippedItem[] = missingIds.map((id) => ({
+    id,
+    name: "Không tìm thấy",
+    productCode: null,
+    reason: "Không tìm thấy sản phẩm với ID đã chọn.",
+  }));
+
   if (!ordered.length) {
     throw new ProductAdminValidationError("Không tìm thấy sản phẩm đã chọn.", {
       products: "Không có sản phẩm hợp lệ.",
     });
   }
 
+  let result: ProductBulkResult;
   switch (input.operation) {
     case "archive":
-      return bulkArchive(ordered);
+      result = await bulkArchive(ordered);
+      break;
     case "status": {
       if (!input.status) {
         throw new ProductAdminValidationError("Trạng thái không hợp lệ.", {
           status: "Thiếu trạng thái sản phẩm.",
         });
       }
-      return bulkSetStatus(ordered, input.status);
+      result = await bulkSetStatus(ordered, input.status);
+      break;
     }
     case "publish":
-      return bulkPublish(ordered);
+      result = await bulkPublish(ordered);
+      break;
     case "unpublish":
-      return bulkUnpublish(ordered);
+      result = await bulkUnpublish(ordered);
+      break;
     case "moq": {
       if (!input.moq || input.moq.mode !== "set") {
         throw new ProductAdminValidationError("Giá trị nhập không hợp lệ.", {
           moq: "Thiếu giá trị MOQ.",
         });
       }
-      return bulkMoq(ordered, validateBulkMoqValue(input.moq.value));
+      result = await bulkMoq(ordered, validateBulkMoqValue(input.moq.value));
+      break;
     }
     case "leadTime": {
       if (!input.leadTime || input.leadTime.mode !== "set") {
@@ -464,7 +551,8 @@ export async function performBulkProductOperation(
           leadTime: "Thiếu lead-time.",
         });
       }
-      return bulkLeadTime(ordered, validateBulkLeadTimeValue(input.leadTime.value));
+      result = await bulkLeadTime(ordered, validateBulkLeadTimeValue(input.leadTime.value));
+      break;
     }
     case "capabilities": {
       if (!input.capabilities) {
@@ -482,13 +570,27 @@ export async function performBulkProductOperation(
           capabilities: "Tính năng không hợp lệ.",
         });
       }
-      return bulkCapabilities(ordered, field, Boolean(input.capabilities.value));
+      result = await bulkCapabilities(ordered, field, Boolean(input.capabilities.value));
+      break;
     }
     default:
       throw new ProductAdminValidationError("Thao tác hàng loạt không hợp lệ.", {
         products: "Thao tác không được hỗ trợ.",
       });
   }
+
+  if (missingSkipped.length) {
+    const skipped = [...(result.skipped ?? []), ...missingSkipped];
+    return {
+      ...result,
+      skippedCount: skipped.length,
+      failedCount: result.failedCount + missingSkipped.length,
+      skipped,
+      message: `${result.message} Bỏ qua ${missingSkipped.length} ID không tồn tại.`,
+    };
+  }
+
+  return result;
 }
 
 /** Exported for tests — confirms archive path never touches variants. */

@@ -7,6 +7,7 @@ import {
   isReservedStaticPublicSlug,
   normalizeCategorySlug,
 } from "@/lib/seo/indexable-category-routes";
+import { buildPublicProductVisibilityWhere } from "@/features/products/product-public-visibility";
 
 /** True when the slug is a non-empty, non-whitespace string. */
 function isValidSlug(slug: string | null | undefined): slug is string {
@@ -60,7 +61,7 @@ async function loadDynamicSitemapData(): Promise<DynamicSitemapData> {
         orderBy: { updatedAt: "desc" },
       }),
       prisma.product.findMany({
-        where: { status: "ACTIVE", slug: { not: "" } },
+        where: buildPublicProductVisibilityWhere(),
         select: { slug: true, updatedAt: true },
         orderBy: { updatedAt: "desc" },
       }),

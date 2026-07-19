@@ -7,6 +7,7 @@ import {
   loadCategoryVisibilityNodes,
 } from "@/features/categories/category-public-visibility";
 import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
+import { buildPublicProductVisibilityWhere } from "@/features/products/product-public-visibility";
 
 export async function getCategories() {
   return prisma.category.findMany({
@@ -20,7 +21,7 @@ export async function getCategoriesWithCounts() {
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     include: {
       _count: {
-        select: { products: { where: { status: "ACTIVE" } } },
+        select: { products: { where: buildPublicProductVisibilityWhere() } },
       },
     },
   });
@@ -55,15 +56,15 @@ export type CmsCategoryTreeNode = {
 
 const cmsCategoryInclude = {
   _count: {
-    select: { products: { where: { status: "ACTIVE" as const } } },
+    select: { products: { where: buildPublicProductVisibilityWhere() } },
   },
   products: {
-    where: { status: "ACTIVE" as const },
+    where: buildPublicProductVisibilityWhere(),
     take: 1,
     select: { featuredImage: true },
     orderBy: { createdAt: "desc" as const },
   },
-} as const;
+};
 
 type CategoryRow = Awaited<
   ReturnType<
@@ -291,7 +292,7 @@ export async function getCategoryBySlug(slug: string) {
     where: { slug },
     include: {
       products: {
-        where: { status: "ACTIVE" },
+        where: buildPublicProductVisibilityWhere(),
         select: {
           id: true, name: true, slug: true, productCode: true,
           featuredImage: true, gallery: true,

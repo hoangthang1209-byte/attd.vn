@@ -13,6 +13,7 @@ import {
 } from "@/features/products/product-detail-compat";
 import { PUBLIC_IN_STOCK_VARIANT_FILTER } from "@/features/products/product-foundation-validation";
 import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
+import { buildPublicProductVisibilityWhere } from "@/features/products/product-public-visibility";
 import {
   extractMediaIdsFromDescriptionBlocks,
   hydratePublicDescriptionBlocks,
@@ -105,8 +106,8 @@ async function mapFetchedProductToPublicDetail(
 
 export async function getProductDetailBySlug(slug: string): Promise<PublicProductDetail | null> {
   try {
-    const product = await prisma.product.findUnique({
-      where: { slug, status: "ACTIVE" },
+    const product = await prisma.product.findFirst({
+      where: buildPublicProductVisibilityWhere({ slug }),
       include: PRODUCT_DETAIL_INCLUDE,
     });
     if (!product) return null;
@@ -122,8 +123,8 @@ export async function getProductDetailBySlug(slug: string): Promise<PublicProduc
     }
 
     try {
-      const legacy = await prisma.product.findUnique({
-        where: { slug, status: "ACTIVE" },
+      const legacy = await prisma.product.findFirst({
+        where: buildPublicProductVisibilityWhere({ slug }),
         select: PRODUCT_DETAIL_LEGACY_SELECT,
       });
       if (!legacy) return null;
@@ -153,8 +154,8 @@ export async function getProducts() {
 }
 
 export async function getProductBySlug(slug: string) {
-  return prisma.product.findUnique({
-    where: { slug },
+  return prisma.product.findFirst({
+    where: buildPublicProductVisibilityWhere({ slug }),
     include: {
       category: true,
       images: { orderBy: { sortOrder: "asc" } },
@@ -236,9 +237,7 @@ export function buildPublicProductListingWhere(params: {
   material?: string;
 }): Prisma.ProductWhereInput {
   const searchOr = params.search ? buildPublicProductListingSearchOr(params.search) : [];
-  return {
-    status: "ACTIVE",
-    slug: { not: "" },
+  return buildPublicProductVisibilityWhere({
     ...(params.categoryIds && { categoryId: { in: params.categoryIds } }),
     ...(searchOr.length > 0 && { OR: searchOr }),
     ...(params.supportsPrinting && { supportsPrinting: true }),
@@ -252,7 +251,7 @@ export function buildPublicProductListingWhere(params: {
         some: PUBLIC_IN_STOCK_VARIANT_FILTER,
       },
     }),
-  };
+  });
 }
 
 /** Public product listing with optional category/search filter and pagination. */
@@ -323,12 +322,13 @@ export async function getProductsForPublicListing(params: {
 
 /** Lightweight counts for homepage marketplace strip. */
 export async function getPublicCatalogStats() {
+  const visibility = buildPublicProductVisibilityWhere();
   const [productCount, variantCount, categoryCount] = await Promise.all([
-    prisma.product.count({ where: { status: "ACTIVE", slug: { not: "" } } }),
+    prisma.product.count({ where: visibility }),
     prisma.productVariant.count({
-      where: { product: { status: "ACTIVE", slug: { not: "" } } },
+      where: { product: visibility },
     }),
-    prisma.category.count(),
+    prisma.category.count({ where: { isActive: true } }),
   ]);
   return { productCount, variantCount, categoryCount };
 }
@@ -366,12 +366,10 @@ export async function getRelatedProducts(
   limit = 4
 ) {
   return prisma.product.findMany({
-    where: {
+    where: buildPublicProductVisibilityWhere({
       categoryId,
       id: { not: excludeProductId },
-      status: "ACTIVE",
-      slug: { not: "" },
-    },
+    }),
     select: PUBLIC_PRODUCT_CARD_SELECT,
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -385,12 +383,10 @@ export async function getCrossSellProducts(
   limit = 4
 ) {
   return prisma.product.findMany({
-    where: {
+    where: buildPublicProductVisibilityWhere({
       id: { not: excludeProductId },
       categoryId: { not: excludeCategoryId },
-      status: "ACTIVE",
-      slug: { not: "" },
-    },
+    }),
     select: PUBLIC_PRODUCT_CARD_SELECT,
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -414,10 +410,9 @@ export async function getPublicProductsBySlugs(slugs: string[], limit = 12) {
   if (!normalized.length) return [];
 
   const products = await prisma.product.findMany({
-    where: {
+    where: buildPublicProductVisibilityWhere({
       slug: { in: normalized },
-      status: "ACTIVE",
-    },
+    }),
     select: PUBLIC_PRODUCT_CARD_SELECT,
   });
 
