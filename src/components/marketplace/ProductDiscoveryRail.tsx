@@ -40,7 +40,6 @@ export default function ProductDiscoveryRail({ id, title, description, products,
               moq={product.moq}
               leadTime={product.leadTime}
               compact
-              variant="catalog"
               salesBadges={product.salesBadges}
               availableColors={product.availableColors}
             />

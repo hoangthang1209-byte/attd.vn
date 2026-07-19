@@ -28,10 +28,11 @@ type ProductCardProps = {
   supportsPrinting?: boolean;
   supportsEmbroidery?: boolean;
   supportsOem?: boolean;
-  /** Compact image-first layout for marketplace grids */
+  /**
+   * Denser presentation used by homepage, catalog listings, and discovery rails.
+   * This is the canonical public Product Card look.
+   */
   compact?: boolean;
-  /** Catalog mode adds B2B sourcing metadata without changing homepage cards. */
-  variant?: "default" | "catalog";
   salesBadges?: PublicProductSalesBadge[];
   availableColors?: ProductCardColorSwatch[];
 };
@@ -55,7 +56,6 @@ export default function ProductCard({
   stockStatus,
   stockLabel,
   compact = false,
-  variant = "default",
   salesBadges = [],
   availableColors = [],
 }: ProductCardProps) {
@@ -65,14 +65,8 @@ export default function ProductCard({
 
   const stockColor = stockStatus ? (STOCK_COLORS[stockStatus] ?? "#6b7280") : undefined;
   const moqLabel = isPublicMoq(moq) ? formatProductCardMoq(moq) : null;
-  const isCatalog = variant === "catalog";
-  const normalizedCategory = category?.trim().toLocaleLowerCase("vi-VN");
-  const normalizedName = name.trim().toLocaleLowerCase("vi-VN");
-  const showCategory = Boolean(
-    category && (!isCatalog || normalizedCategory !== normalizedName),
-  );
-  const showB2bMeta = moqLabel || leadTime;
-  const showCatalogMeta = isCatalog && (moqLabel || leadTime);
+  const showCategory = Boolean(category?.trim());
+  const showB2bMeta = Boolean(moqLabel || leadTime);
 
   function openQuote(e: React.MouseEvent) {
     e.preventDefault();
@@ -80,7 +74,7 @@ export default function ProductCard({
     trackPdpQuoteClicked({
       product_id: id,
       product_slug: slug,
-      source: isCatalog ? "product_card_catalog" : "product_card",
+      source: "product_card",
     });
     setQuoteOpen(true);
   }
@@ -91,15 +85,7 @@ export default function ProductCard({
 
   return (
     <>
-      <article
-        className={[
-          "product-card",
-          compact ? "product-card--compact" : "",
-          isCatalog ? "product-card--catalog" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
+      <article className={["product-card", compact ? "product-card--compact" : ""].filter(Boolean).join(" ")}>
         <div className="product-card-media">
           <Link href={productHref} className="product-card-media-link">
             <ProductMediaFrame
@@ -112,7 +98,7 @@ export default function ProductCard({
             />
           </Link>
 
-          {!isCatalog && <ProductSalesBadgeOverlay badges={salesBadges} compact={compact} />}
+          <ProductSalesBadgeOverlay badges={salesBadges} compact={compact} />
 
           {stockLabel && stockStatus !== "IN_STOCK" && (
             <span className="product-card-stock-badge" style={{ background: stockColor }}>
@@ -133,22 +119,7 @@ export default function ProductCard({
             </Link>
           </h3>
 
-          {showCatalogMeta ? (
-            <div className="product-card-catalog-meta" aria-label="Thông tin nguồn hàng">
-              {moqLabel && (
-                <span className="product-card-catalog-meta__item">
-                  <span className="product-card-catalog-meta__label">MOQ</span>
-                  {moqLabel.replace(/^MOQ\s*/i, "")}
-                </span>
-              )}
-              {leadTime && (
-                <span className="product-card-catalog-meta__item">
-                  <span className="product-card-catalog-meta__label">Lead time</span>
-                  {leadTime}
-                </span>
-              )}
-            </div>
-          ) : showB2bMeta && (
+          {showB2bMeta && (
             <div className="product-card-b2b">
               {moqLabel && <span className="product-card-meta">{moqLabel}</span>}
               {leadTime && (
@@ -167,13 +138,13 @@ export default function ProductCard({
               onClick={openQuote}
               aria-label={`Yêu cầu báo giá cho ${name}`}
             >
-              {isCatalog ? "Yêu cầu báo giá" : "Liên hệ báo giá sỉ"}
+              Liên hệ báo giá sỉ
             </button>
             <Link
               href={productHref}
               className="product-card-link"
               onClick={() => {
-                trackViewProduct(isCatalog ? "product_card_catalog" : "product_card", {
+                trackViewProduct("product_card", {
                   product_id: id,
                   product_slug: slug,
                   destination_path: productHref,

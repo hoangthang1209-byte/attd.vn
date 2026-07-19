@@ -352,7 +352,6 @@ describe("product-card-color-swatches", () => {
       "utf8",
     );
     const leadTimeIdx = cardSource.indexOf("product-card-leadtime");
-    const catalogLeadIdx = cardSource.indexOf('product-card-catalog-meta__label">Lead time');
     const swatchIdx = cardSource.indexOf("<ProductCardColorSwatches colors={availableColors}");
     const contactIdx = cardSource.indexOf("product-card-footer");
     const lienHeIdx = cardSource.indexOf("Liên hệ báo giá sỉ");
@@ -365,8 +364,8 @@ describe("product-card-color-swatches", () => {
       "swatches must appear after lead-time row",
     );
     assert.ok(
-      catalogLeadIdx > 0 && swatchIdx > catalogLeadIdx,
-      "swatches must appear after catalog lead-time meta",
+      !cardSource.includes("product-card-catalog-meta"),
+      "catalog-only meta markup must not remain on the shared ProductCard",
     );
     assert.ok(
       !cardSource.includes("product-card-media") ||

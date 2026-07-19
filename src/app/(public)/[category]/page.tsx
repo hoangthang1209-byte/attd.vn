@@ -341,7 +341,7 @@ export default async function CategoryPage({ params }: PageProps) {
                     supportsPrinting={product.supportsPrinting}
                     supportsEmbroidery={product.supportsEmbroidery}
                     supportsOem={product.supportsOem}
-                    variant="catalog"
+                    compact
                     salesBadges={mapPublicProductCardSalesBadges(product)}
                     availableColors={mapProductCardAvailableColors(product)}
                   />
