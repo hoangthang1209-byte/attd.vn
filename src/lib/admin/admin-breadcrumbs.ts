@@ -379,6 +379,15 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/launch",
+    meta: {
+      breadcrumbs: ["Nội dung & Website", "Khởi động Content SEO"],
+      title: "Khởi động Content SEO",
+      description:
+        "Dashboard kích hoạt bài SEO đầu tiên trên quy trình Content đã hoàn thiện — không auto-publish.",
+    },
+  },
+  {
     path: "/admin/content/ai-retrieval",
     meta: {
       breadcrumbs: ["Nội dung & Website", "Kiểm tra ngữ cảnh AI"],

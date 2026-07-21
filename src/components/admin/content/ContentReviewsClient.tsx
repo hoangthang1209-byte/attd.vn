@@ -61,6 +61,8 @@ export default function ContentReviewsClient() {
       <h1 className="admin-page-title">Kiểm duyệt nội dung</h1>
       <p className="admin-field-hint">
         Review workspace cho Writing Draft — approve thủ công trước khi handoff Blog DRAFT.
+        Bài launch đầu tiên: xem thêm{" "}
+        <Link href="/admin/content/launch">Khởi động Content SEO</Link>.
       </p>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
