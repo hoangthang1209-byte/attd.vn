@@ -73,7 +73,8 @@ function AdminShellNav() {
             ...platform,
             items: platform.items.filter(
               (item) =>
-                item.status !== "hidden" &&
+                item.status === "active" &&
+                Boolean(item.href) &&
                 hasRequiredPermissions(permissions, item.requiredPermissions),
             ),
           }))
@@ -97,12 +98,12 @@ function AdminShellNav() {
             <span className={styles.sectionIcon} aria-hidden="true">{section.icon}</span>
             {section.label}
           </p>
-          {section.platforms.map((platform) => (
-            <div key={platform.label} className={styles.navGroup}>
-              <p className={styles.groupLabel}>{platform.label}</p>
+          {section.platforms.map((platform, platformIndex) => (
+            <div key={`${section.label}:${platform.label || platformIndex}`} className={styles.navGroup}>
+              {platform.label ? <p className={styles.groupLabel}>{platform.label}</p> : null}
               {platform.items.map((item) => (
                 <AdminNavItem
-                  key={item.href ?? `${platform.label}:${item.label}`}
+                  key={item.href ?? `${section.label}:${item.label}`}
                   item={item}
                   pathname={pathname}
                   searchParams={searchParams}
