@@ -23,10 +23,14 @@ const emptyForm = (): FormState => ({
   isActive: true,
 });
 
+export function buildMediaMasterDataItemPath(itemPathPrefix: string, id: string): string {
+  return `${itemPathPrefix.replace(/\/$/, "")}/${id}`;
+}
+
 type MediaMasterDataManagerProps = {
   kind: "library" | "role";
   listPath: string;
-  itemPath: (id: string) => string;
+  itemPathPrefix: string;
   listKey: "libraries" | "roles";
   createLabel: string;
   entityLabel: string;
@@ -35,7 +39,7 @@ type MediaMasterDataManagerProps = {
 export default function MediaMasterDataManager({
   kind,
   listPath,
-  itemPath,
+  itemPathPrefix,
   listKey,
   createLabel,
   entityLabel,
@@ -99,7 +103,9 @@ export default function MediaMasterDataManager({
         sortOrder: Number.parseInt(form.sortOrder, 10) || 0,
         isActive: form.isActive,
       };
-      const res = await fetch(editingId ? itemPath(editingId) : listPath, {
+      const res = await fetch(
+        editingId ? buildMediaMasterDataItemPath(itemPathPrefix, editingId) : listPath,
+        {
         method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
@@ -131,7 +137,9 @@ export default function MediaMasterDataManager({
     }
     if (!window.confirm(`Xóa ${entityLabel} "${row.name}"?`)) return;
     try {
-      const res = await fetch(itemPath(row.id), { method: "DELETE" });
+      const res = await fetch(buildMediaMasterDataItemPath(itemPathPrefix, row.id), {
+        method: "DELETE",
+      });
       const data = (await res.json()) as { message?: string };
       if (!res.ok) throw new Error(data.message ?? `Không thể xóa ${entityLabel}.`);
       toast.success(`Đã xóa ${entityLabel}.`);
@@ -143,7 +151,7 @@ export default function MediaMasterDataManager({
 
   async function toggleActive(row: MediaMasterDataRecord) {
     try {
-      const res = await fetch(itemPath(row.id), {
+      const res = await fetch(buildMediaMasterDataItemPath(itemPathPrefix, row.id), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !row.isActive }),

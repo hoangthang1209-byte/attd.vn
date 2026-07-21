@@ -8,7 +8,7 @@ export default function MediaLibrariesPage() {
       <MediaMasterDataManager
         kind="library"
         listPath="/api/content/media-libraries"
-        itemPath={(id) => `/api/content/media-libraries/${id}`}
+        itemPathPrefix="/api/content/media-libraries"
         listKey="libraries"
         createLabel="Thêm thư viện"
         entityLabel="thư viện ảnh"

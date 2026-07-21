@@ -8,7 +8,7 @@ export default function MediaRolesPage() {
       <MediaMasterDataManager
         kind="role"
         listPath="/api/content/media-roles"
-        itemPath={(id) => `/api/content/media-roles/${id}`}
+        itemPathPrefix="/api/content/media-roles"
         listKey="roles"
         createLabel="Thêm vai trò"
         entityLabel="vai trò hiển thị"
