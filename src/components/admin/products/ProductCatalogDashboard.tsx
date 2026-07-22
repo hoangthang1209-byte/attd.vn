@@ -18,6 +18,7 @@ import {
   type ProductReadinessBadge,
   type ProductReadinessFilter,
 } from "@/features/products/product-admin-readiness";
+import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 
 const SHOW_SAMPLE_DATA_BUTTON = process.env.NODE_ENV === "development";
 
@@ -606,6 +607,9 @@ export default function ProductCatalogDashboard() {
                       ? STOCK_STATUS_LABELS.LOW_STOCK
                       : STOCK_STATUS_LABELS.IN_STOCK;
 
+                const primaryThumb = getPublicMediaUrl(
+                  p.featuredImage ?? p.images[0]?.imageUrl ?? (p.gallery ?? [])[0] ?? null,
+                );
                 return (
                   <tr key={p.id} data-testid={`product-row-${p.id}`}>
                     <td>
@@ -618,12 +622,10 @@ export default function ProductCatalogDashboard() {
                     </td>
                     <td>
                       <div className="admin-catalog-product-name">
-                        {(p.featuredImage ?? p.images[0]?.imageUrl ?? (p.gallery ?? [])[0]) && (
+                        {primaryThumb && (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={
-                              p.featuredImage ?? p.images[0]?.imageUrl ?? (p.gallery ?? [])[0]
-                            }
+                            src={primaryThumb}
                             alt={p.name}
                             className="admin-catalog-thumb"
                           />
@@ -698,6 +700,14 @@ export default function ProductCatalogDashboard() {
                         >
                           {readiness.isReady ? "Sửa" : "Hoàn thiện"}
                         </Link>
+                        {readiness.hasBrokenImage && (
+                          <Link
+                            href={`/admin/products/${p.id}/edit#section-media`}
+                            className="admin-btn admin-btn--secondary admin-btn--xs product-admin-btn-row"
+                          >
+                            Sửa ảnh
+                          </Link>
+                        )}
                         <details className="product-admin-action-menu">
                           <summary className="admin-btn admin-btn--secondary admin-btn--xs product-admin-btn-row">
                             Thao tác

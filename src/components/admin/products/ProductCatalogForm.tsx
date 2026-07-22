@@ -84,6 +84,7 @@ import {
 } from "@/features/products/product-size-chart";
 import { validateProductCategorySelection } from "@/features/categories/category-cascade-utils";
 import { useAdminMutation } from "@/hooks/useAdminAction";
+import { classifyImageUrlDeterministic } from "@/features/products/product-image-health";
 import {
   SEO_PUBLISH_QUALITY_GATE_FAILED,
   SEO_PUBLISH_QUALITY_SUMMARY,
@@ -1036,6 +1037,17 @@ export default function ProductCatalogForm({
 
   const publicSlug = form.slug ?? "";
   const publicUrl = publicSlug ? `/san-pham/${publicSlug}` : null;
+  const featuredImageHealth = useMemo(
+    () => classifyImageUrlDeterministic(form.featuredImage),
+    [form.featuredImage],
+  );
+  const galleryImageIssues = useMemo(
+    () =>
+      form.gallery
+        .map((url, index) => ({ index, health: classifyImageUrlDeterministic(url) }))
+        .filter(({ health }) => health.status !== "MISSING" && health.status !== "UNKNOWN_UNCHECKED"),
+    [form.gallery],
+  );
 
   useEffect(() => {
     if (searchParams.get("generateVariants") !== "1") return;
@@ -1258,6 +1270,18 @@ export default function ProductCatalogForm({
         <div className="admin-catalog-media-grid">
           <div className="admin-field" data-field="featuredImage">
             <label className="admin-label">Ảnh đại diện</label>
+            {featuredImageHealth.status === "STALE_BLOB" && (
+              <p className="admin-kb-warning" role="alert">
+                Ảnh cũ từ Vercel Blob không còn tồn tại. Vui lòng chọn lại ảnh từ Media Library.
+              </p>
+            )}
+            {featuredImageHealth.status !== "MISSING" &&
+              featuredImageHealth.status !== "UNKNOWN_UNCHECKED" &&
+              featuredImageHealth.status !== "STALE_BLOB" && (
+                <p className="admin-kb-warning" role="alert">
+                  Ảnh hiện tại không hợp lệ hoặc không còn truy cập được. Vui lòng chọn lại ảnh từ Thư viện ảnh.
+                </p>
+              )}
             <div className="admin-catalog-media-inline">
               <MediaPicker
                 label="Ảnh đại diện"
@@ -1272,6 +1296,16 @@ export default function ProductCatalogForm({
                 onChange={(e) => setField("featuredImage", e.target.value)}
                 placeholder="URL ảnh hoặc chọn từ thư viện"
               />
+              {(featuredImageHealth.status !== "MISSING" &&
+                featuredImageHealth.status !== "UNKNOWN_UNCHECKED") && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  onClick={() => setField("featuredImage", "")}
+                >
+                  Chọn lại ảnh
+                </button>
+              )}
             </div>
             {fieldErrors.featuredImage && (
               <p className="admin-field-error" role="alert">{fieldErrors.featuredImage}</p>
@@ -1338,6 +1372,11 @@ export default function ProductCatalogForm({
             <p className="admin-field-hint admin-catalog-gallery-empty">Chưa có ảnh gallery.</p>
           ) : (
             <div className="admin-catalog-gallery-list">
+              {galleryImageIssues.length > 0 && (
+                <p className="admin-kb-warning" role="alert">
+                  Một số ảnh gallery không hợp lệ hoặc không còn truy cập được. Vui lòng chọn lại ảnh từ Media Library.
+                </p>
+              )}
               {form.gallery.map((url, idx) => (
                 <div key={idx} className="admin-catalog-gallery-row">
                   {url && (

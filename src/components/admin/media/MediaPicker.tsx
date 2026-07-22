@@ -414,7 +414,10 @@ export default function MediaPicker(props: Props) {
 
   function handleSingleSelect(asset: AssetRow) {
     const selectedUrl = getPublicMediaUrl(asset.url) ?? getPublicMediaUrl(asset);
-    if (!selectedUrl) return;
+    if (!selectedUrl) {
+      toast.error("Ảnh này chưa có URL public hợp lệ. Vui lòng tải lại ảnh hoặc chọn ảnh khác.");
+      return;
+    }
 
     if (isDev) {
       console.log("[MediaPicker] selected", selectedUrl);
@@ -480,6 +483,9 @@ export default function MediaPicker(props: Props) {
         ]);
         toast.success("Đã tải file lên.");
       } else {
+        if (res.ok && !uploadedUrl) {
+          toast.error("Ảnh này chưa có URL public hợp lệ. Vui lòng tải lại ảnh hoặc chọn ảnh khác.");
+        }
         setUploadQueue([
           {
             id,

@@ -71,6 +71,10 @@ describe("getPublicMediaUrl", () => {
     assert.equal(getPublicMediaUrl("javascript:alert(1)"), null);
     assert.equal(getPublicMediaUrl("blob:https://example.com/1"), null);
     assert.equal(getPublicMediaUrl("http://cdn.example.com/a.jpg"), null);
+    assert.equal(
+      getPublicMediaUrl("https://0iitstjrwqim8udr.public.blob.vercel-storage.com/products/a.png"),
+      null,
+    );
   });
 
   it("dedupes public URLs", () => {

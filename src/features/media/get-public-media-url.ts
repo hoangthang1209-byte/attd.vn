@@ -6,6 +6,7 @@ import { isPublishableLocalImagePath, isValidImageSrc } from "@/lib/imagePaths";
  */
 
 const UNSAFE_PROTOCOL = /^(javascript|data|vbscript|file|blob):/i;
+const VERCEL_BLOB_HOST_PATTERN = /(^|\.)blob\.vercel-storage\.com$/i;
 
 const BLOCKED_PATH_PREFIXES = ["/api/", "/admin/", "/quan-tri/"] as const;
 
@@ -35,6 +36,7 @@ function isLikelyPublicHttpsUrl(value: string): boolean {
     if (!url.hostname || url.hostname === "localhost" || url.hostname === "127.0.0.1") {
       return false;
     }
+    if (VERCEL_BLOB_HOST_PATTERN.test(url.hostname)) return false;
     if (isBlockedPublicPath(url.pathname)) return false;
     return true;
   } catch {

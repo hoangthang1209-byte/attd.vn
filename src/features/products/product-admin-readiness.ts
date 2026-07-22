@@ -4,8 +4,8 @@
 
 import {
   getPublicMediaUrl,
-  isBrokenPublicMediaReference,
 } from "@/features/media/get-public-media-url";
+import { classifyImageUrlDeterministic } from "@/features/products/product-image-health";
 
 export type ProductReadinessBadge =
   | "missing_image"
@@ -97,13 +97,22 @@ export function productHasMainImage(input: ProductReadinessInput): boolean {
   return collectRawImageUrls(input).some((url) => Boolean(getPublicMediaUrl(url)));
 }
 
+const BROKEN_IMAGE_STATUSES = new Set<string>([
+  "INVALID_URL",
+  "UNREACHABLE",
+  "STALE_BLOB",
+  "ADMIN_API_URL",
+  "NON_CANONICAL",
+]);
+
 export function productHasBrokenImageReference(input: ProductReadinessInput): boolean {
-  const raw = collectRawImageUrls(input);
-  if (!raw.some((url) => Boolean(url?.trim()))) return false;
-  // Broken when at least one non-empty raw URL fails canonical public checks,
-  // or every raw URL is unusable for public rendering.
-  if (raw.some((url) => isBrokenPublicMediaReference(url))) return true;
-  return !productHasMainImage(input) && raw.some((url) => Boolean(url?.trim()));
+  const nonEmpty = collectRawImageUrls(input).filter((url) => Boolean(url?.trim()));
+  if (!nonEmpty.length) return false;
+  // Deterministic only — no remote HEAD checks on list render.
+  if (nonEmpty.some((url) => BROKEN_IMAGE_STATUSES.has(classifyImageUrlDeterministic(url).status))) {
+    return true;
+  }
+  return !productHasMainImage(input);
 }
 
 export function productHasPriceData(input: ProductReadinessInput): boolean {

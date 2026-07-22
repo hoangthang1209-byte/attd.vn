@@ -22,6 +22,14 @@ describe("product admin list readiness UX", () => {
     assert.match(dashboard, /Thiếu ảnh|missing_image/);
   });
 
+  it("surfaces Ảnh lỗi badge/filter and Sửa ảnh action without remote checks", () => {
+    assert.match(dashboard, /broken_image/);
+    assert.match(dashboard, /Sửa ảnh/);
+    assert.match(dashboard, /#section-media/);
+    assert.match(dashboard, /getPublicMediaUrl/);
+    assert.doesNotMatch(dashboard, /checkRemote|probeImageReachability|fetch\(.*HEAD/);
+  });
+
   it("keeps existing search/category/status filters", () => {
     assert.match(dashboard, /Tìm tên sản phẩm, mã hàng, SKU/);
     assert.match(dashboard, /Tất cả danh mục/);

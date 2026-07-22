@@ -6,6 +6,7 @@ import {
   validateVariantPriceFields,
 } from "@/features/products/product-foundation-validation";
 import { isValidProductImageUrl, PRODUCT_IMAGE_URL_ERROR } from "@/features/products/product-image-url";
+import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 import {
   validateCuratedSalesBadgeKeys,
   type ProductCuratedBadgeKey,
@@ -87,7 +88,12 @@ export function normalizeImageUrl(
     fieldErrors[field] = PRODUCT_IMAGE_URL_ERROR;
     return optional ? null : undefined;
   }
-  return trimmed;
+  const canonical = getPublicMediaUrl(trimmed);
+  if (!canonical) {
+    fieldErrors[field] = PRODUCT_IMAGE_URL_ERROR;
+    return optional ? null : undefined;
+  }
+  return canonical;
 }
 
 export function parseOptionalInt(
@@ -390,7 +396,7 @@ export function parseProductInput(
               attributeValueId: v.attributeValueId ? String(v.attributeValueId) : undefined,
               label: String(v.label ?? "").trim(),
               valueCode: v.valueCode ? String(v.valueCode).trim() : undefined,
-              imageUrl: v.imageUrl ? String(v.imageUrl).trim() : undefined,
+              imageUrl: normalizeImageUrl(v.imageUrl, `options.${index}.values.${valIndex}.imageUrl`, fieldErrors),
               sortOrder: typeof v.sortOrder === "number" ? v.sortOrder : valIndex,
             };
           }).filter((v) => v.label)

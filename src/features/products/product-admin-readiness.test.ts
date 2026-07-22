@@ -41,6 +41,29 @@ describe("evaluateProductReadiness", () => {
     assert.equal(result.isReady, false);
   });
 
+  it("flags stale blob / invalid image as broken_image and not ready", () => {
+    const result = evaluateProductReadiness({
+      ...readyBase,
+      featuredImage:
+        "https://0iitstjrwqim8udr.public.blob.vercel-storage.com/products/dead.png",
+    });
+    assert.equal(result.hasImage, false);
+    assert.equal(result.hasBrokenImage, true);
+    assert.ok(result.badges.includes("broken_image"));
+    assert.equal(result.isReady, false);
+    assert.ok(!result.badges.includes("ready"));
+  });
+
+  it("does not treat empty gallery slot as broken when featured image is valid", () => {
+    const result = evaluateProductReadiness({
+      ...readyBase,
+      featuredImage: "https://cdn.example.com/a.jpg",
+      gallery: [""],
+    });
+    assert.equal(result.hasBrokenImage, false);
+    assert.equal(result.isReady, true);
+  });
+
   it("flags missing variants", () => {
     const result = evaluateProductReadiness({
       ...readyBase,
@@ -97,6 +120,15 @@ describe("productMatchesReadinessFilter", () => {
     assert.equal(productMatchesReadinessFilter(missingImage, "ready"), false);
     assert.equal(productMatchesReadinessFilter(missingImage, "missing_image"), true);
     assert.equal(productMatchesReadinessFilter(ready, "all"), true);
+  });
+
+  it("filters broken_image rows (Ảnh lỗi)", () => {
+    const broken = evaluateProductReadiness({
+      ...readyBase,
+      featuredImage: "/api/media/private.jpg",
+    });
+    assert.equal(productMatchesReadinessFilter(broken, "broken_image"), true);
+    assert.equal(productMatchesReadinessFilter(evaluateProductReadiness(readyBase), "broken_image"), false);
   });
 });
 
