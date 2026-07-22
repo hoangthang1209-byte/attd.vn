@@ -7,7 +7,10 @@ import {
   isReservedStaticPublicSlug,
   normalizeCategorySlug,
 } from "@/lib/seo/indexable-category-routes";
-import { buildPublicProductVisibilityWhere } from "@/features/products/product-public-visibility";
+import {
+  buildPublicProductVisibilityWhere,
+  isDemoOrSampleProductMetadata,
+} from "@/features/products/product-public-visibility";
 
 /** True when the slug is a non-empty, non-whitespace string. */
 function isValidSlug(slug: string | null | undefined): slug is string {
@@ -62,7 +65,7 @@ async function loadDynamicSitemapData(): Promise<DynamicSitemapData> {
       }),
       prisma.product.findMany({
         where: buildPublicProductVisibilityWhere(),
-        select: { slug: true, updatedAt: true },
+        select: { slug: true, updatedAt: true, metadata: true },
         orderBy: { updatedAt: "desc" },
       }),
       prisma.blogPost.findMany({
@@ -79,7 +82,7 @@ async function loadDynamicSitemapData(): Promise<DynamicSitemapData> {
 
     return {
       categories,
-      products,
+      products: products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata)),
       posts: blogPosts.length > 0 ? blogPosts : legacyPosts,
     };
   } catch (error) {

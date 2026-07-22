@@ -1,5 +1,4 @@
 import type { Prisma, ProductStatus } from "@prisma/client";
-import { Prisma as PrismaNamespace } from "@prisma/client";
 
 /** Canonical statuses that must never appear on public web surfaces. */
 export const NON_PUBLIC_PRODUCT_STATUSES: ProductStatus[] = [
@@ -9,12 +8,23 @@ export const NON_PUBLIC_PRODUCT_STATUSES: ProductStatus[] = [
 ];
 
 /**
- * Shared public catalog visibility rules.
- * A product is public only when ACTIVE, has a usable slug, belongs to an active
- * category, and is not marked demo/sample in metadata.
+ * Shared public catalog visibility rules (Prisma `where`).
  *
- * Important: null/missing metadata must remain public. Prisma JSON path `NOT`
- * filters exclude DbNull rows, so we explicitly allow null metadata.
+ * Canonical public visibility:
+ * - status ACTIVE
+ * - non-empty slug
+ * - category isActive
+ *
+ * Explicitly NOT part of public visibility:
+ * - admin readiness (missing image/price/SEO/stock)
+ * - image-health / broken image URLs
+ *
+ * Demo/sample metadata exclusion:
+ * Do NOT encode demo exclusion as Prisma JSON `NOT { path: ["isDemo"], equals: true }`.
+ * On PostgreSQL that filter treats missing JSON keys as UNKNOWN and falsely excludes
+ * legitimate ACTIVE products that only have other metadata (e.g. curatedSalesBadges).
+ * Use {@link isDemoOrSampleProductMetadata} / {@link shouldHideProductFromPublic}
+ * after fetch instead. Demo products remain ARCHIVED by policy.
  */
 export function buildPublicProductVisibilityWhere(
   extra: Prisma.ProductWhereInput = {},
@@ -23,27 +33,6 @@ export function buildPublicProductVisibilityWhere(
     status: "ACTIVE",
     slug: { not: "" },
     category: { isActive: true },
-    AND: [
-      {
-        OR: [
-          { metadata: { equals: PrismaNamespace.DbNull } },
-          {
-            AND: [
-              { metadata: { not: PrismaNamespace.JsonNull } },
-              { metadata: { not: PrismaNamespace.DbNull } },
-              {
-                NOT: {
-                  OR: [
-                    { metadata: { path: ["isDemo"], equals: true } },
-                    { metadata: { path: ["sampleData"], equals: true } },
-                  ],
-                },
-              },
-            ],
-          },
-        ],
-      },
-    ],
     ...extra,
   };
 }
@@ -69,6 +58,21 @@ export function isDemoOrSampleProductMetadata(metadata: unknown): boolean {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return false;
   const record = metadata as Record<string, unknown>;
   return record.isDemo === true || record.sampleData === true;
+}
+
+/** Post-query guard for rows already filtered by {@link buildPublicProductVisibilityWhere}. */
+export function isPublicVisibleProductRow(input: {
+  status?: ProductStatus | string | null;
+  slug?: string | null;
+  metadata?: unknown;
+  categoryIsActive?: boolean | null;
+}): boolean {
+  return !shouldHideProductFromPublic({
+    status: input.status ?? "ACTIVE",
+    slug: input.slug,
+    categoryIsActive: input.categoryIsActive ?? true,
+    metadata: input.metadata,
+  });
 }
 
 export function planBulkPublicRevalidationPaths(input: {

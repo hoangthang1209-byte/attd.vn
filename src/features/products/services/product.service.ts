@@ -13,7 +13,11 @@ import {
 } from "@/features/products/product-detail-compat";
 import { PUBLIC_IN_STOCK_VARIANT_FILTER } from "@/features/products/product-foundation-validation";
 import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
-import { buildPublicProductVisibilityWhere } from "@/features/products/product-public-visibility";
+import {
+  buildPublicProductVisibilityWhere,
+  isDemoOrSampleProductMetadata,
+  isPublicVisibleProductRow,
+} from "@/features/products/product-public-visibility";
 import {
   extractMediaIdsFromDescriptionBlocks,
   hydratePublicDescriptionBlocks,
@@ -110,7 +114,10 @@ export async function getProductDetailBySlug(slug: string): Promise<PublicProduc
       where: buildPublicProductVisibilityWhere({ slug }),
       include: PRODUCT_DETAIL_INCLUDE,
     });
-    if (!product) return null;
+    // Demo/sample exclusion is post-query: Prisma JSON NOT(path=true) falsely 404s
+    // real ACTIVE products that only have non-demo metadata (e.g. curatedSalesBadges).
+    // Readiness/image-health must never gate public PDP visibility.
+    if (!product || isDemoOrSampleProductMetadata(product.metadata)) return null;
     return await mapFetchedProductToPublicDetail(product);
   } catch (error) {
     if (!isPartialCatalogSchemaError(error)) {
@@ -127,7 +134,7 @@ export async function getProductDetailBySlug(slug: string): Promise<PublicProduc
         where: buildPublicProductVisibilityWhere({ slug }),
         select: PRODUCT_DETAIL_LEGACY_SELECT,
       });
-      if (!legacy) return null;
+      if (!legacy || isDemoOrSampleProductMetadata(legacy.metadata)) return null;
       return await mapFetchedProductToPublicDetail(normalizeLegacyProductRow(legacy));
     } catch (legacyError) {
       console.error("[pdp] getProductDetailBySlug legacy fallback failed", {
@@ -154,7 +161,7 @@ export async function getProducts() {
 }
 
 export async function getProductBySlug(slug: string) {
-  return prisma.product.findFirst({
+  const product = await prisma.product.findFirst({
     where: buildPublicProductVisibilityWhere({ slug }),
     include: {
       category: true,
@@ -180,6 +187,13 @@ export async function getProductBySlug(slug: string) {
       },
     },
   });
+  if (!product || !isPublicVisibleProductRow({
+    status: product.status,
+    slug: product.slug,
+    metadata: product.metadata,
+    categoryIsActive: product.category?.isActive,
+  })) return null;
+  return product;
 }
 
 export async function getProductById(id: string) {
@@ -317,7 +331,11 @@ export async function getProductsForPublicListing(params: {
     prisma.product.count({ where }),
   ]);
 
-  return { products, total, page, perPage };
+  // Defense-in-depth: never expose ACTIVE demo/sample rows if any exist.
+  const publicProducts = products.filter(
+    (product) => !isDemoOrSampleProductMetadata(product.metadata),
+  );
+  return { products: publicProducts, total, page, perPage };
 }
 
 /** Lightweight counts for homepage marketplace strip. */
@@ -365,7 +383,7 @@ export async function getRelatedProducts(
   excludeProductId: string,
   limit = 4
 ) {
-  return prisma.product.findMany({
+  const products = await prisma.product.findMany({
     where: buildPublicProductVisibilityWhere({
       categoryId,
       id: { not: excludeProductId },
@@ -374,6 +392,7 @@ export async function getRelatedProducts(
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+  return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
 }
 
 /** Cross-sell products from other categories for product detail recommendations. */
@@ -382,7 +401,7 @@ export async function getCrossSellProducts(
   excludeCategoryId: string,
   limit = 4
 ) {
-  return prisma.product.findMany({
+  const products = await prisma.product.findMany({
     where: buildPublicProductVisibilityWhere({
       id: { not: excludeProductId },
       categoryId: { not: excludeCategoryId },
@@ -391,6 +410,7 @@ export async function getCrossSellProducts(
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+  return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
 }
 
 export async function getPublicProductsBySlugs(slugs: string[], limit = 12) {
@@ -416,7 +436,11 @@ export async function getPublicProductsBySlugs(slugs: string[], limit = 12) {
     select: PUBLIC_PRODUCT_CARD_SELECT,
   });
 
-  const bySlug = new Map(products.map((product) => [product.slug, product]));
+  const bySlug = new Map(
+    products
+      .filter((product) => !isDemoOrSampleProductMetadata(product.metadata))
+      .map((product) => [product.slug, product]),
+  );
   return normalized.flatMap((slug) => {
     const product = bySlug.get(slug);
     return product ? [product] : [];

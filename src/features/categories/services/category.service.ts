@@ -7,7 +7,7 @@ import {
   loadCategoryVisibilityNodes,
 } from "@/features/categories/category-public-visibility";
 import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
-import { buildPublicProductVisibilityWhere } from "@/features/products/product-public-visibility";
+import { buildPublicProductVisibilityWhere, isDemoOrSampleProductMetadata } from "@/features/products/product-public-visibility";
 
 export async function getCategories() {
   return prisma.category.findMany({
@@ -288,7 +288,7 @@ export async function getCategoryBySlug(slug: string) {
   const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
   if (!accessible) return null;
 
-  return prisma.category.findUnique({
+  const category = await prisma.category.findUnique({
     where: { slug },
     include: {
       products: {
@@ -312,4 +312,11 @@ export async function getCategoryBySlug(slug: string) {
       },
     },
   });
+  if (!category) return null;
+  return {
+    ...category,
+    products: category.products.filter(
+      (product) => !isDemoOrSampleProductMetadata(product.metadata),
+    ),
+  };
 }
