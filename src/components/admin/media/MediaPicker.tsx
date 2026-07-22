@@ -17,6 +17,7 @@ import { CardGridLoading, ButtonLoading } from "@/components/ui/loading/ContextL
 import { useAdminToast } from "@/hooks/useAdminToast";
 import { ALLOWED_IMAGE_EXTENSIONS, inferImageMimeType } from "@/lib/imageValidation";
 import type { StorageFolderKey } from "@/lib/storage/types";
+import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 const WARN_FILE_SIZE = 500 * 1024;
@@ -93,7 +94,14 @@ function normalizeMediaResponse(data: unknown): RawMediaItem[] {
 }
 
 function getAssetSelectableUrl(raw: RawMediaItem): string | null {
-  return pickString(raw, ["url", "imageUrl", "secureUrl", "secure_url", "image_url"]);
+  return getPublicMediaUrl({
+    url: pickString(raw, ["url"]),
+    publicUrl: pickString(raw, ["publicUrl", "public_url"]),
+    fileUrl: pickString(raw, ["fileUrl", "file_url"]),
+    secureUrl: pickString(raw, ["secureUrl", "secure_url"]),
+    imageUrl: pickString(raw, ["imageUrl", "image_url"]),
+    thumbnailUrl: pickString(raw, ["thumbnailUrl", "thumbnail_url", "thumbUrl"]),
+  });
 }
 
 function getAssetThumbnailUrl(raw: RawMediaItem, selectUrl: string): string {
@@ -405,7 +413,7 @@ export default function MediaPicker(props: Props) {
   }
 
   function handleSingleSelect(asset: AssetRow) {
-    const selectedUrl = asset.url;
+    const selectedUrl = getPublicMediaUrl(asset.url) ?? getPublicMediaUrl(asset);
     if (!selectedUrl) return;
 
     if (isDev) {
@@ -498,16 +506,22 @@ export default function MediaPicker(props: Props) {
   }
 
   function toggleChecked(url: string) {
+    const canonical = getPublicMediaUrl(url);
+    if (!canonical) return;
     setChecked((prev) => {
       const next = new Set(prev);
-      if (next.has(url)) next.delete(url);
-      else next.add(url);
+      if (next.has(canonical)) next.delete(canonical);
+      else next.add(canonical);
       return next;
     });
   }
 
   function confirmMulti() {
-    (props as MultiProps).onAdd(Array.from(checked));
+    const urls = Array.from(checked)
+      .map((url) => getPublicMediaUrl(url))
+      .filter((url): url is string => Boolean(url));
+    if (!urls.length) return;
+    (props as MultiProps).onAdd(urls);
     setOpen(false);
   }
 

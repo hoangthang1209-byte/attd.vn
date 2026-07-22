@@ -1,6 +1,9 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import ImagePlaceholder from "@/components/public/ImagePlaceholder";
-import { isValidImageSrc } from "@/lib/imagePaths";
+import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 
 type ProductMediaFrameProps = {
   imageUrl?: string | null;
@@ -16,6 +19,7 @@ type ProductMediaFrameProps = {
 /**
  * Square 1:1 public product media canvas — object-fit contain, neutral surface.
  * Used on product cards and anywhere a consistent marketplace product frame is needed.
+ * Invalid or runtime-failing URLs fall back to ImagePlaceholder (no broken <img>).
  */
 export default function ProductMediaFrame({
   imageUrl,
@@ -27,12 +31,17 @@ export default function ProductMediaFrame({
   className = "",
   placeholderCompact = false,
 }: ProductMediaFrameProps) {
-  const hasImage = imageUrl && isValidImageSrc(imageUrl);
+  const resolvedPrimary = getPublicMediaUrl(imageUrl);
+  const resolvedHover = getPublicMediaUrl(hoverImageUrl);
+  const [primaryFailed, setPrimaryFailed] = useState(false);
+  const [hoverFailed, setHoverFailed] = useState(false);
+
+  const hasImage = Boolean(resolvedPrimary) && !primaryFailed;
   const hasHover =
     hasImage &&
-    hoverImageUrl &&
-    isValidImageSrc(hoverImageUrl) &&
-    hoverImageUrl.trim() !== imageUrl.trim();
+    Boolean(resolvedHover) &&
+    !hoverFailed &&
+    resolvedHover !== resolvedPrimary;
 
   return (
     <div
@@ -40,24 +49,26 @@ export default function ProductMediaFrame({
         className ? ` ${className}` : ""
       }`}
     >
-      {hasImage ? (
+      {hasImage && resolvedPrimary ? (
         <>
           <Image
-            src={imageUrl}
+            src={resolvedPrimary}
             alt={alt}
             fill
             className="product-media-frame__img product-media-frame__img--primary"
             sizes={sizes}
             priority={priority}
+            onError={() => setPrimaryFailed(true)}
           />
-          {hasHover ? (
+          {hasHover && resolvedHover ? (
             <Image
-              src={hoverImageUrl}
+              src={resolvedHover}
               alt=""
               fill
               aria-hidden="true"
               className="product-media-frame__img product-media-frame__img--hover"
               sizes={sizes}
+              onError={() => setHoverFailed(true)}
             />
           ) : null}
         </>

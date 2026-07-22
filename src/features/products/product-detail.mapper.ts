@@ -1,3 +1,4 @@
+import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 import { buildProductImages } from "@/lib/productImages";
 import {
   buildPdpGalleryAllowlist,
@@ -165,7 +166,7 @@ function buildLegacyOptionGroups(variants: DbVariant[]): ProductOptionGroup[] {
       label: name,
       valueCode: v.colorCode ?? prev?.valueCode ?? null,
       swatchHex: mapPublicSwatchHex(null, v.color?.hex) ?? prev?.swatchHex ?? null,
-      imageUrl: v.imageUrl ?? prev?.imageUrl ?? null,
+      imageUrl: getPublicMediaUrl(v.imageUrl) ?? prev?.imageUrl ?? null,
     });
   }
   if (colorMap.size > 0) {
@@ -246,7 +247,7 @@ function mapStructuredOptionGroups(options: DbOption[]): ProductOptionGroup[] {
           valueCode: val.valueCode,
           // Appearance: AttributeValue.hexCode only — never invent from labels/valueCode.
           swatchHex: mapPublicSwatchHex(val.attributeValue?.hexCode),
-          imageUrl: val.imageUrl,
+          imageUrl: getPublicMediaUrl(val.imageUrl),
           sortOrder: val.sortOrder,
         })),
     }));
@@ -289,7 +290,7 @@ function mapVariant(
     capacity: v.capacity,
     stockStatus: v.stockStatus,
     stockQty: v.stockQty,
-    imageUrl: v.imageUrl,
+    imageUrl: getPublicMediaUrl(v.imageUrl),
     moq: v.moqOverride ?? productMoq,
     leadTime: v.leadTimeOverride ?? productLeadTime,
     material: v.materialOverride ?? productMaterial,

@@ -1,4 +1,4 @@
-import { isValidImageSrc } from "@/lib/imagePaths";
+import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 import type { ProductImageRecord } from "@/lib/productImages";
 
 /** URLs explicitly attached to this product record (gallery). */
@@ -7,9 +7,8 @@ export function buildProductImageUrlSet(
 ): ReadonlySet<string> {
   const set = new Set<string>();
   for (const img of images) {
-    if (img.imageUrl && isValidImageSrc(img.imageUrl)) {
-      set.add(img.imageUrl);
-    }
+    const url = getPublicMediaUrl(img.imageUrl);
+    if (url) set.add(url);
   }
   return set;
 }
@@ -30,9 +29,8 @@ function addValidatedUrls(
 ): void {
   if (!urls) return;
   for (const url of urls) {
-    if (url && isValidImageSrc(url)) {
-      set.add(url.trim());
-    }
+    const resolved = getPublicMediaUrl(url);
+    if (resolved) set.add(resolved);
   }
 }
 
@@ -40,14 +38,12 @@ function addValidatedUrls(
 export function buildPdpImageAllowlist(input: AllowlistInput): ReadonlySet<string> {
   const set = new Set(buildProductImageUrlSet(input.images));
 
-  if (input.featuredImage && isValidImageSrc(input.featuredImage)) {
-    set.add(input.featuredImage.trim());
-  }
+  const featured = getPublicMediaUrl(input.featuredImage);
+  if (featured) set.add(featured);
 
   for (const url of input.gallery ?? []) {
-    if (url && isValidImageSrc(url)) {
-      set.add(url.trim());
-    }
+    const resolved = getPublicMediaUrl(url);
+    if (resolved) set.add(resolved);
   }
 
   addValidatedUrls(set, input.variantImageUrls);
@@ -68,9 +64,13 @@ export function filterProductGalleryImages(
   images: ProductImageRecord[],
   allowlist: ReadonlySet<string>,
 ): ProductImageRecord[] {
-  return images.filter(
-    (img) => img.imageUrl && isValidImageSrc(img.imageUrl) && allowlist.has(img.imageUrl),
-  );
+  return images
+    .map((img) => {
+      const imageUrl = getPublicMediaUrl(img.imageUrl);
+      if (!imageUrl || !allowlist.has(imageUrl)) return null;
+      return { ...img, imageUrl };
+    })
+    .filter((img): img is ProductImageRecord => Boolean(img));
 }
 
 /** Variant/option images must belong to this product's allowlist. */
@@ -78,13 +78,16 @@ export function isProductScopedImageUrl(
   url: string | null | undefined,
   allowedUrls: ReadonlySet<string>,
 ): boolean {
-  if (!url || !isValidImageSrc(url)) return false;
-  return allowedUrls.has(url.trim());
+  const resolved = getPublicMediaUrl(url);
+  if (!resolved) return false;
+  return allowedUrls.has(resolved);
 }
 
 export function acceptProductScopedImageUrl(
   url: string | null | undefined,
   allowedUrls: ReadonlySet<string>,
 ): string | null {
-  return isProductScopedImageUrl(url, allowedUrls) ? url!.trim() : null;
+  const resolved = getPublicMediaUrl(url);
+  if (!resolved || !allowedUrls.has(resolved)) return null;
+  return resolved;
 }

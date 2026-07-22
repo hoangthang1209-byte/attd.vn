@@ -8,6 +8,7 @@ import {
   isAcceptableAspectRatio,
   type UploadFolder,
 } from "@/lib/imagePaths";
+import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 
 export type ProductImageRecord = {
   id?: string;
@@ -29,9 +30,13 @@ export function sortProductImages(
 export function getProductGalleryImages(
   images: ProductImageRecord[]
 ): ProductImageRecord[] {
-  return sortProductImages(images).filter((img) =>
-    isValidImageSrc(img.imageUrl)
-  );
+  return sortProductImages(images)
+    .map((img) => {
+      const imageUrl = getPublicMediaUrl(img.imageUrl);
+      if (!imageUrl) return null;
+      return { ...img, imageUrl };
+    })
+    .filter((img): img is ProductImageRecord => Boolean(img));
 }
 
 /** Primary (first valid) product image URL, or null for fallback placeholder. */
@@ -83,15 +88,17 @@ export function buildProductImages(
   if (legacyImages.length > 0) return legacyImages;
 
   const result: ProductImageRecord[] = [];
-  if (product.featuredImage && isValidImageSrc(product.featuredImage as string)) {
-    result.push({ id: "featured", imageUrl: product.featuredImage as string, altText: null, sortOrder: 0 });
+  const featured = getPublicMediaUrl(product.featuredImage);
+  if (featured) {
+    result.push({ id: "featured", imageUrl: featured, altText: null, sortOrder: 0 });
   }
-  const gallery = Array.isArray(product.gallery) ? product.gallery as string[] : [];
+  const gallery = Array.isArray(product.gallery) ? (product.gallery as string[]) : [];
+  const seen = new Set(featured ? [featured] : []);
   for (let i = 0; i < gallery.length; i++) {
-    const url = gallery[i];
-    if (url && isValidImageSrc(url)) {
-      result.push({ id: `gallery-${i}`, imageUrl: url, altText: null, sortOrder: i + 1 });
-    }
+    const url = getPublicMediaUrl(gallery[i]);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    result.push({ id: `gallery-${i}`, imageUrl: url, altText: null, sortOrder: i + 1 });
   }
   return result;
 }
@@ -114,20 +121,15 @@ export function getProductCardHoverImageUrl(
 ): string | null {
   const gallery = getProductGalleryImages(images);
   const primary =
-    primaryImageUrl && isValidImageSrc(primaryImageUrl)
-      ? primaryImageUrl.trim()
-      : (gallery[0]?.imageUrl ?? null);
+    getPublicMediaUrl(primaryImageUrl) ?? gallery[0]?.imageUrl ?? null;
   if (!primary) return null;
 
-  const normalizedPrimary = primary.trim();
-  const primaryIndex = gallery.findIndex(
-    (img) => img.imageUrl.trim() === normalizedPrimary,
-  );
+  const primaryIndex = gallery.findIndex((img) => img.imageUrl === primary);
   const startIndex = primaryIndex >= 0 ? primaryIndex + 1 : 1;
 
   for (let i = startIndex; i < gallery.length; i++) {
-    const candidate = gallery[i]!.imageUrl.trim();
-    if (candidate !== normalizedPrimary) return candidate;
+    const candidate = gallery[i]!.imageUrl;
+    if (candidate !== primary) return candidate;
   }
   return null;
 }

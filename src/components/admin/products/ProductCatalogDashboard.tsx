@@ -87,6 +87,7 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
 const READINESS_BADGE_CLASS: Record<ProductReadinessBadge, string> = {
   ready: "admin-product-readiness-badge admin-product-readiness-badge--ready",
   missing_image: "admin-product-readiness-badge admin-product-readiness-badge--warn",
+  broken_image: "admin-product-readiness-badge admin-product-readiness-badge--warn",
   missing_price: "admin-product-readiness-badge admin-product-readiness-badge--warn",
   missing_variants: "admin-product-readiness-badge admin-product-readiness-badge--warn",
   missing_stock: "admin-product-readiness-badge admin-product-readiness-badge--warn",
