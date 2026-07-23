@@ -167,19 +167,14 @@ export default function OrderListManager() {
 
   return (
     <div className="order-ops-dashboard">
-      <header className="order-ops-header">
-        <div>
-          <h1 className="order-ops-header__title">Đơn hàng</h1>
-          <p className="order-ops-header__subtitle">
-            Quản lý trạng thái vận hành, thanh toán và tiến độ đơn hàng
-          </p>
-        </div>
-        {canCreateOrders && (
+      {canCreateOrders ? (
+        <header className="order-ops-header">
+          <div />
           <Link href="/admin/orders/new" className="admin-btn admin-btn--primary">
             + Tạo đơn hàng
           </Link>
-        )}
-      </header>
+        </header>
+      ) : null}
 
       {summary && (
         <div className="order-ops-kpi-grid">

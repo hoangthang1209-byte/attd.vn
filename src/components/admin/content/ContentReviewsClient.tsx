@@ -58,7 +58,6 @@ export default function ContentReviewsClient() {
 
   return (
     <div className="admin-page">
-      <h1 className="admin-page-title">Kiểm duyệt nội dung</h1>
       <p className="admin-field-hint">
         Review workspace cho Writing Draft — approve thủ công trước khi handoff Blog DRAFT.
         Bài launch đầu tiên: xem thêm{" "}

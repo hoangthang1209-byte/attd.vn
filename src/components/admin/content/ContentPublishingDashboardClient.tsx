@@ -57,7 +57,6 @@ export default function ContentPublishingDashboardClient() {
 
   return (
     <div className="admin-page">
-      <h1 className="admin-page-title">Xuất bản nội dung</h1>
       <p className="admin-field-hint">
         Queue publish/schedule/fail. Không auto-publish từ AI.{" "}
         <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void load()}>

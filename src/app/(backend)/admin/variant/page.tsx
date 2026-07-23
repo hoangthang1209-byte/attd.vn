@@ -9,8 +9,6 @@ export default async function VariantPage() {
 
   return (
     <div>
-      <h1>Quản lý SKU</h1>
-
       <VariantForm
         products={products}
         colors={colors}

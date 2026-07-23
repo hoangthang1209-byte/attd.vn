@@ -107,7 +107,7 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
       <p className="admin-field-hint">
         <Link href="/admin/content/reviews">← Danh sách</Link>
       </p>
-      <h1 className="admin-page-title">Review {session.id.slice(0, 8)}…</h1>
+      <h2 className="admin-page-title">Review {session.id.slice(0, 8)}…</h2>
       <p className="admin-field-hint">
         Status: <strong>{session.status}</strong> · Draft v{session.writingDraftVersion} · readiness{" "}
         {readiness.score} · sections {readiness.sectionSummary.approved}/{readiness.sectionSummary.total}
