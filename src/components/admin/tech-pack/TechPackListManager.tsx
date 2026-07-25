@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AdminLoadingState,
   AdminPageShell,
+  DataToolbar,
   EmptyState,
   PageHeader,
 } from "@/components/admin/AdminUi";
@@ -132,14 +133,20 @@ export default function TechPackListManager() {
         }
       />
 
-      <div className="admin-data-toolbar" style={{ gap: 12, display: "flex", flexWrap: "wrap", marginBottom: 16 }}>
+      <DataToolbar data-testid="tech-pack-workspace-toolbar" style={{ marginBottom: 16 }}>
         <input
-          className="admin-input"
+          className="admin-input admin-data-toolbar__search"
           placeholder="Tìm mã Tech Pack, đơn hàng, sản phẩm, rập…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void load()}
         />
+        <select className="admin-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="">Tất cả trạng thái</option>
+          <option value="DRAFT">Bản nháp</option>
+          <option value="RELEASED">Đã phát hành</option>
+          <option value="SUPERSEDED">Bị thay thế</option>
+        </select>
         <div className="prod-plan-chips" style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {QUICK_FILTERS.map((f) => (
             <button
@@ -152,16 +159,10 @@ export default function TechPackListManager() {
             </button>
           ))}
         </div>
-        <select className="admin-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          <option value="DRAFT">Bản nháp</option>
-          <option value="RELEASED">Đã phát hành</option>
-          <option value="SUPERSEDED">Bị thay thế</option>
-        </select>
-        <button type="button" className="admin-btn" onClick={() => void load()}>
+        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
           Lọc
         </button>
-      </div>
+      </DataToolbar>
 
       {error && <p className="admin-error">{error}</p>}
       {loading ? (

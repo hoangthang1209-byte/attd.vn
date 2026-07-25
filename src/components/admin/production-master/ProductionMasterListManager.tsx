@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AdminLoadingState,
   AdminPageShell,
+  DataToolbar,
   EmptyState,
   PageHeader,
 } from "@/components/admin/AdminUi";
@@ -162,48 +163,49 @@ export default function ProductionMasterListManager({ config }: Props) {
       {error && <p className="admin-error">{error}</p>}
 
       <form
-        className="admin-filter-bar"
         onSubmit={(e) => {
           e.preventDefault();
           void load();
         }}
       >
-        <input
-          className="admin-input"
-          placeholder="Tìm theo mã hoặc tên..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="admin-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-        >
-          <option value="all">Tất cả trạng thái</option>
-          <option value="active">Đang kích hoạt</option>
-          <option value="inactive">Đã lưu trữ</option>
-        </select>
-        {categories.length > 0 && (
+        <DataToolbar data-testid="production-master-toolbar">
+          <input
+            className="admin-input admin-data-toolbar__search"
+            placeholder="Tìm theo mã hoặc tên..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <select
             className="admin-select"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >
-            <option value="">Tất cả danh mục</option>
-            {categories.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
+            <option value="all">Tất cả trạng thái</option>
+            <option value="active">Đang kích hoạt</option>
+            <option value="inactive">Đã lưu trữ</option>
           </select>
-        )}
-        <select className="admin-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortFilter)}>
-          <option value="updated">Sắp xếp: cập nhật gần nhất</option>
-          <option value="usage">Sắp xếp: mức sử dụng</option>
-        </select>
-        <button type="submit" className="admin-btn">
-          Tìm kiếm
-        </button>
+          {categories.length > 0 && (
+            <select
+              className="admin-select"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              <option value="">Tất cả danh mục</option>
+              {categories.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
+          <select className="admin-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortFilter)}>
+            <option value="updated">Sắp xếp: cập nhật gần nhất</option>
+            <option value="usage">Sắp xếp: mức sử dụng</option>
+          </select>
+          <button type="submit" className="admin-btn admin-btn--secondary">
+            Tìm kiếm
+          </button>
+        </DataToolbar>
       </form>
 
       {creating && (

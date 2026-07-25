@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
+import { DataToolbar, WorkspaceToolbarEnd } from "@/components/admin/AdminUi";
 
 type ReviewRow = {
   id: string;
@@ -64,7 +65,7 @@ export default function ContentReviewsClient() {
         <Link href="/admin/content/launch">Khởi động Content SEO</Link>.
       </p>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+      <DataToolbar data-testid="content-reviews-toolbar">
         <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">Tất cả trạng thái</option>
           <option value="NOT_STARTED">Not started</option>
@@ -74,13 +75,15 @@ export default function ContentReviewsClient() {
           <option value="REJECTED">Rejected</option>
           <option value="SUPERSEDED">Superseded</option>
         </select>
-        <label className="admin-field-hint">
+        <label className="admin-field-hint admin-data-toolbar__checkbox">
           <input type="checkbox" checked={assignedMe} onChange={(e) => setAssignedMe(e.target.checked)} /> Assigned to me
         </label>
-        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void load()}>
-          Refresh
-        </button>
-      </div>
+        <WorkspaceToolbarEnd>
+          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void load()}>
+            Refresh
+          </button>
+        </WorkspaceToolbarEnd>
+      </DataToolbar>
 
       {loading ? <p>Đang tải…</p> : null}
 

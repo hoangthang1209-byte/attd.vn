@@ -65,6 +65,27 @@ export function DataToolbar({
   );
 }
 
+/**
+ * Right-aligned action cluster for list toolbars.
+ * Use so secondary/primary actions sit after search/filters without new CSS.
+ */
+export function WorkspaceToolbarEnd({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={joinClasses("admin-page-header__actions", className)}
+      style={{ marginLeft: "auto" }}
+    >
+      {children}
+    </div>
+  );
+}
+
 type SectionCardProps = HTMLAttributes<HTMLElement> & {
   title?: string;
   description?: string;

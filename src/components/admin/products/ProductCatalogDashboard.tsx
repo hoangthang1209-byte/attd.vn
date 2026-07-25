@@ -337,11 +337,8 @@ export default function ProductCatalogDashboard() {
         </div>
       </div>
 
-      <div className="admin-catalog-toolbar product-admin-toolbar">
+      <div className="admin-catalog-toolbar product-admin-toolbar" data-testid="product-workspace-toolbar">
         <div className="admin-catalog-toolbar-left">
-          <Link href="/admin/products/new" className="admin-btn admin-btn--primary product-admin-btn">
-            Tạo sản phẩm mới
-          </Link>
           <Link href="/admin/products/import" className="admin-btn admin-btn--secondary product-admin-btn">
             Nhập sản phẩm
           </Link>
@@ -364,14 +361,17 @@ export default function ProductCatalogDashboard() {
               Tạo dữ liệu mẫu
             </AdminLoadingButton>
           )}
-        </div>
-        <div className="admin-catalog-toolbar-right">
           {selectedIds.size > 0 && (
             <span className="admin-field-hint" data-testid="product-bulk-selection-count">
               Đã chọn {selectedIds.size} sản phẩm
             </span>
           )}
           <span className="admin-field-hint">{data?.total ?? 0} sản phẩm</span>
+        </div>
+        <div className="admin-catalog-toolbar-right" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <Link href="/admin/products/new" className="admin-btn admin-btn--primary product-admin-btn">
+            Tạo sản phẩm mới
+          </Link>
         </div>
       </div>
 

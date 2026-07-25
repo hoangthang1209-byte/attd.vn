@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
+import { DataToolbar, WorkspaceToolbarEnd } from "@/components/admin/AdminUi";
 
 export default function ContentPublishingDashboardClient() {
   const toast = useAdminToast();
@@ -57,12 +58,16 @@ export default function ContentPublishingDashboardClient() {
 
   return (
     <div className="admin-page">
-      <p className="admin-field-hint">
-        Queue publish/schedule/fail. Không auto-publish từ AI.{" "}
-        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void load()}>
-          Refresh
-        </button>
-      </p>
+      <DataToolbar data-testid="content-publishing-toolbar">
+        <p className="admin-field-hint" style={{ margin: 0, flex: "1 1 240px" }}>
+          Queue publish/schedule/fail. Không auto-publish từ AI.
+        </p>
+        <WorkspaceToolbarEnd>
+          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void load()}>
+            Refresh
+          </button>
+        </WorkspaceToolbarEnd>
+      </DataToolbar>
       {queues && (
         <>
           {list("Ready / Draft governed", queues.ready)}

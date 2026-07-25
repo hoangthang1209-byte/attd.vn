@@ -221,18 +221,24 @@ export default function CrmCustomersList() {
           Tổng: {total} khách hàng
           {selectedIds.size > 0 ? ` · Đã chọn ${selectedIds.size} khách hàng` : ""}
         </p>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div
+          className="admin-page-header__actions"
+          data-testid="customers-workspace-actions"
+          style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+        >
           <Link href="/admin/crm/customer-types" className="admin-btn admin-btn--secondary">
             Loại khách hàng
           </Link>
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary"
-            disabled={selectedIds.size === 0}
-            onClick={openBulkModal}
-          >
-            Sửa hàng loạt
-          </button>
+          {selectedIds.size > 0 ? (
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary"
+              onClick={openBulkModal}
+              data-testid="customers-bulk-action"
+            >
+              Sửa hàng loạt
+            </button>
+          ) : null}
           <Link href="/admin/crm/customers/import" className="admin-btn admin-btn--secondary">
             Import Excel
           </Link>
@@ -262,6 +268,7 @@ export default function CrmCustomersList() {
       {loadState !== "loading" && loadState !== "error" && (
         <form
           className="admin-crm-filters"
+          data-testid="customers-workspace-filters"
           onSubmit={(e) => {
             e.preventDefault();
             void load();
@@ -272,7 +279,7 @@ export default function CrmCustomersList() {
             placeholder="Tìm tên, mã, SĐT, email, MST..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="admin-input"
+            className="admin-input admin-data-toolbar__search"
           />
           <select
             value={unclassifiedFilter ? "__unclassified__" : customerTypeFilter}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AdminLoadingState } from "@/components/admin/AdminUi";
+import { AdminLoadingState, DataToolbar, PageHeader } from "@/components/admin/AdminUi";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import SupplierMaterialsModal from "@/components/admin/materials/SupplierMaterialsModal";
@@ -59,31 +59,36 @@ export default function MaterialSuppliersList() {
 
   return (
     <div className="admin-panel">
-      <div className="admin-section-header">
-        <p>Tổng: {total} nhà cung cấp</p>
-        <Link href={newHref} className="admin-btn admin-btn--primary">
-          Thêm nhà cung cấp
-        </Link>
-      </div>
+      <PageHeader
+        meta={<span>Tổng: {total} nhà cung cấp</span>}
+        actions={
+          <Link href={newHref} className="admin-btn admin-btn--primary">
+            Thêm nhà cung cấp
+          </Link>
+        }
+      />
 
       <form
-        className="admin-crm-filters"
         onSubmit={(e) => {
           e.preventDefault();
           void load();
         }}
       >
-        <input
-          className="admin-input"
-          placeholder="Tìm mã, tên, liên hệ, SĐT, email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <label className="admin-checkbox-label">
-          <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} />
-          Chỉ đang hoạt động
-        </label>
-        <button type="submit" className="admin-btn">Tìm kiếm</button>
+        <DataToolbar data-testid="material-suppliers-toolbar">
+          <input
+            className="admin-input admin-data-toolbar__search"
+            placeholder="Tìm mã, tên, liên hệ, SĐT, email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <label className="admin-checkbox-label admin-data-toolbar__checkbox">
+            <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} />
+            Chỉ đang hoạt động
+          </label>
+          <button type="submit" className="admin-btn admin-btn--secondary">
+            Tìm kiếm
+          </button>
+        </DataToolbar>
       </form>
 
       {error && <p className="admin-error">{error}</p>}

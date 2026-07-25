@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AdminLoadingState,
   AdminPageShell,
+  DataToolbar,
   EmptyState,
   PageHeader,
 } from "@/components/admin/AdminUi";
@@ -155,9 +156,9 @@ export default function PatternListManager() {
         }
       />
 
-      <div className="admin-data-toolbar">
+      <DataToolbar data-testid="pattern-workspace-toolbar">
         <input
-          className="admin-input"
+          className="admin-input admin-data-toolbar__search"
           placeholder="Tìm rập, khách hàng, nhà cung cấp..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -169,10 +170,10 @@ export default function PatternListManager() {
           <option value="APPROVED">Đã duyệt</option>
           <option value="ARCHIVED">Lưu trữ</option>
         </select>
-        <button type="button" className="admin-btn" onClick={() => void load()}>
+        <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
           Lọc
         </button>
-      </div>
+      </DataToolbar>
 
       {error && <p className="admin-error">{error}</p>}
       {loading ? (
