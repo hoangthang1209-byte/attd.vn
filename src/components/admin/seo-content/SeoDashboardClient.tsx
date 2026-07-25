@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
+import { EmptyState } from "@/components/admin/AdminUi";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import {
   SEO_TOPIC_PRIORITY_LABELS,
@@ -84,16 +85,20 @@ export default function SeoDashboardClient() {
   const toast = useAdminToast();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/content/seo/dashboard");
       const json = (await res.json()) as { dashboard?: DashboardData; message?: string };
       if (!res.ok || !json.dashboard) throw new Error(json.message ?? "Không thể tải dashboard SEO");
       setData(json.dashboard);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Không thể tải dashboard SEO");
+      const message = err instanceof Error ? err.message : "Không thể tải dashboard SEO";
+      setError(message);
+      toast.error(message);
       setData(null);
     } finally {
       setLoading(false);
@@ -109,7 +114,6 @@ export default function SeoDashboardClient() {
       <AdminPageTitle title="SEO Content Platform" />
       <div className="admin-panel">
         <div className="admin-section-header">
-          <p>Tổng quan kế hoạch nội dung SEO, tiến độ cụm chủ đề và chủ đề ưu tiên.</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Link href="/admin/content/seo-strategies" className="admin-btn admin-btn--secondary">
               Chiến lược SEO
@@ -126,13 +130,21 @@ export default function SeoDashboardClient() {
             description="Hệ thống đang tổng hợp số liệu chiến lược và chủ đề."
             tone="admin"
           />
-        ) : !data ? (
-          <div className="admin-empty-state">
-            <p>Không thể tải dữ liệu dashboard.</p>
-          </div>
+        ) : error || !data ? (
+          <EmptyState
+            tone="error"
+            title="Không thể tải dữ liệu dashboard"
+            description={error ?? "Vui lòng thử lại sau."}
+            action={
+              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
+                Thử lại
+              </button>
+            }
+          />
         ) : (
           <>
             <div
+              className="admin-catalog-kpi-bar"
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
@@ -141,16 +153,21 @@ export default function SeoDashboardClient() {
               }}
             >
               {COUNT_CARDS.map(({ key, label }) => (
-                <div key={key} className="admin-sidebar-card" style={{ margin: 0, textAlign: "center" }}>
-                  <p className="admin-field-hint" style={{ margin: "0 0 4px" }}>
-                    {label}
-                  </p>
-                  <p style={{ margin: 0, fontSize: 28, fontWeight: 700 }}>{data.counts[key]}</p>
+                <div key={key} className="admin-catalog-kpi" style={{ margin: 0, textAlign: "center" }}>
+                  <strong>{data.counts[key]}</strong>
+                  <span>{label}</span>
                 </div>
               ))}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: 16,
+                marginBottom: 24,
+              }}
+            >
               <div className="admin-sidebar-card" style={{ margin: 0 }}>
                 <h3 className="admin-sidebar-title">Chủ đề ưu tiên</h3>
                 {data.priorityTopics.length === 0 ? (

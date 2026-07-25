@@ -74,6 +74,9 @@ export default async function DashboardPage() {
 
       <div className="admin-quick-actions">
         <h2 className="admin-subtitle">Thiết lập nhanh</h2>
+        <p className="admin-muted" style={{ marginTop: 0 }}>
+          Liên kết nhanh tới cấu hình CMS và CRM
+        </p>
         <div className="admin-quick-grid">
           <Link href="/admin/settings/company">Thông tin công ty</Link>
           <Link href="/admin/settings/trust">Chỉ số tin cậy</Link>

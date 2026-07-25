@@ -309,43 +309,45 @@ export default function ProductCatalogDashboard() {
     visibleProducts.every((row) => selectedIds.has(row.product.id));
 
   const kpis = data?.kpis;
+  const kpiValue = (value: number | undefined) => (loading ? "—" : String(value ?? 0));
 
   return (
     <div className="admin-catalog-page product-admin-list" data-testid="admin-products-dashboard">
       <div
         className="product-admin-summary-grid"
         data-testid="product-readiness-summary"
+        aria-busy={loading}
       >
         <div className="product-admin-summary-card">
-          <strong>{kpis?.totalProducts ?? data?.total ?? 0}</strong>
+          <strong>{kpiValue(kpis?.totalProducts ?? data?.total)}</strong>
           <span>Tổng sản phẩm</span>
         </div>
         <div className="product-admin-summary-card">
-          <strong>{kpis?.activeProducts ?? 0}</strong>
+          <strong>{kpiValue(kpis?.activeProducts)}</strong>
           <span>Đang bán</span>
         </div>
         <div className="product-admin-summary-card">
-          <strong>{readinessSummary.ready}</strong>
+          <strong>{loading ? "—" : readinessSummary.ready}</strong>
           <span>Sẵn sàng</span>
         </div>
         <div className="product-admin-summary-card product-admin-summary-card--warn">
-          <strong>{readinessSummary.needsAttention}</strong>
+          <strong>{loading ? "—" : readinessSummary.needsAttention}</strong>
           <span>Cần bổ sung</span>
         </div>
         <div className="product-admin-summary-card">
-          <strong>{readinessSummary.unpublished}</strong>
+          <strong>{loading ? "—" : readinessSummary.unpublished}</strong>
           <span>Chưa publish</span>
         </div>
         <div className="product-admin-summary-card">
-          <strong>{kpis?.totalVariants ?? 0}</strong>
+          <strong>{kpiValue(kpis?.totalVariants)}</strong>
           <span>Tổng SKU</span>
         </div>
         <div className="product-admin-summary-card product-admin-summary-card--warn">
-          <strong>{kpis?.lowStockVariants ?? 0}</strong>
+          <strong>{kpiValue(kpis?.lowStockVariants)}</strong>
           <span>Sắp hết</span>
         </div>
         <div className="product-admin-summary-card product-admin-summary-card--danger">
-          <strong>{kpis?.outOfStockVariants ?? 0}</strong>
+          <strong>{kpiValue(kpis?.outOfStockVariants)}</strong>
           <span>Hết hàng</span>
         </div>
       </div>

@@ -119,6 +119,7 @@ export default function ExecutiveDashboard() {
     return (
       <AdminPageShell>
         <EmptyState
+          tone="error"
           title="Không thể tải dashboard"
           description={error ?? "Vui lòng thử lại sau."}
           action={
@@ -134,8 +135,6 @@ export default function ExecutiveDashboard() {
   return (
     <AdminPageShell>
       <PageHeader
-        title="Bảng điều khiển điều hành"
-        description="Tổng quan doanh thu, pipeline, báo giá, đơn hàng và cảnh báo vận hành."
         meta={
           <span className="admin-field-hint">
             Cập nhật: {formatPricingDateTime(payload.generatedAt)}

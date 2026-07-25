@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
 import CrmActivityTimeline from "@/components/admin/crm/CrmActivityTimeline";
+import { EmptyState } from "@/components/admin/AdminUi";
 import { displayLeadCompanyName, displayLeadContactName } from "@/features/crm/labels";
 import { formatCrmDateTime } from "@/features/crm/format";
 import type { CrmOverviewMetrics } from "@/features/crm/types";
@@ -40,9 +41,11 @@ export default function CrmOverviewDashboard() {
   }
   if (error) {
     return (
-      <div className="admin-empty-state admin-empty-state--error">
-        <p>{error}</p>
-      </div>
+      <EmptyState
+        tone="error"
+        title="Không tải được tổng quan CRM"
+        description={error}
+      />
     );
   }
   if (!data) return null;

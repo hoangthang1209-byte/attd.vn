@@ -71,7 +71,9 @@ export default function ContentPublishingDashboardClient() {
               </li>
             );
           })}
-          {(rows ?? []).length === 0 && <li className="admin-field-hint">Trống</li>}
+          {(rows ?? []).length === 0 && (
+            <li className="admin-field-hint">Không có mục trong hàng đợi</li>
+          )}
         </ul>
       </div>
     );

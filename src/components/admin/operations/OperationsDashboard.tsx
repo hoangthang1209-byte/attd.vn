@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
+import { AdminLoadingState, EmptyState } from "@/components/admin/AdminUi";
 import { formatOrderCurrency } from "@/features/orders/order-format";
 import type { OrderOperationalSummary } from "@/features/orders/order-operations.types";
 
@@ -30,9 +30,24 @@ export default function OperationsDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <AdminPageSkeleton message="Đang tải tổng quan vận hành…" />;
-  if (error) return <p className="admin-error">{error}</p>;
-  if (!summary) return <div className="admin-empty-state"><p>Không có dữ liệu vận hành</p></div>;
+  if (loading) return <AdminLoadingState label="Đang tải tổng quan vận hành…" rows={4} />;
+  if (error) {
+    return (
+      <EmptyState
+        tone="error"
+        title="Không tải được tổng quan vận hành"
+        description={error}
+      />
+    );
+  }
+  if (!summary) {
+    return (
+      <EmptyState
+        title="Không có dữ liệu vận hành"
+        description="Chưa có đơn hàng hoặc tóm tắt vận hành để hiển thị."
+      />
+    );
+  }
 
   const cards: SummaryCard[] = [
     { label: "Đơn mới", value: summary.newOrders, href: "/admin/orders?status=NEW" },
@@ -68,10 +83,9 @@ export default function OperationsDashboard() {
   return (
     <div className="admin-panel">
       <div className="admin-section-header">
-        <div>
-          <h2 className="admin-subtitle">Tổng quan vận hành</h2>
-          <p className="admin-muted">Tóm tắt nhanh các đơn hàng cần xử lý</p>
-        </div>
+        <p className="admin-muted" style={{ margin: 0 }}>
+          Tóm tắt nhanh các đơn hàng cần xử lý
+        </p>
         <div className="admin-crm-detail-actions">
           <Link href="/admin/production" className="admin-btn admin-btn--secondary">Bảng sản xuất</Link>
           <Link href="/admin/delivery" className="admin-btn admin-btn--secondary">Vận hành giao hàng</Link>

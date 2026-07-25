@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatPricingCurrency, formatPricingDateTime } from "@/features/pricing/format";
 import { getPricingStatusLabel } from "@/features/pricing/labels";
-import { AdminLoadingState } from "@/components/admin/AdminUi";
+import { AdminLoadingState, EmptyState } from "@/components/admin/AdminUi";
 import type { PricingCalculationListRecord, PricingOverviewStats } from "@/features/pricing/types";
 
 export default function PricingOverviewDashboard() {
@@ -12,41 +12,36 @@ export default function PricingOverviewDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function reload() {
+    setLoading(true);
+    setError(null);
     void fetch("/api/pricing/overview")
       .then(async (res) => {
-        const data = await res.json() as PricingOverviewStats & { message?: string };
+        const data = (await res.json()) as PricingOverviewStats & { message?: string };
         if (!res.ok) throw new Error(data.message ?? "Không thể tải dữ liệu");
         setStats(data);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    reload();
   }, []);
 
   if (loading) return <AdminLoadingState label="Đang tải tổng quan giá…" />;
   if (error) {
     return (
-      <div className="admin-empty-state admin-empty-state--error">
-        <p>{error}</p>
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary"
-          onClick={() => {
-            setLoading(true);
-            setError(null);
-            void fetch("/api/pricing/overview")
-              .then(async (res) => {
-                const data = await res.json() as PricingOverviewStats & { message?: string };
-                if (!res.ok) throw new Error(data.message ?? "Không thể tải dữ liệu");
-                setStats(data);
-              })
-              .catch((err: Error) => setError(err.message))
-              .finally(() => setLoading(false));
-          }}
-        >
-          Thử lại
-        </button>
-      </div>
+      <EmptyState
+        tone="error"
+        title="Không tải được tổng quan giá"
+        description={error}
+        action={
+          <button type="button" className="admin-btn admin-btn--secondary" onClick={() => reload()}>
+            Thử lại
+          </button>
+        }
+      />
     );
   }
 
@@ -75,24 +70,43 @@ export default function PricingOverviewDashboard() {
         <h3 className="admin-subtitle">Truy cập nhanh</h3>
       </div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">Costing & báo giá nhanh</Link>
-        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary">Bộ tính giá</Link>
-        <Link href="/admin/pricing/price-groups" className="admin-btn admin-btn--secondary">Nhóm giá</Link>
-        <Link href="/admin/pricing/product-tiers" className="admin-btn admin-btn--secondary">Bảng giá sản phẩm</Link>
-        <Link href="/admin/pricing/service-rules" className="admin-btn admin-btn--secondary">Phí dịch vụ</Link>
-        <Link href="/admin/pricing/history" className="admin-btn admin-btn--secondary">Lịch sử tính giá</Link>
+        <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">
+          Costing & báo giá nhanh
+        </Link>
+        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary">
+          Bộ tính giá
+        </Link>
+        <Link href="/admin/pricing/price-groups" className="admin-btn admin-btn--secondary">
+          Nhóm giá
+        </Link>
+        <Link href="/admin/pricing/product-tiers" className="admin-btn admin-btn--secondary">
+          Bảng giá sản phẩm
+        </Link>
+        <Link href="/admin/pricing/service-rules" className="admin-btn admin-btn--secondary">
+          Phí dịch vụ
+        </Link>
+        <Link href="/admin/pricing/history" className="admin-btn admin-btn--secondary">
+          Lịch sử tính giá
+        </Link>
       </div>
 
       <div className="admin-section-header" style={{ marginTop: 32 }}>
         <h3 className="admin-subtitle">Bản tính giá gần đây</h3>
-        <Link href="/admin/pricing/history" className="admin-btn admin-btn--secondary admin-btn--xs">Xem tất cả</Link>
+        <Link href="/admin/pricing/history" className="admin-btn admin-btn--secondary admin-btn--xs">
+          Xem tất cả
+        </Link>
       </div>
 
       {(stats?.recentCalculations.length ?? 0) === 0 ? (
-        <div className="admin-empty-state">
-          <p>Chưa có bản tính giá nào.</p>
-          <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">Tạo costing đầu tiên</Link>
-        </div>
+        <EmptyState
+          title="Chưa có bản tính giá nào"
+          description="Khi có bản tính giá, danh sách gần đây sẽ hiển thị tại đây."
+          action={
+            <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">
+              Tạo costing đầu tiên
+            </Link>
+          }
+        />
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">
@@ -109,10 +123,18 @@ export default function PricingOverviewDashboard() {
             <tbody>
               {stats?.recentCalculations.map((row: PricingCalculationListRecord) => (
                 <tr key={row.id}>
-                  <td><Link href={`/admin/pricing/history/${row.id}`}>{row.code}</Link></td>
+                  <td>
+                    <Link href={`/admin/pricing/history/${row.id}`}>{row.code}</Link>
+                  </td>
                   <td>{row.customerLabel ?? row.leadLabel ?? "—"}</td>
                   <td>{row.priceGroupName ?? "—"}</td>
-                  <td>{formatPricingCurrency(row.manualOverride && row.manualTotalAmount != null ? row.manualTotalAmount : row.totalAmount)}</td>
+                  <td>
+                    {formatPricingCurrency(
+                      row.manualOverride && row.manualTotalAmount != null
+                        ? row.manualTotalAmount
+                        : row.totalAmount,
+                    )}
+                  </td>
                   <td>{getPricingStatusLabel(row.status)}</td>
                   <td>{formatPricingDateTime(row.createdAt)}</td>
                 </tr>
