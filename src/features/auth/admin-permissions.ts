@@ -41,6 +41,10 @@ const LEGACY_PRODUCTION_CODES = new Set([
   "orders.view",
   "production.view",
   "production.update",
+  "manufacturing.production.view",
+  "manufacturing.production.create",
+  "manufacturing.production.update",
+  "manufacturing.production.assign",
   "qc.update",
   "warehouse.view",
   "media.view",
@@ -64,6 +68,7 @@ const LEGACY_SALES_CODES = new Set([
   "orders.view_financials",
   "payments.view",
   "production.view",
+  "manufacturing.production.view",
   "delivery.view",
 ]);
 
@@ -72,9 +77,16 @@ function legacyRoleAllows(role: NonNullable<AdminSessionUser["legacyEmployeeRole
   if (role === "SALES") return LEGACY_SALES_CODES.has(code);
   if (role === "PRODUCTION") return LEGACY_PRODUCTION_CODES.has(code);
   if (role === "DELIVERY") {
-    return ["dashboard.view", "orders.view", "delivery.view", "delivery.update", "production.view"].includes(code);
+    return [
+      "dashboard.view",
+      "orders.view",
+      "delivery.view",
+      "delivery.update",
+      "production.view",
+      "manufacturing.production.view",
+    ].includes(code);
   }
-  return ["dashboard.view", "orders.view", "production.view"].includes(code);
+  return ["dashboard.view", "orders.view", "production.view", "manufacturing.production.view"].includes(code);
 }
 
 export function canViewOrderFinancials(session: AdminSessionUser): boolean {

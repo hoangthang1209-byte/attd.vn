@@ -1,0 +1,52 @@
+import type {
+  ItemProductionDeliveryStatus,
+  ItemProductionProgressEventType,
+  ItemProductionRiskStatus,
+  ItemProductionStageStatus,
+  ItemProductionStatus,
+} from "@prisma/client";
+
+export const ITEM_PRODUCTION_STATUS_LABELS: Record<ItemProductionStatus, string> = {
+  DRAFT: "Nháp",
+  PLANNED: "Đã lên kế hoạch",
+  IN_PRODUCTION: "Đang sản xuất",
+  FINISHING: "Đang hoàn thiện",
+  COMPLETED: "Hoàn thành",
+  ON_HOLD: "Tạm dừng",
+  CANCELLED: "Đã hủy",
+};
+
+export const ITEM_PRODUCTION_STAGE_STATUS_LABELS: Record<ItemProductionStageStatus, string> = {
+  NOT_STARTED: "Chưa bắt đầu",
+  IN_PROGRESS: "Đang làm",
+  COMPLETED: "Hoàn thành",
+  BLOCKED: "Bị chặn",
+  SKIPPED: "Không áp dụng",
+};
+
+export const ITEM_PRODUCTION_DELIVERY_STATUS_LABELS: Record<ItemProductionDeliveryStatus, string> = {
+  NOT_READY: "Chưa sẵn sàng",
+  PARTIALLY_READY: "Sẵn sàng một phần",
+  READY: "Sẵn sàng giao",
+  PARTIALLY_SHIPPED: "Đã giao một phần",
+  SHIPPED: "Đã giao",
+};
+
+export const ITEM_PRODUCTION_RISK_LABELS: Record<ItemProductionRiskStatus, string> = {
+  ON_TRACK: "Đúng tiến độ",
+  NEEDS_ATTENTION: "Cần chú ý",
+  AT_RISK: "Nguy cơ trễ",
+  DELAYED: "Đã trễ",
+  BLOCKED: "Bị chặn",
+};
+
+export const ITEM_PRODUCTION_EVENT_LABELS: Record<ItemProductionProgressEventType, string> = {
+  START: "Bắt đầu công đoạn",
+  PROGRESS_UPDATE: "Cập nhật tiến độ",
+  COMPLETE: "Hoàn thành công đoạn",
+  BLOCK: "Đánh dấu bị chặn",
+  UNBLOCK: "Bỏ chặn",
+  REOPEN: "Mở lại công đoạn",
+  SKIP: "Bỏ qua công đoạn",
+  NOTE: "Ghi chú",
+};

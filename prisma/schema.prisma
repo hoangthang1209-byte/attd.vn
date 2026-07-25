@@ -4056,6 +4056,7 @@ model Employee {
   deliveryAttempts           OrderDeliveryAttempt[]    @relation("DeliveryAttemptBy")
   adminUser                  AdminUser?
   productionPlans            ProductionPlan[]          @relation("ProductionPlanOwner")
+  itemProductionAssignments  ItemProductionTracking[]  @relation("ItemProductionAssignee")
 
   @@index([employeeCode])
   @@index([isActive])
@@ -4146,6 +4147,7 @@ model OrderItem {
   deliveryExecutionItems      OrderDeliveryExecutionItem[]
   techPacks                   TechPack[]
   productionPlan              ProductionPlan?
+  itemProductionTracking      ItemProductionTracking?
 
   @@index([orderId])
   @@index([productId])
@@ -4845,9 +4847,10 @@ model AdminUser {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  employee           Employee?   @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  role               AdminRole?  @relation(fields: [roleId], references: [id], onDelete: SetNull)
-  assignedDealerRfqs DealerRFQ[]
+  employee                      Employee?                     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  role                          AdminRole?                    @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  assignedDealerRfqs            DealerRFQ[]
+  itemProductionProgressEntries ItemProductionProgressEntry[]
 
   @@index([username])
   @@index([roleId])
@@ -5401,10 +5404,12 @@ model ProductionSupplier {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  materials ProductionMaterial[]
-  trims     ProductionTrim[]
-  bomItems  TechPackBomItem[]
-  patterns  Pattern[]
+  materials               ProductionMaterial[]
+  trims                   ProductionTrim[]
+  bomItems                TechPackBomItem[]
+  patterns                Pattern[]
+  itemProductionTrackings ItemProductionTracking[]
+  itemProductionStages    ItemProductionStage[]
 
   @@index([code])
   @@index([isActive])
@@ -5470,4 +5475,200 @@ model PrintMethod {
   @@index([code])
   @@index([isActive])
   @@index([category])
+}
+
+// =============================================================================
+// Sprint M1 — Item production progress tracking (order-item operational timeline)
+// Separate from Manufacturing Library CMS workflows and OrderProductionStage shop-floor rows.
+// =============================================================================
+
+enum ItemProductionStageKey {
+  MATERIAL_SYNC
+  CUTTING
+  PRINT_EMBROIDERY
+  SEWING
+  WASHING
+  FINISHING
+  IRONING
+  QC
+  PACKING
+  READY_TO_SHIP
+}
+
+enum ItemProductionStatus {
+  DRAFT
+  PLANNED
+  IN_PRODUCTION
+  FINISHING
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+enum ItemProductionStageStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+  SKIPPED
+}
+
+enum ItemProductionDeliveryStatus {
+  NOT_READY
+  PARTIALLY_READY
+  READY
+  PARTIALLY_SHIPPED
+  SHIPPED
+}
+
+enum ItemProductionRiskStatus {
+  ON_TRACK
+  NEEDS_ATTENTION
+  AT_RISK
+  DELAYED
+  BLOCKED
+}
+
+enum ItemProductionProgressEventType {
+  START
+  PROGRESS_UPDATE
+  COMPLETE
+  BLOCK
+  UNBLOCK
+  REOPEN
+  SKIP
+  NOTE
+}
+
+model ItemProductionWorkflowTemplate {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?  @db.Text
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps     ItemProductionWorkflowTemplateStep[]
+  trackings ItemProductionTracking[]
+
+  @@index([isActive, sortOrder])
+}
+
+model ItemProductionWorkflowTemplateStep {
+  id           String                 @id @default(cuid())
+  templateId   String
+  stageKey     ItemProductionStageKey
+  label        String
+  sequence     Int
+  weight       Int                    @default(10)
+  isApplicable Boolean                @default(true)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  template ItemProductionWorkflowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, stageKey])
+  @@index([templateId, sequence])
+}
+
+model ItemProductionTracking {
+  id                   String                       @id @default(cuid())
+  orderItemId          String                       @unique
+  workflowTemplateId   String?
+  supplierId           String?
+  assignedEmployeeId   String?
+  productionStatus     ItemProductionStatus         @default(DRAFT)
+  deliveryStatus       ItemProductionDeliveryStatus @default(NOT_READY)
+  riskStatus           ItemProductionRiskStatus     @default(ON_TRACK)
+  orderedQuantity      Int
+  plannedQuantity      Int
+  readyQuantity        Int                          @default(0)
+  currentStageKey      ItemProductionStageKey?
+  progressPercent      Decimal                      @default(0) @db.Decimal(5, 2)
+  promisedDeliveryDate DateTime?
+  actualCompletedAt    DateTime?
+  lastProgressAt       DateTime?
+  note                 String?                      @db.Text
+  rowVersion           Int                          @default(1)
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  orderItem        OrderItem                       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  workflowTemplate ItemProductionWorkflowTemplate? @relation(fields: [workflowTemplateId], references: [id], onDelete: SetNull)
+  supplier         ProductionSupplier?             @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  assignedEmployee Employee?                       @relation("ItemProductionAssignee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  stages           ItemProductionStage[]
+
+  @@index([productionStatus])
+  @@index([deliveryStatus])
+  @@index([riskStatus])
+  @@index([supplierId])
+  @@index([assignedEmployeeId])
+  @@index([promisedDeliveryDate])
+  @@index([lastProgressAt])
+  @@index([currentStageKey])
+  @@index([workflowTemplateId])
+}
+
+model ItemProductionStage {
+  id                 String                    @id @default(cuid())
+  productionItemId   String
+  stageKey           ItemProductionStageKey
+  labelSnapshot      String
+  sequence           Int
+  isApplicable       Boolean                   @default(true)
+  weight             Int                       @default(10)
+  status             ItemProductionStageStatus @default(NOT_STARTED)
+  plannedQuantity    Int                       @default(0)
+  receivedQuantity   Int                       @default(0)
+  inProgressQuantity Int                       @default(0)
+  completedQuantity  Int                       @default(0)
+  acceptedQuantity   Int                       @default(0)
+  rejectedQuantity   Int                       @default(0)
+  reworkQuantity     Int                       @default(0)
+  wasteQuantity      Int                       @default(0)
+  plannedStartAt     DateTime?
+  plannedEndAt       DateTime?
+  actualStartAt      DateTime?
+  actualEndAt        DateTime?
+  supplierId         String?
+  note               String?                   @db.Text
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  productionItem ItemProductionTracking        @relation(fields: [productionItemId], references: [id], onDelete: Cascade)
+  supplier       ProductionSupplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  history        ItemProductionProgressEntry[]
+
+  @@unique([productionItemId, stageKey])
+  @@index([productionItemId, sequence])
+  @@index([status])
+  @@index([supplierId])
+}
+
+model ItemProductionProgressEntry {
+  id                    String                          @id @default(cuid())
+  productionStageId     String
+  eventType             ItemProductionProgressEventType
+  quantityDelta         Int                             @default(0)
+  acceptedQuantityDelta Int                             @default(0)
+  rejectedQuantityDelta Int                             @default(0)
+  reworkQuantityDelta   Int                             @default(0)
+  wasteQuantityDelta    Int                             @default(0)
+  previousStatus        ItemProductionStageStatus?
+  nextStatus            ItemProductionStageStatus?
+  note                  String?                         @db.Text
+  happenedAt            DateTime                        @default(now())
+  createdByAdminUserId  String?
+  createdAt             DateTime                        @default(now())
+
+  productionStage    ItemProductionStage @relation(fields: [productionStageId], references: [id], onDelete: Cascade)
+  createdByAdminUser AdminUser?          @relation(fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+
+  @@index([productionStageId, happenedAt])
+  @@index([createdByAdminUserId])
+  @@index([eventType])
 }

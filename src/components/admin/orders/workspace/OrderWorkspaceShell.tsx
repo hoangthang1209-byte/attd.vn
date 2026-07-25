@@ -12,6 +12,7 @@ import OrderWorkspaceHeader from "./OrderWorkspaceHeader";
 import OrderWorkspaceSummaryCards from "./OrderWorkspaceSummaryCards";
 import OrderProductTable from "./OrderProductTable";
 import OrderProductionSummaryPanel from "./OrderProductionSummaryPanel";
+import OrderItemProductionPanel from "@/components/admin/item-production/OrderItemProductionPanel";
 import OrderWorkspaceInfoTab from "./OrderWorkspaceInfoTab";
 import OrderWorkspaceDeliveryTab from "./OrderWorkspaceDeliveryTab";
 import OrderWorkspacePaymentTab from "./OrderWorkspacePaymentTab";
@@ -223,6 +224,10 @@ export default function OrderWorkspaceShell(props: OrderWorkspaceShellProps) {
               roleCode={roleCode}
             />
           </div>
+        )}
+
+        {activeTab === "products" && (
+          <OrderItemProductionPanel orderId={orderId} orderStatus={order.status} />
         )}
 
         {activeTab === "info" && (

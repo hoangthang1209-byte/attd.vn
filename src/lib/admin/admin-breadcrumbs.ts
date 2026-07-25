@@ -345,6 +345,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/manufacturing/production-timeline",
+    meta: {
+      breadcrumbs: ["SẢN XUẤT", "Tiến độ sản xuất"],
+      title: "Tiến độ sản xuất",
+      description: "Theo dõi tiến độ sản xuất theo từng item đơn hàng, công đoạn và rủi ro giao hàng.",
+    },
+  },
+  {
     path: "/admin/production",
     meta: {
       breadcrumbs: ["SẢN XUẤT", "Lệnh sản xuất"],

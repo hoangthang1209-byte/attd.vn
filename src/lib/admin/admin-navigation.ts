@@ -83,6 +83,12 @@ export const adminNavigationSections: AdminNavigationSection[] = [
     platforms: domainItems([
       { label: "Lệnh sản xuất", href: "/admin/production", status: "active", requiredPermissions: ["canViewProduction"] },
       {
+        label: "Tiến độ sản xuất",
+        href: "/admin/manufacturing/production-timeline",
+        status: "active",
+        requiredPermissions: ["canViewProduction"],
+      },
+      {
         label: "Thư viện sản xuất",
         href: "/admin/manufacturing-library",
         status: "active",

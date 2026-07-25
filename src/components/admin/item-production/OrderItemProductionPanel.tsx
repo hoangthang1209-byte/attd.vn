@@ -1,0 +1,105 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
+
+type Props = { orderId: string; orderStatus: string };
+
+export default function OrderItemProductionPanel({ orderId, orderStatus }: Props) {
+  const { permissions } = useAdminPermissions();
+  const [loading, setLoading] = useState(true);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<{
+    total: number;
+    averageProgressPercent: number;
+    readyQuantity: number;
+    plannedQuantity: number;
+    atRiskCount: number;
+    delayedCount: number;
+  } | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/orders/${orderId}/item-production-summary`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? "Không tải được tóm tắt");
+      setSummary(json.summary);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Lỗi tải");
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!permissions.canViewItemProduction) return;
+    queueMicrotask(() => {
+      void load();
+    });
+  }, [load, permissions.canViewItemProduction]);
+
+  async function initialize() {
+    setPending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/manufacturing/production-items/initialize-from-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? "Khởi tạo thất bại");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Khởi tạo thất bại");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (!permissions.canViewItemProduction) return null;
+
+  return (
+    <section className="admin-section-card" style={{ marginTop: 16 }}>
+      <div className="admin-section-header">
+        <h2 className="admin-subtitle">Tiến độ sản xuất theo item</h2>
+        <Link
+          href={`/admin/manufacturing/production-timeline?order=${orderId}`}
+          className="admin-btn admin-btn--secondary admin-btn--small"
+        >
+          Xem tiến độ sản xuất
+        </Link>
+      </div>
+      {loading ? (
+        <p className="admin-field-hint">Đang tải tóm tắt…</p>
+      ) : (
+        <>
+          {error ? <p className="admin-error">{error}</p> : null}
+          {summary && summary.total > 0 ? (
+            <p className="admin-field-hint" style={{ margin: 0 }}>
+              {summary.total} item · tiến độ TB {summary.averageProgressPercent}% · sẵn sàng{" "}
+              {summary.readyQuantity}/{summary.plannedQuantity} · rủi ro {summary.atRiskCount} · trễ{" "}
+              {summary.delayedCount}
+            </p>
+          ) : (
+            <p className="admin-field-hint" style={{ margin: 0 }}>
+              Chưa khởi tạo theo dõi sản xuất cho các item của đơn này.
+            </p>
+          )}
+          {permissions.canUpdateItemProduction && orderStatus !== "CANCELLED" ? (
+            <div style={{ marginTop: 10 }}>
+              <AdminLoadingButton pending={pending} onClick={() => void initialize()}>
+                Khởi tạo theo dõi sản xuất
+              </AdminLoadingButton>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}

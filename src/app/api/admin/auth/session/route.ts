@@ -30,6 +30,10 @@ export async function GET() {
       canUpdateOrders: can(session, "orders.update"),
       canViewProduction: can(session, "production.view"),
       canUpdateProduction: can(session, "production.update"),
+      canViewItemProduction:
+        can(session, "manufacturing.production.view") || can(session, "production.view"),
+      canUpdateItemProduction:
+        can(session, "manufacturing.production.update") || can(session, "production.update"),
       canViewDelivery: can(session, "delivery.view"),
       canManageEmployees: can(session, "employees.manage"),
       canManageProducts: can(session, "products.manage"),

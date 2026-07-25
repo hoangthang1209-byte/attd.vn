@@ -20,6 +20,8 @@ export type AdminPermissionFlags = {
   canUpdateOrders: boolean;
   canViewProduction: boolean;
   canUpdateProduction: boolean;
+  canViewItemProduction: boolean;
+  canUpdateItemProduction: boolean;
   canViewDelivery: boolean;
   canManageEmployees: boolean;
   canManageProducts: boolean;
@@ -51,6 +53,8 @@ const defaultFlags: AdminPermissionFlags = {
   canUpdateOrders: true,
   canViewProduction: true,
   canUpdateProduction: true,
+  canViewItemProduction: true,
+  canUpdateItemProduction: true,
   canViewDelivery: true,
   canManageEmployees: true,
   canManageProducts: true,
@@ -109,6 +113,8 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
           canUpdateOrders: data.flags?.canUpdateOrders ?? true,
           canViewProduction: data.flags?.canViewProduction ?? true,
           canUpdateProduction: data.flags?.canUpdateProduction ?? true,
+          canViewItemProduction: data.flags?.canViewItemProduction ?? true,
+          canUpdateItemProduction: data.flags?.canUpdateItemProduction ?? true,
           canViewDelivery: data.flags?.canViewDelivery ?? true,
           canManageEmployees: data.flags?.canManageEmployees ?? true,
           canManageProducts: data.flags?.canManageProducts ?? true,
