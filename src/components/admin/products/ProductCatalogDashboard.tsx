@@ -8,6 +8,7 @@ import ProductBulkDialogs, {
   type ProductBulkDialogKind,
 } from "@/components/admin/products/ProductBulkDialogs";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
+import { EmptyState } from "@/components/admin/AdminUi";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import {
   evaluateProductReadiness,
@@ -100,6 +101,7 @@ export default function ProductCatalogDashboard() {
   const router = useRouter();
   const [data, setData] = useState<FetchResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [status, setStatus] = useState("");
@@ -117,6 +119,7 @@ export default function ProductCatalogDashboard() {
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
+    setListError(null);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (categoryId) params.set("categoryId", categoryId);
@@ -124,10 +127,16 @@ export default function ProductCatalogDashboard() {
     if (stockStatus) params.set("stockStatus", stockStatus);
     try {
       const res = await fetch(`/api/admin/products?${params.toString()}`);
-      const json = (await res.json()) as FetchResult;
-      setData(json);
+      const json = (await res.json()) as FetchResult & { message?: string };
+      if (!res.ok) {
+        setListError(json.message ?? "Không thể tải danh sách sản phẩm.");
+        setData(null);
+      } else {
+        setData(json);
+      }
     } catch {
-      /* ignore */
+      setListError("Không thể tải danh sách sản phẩm.");
+      setData(null);
     }
     setLoading(false);
   }, [search, categoryId, status, stockStatus]);
@@ -160,6 +169,10 @@ export default function ProductCatalogDashboard() {
         productMatchesReadinessFilter(row.readiness, readinessFilter),
       ),
     [productsWithReadiness, readinessFilter],
+  );
+
+  const filtersActive = Boolean(
+    search || categoryId || status || stockStatus || readinessFilter !== "all",
   );
 
   async function seedSampleData() {
@@ -569,6 +582,33 @@ export default function ProductCatalogDashboard() {
           description="Hệ thống đang cập nhật dữ liệu catalog mới nhất."
           tone="admin"
         />
+      ) : listError ? (
+        <EmptyState
+          tone="error"
+          title="Không tải được danh sách sản phẩm"
+          description={listError}
+          action={
+            <button type="button" className="admin-btn" onClick={() => void fetchProducts()}>
+              Thử lại
+            </button>
+          }
+        />
+      ) : visibleProducts.length === 0 ? (
+        <EmptyState
+          title={filtersActive ? "Không tìm thấy sản phẩm phù hợp" : "Chưa có sản phẩm"}
+          description={
+            filtersActive
+              ? "Thử đổi từ khóa, danh mục hoặc bộ lọc sẵn sàng."
+              : "Thêm sản phẩm mới hoặc tạo dữ liệu mẫu để bắt đầu."
+          }
+          action={
+            filtersActive ? undefined : (
+              <Link href="/admin/products/new" className="admin-btn admin-btn--primary product-admin-btn">
+                Tạo sản phẩm mới
+              </Link>
+            )
+          }
+        />
       ) : (
         <div className="admin-catalog-table-wrap product-admin-table-wrap">
           <table className="admin-catalog-table admin-catalog-table--dense product-admin-table">
@@ -753,11 +793,6 @@ export default function ProductCatalogDashboard() {
               })}
             </tbody>
           </table>
-          {visibleProducts.length === 0 && (
-            <p className="admin-field-hint" style={{ padding: "16px 0", textAlign: "center" }}>
-              Không tìm thấy sản phẩm. Thử tạo dữ liệu mẫu hoặc thêm sản phẩm mới.
-            </p>
-          )}
         </div>
       )}
     </div>

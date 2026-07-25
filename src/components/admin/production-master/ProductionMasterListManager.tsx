@@ -160,8 +160,6 @@ export default function ProductionMasterListManager({ config }: Props) {
         onComplete={() => void load()}
       />
 
-      {error && <p className="admin-error">{error}</p>}
-
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -241,10 +239,34 @@ export default function ProductionMasterListManager({ config }: Props) {
 
       {loading ? (
         <AdminLoadingState label={`Đang tải ${config.title.toLowerCase()}...`} />
+      ) : error && items.length === 0 ? (
+        <EmptyState
+          tone="error"
+          title={`Không tải được ${config.title.toLowerCase()}`}
+          description={error}
+          action={
+            <button type="button" className="admin-btn" onClick={() => void load()}>
+              Thử lại
+            </button>
+          }
+        />
       ) : items.length === 0 ? (
-        <EmptyState title="Chưa có dữ liệu" description="Tạo mục đầu tiên để bắt đầu." />
+        <EmptyState
+          title={
+            search.trim() || statusFilter !== "all" || categoryFilter
+              ? "Không tìm thấy kết quả phù hợp"
+              : "Chưa có dữ liệu"
+          }
+          description={
+            search.trim() || statusFilter !== "all" || categoryFilter
+              ? "Thử đổi từ khóa, trạng thái hoặc danh mục."
+              : "Tạo mục đầu tiên để bắt đầu."
+          }
+        />
       ) : (
-        <div className="admin-table-wrap">
+        <>
+          {error && <p className="admin-error">{error}</p>}
+          <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
@@ -277,6 +299,7 @@ export default function ProductionMasterListManager({ config }: Props) {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </AdminPageShell>
   );

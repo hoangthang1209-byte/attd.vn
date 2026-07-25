@@ -12,7 +12,7 @@ import { useCustomerTypeOptions } from "@/components/admin/crm/useCustomerTypeOp
 import { CUSTOMER_STATUS_LABELS } from "@/features/crm/labels";
 import { formatCrmDateTime } from "@/features/crm/format";
 import { CRM_CUSTOMER_STATUSES, type CrmCustomerRecord } from "@/features/crm/types";
-import { PageHeader } from "@/components/admin/AdminUi";
+import { EmptyState, PageHeader } from "@/components/admin/AdminUi";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import { useAdminToast } from "@/hooks/useAdminToast";
 
@@ -135,6 +135,9 @@ export default function CrmCustomersList() {
   const visibleIds = useMemo(() => customers.map((customer) => customer.id), [customers]);
   const selectedVisibleCount = visibleIds.filter((id) => selectedIds.has(id)).length;
   const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
+  const filtersActive = Boolean(
+    search.trim() || customerTypeFilter || unclassifiedFilter || statusFilter,
+  );
 
   function openCustomer(id: string) {
     router.push(`/admin/crm/customers/${id}`);
@@ -249,32 +252,14 @@ export default function CrmCustomersList() {
         }
       />
 
-      {loadState === "error" && (
-        <div className="admin-empty-state admin-empty-state--error">
-          <p>{errorMessage}</p>
-          <button type="button" className="admin-btn" onClick={() => void load()}>
-            Thử lại
-          </button>
-        </div>
-      )}
-
-      {loadState === "loading" && (
-        <TableLoading
-          title="Đang tải danh sách khách hàng..."
-          description="Hệ thống đang tải dữ liệu khách hàng theo bộ lọc hiện tại."
-          tone="admin"
-        />
-      )}
-
-      {loadState !== "loading" && loadState !== "error" && (
-        <form
-          className="admin-crm-filters"
-          data-testid="customers-workspace-filters"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void load();
-          }}
-        >
+      <form
+        className="admin-crm-filters"
+        data-testid="customers-workspace-filters"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void load();
+        }}
+      >
           <input
             type="search"
             placeholder="Tìm tên, mã, SĐT, email, MST..."
@@ -322,6 +307,26 @@ export default function CrmCustomersList() {
             Lọc
           </button>
         </form>
+
+      {loadState === "error" && (
+        <EmptyState
+          tone="error"
+          title="Không tải được danh sách khách hàng"
+          description={errorMessage ?? "Vui lòng thử lại."}
+          action={
+            <button type="button" className="admin-btn" onClick={() => void load()}>
+              Thử lại
+            </button>
+          }
+        />
+      )}
+
+      {loadState === "loading" && (
+        <TableLoading
+          title="Đang tải danh sách khách hàng..."
+          description="Hệ thống đang tải dữ liệu khách hàng theo bộ lọc hiện tại."
+          tone="admin"
+        />
       )}
 
       {bulkResult && (
@@ -359,12 +364,21 @@ export default function CrmCustomersList() {
       )}
 
       {loadState === "empty" && (
-        <div className="admin-empty-state">
-          <p>Chưa có khách hàng nào</p>
-          <Link href="/admin/crm/customers/new" className="admin-btn admin-btn--primary">
-            Thêm khách hàng
-          </Link>
-        </div>
+        <EmptyState
+          title={filtersActive ? "Không tìm thấy khách hàng phù hợp" : "Chưa có khách hàng"}
+          description={
+            filtersActive
+              ? "Thử đổi từ khóa hoặc bộ lọc hiện tại."
+              : "Thêm khách hàng đầu tiên để bắt đầu quản lý CRM."
+          }
+          action={
+            filtersActive ? undefined : (
+              <Link href="/admin/crm/customers/new" className="admin-btn admin-btn--primary">
+                Thêm khách hàng
+              </Link>
+            )
+          }
+        />
       )}
 
       {loadState === "ready" && (

@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
-import { DataToolbar, WorkspaceToolbarEnd } from "@/components/admin/AdminUi";
+import {
+  AdminLoadingState,
+  DataToolbar,
+  EmptyState,
+  WorkspaceToolbarEnd,
+} from "@/components/admin/AdminUi";
 
 type ReviewRow = {
   id: string;
@@ -34,10 +39,14 @@ export default function ContentReviewsClient() {
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [status, setStatus] = useState("");
   const [assignedMe, setAssignedMe] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const filtersActive = Boolean(status || assignedMe);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const qs = new URLSearchParams();
       if (status) qs.set("status", status);
@@ -47,7 +56,9 @@ export default function ContentReviewsClient() {
       if (!res.ok) throw new Error(data.message ?? "Load failed");
       setReviews(data.reviews ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Không tải danh sách");
+      const message = err instanceof Error ? err.message : "Không tải danh sách";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -85,62 +96,91 @@ export default function ContentReviewsClient() {
         </WorkspaceToolbarEnd>
       </DataToolbar>
 
-      {loading ? <p>Đang tải…</p> : null}
-
-      <div className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Topic</th>
-              <th>Draft</th>
-              <th>Version</th>
-              <th>Type</th>
-              <th>Review</th>
-              <th>Sections</th>
-              <th>QA</th>
-              <th>Blocking</th>
-              <th>Blog</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {reviews.map((r) => (
-              <tr key={r.id}>
-                <td>
-                  {r.topicId ? (
-                    <Link href={`/admin/content/seo-topics/${r.topicId}`}>{r.topicTitle ?? r.topicId}</Link>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td>{r.writingDraftId.slice(0, 8)}…</td>
-                <td>v{r.writingDraftVersion}</td>
-                <td>{r.contentType ?? "—"}</td>
-                <td>{r.status}</td>
-                <td>
-                  {r.sectionProgress.approved}/{r.sectionProgress.total}
-                </td>
-                <td>{r.qaScore ?? "—"}</td>
-                <td>{r.blockingIssues}</td>
-                <td>
-                  {r.targetBlogId ? (
-                    <Link href={`/admin/blog/${r.targetBlogId}`}>Open</Link>
-                  ) : r.readyForHandoff ? (
-                    "Ready"
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td>
-                  <Link className="admin-btn admin-btn--secondary admin-btn--small" href={`/admin/content/reviews/${r.id}`}>
-                    Open
-                  </Link>
-                </td>
+      {loading ? (
+        <AdminLoadingState label="Đang tải hàng đợi kiểm duyệt…" rows={4} />
+      ) : error ? (
+        <EmptyState
+          tone="error"
+          title="Không tải được hàng đợi kiểm duyệt"
+          description={error}
+          action={
+            <button type="button" className="admin-btn" onClick={() => void load()}>
+              Thử lại
+            </button>
+          }
+        />
+      ) : reviews.length === 0 ? (
+        <EmptyState
+          title={
+            filtersActive
+              ? "Không có nội dung phù hợp với bộ lọc hiện tại"
+              : "Không có nội dung chờ kiểm duyệt"
+          }
+          description={
+            filtersActive
+              ? "Thử đổi trạng thái hoặc bỏ lọc Assigned to me."
+              : "Khi có Writing Draft cần duyệt, hàng đợi sẽ hiển thị tại đây."
+          }
+        />
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Topic</th>
+                <th>Draft</th>
+                <th>Version</th>
+                <th>Type</th>
+                <th>Review</th>
+                <th>Sections</th>
+                <th>QA</th>
+                <th>Blocking</th>
+                <th>Blog</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {reviews.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    {r.topicId ? (
+                      <Link href={`/admin/content/seo-topics/${r.topicId}`}>{r.topicTitle ?? r.topicId}</Link>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td>{r.writingDraftId.slice(0, 8)}…</td>
+                  <td>v{r.writingDraftVersion}</td>
+                  <td>{r.contentType ?? "—"}</td>
+                  <td>{r.status}</td>
+                  <td>
+                    {r.sectionProgress.approved}/{r.sectionProgress.total}
+                  </td>
+                  <td>{r.qaScore ?? "—"}</td>
+                  <td>{r.blockingIssues}</td>
+                  <td>
+                    {r.targetBlogId ? (
+                      <Link href={`/admin/blog/${r.targetBlogId}`}>Open</Link>
+                    ) : r.readyForHandoff ? (
+                      "Ready"
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td>
+                    <Link
+                      className="admin-btn admin-btn--secondary admin-btn--small"
+                      href={`/admin/content/reviews/${r.id}`}
+                    >
+                      Open
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

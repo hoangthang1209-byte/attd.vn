@@ -175,13 +175,32 @@ export default function PatternListManager() {
         </button>
       </DataToolbar>
 
-      {error && <p className="admin-error">{error}</p>}
       {loading ? (
         <AdminLoadingState label="Đang tải thư viện rập..." />
+      ) : error && items.length === 0 ? (
+        <EmptyState
+          tone="error"
+          title="Không tải được thư viện rập"
+          description={error}
+          action={
+            <button type="button" className="admin-btn" onClick={() => void load()}>
+              Thử lại
+            </button>
+          }
+        />
       ) : items.length === 0 ? (
-        <EmptyState title="Chưa có rập" description="Tạo rập đầu tiên để dùng trong Tech Pack." />
+        <EmptyState
+          title={statusFilter || search.trim() ? "Không tìm thấy rập phù hợp" : "Chưa có rập"}
+          description={
+            statusFilter || search.trim()
+              ? "Thử đổi từ khóa hoặc trạng thái."
+              : "Tạo rập đầu tiên để dùng trong Tech Pack."
+          }
+        />
       ) : (
-        <div className="admin-table-wrap">
+        <>
+          {error && <p className="admin-error">{error}</p>}
+          <div className="admin-table-wrap">
           <table className="admin-table admin-table--compact">
             <thead>
               <tr>
@@ -250,6 +269,7 @@ export default function PatternListManager() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {creating && (

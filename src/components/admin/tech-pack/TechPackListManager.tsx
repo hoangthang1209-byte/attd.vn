@@ -164,13 +164,36 @@ export default function TechPackListManager() {
         </button>
       </DataToolbar>
 
-      {error && <p className="admin-error">{error}</p>}
       {loading ? (
         <AdminLoadingState label="Đang tải Tech Pack..." />
+      ) : error && items.length === 0 ? (
+        <EmptyState
+          tone="error"
+          title="Không tải được Tech Pack"
+          description={error}
+          action={
+            <button type="button" className="admin-btn" onClick={() => void load()}>
+              Thử lại
+            </button>
+          }
+        />
       ) : items.length === 0 ? (
-        <EmptyState title="Chưa có Tech Pack" description="Tạo Tech Pack từ hạng mục đơn hàng hoặc báo giá." />
+        <EmptyState
+          title={
+            statusFilter || quickFilter !== "all" || search.trim()
+              ? "Không tìm thấy Tech Pack phù hợp"
+              : "Chưa có Tech Pack"
+          }
+          description={
+            statusFilter || quickFilter !== "all" || search.trim()
+              ? "Thử đổi từ khóa, trạng thái hoặc bộ lọc nhanh."
+              : "Tạo Tech Pack từ hạng mục đơn hàng hoặc báo giá."
+          }
+        />
       ) : (
-        <div className="admin-table-wrap">
+        <>
+          {error && <p className="admin-error">{error}</p>}
+          <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
@@ -225,6 +248,7 @@ export default function TechPackListManager() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {creating && (

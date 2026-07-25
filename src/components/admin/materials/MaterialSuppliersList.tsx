@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AdminLoadingState, DataToolbar, PageHeader } from "@/components/admin/AdminUi";
+import { AdminLoadingState, DataToolbar, EmptyState, PageHeader } from "@/components/admin/AdminUi";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import SupplierMaterialsModal from "@/components/admin/materials/SupplierMaterialsModal";
@@ -56,6 +56,7 @@ export default function MaterialSuppliersList() {
   }
 
   const newHref = withFromListParams("/admin/material-suppliers/new", searchParams);
+  const filtersActive = Boolean(search.trim() || activeOnly);
 
   return (
     <div className="admin-panel">
@@ -91,14 +92,36 @@ export default function MaterialSuppliersList() {
         </DataToolbar>
       </form>
 
-      {error && <p className="admin-error">{error}</p>}
-      {loading && <AdminLoadingState label="Đang tải nhà cung cấp vật tư…" rows={3} />}
-
-      {!loading && suppliers.length === 0 && (
-        <p className="admin-empty-state">Chưa có nhà cung cấp.</p>
-      )}
-
-      {!loading && suppliers.length > 0 && (
+      {loading ? (
+        <AdminLoadingState label="Đang tải nhà cung cấp vật tư…" rows={3} />
+      ) : error ? (
+        <EmptyState
+          tone="error"
+          title="Không tải được nhà cung cấp"
+          description={error}
+          action={
+            <button type="button" className="admin-btn" onClick={() => void load()}>
+              Thử lại
+            </button>
+          }
+        />
+      ) : suppliers.length === 0 ? (
+        <EmptyState
+          title={filtersActive ? "Không tìm thấy nhà cung cấp phù hợp" : "Chưa có nhà cung cấp"}
+          description={
+            filtersActive
+              ? "Thử đổi từ khóa hoặc bỏ lọc đang hoạt động."
+              : "Thêm nhà cung cấp vật tư đầu tiên để liên kết nguồn hàng."
+          }
+          action={
+            filtersActive ? undefined : (
+              <Link href={newHref} className="admin-btn admin-btn--primary">
+                Thêm nhà cung cấp
+              </Link>
+            )
+          }
+        />
+      ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
