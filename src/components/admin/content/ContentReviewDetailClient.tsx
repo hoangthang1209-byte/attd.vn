@@ -4,29 +4,50 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { AdminLoadingState, EmptyState, StatusBadge } from "@/components/admin/AdminUi";
 
 type Props = { reviewId: string };
+
+function reviewStatusTone(status: string): "neutral" | "info" | "success" | "warning" | "danger" {
+  if (status === "APPROVED") return "success";
+  if (status === "REJECTED") return "danger";
+  if (status === "CHANGES_REQUESTED" || status === "IN_REVIEW") return "warning";
+  return "info";
+}
 
 export default function ContentReviewDetailClient({ reviewId }: Props) {
   const toast = useAdminToast();
   const [data, setData] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [note, setNote] = useState("");
   const [activeSection, setActiveSection] = useState("");
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/content/reviews/${reviewId}`);
-    const json = await res.json();
-    if (!res.ok) {
-      toast.error(json.message ?? "Load failed");
-      return;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch(`/api/content/reviews/${reviewId}`);
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.message ?? "Load failed");
+      }
+      setData(json);
+      setActiveSection((prev) => {
+        if (prev) return prev;
+        const sections = (json.session as { sections?: Array<{ sectionId: string }> })?.sections;
+        return sections?.[0]?.sectionId ?? "";
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Load failed";
+      setLoadError(message);
+      setData(null);
+      toast.error(message);
+    } finally {
+      setLoading(false);
     }
-    setData(json);
-    setActiveSection((prev) => {
-      if (prev) return prev;
-      const sections = (json.session as { sections?: Array<{ sectionId: string }> })?.sections;
-      return sections?.[0]?.sectionId ?? "";
-    });
   }, [reviewId, toast]);
 
   useEffect(() => {
@@ -53,7 +74,26 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
     }
   }
 
-  if (!data) return <p className="admin-page">Đang tải review…</p>;
+  if (loading) return <AdminLoadingState label="Đang tải review…" rows={4} />;
+  if (loadError || !data) {
+    return (
+      <EmptyState
+        tone="error"
+        title="Không tải được chi tiết kiểm duyệt"
+        description={loadError ?? "Không tìm thấy phiên kiểm duyệt."}
+        action={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className="admin-btn" onClick={() => void load()}>
+              Thử lại
+            </button>
+            <Link href="/admin/content/reviews" className="admin-btn admin-btn--secondary">
+              Quay lại danh sách
+            </Link>
+          </div>
+        }
+      />
+    );
+  }
 
   const session = data.session as {
     id: string;
@@ -101,16 +141,26 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
   const metadata = data.metadata as Record<string, unknown> | null;
 
   const currentSection = structured?.sections?.find((s) => s.sectionId === activeSection);
+  const reviewLabel = structured?.title
+    ? String(structured.title)
+    : `Review ${session.id.slice(0, 8)}…`;
 
   return (
-    <div className="admin-page">
-      <p className="admin-field-hint">
-        <Link href="/admin/content/reviews">← Danh sách</Link>
+    <div className="admin-panel">
+      <AdminPageTitle title={reviewLabel} />
+      <p className="admin-field-hint" style={{ margin: 0 }}>
+        <Link href="/admin/content/reviews">← Danh sách kiểm duyệt</Link>
       </p>
       <h2 className="admin-page-title">Review {session.id.slice(0, 8)}…</h2>
-      <p className="admin-field-hint">
-        Status: <strong>{session.status}</strong> · Draft v{session.writingDraftVersion} · readiness{" "}
-        {readiness.score} · sections {readiness.sectionSummary.approved}/{readiness.sectionSummary.total}
+      <p className="admin-field-hint" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <span>
+          Status:{" "}
+          <StatusBadge tone={reviewStatusTone(session.status)}>{session.status}</StatusBadge>
+        </span>
+        <span>
+          Draft v{session.writingDraftVersion} · readiness {readiness.score} · sections{" "}
+          {readiness.sectionSummary.approved}/{readiness.sectionSummary.total}
+        </span>
       </p>
       <p className="admin-field-hint">
         Plan {session.writingPlanId.slice(0, 8)}… · Context {session.contextBuildId.slice(0, 8)}…
@@ -127,7 +177,14 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 16 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 16,
+        }}
+        className="content-review-detail-layout"
+      >
         <div>
           <h3>Sections</h3>
           <ul style={{ listStyle: "none", padding: 0 }}>

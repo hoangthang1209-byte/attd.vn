@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminBackLink from "@/components/admin/AdminBackLink";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { EmptyState, StatusBadge } from "@/components/admin/AdminUi";
 import { buildListBackHref } from "@/lib/admin/list-return";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
@@ -20,6 +22,7 @@ export default function MaterialSupplierForm({ mode, supplierId }: Props) {
   const mutate = useAdminMutation();
   const listBackHref = buildListBackHref("/admin/material-suppliers", searchParams);
   const [loading, setLoading] = useState(mode === "edit");
+  const [loadFailed, setLoadFailed] = useState(false);
   const [supplierCode, setSupplierCode] = useState("");
   const [name, setName] = useState("");
   const [shortName, setShortName] = useState("");
@@ -35,6 +38,7 @@ export default function MaterialSupplierForm({ mode, supplierId }: Props) {
 
   useEffect(() => {
     if (mode !== "edit" || !supplierId) return;
+    setLoadFailed(false);
     void fetch(`/api/material-suppliers/${supplierId}`)
       .then(async (res) => {
         const data = (await res.json()) as {
@@ -65,7 +69,10 @@ export default function MaterialSupplierForm({ mode, supplierId }: Props) {
         setNote(s.note ?? "");
         setIsActive(s.isActive);
       })
-      .catch((err: Error) => setError(err.message))
+      .catch((err: Error) => {
+        setError(err.message);
+        setLoadFailed(true);
+      })
       .finally(() => setLoading(false));
   }, [mode, supplierId]);
 
@@ -109,6 +116,21 @@ export default function MaterialSupplierForm({ mode, supplierId }: Props) {
 
   if (loading) return <AdminPageSkeleton message="Đang tải nhà cung cấp vật tư…" />;
 
+  if (mode === "edit" && loadFailed) {
+    return (
+      <EmptyState
+        tone="error"
+        title="Không tải được nhà cung cấp"
+        description={error ?? "Nhà cung cấp không tồn tại hoặc bạn không có quyền xem."}
+        action={
+          <Link href={listBackHref} className="admin-btn">
+            Quay lại danh sách
+          </Link>
+        }
+      />
+    );
+  }
+
   if (createdId) {
     return (
       <div className="admin-panel">
@@ -130,9 +152,26 @@ export default function MaterialSupplierForm({ mode, supplierId }: Props) {
 
   return (
     <>
+      {mode === "edit" && name ? <AdminPageTitle title={name} /> : null}
       <AdminBackLink href={listBackHref} label="Quay lại danh sách nhà cung cấp" />
       <form className="admin-panel" style={{ marginTop: 12 }} onSubmit={(e) => void handleSubmit(e)}>
         {error && <p className="admin-error">{error}</p>}
+        {mode === "edit" && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <span className="admin-crm-detail-code">Mã NCC: {supplierCode}</span>
+            <StatusBadge tone={isActive ? "success" : "neutral"}>
+              {isActive ? "Đang hoạt động" : "Ngừng sử dụng"}
+            </StatusBadge>
+          </div>
+        )}
         {mode === "edit" && (
           <div className="admin-field">
             <label className="admin-label">Mã NCC</label>

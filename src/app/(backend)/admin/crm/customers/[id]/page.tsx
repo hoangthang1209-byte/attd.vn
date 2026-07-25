@@ -17,7 +17,7 @@ export default async function CrmCustomerDetailPage({ params }: PageProps) {
 
   return (
     <>
-      <AdminPageTitle title={`Khách hàng: ${customer.name}`} />
+      <AdminPageTitle title="Khách hàng" />
       <CrmCustomerDetailView initialCustomer={customer} />
     </>
   );

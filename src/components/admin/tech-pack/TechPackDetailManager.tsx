@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AdminLoadingState, AdminPageShell } from "@/components/admin/AdminUi";
+import { AdminLoadingState, AdminPageShell, EmptyState } from "@/components/admin/AdminUi";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { TechPackStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import PatternPicker from "@/components/admin/tech-pack/PatternPicker";
@@ -415,15 +416,30 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
   }
 
   if (loading) return <AdminLoadingState label="Đang tải Tech Pack..." />;
-  if (!pack || !draft) return <p className="admin-error">{error ?? "Không tìm thấy Tech Pack"}</p>;
+  if (!pack || !draft) {
+    return (
+      <EmptyState
+        tone="error"
+        title="Không tìm thấy Tech Pack"
+        description={error ?? "Tech Pack không tồn tại hoặc bạn không có quyền xem."}
+        action={
+          <Link href="/admin/tech-pack" className="admin-btn">
+            Quay lại danh sách
+          </Link>
+        }
+      />
+    );
+  }
 
   const bomCount = pack.bomItems?.length ?? 0;
   const artworkCount = pack.artworkPlacements?.length ?? 0;
   const measurementCount = draft.measurements.filter((r) => r.pointOfMeasure.trim()).length;
   const assetCount = pack.assets?.length ?? 0;
+  const entityTitle = `${pack.code} — ${pack.title ?? pack.productNameSnapshot ?? "Tech Pack"}`;
 
   return (
     <AdminPageShell className={readOnly ? "tech-pack-detail--readonly" : undefined}>
+      <AdminPageTitle title={entityTitle} />
       <div className="tech-pack-workspace">
         <header className="tech-pack-workspace__header">
           <nav className="tech-pack-workspace__breadcrumb" aria-label="Breadcrumb">
@@ -441,9 +457,9 @@ export default function TechPackDetailManager({ techPackId }: { techPackId: stri
 
           <div className="tech-pack-workspace__header-main">
             <div className="tech-pack-workspace__title-block">
-              <h1 className="tech-pack-workspace__title">
-                {pack.code} — {pack.title ?? pack.productNameSnapshot ?? "Tech Pack"}
-              </h1>
+              <h2 className="tech-pack-workspace__title">
+                {entityTitle}
+              </h2>
               <div className="tech-pack-workspace__badges">
                 <TechPackStatusBadge status={pack.status} />
                 <span className="tech-pack-workspace__badge tech-pack-workspace__badge--version">

@@ -5,7 +5,9 @@ import Link from "next/link";
 import {
   AdminLoadingState,
   AdminPageShell,
+  EmptyState,
 } from "@/components/admin/AdminUi";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import PrivateFileUploadZone from "@/components/admin/tech-pack/PrivateFileUploadZone";
@@ -696,7 +698,20 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   }
 
   if (loading) return <AdminLoadingState label="Đang tải rập..." />;
-  if (!pattern || !draft) return <p className="admin-error">{error ?? "Không tìm thấy rập"}</p>;
+  if (!pattern || !draft) {
+    return (
+      <EmptyState
+        tone="error"
+        title="Không tìm thấy rập"
+        description={error ?? "Rập không tồn tại hoặc bạn không có quyền xem."}
+        action={
+          <Link href={PATTERN_ADMIN_LIST_PATH} className="admin-btn">
+            Quay lại danh sách
+          </Link>
+        }
+      />
+    );
+  }
 
   const readOnly = pattern.status === "ARCHIVED";
   const historyEvents = buildPatternHistory(pattern);
@@ -725,9 +740,11 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     categories.find((category) => category.id === draft.productCategoryId)?.name
     ?? pattern.productCategory?.name
     ?? "—";
+  const entityTitle = draft.name || pattern.name;
 
   return (
     <AdminPageShell>
+      <AdminPageTitle title={`${pattern.code} — ${entityTitle}`} />
       <div className="pattern-workspace">
         <header className="pattern-workspace__header">
           <nav className="pattern-workspace__breadcrumb" aria-label="Breadcrumb">
@@ -749,9 +766,9 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 showName={Boolean(draftCategoryVisual?.name)}
               />
               <div className="pattern-workspace__title-content">
-                <h1 className="pattern-workspace__title">
-                  {draft.name || pattern.name}
-                </h1>
+                <h2 className="pattern-workspace__title">
+                  {entityTitle}
+                </h2>
                 <p className="pattern-workspace__title-subline">
                   {pattern.code}
                   {categoryLabel !== "—" ? ` · ${categoryLabel}` : ""}
@@ -794,15 +811,6 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 </button>
               )}
               {!readOnly && (
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--xs admin-btn--danger"
-                  onClick={() => void deletePatternPermanently()}
-                >
-                  Xóa rập
-                </button>
-              )}
-              {!readOnly && (
                 <AdminLoadingButton
                   variant="primary"
                   size="xs"
@@ -813,6 +821,15 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                 >
                   Lưu
                 </AdminLoadingButton>
+              )}
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--xs admin-btn--danger"
+                  onClick={() => void deletePatternPermanently()}
+                >
+                  Xóa rập
+                </button>
               )}
             </div>
           </div>

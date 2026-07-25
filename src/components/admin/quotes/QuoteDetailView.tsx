@@ -16,6 +16,7 @@ import { useAdminToast } from "@/hooks/useAdminToast";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
 import AdminPageSkeleton from "@/components/admin/feedback/AdminPageSkeleton";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { EmptyState } from "@/components/admin/AdminUi";
 import {
   downloadQuotePdfFromApi,
   quotePdfDownloadFilename,
@@ -226,10 +227,16 @@ export default function QuoteDetailView({ id }: { id: string }) {
   if (loading) return <AdminPageSkeleton message="Đang tải báo giá…" />;
   if (error || !quote) {
     return (
-      <div className="admin-empty-state admin-empty-state--error">
-        <p>{error ?? "Không tìm thấy báo giá"}</p>
-        <Link href="/admin/quotes" className="admin-btn">Quay lại</Link>
-      </div>
+      <EmptyState
+        tone="error"
+        title="Không tải được báo giá"
+        description={error ?? "Không tìm thấy báo giá"}
+        action={
+          <Link href="/admin/quotes" className="admin-btn">
+            Quay lại
+          </Link>
+        }
+      />
     );
   }
 
@@ -408,7 +415,6 @@ export default function QuoteDetailView({ id }: { id: string }) {
         <button type="button" className="admin-btn admin-btn--primary" disabled={busy} aria-busy={busy} onClick={() => void updateStatus("SENT")}>Gửi báo giá</button>
         <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} aria-busy={busy} onClick={() => void updateStatus("ACCEPTED")}>Khách đồng ý</button>
         <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} aria-busy={busy} onClick={() => void updateStatus("REJECTED")}>Khách từ chối</button>
-        <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} aria-busy={busy} onClick={() => void updateStatus("CANCELLED")}>Đã hủy</button>
         {quote.order ? (
           <Link href={`/admin/orders/${quote.order.id}`} className="admin-btn admin-btn--secondary">
             Đơn hàng {quote.order.orderNo}
@@ -423,6 +429,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
             Tạo đơn hàng
           </AdminLoadingButton>
         ) : null}
+        <button type="button" className="admin-btn admin-btn--danger" disabled={busy} aria-busy={busy} onClick={() => void updateStatus("CANCELLED")}>Đã hủy</button>
       </div>
     </div>
   );

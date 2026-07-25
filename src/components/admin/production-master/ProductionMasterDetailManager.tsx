@@ -5,9 +5,12 @@ import Link from "next/link";
 import {
   AdminLoadingState,
   AdminPageShell,
+  EmptyState,
   PageHeader,
   SectionCard,
+  StatusBadge,
 } from "@/components/admin/AdminUi";
+import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import ProductionMasterSearchSelect from "@/components/admin/production-master/ProductionMasterSearchSelect";
@@ -102,7 +105,20 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
   }
 
   if (loading) return <AdminLoadingState label="Đang tải..." />;
-  if (!item) return <p className="admin-error">{error ?? "Không tìm thấy"}</p>;
+  if (!item) {
+    return (
+      <EmptyState
+        tone="error"
+        title={`Không tìm thấy ${config.title.toLowerCase()}`}
+        description={error ?? "Bản ghi không tồn tại hoặc đã bị xóa."}
+        action={
+          <Link href={config.listPath} className="admin-btn">
+            Quay lại danh sách
+          </Link>
+        }
+      />
+    );
+  }
 
   const code = String(item.code ?? "");
   const name = String(item.name ?? "");
@@ -111,6 +127,7 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
   const isActive = fieldBool("isActive");
   const isReferenced = usageCount > 0;
   const statusBadge = !isActive ? "Đã lưu trữ" : isReferenced ? "Đang dùng" : "Chưa dùng";
+  const statusTone = !isActive ? "danger" : isReferenced ? "success" : "neutral";
   const createdAt = item.createdAt ? new Date(String(item.createdAt)).toLocaleString("vi-VN") : "—";
   const updatedAt = item.updatedAt ? new Date(String(item.updatedAt)).toLocaleString("vi-VN") : "—";
 
@@ -126,10 +143,21 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
 
   return (
     <AdminPageShell>
+      <AdminPageTitle title={`${code} — ${name}`} />
       <PageHeader
-        title={`${code} — ${name}`}
+        meta={
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <span>
+              <code>{code}</code> · {name}
+            </span>
+            <StatusBadge tone={statusTone}>{statusBadge}</StatusBadge>
+          </div>
+        }
         actions={
           <>
+            <Link href={config.listPath} className="admin-btn">
+              Quay lại
+            </Link>
             {config.kind === "supplier" && (
               <button type="button" className="admin-btn" onClick={() => setMergeOpen(true)}>
                 Gộp nhà cung cấp
@@ -138,9 +166,6 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
             <button type="button" className="admin-btn admin-btn--danger" onClick={() => void handleArchive()}>
               Lưu trữ
             </button>
-            <Link href={config.listPath} className="admin-btn">
-              Quay lại
-            </Link>
           </>
         }
       />
@@ -149,7 +174,7 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
       {saving && <AdminInlineLoader message="Đang lưu dữ liệu master…" />}
 
       <SectionCard title="Thông tin hệ thống">
-        <div className="admin-meta-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+        <div className="admin-meta-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
           <div>
             <strong>Tạo lúc</strong>
             <div>{createdAt}</div>
@@ -160,7 +185,9 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
           </div>
           <div>
             <strong>Trạng thái</strong>
-            <div>{statusBadge}</div>
+            <div>
+              <StatusBadge tone={statusTone}>{statusBadge}</StatusBadge>
+            </div>
           </div>
           <div>
             <strong>Tổng sử dụng</strong>
