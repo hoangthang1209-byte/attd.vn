@@ -20443,7 +20443,8 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   }
 
   .mp-pdp--b2b .mp-pdp-overview-title {
-    font-size: clamp(56px, 5.4vw, 78px);
+    font-size: 52px;
+    line-height: 1.02;
   }
 }
 
