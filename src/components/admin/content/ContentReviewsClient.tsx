@@ -58,8 +58,8 @@ export default function ContentReviewsClient() {
   }, [load]);
 
   return (
-    <div className="admin-page">
-      <p className="admin-field-hint">
+    <div className="admin-panel">
+      <p className="admin-field-hint" style={{ margin: 0 }}>
         Review workspace cho Writing Draft — approve thủ công trước khi handoff Blog DRAFT.
         Bài launch đầu tiên: xem thêm{" "}
         <Link href="/admin/content/launch">Khởi động Content SEO</Link>.

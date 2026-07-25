@@ -133,7 +133,7 @@ export default function TechPackListManager() {
         }
       />
 
-      <DataToolbar data-testid="tech-pack-workspace-toolbar" style={{ marginBottom: 16 }}>
+      <DataToolbar data-testid="tech-pack-workspace-toolbar">
         <input
           className="admin-input admin-data-toolbar__search"
           placeholder="Tìm mã Tech Pack, đơn hàng, sản phẩm, rập…"

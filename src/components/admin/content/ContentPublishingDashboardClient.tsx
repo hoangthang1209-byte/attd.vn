@@ -25,7 +25,7 @@ export default function ContentPublishingDashboardClient() {
 
   function list(title: string, rows: unknown[] | undefined) {
     return (
-      <div className="admin-sidebar-card" style={{ marginBottom: 12 }}>
+      <div className="admin-sidebar-card">
         <h3>{title}</h3>
         <ul style={{ fontSize: 13, paddingLeft: 16 }}>
           {(rows ?? []).slice(0, 12).map((row, i) => {
@@ -57,7 +57,7 @@ export default function ContentPublishingDashboardClient() {
   }
 
   return (
-    <div className="admin-page">
+    <div className="admin-panel">
       <DataToolbar data-testid="content-publishing-toolbar">
         <p className="admin-field-hint" style={{ margin: 0, flex: "1 1 240px" }}>
           Queue publish/schedule/fail. Không auto-publish từ AI.

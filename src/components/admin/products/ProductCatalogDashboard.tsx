@@ -381,6 +381,7 @@ export default function ProductCatalogDashboard() {
           role="toolbar"
           aria-label="Cập nhật hàng loạt sản phẩm"
           data-testid="product-bulk-toolbar"
+          style={{ marginBottom: 0 }}
         >
           <span className="admin-field-hint">Đã chọn {selectedIds.size} sản phẩm</span>
           <button

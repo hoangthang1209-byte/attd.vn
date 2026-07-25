@@ -12,6 +12,7 @@ import { useCustomerTypeOptions } from "@/components/admin/crm/useCustomerTypeOp
 import { CUSTOMER_STATUS_LABELS } from "@/features/crm/labels";
 import { formatCrmDateTime } from "@/features/crm/format";
 import { CRM_CUSTOMER_STATUSES, type CrmCustomerRecord } from "@/features/crm/types";
+import { PageHeader } from "@/components/admin/AdminUi";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import { useAdminToast } from "@/hooks/useAdminToast";
 
@@ -216,37 +217,37 @@ export default function CrmCustomersList() {
 
   return (
     <div className="admin-panel">
-      <div className="admin-section-header">
-        <p>
-          Tổng: {total} khách hàng
-          {selectedIds.size > 0 ? ` · Đã chọn ${selectedIds.size} khách hàng` : ""}
-        </p>
-        <div
-          className="admin-page-header__actions"
-          data-testid="customers-workspace-actions"
-          style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-        >
-          <Link href="/admin/crm/customer-types" className="admin-btn admin-btn--secondary">
-            Loại khách hàng
-          </Link>
-          {selectedIds.size > 0 ? (
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary"
-              onClick={openBulkModal}
-              data-testid="customers-bulk-action"
-            >
-              Sửa hàng loạt
-            </button>
-          ) : null}
-          <Link href="/admin/crm/customers/import" className="admin-btn admin-btn--secondary">
-            Import Excel
-          </Link>
-          <Link href="/admin/crm/customers/new" className="admin-btn admin-btn--primary">
-            Thêm khách hàng
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        meta={
+          <span>
+            Tổng: {total} khách hàng
+            {selectedIds.size > 0 ? ` · Đã chọn ${selectedIds.size} khách hàng` : ""}
+          </span>
+        }
+        actions={
+          <span data-testid="customers-workspace-actions" style={{ display: "contents" }}>
+            <Link href="/admin/crm/customer-types" className="admin-btn admin-btn--secondary">
+              Loại khách hàng
+            </Link>
+            {selectedIds.size > 0 ? (
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary"
+                onClick={openBulkModal}
+                data-testid="customers-bulk-action"
+              >
+                Sửa hàng loạt
+              </button>
+            ) : null}
+            <Link href="/admin/crm/customers/import" className="admin-btn admin-btn--secondary">
+              Import Excel
+            </Link>
+            <Link href="/admin/crm/customers/new" className="admin-btn admin-btn--primary">
+              Thêm khách hàng
+            </Link>
+          </span>
+        }
+      />
 
       {loadState === "error" && (
         <div className="admin-empty-state admin-empty-state--error">
