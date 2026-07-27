@@ -19,6 +19,7 @@ import {
 import type { ItemProductionRiskStatus, ItemProductionStageKey, ItemProductionStatus } from "@prisma/client";
 import ItemProductionStageDrawer from "@/components/admin/item-production/ItemProductionStageDrawer";
 import ItemProductionDetailDrawer from "@/components/admin/item-production/ItemProductionDetailDrawer";
+import { ITEM_PRODUCTION_RISK_CONFIG } from "@/features/item-production-tracking/config";
 
 type StageCell = {
   id: string;
@@ -87,15 +88,55 @@ function stageCellContent(stage: StageCell) {
   if (stage.status === "BLOCKED") return "!";
   if (stage.status === "COMPLETED") return "✓";
   if (stage.status === "IN_PROGRESS") {
-    return `${stage.completedQuantity}/${stage.plannedQuantity || "—"}`;
+    return "●";
   }
-  return "○";
+  return "—";
 }
 
 function formatDate(value: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleDateString("vi-VN");
 }
+
+function toStartOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function differenceInDays(target: Date, now: Date) {
+  const ms = toStartOfDay(target).getTime() - toStartOfDay(now).getTime();
+  return Math.round(ms / (24 * 60 * 60 * 1000));
+}
+
+function relativeTime(value: string | null) {
+  if (!value) return "Chưa cập nhật";
+  const now = Date.now();
+  const ts = new Date(value).getTime();
+  const diffMs = Math.max(0, now - ts);
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "Vừa xong";
+  if (minutes < 60) return `${minutes} phút trước`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} giờ trước`;
+  const days = Math.floor(hours / 24);
+  return `${days} ngày trước`;
+}
+
+function stageTone(status: string): "neutral" | "info" | "warning" | "success" {
+  if (status === "COMPLETED") return "success";
+  if (status === "IN_PROGRESS") return "info";
+  if (status === "BLOCKED") return "warning";
+  return "neutral";
+}
+
+type FilterMap = Record<string, string>;
+type AlertItem = {
+  key: string;
+  label: string;
+  description: string;
+  value: number;
+  tone: "warning" | "danger" | "info";
+  filter: FilterMap;
+};
 
 export default function ItemProductionTimelineManager() {
   const toast = useAdminToast();
@@ -151,17 +192,6 @@ export default function ItemProductionTimelineManager() {
     });
   }, [load]);
 
-  const kpiCards = [
-    { key: "total", label: "Tổng item", value: kpis?.total ?? 0, filter: null },
-    { key: "inProduction", label: "Đang sản xuất", value: kpis?.inProduction ?? 0, filter: { productionStatus: "IN_PRODUCTION" } },
-    { key: "awaitingQc", label: "Đang chờ QC", value: kpis?.awaitingQc ?? 0, filter: { currentStage: "QC" } },
-    { key: "readyToShip", label: "Sẵn sàng giao", value: kpis?.readyToShip ?? 0, filter: { readyToShip: "1" } },
-    { key: "needsAttention", label: "Cần chú ý", value: kpis?.needsAttention ?? 0, filter: { riskStatus: "NEEDS_ATTENTION" } },
-    { key: "atRisk", label: "Nguy cơ trễ", value: kpis?.atRisk ?? 0, filter: { riskStatus: "AT_RISK" } },
-    { key: "delayed", label: "Đã trễ", value: kpis?.delayed ?? 0, filter: { riskStatus: "DELAYED" } },
-    { key: "stale", label: "Quá hạn cập nhật", value: kpis?.stale ?? 0, filter: { onlyStale: "1" } },
-  ] as const;
-
   function applyKpiFilter(filter: Record<string, string> | null) {
     const next = new URLSearchParams();
     if (filter) {
@@ -181,26 +211,138 @@ export default function ItemProductionTimelineManager() {
   }, [items]);
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const shippingToday = useMemo(
+    () => {
+      const now = new Date();
+      return items.filter((item) => {
+        if (!item.promisedDeliveryDate) return false;
+        return differenceInDays(new Date(item.promisedDeliveryDate), now) === 0;
+      }).length;
+    },
+    [items],
+  );
 
+  const alerts = useMemo(() => {
+    const now = new Date();
+    const delayed = items.filter((item) => item.riskStatus === "DELAYED").length;
+    const blocked = items.filter((item) => item.riskStatus === "BLOCKED").length;
+    const missingSupplier = items.filter(
+      (item) =>
+        (item.productionStatus === "IN_PRODUCTION" || item.productionStatus === "FINISHING") &&
+        !item.supplier,
+    ).length;
+    const stale = items.filter((item) => {
+      if (!item.lastProgressAt) return true;
+      const days = differenceInDays(now, new Date(item.lastProgressAt));
+      return days >= ITEM_PRODUCTION_RISK_CONFIG.staleUpdateDays;
+    }).length;
+    return [
+      {
+        key: "blocked",
+        label: "Sản xuất bị chặn",
+        description: "Có công đoạn đang bị chặn.",
+        value: blocked,
+        tone: "warning" as const,
+        filter: { riskStatus: "BLOCKED" } as FilterMap,
+      },
+      {
+        key: "delayed",
+        label: "Sản xuất trễ hạn",
+        description: "Đã quá ngày giao dự kiến.",
+        value: delayed,
+        tone: "danger" as const,
+        filter: { riskStatus: "DELAYED" } as FilterMap,
+      },
+      {
+        key: "missing-supplier",
+        label: "Thiếu xưởng phụ trách",
+        description: "Đang sản xuất nhưng chưa gán xưởng.",
+        value: missingSupplier,
+        tone: "warning" as const,
+        filter: { productionStatus: "IN_PRODUCTION" } as FilterMap,
+      },
+      {
+        key: "shipping-today",
+        label: "Cần giao hôm nay",
+        description: "Item có ngày giao là hôm nay.",
+        value: shippingToday,
+        tone: "info" as const,
+        filter: { shippingToday: "1" } as FilterMap,
+      },
+      {
+        key: "stale",
+        label: "Quá hạn cập nhật",
+        description: `Chưa cập nhật trên ${ITEM_PRODUCTION_RISK_CONFIG.staleUpdateDays} ngày.`,
+        value: stale,
+        tone: "warning" as const,
+        filter: { onlyStale: "1" } as FilterMap,
+      },
+    ].filter((entry): entry is AlertItem => entry.value > 0);
+  }, [items, shippingToday]);
+
+  const filteredItems = useMemo(() => {
+    const now = new Date();
+    if (searchParams.get("shippingToday") !== "1") return items;
+    return items.filter((item) => {
+      if (!item.promisedDeliveryDate) return false;
+      return differenceInDays(new Date(item.promisedDeliveryDate), now) === 0;
+    });
+  }, [items, searchParams]);
+
+  const stickyOffsets = { order: 0, product: 110, progress: 390, risk: 510 };
   return (
     <div className="admin-panel">
       <div
         className="admin-catalog-kpi-bar"
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginBottom: 16 }}
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, marginBottom: 16 }}
       >
-        {kpiCards.map((card) => (
+        {[
+          { key: "inProduction", label: "In Production", value: kpis?.inProduction ?? 0, tone: "#166534", bg: "#ecfdf3", filter: { productionStatus: "IN_PRODUCTION" } as FilterMap },
+          { key: "needsAttention", label: "Needs Attention", value: kpis?.needsAttention ?? 0, tone: "#a16207", bg: "#fffbeb", filter: { riskStatus: "NEEDS_ATTENTION" } as FilterMap },
+          { key: "delayed", label: "Delayed", value: kpis?.delayed ?? 0, tone: "#991b1b", bg: "#fef2f2", filter: { riskStatus: "DELAYED" } as FilterMap },
+          { key: "readyToShip", label: "Ready to Ship", value: kpis?.readyToShip ?? 0, tone: "#1d4ed8", bg: "#eff6ff", filter: { readyToShip: "1" } as FilterMap },
+          { key: "shippingToday", label: "Shipping Today", value: shippingToday, tone: "#0f766e", bg: "#f0fdfa", filter: { shippingToday: "1" } as FilterMap },
+          { key: "stale", label: "Overdue Updates", value: kpis?.stale ?? 0, tone: "#7c2d12", bg: "#fff7ed", filter: { onlyStale: "1" } as FilterMap },
+        ].map((card) => (
           <button
             key={card.key}
             type="button"
             className="admin-catalog-kpi"
-            style={{ textAlign: "left", cursor: "pointer", border: "none" }}
-            onClick={() => applyKpiFilter(card.filter ? { ...card.filter } : null)}
+            style={{ textAlign: "left", cursor: "pointer", border: "1px solid #e5e7eb", background: card.bg, color: card.tone }}
+            onClick={() => applyKpiFilter(card.filter)}
           >
             <strong>{card.value}</strong>
             <span>{card.label}</span>
           </button>
         ))}
       </div>
+
+      {alerts.length > 0 ? (
+        <section className="admin-section-card" style={{ marginBottom: 14 }}>
+          <div className="admin-section-header">
+            <h3 className="admin-subtitle" style={{ margin: 0 }}>
+              Alert Center
+            </h3>
+            <span className="admin-field-hint">{alerts.length} cảnh báo hoạt động</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8 }}>
+            {alerts.map((alert) => (
+              <button
+                key={alert.key}
+                type="button"
+                onClick={() => applyKpiFilter(alert.filter)}
+                className="admin-btn admin-btn--secondary"
+                style={{ textAlign: "left", padding: "10px 12px", borderColor: alert.tone === "danger" ? "#ef4444" : undefined }}
+              >
+                <div style={{ fontWeight: 700 }}>{alert.label}</div>
+                <div className="admin-field-hint">
+                  {alert.value} item · {alert.description}
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <DataToolbar>
         <input
@@ -248,6 +390,14 @@ export default function ItemProductionTimelineManager() {
           />
           Chỉ đã trễ
         </label>
+        <label className="admin-field-hint" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={searchParams.get("shippingToday") === "1"}
+            onChange={(e) => setParam("shippingToday", e.target.checked ? "1" : null)}
+          />
+          Giao hôm nay
+        </label>
         <WorkspaceToolbarEnd>
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
             Làm mới
@@ -268,7 +418,7 @@ export default function ItemProductionTimelineManager() {
             </button>
           }
         />
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <EmptyState
           title="Chưa có item sản xuất"
           description="Khởi tạo theo dõi từ chi tiết đơn hàng để bắt đầu theo dõi tiến độ theo item."
@@ -284,16 +434,26 @@ export default function ItemProductionTimelineManager() {
             <table className="admin-table admin-table--compact">
               <thead>
                 <tr>
-                  <th style={{ position: "sticky", left: 0, background: "var(--admin-surface, #fff)", zIndex: 1 }}>Đơn</th>
-                  <th>Khách hàng</th>
-                  <th>Item / SP</th>
-                  <th>SL</th>
-                  <th>Sẵn sàng</th>
-                  <th>Ngày giao</th>
-                  <th>Xưởng</th>
-                  <th>Phụ trách</th>
-                  <th>TT / Rủi ro</th>
-                  <th>Tiến độ</th>
+                  <th style={{ position: "sticky", left: stickyOffsets.order, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 110 }}>
+                    Đơn
+                  </th>
+                  <th style={{ minWidth: 160 }}>Khách hàng</th>
+                  <th style={{ position: "sticky", left: stickyOffsets.product, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 280 }}>
+                    Sản phẩm / SKU
+                  </th>
+                  <th style={{ minWidth: 130 }}>Xưởng</th>
+                  <th style={{ minWidth: 120 }}>PIC</th>
+                  <th style={{ position: "sticky", left: stickyOffsets.progress, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 120 }}>
+                    Tiến độ
+                  </th>
+                  <th style={{ position: "sticky", left: stickyOffsets.risk, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 130 }}>
+                    Rủi ro
+                  </th>
+                  <th style={{ minWidth: 110 }}>Số lượng</th>
+                  <th style={{ minWidth: 140 }}>Sẵn sàng giao</th>
+                  <th style={{ minWidth: 130 }}>ETA</th>
+                  <th style={{ minWidth: 110 }}>Ngày giao</th>
+                  <th style={{ minWidth: 120 }}>Cập nhật</th>
                   {stageKeys.map((key) => (
                     <th key={key} title={ITEM_PRODUCTION_STAGE_LABELS[key]}>
                       {ITEM_PRODUCTION_STAGE_LABELS[key]}
@@ -302,7 +462,8 @@ export default function ItemProductionTimelineManager() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
+                {filteredItems.map((item) => {
+                  const now = new Date();
                   const customer =
                     item.orderItem.order.customer?.name ||
                     item.orderItem.order.customerCompanyName ||
@@ -312,16 +473,25 @@ export default function ItemProductionTimelineManager() {
                     item.orderItem.designMediaAsset?.thumbnailUrl ||
                     item.orderItem.designMediaAsset?.url ||
                     item.orderItem.designImageUrl;
+                  const progress = Number(item.progressPercent);
+                  const readyRatio = item.plannedQuantity > 0 ? Math.round((item.readyQuantity / item.plannedQuantity) * 100) : 0;
+                  const etaText = (() => {
+                    if (!item.promisedDeliveryDate) return "—";
+                    const days = differenceInDays(new Date(item.promisedDeliveryDate), now);
+                    if (days < 0) return `Trễ ${Math.abs(days)} ngày`;
+                    if (days === 0) return "Hôm nay";
+                    return `Còn ${days} ngày`;
+                  })();
                   const stageMap = new Map(item.stages.map((s) => [s.stageKey, s]));
                   return (
                     <tr key={item.id}>
-                      <td style={{ position: "sticky", left: 0, background: "var(--admin-surface, #fff)" }}>
+                      <td style={{ position: "sticky", left: stickyOffsets.order, background: "var(--admin-surface, #fff)", zIndex: 2 }}>
                         <button type="button" className="admin-link" onClick={() => setDetailId(item.id)}>
                           {item.orderItem.order.orderNo}
                         </button>
                       </td>
                       <td>{customer}</td>
-                      <td>
+                      <td style={{ position: "sticky", left: stickyOffsets.product, background: "var(--admin-surface, #fff)", zIndex: 2 }}>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           {image ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -332,28 +502,38 @@ export default function ItemProductionTimelineManager() {
                               {item.orderItem.productNameSnapshot ?? "Item"}
                             </button>
                             <div className="admin-field-hint">
-                              {item.orderItem.colorSnapshot || item.orderItem.variantNameSnapshot || "—"} ·{" "}
+                              {item.orderItem.colorSnapshot || item.orderItem.variantNameSnapshot || "—"} · SKU{" "}
                               {item.orderItem.skuSnapshot || item.orderItem.id.slice(0, 8)}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td>{item.orderedQuantity}</td>
-                      <td>
-                        {item.readyQuantity}/{item.plannedQuantity}
-                      </td>
-                      <td>{formatDate(item.promisedDeliveryDate)}</td>
                       <td>{item.supplier?.name ?? "—"}</td>
                       <td>{item.assignedEmployee?.fullName ?? "—"}</td>
-                      <td>
-                        <div style={{ display: "grid", gap: 4 }}>
-                          <span>{ITEM_PRODUCTION_STATUS_LABELS[item.productionStatus]}</span>
-                          <StatusBadge tone={riskTone(item.riskStatus)}>
-                            {ITEM_PRODUCTION_RISK_LABELS[item.riskStatus]}
-                          </StatusBadge>
+                      <td style={{ position: "sticky", left: stickyOffsets.progress, background: "var(--admin-surface, #fff)", zIndex: 2 }}>
+                        <div style={{ display: "grid", gap: 5 }}>
+                          <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                            <div style={{ width: `${Math.min(100, Math.max(0, progress))}%`, height: "100%", background: "#2563eb" }} />
+                          </div>
+                          <strong>{progress.toLocaleString("vi-VN")}%</strong>
                         </div>
                       </td>
-                      <td>{Number(item.progressPercent).toLocaleString("vi-VN")}%</td>
+                      <td style={{ position: "sticky", left: stickyOffsets.risk, background: "var(--admin-surface, #fff)", zIndex: 2 }}>
+                        <StatusBadge tone={riskTone(item.riskStatus)}>{ITEM_PRODUCTION_RISK_LABELS[item.riskStatus]}</StatusBadge>
+                      </td>
+                      <td>
+                        <div>{item.orderedQuantity}</div>
+                        <div className="admin-field-hint">{ITEM_PRODUCTION_STATUS_LABELS[item.productionStatus]}</div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 700 }}>
+                          {item.readyQuantity}/{item.plannedQuantity}
+                        </div>
+                        <div className="admin-field-hint">{readyRatio}%</div>
+                      </td>
+                      <td>{etaText}</td>
+                      <td>{formatDate(item.promisedDeliveryDate)}</td>
+                      <td>{relativeTime(item.lastProgressAt)}</td>
                       {stageKeys.map((key) => {
                         const stage = stageMap.get(key);
                         if (!stage) {
@@ -370,6 +550,34 @@ export default function ItemProductionTimelineManager() {
                               className="admin-btn admin-btn--secondary admin-btn--small"
                               onClick={() => setStageDrawerId(stage.id)}
                               title={stage.labelSnapshot}
+                              style={{
+                                minWidth: 34,
+                                fontWeight: 700,
+                                borderColor:
+                                  stage.status === "BLOCKED"
+                                    ? "#f59e0b"
+                                    : stage.status === "COMPLETED"
+                                      ? "#16a34a"
+                                      : stage.status === "IN_PROGRESS"
+                                        ? "#2563eb"
+                                        : "#d1d5db",
+                                color:
+                                  stage.status === "BLOCKED"
+                                    ? "#b45309"
+                                    : stage.status === "COMPLETED"
+                                      ? "#166534"
+                                      : stage.status === "IN_PROGRESS"
+                                        ? "#1d4ed8"
+                                        : "#6b7280",
+                                background:
+                                  stageTone(stage.status) === "success"
+                                    ? "#ecfdf3"
+                                    : stageTone(stage.status) === "info"
+                                      ? "#eff6ff"
+                                      : stageTone(stage.status) === "warning"
+                                        ? "#fffbeb"
+                                        : "#fff",
+                              }}
                             >
                               {stageCellContent(stage)}
                             </button>

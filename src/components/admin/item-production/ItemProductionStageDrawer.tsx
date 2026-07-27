@@ -6,6 +6,7 @@ import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { ITEM_PRODUCTION_STAGE_LABELS } from "@/features/item-production-tracking/config";
 import {
   ITEM_PRODUCTION_EVENT_LABELS,
+  ITEM_PRODUCTION_RISK_LABELS,
   ITEM_PRODUCTION_STAGE_STATUS_LABELS,
 } from "@/features/item-production-tracking/labels";
 type StageAction = "START" | "PROGRESS_UPDATE" | "COMPLETE" | "BLOCK" | "UNBLOCK" | "REOPEN";
@@ -20,6 +21,11 @@ type ItemPayload = {
   id: string;
   rowVersion: number;
   orderedQuantity: number;
+  plannedQuantity?: number;
+  readyQuantity?: number;
+  progressPercent?: number | string;
+  riskStatus?: string;
+  promisedDeliveryDate?: string | null;
   supplier: { name: string } | null;
   orderItem: {
     id: string;
@@ -90,6 +96,9 @@ export default function ItemProductionStageDrawer({ stageId, onClose, onUpdated 
   }, [stageId]);
 
   const stage = item?.stages.find((s) => s.id === stageId) ?? null;
+  const progress = Number(item?.progressPercent ?? 0);
+  const readyQty = Number(item?.readyQuantity ?? 0);
+  const plannedQty = Number(item?.plannedQuantity ?? item?.orderedQuantity ?? 0);
 
   async function runAction(action: StageAction) {
     if (!item) return;
@@ -141,41 +150,81 @@ export default function ItemProductionStageDrawer({ stageId, onClose, onUpdated 
               <strong>{item.orderItem.productNameSnapshot ?? "Sản phẩm"}</strong>
               <span className="admin-field-hint"> · {item.orderItem.colorSnapshot ?? "—"}</span>
             </p>
-            <p className="admin-field-hint" style={{ margin: 0 }}>
-              Công đoạn: {stage.labelSnapshot || ITEM_PRODUCTION_STAGE_LABELS[stage.stageKey]}
-            </p>
-            <StatusBadge tone="info">
-              {ITEM_PRODUCTION_STAGE_STATUS_LABELS[stage.status] ?? stage.status}
-            </StatusBadge>
-            <p className="admin-field-hint" style={{ margin: 0 }}>
-              SL đặt: {item.orderedQuantity} · Xưởng: {item.supplier?.name ?? "—"}
-            </p>
-            <div
-              className="admin-meta-grid"
-              style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}
-            >
-              <div>Kế hoạch: {stage.plannedQuantity}</div>
-              <div>Nhận: {stage.receivedQuantity}</div>
-              <div>Hoàn thành: {stage.completedQuantity}</div>
-              <div>Đạt: {stage.acceptedQuantity}</div>
-              <div>Lỗi: {stage.rejectedQuantity}</div>
-              <div>Rework: {stage.reworkQuantity}</div>
-              <div>Hao hụt: {stage.wasteQuantity}</div>
-            </div>
-            <label className="admin-label">
-              Số lượng thêm trong lần cập nhật
-              <input
-                className="admin-input"
-                type="number"
-                min={0}
-                value={quantityDelta}
-                onChange={(e) => setQuantityDelta(Number(e.target.value) || 0)}
-              />
-            </label>
-            <label className="admin-label">
-              Ghi chú
-              <textarea className="admin-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
-            </label>
+            <section className="admin-section-card" style={{ margin: 0 }}>
+              <div style={{ display: "grid", gap: 8 }}>
+                <div className="admin-field-hint">
+                  Công đoạn hiện tại: {stage.labelSnapshot || ITEM_PRODUCTION_STAGE_LABELS[stage.stageKey]}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+                  <div>
+                    <div className="admin-field-hint">Progress</div>
+                    <strong>{progress.toLocaleString("vi-VN")}%</strong>
+                  </div>
+                  <div>
+                    <div className="admin-field-hint">Ready Qty</div>
+                    <strong>
+                      {readyQty}/{plannedQty || item.orderedQuantity}
+                    </strong>
+                  </div>
+                  <div>
+                    <div className="admin-field-hint">ETA</div>
+                    <strong>
+                      {item.promisedDeliveryDate ? new Date(item.promisedDeliveryDate).toLocaleDateString("vi-VN") : "—"}
+                    </strong>
+                  </div>
+                  <div>
+                    <div className="admin-field-hint">Risk</div>
+                    <StatusBadge tone="warning">
+                      {item.riskStatus
+                        ? ITEM_PRODUCTION_RISK_LABELS[item.riskStatus as keyof typeof ITEM_PRODUCTION_RISK_LABELS]
+                        : "—"}
+                    </StatusBadge>
+                  </div>
+                </div>
+                <StatusBadge tone="info">{ITEM_PRODUCTION_STAGE_STATUS_LABELS[stage.status] ?? stage.status}</StatusBadge>
+                <p className="admin-field-hint" style={{ margin: 0 }}>
+                  SL đặt: {item.orderedQuantity} · Xưởng: {item.supplier?.name ?? "—"}
+                </p>
+              </div>
+            </section>
+            <section className="admin-section-card" style={{ margin: 0 }}>
+              <h3 className="admin-subtitle" style={{ marginTop: 0 }}>
+                Production Statistics
+              </h3>
+              <div
+                className="admin-meta-grid"
+                style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}
+              >
+                <div>Kế hoạch: {stage.plannedQuantity}</div>
+                <div>Nhận: {stage.receivedQuantity}</div>
+                <div>Hoàn thành: {stage.completedQuantity}</div>
+                <div>Đạt: {stage.acceptedQuantity}</div>
+                <div>Lỗi: {stage.rejectedQuantity}</div>
+                <div>Rework: {stage.reworkQuantity}</div>
+                <div>Hao hụt: {stage.wasteQuantity}</div>
+              </div>
+            </section>
+            <section className="admin-section-card" style={{ margin: 0 }}>
+              <h3 className="admin-subtitle" style={{ marginTop: 0 }}>
+                Cập nhật công đoạn
+              </h3>
+              <div style={{ display: "grid", gap: 10 }}>
+                <label className="admin-label">
+                  Số lượng thêm trong lần cập nhật
+                  <input
+                    className="admin-input"
+                    type="number"
+                    min={0}
+                    value={quantityDelta}
+                    onChange={(e) => setQuantityDelta(Number(e.target.value) || 0)}
+                  />
+                </label>
+                <label className="admin-label">
+                  Ghi chú
+                  <textarea className="admin-input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+                </label>
+              </div>
+            </section>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               <AdminLoadingButton pending={pending} onClick={() => void runAction("START")}>
                 Bắt đầu công đoạn
@@ -197,10 +246,10 @@ export default function ItemProductionStageDrawer({ stageId, onClose, onUpdated 
               </AdminLoadingButton>
             </div>
             <div>
-              <h3 className="admin-subtitle">Lịch sử gần đây</h3>
+              <h3 className="admin-subtitle">Production History Timeline</h3>
               <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
                 {history.map((entry) => (
-                  <li key={entry.id} className="admin-field-hint">
+                  <li key={entry.id} className="admin-field-hint" style={{ borderLeft: "2px solid #d1d5db", paddingLeft: 8 }}>
                     {new Date(entry.happenedAt).toLocaleString("vi-VN")} ·{" "}
                     {ITEM_PRODUCTION_EVENT_LABELS[entry.eventType as keyof typeof ITEM_PRODUCTION_EVENT_LABELS] ??
                       entry.eventType}
