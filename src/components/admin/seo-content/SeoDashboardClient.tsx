@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import { EmptyState, StatusBadge } from "@/components/admin/AdminUi";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
+import {
+  fetchDashboardJson,
+  sectionFromFetchResult,
+  type SectionLoadState,
+} from "@/features/content/editorial/dashboard-fetch";
 import {
   CONTENT_STATUS_COLORS,
   deriveWorkflowNodeStates,
@@ -121,64 +126,153 @@ function ProgressBar({ value, label }: { value: number; label: string }) {
   );
 }
 
+function SectionLoading({ label }: { label: string }) {
+  return (
+    <TableLoading
+      title={label}
+      description="Đang tải…"
+      tone="admin"
+    />
+  );
+}
+
 export default function SeoDashboardClient() {
   const toast = useAdminToast();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [reviews, setReviews] = useState<ReviewRow[]>([]);
-  const [queues, setQueues] = useState<PublishingQueues | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [dashRes, reviewRes, pubRes] = await Promise.all([
-        fetch("/api/content/seo/dashboard"),
-        fetch("/api/content/reviews"),
-        fetch("/api/content/publishing"),
-      ]);
-      const dashJson = (await dashRes.json()) as { dashboard?: DashboardData; message?: string };
-      if (!dashRes.ok || !dashJson.dashboard) {
-        throw new Error(dashJson.message ?? "Không thể tải Content Dashboard");
-      }
-      setData(dashJson.dashboard);
+  const [core, setCore] = useState<SectionLoadState<DashboardData>>({ status: "loading" });
+  const [reviews, setReviews] = useState<SectionLoadState<ReviewRow[]>>({ status: "loading" });
+  const [publishing, setPublishing] = useState<SectionLoadState<PublishingQueues>>({
+    status: "loading",
+  });
+  const [reloadToken, setReloadToken] = useState(0);
 
-      if (reviewRes.ok) {
-        const reviewJson = (await reviewRes.json()) as { reviews?: ReviewRow[] };
-        setReviews(reviewJson.reviews ?? []);
-      } else {
-        setReviews([]);
-      }
+  const load = useCallback(async (signal: AbortSignal) => {
+    setCore({ status: "loading" });
+    setReviews({ status: "loading" });
+    setPublishing({ status: "loading" });
 
-      if (pubRes.ok) {
-        const pubJson = (await pubRes.json()) as { queues?: PublishingQueues };
-        setQueues(pubJson.queues ?? null);
-      } else {
-        setQueues(null);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Không thể tải Content Dashboard";
-      setError(message);
-      toast.error(message);
-      setData(null);
-    } finally {
-      setLoading(false);
+    // Independent sources — optional failures must not block critical dashboard data.
+    const [dashResult, reviewResult, pubResult] = await Promise.all([
+      fetchDashboardJson("/api/content/seo/dashboard", {
+        signal,
+        validate: (json) => {
+          const body = json as { dashboard?: DashboardData; message?: string };
+          if (!body.dashboard || typeof body.dashboard !== "object") {
+            throw new Error(body.message ?? "Thiếu dữ liệu dashboard.");
+          }
+          if (!body.dashboard.counts || !Array.isArray(body.dashboard.priorityTopics)) {
+            throw new Error("Schema dashboard không hợp lệ.");
+          }
+          return body.dashboard;
+        },
+      }),
+      fetchDashboardJson("/api/content/reviews?take=12", {
+        signal,
+        validate: (json) => {
+          const body = json as { reviews?: ReviewRow[] };
+          return Array.isArray(body.reviews) ? body.reviews : [];
+        },
+      }),
+      fetchDashboardJson("/api/content/publishing", {
+        signal,
+        validate: (json) => {
+          const body = json as { queues?: PublishingQueues };
+          return body.queues ?? {};
+        },
+      }),
+    ]);
+
+    if (signal.aborted) return;
+
+    const nextCore = sectionFromFetchResult(dashResult, () => false);
+    setCore(nextCore);
+
+    if (!dashResult.ok && dashResult.error.kind !== "abort") {
+      toastRef.current.error(dashResult.error.message);
     }
-  }, [toast]);
+
+    if (signal.aborted) return;
+
+    setReviews(
+      sectionFromFetchResult(reviewResult, (rows) => rows.length === 0),
+    );
+    setPublishing(
+      sectionFromFetchResult(pubResult, (queues) => {
+        const ready = queues.ready?.length ?? 0;
+        const recent = queues.recent?.length ?? 0;
+        const failed = queues.failed?.length ?? 0;
+        const scheduled = queues.scheduled?.length ?? 0;
+        return ready + recent + failed + scheduled === 0;
+      }),
+    );
+  }, []);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      void load();
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [load, reloadToken]);
+
+  const retryAll = useCallback(() => {
+    setReloadToken((n) => n + 1);
+  }, []);
+
+  const retryReviews = useCallback(async () => {
+    setReviews({ status: "loading" });
+    const controller = new AbortController();
+    const result = await fetchDashboardJson("/api/content/reviews?take=12", {
+      signal: controller.signal,
+      validate: (json) => {
+        const body = json as { reviews?: ReviewRow[] };
+        return Array.isArray(body.reviews) ? body.reviews : [];
+      },
     });
-  }, [load]);
+    setReviews(sectionFromFetchResult(result, (rows) => rows.length === 0));
+  }, []);
+
+  const retryPublishing = useCallback(async () => {
+    setPublishing({ status: "loading" });
+    const result = await fetchDashboardJson("/api/content/publishing", {
+      validate: (json) => {
+        const body = json as { queues?: PublishingQueues };
+        return body.queues ?? {};
+      },
+    });
+    setPublishing(
+      sectionFromFetchResult(result, (queues) => {
+        const ready = queues.ready?.length ?? 0;
+        const recent = queues.recent?.length ?? 0;
+        const failed = queues.failed?.length ?? 0;
+        const scheduled = queues.scheduled?.length ?? 0;
+        return ready + recent + failed + scheduled === 0;
+      }),
+    );
+  }, []);
+
+  const data = core.status === "ready" ? core.data : null;
+  const reviewRows =
+    reviews.status === "ready" ? reviews.data : reviews.status === "empty" ? [] : [];
+  const queues =
+    publishing.status === "ready"
+      ? publishing.data
+      : publishing.status === "empty"
+        ? {}
+        : null;
 
   const openReviews = useMemo(
-    () => reviews.filter((r) => ["NOT_STARTED", "IN_REVIEW", "CHANGES_REQUESTED"].includes(r.status)),
-    [reviews],
+    () => reviewRows.filter((r) => ["NOT_STARTED", "IN_REVIEW", "CHANGES_REQUESTED"].includes(r.status)),
+    [reviewRows],
   );
   const readyToPublish = queues?.ready?.length ?? 0;
   const recentlyPublished = queues?.recent?.length ?? 0;
+
+  const partialWarning =
+    (core.status === "ready" || core.status === "empty") &&
+    (reviews.status === "error" || publishing.status === "error");
 
   const todaySummary = useMemo(() => {
     if (!data) return [];
@@ -186,7 +280,11 @@ export default function SeoDashboardClient() {
       { label: "Chủ đề cần Brief", value: data.counts.approvedTopics, href: "/admin/content/seo-topics?view=approved" },
       { label: "Brief chờ duyệt / viết", value: data.counts.briefReadyTopics, href: "/admin/content/seo-topics?view=brief" },
       { label: "Bản nháp đang viết", value: data.counts.draftingTopics, href: "/admin/content/seo-topics?view=drafting" },
-      { label: "Chờ kiểm duyệt", value: Math.max(data.counts.reviewTopics, openReviews.length), href: "/admin/content/reviews" },
+      {
+        label: "Chờ kiểm duyệt",
+        value: Math.max(data.counts.reviewTopics, openReviews.length),
+        href: "/admin/content/reviews",
+      },
       { label: "Sẵn sàng xuất bản", value: readyToPublish, href: "/admin/content/publishing" },
       { label: "Thiếu hình ảnh", value: data.counts.missingMediaTopics, href: "/admin/content/seo-topics?view=missing-media" },
     ];
@@ -226,11 +324,21 @@ export default function SeoDashboardClient() {
     return {
       knowledge: Math.round(((total - data.counts.noTargetUrlTopics) / total) * 100),
       images: Math.round(((total - data.counts.missingMediaTopics) / total) * 100),
-      seo: Math.round((data.counts.briefReadyTopics + data.counts.draftingTopics + data.counts.reviewTopics + data.counts.publishedTopics) / total * 100),
+      seo: Math.round(
+        ((data.counts.briefReadyTopics +
+          data.counts.draftingTopics +
+          data.counts.reviewTopics +
+          data.counts.publishedTopics) /
+          total) *
+          100,
+      ),
       review: Math.round(((total - data.counts.reviewTopics) / total) * 100),
       publishing: Math.round((data.counts.publishedTopics / total) * 100),
     };
   }, [data]);
+
+  const coreFailed = core.status === "error";
+  const coreLoading = core.status === "loading";
 
   return (
     <>
@@ -249,27 +357,39 @@ export default function SeoDashboardClient() {
             <Link href="/admin/content/launch" className="admin-btn admin-btn--secondary">
               Quy trình viết bài
             </Link>
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={retryAll}>
+              Tải lại
+            </button>
           </div>
         </div>
 
-        {loading ? (
-          <TableLoading
-            title="Đang tải Content Dashboard…"
-            description="Đang tổng hợp việc hôm nay từ chủ đề, kiểm duyệt và xuất bản."
-            tone="admin"
-          />
-        ) : error || !data ? (
+        {partialWarning ? (
+          <p className="admin-message admin-message--warning" role="status">
+            Một số dữ liệu chưa tải được. Các phần còn lại vẫn có thể sử dụng.
+          </p>
+        ) : null}
+
+        {coreFailed ? (
           <EmptyState
             tone="error"
-            title="Không thể tải Content Dashboard"
-            description={error ?? "Vui lòng thử lại sau."}
+            title="Không tải được Content Dashboard"
+            description="Không thể lấy đầy đủ dữ liệu biên tập. Bạn có thể thử tải lại hoặc mở trực tiếp danh sách chủ đề."
             action={
-              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
-                Thử lại
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" className="admin-btn admin-btn--primary" onClick={retryAll}>
+                  Thử lại
+                </button>
+                <Link href="/admin/content/seo-topics" className="admin-btn admin-btn--secondary">
+                  Mở danh sách chủ đề
+                </Link>
+              </div>
             }
           />
-        ) : (
+        ) : null}
+
+        {coreLoading ? (
+          <SectionLoading label="Đang tải Content Dashboard…" />
+        ) : data ? (
           <>
             <section className="admin-section-card" style={{ marginBottom: 16 }}>
               <div className="admin-section-header">
@@ -438,7 +558,10 @@ export default function SeoDashboardClient() {
                                 {topic.dueDate ? ` · Hạn ${formatDate(topic.dueDate)}` : ""}
                               </p>
                               <div>
-                                <Link href={next.href(topic.id)} className="admin-btn admin-btn--primary admin-btn--small">
+                                <Link
+                                  href={next.href(topic.id)}
+                                  className="admin-btn admin-btn--primary admin-btn--small"
+                                >
                                   {next.label}
                                 </Link>
                               </div>
@@ -485,7 +608,20 @@ export default function SeoDashboardClient() {
             >
               <section className="admin-sidebar-card" style={{ margin: 0 }}>
                 <h3 className="admin-sidebar-title">Chờ kiểm duyệt</h3>
-                {openReviews.length === 0 ? (
+                {reviews.status === "loading" ? (
+                  <SectionLoading label="Đang tải kiểm duyệt…" />
+                ) : reviews.status === "error" ? (
+                  <div>
+                    <p className="admin-field-hint">Chưa tải được dữ liệu kiểm duyệt.</p>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--small"
+                      onClick={() => void retryReviews()}
+                    >
+                      Thử lại
+                    </button>
+                  </div>
+                ) : openReviews.length === 0 ? (
                   <p className="admin-field-hint">Không có bài đang chờ kiểm duyệt.</p>
                 ) : (
                   <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
@@ -511,17 +647,37 @@ export default function SeoDashboardClient() {
 
               <section className="admin-sidebar-card" style={{ margin: 0 }}>
                 <h3 className="admin-sidebar-title">Xuất bản</h3>
-                <p className="admin-field-hint" style={{ margin: "0 0 8px" }}>
-                  Sẵn sàng: {readyToPublish} · Vừa đăng: {recentlyPublished} · Lỗi:{" "}
-                  {queues?.failed?.length ?? 0}
-                </p>
-                {(queues?.ready ?? []).slice(0, 4).map((row, index) => (
-                  <div key={String(row.id ?? index)} className="admin-field-hint">
-                    {String(row.title ?? row.id ?? "Bài viết")}
+                {publishing.status === "loading" ? (
+                  <SectionLoading label="Đang tải xuất bản…" />
+                ) : publishing.status === "error" ? (
+                  <div>
+                    <p className="admin-field-hint">Chưa tải được dữ liệu xuất bản.</p>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--small"
+                      onClick={() => void retryPublishing()}
+                    >
+                      Thử lại
+                    </button>
                   </div>
-                ))}
+                ) : (
+                  <>
+                    <p className="admin-field-hint" style={{ margin: "0 0 8px" }}>
+                      Sẵn sàng: {readyToPublish} · Vừa đăng: {recentlyPublished} · Lỗi:{" "}
+                      {queues?.failed?.length ?? 0}
+                    </p>
+                    {(queues?.ready ?? []).slice(0, 4).map((row, index) => (
+                      <div key={String(row.id ?? index)} className="admin-field-hint">
+                        {String(row.title ?? row.id ?? "Bài viết")}
+                      </div>
+                    ))}
+                  </>
+                )}
                 <div style={{ marginTop: 10 }}>
-                  <Link href="/admin/content/publishing" className="admin-btn admin-btn--secondary admin-btn--small">
+                  <Link
+                    href="/admin/content/publishing"
+                    className="admin-btn admin-btn--secondary admin-btn--small"
+                  >
                     Mở workspace xuất bản
                   </Link>
                 </div>
@@ -598,7 +754,7 @@ export default function SeoDashboardClient() {
               )}
             </section>
           </>
-        )}
+        ) : null}
       </div>
     </>
   );

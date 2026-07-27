@@ -202,6 +202,11 @@ export async function listContentReviews(filters?: {
         where: { id: row.writingDraftId },
         select: { status: true, version: true, qaReport: true },
       });
+      // Only surface QA score — never return full report bodies to list/dashboard clients.
+      const qaScore =
+        draft?.qaReport && typeof draft.qaReport === "object" && draft.qaReport !== null
+          ? Number((draft.qaReport as { score?: number }).score ?? 0)
+          : null;
       const topic = plan
         ? await prisma.seoTopic.findUnique({
             where: { id: plan.topicId },
@@ -215,11 +220,8 @@ export async function listContentReviews(filters?: {
           status: "COMPLETED",
         },
         orderBy: { createdAt: "desc" },
+        select: { targetEntityId: true },
       });
-      const qaScore =
-        draft?.qaReport && typeof draft.qaReport === "object" && draft.qaReport !== null
-          ? Number((draft.qaReport as { score?: number }).score ?? 0)
-          : null;
 
       return {
         id: row.id,

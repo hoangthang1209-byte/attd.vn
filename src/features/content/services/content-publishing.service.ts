@@ -713,12 +713,30 @@ export async function listPublishingQueue(filters?: {
         where: { contentModifiedAfterHandoff: true },
         orderBy: { updatedAt: "desc" },
         take,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          status: true,
+          sourceWritingDraftId: true,
+          contentModifiedAfterHandoff: true,
+          updatedAt: true,
+        },
       });
     case "failed": {
       const events = await prisma.contentPublishEvent.findMany({
         where: { status: "FAILED" },
         orderBy: { createdAt: "desc" },
         take,
+        select: {
+          id: true,
+          blogPostId: true,
+          action: true,
+          status: true,
+          errorMessage: true,
+          createdAt: true,
+          completedAt: true,
+        },
       });
       return events;
     }
@@ -727,6 +745,17 @@ export async function listPublishingQueue(filters?: {
         where: { status: { in: ["DRAFT", "REVIEW"] }, sourceHandoffRecordId: { not: null } },
         orderBy: { updatedAt: "desc" },
         take,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          status: true,
+          scheduledAt: true,
+          sourceWritingDraftId: true,
+          sourceHandoffRecordId: true,
+          contentModifiedAfterHandoff: true,
+          updatedAt: true,
+        },
       });
   }
 }
