@@ -347,15 +347,12 @@ export default function SeoDashboardClient() {
         <div className="admin-section-header" style={{ alignItems: "flex-start" }}>
           <div>
             <p className="admin-field-hint" style={{ margin: 0 }}>
-              Bảng điều khiển biên tập — ưu tiên việc cần làm hôm nay, không phải số liệu kỹ thuật.
+              Việc cần làm hôm nay.
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Link href="/admin/content/seo-topics" className="admin-btn admin-btn--primary">
-              Mở danh sách chủ đề
-            </Link>
-            <Link href="/admin/content/launch" className="admin-btn admin-btn--secondary">
-              Quy trình viết bài
+              Danh sách chủ đề
             </Link>
             <button type="button" className="admin-btn admin-btn--secondary" onClick={retryAll}>
               Tải lại
@@ -429,7 +426,7 @@ export default function SeoDashboardClient() {
               <section className="admin-section-card" style={{ marginBottom: 16 }}>
                 <div className="admin-section-header">
                   <h2 className="admin-subtitle" style={{ margin: 0 }}>
-                    Quy trình biên tập
+                    Quy trình
                   </h2>
                 </div>
                 <div
@@ -532,7 +529,7 @@ export default function SeoDashboardClient() {
                               style={{ margin: 0, display: "grid", gap: 8 }}
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                                <Link href={`/admin/content/seo-topics/${topic.id}`} className="admin-link">
+                                <Link href={`/admin/content/topics/${topic.id}`} className="admin-link">
                                   <strong>{topic.title}</strong>
                                 </Link>
                                 <span
@@ -691,7 +688,7 @@ export default function SeoDashboardClient() {
                   <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
                     {data.upcomingDue.slice(0, 6).map((topic) => (
                       <li key={topic.id}>
-                        <Link href={`/admin/content/seo-topics/${topic.id}`} className="admin-link">
+                        <Link href={`/admin/content/topics/${topic.id}`} className="admin-link">
                           {topic.title}
                         </Link>
                         <div className="admin-field-hint">

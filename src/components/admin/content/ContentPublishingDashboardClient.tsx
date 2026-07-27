@@ -19,34 +19,34 @@ const QUEUE_META: Record<
   { title: string; description: string; tone: keyof typeof CONTENT_STATUS_COLORS; primaryLabel: string }
 > = {
   ready: {
-    title: "Bản nháp",
-    description: "Bài đã sẵn sàng để xuất bản thủ công.",
+    title: "Ready",
+    description: "Sẵn sàng xuất bản.",
     tone: "draft",
-    primaryLabel: "Xuất bản",
+    primaryLabel: "Publish",
   },
   scheduled: {
-    title: "Đã lên lịch",
-    description: "Bài sẽ đăng theo lịch đã xác nhận.",
+    title: "Scheduled",
+    description: "Đã lên lịch đăng.",
     tone: "scheduled",
-    primaryLabel: "Xem lịch",
+    primaryLabel: "Schedule",
   },
   recent: {
-    title: "Đã xuất bản",
-    description: "Bài vừa đăng gần đây.",
+    title: "Published",
+    description: "Đã xuất bản.",
     tone: "published",
-    primaryLabel: "Xem bài",
+    primaryLabel: "Preview",
   },
   failed: {
-    title: "Xuất bản lỗi",
-    description: "Cần xử lý trước khi đăng lại.",
+    title: "Failed",
+    description: "Xuất bản thất bại — cần xử lý.",
     tone: "blocked",
-    primaryLabel: "Xử lý lỗi",
+    primaryLabel: "Retry",
   },
   modified: {
-    title: "Đã chỉnh sau bàn giao",
-    description: "Nội dung thay đổi sau khi tạo bản nháp Blog.",
+    title: "History",
+    description: "Thay đổi sau khi tạo bản nháp.",
     tone: "needsReview",
-    primaryLabel: "Xem lại",
+    primaryLabel: "Open",
   },
 };
 

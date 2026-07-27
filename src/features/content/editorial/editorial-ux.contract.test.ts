@@ -4,9 +4,13 @@ import { readFileSync } from "node:fs";
 import { adminNavigationSections } from "@/lib/admin/admin-navigation";
 import { getAdminBreadcrumbMeta } from "@/lib/admin/admin-breadcrumbs";
 import {
+  buildEditorialChecklist,
+  deriveTopicDocumentNodes,
   deriveWorkflowNodeStates,
-  getTopicNextAction,
+  DOCUMENT_WORKFLOW_STEPS,
   EDITORIAL_WORKFLOW_STEPS,
+  getTopicNextAction,
+  getTopicProgressPercent,
 } from "@/features/content/editorial/editorial-ux";
 
 function read(path: string) {
@@ -20,7 +24,7 @@ describe("Sprint 13.1 content editorial IA", () => {
     const labels = content.platforms[0].items.map((i) => i.label);
     assert.ok(labels.includes("Dashboard"));
     assert.ok(labels.includes("Chủ đề"));
-    assert.ok(labels.includes("Viết bài"));
+    assert.ok(labels.includes("Hướng dẫn biên tập"));
     assert.ok(labels.includes("Kiểm duyệt"));
     assert.ok(labels.includes("Xuất bản"));
     assert.ok(labels.includes("Blog"));
@@ -44,11 +48,15 @@ describe("Sprint 13.1 content editorial IA", () => {
     ]);
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/launch").breadcrumbs, [
       "NỘI DUNG",
-      "Viết bài",
+      "Hướng dẫn biên tập",
     ]);
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/reviews").breadcrumbs, [
       "NỘI DUNG",
       "Kiểm duyệt",
+    ]);
+    assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/topics/abc").breadcrumbs, [
+      "NỘI DUNG",
+      "Workspace",
     ]);
   });
 
@@ -56,15 +64,17 @@ describe("Sprint 13.1 content editorial IA", () => {
     const source = read("src/components/admin/seo-content/SeoDashboardClient.tsx");
     assert.match(source, /Việc hôm nay/);
     assert.match(source, /Việc của tôi/);
-    assert.match(source, /Quy trình biên tập/);
+    assert.match(source, /Quy trình/);
     assert.match(source, /Sức khỏe nội dung/);
     assert.doesNotMatch(source, /SEO Content Platform/);
   });
 
   it("provides one primary next action per topic status", () => {
     assert.equal(getTopicNextAction("APPROVED").label, "Tạo Brief");
+    assert.equal(getTopicNextAction("DRAFTING").label, "Continue Draft");
     assert.equal(getTopicNextAction("DRAFTING").group, "needs_writing");
     assert.equal(getTopicNextAction("REVIEW").group, "needs_review");
+    assert.equal(getTopicNextAction("DRAFTING").href("t1"), "/admin/content/topics/t1");
     assert.equal(EDITORIAL_WORKFLOW_STEPS.length, 8);
     const nodes = deriveWorkflowNodeStates({
       approvedTopics: 2,
@@ -77,5 +87,34 @@ describe("Sprint 13.1 content editorial IA", () => {
     });
     assert.equal(nodes.writing, "active");
     assert.equal(nodes.review, "active");
+  });
+
+  it("document workspace helpers expose progress and checklist", () => {
+    assert.equal(getTopicProgressPercent("DRAFTING"), 62);
+    assert.equal(DOCUMENT_WORKFLOW_STEPS.length, 7);
+    assert.equal(deriveTopicDocumentNodes("DRAFTING").draft, "active");
+    const checklist = buildEditorialChecklist({
+      status: "DRAFTING",
+      briefApproved: true,
+      outlineCount: 3,
+      hasMetaTitle: true,
+      hasMetaDescription: false,
+      internalLinkCount: 0,
+      hasMediaBundle: true,
+      mediaPlanOk: false,
+      hasTargetUrl: false,
+    });
+    assert.ok(checklist.some((i) => i.group === "content" && i.done));
+    assert.ok(checklist.some((i) => i.id === "meta" && !i.done));
+  });
+
+  it("topic workspace route and client are document-first", () => {
+    const page = read("src/app/(backend)/admin/content/topics/[id]/page.tsx");
+    const client = read("src/components/admin/seo-content/SeoTopicDetailClient.tsx");
+    assert.match(page, /SeoTopicDetailClient/);
+    assert.match(client, /Editorial Workspace/);
+    assert.match(client, /Continue Writing/);
+    assert.match(client, /Knowledge \(tham khảo\)/);
+    assert.match(client, /id=\"writing\"/);
   });
 });

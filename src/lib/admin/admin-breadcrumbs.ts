@@ -455,6 +455,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/topics/:id",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "Workspace"],
+      title: "Editorial Workspace",
+      description: "Workspace biên tập cho một chủ đề: Brief, Context, Viết bài và QA.",
+    },
+  },
+  {
     path: "/admin/content/seo-topics/:id",
     meta: {
       breadcrumbs: ["NỘI DUNG", "Chủ đề", "Chi tiết"],
@@ -473,8 +481,8 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/launch",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Viết bài"],
-      title: "Viết bài",
+      breadcrumbs: ["NỘI DUNG", "Hướng dẫn biên tập"],
+      title: "Hướng dẫn biên tập",
       description: "Quy trình viết bài từ Brief đến xuất bản — dành cho biên tập viên.",
     },
   },

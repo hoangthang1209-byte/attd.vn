@@ -24,6 +24,11 @@ export type EditorialNextAction = {
   group: EditorialTaskGroup;
 };
 
+/** Canonical document workspace path for a topic (UX alias of seo-topics detail). */
+export function topicWorkspaceHref(topicId: string): string {
+  return `/admin/content/topics/${topicId}`;
+}
+
 /** Map topic pipeline status → one primary editorial next action (UX only). */
 export function getTopicNextAction(status: SeoTopicStatus): EditorialNextAction {
   switch (status) {
@@ -31,54 +36,179 @@ export function getTopicNextAction(status: SeoTopicStatus): EditorialNextAction 
     case "RESEARCHING":
       return {
         label: "Duyệt chủ đề",
-        href: (id) => `/admin/content/seo-topics/${id}`,
+        href: topicWorkspaceHref,
         group: "needs_brief",
       };
     case "APPROVED":
       return {
         label: "Tạo Brief",
-        href: (id) => `/admin/content/seo-topics/${id}`,
+        href: topicWorkspaceHref,
         group: "needs_brief",
       };
     case "BRIEF_READY":
       return {
-        label: "Xây dựng Context & viết bài",
-        href: (id) => `/admin/content/seo-topics/${id}`,
+        label: "Bắt đầu viết",
+        href: topicWorkspaceHref,
         group: "needs_writing",
       };
     case "DRAFTING":
       return {
-        label: "Tiếp tục viết / chạy QA",
-        href: (id) => `/admin/content/seo-topics/${id}`,
+        label: "Continue Draft",
+        href: topicWorkspaceHref,
         group: "needs_writing",
       };
     case "REVIEW":
       return {
-        label: "Kiểm duyệt",
-        href: (id) => `/admin/content/reviews`,
+        label: "Needs Review",
+        href: () => `/admin/content/reviews`,
         group: "needs_review",
       };
     case "PUBLISHED":
       return {
         label: "Xem bài đã xuất bản",
-        href: (id) => `/admin/content/seo-topics/${id}`,
+        href: topicWorkspaceHref,
         group: "recently_published",
       };
     case "PAUSED":
     case "REJECTED":
       return {
         label: "Xem lại chủ đề",
-        href: (id) => `/admin/content/seo-topics/${id}`,
+        href: topicWorkspaceHref,
         group: "needs_brief",
       };
     case "ARCHIVED":
     default:
       return {
-        label: "Mở chủ đề",
-        href: (id) => `/admin/content/seo-topics/${id}`,
+        label: "Open Workspace",
+        href: topicWorkspaceHref,
         group: "needs_brief",
       };
   }
+}
+
+/** Display-only progress for topic rows / workspace header. */
+export function getTopicProgressPercent(status: SeoTopicStatus): number {
+  switch (status) {
+    case "IDEA":
+    case "RESEARCHING":
+      return 12;
+    case "APPROVED":
+      return 25;
+    case "BRIEF_READY":
+      return 40;
+    case "DRAFTING":
+      return 62;
+    case "REVIEW":
+      return 80;
+    case "PUBLISHED":
+      return 100;
+    case "PAUSED":
+    case "REJECTED":
+      return 35;
+    case "ARCHIVED":
+      return 100;
+    default:
+      return 0;
+  }
+}
+
+export const DOCUMENT_WORKFLOW_STEPS = [
+  { key: "idea", label: "Idea", sectionId: "overview" },
+  { key: "brief", label: "Brief", sectionId: "brief" },
+  { key: "outline", label: "Outline", sectionId: "writing" },
+  { key: "draft", label: "Draft", sectionId: "writing" },
+  { key: "qa", label: "QA", sectionId: "writing" },
+  { key: "review", label: "Review", sectionId: "checklist" },
+  { key: "publish", label: "Publish", sectionId: "checklist" },
+] as const;
+
+export type DocumentNodeState = "completed" | "active" | "waiting";
+
+/** Per-topic document timeline (display only — no workflow changes). */
+export function deriveTopicDocumentNodes(status: SeoTopicStatus): Record<
+  (typeof DOCUMENT_WORKFLOW_STEPS)[number]["key"],
+  DocumentNodeState
+> {
+  const order = ["idea", "brief", "outline", "draft", "qa", "review", "publish"] as const;
+  const activeIndex =
+    status === "IDEA" || status === "RESEARCHING"
+      ? 0
+      : status === "APPROVED"
+        ? 1
+        : status === "BRIEF_READY"
+          ? 2
+          : status === "DRAFTING"
+            ? 3
+            : status === "REVIEW"
+              ? 5
+              : status === "PUBLISHED" || status === "ARCHIVED"
+                ? 6
+                : 0;
+  const result = {} as Record<(typeof order)[number], DocumentNodeState>;
+  for (let i = 0; i < order.length; i += 1) {
+    const key = order[i];
+    if (status === "PUBLISHED" || status === "ARCHIVED") {
+      result[key] = "completed";
+    } else if (i < activeIndex) {
+      result[key] = "completed";
+    } else if (i === activeIndex) {
+      result[key] = "active";
+    } else {
+      result[key] = "waiting";
+    }
+  }
+  if (status === "DRAFTING") {
+    result.outline = "completed";
+    result.draft = "active";
+    result.qa = "waiting";
+  }
+  if (status === "REVIEW") {
+    result.outline = "completed";
+    result.draft = "completed";
+    result.qa = "completed";
+    result.review = "active";
+  }
+  return result;
+}
+
+export type EditorialChecklistItem = {
+  id: string;
+  group: "content" | "seo" | "media" | "publish";
+  label: string;
+  done: boolean;
+};
+
+/** Editor-facing checklist derived from existing topic fields (display only). */
+export function buildEditorialChecklist(input: {
+  status: SeoTopicStatus;
+  briefApproved: boolean;
+  outlineCount: number;
+  hasMetaTitle: boolean;
+  hasMetaDescription: boolean;
+  internalLinkCount: number;
+  hasMediaBundle: boolean;
+  mediaPlanOk: boolean;
+  hasTargetUrl: boolean;
+}): EditorialChecklistItem[] {
+  const writingStarted = ["DRAFTING", "REVIEW", "PUBLISHED"].includes(input.status);
+  const reviewed = ["REVIEW", "PUBLISHED"].includes(input.status);
+  const published = input.status === "PUBLISHED";
+  return [
+    { id: "outline", group: "content", label: "Outline", done: input.outlineCount > 0 || input.briefApproved },
+    { id: "intro", group: "content", label: "Introduction", done: writingStarted },
+    { id: "sections", group: "content", label: "Sections", done: writingStarted },
+    { id: "cta", group: "content", label: "CTA", done: input.briefApproved },
+    { id: "title", group: "seo", label: "Title", done: input.hasMetaTitle || input.briefApproved },
+    { id: "meta", group: "seo", label: "Meta", done: input.hasMetaDescription },
+    { id: "links", group: "seo", label: "Internal links", done: input.internalLinkCount > 0 },
+    { id: "hero", group: "media", label: "Hero", done: input.hasMediaBundle && input.mediaPlanOk },
+    { id: "product", group: "media", label: "Product", done: input.hasMediaBundle },
+    { id: "process", group: "media", label: "Process", done: input.mediaPlanOk },
+    { id: "factory", group: "media", label: "Factory", done: input.mediaPlanOk },
+    { id: "review", group: "publish", label: "Review", done: reviewed },
+    { id: "blog", group: "publish", label: "Blog", done: published || Boolean(input.hasTargetUrl) },
+    { id: "publish", group: "publish", label: "Publish", done: published },
+  ];
 }
 
 export function topicStatusTone(status: SeoTopicStatus): keyof typeof CONTENT_STATUS_COLORS {

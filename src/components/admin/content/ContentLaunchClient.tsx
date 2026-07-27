@@ -268,11 +268,11 @@ export default function ContentLaunchClient() {
 
   return (
     <>
-      <AdminPageTitle title="Viết bài" />
+      <AdminPageTitle title="Hướng dẫn biên tập" />
       <div className="admin-page">
         <p className="admin-field-hint">
-          Quy trình biên tập: Chủ đề → Brief → Context → Viết bài → QA → Kiểm duyệt → Bản nháp Blog → Xuất bản.
-          Không tự duyệt. Không tự đăng.
+          Tài liệu, chính sách và mẫu cho biên tập viên. Công việc hàng ngày nằm trong{" "}
+          <Link href="/admin/content/seo-topics">Workspace của từng chủ đề</Link>.
         </p>
 
         <section className="admin-panel" style={{ marginBottom: 16 }}>

@@ -14,6 +14,12 @@ import {
   SEO_TOPIC_STATUS_LABELS,
 } from "@/features/content/seo/seo-labels";
 import {
+  CONTENT_STATUS_COLORS,
+  getTopicNextAction,
+  getTopicProgressPercent,
+  topicStatusTone,
+} from "@/features/content/editorial/editorial-ux";
+import {
   SEO_CONTENT_TYPES,
   SEO_FUNNEL_STAGES,
   SEO_SEARCH_INTENTS,
@@ -372,16 +378,28 @@ export default function SeoTopicsClient() {
                     />
                   </th>
                   <th>Chủ đề</th>
-                  <th>Từ khóa chính</th>
-                  <th>Chiến lược / Cụm</th>
-                  <th>Trạng thái</th>
+                  <th>Tiến độ</th>
+                  <th>Next action</th>
+                  <th>Từ khóa</th>
+                  <th>Cụm</th>
                   <th>Ưu tiên</th>
                   <th>Hạn</th>
-                  <th />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {rows.map((row) => {
+                  const next = getTopicNextAction(row.status);
+                  const progress = getTopicProgressPercent(row.status);
+                  const tone = CONTENT_STATUS_COLORS[topicStatusTone(row.status)];
+                  const ctaLabel =
+                    row.status === "DRAFTING"
+                      ? "Continue Draft"
+                      : row.status === "REVIEW"
+                        ? "Needs Review"
+                        : row.status === "PUBLISHED"
+                          ? "Published"
+                          : next.label;
+                  return (
                   <tr key={row.id}>
                     <td>
                       <input
@@ -391,34 +409,55 @@ export default function SeoTopicsClient() {
                       />
                     </td>
                     <td>
-                      <Link href={`/admin/content/seo-topics/${row.id}`} className="admin-link">
+                      <Link href={`/admin/content/topics/${row.id}`} className="admin-link">
                         {row.title}
                       </Link>
                       <p className="admin-field-hint" style={{ margin: 0 }}>
-                        {SEO_CONTENT_TYPE_LABELS[row.contentType]} ·{" "}
-                        {SEO_SEARCH_INTENT_LABELS[row.searchIntent]}
+                        <span
+                          style={{
+                            display: "inline-block",
+                            fontSize: 11,
+                            padding: "1px 6px",
+                            borderRadius: 999,
+                            background: tone.bg,
+                            color: tone.fg,
+                            border: `1px solid ${tone.border}`,
+                            marginRight: 6,
+                          }}
+                        >
+                          {SEO_TOPIC_STATUS_LABELS[row.status]}
+                        </span>
+                        {SEO_CONTENT_TYPE_LABELS[row.contentType]}
                       </p>
+                    </td>
+                    <td style={{ minWidth: 110 }}>
+                      <div style={{ display: "grid", gap: 4 }}>
+                        <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                          <div style={{ width: `${progress}%`, height: "100%", background: "#2563eb" }} />
+                        </div>
+                        <span className="admin-field-hint">{progress}%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <Link
+                        href={next.href(row.id)}
+                        className="admin-btn admin-btn--primary admin-btn--xs"
+                      >
+                        {ctaLabel}
+                      </Link>
                     </td>
                     <td>{row.primaryKeyword}</td>
                     <td>
-                      {row.strategyName}
+                      {row.clusterName}
                       <p className="admin-field-hint" style={{ margin: 0 }}>
-                        {row.clusterName}
+                        {row.strategyName}
                       </p>
                     </td>
-                    <td>{SEO_TOPIC_STATUS_LABELS[row.status]}</td>
                     <td>{SEO_TOPIC_PRIORITY_LABELS[row.priority]}</td>
                     <td>{formatDate(row.dueDate)}</td>
-                    <td>
-                      <Link
-                        href={`/admin/content/seo-topics/${row.id}`}
-                        className="admin-btn admin-btn--secondary admin-btn--xs"
-                      >
-                        Mở
-                      </Link>
-                    </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
