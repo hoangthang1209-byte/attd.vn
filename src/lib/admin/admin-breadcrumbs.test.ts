@@ -112,7 +112,7 @@ describe("admin breadcrumb IA v2.0 metadata authority", () => {
     ]);
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/ai-retrieval").breadcrumbs, [
       "KNOWLEDGE & AI",
-      "Kiểm tra ngữ cảnh AI",
+      "Kiểm tra ngữ cảnh bài viết",
     ]);
   });
 
@@ -138,15 +138,15 @@ describe("admin breadcrumb IA v2.0 metadata authority", () => {
 
   it("gives reviews and publishing explicit NỘI DUNG metadata", () => {
     const reviews = getAdminBreadcrumbMeta("/admin/content/reviews");
-    assert.deepEqual(reviews.breadcrumbs, ["NỘI DUNG", "Kiểm duyệt nội dung"]);
+    assert.deepEqual(reviews.breadcrumbs, ["NỘI DUNG", "Kiểm duyệt"]);
     assert.notEqual(reviews.title, "ATTD CMS");
 
     const reviewDetail = getAdminBreadcrumbMeta("/admin/content/reviews/rev_1");
     assert.equal(reviewDetail.breadcrumbs[0], "NỘI DUNG");
-    assert.equal(reviewDetail.breadcrumbs[1], "Kiểm duyệt nội dung");
+    assert.equal(reviewDetail.breadcrumbs[1], "Kiểm duyệt");
 
     const publishing = getAdminBreadcrumbMeta("/admin/content/publishing");
-    assert.deepEqual(publishing.breadcrumbs, ["NỘI DUNG", "Xuất bản nội dung"]);
+    assert.deepEqual(publishing.breadcrumbs, ["NỘI DUNG", "Xuất bản"]);
   });
 
   it("lets specific new/detail/edit metadata win over list prefixes", () => {

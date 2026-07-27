@@ -166,7 +166,7 @@ export default function MediaBundlesPage() {
 
   return (
     <>
-      <AdminPageTitle title="Gói nội dung hình ảnh" />
+      <AdminPageTitle title="Bộ hình bài viết" />
       <div className="admin-panel">
         <div className="admin-section-header">
           <p>Quản lý bộ ảnh theo vị trí (slot) dùng cho từng loại nội dung: blog, landing page, sản phẩm, case study…</p>

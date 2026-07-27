@@ -33,7 +33,7 @@ export default async function AiRetrievalPreviewPage({
 
   return (
     <>
-      <AdminPageTitle title="Kiểm tra ngữ cảnh AI" />
+      <AdminPageTitle title="Kiểm tra ngữ cảnh bài viết" />
       <AiRetrievalPreviewClient
         initialConsumer={consumer}
         initialPurpose={purpose}

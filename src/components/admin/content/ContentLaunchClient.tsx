@@ -121,8 +121,8 @@ type LaunchPayload = {
     readyForInformationalArticle: boolean;
     hardBlockers: string[];
     warnings: string[];
-    missingDomains: Array<{ key: string; label: string; required: boolean }>;
-    coveredDomains: Array<{ key: string; label: string; publicApprovedCount: number }>;
+    missingDomains: Array<{ key?: string; label: string; required: boolean }>;
+    coveredDomains: Array<{ key?: string; label: string; publicApprovedCount?: number }>;
   };
   media: {
     bundleId: string | null;
@@ -237,8 +237,8 @@ export default function ContentLaunchClient() {
   if (loading && !data) {
     return (
       <>
-        <AdminPageTitle title="Khởi động Content SEO" />
-        <div className="admin-panel">Đang tải trạng thái launch…</div>
+        <AdminPageTitle title="Viết bài" />
+        <div className="admin-panel">Đang tải quy trình viết bài…</div>
       </>
     );
   }
@@ -246,9 +246,9 @@ export default function ContentLaunchClient() {
   if (!data) {
     return (
       <>
-        <AdminPageTitle title="Khởi động Content SEO" />
+        <AdminPageTitle title="Viết bài" />
         <div className="admin-panel">
-          <p className="admin-message admin-message--error">Không tải được dữ liệu launch.</p>
+          <p className="admin-message admin-message--error">Không tải được dữ liệu quy trình viết bài.</p>
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
             Thử lại
           </button>
@@ -261,95 +261,104 @@ export default function ContentLaunchClient() {
     data;
   const blockers = [
     ...status.aiGeneration.errors.map((e) => `AI: ${e}`),
-    ...status.publishing.errors.map((e) => `Publish: ${e}`),
-    ...knowledge.hardBlockers.map((e) => `Knowledge: ${e}`),
+    ...status.publishing.errors.map((e) => `Xuất bản: ${e}`),
+    ...knowledge.hardBlockers.map((e) => `Kiến thức: ${e}`),
     ...workflow.steps.filter((s) => s.status === "blocked" && s.blocker).map((s) => `${s.label}: ${s.blocker}`),
   ];
 
   return (
     <>
-      <AdminPageTitle title="Khởi động Content SEO" />
+      <AdminPageTitle title="Viết bài" />
       <div className="admin-page">
         <p className="admin-field-hint">
-          Kích hoạt quy trình Content đã hoàn thiện (Topic → Brief → Context → Writing → QA → Review →
-          Blog DRAFT → Publish). Không auto-approve. Không auto-publish. Knowledge Graph expansion OFF.
+          Quy trình biên tập: Chủ đề → Brief → Context → Viết bài → QA → Kiểm duyệt → Bản nháp Blog → Xuất bản.
+          Không tự duyệt. Không tự đăng.
         </p>
 
         <section className="admin-panel" style={{ marginBottom: 16 }}>
-          <h2 className="admin-subtitle">1. Trạng thái hệ thống</h2>
+          <h2 className="admin-subtitle">1. Trạng thái sẵn sàng</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
             {status.readyForManualContentLaunch ? (
-              <Badge tone="ready">Manual launch sẵn sàng</Badge>
+              <Badge tone="ready">Sẵn sàng viết thủ công</Badge>
             ) : (
-              <Badge tone="blocked">Manual bị chặn</Badge>
+              <Badge tone="blocked">Chưa sẵn sàng viết thủ công</Badge>
             )}
             {status.readyForAiAssistedLaunch ? (
-              <Badge tone="ready">AI-assisted sẵn sàng</Badge>
+              <Badge tone="ready">AI Ready</Badge>
             ) : (
-              <Badge tone="config">AI cần cấu hình</Badge>
+              <Badge tone="config">Manual Mode</Badge>
             )}
             {status.readyForScheduledPublishing ? (
-              <Badge tone="ready">Scheduling sẵn sàng</Badge>
+              <Badge tone="ready">Lên lịch xuất bản sẵn sàng</Badge>
             ) : (
-              <Badge tone="config">Scheduling chưa cấu hình</Badge>
+              <Badge tone="config">Lên lịch chưa cấu hình</Badge>
             )}
             {!status.graph.globalExpansionEnabled && status.graph.consumerFlagsEnabled.length === 0 ? (
-              <Badge tone="done">KG expansion OFF</Badge>
+              <Badge tone="done">Chế độ biên tập tiêu chuẩn</Badge>
             ) : (
-              <Badge tone="blocked">KG flags ON — không kỳ vọng cho launch này</Badge>
+              <Badge tone="blocked">Cấu hình nâng cao đang bật</Badge>
             )}
           </div>
           <p className="admin-field-hint">
-            Graph rollout: <code>{status.graph.rolloutMode}</code> · Consumer flags:{" "}
-            {status.graph.consumerFlagsEnabled.length
-              ? status.graph.consumerFlagsEnabled.join(", ")
-              : "SEO_TOPIC_PLANNER/SEO_BRIEF/SEO_CONTENT = false"}
+            Chế độ cấu hình nâng cao: tắt theo mặc định cho biên tập viên hàng ngày.
           </p>
         </section>
 
         <section className="admin-panel" style={{ marginBottom: 16 }}>
-          <h2 className="admin-subtitle">2. Knowledge readiness</h2>
+          <h2 className="admin-subtitle">2. Kiến thức sẵn có</h2>
           <p>
-            Public approved: <strong>{knowledge.publicApprovedFacts}</strong> · Retrieval-ready:{" "}
-            <strong>{status.knowledge.retrievalReadyFacts}</strong> ·{" "}
+            Available Knowledge: <strong>{knowledge.publicApprovedFacts}</strong> mục đã duyệt ·{" "}
             {knowledge.readyForInformationalArticle ? (
-              <Badge tone="ready">Informational OK</Badge>
+              <Badge tone="ready">Đủ để viết bài thông tin</Badge>
             ) : (
-              <Badge tone="blocked">Chưa sẵn sàng</Badge>
+              <Badge tone="blocked">Chưa đủ kiến thức</Badge>
             )}
           </p>
-          {knowledge.missingDomains.filter((d) => d.required).length > 0 && (
-            <p className="admin-field-hint">
-              Domain required còn thiếu:{" "}
-              {knowledge.missingDomains
-                .filter((d) => d.required)
-                .map((d) => d.label)
-                .join(", ")}
-            </p>
-          )}
+          <ul style={{ margin: "8px 0", paddingLeft: 18, display: "grid", gap: 4 }}>
+            {knowledge.coveredDomains.map((d) => (
+              <li key={`ok-${d.key ?? d.label}`}>
+                {d.label} — <Badge tone="ready">Green</Badge>
+                {d.publicApprovedCount != null ? ` · ${d.publicApprovedCount} mục` : ""}
+              </li>
+            ))}
+            {knowledge.missingDomains.map((d) => (
+              <li key={`miss-${d.key ?? d.label}`}>
+                {d.label} —{" "}
+                {d.required ? <Badge tone="blocked">Red</Badge> : <Badge tone="config">Yellow</Badge>}
+                {d.required ? " · bắt buộc" : " · tùy chọn"}
+              </li>
+            ))}
+          </ul>
           {knowledge.warnings.slice(0, 5).map((w) => (
             <p key={w} className="admin-message admin-message--warning">
               {w}
             </p>
           ))}
           <Link className="admin-btn admin-btn--secondary admin-btn--xs" href="/admin/knowledge-base">
-            Mở Knowledge Base
+            Mở kho kiến thức
           </Link>
         </section>
 
         <section className="admin-panel" style={{ marginBottom: 16 }}>
-          <h2 className="admin-subtitle">3. Media readiness — {media.bundleCode}</h2>
+          <h2 className="admin-subtitle">3. Hình ảnh sẵn sàng</h2>
           <p>
-            {media.bundleName ?? "Bundle chưa tạo"} · Status:{" "}
-            <code>{media.bundleStatus ?? "—"}</code> · Public assets: {media.publicAssetCount} ·
-            Required slots: {media.requiredSlotsFilled}/{media.requiredSlotsTotal}
+            {media.bundleName ?? "Chưa có bộ hình"} · Trạng thái:{" "}
+            <strong>{media.bundleStatus ?? "—"}</strong> · Ảnh công khai: {media.publicAssetCount} ·
+            Nhóm bắt buộc: {media.requiredSlotsFilled}/{media.requiredSlotsTotal}
           </p>
           <ul style={{ margin: "8px 0", paddingLeft: 18 }}>
             {media.slots.map((slot) => (
               <li key={slot.label}>
-                {slot.label} ({slot.slotType}) — {slot.publicAssetCount} PUBLIC
-                {slot.required ? " · required" : ""}
-                {slot.missingAlt ? ` · thiếu alt: ${slot.missingAlt}` : ""}
+                {slot.label}
+                {slot.required ? " · bắt buộc" : " · tùy chọn"} —{" "}
+                {slot.publicAssetCount > 0 ? (
+                  <Badge tone="ready">Ready</Badge>
+                ) : slot.required ? (
+                  <Badge tone="blocked">Missing</Badge>
+                ) : (
+                  <Badge tone="config">Optional</Badge>
+                )}
+                {slot.missingAlt ? ` · thiếu mô tả ảnh: ${slot.missingAlt}` : ""}
               </li>
             ))}
           </ul>
@@ -360,32 +369,37 @@ export default function ContentLaunchClient() {
           ))}
           {media.editorHref && (
             <Link className="admin-btn admin-btn--secondary admin-btn--xs" href={media.editorHref}>
-              Mở Bundle editor
+              Chỉnh bộ hình bài viết
             </Link>
           )}
         </section>
 
         <section className="admin-panel" style={{ marginBottom: 16 }}>
-          <h2 className="admin-subtitle">4. AI generation configuration</h2>
+          <h2 className="admin-subtitle">4. AI</h2>
           {!status.aiGeneration.enabled || !status.aiGeneration.providerConfigured ? (
             <p className="admin-message admin-message--warning">{manualFallbackMessage}</p>
           ) : (
-            <Badge tone="ready">Section generation sẵn sàng</Badge>
+            <Badge tone="ready">AI Ready</Badge>
           )}
+          <details style={{ marginTop: 8 }}>
+            <summary className="admin-field-hint" style={{ cursor: "pointer" }}>
+              Cấu hình nâng cao (ẩn mặc định)
+            </summary>
+            <p className="admin-field-hint">
+              enabled={String(status.aiGeneration.enabled)} · provider=
+              {status.aiGeneration.provider ?? "—"} · model={status.aiGeneration.model ?? "—"} ·
+              apiKeyConfigured={String(status.aiGeneration.apiKeyConfigured)} (không hiển thị secret)
+            </p>
+            <p className="admin-field-hint">
+              Cap: {status.aiGeneration.maxOutputTokensPerSection ?? "—"} output tokens/section · max
+              sections/run: {status.aiGeneration.maxSectionsPerRun ?? "—"} · daily limit:{" "}
+              {status.aiGeneration.dailyRunLimit ?? "—"} · monthly budget:{" "}
+              {status.aiGeneration.monthlyBudgetUsd ?? "Chưa xác định"}
+            </p>
+          </details>
           <p className="admin-field-hint">
-            enabled={String(status.aiGeneration.enabled)} · provider=
-            {status.aiGeneration.provider ?? "—"} · model={status.aiGeneration.model ?? "—"} ·
-            apiKeyConfigured={String(status.aiGeneration.apiKeyConfigured)} (không hiển thị secret)
-          </p>
-          <p className="admin-field-hint">
-            Cap: {status.aiGeneration.maxOutputTokensPerSection ?? "—"} output tokens/section · max
-            sections/run: {status.aiGeneration.maxSectionsPerRun ?? "—"} · daily limit:{" "}
-            {status.aiGeneration.dailyRunLimit ?? "—"} · monthly budget:{" "}
-            {status.aiGeneration.monthlyBudgetUsd ?? "Chưa xác định"}
-          </p>
-          <p className="admin-field-hint">
-            Khi generate: chỉ chọn 1 section low-risk (Intro / chất liệu). Không pricing/MOQ/lead
-            time/cert/customer claims. Xem docs/operations/content-ai-generation.md
+            Khi dùng AI: chỉ sinh một đoạn an toàn (mở bài / chất liệu). Không viết giá, MOQ, lead
+            time, chứng nhận hay claim khách hàng.
           </p>
           {status.aiGeneration.warnings.map((w) => (
             <p key={w} className="admin-message admin-message--warning">
@@ -395,36 +409,41 @@ export default function ContentLaunchClient() {
         </section>
 
         <section className="admin-panel" style={{ marginBottom: 16 }}>
-          <h2 className="admin-subtitle">5. Publishing and cron</h2>
+          <h2 className="admin-subtitle">5. Xuất bản</h2>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <Badge tone={status.publishing.immediatePublishReady ? "ready" : "blocked"}>
-              Immediate publish
-            </Badge>
-            <Badge tone={status.publishing.cronRouteRegistered ? "ready" : "blocked"}>
-              Route registered
+              Xuất bản ngay {status.publishing.immediatePublishReady ? "sẵn sàng" : "chưa sẵn sàng"}
             </Badge>
             <Badge tone={status.publishing.cronScheduleConfigured ? "ready" : "config"}>
-              Schedule {status.publishing.cronSchedule}
+              Lên lịch {status.publishing.cronScheduleConfigured ? "đã cấu hình" : "chưa cấu hình"}
             </Badge>
-            <Badge tone={status.publishing.cronSecretConfigured ? "ready" : "config"}>
-              Secret {status.publishing.cronSecretConfigured ? "configured" : "missing"}
+            <Badge tone={status.readyForScheduledPublishing ? "ready" : "config"}>
+              Hàng đợi xuất bản {status.readyForScheduledPublishing ? "hoạt động" : "chờ cấu hình"}
             </Badge>
           </div>
-          <p className="admin-field-hint">
-            Last due-processor success: {status.publishing.lastSuccessfulDueRunAt ?? "Chưa xác minh"}
-          </p>
+          <details style={{ marginTop: 8 }}>
+            <summary className="admin-field-hint" style={{ cursor: "pointer" }}>
+              Chi tiết kỹ thuật (ẩn mặc định)
+            </summary>
+            <p className="admin-field-hint">
+              Route: {status.publishing.cronRouteRegistered ? "OK" : "thiếu"} · Secret:{" "}
+              {status.publishing.cronSecretConfigured ? "OK" : "thiếu"} · Schedule:{" "}
+              {status.publishing.cronSchedule ?? "—"} · Lần chạy gần nhất:{" "}
+              {status.publishing.lastSuccessfulDueRunAt ?? "Chưa xác minh"}
+            </p>
+          </details>
           {status.publishing.warnings.map((w) => (
             <p key={w} className="admin-message admin-message--warning">
               {w}
             </p>
           ))}
           <Link className="admin-btn admin-btn--secondary admin-btn--xs" href="/admin/content/publishing">
-            Mở Publishing dashboard
+            Mở workspace Xuất bản
           </Link>
         </section>
 
         <section className="admin-panel" style={{ marginBottom: 16 }}>
-          <h2 className="admin-subtitle">6. First-article workflow</h2>
+          <h2 className="admin-subtitle">6. Quy trình bài đầu tiên</h2>
           <p>
             Bài mục tiêu: <strong>Hướng dẫn chọn áo polo đồng phục công ty</strong>
           </p>
@@ -435,15 +454,15 @@ export default function ContentLaunchClient() {
               variant="primary"
               onClick={() => void runSetup()}
             >
-              Setup / tái sử dụng Topic
+              Tạo / mở lại chủ đề
             </AdminLoadingButton>
             {article?.topicHref && (
               <Link className="admin-btn admin-btn--secondary" href={article.topicHref}>
-                Mở Topic
+                Mở chủ đề
               </Link>
             )}
             <Link className="admin-btn admin-btn--secondary" href="/admin/content/reviews">
-              Review queue
+              Hàng đợi kiểm duyệt
             </Link>
           </div>
           {article?.topicId && (
@@ -520,9 +539,9 @@ export default function ContentLaunchClient() {
         </section>
 
         <section className="admin-panel" style={{ marginBottom: 16 }}>
-          <h2 className="admin-subtitle">8. Recent launch activity / reviews</h2>
+          <h2 className="admin-subtitle">8. Hoạt động gần đây</h2>
           {recentLaunchReviews.length === 0 ? (
-            <p className="admin-field-hint">Chưa có review session liên quan polo launch.</p>
+            <p className="admin-field-hint">Chưa có phiên kiểm duyệt liên quan bài launch.</p>
           ) : (
             <ul style={{ paddingLeft: 18 }}>
               {recentLaunchReviews.map((r) => (
@@ -530,9 +549,9 @@ export default function ContentLaunchClient() {
                   <Link href={`/admin/content/reviews/${r.id}`}>
                     {r.topicTitle ?? r.id}
                   </Link>{" "}
-                  · {r.status} · QA {r.qaScore ?? "—"} · blocking {r.blockingIssues} · sections{" "}
+                  · {r.status} · Điểm QA {r.qaScore ?? "—"} · chặn {r.blockingIssues} · đoạn duyệt{" "}
                   {r.sectionProgress.approved}/{r.sectionProgress.total}
-                  {r.readyForHandoff ? " · sẵn sàng handoff" : ""}
+                  {r.readyForHandoff ? " · sẵn sàng chuyển Blog" : ""}
                 </li>
               ))}
             </ul>
@@ -540,7 +559,7 @@ export default function ContentLaunchClient() {
         </section>
 
         <section className="admin-panel" style={{ marginBottom: 16 }}>
-          <h2 className="admin-subtitle">Checklist · Keywords · Brief template · QA · Fact policy</h2>
+          <h2 className="admin-subtitle">Hướng dẫn biên tập · Checklist · QA · Nguyên tắc viết</h2>
           {checklist && (
             <p className="admin-field-hint">
               Tiến độ checklist: {checklist.percentComplete}% · required còn lại:{" "}
@@ -592,19 +611,63 @@ export default function ContentLaunchClient() {
                 </p>
               ))}
 
-              <h3 className="admin-subtitle">Fact / claim policy</h3>
-              <p className="admin-field-hint">
-                Allowed: {article.factPolicy.allowed.join("; ")}
+              <h3 className="admin-subtitle">Editorial Guidelines</h3>
+              <p>
+                <Badge tone="ready">Safe to write</Badge>{" "}
+                <span className="admin-field-hint">{article.factPolicy.allowed.join(" · ")}</span>
               </p>
-              <p className="admin-field-hint">
-                Not without evidence: {article.factPolicy.notAllowedWithoutEvidence.join("; ")}
+              <p style={{ marginTop: 8 }}>
+                <Badge tone="config">Needs approval</Badge>{" "}
+                <span className="admin-field-hint">
+                  Mọi số liệu (MOQ, lead time, giá) và claim khách hàng cần nguồn đã duyệt.
+                </span>
               </p>
+              <p style={{ marginTop: 8 }}>
+                <Badge tone="blocked">Never claim</Badge>{" "}
+                <span className="admin-field-hint">
+                  {article.factPolicy.notAllowedWithoutEvidence.join(" · ")}
+                </span>
+              </p>
+              <details style={{ marginTop: 8 }}>
+                <summary className="admin-field-hint" style={{ cursor: "pointer" }}>
+                  Read Full Policy
+                </summary>
+                <p className="admin-field-hint">Được viết: {article.factPolicy.allowed.join("; ")}</p>
+                <p className="admin-field-hint">
+                  Không được khẳng định khi thiếu bằng chứng:{" "}
+                  {article.factPolicy.notAllowedWithoutEvidence.join("; ")}
+                </p>
+              </details>
             </>
           )}
 
-          <h3 className="admin-subtitle">{qaPreset.label}</h3>
+          <h3 className="admin-subtitle">QA</h3>
           <p className="admin-field-hint">{qaPreset.notes.join(" ")}</p>
-          <p className="admin-field-hint">Checks: {qaPreset.checks.join(" · ")}</p>
+          <ul style={{ margin: "8px 0", paddingLeft: 18, display: "grid", gap: 4 }}>
+            {[
+              { label: "SEO", match: /h1|heading|seo|metadata/i },
+              { label: "Grammar", match: /grammar|language|viết/i },
+              { label: "Claims", match: /claim|fact|unsupported|numeric/i },
+              { label: "Structure", match: /structure|hierarchy|heading/i },
+              { label: "Metadata", match: /meta|title|slug/i },
+              { label: "Internal Links", match: /link/i },
+              { label: "Images", match: /media|image|ảnh/i },
+            ].map((row) => {
+              const covered = qaPreset.checks.some((c) => row.match.test(c));
+              return (
+                <li key={row.label}>
+                  {row.label} —{" "}
+                  {covered ? <Badge tone="ready">Covered</Badge> : <Badge tone="config">Review in detail</Badge>}
+                </li>
+              );
+            })}
+          </ul>
+          <details style={{ marginTop: 8 }}>
+            <summary className="admin-field-hint" style={{ cursor: "pointer" }}>
+              Chi tiết QA ({qaPreset.label})
+            </summary>
+            <p className="admin-field-hint">{qaPreset.checks.join(" · ")}</p>
+          </details>
         </section>
       </div>
     </>

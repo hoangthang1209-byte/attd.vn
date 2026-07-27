@@ -423,68 +423,83 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/reviews/:id",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Kiểm duyệt nội dung", "Chi tiết"],
+      breadcrumbs: ["NỘI DUNG", "Kiểm duyệt", "Chi tiết"],
       title: "Chi tiết kiểm duyệt",
-      description: "Xem và xử lý một mục nội dung đang chờ kiểm duyệt.",
+      description: "Xem và xử lý một bài đang chờ kiểm duyệt biên tập.",
     },
   },
   {
     path: "/admin/content/reviews",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Kiểm duyệt nội dung"],
-      title: "Kiểm duyệt nội dung",
-      description: "Duyệt và phê duyệt nội dung trước khi xuất bản.",
+      breadcrumbs: ["NỘI DUNG", "Kiểm duyệt"],
+      title: "Kiểm duyệt",
+      description: "Hàng đợi kiểm duyệt biên tập trước khi xuất bản.",
     },
   },
   {
     path: "/admin/content/publishing",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Xuất bản nội dung"],
-      title: "Xuất bản nội dung",
-      description: "Quản lý lịch và trạng thái xuất bản nội dung.",
+      breadcrumbs: ["NỘI DUNG", "Xuất bản"],
+      title: "Xuất bản",
+      description: "Theo dõi bản nháp, lịch xuất bản và bài đã đăng.",
     },
   },
 
-  // ── SEO & GROWTH ───────────────────────────────────────────
+  // ── NỘI DUNG (editorial SEO workflow) ──────────────────────
   {
     path: "/admin/seo-planning",
     meta: {
-      breadcrumbs: ["SEO & GROWTH", "SEO Planning"],
+      breadcrumbs: ["NỘI DUNG", "SEO Planning"],
       title: "SEO Planning",
-      description: "Quản lý kế hoạch SEO, campaign và nội dung tăng trưởng organic.",
+      description: "Kế hoạch SEO chiến dịch (workspace kế thừa).",
+    },
+  },
+  {
+    path: "/admin/content/seo-topics/:id",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "Chủ đề", "Chi tiết"],
+      title: "Chi tiết chủ đề",
+      description: "Workspace biên tập cho một chủ đề: Brief, Context, Viết bài và QA.",
     },
   },
   {
     path: "/admin/content/seo-topics",
     meta: {
-      breadcrumbs: ["SEO & GROWTH", "Kế hoạch nội dung"],
-      title: "Kế hoạch nội dung SEO",
-      description: "Lập kế hoạch, lọc và quản lý chủ đề SEO theo chiến lược và cụm chủ đề.",
+      breadcrumbs: ["NỘI DUNG", "Chủ đề"],
+      title: "Chủ đề",
+      description: "Danh sách chủ đề nội dung — chọn bài cần làm tiếp theo.",
     },
   },
   {
     path: "/admin/content/launch",
     meta: {
-      breadcrumbs: ["SEO & GROWTH", "Khởi động Content SEO"],
-      title: "Khởi động Content SEO",
-      description:
-        "Dashboard kích hoạt bài SEO đầu tiên trên quy trình Content đã hoàn thiện — không auto-publish.",
+      breadcrumbs: ["NỘI DUNG", "Viết bài"],
+      title: "Viết bài",
+      description: "Quy trình viết bài từ Brief đến xuất bản — dành cho biên tập viên.",
+    },
+  },
+  {
+    path: "/admin/content/seo-strategies/:id",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "Chiến lược", "Chi tiết"],
+      title: "Chi tiết chiến lược",
+      description: "Chiến lược nội dung và cụm chủ đề liên quan.",
     },
   },
   {
     path: "/admin/content/seo-strategies",
     meta: {
-      breadcrumbs: ["SEO & GROWTH", "Chiến lược SEO"],
-      title: "Chiến lược SEO",
-      description: "Quản lý chiến lược SEO, cụm chủ đề và tiến độ nội dung theo chiến dịch.",
+      breadcrumbs: ["NỘI DUNG", "Chiến lược"],
+      title: "Chiến lược",
+      description: "Quản lý chiến lược nội dung và tiến độ theo cụm chủ đề.",
     },
   },
   {
     path: "/admin/content/seo",
     meta: {
-      breadcrumbs: ["SEO & GROWTH", "Tổng quan SEO"],
-      title: "SEO Content Platform",
-      description: "Tổng quan kế hoạch nội dung SEO, chủ đề ưu tiên và độ phủ cụm chủ đề.",
+      breadcrumbs: ["NỘI DUNG", "Dashboard"],
+      title: "Content Dashboard",
+      description: "Bảng điều khiển biên tập — việc hôm nay, tiến độ và hành động tiếp theo.",
     },
   },
 
@@ -532,9 +547,9 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/media-bundles",
     meta: {
-      breadcrumbs: ["MEDIA", "Gói hình ảnh"],
-      title: "Gói hình ảnh",
-      description: "Quản lý bộ ảnh theo vị trí (slot) cho từng loại nội dung: blog, landing page, sản phẩm...",
+      breadcrumbs: ["MEDIA", "Bộ hình bài viết"],
+      title: "Bộ hình bài viết",
+      description: "Bộ hình ảnh gắn với bài viết — cover, sản phẩm, nhà máy và OG.",
     },
   },
   {
@@ -616,9 +631,9 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/ai-retrieval",
     meta: {
-      breadcrumbs: ["KNOWLEDGE & AI", "Kiểm tra ngữ cảnh AI"],
-      title: "Kiểm tra ngữ cảnh AI",
-      description: "Xem trước ngữ cảnh retrieval mà các hệ thống AI tương lai sẽ nhận — không gọi LLM.",
+      breadcrumbs: ["KNOWLEDGE & AI", "Kiểm tra ngữ cảnh bài viết"],
+      title: "Kiểm tra ngữ cảnh bài viết",
+      description: "Xem trước kiến thức sẵn có cho bài viết — không gọi AI sinh nội dung.",
     },
   },
 

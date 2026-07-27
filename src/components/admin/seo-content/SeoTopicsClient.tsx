@@ -242,7 +242,7 @@ export default function SeoTopicsClient() {
           <p>Lập kế hoạch, lọc và quản lý chủ đề SEO theo chiến lược và cụm.</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Link href="/admin/content/seo" className="admin-btn admin-btn--secondary">
-              Tổng quan SEO
+              Dashboard
             </Link>
             <a href={exportHref} className="admin-btn admin-btn--secondary">
               Xuất CSV

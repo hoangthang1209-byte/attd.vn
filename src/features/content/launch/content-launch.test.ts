@@ -235,6 +235,6 @@ describe("content launch knowledge / media / workflow contracts", () => {
   it("nav includes launch entry", () => {
     const nav = readFileSync("src/lib/admin/admin-navigation.ts", "utf8");
     assert.match(nav, /\/admin\/content\/launch/);
-    assert.match(nav, /Khởi động Content SEO/);
+    assert.match(nav, /Viết bài/);
   });
 });

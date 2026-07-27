@@ -7,8 +7,48 @@ import {
   AdminLoadingState,
   DataToolbar,
   EmptyState,
+  StatusBadge,
   WorkspaceToolbarEnd,
 } from "@/components/admin/AdminUi";
+import { CONTENT_STATUS_COLORS } from "@/features/content/editorial/editorial-ux";
+
+type QueueKey = "ready" | "scheduled" | "failed" | "recent" | "modified";
+
+const QUEUE_META: Record<
+  QueueKey,
+  { title: string; description: string; tone: keyof typeof CONTENT_STATUS_COLORS; primaryLabel: string }
+> = {
+  ready: {
+    title: "Bản nháp",
+    description: "Bài đã sẵn sàng để xuất bản thủ công.",
+    tone: "draft",
+    primaryLabel: "Xuất bản",
+  },
+  scheduled: {
+    title: "Đã lên lịch",
+    description: "Bài sẽ đăng theo lịch đã xác nhận.",
+    tone: "scheduled",
+    primaryLabel: "Xem lịch",
+  },
+  recent: {
+    title: "Đã xuất bản",
+    description: "Bài vừa đăng gần đây.",
+    tone: "published",
+    primaryLabel: "Xem bài",
+  },
+  failed: {
+    title: "Xuất bản lỗi",
+    description: "Cần xử lý trước khi đăng lại.",
+    tone: "blocked",
+    primaryLabel: "Xử lý lỗi",
+  },
+  modified: {
+    title: "Đã chỉnh sau bàn giao",
+    description: "Nội dung thay đổi sau khi tạo bản nháp Blog.",
+    tone: "needsReview",
+    primaryLabel: "Xem lại",
+  },
+};
 
 export default function ContentPublishingDashboardClient() {
   const toast = useAdminToast();
@@ -36,7 +76,9 @@ export default function ContentPublishingDashboardClient() {
   }, [toast]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => {
+      void load();
+    });
   }, [load]);
 
   const allQueuesEmpty = useMemo(() => {
@@ -44,38 +86,80 @@ export default function ContentPublishingDashboardClient() {
     return Object.values(queues).every((rows) => (rows?.length ?? 0) === 0);
   }, [queues]);
 
-  function list(title: string, rows: unknown[] | undefined) {
+  function renderQueue(key: QueueKey) {
+    const meta = QUEUE_META[key];
+    const rows = (queues?.[key] ?? []) as Array<Record<string, unknown>>;
+    const tone = CONTENT_STATUS_COLORS[meta.tone];
     return (
-      <div className="admin-sidebar-card">
-        <h3>{title}</h3>
-        <ul style={{ fontSize: 13, paddingLeft: 16 }}>
-          {(rows ?? []).slice(0, 12).map((row, i) => {
-            const r = row as Record<string, unknown>;
-            const id = String(r.id ?? i);
-            const titleText = String(r.title ?? r.action ?? id);
-            return (
-              <li key={id}>
-                {r.blogPostId || r.slug ? (
-                  <Link href={r.slug ? `/admin/blog/${r.id}` : `/admin/blog/${r.blogPostId}`}>
-                    {titleText}
-                  </Link>
-                ) : (
-                  titleText
-                )}{" "}
-                · {String(r.status ?? "")}
-                {r.scheduledAt
-                  ? ` · ${new Date(String(r.scheduledAt)).toLocaleString("vi-VN", {
-                      timeZone: "Asia/Ho_Chi_Minh",
-                    })}`
-                  : ""}
-              </li>
-            );
-          })}
-          {(rows ?? []).length === 0 && (
-            <li className="admin-field-hint">Không có mục trong hàng đợi</li>
-          )}
-        </ul>
-      </div>
+      <section className="admin-sidebar-card" style={{ margin: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>{meta.title}</h3>
+            <p className="admin-field-hint" style={{ margin: "4px 0 0" }}>
+              {meta.description}
+            </p>
+          </div>
+          <StatusBadge tone={meta.tone === "blocked" ? "danger" : meta.tone === "published" ? "success" : "info"}>
+            {rows.length}
+          </StatusBadge>
+        </div>
+        {rows.length === 0 ? (
+          <p className="admin-field-hint">Không có mục trong hàng đợi này.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {rows.slice(0, 12).map((row, i) => {
+              const id = String(row.id ?? i);
+              const titleText = String(row.title ?? row.action ?? id);
+              const href = row.slug
+                ? `/admin/blog/${row.id}`
+                : row.blogPostId
+                  ? `/admin/blog/${row.blogPostId}`
+                  : null;
+              return (
+                <article
+                  key={id}
+                  style={{
+                    border: `1px solid ${tone.border}`,
+                    background: tone.bg,
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    display: "grid",
+                    gap: 6,
+                  }}
+                >
+                  <strong style={{ color: tone.fg }}>{titleText}</strong>
+                  <span className="admin-field-hint">
+                    {String(row.status ?? "")}
+                    {row.scheduledAt
+                      ? ` · ${new Date(String(row.scheduledAt)).toLocaleString("vi-VN", {
+                          timeZone: "Asia/Ho_Chi_Minh",
+                        })}`
+                      : ""}
+                  </span>
+                  <div>
+                    {href ? (
+                      <Link href={href} className="admin-btn admin-btn--primary admin-btn--small">
+                        {meta.primaryLabel}
+                      </Link>
+                    ) : (
+                      <span className="admin-field-hint">Không có liên kết Blog</span>
+                    )}
+                    {href ? (
+                      <Link
+                        href={href}
+                        className="admin-btn admin-btn--secondary admin-btn--small"
+                        style={{ marginLeft: 8 }}
+                      >
+                        Xem trước
+                      </Link>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
     );
   }
 
@@ -83,11 +167,11 @@ export default function ContentPublishingDashboardClient() {
     <div className="admin-panel">
       <DataToolbar data-testid="content-publishing-toolbar">
         <p className="admin-field-hint" style={{ margin: 0, flex: "1 1 240px" }}>
-          Queue publish/schedule/fail. Không auto-publish từ AI.
+          Workspace xuất bản — Bản nháp / Đã lên lịch / Đã xuất bản / Lỗi. Không tự đăng từ AI.
         </p>
         <WorkspaceToolbarEnd>
           <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void load()}>
-            Refresh
+            Làm mới
           </button>
         </WorkspaceToolbarEnd>
       </DataToolbar>
@@ -97,7 +181,7 @@ export default function ContentPublishingDashboardClient() {
       ) : error ? (
         <EmptyState
           tone="error"
-          title="Không tải được dashboard xuất bản"
+          title="Không tải được workspace xuất bản"
           description={error}
           action={
             <button type="button" className="admin-btn" onClick={() => void load()}>
@@ -107,17 +191,28 @@ export default function ContentPublishingDashboardClient() {
         />
       ) : queues && allQueuesEmpty ? (
         <EmptyState
-          title="Không có nội dung trong hàng đợi xuất bản"
-          description="Khi có bài sẵn sàng publish/schedule hoặc lỗi xuất bản, các hàng đợi sẽ hiển thị tại đây."
+          title="Chưa có bài trong hàng đợi xuất bản"
+          description="Khi có bài sẵn sàng đăng, đã lên lịch, hoặc lỗi xuất bản, các thẻ sẽ xuất hiện tại đây."
+          action={
+            <Link href="/admin/content/seo" className="admin-btn admin-btn--primary">
+              Về Content Dashboard
+            </Link>
+          }
         />
       ) : queues ? (
-        <>
-          {list("Ready / Draft governed", queues.ready)}
-          {list("Scheduled", queues.scheduled)}
-          {list("Publishing failures", queues.failed)}
-          {list("Recently published", queues.recent)}
-          {list("Modified after handoff", queues.modified)}
-        </>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 12,
+          }}
+        >
+          {renderQueue("ready")}
+          {renderQueue("scheduled")}
+          {renderQueue("recent")}
+          {renderQueue("failed")}
+          {renderQueue("modified")}
+        </div>
       ) : null}
     </div>
   );

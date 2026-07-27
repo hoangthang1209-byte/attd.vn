@@ -117,7 +117,7 @@ export default function SeoStrategiesClient() {
           <p>Quản lý chiến lược SEO, cụm chủ đề và kế hoạch nội dung theo chiến dịch.</p>
           <div style={{ display: "flex", gap: 8 }}>
             <Link href="/admin/content/seo" className="admin-btn admin-btn--secondary">
-              Tổng quan SEO
+              Dashboard
             </Link>
             <button
               type="button"
