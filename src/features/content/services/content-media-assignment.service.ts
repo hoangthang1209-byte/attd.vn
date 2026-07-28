@@ -145,6 +145,7 @@ export async function getBlogMediaWorkspace(postId: string): Promise<{
     featuredImageUrl: string | null;
     ogImageUrl: string | null;
     mediaBundleId: string | null;
+    content: string | null;
   };
 }> {
   const post = await prisma.blogPost.findUnique({
@@ -177,7 +178,7 @@ export async function getBlogMediaWorkspace(postId: string): Promise<{
         ? {
             visibility: a.mediaAsset.visibility,
             seoScore: a.mediaAsset.seoScore,
-            altText: a.mediaAsset.altText,
+            altText: a.altTextOverride?.trim() || a.mediaAsset.altText,
           }
         : null,
     })),
@@ -690,17 +691,18 @@ export async function assertBlogPublishMediaReady(postId: string): Promise<void>
   const workspace = await getBlogMediaWorkspace(postId);
   const readiness = evaluateBlogMediaReadiness({
     status: "PUBLISHED",
-    requireFeatured: false,
+    requireFeatured: true,
     featuredImageUrl: workspace.post.featuredImageUrl,
     ogImageUrl: workspace.post.ogImageUrl,
-    contentLength: 0,
+    contentLength: workspace.post.content?.length ?? 0,
     assignments: workspace.assignments.map((a) => ({
       placement: a.placement,
       mediaAsset: a.mediaAsset
         ? {
             visibility: a.mediaAsset.visibility,
             seoScore: a.mediaAsset.seoScore,
-            altText: a.mediaAsset.altText,
+            // Prefer assignment override when present
+            altText: a.altTextOverride?.trim() || a.mediaAsset.altText,
           }
         : null,
     })),

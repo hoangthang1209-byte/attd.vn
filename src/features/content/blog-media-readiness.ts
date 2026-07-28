@@ -66,7 +66,7 @@ export function evaluateBlogMediaReadiness(input: BlogMediaReadinessInput): Blog
 
   if (!featuredAssigned && !hasFeaturedUrl && requireFeatured) {
     if (input.status === "PUBLISHED") {
-      errors.push("Thiếu ảnh Featured cho bài viết công khai.");
+      errors.push("Thiếu ảnh Featured bắt buộc.");
     } else {
       warnings.push("Chưa có ảnh Featured.");
     }
@@ -80,10 +80,20 @@ export function evaluateBlogMediaReadiness(input: BlogMediaReadinessInput): Blog
     warnings.push("Bài dài nên có ít nhất 2–3 ảnh nội dung (inline).");
   }
 
-  if (featuredAssigned) {
+  if (featuredAssigned || hasFeaturedUrl) {
     const featured = input.assignments.find((a) => a.placement === "FEATURED")?.mediaAsset;
-    if (featured && featured.seoScore < LOW_SEO_THRESHOLD) {
-      warnings.push("Ảnh Featured có điểm SEO thấp hơn 65.");
+    if (featured) {
+      if (input.status === "PUBLISHED" && featured.visibility !== "PUBLIC") {
+        errors.push("Ảnh Featured phải PUBLIC.");
+      }
+      if (input.status === "PUBLISHED" && !featured.altText?.trim()) {
+        errors.push("Ảnh Featured thiếu alt text bắt buộc.");
+      }
+      if (featured.seoScore < LOW_SEO_THRESHOLD) {
+        warnings.push("Ảnh Featured có điểm SEO thấp hơn 65.");
+      }
+    } else if (hasFeaturedUrl && !featuredAssigned && input.status === "PUBLISHED") {
+      warnings.push("Featured đang dùng URL legacy — nên gán MediaAsset PUBLIC có alt.");
     }
   }
 

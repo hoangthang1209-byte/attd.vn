@@ -9,8 +9,14 @@ import {
   validatePublicContentLinks,
   type ContentPublishReadiness,
 } from "@/features/content/content-publish.types";
+import {
+  blockingQaBlocks,
+  evaluateReviewPublishGate,
+  missingCanonicalBlocks,
+  missingSeoMetadataBlocks,
+} from "@/features/content/content-publish-readiness.policy";
 
-function isGoverned(post: {
+function hasFullGovernedHandoff(post: {
   sourceWritingDraftId: string | null;
   sourceReviewSessionId: string | null;
   sourceHandoffRecordId: string | null;
@@ -20,9 +26,22 @@ function isGoverned(post: {
   );
 }
 
+function hasPipelineReviewLink(post: {
+  sourceReviewSessionId: string | null;
+}): boolean {
+  return Boolean(post.sourceReviewSessionId);
+}
+
 /**
  * Publish readiness V2 — does NOT publish.
- * Governed posts require handoff + approved review; manual posts use legacy Blog checks.
+ *
+ * Paths:
+ * - Full governed handoff (draft + review + handoff triad): enforce handoff COMPLETED + Review APPROVED + draft APPROVED.
+ * - Pipeline-linked Review (sourceReviewSessionId set, no handoff): enforce Review APPROVED; warn if Brief unapproved.
+ * - Manual Blog (no review link): legacy Blog field checks only.
+ *
+ * Mandatory blockers (all paths): title, slug, body, meta title/description, canonical,
+ * featured PUBLIC+alt, blocking QA (when draft linked), duplicate slug, unsafe/public-route issues.
  */
 export async function getContentPublishReadiness(
   blogPostId: string,
@@ -46,7 +65,8 @@ export async function getContentPublishReadiness(
     };
   }
 
-  const governed = isGoverned(post);
+  const governed = hasFullGovernedHandoff(post);
+  const pipelineReview = hasPipelineReviewLink(post);
   const contentHash = hashBlogPublicContent({
     title: post.title,
     slug: post.slug,
@@ -76,26 +96,48 @@ export async function getContentPublishReadiness(
   checks.slugValid = !slugErr;
   if (slugErr) errors.push(slugErr);
 
+  if (post.slug?.trim()) {
+    const dup = await prisma.blogPost.findFirst({
+      where: {
+        slug: post.slug.trim(),
+        NOT: { id: post.id },
+      },
+      select: { id: true },
+    });
+    if (dup) {
+      checks.slugValid = false;
+      errors.push("Slug Blog bị trùng");
+    }
+  }
+
   checks.contentValid = Boolean(post.content?.trim());
   if (!checks.contentValid) errors.push("Thiếu nội dung");
 
-  checks.seoMetadataValid = Boolean(post.metaTitle?.trim() && post.metaDescription?.trim());
-  if (!post.metaTitle?.trim()) warnings.push("Thiếu meta title");
-  if (!post.metaDescription?.trim()) warnings.push("Thiếu meta description");
+  checks.seoMetadataValid = !missingSeoMetadataBlocks(post.metaTitle, post.metaDescription);
+  if (!post.metaTitle?.trim()) errors.push("Thiếu meta title");
+  if (!post.metaDescription?.trim()) errors.push("Thiếu meta description");
   if (post.metaDescription && post.metaDescription.trim().length < 50) {
     warnings.push("Meta description khá ngắn");
   }
 
-  const canonicalErr = validateCanonicalUrl(post.canonicalUrl);
-  checks.canonicalValid = !canonicalErr;
-  if (canonicalErr) errors.push(canonicalErr);
+  if (missingCanonicalBlocks(post.canonicalUrl)) {
+    checks.canonicalValid = false;
+    errors.push("Thiếu canonical");
+  } else {
+    const canonicalErr = validateCanonicalUrl(post.canonicalUrl);
+    checks.canonicalValid = !canonicalErr;
+    if (canonicalErr) errors.push(canonicalErr);
+  }
 
   const linkErrors = validatePublicContentLinks(post.content);
   checks.internalLinksValid = linkErrors.length === 0;
   errors.push(...linkErrors);
 
   if (!post.ogImageUrl && !post.featuredImageUrl) {
-    warnings.push("Thiếu ảnh Featured/OG");
+    // Featured is enforced as blocker via media readiness; OG remains a warning when featured exists.
+    warnings.push("Thiếu ảnh OG (sẽ fallback Featured nếu có)");
+  } else if (!post.ogImageUrl) {
+    warnings.push("Thiếu ảnh OG (sẽ fallback Featured nếu có)");
   }
 
   let faqOk = true;
@@ -114,12 +156,20 @@ export async function getContentPublishReadiness(
   checks.faqValid = faqOk;
   if (!faqOk) errors.push("FAQ không hợp lệ");
 
-  // Schema: only reject obviously fabricated rating schemas in content markers
   const schemaBad =
     /"@type"\s*:\s*"(AggregateRating|Review)"/i.test(post.content ?? "") ||
     /itemtype=["'][^"']*(AggregateRating|Review)/i.test(post.content ?? "");
   checks.schemaValid = !schemaBad;
   if (schemaBad) errors.push("Schema Review/AggregateRating không được phép (tránh fake rating)");
+
+  // Unsafe commercial claims that should not ship without human review
+  const unsafeClaim =
+    /\bMOQ\s*[:=]?\s*\d+/i.test(post.content ?? "") ||
+    /giá\s*(chỉ\s*)?từ\s*[\d.,]+\s*(đ|vnd|k)/i.test(post.content ?? "") ||
+    /giao\s*trong\s*\d+\s*(ngày|giờ)/i.test(post.content ?? "");
+  if (unsafeClaim) {
+    errors.push("Phát hiện claim nhạy cảm (MOQ/giá/lead-time) — cần human confirm trước khi publish");
+  }
 
   checks.publicVisibilityValid = true;
   checks.mediaValid = true;
@@ -138,6 +188,37 @@ export async function getContentPublishReadiness(
   const materiallyChanged = Boolean(post.contentModifiedAfterHandoff);
   const acknowledged = Boolean(post.publishReadinessAcknowledgedAt);
 
+  // Brief policy: launch workflow treats Brief approval as required before Context,
+  // but Blog publish historically does not hard-block on Brief. Keep as explicit warning.
+  const linkedTopic = await prisma.seoTopic.findFirst({
+    where: { targetEntityType: "BLOG_POST", targetEntityId: post.id },
+    select: { id: true },
+  });
+  if (linkedTopic) {
+    const brief = await prisma.seoContentBrief.findUnique({
+      where: { topicId: linkedTopic.id },
+      select: { approvedAt: true, approvedBy: true },
+    });
+    if (brief && !brief.approvedAt) {
+      warnings.push("Brief chưa được human approve (không chặn publish theo policy hiện tại)");
+    }
+  }
+
+  // Blocking QA from linked writing draft (warning-only QA does not block)
+  if (post.sourceWritingDraftId) {
+    const draft = await prisma.writingDraftRecord.findUnique({
+      where: { id: post.sourceWritingDraftId },
+      select: { qaReport: true },
+    });
+    const qa = draft?.qaReport as { issues?: Array<{ severity?: string; message?: string }> } | null;
+    if (blockingQaBlocks(qa?.issues)) {
+      const first = (qa?.issues ?? []).find(
+        (i) => i.severity === "BLOCKING" || i.severity === "ERROR"
+      );
+      errors.push(`QA blocking: ${first?.message ?? "có lỗi QA"}`);
+    }
+  }
+
   if (governed) {
     checks.sourceApproved = false;
     checks.handoffCompleted = false;
@@ -154,7 +235,6 @@ export async function getContentPublishReadiness(
       sourceSnapshotHash = handoff.sourceSnapshotHash;
       const snap = handoff.resultSnapshot as { contentHash?: string } | null;
       if (snap?.contentHash && snap.contentHash !== contentHash && !materiallyChanged) {
-        // Hash drifted without flag — treat as material
         warnings.push("Content hash khác handoff snapshot");
       }
     }
@@ -162,8 +242,9 @@ export async function getContentPublishReadiness(
     const review = post.sourceReviewSessionId
       ? await prisma.contentReviewSession.findUnique({ where: { id: post.sourceReviewSessionId } })
       : null;
-    if (!review || review.status !== "APPROVED") {
-      errors.push("Review session chưa APPROVED");
+    const gate = evaluateReviewPublishGate(review?.status);
+    if (!gate.ok) {
+      errors.push(gate.error!);
     } else {
       checks.sourceApproved = true;
       checks.reviewStillValid = true;
@@ -197,6 +278,24 @@ export async function getContentPublishReadiness(
         warnings.push("Thay đổi biên tập đã được xác nhận");
       }
     }
+  } else if (pipelineReview) {
+    // Content pipeline Blog linked to a Review without full handoff triad.
+    checks.handoffCompleted = true; // handoff not required on this path
+    checks.draftVersionMatches = true;
+    checks.contentAcknowledged = true;
+    checks.sourceApproved = false;
+    checks.reviewStillValid = false;
+
+    const review = await prisma.contentReviewSession.findUnique({
+      where: { id: post.sourceReviewSessionId! },
+    });
+    const gate = evaluateReviewPublishGate(review?.status);
+    if (!gate.ok) {
+      errors.push(gate.error!);
+    } else {
+      checks.sourceApproved = true;
+      checks.reviewStillValid = true;
+    }
   } else {
     // Manual Blog — no writing traceability required
     checks.sourceApproved = true;
@@ -211,7 +310,7 @@ export async function getContentPublishReadiness(
   return {
     ready,
     blogPostId: post.id,
-    governed,
+    governed: governed || pipelineReview,
     sourceWritingDraftId: post.sourceWritingDraftId,
     sourceDraftVersion: post.sourceWritingDraftVersion,
     approvedReviewSessionId: post.sourceReviewSessionId,
