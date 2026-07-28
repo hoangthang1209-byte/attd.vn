@@ -468,6 +468,31 @@ export default function SeoDashboardClient() {
               )}
             </section>
 
+            <section className="admin-section-card" style={{ marginBottom: 16 }}>
+              <div className="admin-section-header">
+                <h2 className="admin-subtitle" style={{ margin: 0 }}>
+                  Cần tối ưu
+                </h2>
+                <Link href="/admin/content/performance" className="admin-btn admin-btn--secondary admin-btn--small">
+                  Mở hiệu quả nội dung
+                </Link>
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+                <li className="admin-field-hint">
+                  Search Console chưa kết nối — không có clicks/impressions đo được.
+                </li>
+                <li className="admin-field-hint">
+                  Bài cần refresh / thiếu CTA xem trong Hiệu quả nội dung.
+                </li>
+                {data.counts.publishedTopics > 0 ? (
+                  <li className="admin-field-hint">
+                    {data.counts.publishedTopics} chủ đề đã xuất bản — kiểm tra tuổi nội dung và lead gắn
+                    landing URL.
+                  </li>
+                ) : null}
+              </ul>
+            </section>
+
             {workflowStates ? (
               <section className="admin-section-card" style={{ marginBottom: 16 }}>
                 <div className="admin-section-header">

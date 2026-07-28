@@ -88,6 +88,7 @@ type TopicDetail = {
   strategyId: string;
   strategyName: string;
   clusterName: string;
+  updatedAt?: string;
   keywords: KeywordRow[];
   brief: BriefData | null;
 };
@@ -698,7 +699,31 @@ export default function SeoTopicDetailClient({ topicId }: { topicId: string }) {
               <Link href="/admin/content/calendar" className="admin-link">
                 Calendar
               </Link>
+              {topic.status === "PUBLISHED" ? (
+                <>
+                  {" · "}
+                  <Link href="/admin/content/performance" className="admin-link">
+                    Hiệu quả
+                  </Link>
+                </>
+              ) : null}
             </p>
+            {topic.status === "PUBLISHED" ? (
+              <div
+                className="admin-sidebar-card"
+                style={{ margin: "0 0 12px", padding: "10px 12px", background: "#f8fafc" }}
+              >
+                <p className="admin-field-hint" style={{ margin: 0 }}>
+                  Hiệu quả bài: Chưa có dữ liệu Search/Analytics đo được trong CMS.
+                </p>
+                <p className="admin-field-hint" style={{ margin: "4px 0 0" }}>
+                  Last updated: {new Date(topic.updatedAt ?? Date.now()).toLocaleDateString("vi-VN")} ·{" "}
+                  <Link href="/admin/content/performance" className="admin-link">
+                    Open full performance
+                  </Link>
+                </p>
+              </div>
+            ) : null}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span
                 style={{

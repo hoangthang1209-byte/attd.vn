@@ -245,12 +245,18 @@ export default function SeoStrategyDetailClient({ strategyId }: { strategyId: st
               </li>
             ))}
           </ul>
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Link
               href={`/admin/content/calendar?strategyId=${strategyId}&view=month`}
               className="admin-btn admin-btn--secondary admin-btn--small"
             >
               Open month calendar
+            </Link>
+            <Link
+              href={`/admin/content/performance?strategyId=${strategyId}`}
+              className="admin-btn admin-btn--secondary admin-btn--small"
+            >
+              Hiệu quả nội dung
             </Link>
           </div>
         </div>

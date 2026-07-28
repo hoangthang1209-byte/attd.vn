@@ -114,6 +114,7 @@ export default function EditorialCalendarClient() {
     priority: "",
     month: "",
   });
+  const [calendarLayer, setCalendarLayer] = useState<"planning" | "performance" | "refresh">("planning");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -218,11 +219,34 @@ export default function EditorialCalendarClient() {
                       : "Agenda"}
               </button>
             ))}
+            {(["planning", "performance", "refresh"] as const).map((layer) => (
+              <button
+                key={layer}
+                type="button"
+                className={
+                  calendarLayer === layer
+                    ? "admin-btn admin-btn--primary admin-btn--small"
+                    : "admin-btn admin-btn--secondary admin-btn--small"
+                }
+                onClick={() => setCalendarLayer(layer)}
+              >
+                {layer === "planning" ? "Planning" : layer === "performance" ? "Performance" : "Refresh"}
+              </button>
+            ))}
             <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
               Tải lại
             </button>
           </div>
         </div>
+
+        {calendarLayer !== "planning" ? (
+          <p className="admin-message admin-message--warning" role="status">
+            {calendarLayer === "performance"
+              ? "Performance: Search Console chưa kết nối — chỉ hiện badge Published / Missing measurement. "
+              : "Refresh: đánh dấu bài PUBLISHED cần rà soát tuổi nội dung. "}
+            <Link href="/admin/content/performance">Mở hiệu quả nội dung</Link>
+          </p>
+        ) : null}
 
         {/* Campaign timeline */}
         <section className="admin-section-card" style={{ marginBottom: 16 }}>

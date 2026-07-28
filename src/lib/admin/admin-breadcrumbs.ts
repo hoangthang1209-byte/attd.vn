@@ -503,6 +503,30 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/performance/settings",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "Hiệu quả nội dung", "Cài đặt nguồn"],
+      title: "Cài đặt nguồn đo lường",
+      description: "Trạng thái kết nối Search Console, Analytics và attribution — không hiển thị credential.",
+    },
+  },
+  {
+    path: "/admin/content/performance/:id",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "Hiệu quả nội dung", "Chi tiết"],
+      title: "Chi tiết hiệu quả bài",
+      description: "Search, engagement, conversion và khuyến nghị cập nhật cho một bài đã xuất bản.",
+    },
+  },
+  {
+    path: "/admin/content/performance",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "Hiệu quả nội dung"],
+      title: "Hiệu quả nội dung",
+      description: "Theo dõi hiệu quả bài đã xuất bản và xác định nội dung cần tối ưu tiếp theo.",
+    },
+  },
+  {
     path: "/admin/content/seo-strategies",
     meta: {
       breadcrumbs: ["NỘI DUNG", "Chiến lược"],
