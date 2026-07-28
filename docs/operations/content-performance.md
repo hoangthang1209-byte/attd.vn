@@ -17,6 +17,7 @@ Unavailable metrics are returned as `null` and rendered as “Chưa kết nối�
 
 ### Search Console
 Not implemented in this repository. Future work needs a secure OAuth or service-account pattern, property verification, and batched page queries with caching.
+Setup/runbook: `docs/operations/google-search-console.md`.
 
 ### Analytics
 Environment variable (name only):

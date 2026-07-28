@@ -33,22 +33,72 @@ function cacheSet(key: string, value: unknown) {
   MEMORY_CACHE.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, value });
 }
 
+function getSearchConsoleConnectionDiagnostics(): {
+  status: PerformanceSourceReport["status"];
+  freshness: PerformanceSourceReport["freshness"];
+  propertyIdentifier: string | null;
+  lastErrorSummary: string | null;
+  dataCoverage: string;
+  notes: string[];
+} {
+  const siteUrl = process.env.GOOGLE_SEARCH_CONSOLE_SITE_URL?.trim() || null;
+  const clientEmail = process.env.GOOGLE_SEARCH_CONSOLE_CLIENT_EMAIL?.trim() || null;
+  const privateKeyConfigured = Boolean(process.env.GOOGLE_SEARCH_CONSOLE_PRIVATE_KEY?.trim());
+  const configuredCount = [siteUrl, clientEmail, privateKeyConfigured].filter(Boolean).length;
+
+  if (configuredCount === 0) {
+    return {
+      status: "NOT_CONNECTED",
+      freshness: "UNAVAILABLE",
+      propertyIdentifier: null,
+      lastErrorSummary: null,
+      dataCoverage: "Chưa cấu hình GOOGLE_SEARCH_CONSOLE_* — không gọi API.",
+      notes: [
+        "Xem docs/operations/google-search-console.md",
+        "Không dùng dữ liệu demo cho impressions/clicks/position.",
+      ],
+    };
+  }
+
+  if (configuredCount < 3) {
+    return {
+      status: "PARTIAL",
+      freshness: "UNAVAILABLE",
+      propertyIdentifier: siteUrl,
+      lastErrorSummary: "Thiếu một phần cấu hình GSC (site URL / client email / private key).",
+      dataCoverage: "Chưa đủ credential để query Search Console an toàn.",
+      notes: ["Không gọi GSC API khi cấu hình chưa đủ.", "Không trả secret trong response."],
+    };
+  }
+
+  return {
+    status: "PARTIAL",
+    freshness: "UNAVAILABLE",
+    propertyIdentifier: siteUrl,
+    lastErrorSummary:
+      "Credential env có mặt nhưng CMS chưa bật GSC Data API query trong sprint này.",
+    dataCoverage: "Connection-ready diagnostics only — chưa đọc impressions/clicks.",
+    notes: [
+      `Service account email configured: ${clientEmail ? `${clientEmail.split("@")[0]}@…` : "yes"}`,
+      "Private key presence checked as boolean only.",
+    ],
+  };
+}
+
 export function getPerformanceSourceReports(): PerformanceSourceReport[] {
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() || null;
+  const gsc = getSearchConsoleConnectionDiagnostics();
   return [
     {
       id: "search_console",
       label: "Google Search Console",
-      status: "NOT_CONNECTED",
-      freshness: "UNAVAILABLE",
-      propertyIdentifier: null,
+      status: gsc.status,
+      freshness: gsc.freshness,
+      propertyIdentifier: gsc.propertyIdentifier,
       lastSuccessAt: null,
-      lastErrorSummary: null,
-      dataCoverage: "Không có API/credential GSC trong repository.",
-      notes: [
-        "Sprint này chỉ hiển thị trạng thái kết nối.",
-        "Không dùng dữ liệu demo cho impressions/clicks/position.",
-      ],
+      lastErrorSummary: gsc.lastErrorSummary,
+      dataCoverage: gsc.dataCoverage,
+      notes: gsc.notes,
     },
     {
       id: "analytics",
