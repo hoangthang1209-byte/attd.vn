@@ -203,10 +203,54 @@ export default function SeoStrategyDetailClient({ strategyId }: { strategyId: st
               Danh sách chiến lược
             </Link>
             <Link
+              href={`/admin/content/calendar?strategyId=${strategyId}`}
+              className="admin-btn admin-btn--secondary"
+            >
+              Lịch biên tập
+            </Link>
+            <Link
               href={`/admin/content/seo-topics?strategyId=${strategyId}`}
               className="admin-btn admin-btn--primary"
             >
               Xem chủ đề
+            </Link>
+          </div>
+        </div>
+
+        <div className="admin-sidebar-card" style={{ marginBottom: 16 }}>
+          <h3 className="admin-sidebar-title">Calendar preview</h3>
+          <p className="admin-field-hint" style={{ margin: "0 0 8px" }}>
+            Publishing timeline · {strategy.publishedCount}/{strategy.topicCount} published (
+            {strategy.topicCount > 0
+              ? Math.round((strategy.publishedCount / strategy.topicCount) * 100)
+              : 0}
+            %)
+          </p>
+          <div style={{ height: 10, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", marginBottom: 12 }}>
+            <div
+              style={{
+                width: `${strategy.topicCount > 0 ? Math.round((strategy.publishedCount / strategy.topicCount) * 100) : 0}%`,
+                height: "100%",
+                background: "#047857",
+              }}
+            />
+          </div>
+          <h4 className="admin-sidebar-title" style={{ fontSize: 13 }}>
+            Cluster completion
+          </h4>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 6 }}>
+            {clusters.slice(0, 8).map((cluster) => (
+              <li key={cluster.id} className="admin-field-hint">
+                {cluster.name} · {cluster.topicCount} topics
+              </li>
+            ))}
+          </ul>
+          <div style={{ marginTop: 10 }}>
+            <Link
+              href={`/admin/content/calendar?strategyId=${strategyId}&view=month`}
+              className="admin-btn admin-btn--secondary admin-btn--small"
+            >
+              Open month calendar
             </Link>
           </div>
         </div>

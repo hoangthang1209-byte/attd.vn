@@ -495,6 +495,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/calendar",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "Lịch biên tập"],
+      title: "Lịch biên tập",
+      description: "Lập kế hoạch xuất bản theo pipeline, tuần, tháng và agenda.",
+    },
+  },
+  {
     path: "/admin/content/seo-strategies",
     meta: {
       breadcrumbs: ["NỘI DUNG", "Chiến lược"],

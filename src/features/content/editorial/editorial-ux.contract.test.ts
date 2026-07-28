@@ -24,6 +24,7 @@ describe("Sprint 13.1 content editorial IA", () => {
     const labels = content.platforms[0].items.map((i) => i.label);
     assert.ok(labels.includes("Dashboard"));
     assert.ok(labels.includes("Chủ đề"));
+    assert.ok(labels.includes("Lịch biên tập"));
     assert.ok(labels.includes("Hướng dẫn biên tập"));
     assert.ok(labels.includes("Kiểm duyệt"));
     assert.ok(labels.includes("Xuất bản"));
@@ -62,7 +63,9 @@ describe("Sprint 13.1 content editorial IA", () => {
 
   it("dashboard client uses editorial Today Work and My Tasks copy", () => {
     const source = read("src/components/admin/seo-content/SeoDashboardClient.tsx");
-    assert.match(source, /Việc hôm nay/);
+    assert.match(source, /Today/);
+    assert.match(source, /This Week/);
+    assert.match(source, /Upcoming/);
     assert.match(source, /Việc của tôi/);
     assert.match(source, /Quy trình/);
     assert.match(source, /Sức khỏe nội dung/);

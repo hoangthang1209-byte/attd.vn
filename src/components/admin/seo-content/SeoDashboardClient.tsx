@@ -347,11 +347,14 @@ export default function SeoDashboardClient() {
         <div className="admin-section-header" style={{ alignItems: "flex-start" }}>
           <div>
             <p className="admin-field-hint" style={{ margin: 0 }}>
-              Việc cần làm hôm nay.
+              Today · This Week · Upcoming
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/admin/content/seo-topics" className="admin-btn admin-btn--primary">
+            <Link href="/admin/content/calendar" className="admin-btn admin-btn--primary">
+              Lịch biên tập
+            </Link>
+            <Link href="/admin/content/seo-topics" className="admin-btn admin-btn--secondary">
               Danh sách chủ đề
             </Link>
             <button type="button" className="admin-btn admin-btn--secondary" onClick={retryAll}>
@@ -391,9 +394,11 @@ export default function SeoDashboardClient() {
             <section className="admin-section-card" style={{ marginBottom: 16 }}>
               <div className="admin-section-header">
                 <h2 className="admin-subtitle" style={{ margin: 0 }}>
-                  Việc hôm nay
+                  Today
                 </h2>
-                <span className="admin-field-hint">Dữ liệu thật từ quy trình hiện tại</span>
+                <Link href="/admin/content/calendar" className="admin-field-hint">
+                  Xem lịch đầy đủ →
+                </Link>
               </div>
               <div
                 style={{
@@ -420,6 +425,47 @@ export default function SeoDashboardClient() {
                   </Link>
                 ))}
               </div>
+            </section>
+
+            <section className="admin-section-card" style={{ marginBottom: 16 }}>
+              <div className="admin-section-header">
+                <h2 className="admin-subtitle" style={{ margin: 0 }}>
+                  This Week
+                </h2>
+                <span className="admin-field-hint">
+                  Quá hạn {data.counts.overdueTopics} · Review {data.counts.reviewTopics}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <Link href="/admin/content/calendar?view=agenda" className="admin-btn admin-btn--secondary">
+                  Agenda tuần này
+                </Link>
+                <Link href="/admin/content/calendar?view=pipeline" className="admin-btn admin-btn--secondary">
+                  Pipeline
+                </Link>
+              </div>
+            </section>
+
+            <section className="admin-section-card" style={{ marginBottom: 16 }}>
+              <div className="admin-section-header">
+                <h2 className="admin-subtitle" style={{ margin: 0 }}>
+                  Upcoming
+                </h2>
+              </div>
+              {data.upcomingDue.length === 0 ? (
+                <p className="admin-field-hint">Không có chủ đề sắp đến hạn.</p>
+              ) : (
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
+                  {data.upcomingDue.slice(0, 5).map((topic) => (
+                    <li key={topic.id} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <Link href={`/admin/content/topics/${topic.id}`} className="admin-link">
+                        {topic.title}
+                      </Link>
+                      <span className="admin-field-hint">{formatDate(topic.dueDate)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             {workflowStates ? (

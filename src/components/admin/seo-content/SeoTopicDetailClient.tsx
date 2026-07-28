@@ -79,6 +79,7 @@ type TopicDetail = {
   targetUrl: string | null;
   existingUrl: string | null;
   notes: string | null;
+  assignedTo: string | null;
   dueDate: string | null;
   mediaBundleId: string | null;
   mediaBundleName: string | null;
@@ -683,6 +684,21 @@ export default function SeoTopicDetailClient({ topicId }: { topicId: string }) {
             <p className="admin-field-hint" style={{ margin: "0 0 6px" }}>
               Từ khóa: <strong>{topic.primaryKeyword}</strong>
             </p>
+            <p className="admin-field-hint" style={{ margin: "0 0 8px" }}>
+              Publish target:{" "}
+              <strong>
+                {topic.dueDate ? new Date(topic.dueDate).toLocaleDateString("vi-VN") : "Chưa đặt"}
+              </strong>
+              {" · "}
+              Campaign:{" "}
+              <Link href={`/admin/content/seo-strategies/${topic.strategyId}`} className="admin-link">
+                {topic.strategyName}
+              </Link>
+              {" · "}
+              <Link href="/admin/content/calendar" className="admin-link">
+                Calendar
+              </Link>
+            </p>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span
                 style={{
@@ -750,7 +766,7 @@ export default function SeoTopicDetailClient({ topicId }: { topicId: string }) {
               <p className="admin-field-hint" style={{ margin: 0 }}>
                 Owner
               </p>
-              <p style={{ margin: 0 }}>—</p>
+              <p style={{ margin: 0 }}>{topic.assignedTo ?? "—"}</p>
             </div>
             <div>
               <p className="admin-field-hint" style={{ margin: 0 }}>
