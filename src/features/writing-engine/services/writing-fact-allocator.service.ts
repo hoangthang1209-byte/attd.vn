@@ -5,6 +5,15 @@ import type {
   WritingSectionPlan,
 } from "@/features/writing-engine/writing-engine.types";
 import { isExactValueFactKey } from "@/features/writing-engine/writing-utils";
+import {
+  isMediaFactId,
+  isMediaFactSourceType,
+} from "@/features/content/editorial/review-approval.policy";
+
+/** Media-derived facts may be cited but never demanded as Knowledge required facts. */
+function isKnowledgeRequired(fact: ContentContextPackage["facts"][0]): boolean {
+  return fact.required && !isMediaFactId(fact.factId) && !isMediaFactSourceType(fact.sourceType);
+}
 
 const DOMAIN_SECTION_MAP: Array<{ pattern: RegExp; types: string[] }> = [
   { pattern: /moq|minimum order|đặt tối thiểu/i, types: ["COMMERCIAL", "PRICING"] },
@@ -59,7 +68,7 @@ export function allocateFactsToSections(
   const usages: WritingFactUsage[] = [];
   const updatedSections = sections.map((section) => ({ ...section }));
 
-  const requiredFacts = usableFacts.filter((f) => f.required);
+  const requiredFacts = usableFacts.filter(isKnowledgeRequired);
   for (const fact of requiredFacts) {
     let bestSection = updatedSections[0];
     let bestScore = -1;
@@ -77,7 +86,7 @@ export function allocateFactsToSections(
     }
   }
 
-  for (const fact of usableFacts.filter((f) => !f.required)) {
+  for (const fact of usableFacts.filter((f) => !isKnowledgeRequired(f))) {
     if (allocated.has(fact.factId)) continue;
     const candidates = updatedSections
       .map((section) => ({ section, score: scoreFactForSection(fact, section) }))
@@ -104,7 +113,7 @@ export function allocateFactsToSections(
   }
 
   const unallocated = usableFacts
-    .filter((f) => f.required && !allocated.has(f.factId))
+    .filter((f) => isKnowledgeRequired(f) && !allocated.has(f.factId))
     .map((f) => f.factId);
 
   return {

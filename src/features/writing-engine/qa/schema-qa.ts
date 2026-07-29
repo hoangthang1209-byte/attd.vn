@@ -1,14 +1,23 @@
 import type { WritingPlan, WritingQaIssue } from "@/features/writing-engine/writing-engine.types";
+import { evaluateFaqSchemaSignal } from "@/features/content/editorial/review-approval.policy";
 
-export function runSchemaQa(plan: WritingPlan, faqCount: number): WritingQaIssue[] {
+export type SchemaQaFaqInput = { structuredFaqCount: number; visibleFaqCount: number };
+
+export function runSchemaQa(
+  plan: WritingPlan,
+  faq: number | SchemaQaFaqInput
+): WritingQaIssue[] {
   const issues: WritingQaIssue[] = [];
   const types = plan.schemaPlan.schemaTypes;
+  const faqInput: SchemaQaFaqInput =
+    typeof faq === "number" ? { structuredFaqCount: faq, visibleFaqCount: 0 } : faq;
 
-  if (types.includes("FAQPage") && faqCount === 0) {
+  const faqSignal = evaluateFaqSchemaSignal({ schemaTypes: types, ...faqInput });
+  if (faqSignal.code && faqSignal.message) {
     issues.push({
-      code: "FAQ_SCHEMA_WITHOUT_FAQ",
-      severity: "ERROR",
-      message: "FAQPage schema without FAQ content",
+      code: faqSignal.code,
+      severity: faqSignal.severity === "ERROR" ? "ERROR" : "WARNING",
+      message: faqSignal.message,
     });
   }
 

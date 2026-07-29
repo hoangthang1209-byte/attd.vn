@@ -10,6 +10,10 @@ import { runLinkQa } from "@/features/writing-engine/qa/link-qa";
 import { runMediaQa } from "@/features/writing-engine/qa/media-qa";
 import { runMetadataQa, runSeoQa } from "@/features/writing-engine/qa/seo-qa";
 import { runSafetyQa, runSchemaQa } from "@/features/writing-engine/qa/schema-qa";
+import {
+  countVisibleFaqEntries,
+  isMediaFactId,
+} from "@/features/content/editorial/review-approval.policy";
 
 export function runWritingQa(plan: WritingPlan, draft: WritingStructuredDraft): WritingQaReport {
   const sections = draft.sections;
@@ -21,12 +25,17 @@ export function runWritingQa(plan: WritingPlan, draft: WritingStructuredDraft): 
     ...runMediaQa(plan, sections),
     ...runSeoQa(plan, sections),
     ...runMetadataQa(plan),
-    ...runSchemaQa(plan, draft.faq.length),
+    ...runSchemaQa(plan, {
+      structuredFaqCount: draft.faq.length,
+      visibleFaqCount: countVisibleFaqEntries(sections),
+    }),
     ...runSafetyQa(plan),
   ];
 
   const blocking = issues.filter((i) => i.severity === "BLOCKING" || i.severity === "ERROR");
-  const requiredFacts = plan.factPlan.usages.filter((u) => u.required).length;
+  const requiredFacts = plan.factPlan.usages.filter(
+    (u) => u.required && !isMediaFactId(u.factId)
+  ).length;
   const usedFacts = new Set(sections.flatMap((s) => s.factIdsUsed)).size;
   const requiredFactCoverage =
     requiredFacts === 0 ? 1 : Math.min(1, usedFacts / requiredFacts);

@@ -3,6 +3,7 @@ import { requireAdminPermission } from "@/lib/permissions/require-admin-permissi
 import {
   ContentReviewError,
   getContentReviewSession,
+  getReviewDraftChanges,
 } from "@/features/content/services/content-review.service";
 import {
   diffPlainText,
@@ -58,10 +59,13 @@ export async function GET(req: NextRequest, context: RouteContext) {
         };
       }) ?? [];
 
+    const draftChanges = result.readiness.stale ? await getReviewDraftChanges(reviewId) : null;
+
     return NextResponse.json({
       ...result,
       facts,
       sectionDiff,
+      draftChanges,
       media: result.structuredDraft?.media ?? [],
       internalLinks: result.structuredDraft?.internalLinks ?? [],
       metadata: result.structuredDraft

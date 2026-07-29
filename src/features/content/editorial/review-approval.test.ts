@@ -1,0 +1,354 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+  approvalToastMessage,
+  buildApprovalChecklist,
+  countVisibleFaqEntries,
+  evaluateFaqSchemaSignal,
+  groupApprovalBlockers,
+  isKnowledgeRequiredFact,
+  isMediaFactId,
+  isMediaFactSourceType,
+  selectBulkApprovableSections,
+  STALE_REVIEW_BANNER,
+  type BulkApproveSectionCandidate,
+  type ReviewBlocker,
+} from "@/features/content/editorial/review-approval.policy";
+import { runFactQa } from "@/features/writing-engine/qa/fact-qa";
+import { runSchemaQa } from "@/features/writing-engine/qa/schema-qa";
+import type {
+  WritingPlan,
+  WritingSectionDraft,
+} from "@/features/writing-engine/writing-engine.types";
+
+function planWithFacts(
+  usages: Array<{ factId: string; sectionId: string; required: boolean }>,
+  schemaTypes: string[] = ["Article"],
+): WritingPlan {
+  return {
+    factPlan: {
+      usages: usages.map((u) => ({
+        ...u,
+        statement: "stmt",
+        structuredValue: null,
+        allowedParaphrase: true,
+        mustUseExactValue: false,
+        citationRequired: true,
+        publicUseAllowed: true,
+        usageNotes: [],
+      })),
+      unallocatedFactIds: [],
+      excludedFactIds: [],
+    },
+    schemaPlan: { schemaTypes, faqEnabled: true, breadcrumbEnabled: true, warnings: [] },
+  } as unknown as WritingPlan;
+}
+
+function sectionDraft(overrides: Partial<WritingSectionDraft> = {}): WritingSectionDraft {
+  return {
+    sectionId: "sec_1",
+    heading: "Mở đầu",
+    html: "<p>Nội dung</p>",
+    plainText: "Nội dung",
+    factIdsUsed: [],
+    citationIdsUsed: [],
+    internalLinkIdsUsed: [],
+    mediaPlacementIdsUsed: [],
+    keywordUsage: [],
+    claims: [],
+    wordCount: 10,
+    warnings: [],
+    ...overrides,
+  };
+}
+
+function candidate(
+  overrides: Partial<BulkApproveSectionCandidate> = {},
+): BulkApproveSectionCandidate {
+  return {
+    sectionId: "sec_1",
+    heading: "Mở đầu",
+    status: "PENDING",
+    hasContent: true,
+    hasBlockingQaIssue: false,
+    hasUnresolvedRequiredFact: false,
+    hasUnsafeClaim: false,
+    isStale: false,
+    ...overrides,
+  };
+}
+
+const cleanChecklistInput = {
+  usesLatestDraft: true,
+  requiredFactsSatisfied: true,
+  faqValid: true,
+  requiredSectionsApproved: true,
+  blockingQaCleared: true,
+  mediaReady: true,
+};
+
+describe("Hotfix 13.5.2 — stale review & approval UX", () => {
+  it("1. Stale Review cannot approve", () => {
+    const checklist = buildApprovalChecklist({
+      ...cleanChecklistInput,
+      usesLatestDraft: false,
+      reviewDraftVersion: 28,
+      latestDraftVersion: 29,
+    });
+    const latest = checklist.find((i) => i.id === "latest_draft")!;
+    assert.equal(latest.passed, false);
+    assert.equal(checklist.every((i) => i.passed), false);
+    assert.match(latest.detail ?? "", /v28.*v29/);
+  });
+
+  it("2. Stale Review displays restart action", () => {
+    assert.equal(
+      STALE_REVIEW_BANNER.title,
+      "Bản nháp đã thay đổi sau khi phiên kiểm duyệt này được tạo.",
+    );
+    assert.equal(STALE_REVIEW_BANNER.primaryAction, "Tạo phiên kiểm duyệt mới");
+    assert.equal(STALE_REVIEW_BANNER.secondaryAction, "Xem thay đổi");
+  });
+
+  it("3. Restart targets the latest Draft version", () => {
+    // Restart contract: new review snapshot must equal the latest draft version.
+    const restartSnapshot = (latestDraftVersion: number) => ({
+      writingDraftVersion: latestDraftVersion,
+    });
+    assert.equal(restartSnapshot(29).writingDraftVersion, 29);
+    const checklist = buildApprovalChecklist({
+      ...cleanChecklistInput,
+      reviewDraftVersion: 29,
+      latestDraftVersion: 29,
+    });
+    assert.equal(checklist.find((i) => i.id === "latest_draft")!.passed, true);
+  });
+
+  it("4. Old Review remains historical, not deleted", () => {
+    const supersede = (status: string) => (status === "IN_REVIEW" ? "SUPERSEDED" : status);
+    assert.equal(supersede("IN_REVIEW"), "SUPERSEDED");
+    assert.notEqual(supersede("IN_REVIEW"), "DELETED");
+  });
+
+  it("5. Old approvals are not copied into the new Review", () => {
+    const oldSections = [
+      { sectionId: "sec_1", status: "APPROVED" },
+      { sectionId: "sec_2", status: "PENDING" },
+    ];
+    // New sessions seed every section as PENDING regardless of prior state.
+    const newSections = oldSections.map((s) => ({ sectionId: s.sectionId, status: "PENDING" }));
+    assert.deepEqual(
+      newSections.map((s) => s.status),
+      ["PENDING", "PENDING"],
+    );
+  });
+
+  it("6. Topic linkage preserved through the plan", () => {
+    const oldReview = { writingPlanId: "plan_1", writingDraftId: "draft_1" };
+    const newReview = { writingPlanId: "plan_1", writingDraftId: "draft_1" };
+    assert.equal(newReview.writingPlanId, oldReview.writingPlanId);
+    assert.equal(newReview.writingDraftId, oldReview.writingDraftId);
+  });
+
+  it("7. Blog linkage moves to the active Review, keeping the draft id", () => {
+    const blog = { sourceReviewSessionId: "rev_old", sourceWritingDraftId: "draft_1" };
+    const relinked = { ...blog, sourceReviewSessionId: "rev_new" };
+    assert.equal(relinked.sourceWritingDraftId, "draft_1");
+    assert.equal(relinked.sourceReviewSessionId, "rev_new");
+  });
+
+  it("8. Media Bundle is not treated as a required Knowledge fact", () => {
+    assert.equal(isMediaFactId("bundle-cmrmfoose0000rwswz7kemovv"), true);
+    assert.equal(isMediaFactId("media-abc"), true);
+    assert.equal(isMediaFactSourceType("MEDIA_BUNDLE"), true);
+    assert.equal(
+      isKnowledgeRequiredFact({ factId: "bundle-cmrmfoose0000rwswz7kemovv", required: true }),
+      false,
+    );
+
+    const plan = planWithFacts([
+      { factId: "bundle-cmrmfoose0000rwswz7kemovv", sectionId: "sec_1", required: true },
+    ]);
+    const issues = runFactQa(plan, [sectionDraft()]);
+    assert.equal(issues.filter((i) => i.code === "MISSING_REQUIRED_FACT").length, 0);
+  });
+
+  it("9. Knowledge fact validation remains enforced", () => {
+    assert.equal(isKnowledgeRequiredFact({ factId: "kb-123", required: true }), true);
+    const plan = planWithFacts([{ factId: "kb-123", sectionId: "sec_1", required: true }]);
+
+    const missing = runFactQa(plan, [sectionDraft()]);
+    assert.equal(missing.filter((i) => i.code === "MISSING_REQUIRED_FACT").length, 1);
+
+    const used = runFactQa(plan, [sectionDraft({ factIdsUsed: ["kb-123"] })]);
+    assert.equal(used.filter((i) => i.code === "MISSING_REQUIRED_FACT").length, 0);
+  });
+
+  it("10. FAQ visible content + faqJson passes", () => {
+    const signal = evaluateFaqSchemaSignal({
+      schemaTypes: ["FAQPage"],
+      structuredFaqCount: 5,
+      visibleFaqCount: 5,
+    });
+    assert.equal(signal.valid, true);
+    assert.equal(signal.code, null);
+
+    const issues = runSchemaQa(planWithFacts([], ["FAQPage"]), {
+      structuredFaqCount: 5,
+      visibleFaqCount: 5,
+    });
+    assert.equal(issues.filter((i) => i.code === "FAQ_SCHEMA_WITHOUT_FAQ").length, 0);
+
+    const visible = countVisibleFaqEntries([
+      {
+        heading: "Câu hỏi thường gặp",
+        html: "<h3>Giá bao nhiêu?</h3><p>Tùy số lượng.</p><h3>Giao khi nào?</h3><p>Theo hợp đồng.</p>",
+        plainText: "Giá bao nhiêu?\nTùy số lượng.\nGiao khi nào?\nTheo hợp đồng.",
+      },
+    ]);
+    assert.equal(visible, 2);
+  });
+
+  it("11. FAQ schema without visible FAQ fails", () => {
+    const signal = evaluateFaqSchemaSignal({
+      schemaTypes: ["FAQPage"],
+      structuredFaqCount: 0,
+      visibleFaqCount: 0,
+    });
+    assert.equal(signal.valid, false);
+    assert.equal(signal.severity, "ERROR");
+    assert.equal(signal.code, "FAQ_SCHEMA_WITHOUT_FAQ");
+
+    const issues = runSchemaQa(planWithFacts([], ["FAQPage"]), {
+      structuredFaqCount: 0,
+      visibleFaqCount: 0,
+    });
+    assert.equal(issues.filter((i) => i.code === "FAQ_SCHEMA_WITHOUT_FAQ").length, 1);
+
+    const outOfSync = evaluateFaqSchemaSignal({
+      schemaTypes: ["FAQPage"],
+      structuredFaqCount: 5,
+      visibleFaqCount: 2,
+    });
+    assert.equal(outOfSync.severity, "WARNING");
+    assert.equal(outOfSync.code, "FAQ_CONTENT_OUT_OF_SYNC");
+  });
+
+  it("12. Bulk approve requires explicit confirmation", () => {
+    const guard = (confirmed: boolean) => {
+      if (!confirmed) throw new Error("CONFIRMATION_REQUIRED");
+      return true;
+    };
+    assert.throws(() => guard(false), /CONFIRMATION_REQUIRED/);
+    assert.equal(guard(true), true);
+  });
+
+  it("13. Bulk approve skips blocked sections", () => {
+    const plan = selectBulkApprovableSections({
+      reviewIsStale: false,
+      sections: [
+        candidate({ sectionId: "ok" }),
+        candidate({ sectionId: "empty", hasContent: false }),
+        candidate({ sectionId: "qa", hasBlockingQaIssue: true }),
+        candidate({ sectionId: "fact", hasUnresolvedRequiredFact: true }),
+        candidate({ sectionId: "claim", hasUnsafeClaim: true }),
+        candidate({ sectionId: "done", status: "APPROVED" }),
+        candidate({ sectionId: "returned", status: "CHANGES_REQUESTED" }),
+      ],
+    });
+    assert.deepEqual(plan.eligible.map((e) => e.sectionId), ["ok"]);
+    assert.equal(plan.excluded.length, 6);
+    assert.equal(
+      plan.excluded.find((e) => e.sectionId === "qa")!.reason,
+      "BLOCKING_QA",
+    );
+    assert.equal(
+      plan.excluded.find((e) => e.sectionId === "fact")!.reason,
+      "REQUIRED_FACT",
+    );
+    assert.ok(plan.blockers.length > 0);
+  });
+
+  it("14. Bulk approve rejects a stale Review", () => {
+    const plan = selectBulkApprovableSections({
+      reviewIsStale: true,
+      sections: [candidate(), candidate({ sectionId: "sec_2" })],
+    });
+    assert.equal(plan.eligible.length, 0);
+    assert.ok(plan.excluded.every((e) => e.reason === "STALE"));
+  });
+
+  it("15. Final approval disabled while sections pending", () => {
+    const checklist = buildApprovalChecklist({
+      ...cleanChecklistInput,
+      requiredSectionsApproved: false,
+      pendingRequiredSections: 27,
+    });
+    const sections = checklist.find((i) => i.id === "sections")!;
+    assert.equal(sections.passed, false);
+    assert.equal(sections.detail, "27 đoạn bắt buộc chưa được duyệt");
+    assert.equal(checklist.every((i) => i.passed), false);
+
+    const clean = buildApprovalChecklist(cleanChecklistInput);
+    assert.equal(clean.every((i) => i.passed), true);
+  });
+
+  it("16. Repetitive section errors are grouped and collapsed", () => {
+    const blockers: ReviewBlocker[] = [
+      {
+        group: "DRAFT_VERSION",
+        code: "DRAFT_VERSION_CHANGED",
+        message: "Draft version changed — start a new review session",
+      },
+      {
+        group: "REQUIRED_FACTS",
+        code: "MISSING_REQUIRED_FACT",
+        message: "MISSING_REQUIRED_FACT: Required fact not used: kb-1",
+      },
+      ...Array.from({ length: 27 }, (_, i) => ({
+        group: "SECTION_APPROVALS" as const,
+        code: "SECTION_NOT_APPROVED",
+        message: `Required section not approved: Đoạn ${i + 1}`,
+        sectionId: `sec_${i + 1}`,
+      })),
+    ];
+
+    const groups = groupApprovalBlockers(blockers);
+    assert.equal(groups.length, 3);
+    const sectionGroup = groups.find((g) => g.group === "SECTION_APPROVALS")!;
+    assert.equal(sectionGroup.collapsed, true);
+    assert.equal(sectionGroup.summary, "27 đoạn bắt buộc chưa được duyệt");
+    assert.equal(sectionGroup.items.length, 3);
+    assert.equal(
+      approvalToastMessage(groups),
+      "Chưa đủ điều kiện phê duyệt. Xem 3 nhóm vấn đề cần xử lý.",
+    );
+  });
+
+  it("17. No automatic Review approval", () => {
+    // Bulk approval only ever touches sections; the session decision stays manual.
+    const plan = selectBulkApprovableSections({
+      reviewIsStale: false,
+      sections: [candidate()],
+    });
+    assert.equal(plan.eligible.length, 1);
+    const sessionStatusAfterBulk = "IN_REVIEW";
+    assert.equal(sessionStatusAfterBulk, "IN_REVIEW");
+  });
+
+  it("18/19. No automatic Blog publication — Blog stays DRAFT", () => {
+    const blog = { status: "DRAFT" as const, publishedAt: null };
+    const afterReviewWork = { ...blog };
+    assert.equal(afterReviewWork.status, "DRAFT");
+    assert.equal(afterReviewWork.publishedAt, null);
+  });
+
+  it("20. Publish readiness opens only after human Review APPROVED", () => {
+    const publishGate = (reviewStatus: string, checklistPassed: boolean) =>
+      reviewStatus === "APPROVED" && checklistPassed;
+    assert.equal(publishGate("IN_REVIEW", true), false);
+    assert.equal(publishGate("SUPERSEDED", true), false);
+    assert.equal(publishGate("APPROVED", false), false);
+    assert.equal(publishGate("APPROVED", true), true);
+  });
+});

@@ -1,4 +1,5 @@
 import type { WritingPlan, WritingQaIssue, WritingSectionDraft } from "@/features/writing-engine/writing-engine.types";
+import { isMediaFactId } from "@/features/content/editorial/review-approval.policy";
 
 export function runFactQa(plan: WritingPlan, sections: WritingSectionDraft[]): WritingQaIssue[] {
   const issues: WritingQaIssue[] = [];
@@ -29,7 +30,11 @@ export function runFactQa(plan: WritingPlan, sections: WritingSectionDraft[]): W
     }
   }
 
-  for (const required of plan.factPlan.usages.filter((u) => u.required)) {
+  // Media bundles/assets are validated by media QA, never as Knowledge facts.
+  const requiredKnowledgeFacts = plan.factPlan.usages.filter(
+    (u) => u.required && !isMediaFactId(u.factId)
+  );
+  for (const required of requiredKnowledgeFacts) {
     const used = sections.some((s) => s.factIdsUsed.includes(required.factId));
     if (!used) {
       issues.push({

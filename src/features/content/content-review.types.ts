@@ -7,6 +7,11 @@ import type {
   WritingSeverity,
 } from "@/features/writing-engine/writing-engine.types";
 import { sanitizeWritingSectionHtml } from "@/features/writing-engine/services/writing-section-sanitize.service";
+import type {
+  ApprovalChecklistItem,
+  BulkApprovePlan,
+  ReviewBlocker,
+} from "@/features/content/editorial/review-approval.policy";
 
 export type ContentReviewStatus =
   | "NOT_STARTED"
@@ -40,12 +45,22 @@ export type ContentReviewReadiness = {
   score: number;
   blockingIssues: string[];
   warnings: string[];
+  /** Structured form of `blockingIssues`, used for grouped error presentation. */
+  blockers: ReviewBlocker[];
+  /** Review snapshot no longer matches the latest Writing Draft version. */
+  stale: boolean;
+  reviewDraftVersion: number;
+  latestDraftVersion: number | null;
+  checklist: ApprovalChecklistItem[];
+  bulkApprove: BulkApprovePlan;
   sectionSummary: {
     total: number;
     approved: number;
     pending: number;
     changesRequested: number;
     rejected: number;
+    blocked: number;
+    stale: number;
   };
 };
 

@@ -1,0 +1,322 @@
+/**
+ * Pure policy helpers for the editorial Review approval UX.
+ * Client-safe: no server-only imports, no database access.
+ */
+
+export type ReviewBlockerGroup =
+  | "DRAFT_VERSION"
+  | "REQUIRED_FACTS"
+  | "FAQ"
+  | "SECTION_APPROVALS"
+  | "QA";
+
+export type ReviewBlocker = {
+  group: ReviewBlockerGroup;
+  code: string;
+  message: string;
+  sectionId?: string | null;
+};
+
+export type ReviewBlockerGroupView = {
+  group: ReviewBlockerGroup;
+  label: string;
+  summary: string;
+  count: number;
+  items: string[];
+  collapsed: boolean;
+};
+
+export const REVIEW_BLOCKER_GROUP_LABELS: Record<ReviewBlockerGroup, string> = {
+  DRAFT_VERSION: "Phiên bản bản nháp",
+  REQUIRED_FACTS: "Dữ kiện bắt buộc",
+  FAQ: "FAQ",
+  SECTION_APPROVALS: "Duyệt đoạn",
+  QA: "QA",
+};
+
+/**
+ * Fact IDs produced by the AI retrieval layer are prefixed by source family.
+ * Media families describe assets, not knowledge claims, so they must never be
+ * validated as Knowledge required facts.
+ */
+export const MEDIA_FACT_ID_PREFIXES = ["bundle-", "media-"] as const;
+export const MEDIA_FACT_SOURCE_TYPES = ["MEDIA_BUNDLE", "MEDIA_ASSET"] as const;
+
+export function isMediaFactId(factId: string): boolean {
+  return MEDIA_FACT_ID_PREFIXES.some((prefix) => factId.startsWith(prefix));
+}
+
+export function isMediaFactSourceType(sourceType: string | null | undefined): boolean {
+  if (!sourceType) return false;
+  return (MEDIA_FACT_SOURCE_TYPES as readonly string[]).includes(sourceType);
+}
+
+/** A fact only enters Knowledge required-fact validation when it is not media-derived. */
+export function isKnowledgeRequiredFact(fact: {
+  factId: string;
+  sourceType?: string | null;
+  required?: boolean;
+}): boolean {
+  if (fact.required === false) return false;
+  return !isMediaFactId(fact.factId) && !isMediaFactSourceType(fact.sourceType);
+}
+
+export type FaqSchemaSignal = {
+  valid: boolean;
+  severity: "NONE" | "WARNING" | "ERROR";
+  code: "FAQ_SCHEMA_WITHOUT_FAQ" | "FAQ_CONTENT_OUT_OF_SYNC" | null;
+  message: string | null;
+};
+
+/**
+ * FAQPage schema is valid only when the governed source actually carries FAQ
+ * content. Structured FAQ entries render as visible FAQ, so either signal
+ * satisfies the schema; a mismatch between the two is a sync warning.
+ */
+export function evaluateFaqSchemaSignal(input: {
+  schemaTypes: string[];
+  structuredFaqCount: number;
+  visibleFaqCount: number;
+}): FaqSchemaSignal {
+  if (!input.schemaTypes.includes("FAQPage")) {
+    return { valid: true, severity: "NONE", code: null, message: null };
+  }
+
+  const total = input.structuredFaqCount + input.visibleFaqCount;
+  if (total === 0) {
+    return {
+      valid: false,
+      severity: "ERROR",
+      code: "FAQ_SCHEMA_WITHOUT_FAQ",
+      message: "FAQPage schema without FAQ content",
+    };
+  }
+
+  if (
+    input.structuredFaqCount > 0 &&
+    input.visibleFaqCount > 0 &&
+    input.structuredFaqCount !== input.visibleFaqCount
+  ) {
+    return {
+      valid: true,
+      severity: "WARNING",
+      code: "FAQ_CONTENT_OUT_OF_SYNC",
+      message: `FAQ hiển thị (${input.visibleFaqCount}) khác FAQ có cấu trúc (${input.structuredFaqCount})`,
+    };
+  }
+
+  return { valid: true, severity: "NONE", code: null, message: null };
+}
+
+const FAQ_HEADING_PATTERN = /(faq|câu hỏi thường gặp|hỏi\s*[-–&]\s*đáp|questions?)/i;
+
+/** Count visible FAQ question/answer pairs rendered in the draft body. */
+export function countVisibleFaqEntries(
+  sections: Array<{ heading: string; html: string; plainText: string }>,
+): number {
+  let count = 0;
+  for (const section of sections) {
+    if (!FAQ_HEADING_PATTERN.test(section.heading)) continue;
+    const headings = section.html.match(/<h[34][^>]*>/gi)?.length ?? 0;
+    const strongs = section.html.match(/<strong[^>]*>/gi)?.length ?? 0;
+    const questionLines = section.plainText
+      .split("\n")
+      .filter((line) => line.trim().endsWith("?")).length;
+    count += Math.max(headings, strongs, questionLines);
+  }
+  return count;
+}
+
+export type BulkApproveSectionCandidate = {
+  sectionId: string;
+  heading: string;
+  status: string;
+  hasContent: boolean;
+  hasBlockingQaIssue: boolean;
+  hasUnresolvedRequiredFact: boolean;
+  hasUnsafeClaim: boolean;
+  isStale: boolean;
+};
+
+export type BulkApproveExclusionReason =
+  | "ALREADY_APPROVED"
+  | "EMPTY_CONTENT"
+  | "BLOCKING_QA"
+  | "REQUIRED_FACT"
+  | "UNSAFE_CLAIM"
+  | "STALE"
+  | "NEEDS_DECISION";
+
+export const BULK_APPROVE_EXCLUSION_LABELS: Record<BulkApproveExclusionReason, string> = {
+  ALREADY_APPROVED: "Đã duyệt",
+  EMPTY_CONTENT: "Chưa có nội dung",
+  BLOCKING_QA: "Còn lỗi QA chặn",
+  REQUIRED_FACT: "Dữ kiện bắt buộc chưa xử lý",
+  UNSAFE_CLAIM: "Có tuyên bố chưa được phép",
+  STALE: "Đoạn đã lệch phiên bản",
+  NEEDS_DECISION: "Cần quyết định riêng (từ chối/yêu cầu sửa)",
+};
+
+export type BulkApprovePlan = {
+  eligible: Array<{ sectionId: string; heading: string }>;
+  excluded: Array<{ sectionId: string; heading: string; reason: BulkApproveExclusionReason }>;
+  blockers: string[];
+};
+
+/**
+ * Decide which sections a human may approve in one confirmed batch.
+ * Only clean, current-version sections qualify — everything else stays manual.
+ */
+export function selectBulkApprovableSections(input: {
+  reviewIsStale: boolean;
+  sections: BulkApproveSectionCandidate[];
+}): BulkApprovePlan {
+  const eligible: BulkApprovePlan["eligible"] = [];
+  const excluded: BulkApprovePlan["excluded"] = [];
+  const blockers = new Set<string>();
+
+  for (const section of input.sections) {
+    const entry = { sectionId: section.sectionId, heading: section.heading };
+    const exclude = (reason: BulkApproveExclusionReason) => {
+      excluded.push({ ...entry, reason });
+      if (reason !== "ALREADY_APPROVED") {
+        blockers.add(BULK_APPROVE_EXCLUSION_LABELS[reason]);
+      }
+    };
+
+    if (input.reviewIsStale || section.isStale) {
+      exclude("STALE");
+      continue;
+    }
+    if (section.status === "APPROVED") {
+      exclude("ALREADY_APPROVED");
+      continue;
+    }
+    if (section.status === "REJECTED" || section.status === "CHANGES_REQUESTED") {
+      exclude("NEEDS_DECISION");
+      continue;
+    }
+    if (!section.hasContent) {
+      exclude("EMPTY_CONTENT");
+      continue;
+    }
+    if (section.hasBlockingQaIssue) {
+      exclude("BLOCKING_QA");
+      continue;
+    }
+    if (section.hasUnresolvedRequiredFact) {
+      exclude("REQUIRED_FACT");
+      continue;
+    }
+    if (section.hasUnsafeClaim) {
+      exclude("UNSAFE_CLAIM");
+      continue;
+    }
+    eligible.push(entry);
+  }
+
+  return { eligible, excluded, blockers: [...blockers] };
+}
+
+export type ApprovalChecklistItem = {
+  id:
+    | "latest_draft"
+    | "required_facts"
+    | "faq"
+    | "sections"
+    | "qa"
+    | "media";
+  label: string;
+  passed: boolean;
+  detail: string | null;
+};
+
+/** Compact pre-approval checklist shown above the final Approve button. */
+export function buildApprovalChecklist(input: {
+  usesLatestDraft: boolean;
+  requiredFactsSatisfied: boolean;
+  faqValid: boolean;
+  requiredSectionsApproved: boolean;
+  blockingQaCleared: boolean;
+  mediaReady: boolean;
+  latestDraftVersion?: number | null;
+  reviewDraftVersion?: number | null;
+  pendingRequiredSections?: number;
+}): ApprovalChecklistItem[] {
+  const pending = input.pendingRequiredSections ?? 0;
+  return [
+    {
+      id: "latest_draft",
+      label: "Review dùng bản nháp mới nhất",
+      passed: input.usesLatestDraft,
+      detail: input.usesLatestDraft
+        ? null
+        : `Review v${input.reviewDraftVersion ?? "?"} · bản nháp v${input.latestDraftVersion ?? "?"}`,
+    },
+    {
+      id: "required_facts",
+      label: "Dữ kiện bắt buộc đã đủ",
+      passed: input.requiredFactsSatisfied,
+      detail: null,
+    },
+    { id: "faq", label: "FAQ hợp lệ", passed: input.faqValid, detail: null },
+    {
+      id: "sections",
+      label: "Đã duyệt các đoạn bắt buộc",
+      passed: input.requiredSectionsApproved,
+      detail: pending > 0 ? `${pending} đoạn bắt buộc chưa được duyệt` : null,
+    },
+    { id: "qa", label: "Không còn lỗi QA chặn", passed: input.blockingQaCleared, detail: null },
+    { id: "media", label: "Media sẵn sàng", passed: input.mediaReady, detail: null },
+  ];
+}
+
+/**
+ * Collapse repeated blockers (notably per-section approval errors) into
+ * a small set of groups suitable for an inline panel.
+ */
+export function groupApprovalBlockers(blockers: ReviewBlocker[]): ReviewBlockerGroupView[] {
+  const order: ReviewBlockerGroup[] = [
+    "DRAFT_VERSION",
+    "REQUIRED_FACTS",
+    "FAQ",
+    "SECTION_APPROVALS",
+    "QA",
+  ];
+
+  const views: ReviewBlockerGroupView[] = [];
+  for (const group of order) {
+    const items = blockers.filter((b) => b.group === group);
+    if (items.length === 0) continue;
+
+    const collapsed = group === "SECTION_APPROVALS" && items.length > 3;
+    const notApproved = items.filter((i) => i.code === "SECTION_NOT_APPROVED").length;
+
+    views.push({
+      group,
+      label: REVIEW_BLOCKER_GROUP_LABELS[group],
+      summary: collapsed
+        ? notApproved > 0
+          ? `${notApproved} đoạn bắt buộc chưa được duyệt`
+          : `${items.length} vấn đề ở phần duyệt đoạn`
+        : items[0].message,
+      count: items.length,
+      items: collapsed ? items.slice(0, 3).map((i) => i.message) : items.map((i) => i.message),
+      collapsed,
+    });
+  }
+  return views;
+}
+
+/** Short toast copy — details belong in the inline grouped panel. */
+export function approvalToastMessage(groups: ReviewBlockerGroupView[]): string {
+  if (groups.length === 0) return "Chưa đủ điều kiện phê duyệt.";
+  return `Chưa đủ điều kiện phê duyệt. Xem ${groups.length} nhóm vấn đề cần xử lý.`;
+}
+
+export const STALE_REVIEW_BANNER = {
+  title: "Bản nháp đã thay đổi sau khi phiên kiểm duyệt này được tạo.",
+  primaryAction: "Tạo phiên kiểm duyệt mới",
+  secondaryAction: "Xem thay đổi",
+  bulkApproveAction: "Duyệt tất cả đoạn đạt điều kiện",
+} as const;

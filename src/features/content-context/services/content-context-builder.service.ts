@@ -31,6 +31,7 @@ import {
   stripUnsafeHtml,
 } from "@/features/content-context/services/content-context-normalize.service";
 import { evaluateContentContextBriefReadiness } from "@/features/content-context/services/content-context-readiness.service";
+import { isMediaFactSourceType } from "@/features/content/editorial/review-approval.policy";
 
 export class ContentContextBuilderError extends Error {
   code: string;
@@ -633,10 +634,13 @@ export async function buildContentContextPackage(
         normalizeRetrievalFact(fact, {
           primaryKeyword: topic.primaryKeyword,
           relatedIds,
+          // Media sources describe assets, not knowledge claims: media
+          // requirements are enforced by the media plan, never by fact usage.
           required:
-            relatedIds.has(fact.sourceId) ||
-            fact.sourceType === "PRODUCT" ||
-            [...requiredHeadings].some((h) => fact.title.toLowerCase().includes(h)),
+            !isMediaFactSourceType(fact.sourceType) &&
+            (relatedIds.has(fact.sourceId) ||
+              fact.sourceType === "PRODUCT" ||
+              [...requiredHeadings].some((h) => fact.title.toLowerCase().includes(h))),
         }),
       )
       .filter((f): f is NonNullable<typeof f> => Boolean(f));
