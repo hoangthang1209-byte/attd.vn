@@ -28,11 +28,18 @@ export async function POST(req: NextRequest, context: RouteContext) {
       ...result,
       reviewId: result.session.id,
       adminRoute: `/admin/content/reviews/${result.session.id}`,
-      message: "Đã tạo phiên kiểm duyệt mới từ bản nháp mới nhất.",
+      message: result.recovered
+        ? "Đã khôi phục: tạo phiên kiểm duyệt kế nhiệm từ bản nháp mới nhất."
+        : "Đã tạo phiên kiểm duyệt mới từ bản nháp mới nhất.",
     });
   } catch (err) {
     if (err instanceof ContentReviewError) {
-      return NextResponse.json({ message: err.message, code: err.code }, { status: err.status });
+      // SUCCESSOR_EXISTS carries the successor route so the client can navigate
+      // instead of dead-ending on an error.
+      return NextResponse.json(
+        { message: err.message, code: err.code, ...(err.details ?? {}) },
+        { status: err.status },
+      );
     }
     return NextResponse.json({ message: "Không tạo được phiên kiểm duyệt mới" }, { status: 500 });
   }

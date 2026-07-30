@@ -314,6 +314,35 @@ export function approvalToastMessage(groups: ReviewBlockerGroupView[]): string {
   return `Chưa đủ điều kiện phê duyệt. Xem ${groups.length} nhóm vấn đề cần xử lý.`;
 }
 
+/** Review statuses that still accept reviewer decisions. */
+export const ACTIVE_REVIEW_STATUSES = [
+  "NOT_STARTED",
+  "IN_REVIEW",
+  "CHANGES_REQUESTED",
+] as const;
+
+export function isActiveReviewStatus(status: string): boolean {
+  return (ACTIVE_REVIEW_STATUSES as readonly string[]).includes(status);
+}
+
+export type ReviewRestartMode = "STALE" | "ORPHAN_RECOVERY" | "OPEN_SUCCESSOR" | "NONE";
+
+/**
+ * Which restart affordance a Review should offer.
+ * A SUPERSEDED Review without a successor is an interrupted restart and is the
+ * only closed state that may be restarted, as a recovery path.
+ */
+export function resolveReviewRestartMode(input: {
+  sessionStatus: string;
+  hasSuccessor: boolean;
+  stale: boolean;
+}): ReviewRestartMode {
+  if (input.hasSuccessor) return "OPEN_SUCCESSOR";
+  if (input.sessionStatus === "SUPERSEDED") return "ORPHAN_RECOVERY";
+  if (isActiveReviewStatus(input.sessionStatus) && input.stale) return "STALE";
+  return "NONE";
+}
+
 export const STALE_REVIEW_BANNER = {
   title: "Bản nháp đã thay đổi sau khi phiên kiểm duyệt này được tạo.",
   primaryAction: "Tạo phiên kiểm duyệt mới",

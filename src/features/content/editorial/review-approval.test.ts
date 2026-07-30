@@ -6,9 +6,11 @@ import {
   countVisibleFaqEntries,
   evaluateFaqSchemaSignal,
   groupApprovalBlockers,
+  isActiveReviewStatus,
   isKnowledgeRequiredFact,
   isMediaFactId,
   isMediaFactSourceType,
+  resolveReviewRestartMode,
   selectBulkApprovableSections,
   STALE_REVIEW_BANNER,
   type BulkApproveSectionCandidate,
@@ -341,6 +343,67 @@ describe("Hotfix 13.5.2 — stale review & approval UX", () => {
     const afterReviewWork = { ...blog };
     assert.equal(afterReviewWork.status, "DRAFT");
     assert.equal(afterReviewWork.publishedAt, null);
+  });
+
+  it("21. Superseded Review with a successor points at the successor, not restart", () => {
+    assert.equal(
+      resolveReviewRestartMode({
+        sessionStatus: "SUPERSEDED",
+        hasSuccessor: true,
+        stale: true,
+      }),
+      "OPEN_SUCCESSOR",
+    );
+    assert.equal(
+      resolveReviewRestartMode({ sessionStatus: "IN_REVIEW", hasSuccessor: true, stale: true }),
+      "OPEN_SUCCESSOR",
+    );
+  });
+
+  it("22. Superseded Review without a successor offers orphan recovery", () => {
+    assert.equal(
+      resolveReviewRestartMode({
+        sessionStatus: "SUPERSEDED",
+        hasSuccessor: false,
+        stale: true,
+      }),
+      "ORPHAN_RECOVERY",
+    );
+    // Recovery stays available even when versions happen to match.
+    assert.equal(
+      resolveReviewRestartMode({
+        sessionStatus: "SUPERSEDED",
+        hasSuccessor: false,
+        stale: false,
+      }),
+      "ORPHAN_RECOVERY",
+    );
+  });
+
+  it("23. Restart offered only for stale active Reviews", () => {
+    assert.equal(
+      resolveReviewRestartMode({ sessionStatus: "IN_REVIEW", hasSuccessor: false, stale: true }),
+      "STALE",
+    );
+    assert.equal(
+      resolveReviewRestartMode({ sessionStatus: "IN_REVIEW", hasSuccessor: false, stale: false }),
+      "NONE",
+    );
+    for (const closed of ["APPROVED", "REJECTED"]) {
+      assert.equal(
+        resolveReviewRestartMode({ sessionStatus: closed, hasSuccessor: false, stale: true }),
+        "NONE",
+      );
+    }
+  });
+
+  it("24. Closed Reviews accept no reviewer decisions", () => {
+    assert.equal(isActiveReviewStatus("IN_REVIEW"), true);
+    assert.equal(isActiveReviewStatus("CHANGES_REQUESTED"), true);
+    assert.equal(isActiveReviewStatus("NOT_STARTED"), true);
+    assert.equal(isActiveReviewStatus("SUPERSEDED"), false);
+    assert.equal(isActiveReviewStatus("APPROVED"), false);
+    assert.equal(isActiveReviewStatus("REJECTED"), false);
   });
 
   it("20. Publish readiness opens only after human Review APPROVED", () => {

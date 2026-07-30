@@ -17,10 +17,13 @@ import {
   type ContentReviewSeverity,
 } from "@/features/content/content-review.types";
 import {
+  ACTIVE_REVIEW_STATUSES,
   approvalToastMessage,
   buildApprovalChecklist,
   groupApprovalBlockers,
+  isActiveReviewStatus,
   isMediaFactId,
+  resolveReviewRestartMode,
   selectBulkApprovableSections,
   type BulkApproveSectionCandidate,
   type ReviewBlocker,
@@ -40,7 +43,7 @@ export class ContentReviewError extends Error {
   }
 }
 
-const ACTIVE_REVIEW = ["NOT_STARTED", "IN_REVIEW", "CHANGES_REQUESTED"] as const;
+const ACTIVE_REVIEW = ACTIVE_REVIEW_STATUSES;
 
 const UNSAFE_CLAIM_CODES = new Set([
   "SUPERLATIVE",
@@ -69,14 +72,25 @@ function blockerGroupForCode(code: string): ReviewBlockerGroup {
   return "QA";
 }
 
-export async function startContentReview(input: {
-  writingDraftId: string;
-  actorId: string;
-  assignedReviewerId?: string | null;
-}) {
-  const draft = await prisma.writingDraftRecord.findUnique({
-    where: { id: input.writingDraftId },
-  });
+/**
+ * Session creation writes one row per section plus one per QA issue. Batched
+ * inserts keep the whole thing inside a single short transaction — sequential
+ * per-row inserts exceeded the interactive transaction budget on production
+ * latency and left superseded reviews without a successor.
+ */
+const REVIEW_TX_OPTIONS = { timeout: 20_000, maxWait: 10_000 } as const;
+
+type ReviewCreationInputs = {
+  draft: NonNullable<Awaited<ReturnType<typeof prisma.writingDraftRecord.findUnique>>>;
+  contextBuildId: string;
+  structured: ReturnType<typeof parseDraftJson>;
+  planJson: WritingPlan;
+  qa: WritingStructuredDraft["qa"];
+};
+
+/** Validate every governance gate before any write happens. */
+async function loadReviewCreationInputs(writingDraftId: string): Promise<ReviewCreationInputs> {
+  const draft = await prisma.writingDraftRecord.findUnique({ where: { id: writingDraftId } });
   if (!draft) throw new ContentReviewError("Draft not found", "DRAFT_NOT_FOUND", 404);
   if (!["REVIEW_READY", "QA_FAILED"].includes(draft.status)) {
     throw new ContentReviewError(
@@ -100,81 +114,109 @@ export async function startContentReview(input: {
     throw new ContentReviewError("Context Build đã SUPERSEDED", "CONTEXT_SUPERSEDED", 409);
   }
 
+  const structured = parseDraftJson(draft as never);
+  return {
+    draft,
+    contextBuildId: plan.contextBuildId,
+    structured,
+    planJson: parsePlanJson(plan as never),
+    qa: (draft.qaReport as WritingStructuredDraft["qa"]) ?? structured.qa,
+  };
+}
+
+async function assertNoActiveReviewForVersion(writingDraftId: string, version: number) {
   const existing = await prisma.contentReviewSession.findFirst({
     where: {
-      writingDraftId: draft.id,
-      writingDraftVersion: draft.version,
+      writingDraftId,
+      writingDraftVersion: version,
       status: { in: [...ACTIVE_REVIEW] },
     },
+    select: { id: true },
   });
   if (existing) {
     throw new ContentReviewError(
       "Đã có review session active cho version này.",
       "ACTIVE_REVIEW_EXISTS",
-      409
+      409,
+      { existingReviewId: existing.id }
     );
   }
+}
 
-  // Supersede incomplete reviews for older versions
-  await prisma.contentReviewSession.updateMany({
-    where: {
+/** Create the session and seed sections/issues inside the caller's transaction. */
+async function createReviewSessionInTx(
+  tx: Prisma.TransactionClient,
+  inputs: ReviewCreationInputs,
+  actor: { actorId: string; assignedReviewerId?: string | null }
+) {
+  const { draft, structured, planJson, qa } = inputs;
+
+  const created = await tx.contentReviewSession.create({
+    data: {
       writingDraftId: draft.id,
-      writingDraftVersion: { not: draft.version },
-      status: { in: [...ACTIVE_REVIEW] },
+      writingDraftVersion: draft.version,
+      writingPlanId: draft.writingPlanId,
+      contextBuildId: inputs.contextBuildId,
+      status: "IN_REVIEW",
+      assignedReviewerId: actor.assignedReviewerId ?? actor.actorId,
+      startedBy: actor.actorId,
+      startedAt: new Date(),
     },
-    data: { status: "SUPERSEDED" },
   });
 
-  const structured = parseDraftJson(draft as never);
-  const qa = (draft.qaReport as WritingStructuredDraft["qa"]) ?? structured.qa;
-  const planJson = parsePlanJson(plan as never);
+  // Sections always start PENDING — approvals are never inherited.
+  await tx.contentReviewSection.createMany({
+    data: structured.sections.map((section) => ({
+      reviewSessionId: created.id,
+      sectionId: section.sectionId,
+      sectionKey:
+        planJson.sections.find((s) => s.id === section.sectionId)?.sectionKey ?? section.sectionId,
+      heading: section.heading,
+      status: "PENDING" as const,
+    })),
+  });
+
+  const seeds = qaIssuesToReviewSeeds(qa);
+  if (seeds.length > 0) {
+    await tx.contentReviewIssue.createMany({
+      data: seeds.map((seed) => ({
+        reviewSessionId: created.id,
+        sectionId: seed.sectionId,
+        code: seed.code,
+        severity: seed.severity as never,
+        status: "OPEN" as const,
+        message: seed.message,
+        suggestedFix: seed.suggestedFix,
+        source: seed.source,
+        metadata: seed.metadata as Prisma.InputJsonValue,
+      })),
+    });
+  }
+
+  return created;
+}
+
+export async function startContentReview(input: {
+  writingDraftId: string;
+  actorId: string;
+  assignedReviewerId?: string | null;
+}) {
+  const inputs = await loadReviewCreationInputs(input.writingDraftId);
+  await assertNoActiveReviewForVersion(inputs.draft.id, inputs.draft.version);
 
   const session = await prisma.$transaction(async (tx) => {
-    const created = await tx.contentReviewSession.create({
-      data: {
-        writingDraftId: draft.id,
-        writingDraftVersion: draft.version,
-        writingPlanId: draft.writingPlanId,
-        contextBuildId: plan.contextBuildId,
-        status: "IN_REVIEW",
-        assignedReviewerId: input.assignedReviewerId ?? input.actorId,
-        startedBy: input.actorId,
-        startedAt: new Date(),
+    // Supersede incomplete reviews for older versions
+    await tx.contentReviewSession.updateMany({
+      where: {
+        writingDraftId: inputs.draft.id,
+        writingDraftVersion: { not: inputs.draft.version },
+        status: { in: [...ACTIVE_REVIEW] },
       },
+      data: { status: "SUPERSEDED" },
     });
 
-    for (const section of structured.sections) {
-      const planSection = planJson.sections.find((s) => s.id === section.sectionId);
-      await tx.contentReviewSection.create({
-        data: {
-          reviewSessionId: created.id,
-          sectionId: section.sectionId,
-          sectionKey: planSection?.sectionKey ?? section.sectionId,
-          heading: section.heading,
-          status: "PENDING",
-        },
-      });
-    }
-
-    const seeds = qaIssuesToReviewSeeds(qa);
-    for (const seed of seeds) {
-      await tx.contentReviewIssue.create({
-        data: {
-          reviewSessionId: created.id,
-          sectionId: seed.sectionId,
-          code: seed.code,
-          severity: seed.severity as never,
-          status: "OPEN",
-          message: seed.message,
-          suggestedFix: seed.suggestedFix,
-          source: seed.source,
-          metadata: seed.metadata as Prisma.InputJsonValue,
-        },
-      });
-    }
-
-    return created;
-  });
+    return createReviewSessionInTx(tx, inputs, input);
+  }, REVIEW_TX_OPTIONS);
 
   return getContentReviewSession(session.id);
 }
@@ -199,6 +241,7 @@ export async function getContentReviewSession(reviewId: string) {
   const structured = draft ? parseDraftJson(draft as never) : null;
   const planJson = plan ? parsePlanJson(plan as never) : null;
   const readiness = await evaluateContentReviewReadiness(session.id);
+  const successor = await findSuccessorReview(session);
 
   return {
     session,
@@ -208,6 +251,13 @@ export async function getContentReviewSession(reviewId: string) {
     writingPlan: planJson,
     readiness,
     versionMatch: draft ? draft.version === session.writingDraftVersion : false,
+    successorReview: successor,
+    successorAdminRoute: successor ? `/admin/content/reviews/${successor.id}` : null,
+    restartMode: resolveReviewRestartMode({
+      sessionStatus: session.status,
+      hasSuccessor: Boolean(successor),
+      stale: readiness.stale,
+    }),
   };
 }
 
@@ -348,6 +398,13 @@ export async function evaluateContentReviewReadiness(
   const stale = Boolean(draft && draft.version !== session.writingDraftVersion);
 
   if (!draft) addBlocker("QA", "DRAFT_MISSING", "Draft missing");
+  if (!isActiveReviewStatus(session.status)) {
+    addBlocker(
+      "DRAFT_VERSION",
+      "REVIEW_NOT_EDITABLE",
+      `Phiên kiểm duyệt ở trạng thái ${session.status} — không thể phê duyệt.`
+    );
+  }
   if (stale) {
     addBlocker(
       "DRAFT_VERSION",
@@ -571,7 +628,7 @@ export async function evaluateContentReviewReadiness(
 async function assertReviewEditable(reviewId: string) {
   const session = await prisma.contentReviewSession.findUnique({ where: { id: reviewId } });
   if (!session) throw new ContentReviewError("Review not found", "REVIEW_NOT_FOUND", 404);
-  if (!ACTIVE_REVIEW.includes(session.status as (typeof ACTIVE_REVIEW)[number])) {
+  if (!isActiveReviewStatus(session.status)) {
     throw new ContentReviewError("Review không còn editable", "REVIEW_NOT_EDITABLE", 409);
   }
   const draft = await prisma.writingDraftRecord.findUnique({
@@ -719,9 +776,35 @@ export async function getReviewDraftChanges(reviewId: string): Promise<ReviewDra
   };
 }
 
+export type ReviewSuccessor = {
+  id: string;
+  status: string;
+  writingDraftVersion: number;
+  createdAt: Date;
+};
+
+/** The Review that replaced this one, if a restart already happened. */
+export async function findSuccessorReview(session: {
+  id: string;
+  writingDraftId: string;
+  createdAt: Date;
+}): Promise<ReviewSuccessor | null> {
+  return prisma.contentReviewSession.findFirst({
+    where: {
+      writingDraftId: session.writingDraftId,
+      id: { not: session.id },
+      createdAt: { gte: session.createdAt },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, status: true, writingDraftVersion: true, createdAt: true },
+  });
+}
+
 /**
- * Governed restart: supersede a stale Review and open a new one on the latest
- * Draft version. History is preserved and no approval state is carried over.
+ * Governed restart: open a new Review on the latest Draft version and supersede
+ * the old one in the same transaction, so a failed creation can never leave a
+ * superseded Review without a successor. History is preserved and no approval
+ * state is carried over.
  */
 export async function restartContentReview(input: {
   reviewId: string;
@@ -730,64 +813,89 @@ export async function restartContentReview(input: {
 }) {
   const session = await prisma.contentReviewSession.findUnique({ where: { id: input.reviewId } });
   if (!session) throw new ContentReviewError("Review not found", "REVIEW_NOT_FOUND", 404);
-  if (!ACTIVE_REVIEW.includes(session.status as (typeof ACTIVE_REVIEW)[number])) {
+
+  const successor = await findSuccessorReview(session);
+  if (successor) {
     throw new ContentReviewError(
-      "Chỉ tạo phiên mới từ phiên đang mở.",
-      "REVIEW_NOT_EDITABLE",
+      "Phiên kiểm duyệt mới đã tồn tại — mở phiên đó để tiếp tục.",
+      "SUCCESSOR_EXISTS",
+      409,
+      {
+        successorReviewId: successor.id,
+        adminRoute: `/admin/content/reviews/${successor.id}`,
+      }
+    );
+  }
+
+  const isActive = isActiveReviewStatus(session.status);
+  const isOrphanedSupersede = session.status === "SUPERSEDED";
+  if (!isActive && !isOrphanedSupersede) {
+    throw new ContentReviewError(
+      "Chỉ tạo phiên mới từ phiên đang mở hoặc phiên bị thay thế mà chưa có phiên kế nhiệm.",
+      "REVIEW_NOT_RESTARTABLE",
       409
     );
   }
 
-  const draft = await prisma.writingDraftRecord.findUnique({
-    where: { id: session.writingDraftId },
-  });
-  if (!draft) throw new ContentReviewError("Draft not found", "DRAFT_NOT_FOUND", 404);
-  if (draft.version === session.writingDraftVersion) {
+  const inputs = await loadReviewCreationInputs(session.writingDraftId);
+  const draft = inputs.draft;
+  if (isActive && draft.version === session.writingDraftVersion) {
     throw new ContentReviewError(
       "Phiên kiểm duyệt đang dùng bản nháp mới nhất.",
       "REVIEW_NOT_STALE",
       409
     );
   }
+  await assertNoActiveReviewForVersion(draft.id, draft.version);
 
-  await prisma.$transaction(async (tx) => {
+  const reason = isOrphanedSupersede ? "ORPHANED_SUPERSEDE_RECOVERY" : "STALE_DRAFT_VERSION";
+  const created = await prisma.$transaction(async (tx) => {
+    const newSession = await createReviewSessionInTx(tx, inputs, {
+      actorId: input.actorId,
+      assignedReviewerId: session.assignedReviewerId ?? input.actorId,
+    });
+
     await tx.contentReviewDecision.create({
       data: {
         reviewSessionId: session.id,
         decisionType: "REOPEN_DRAFT",
         actorId: input.actorId,
         note:
-          input.note ??
-          `Superseded: draft v${session.writingDraftVersion} → v${draft.version} (new review session)`,
+          input.note?.trim() ||
+          `Superseded: draft v${session.writingDraftVersion} → v${draft.version} (successor ${newSession.id})`,
         metadata: {
-          reason: "STALE_DRAFT_VERSION",
+          reason,
           previousDraftVersion: session.writingDraftVersion,
           latestDraftVersion: draft.version,
+          successorReviewId: newSession.id,
         },
       },
     });
-    await tx.contentReviewSession.update({
-      where: { id: session.id },
-      data: { status: "SUPERSEDED", completedAt: new Date() },
+
+    if (session.status !== "SUPERSEDED") {
+      await tx.contentReviewSession.update({
+        where: { id: session.id },
+        data: { status: "SUPERSEDED", completedAt: new Date() },
+      });
+    }
+
+    // Keep the governed Blog linkage pointing at the active review session.
+    await tx.blogPost.updateMany({
+      where: { sourceReviewSessionId: session.id },
+      data: {
+        sourceReviewSessionId: newSession.id,
+        sourceWritingDraftVersion: draft.version,
+      },
     });
-  });
 
-  const created = await startContentReview({
-    writingDraftId: draft.id,
-    actorId: input.actorId,
-    assignedReviewerId: session.assignedReviewerId ?? input.actorId,
-  });
+    return newSession;
+  }, REVIEW_TX_OPTIONS);
 
-  // Keep the governed Blog linkage pointing at the active review session.
-  await prisma.blogPost.updateMany({
-    where: { sourceReviewSessionId: session.id },
-    data: {
-      sourceReviewSessionId: created.session.id,
-      sourceWritingDraftVersion: draft.version,
-    },
-  });
-
-  return { previousReviewId: session.id, ...created };
+  return {
+    previousReviewId: session.id,
+    recovered: isOrphanedSupersede,
+    ...(await getContentReviewSession(created.id)),
+  };
 }
 
 export type BulkApproveResult = {
@@ -1034,6 +1142,10 @@ export async function approveWritingDraftReview(input: {
   actorId: string;
   note?: string | null;
 }) {
+  // Superseded/closed sessions can never be approved, even if their snapshot
+  // once satisfied every gate.
+  const { draft } = await assertReviewEditable(input.reviewId);
+
   const readiness = await evaluateContentReviewReadiness(input.reviewId);
   if (!readiness.readyToApprove) {
     const groups = groupApprovalBlockers(readiness.blockers);
@@ -1043,14 +1155,6 @@ export async function approveWritingDraftReview(input: {
       checklist: readiness.checklist,
     });
   }
-
-  const session = await prisma.contentReviewSession.findUnique({ where: { id: input.reviewId } });
-  if (!session) throw new ContentReviewError("Review not found", "REVIEW_NOT_FOUND", 404);
-
-  const draft = await prisma.writingDraftRecord.findUnique({
-    where: { id: session.writingDraftId },
-  });
-  if (!draft) throw new ContentReviewError("Draft not found", "DRAFT_NOT_FOUND", 404);
 
   const structured = parseDraftJson(draft as never);
   const rendered = renderDraftOutputs(structured);

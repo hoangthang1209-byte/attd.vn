@@ -115,6 +115,12 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
         });
         const json = await res.json();
         if (!res.ok) {
+          // A restart that lost the race still knows where the successor lives.
+          if (json.code === "SUCCESSOR_EXISTS" && typeof json.adminRoute === "string") {
+            toast.error(json.message ?? "Phiên kiểm duyệt mới đã tồn tại.");
+            window.location.href = json.adminRoute;
+            return null;
+          }
           // Detailed blockers belong in the inline panel — the toast stays short.
           const groups = (json.groups as ReviewBlockerGroupView[] | undefined) ?? null;
           setSubmitGroups(groups);
@@ -200,6 +206,14 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
   const links = (data.internalLinks as Array<Record<string, unknown>>) ?? [];
   const metadata = data.metadata as Record<string, unknown> | null;
   const draftChanges = (data.draftChanges as DraftChanges | null) ?? null;
+  const successor = data.successorReview as { id: string; status: string; writingDraftVersion: number } | null;
+  const successorRoute = (data.successorAdminRoute as string | null) ?? null;
+  const restartMode = (data.restartMode as
+    | "STALE"
+    | "ORPHAN_RECOVERY"
+    | "OPEN_SUCCESSOR"
+    | "NONE"
+    | undefined) ?? "NONE";
 
   const currentSection = structured?.sections?.find((s) => s.sectionId === activeSection);
   const reviewLabel = structured?.title
@@ -209,7 +223,8 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
   const summary = readiness.sectionSummary;
   const bulk = readiness.bulkApprove;
   const stale = readiness.stale;
-  const sectionActionsDisabled = pending || stale;
+  const sessionClosed = !["NOT_STARTED", "IN_REVIEW", "CHANGES_REQUESTED"].includes(session.status);
+  const sectionActionsDisabled = pending || stale || sessionClosed;
 
   const excludedByReason = bulk.excluded.reduce<Record<string, number>>((acc, item) => {
     acc[item.reason] = (acc[item.reason] ?? 0) + 1;
@@ -254,12 +269,27 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
         </div>
       </div>
 
-      {stale && (
-        <div className="admin-message admin-message--error" style={{ marginBottom: 12 }}>
-          <strong>{STALE_REVIEW_BANNER.title}</strong>
+      {restartMode === "OPEN_SUCCESSOR" && successorRoute && (
+        <div className="admin-message admin-message--warning" style={{ marginBottom: 12 }}>
+          <strong>Phiên kiểm duyệt này đã được thay thế.</strong>
           <p className="admin-field-hint" style={{ margin: "6px 0 0" }}>
-            Phiên này chụp bản nháp v{readiness.reviewDraftVersion}, bản nháp hiện tại là v
-            {readiness.latestDraftVersion ?? "?"}. Không thể duyệt đoạn trên nội dung cũ.
+            Phiên kế nhiệm: {successor?.id} · bản nháp v{successor?.writingDraftVersion} ·{" "}
+            {REVIEW_STATUS_LABELS[successor?.status ?? ""] ?? successor?.status}
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            <Link href={successorRoute} className="admin-btn admin-btn--primary admin-btn--small">
+              Mở phiên kiểm duyệt mới
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {restartMode === "ORPHAN_RECOVERY" && (
+        <div className="admin-message admin-message--error" style={{ marginBottom: 12 }}>
+          <strong>Phiên này đã bị đánh dấu thay thế nhưng chưa có phiên kế nhiệm.</strong>
+          <p className="admin-field-hint" style={{ margin: "6px 0 0" }}>
+            Lần tạo phiên mới trước đó không hoàn tất. Tạo phiên kế nhiệm từ bản nháp v
+            {readiness.latestDraftVersion ?? "?"} để tiếp tục kiểm duyệt.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
             <AdminLoadingButton
@@ -271,8 +301,51 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
                 if (json?.adminRoute) window.location.href = String(json.adminRoute);
               }}
             >
-              {STALE_REVIEW_BANNER.primaryAction}
+              Tạo phiên kiểm duyệt mới
             </AdminLoadingButton>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--small"
+              onClick={() => setShowChanges((v) => !v)}
+            >
+              {STALE_REVIEW_BANNER.secondaryAction}
+            </button>
+          </div>
+          {showChanges && draftChanges?.available && (
+            <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13 }}>
+              <li>
+                Phiên bản: v{draftChanges.reviewDraftVersion} → v{draftChanges.latestDraftVersion}
+              </li>
+              <li>Đoạn đã sửa: {draftChanges.modifiedSections.length}</li>
+              <li>
+                FAQ: {draftChanges.faqCountBefore} → {draftChanges.faqCountAfter}
+              </li>
+            </ul>
+          )}
+        </div>
+      )}
+
+      {stale && restartMode !== "OPEN_SUCCESSOR" && restartMode !== "ORPHAN_RECOVERY" && (
+        <div className="admin-message admin-message--error" style={{ marginBottom: 12 }}>
+          <strong>{STALE_REVIEW_BANNER.title}</strong>
+          <p className="admin-field-hint" style={{ margin: "6px 0 0" }}>
+            Phiên này chụp bản nháp v{readiness.reviewDraftVersion}, bản nháp hiện tại là v
+            {readiness.latestDraftVersion ?? "?"}. Không thể duyệt đoạn trên nội dung cũ.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            {restartMode === "STALE" && (
+              <AdminLoadingButton
+                pending={pending}
+                size="small"
+                variant="primary"
+                onClick={async () => {
+                  const json = await post(`/api/content/reviews/${reviewId}/restart`, { note });
+                  if (json?.adminRoute) window.location.href = String(json.adminRoute);
+                }}
+              >
+                {STALE_REVIEW_BANNER.primaryAction}
+              </AdminLoadingButton>
+            )}
             <button
               type="button"
               className="admin-btn admin-btn--secondary admin-btn--small"
