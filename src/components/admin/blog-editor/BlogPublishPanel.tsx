@@ -78,7 +78,10 @@ export default function BlogPublishPanel({ post }: Props) {
     }
   }
 
-  const governed = Boolean(post.sourceHandoffRecordId);
+  // A Blog handed off from a Review is governed even before its handoff record
+  // exists (recovered/pipeline-linked articles).
+  const governed = Boolean(post.sourceHandoffRecordId) || Boolean(post.sourceReviewSessionId);
+  const publishBlocked = readiness ? !readiness.ready : true;
 
   return (
     <div className="admin-sidebar-card" style={{ marginBottom: 16 }}>
@@ -96,7 +99,8 @@ export default function BlogPublishPanel({ post }: Props) {
           ) : (
             "—"
           )}{" "}
-          · Handoff {post.sourceHandoffRecordId?.slice(0, 8)}…
+          · Handoff {post.sourceHandoffRecordId?.slice(0, 8) ?? "—"}…
+          {readiness?.checks?.reviewStillValid ? " · Review APPROVED" : ""}
         </p>
       )}
       {post.scheduledAt && (
@@ -135,7 +139,13 @@ export default function BlogPublishPanel({ post }: Props) {
       {readiness && (
         <div style={{ marginBottom: 8 }}>
           <p className="admin-field-hint">
-            Ready: <strong>{readiness.ready ? "YES" : "NO"}</strong>
+            Publish Readiness:{" "}
+            <strong style={{ color: readiness.ready ? "#047857" : "#b91c1c" }}>
+              {readiness.ready ? "READY" : "BLOCKED"}
+            </strong>
+            {readiness.ready && readiness.warnings.length > 0
+              ? ` · ${readiness.warnings.length} cảnh báo không chặn`
+              : ""}
           </p>
           {readiness.errors.map((e) => (
             <p key={e} style={{ color: "#c00", margin: "2px 0", fontSize: 13 }}>
@@ -203,6 +213,7 @@ export default function BlogPublishPanel({ post }: Props) {
           pending={pending}
           size="small"
           variant="primary"
+          disabled={pending || publishBlocked}
           onClick={() => {
             if (!confirmChecked) {
               toast.error("Cần tick xác nhận xuất bản");
@@ -231,6 +242,11 @@ export default function BlogPublishPanel({ post }: Props) {
           Lưu trữ
         </AdminLoadingButton>
       </div>
+      {publishBlocked && (
+        <p className="admin-field-hint" style={{ marginTop: 0 }}>
+          Nút xuất bản mở khóa khi Publish Readiness = READY.
+        </p>
+      )}
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
         <input

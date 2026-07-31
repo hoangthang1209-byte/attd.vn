@@ -9,6 +9,7 @@ import {
   diffPlainText,
   detectNumericChanges,
 } from "@/features/content/content-review.types";
+import { getReviewHandoffStatus } from "@/features/content/services/writing-blog-handoff.service";
 
 type RouteContext = { params: Promise<{ reviewId: string }> };
 
@@ -60,12 +61,14 @@ export async function GET(req: NextRequest, context: RouteContext) {
       }) ?? [];
 
     const draftChanges = result.readiness.stale ? await getReviewDraftChanges(reviewId) : null;
+    const handoff = await getReviewHandoffStatus(reviewId);
 
     return NextResponse.json({
       ...result,
       facts,
       sectionDiff,
       draftChanges,
+      handoff,
       media: result.structuredDraft?.media ?? [],
       internalLinks: result.structuredDraft?.internalLinks ?? [],
       metadata: result.structuredDraft

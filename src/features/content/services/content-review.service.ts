@@ -420,7 +420,9 @@ export async function evaluateContentReviewReadiness(
   const stale = Boolean(draft && draft.version !== session.writingDraftVersion);
 
   if (!draft) addBlocker("QA", "DRAFT_MISSING", "Draft missing");
-  if (!isActiveReviewStatus(session.status)) {
+  // APPROVED is a terminal success, not an approval problem — surfacing it as a
+  // blocker turned a finished review into a red error banner.
+  if (!isActiveReviewStatus(session.status) && session.status !== "APPROVED") {
     addBlocker(
       "DRAFT_VERSION",
       "REVIEW_NOT_EDITABLE",

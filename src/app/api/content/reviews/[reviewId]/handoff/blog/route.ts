@@ -1,58 +1,82 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import { parseJsonBody } from "@/features/content/seo/seo-api-utils";
 import { ContentReviewError } from "@/features/content/services/content-review.service";
-import { handoffApprovedWritingDraftToBlog } from "@/features/content/services/writing-blog-handoff.service";
-import { prisma } from "@/lib/prisma";
+import { handoffApprovedReviewToBlog } from "@/features/content/services/writing-blog-handoff.service";
+import type { HandoffFieldName } from "@/features/content/editorial/blog-handoff.policy";
 
 type RouteContext = { params: Promise<{ reviewId: string }> };
 
+const OVERWRITABLE_FIELDS: HandoffFieldName[] = [
+  "title",
+  "content",
+  "metaTitle",
+  "metaDescription",
+  "faq",
+];
+
 export async function POST(req: NextRequest, context: RouteContext) {
+  // Handoff writes an existing Blog and may create one, so both rights apply.
   const createPerm = await requireAdminPermission({
     platform: "content",
     action: "create",
     request: req,
   });
-  const updatePerm = await requireAdminPermission({
+  if (!createPerm.ok) return createPerm.response;
+  const permission = await requireAdminPermission({
     platform: "content",
     action: "update",
     request: req,
   });
+  if (!permission.ok) return permission.response;
 
   const { reviewId } = await context.params;
   const raw = (await parseJsonBody(req)) ?? {};
-  const mode = raw.mode === "UPDATE_EXISTING" ? "UPDATE_EXISTING" : "CREATE_NEW";
-
-  if (mode === "CREATE_NEW" && !createPerm.ok) return createPerm.response;
-  if (mode === "UPDATE_EXISTING" && !updatePerm.ok) return updatePerm.response;
-
-  const permission = mode === "CREATE_NEW" ? createPerm : updatePerm;
-  if (!permission.ok) return permission.response;
-
-  const session = await prisma.contentReviewSession.findUnique({ where: { id: reviewId } });
-  if (!session) {
-    return NextResponse.json({ message: "Review not found" }, { status: 404 });
-  }
+  const overwriteFields = Array.isArray(raw.overwriteFields)
+    ? (raw.overwriteFields as unknown[]).filter((f): f is HandoffFieldName =>
+        OVERWRITABLE_FIELDS.includes(f as HandoffFieldName),
+      )
+    : undefined;
 
   try {
-    const result = await handoffApprovedWritingDraftToBlog({
-      writingDraftId: session.writingDraftId,
-      draftVersion: session.writingDraftVersion,
-      mode,
-      targetBlogPostId: typeof raw.targetBlogPostId === "string" ? raw.targetBlogPostId : null,
-      confirmUpdate: raw.confirmUpdate === true,
-      requestedBy: permission.user.userId ?? permission.user.username ?? "unknown",
+    const result = await handoffApprovedReviewToBlog({
+      reviewId,
+      actorId: permission.user.userId ?? permission.user.username ?? "unknown",
       fields: typeof raw.fields === "object" && raw.fields ? raw.fields : undefined,
+      overwriteFields,
+      requireCleanSync: raw.requireCleanSync === true,
     });
-    return NextResponse.json(result);
+    return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     if (err instanceof ContentReviewError) {
-      return NextResponse.json({ message: err.message, code: err.code }, { status: err.status });
+      return NextResponse.json(
+        { ok: false, message: err.message, code: err.code, ...(err.details ?? {}) },
+        { status: err.status },
+      );
     }
-    console.error("[handoff blog]", err);
+    // Anything the service could not shape itself: give the operator a code to
+    // quote instead of a bare "Handoff failed".
+    const diagnosticId = randomUUID().slice(0, 8);
+    console.error(
+      JSON.stringify({
+        op: "content.handoff.blog",
+        ok: false,
+        stage: "route",
+        reviewId,
+        diagnosticId,
+        errorName: err instanceof Error ? err.name : "Error",
+        errorMessage: (err instanceof Error ? err.message : "unknown").slice(0, 300),
+      }),
+    );
     return NextResponse.json(
-      { message: err instanceof Error ? err.message : "Handoff failed" },
-      { status: 500 }
+      {
+        ok: false,
+        code: "HANDOFF_WRITE_FAILED",
+        message: `Bàn giao thất bại ở tầng API (mã tra cứu ${diagnosticId}). Blog không bị xuất bản và không có Blog trùng nào được tạo.`,
+        diagnosticId,
+      },
+      { status: 500 },
     );
   }
 }

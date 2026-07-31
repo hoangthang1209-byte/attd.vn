@@ -20,8 +20,46 @@ import {
   type ReviewBlocker,
   type ReviewBlockerGroupView,
 } from "@/features/content/editorial/review-approval.policy";
+import type { HandoffFieldPlan, ReviewHandoffState } from "@/features/content/editorial/blog-handoff.policy";
 
 type Props = { reviewId: string };
+
+/** Handoff failures are actionable — they belong inline, next to the CTA. */
+const HANDOFF_ERROR_CODES = new Set([
+  "BLOG_CONFLICT",
+  "BLOG_NOT_FOUND",
+  "REVIEW_NOT_APPROVED",
+  "DRAFT_VERSION_INVALID",
+  "CONTENT_CONFLICT",
+  "HANDOFF_WRITE_FAILED",
+  "HANDOFF_VERIFY_FAILED",
+  "PUBLISHED_PROTECTED",
+  "SECTION_APPROVALS_LOST",
+]);
+
+type HandoffView = {
+  state: ReviewHandoffState;
+  terminal: boolean;
+  successBanner: { title: string; body: string } | null;
+  ctaLabel: string | null;
+  ctaKind: "OPEN_BLOG" | "RUN_HANDOFF" | "OPEN_SUCCESSOR" | null;
+  needsRelink: boolean;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  draftVersion: number;
+  blog: {
+    id: string;
+    slug: string;
+    status: string;
+    publishedAt: string | null;
+    sourceReviewSessionId: string | null;
+    sourceHandoffRecordId?: string | null;
+    adminRoute: string;
+    publicUrl: string;
+  } | null;
+  candidateConflict: string[] | null;
+  readiness: { ready: boolean; errors: string[]; warnings: string[] } | null;
+};
 
 /** Codes whose message/invariants belong in the Decision panel, not just a toast. */
 const APPROVAL_ERROR_CODES = new Set([
@@ -90,6 +128,11 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
   const [approveError, setApproveError] = useState<{
     message: string;
     invariants: FinalApprovalInvariant[];
+  } | null>(null);
+  const [handoffError, setHandoffError] = useState<{
+    message: string;
+    conflicts: HandoffFieldPlan[];
+    conflictIds: string[];
   } | null>(null);
 
   const load = useCallback(async () => {
@@ -164,6 +207,17 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
                   : [],
               });
             }
+            if (HANDOFF_ERROR_CODES.has(String(json.code))) {
+              setHandoffError({
+                message: json.message,
+                conflicts: Array.isArray(json.conflicts)
+                  ? (json.conflicts as HandoffFieldPlan[])
+                  : [],
+                conflictIds: Array.isArray(json.conflictIds)
+                  ? (json.conflictIds as string[])
+                  : [],
+              });
+            }
             toast.error(json.message);
             return null;
           }
@@ -172,6 +226,7 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
         }
         setSubmitGroups(null);
         setApproveError(null);
+        setHandoffError(null);
         toast.success(json.message ?? "OK");
         await load();
         return json;
@@ -274,6 +329,9 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
     | "OPEN_SUCCESSOR"
     | "NONE"
     | undefined) ?? "NONE";
+
+  const handoff = (data.handoff as HandoffView | null) ?? null;
+  const approved = session.status === "APPROVED";
 
   const currentSection = structured?.sections?.find((s) => s.sectionId === activeSection);
   const reviewLabel = structured?.title
@@ -441,7 +499,100 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
         </div>
       )}
 
-      {groups.length > 0 && (
+      {approved && (
+        <div className="admin-message admin-message--success" style={{ marginBottom: 12 }}>
+          <strong>{handoff?.successBanner?.title ?? "Đã phê duyệt"}</strong>
+          <p className="admin-field-hint" style={{ margin: "6px 0 0" }}>
+            {handoff?.successBanner?.body ??
+              "Phiên kiểm duyệt đã hoàn tất. Tiếp tục với Blog Draft để kiểm tra trước khi xuất bản."}
+          </p>
+          <p className="admin-field-hint" style={{ margin: "6px 0 0" }}>
+            Duyệt lúc{" "}
+            {handoff?.approvedAt ? new Date(handoff.approvedAt).toLocaleString("vi-VN") : "—"}
+            {handoff?.approvedBy ? ` · bởi ${handoff.approvedBy}` : ""} · Draft v
+            {readiness.reviewDraftVersion} · Đoạn {summary.approved}/{summary.total} · QA{" "}
+            {readiness.score} · Media {media.length}
+          </p>
+          {handoff?.blog && (
+            <p className="admin-field-hint" style={{ margin: "6px 0 0" }}>
+              Blog {handoff.blog.id} · {handoff.blog.status} ·{" "}
+              {handoff.readiness
+                ? handoff.readiness.ready
+                  ? "Publish Readiness: READY"
+                  : `Publish Readiness: BLOCKED (${handoff.readiness.errors.length})`
+                : "Publish Readiness: chưa tính"}
+              {handoff.needsRelink ? " · đang trỏ tới phiên kiểm duyệt cũ" : ""}
+            </p>
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            {handoff?.ctaKind === "OPEN_BLOG" && handoff.blog && (
+              <Link
+                href={handoff.blog.adminRoute}
+                className="admin-btn admin-btn--primary admin-btn--small"
+              >
+                {handoff.ctaLabel}
+              </Link>
+            )}
+            {handoff?.ctaKind === "RUN_HANDOFF" && (
+              <AdminLoadingButton
+                pending={pending}
+                size="small"
+                variant="primary"
+                disabled={pending || Boolean(handoff.candidateConflict)}
+                onClick={async () => {
+                  const json = await post(`/api/content/reviews/${reviewId}/handoff/blog`, {});
+                  if (json?.adminRoute) window.location.href = String(json.adminRoute);
+                }}
+              >
+                {handoff.ctaLabel}
+              </AdminLoadingButton>
+            )}
+            <a href="#review-activity" className="admin-btn admin-btn--secondary admin-btn--small">
+              Xem lịch sử kiểm duyệt
+            </a>
+          </div>
+          {handoff?.candidateConflict && (
+            <p style={{ margin: "8px 0 0", fontSize: 12, color: "#b91c1c" }}>
+              Có {handoff.candidateConflict.length} Blog cùng thuộc bài viết này (
+              {handoff.candidateConflict.join(", ")}). Cần chọn Blog đích thủ công trước khi bàn
+              giao.
+            </p>
+          )}
+          {handoff?.readiness && !handoff.readiness.ready && (
+            <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 12, color: "#b91c1c" }}>
+              {handoff.readiness.errors.map((e, i) => (
+                <li key={`${e}-${i}`}>{e}</li>
+              ))}
+            </ul>
+          )}
+          {handoffError && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: 8,
+                border: "1px solid #fecaca",
+                borderRadius: 6,
+                background: "#fef2f2",
+                fontSize: 12,
+              }}
+            >
+              <strong>Bàn giao không thành công</strong>
+              <p style={{ margin: "4px 0 0" }}>{handoffError.message}</p>
+              {handoffError.conflicts.length > 0 && (
+                <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                  {handoffError.conflicts.map((c, i) => (
+                    <li key={`${c.field}-${i}`}>
+                      {c.field}: {c.reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!approved && groups.length > 0 && (
         <div className="admin-message admin-message--error" style={{ marginBottom: 12 }}>
           <strong>Chưa đủ điều kiện phê duyệt — {groups.length} nhóm vấn đề</strong>
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
@@ -536,6 +687,8 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
         </div>
 
         <div style={{ display: "grid", gap: 12, position: "sticky", top: 12 }}>
+          {/* Approval controls disappear once the review reaches a terminal state. */}
+          {!approved && (
           <section className="admin-sidebar-card" style={{ margin: 0 }}>
             <h3 className="admin-sidebar-title">Duyệt đoạn</h3>
             <p className="admin-field-hint" style={{ marginTop: 0 }}>
@@ -627,6 +780,7 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
               </div>
             )}
           </section>
+          )}
 
           <section className="admin-sidebar-card" style={{ margin: 0 }}>
             <h3 className="admin-sidebar-title">QA</h3>
@@ -688,6 +842,7 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                 />
+                {!approved && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                   <AdminLoadingButton
                     pending={pending}
@@ -730,6 +885,7 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
                     Reject đoạn
                   </AdminLoadingButton>
                 </div>
+                )}
                 {stale && (
                   <p className="admin-field-hint" style={{ margin: "6px 0 0" }}>
                     Cần tạo phiên kiểm duyệt mới trước khi duyệt đoạn.
@@ -741,6 +897,64 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
             )}
           </section>
 
+          {approved ? (
+            <section className="admin-sidebar-card" style={{ margin: 0 }}>
+              <h3 className="admin-sidebar-title">Đã duyệt</h3>
+              <p className="admin-field-hint" style={{ marginTop: 0 }}>
+                Phiên kiểm duyệt đã kết thúc. Bước tiếp theo nằm ở Blog Draft.
+              </p>
+              <ul style={{ listStyle: "none", margin: "0 0 10px", padding: 0, fontSize: 13 }}>
+                <li>
+                  Duyệt lúc:{" "}
+                  {handoff?.approvedAt
+                    ? new Date(handoff.approvedAt).toLocaleString("vi-VN")
+                    : "—"}
+                </li>
+                <li>Người duyệt: {handoff?.approvedBy ?? "—"}</li>
+                <li>Draft: v{readiness.reviewDraftVersion}</li>
+                <li>
+                  Đoạn: {summary.approved}/{summary.total} đã duyệt
+                </li>
+                <li>QA: {readiness.score}</li>
+                <li>Media: {media.length} · Internal links: {links.length}</li>
+                <li>
+                  Blog:{" "}
+                  {handoff?.blog ? (
+                    <Link href={handoff.blog.adminRoute}>
+                      {handoff.blog.id} ({handoff.blog.status})
+                    </Link>
+                  ) : (
+                    "chưa liên kết"
+                  )}
+                </li>
+              </ul>
+              {handoff?.ctaKind === "OPEN_BLOG" && handoff.blog && (
+                <Link
+                  href={handoff.blog.adminRoute}
+                  className="admin-btn admin-btn--primary admin-btn--small"
+                >
+                  {handoff.ctaLabel}
+                </Link>
+              )}
+              {handoff?.ctaKind === "RUN_HANDOFF" && (
+                <AdminLoadingButton
+                  pending={pending}
+                  size="small"
+                  variant="primary"
+                  disabled={pending || Boolean(handoff.candidateConflict)}
+                  onClick={async () => {
+                    const json = await post(`/api/content/reviews/${reviewId}/handoff/blog`, {});
+                    if (json?.adminRoute) window.location.href = String(json.adminRoute);
+                  }}
+                >
+                  {handoff.ctaLabel}
+                </AdminLoadingButton>
+              )}
+              <p className="admin-field-hint" style={{ marginTop: 8 }}>
+                <Link href="/admin/content/publishing">Mở Publishing</Link>
+              </p>
+            </section>
+          ) : (
           <section className="admin-sidebar-card" style={{ margin: 0 }}>
             <h3 className="admin-sidebar-title">Decision</h3>
             <ul style={{ listStyle: "none", margin: "0 0 10px", padding: 0, fontSize: 13 }}>
@@ -784,19 +998,6 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
               >
                 Return
               </AdminLoadingButton>
-              <AdminLoadingButton
-                pending={pending}
-                size="small"
-                variant="primary"
-                onClick={async () => {
-                  const json = await post(`/api/content/reviews/${reviewId}/handoff/blog`, {
-                    mode: "CREATE_NEW",
-                  });
-                  if (json?.adminRoute) window.location.href = json.adminRoute;
-                }}
-              >
-                Tạo Blog Draft
-              </AdminLoadingButton>
             </div>
             {!readiness.readyToApprove && (
               <>
@@ -838,8 +1039,9 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
               <Link href="/admin/content/publishing">Mở Publishing</Link>
             </p>
           </section>
+          )}
 
-          <section className="admin-sidebar-card" style={{ margin: 0 }}>
+          <section className="admin-sidebar-card" style={{ margin: 0 }} id="review-activity">
             <h3 className="admin-sidebar-title">Activity</h3>
             <ul style={{ fontSize: 12, paddingLeft: 16, margin: 0 }}>
               {(session.decisions ?? [])
