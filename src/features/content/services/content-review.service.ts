@@ -18,13 +18,17 @@ import {
 } from "@/features/content/content-review.types";
 import {
   ACTIVE_REVIEW_STATUSES,
-  approvalToastMessage,
   buildApprovalChecklist,
+  buildFinalApprovalFailure,
+  evaluateFinalApproval,
+  finalApprovalToastMessage,
   groupApprovalBlockers,
   isActiveReviewStatus,
+  isApprovalWriteConsistent,
   isMediaFactId,
   resolveReviewRestartMode,
   selectBulkApprovableSections,
+  type ApprovalStage,
   type BulkApproveSectionCandidate,
   type ReviewBlocker,
   type ReviewBlockerGroup,
@@ -351,6 +355,11 @@ export async function evaluateContentReviewReadiness(
     return {
       readyToStart: false,
       readyToApprove: false,
+      approval: {
+        ok: false,
+        alreadyApproved: false,
+        failed: [{ code: "UNMAPPED_BLOCKER", message: "Review not found" }],
+      },
       score: 0,
       blockingIssues: ["Review not found"],
       warnings: [],
@@ -610,7 +619,9 @@ export async function evaluateContentReviewReadiness(
     usesLatestDraft: Boolean(draft) && !stale,
     requiredFactsSatisfied: !hasGroup("REQUIRED_FACTS"),
     faqValid: !hasGroup("FAQ"),
-    requiredSectionsApproved,
+    // Every section-approval blocker must dim this row, otherwise a drifted
+    // approved hash would leave the checklist green while approval refuses.
+    requiredSectionsApproved: requiredSectionsApproved && !hasGroup("SECTION_APPROVALS"),
     blockingQaCleared: !hasGroup("QA"),
     mediaReady,
     latestDraftVersion: draft?.version ?? null,
@@ -623,14 +634,19 @@ export async function evaluateContentReviewReadiness(
   const blockingIssues = blockers.map((b) => b.message);
   const score = Math.max(0, 100 - blockingIssues.length * 15 - warnings.length * 3);
 
+  // One canonical gate for the UI checklist and the approval endpoint.
+  const approval = evaluateFinalApproval({
+    reviewStatus: session.status,
+    checklist,
+    blockers,
+    rejectedSections: sectionSummary.rejected,
+    changesRequestedSections: sectionSummary.changesRequested,
+  });
+
   return {
     readyToStart: true,
-    readyToApprove:
-      !stale &&
-      blockers.length === 0 &&
-      sectionSummary.rejected === 0 &&
-      sectionSummary.changesRequested === 0 &&
-      requiredSectionsApproved,
+    readyToApprove: approval.ok,
+    approval,
     score,
     blockingIssues,
     warnings,
@@ -1254,84 +1270,282 @@ export async function approveWritingDraftReview(input: {
   actorId: string;
   note?: string | null;
 }) {
-  // Superseded/closed sessions can never be approved, even if their snapshot
-  // once satisfied every gate.
-  const { draft } = await assertReviewEditable(input.reviewId);
+  const startedAt = Date.now();
+  let stage: ApprovalStage = "load_review";
+  let draftId: string | null = null;
 
-  const readiness = await evaluateContentReviewReadiness(input.reviewId);
-  if (!readiness.readyToApprove) {
-    const groups = groupApprovalBlockers(readiness.blockers, readiness.bulkApprove.counts);
-    throw new ContentReviewError(approvalToastMessage(groups), "NOT_READY", 422, {
-      groups,
-      stale: readiness.stale,
-      checklist: readiness.checklist,
-    });
-  }
-
-  const structured = parseDraftJson(draft as never);
-  const rendered = renderDraftOutputs(structured);
-  const approvedDraft = {
-    ...structured,
-    rendered,
-    status: "APPROVED" as const,
-    updatedAt: new Date().toISOString(),
-  };
-
-  await prisma.$transaction(async (tx) => {
-    await tx.contentReviewSession.update({
+  try {
+    const current = await prisma.contentReviewSession.findUnique({
       where: { id: input.reviewId },
-      data: {
-        status: "APPROVED",
-        approvedBy: input.actorId,
-        approvedAt: new Date(),
-        completedAt: new Date(),
-        finalNotes: input.note ?? null,
-      },
+      select: { id: true, status: true, writingDraftId: true },
     });
+    if (!current) throw new ContentReviewError("Review not found", "REVIEW_NOT_FOUND", 404);
+    draftId = current.writingDraftId;
 
+    // Idempotent replay: a double click returns the approved state instead of
+    // a second decision row or a confusing 409.
+    if (current.status === "APPROVED") {
+      logApprovalEvent({
+        ok: true,
+        reviewId: input.reviewId,
+        draftId,
+        stage,
+        durationMs: Date.now() - startedAt,
+        idempotent: true,
+      });
+      return { ...(await getContentReviewSession(input.reviewId)), alreadyApproved: true };
+    }
+
+    // Superseded/rejected/closed sessions can never be approved, even if their
+    // snapshot once satisfied every gate.
+    const { draft } = await assertReviewEditable(input.reviewId);
+    draftId = draft.id;
+
+    stage = "policy";
+    const readiness = await evaluateContentReviewReadiness(input.reviewId);
+    if (!readiness.approval.ok) {
+      const groups = groupApprovalBlockers(readiness.blockers, readiness.bulkApprove.counts);
+      throw new ContentReviewError(
+        finalApprovalToastMessage(readiness.approval),
+        "NOT_READY",
+        422,
+        {
+          ok: false,
+          blockers: readiness.approval.failed,
+          groups,
+          stale: readiness.stale,
+          checklist: readiness.checklist,
+        }
+      );
+    }
+
+    stage = "render";
+    const structured = parseDraftJson(draft as never);
+    const rendered = renderDraftOutputs(structured);
+    const approvedAt = new Date();
+    const approvedDraft = {
+      ...structured,
+      rendered,
+      status: "APPROVED" as const,
+      updatedAt: approvedAt.toISOString(),
+    };
     let locks = parseSectionLocks(draft.sectionLocks);
     for (const section of structured.sections) {
       locks = lockSection(locks, section.sectionId, "USER_APPROVED", input.actorId, "Final approval");
     }
 
-    await tx.writingDraftRecord.update({
-      where: { id: draft.id },
-      data: {
-        status: "APPROVED",
-        approvedBy: input.actorId,
-        approvedAt: new Date(),
-        structuredDraft: approvedDraft as Prisma.InputJsonValue,
-        renderedHtml: rendered.html,
-        renderedMarkdown: rendered.markdown,
-        sectionLocks: locks as Prisma.InputJsonValue,
-        version: draft.version,
-      },
-    });
+    const outcome = await prisma.$transaction(async (tx) => {
+      stage = "write_review_status";
+      // Claiming the session with a status-scoped update is also the
+      // concurrency guard: a parallel approve that already flipped the status
+      // leaves nothing for this request to claim.
+      const claimed = await tx.contentReviewSession.updateMany({
+        where: { id: input.reviewId, status: { in: [...ACTIVE_REVIEW] } },
+        data: {
+          status: "APPROVED",
+          approvedBy: input.actorId,
+          approvedAt,
+          completedAt: approvedAt,
+          finalNotes: input.note ?? null,
+        },
+      });
+      if (claimed.count === 0) return { claimed: false as const };
 
-    await tx.writingDraftVersion.create({
-      data: {
-        writingDraftId: draft.id,
-        version: draft.version,
-        reason: "final_approval",
-        structuredDraft: approvedDraft as Prisma.InputJsonValue,
-        qaReport: approvedDraft.qa as Prisma.InputJsonValue,
-        createdBy: input.actorId,
-      },
-    }).catch(async () => {
-      // unique constraint if snapshot already exists for version — update skip
-    });
+      stage = "write_draft_record";
+      await tx.writingDraftRecord.update({
+        where: { id: draft.id },
+        data: {
+          status: "APPROVED",
+          approvedBy: input.actorId,
+          approvedAt,
+          structuredDraft: approvedDraft as Prisma.InputJsonValue,
+          renderedHtml: rendered.html,
+          renderedMarkdown: rendered.markdown,
+          sectionLocks: locks as Prisma.InputJsonValue,
+          version: draft.version,
+        },
+      });
 
-    await tx.contentReviewDecision.create({
-      data: {
-        reviewSessionId: input.reviewId,
-        decisionType: "APPROVE_DRAFT",
-        actorId: input.actorId,
-        note: input.note ?? null,
-      },
-    });
-  });
+      stage = "write_version_snapshot";
+      // A snapshot row can already exist for this version (an earlier content
+      // fix wrote one). `skipDuplicates` keeps that audit row intact; a bare
+      // create hits the (writingDraftId, version) unique index and Postgres
+      // then aborts every later statement in this transaction.
+      const snapshot = await tx.writingDraftVersion.createMany({
+        data: [
+          {
+            writingDraftId: draft.id,
+            version: draft.version,
+            reason: "final_approval",
+            structuredDraft: approvedDraft as Prisma.InputJsonValue,
+            qaReport: approvedDraft.qa as Prisma.InputJsonValue,
+            createdBy: input.actorId,
+          },
+        ],
+        skipDuplicates: true,
+      });
 
-  return getContentReviewSession(input.reviewId);
+      stage = "write_decision";
+      const priorDecisions = await tx.contentReviewDecision.count({
+        where: { reviewSessionId: input.reviewId, decisionType: "APPROVE_DRAFT" },
+      });
+      if (priorDecisions === 0) {
+        await tx.contentReviewDecision.create({
+          data: {
+            reviewSessionId: input.reviewId,
+            decisionType: "APPROVE_DRAFT",
+            actorId: input.actorId,
+            note: input.note ?? null,
+            metadata: {
+              draftVersion: draft.version,
+              versionSnapshot: snapshot.count > 0 ? "created" : "existing",
+            } as Prisma.InputJsonValue,
+          },
+        });
+      }
+
+      stage = "verify";
+      const [verifiedSession, verifiedDraft, decisionCount] = await Promise.all([
+        tx.contentReviewSession.findUnique({
+          where: { id: input.reviewId },
+          select: { status: true, approvedBy: true, approvedAt: true },
+        }),
+        tx.writingDraftRecord.findUnique({
+          where: { id: draft.id },
+          select: { status: true, approvedBy: true, approvedAt: true, version: true },
+        }),
+        tx.contentReviewDecision.count({
+          where: { reviewSessionId: input.reviewId, decisionType: "APPROVE_DRAFT" },
+        }),
+      ]);
+      const consistent = isApprovalWriteConsistent({
+        reviewStatus: verifiedSession?.status,
+        reviewApprovedBy: verifiedSession?.approvedBy,
+        reviewApprovedAt: verifiedSession?.approvedAt,
+        draftStatus: verifiedDraft?.status,
+        draftApprovedBy: verifiedDraft?.approvedBy,
+        draftVersion: verifiedDraft?.version,
+        expectedDraftVersion: draft.version,
+        approveDecisions: decisionCount,
+      });
+      if (!consistent) {
+        // Roll back rather than leave a half-approved Review behind.
+        throw new ContentReviewError(
+          "Phê duyệt bị hủy: trạng thái sau khi ghi không nhất quán. Không có thay đổi nào được lưu.",
+          "APPROVE_VERIFY_FAILED",
+          500,
+          {
+            ok: false,
+            stage,
+            reviewStatus: verifiedSession?.status ?? null,
+            draftStatus: verifiedDraft?.status ?? null,
+            approveDecisions: decisionCount,
+          }
+        );
+      }
+
+      // Blog linkage is verified, never rewritten here: final approval must not
+      // touch the Blog or trigger publishing.
+      const blog = await tx.blogPost.findFirst({
+        where: { sourceWritingDraftId: draft.id },
+        select: { id: true, status: true, sourceReviewSessionId: true },
+      });
+
+      return { claimed: true as const, snapshotCreated: snapshot.count > 0, blog };
+    }, REVIEW_TX_OPTIONS);
+
+    if (!outcome.claimed) {
+      logApprovalEvent({
+        ok: true,
+        reviewId: input.reviewId,
+        draftId,
+        stage: "write_review_status",
+        durationMs: Date.now() - startedAt,
+        idempotent: true,
+      });
+      return { ...(await getContentReviewSession(input.reviewId)), alreadyApproved: true };
+    }
+
+    stage = "reload";
+    const session = await getContentReviewSession(input.reviewId);
+    const blogLinkage = {
+      blogPostId: outcome.blog?.id ?? null,
+      blogStatus: outcome.blog?.status ?? null,
+      sourceReviewSessionId: outcome.blog?.sourceReviewSessionId ?? null,
+      matchesReview: outcome.blog ? outcome.blog.sourceReviewSessionId === input.reviewId : null,
+    };
+    logApprovalEvent({
+      ok: true,
+      reviewId: input.reviewId,
+      draftId,
+      stage,
+      durationMs: Date.now() - startedAt,
+      snapshotCreated: outcome.snapshotCreated,
+      blogPostId: blogLinkage.blogPostId,
+      blogStatus: blogLinkage.blogStatus,
+      blogLinkageMatches: blogLinkage.matchesReview,
+    });
+    return { ...session, alreadyApproved: false, blogLinkage };
+  } catch (err) {
+    const failure = err as { name?: string; code?: string; message?: string };
+    if (err instanceof ContentReviewError) {
+      if (err.status >= 500) {
+        logApprovalEvent({
+          ok: false,
+          reviewId: input.reviewId,
+          draftId,
+          stage,
+          durationMs: Date.now() - startedAt,
+          errorName: err.name,
+          errorCode: err.code,
+        });
+      }
+      throw err;
+    }
+    logApprovalEvent({
+      ok: false,
+      reviewId: input.reviewId,
+      draftId,
+      stage,
+      durationMs: Date.now() - startedAt,
+      errorName: failure?.name ?? "Error",
+      errorCode: failure?.code ?? null,
+      errorMessage: (failure?.message ?? "unknown").slice(0, 300),
+    });
+    const shaped = buildFinalApprovalFailure({
+      stage,
+      errorName: failure?.name,
+      errorCode: failure?.code,
+    });
+    throw new ContentReviewError(shaped.message, shaped.code, 500, {
+      ok: false,
+      ...shaped.details,
+    });
+  }
+}
+
+/**
+ * Single structured log line per final approval attempt. Only error
+ * names/codes are recorded — no stack traces and no row payloads.
+ */
+function logApprovalEvent(entry: {
+  ok: boolean;
+  reviewId: string;
+  draftId: string | null;
+  stage: ApprovalStage;
+  durationMs: number;
+  idempotent?: boolean;
+  snapshotCreated?: boolean;
+  blogPostId?: string | null;
+  blogStatus?: string | null;
+  blogLinkageMatches?: boolean | null;
+  errorName?: string;
+  errorCode?: string | null;
+  errorMessage?: string;
+}): void {
+  const line = JSON.stringify({ op: "content.reviews.approve", ...entry });
+  if (entry.ok) console.info(line);
+  else console.error(line);
 }
 
 export async function rejectWritingDraftReview(input: {

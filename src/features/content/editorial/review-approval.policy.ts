@@ -410,6 +410,209 @@ export function groupApprovalBlockers(
   return views;
 }
 
+export type FinalApprovalInvariantCode =
+  | "CHECKLIST_ITEM_FAILED"
+  | "REVIEW_NOT_ACTIVE"
+  | "SECTION_REJECTED"
+  | "SECTION_CHANGES_REQUESTED"
+  | "UNMAPPED_BLOCKER";
+
+export type FinalApprovalInvariant = {
+  code: FinalApprovalInvariantCode;
+  message: string;
+  /** Checklist row the reviewer should look at, when the invariant maps to one. */
+  checklistId?: ApprovalChecklistItem["id"];
+};
+
+export type FinalApprovalDecision = {
+  ok: boolean;
+  /** Review is already APPROVED — the caller should replay, not re-approve. */
+  alreadyApproved: boolean;
+  failed: FinalApprovalInvariant[];
+};
+
+/**
+ * The single source of truth for "may this Review be finally approved".
+ *
+ * The UI checklist and this gate read the same inputs on purpose: whenever the
+ * gate refuses, at least one invariant is returned, and any blocker that no
+ * checklist row covers is reported as UNMAPPED_BLOCKER rather than failing
+ * silently behind an all-green checklist.
+ */
+export function evaluateFinalApproval(input: {
+  reviewStatus: string;
+  checklist: ApprovalChecklistItem[];
+  blockers: ReviewBlocker[];
+  rejectedSections: number;
+  changesRequestedSections: number;
+}): FinalApprovalDecision {
+  if (input.reviewStatus === "APPROVED") {
+    return { ok: false, alreadyApproved: true, failed: [] };
+  }
+
+  const failed: FinalApprovalInvariant[] = [];
+  // Blocker codes already spoken for by a stronger invariant below, so the
+  // reviewer is not shown the same problem twice.
+  const coveredCodes = new Set<string>();
+
+  if (!isActiveReviewStatus(input.reviewStatus)) {
+    failed.push({
+      code: "REVIEW_NOT_ACTIVE",
+      message: `Phiên kiểm duyệt ở trạng thái ${input.reviewStatus} — không thể phê duyệt.`,
+    });
+    coveredCodes.add("REVIEW_NOT_EDITABLE");
+  }
+
+  for (const item of input.checklist) {
+    if (item.passed) continue;
+    failed.push({
+      code: "CHECKLIST_ITEM_FAILED",
+      checklistId: item.id,
+      message: item.detail ? `${item.label} — ${item.detail}` : item.label,
+    });
+  }
+
+  if (input.rejectedSections > 0) {
+    failed.push({
+      code: "SECTION_REJECTED",
+      checklistId: "sections",
+      message: `${input.rejectedSections} đoạn đang bị reject — xử lý trước khi phê duyệt.`,
+    });
+  }
+  if (input.changesRequestedSections > 0) {
+    failed.push({
+      code: "SECTION_CHANGES_REQUESTED",
+      checklistId: "sections",
+      message: `${input.changesRequestedSections} đoạn đang yêu cầu sửa — xử lý trước khi phê duyệt.`,
+    });
+  }
+
+  // Safety net: a blocker whose group has no failing checklist row would
+  // otherwise be an all-green checklist over a refusing server.
+  const failedChecklistIds = new Set(
+    input.checklist.filter((i) => !i.passed).map((i) => i.id)
+  );
+  for (const blocker of input.blockers) {
+    if (coveredCodes.has(blocker.code)) continue;
+    if (blockerCoveredByChecklist(blocker.group, failedChecklistIds)) continue;
+    failed.push({
+      code: "UNMAPPED_BLOCKER",
+      message: `${blocker.code}: ${blocker.message}`,
+    });
+  }
+
+  return { ok: failed.length === 0, alreadyApproved: false, failed };
+}
+
+const BLOCKER_GROUP_CHECKLIST_IDS: Record<ReviewBlockerGroup, ApprovalChecklistItem["id"][]> = {
+  DRAFT_VERSION: ["latest_draft"],
+  REQUIRED_FACTS: ["required_facts"],
+  FAQ: ["faq"],
+  SECTION_APPROVALS: ["sections"],
+  QA: ["qa", "media"],
+};
+
+function blockerCoveredByChecklist(
+  group: ReviewBlockerGroup,
+  failedChecklistIds: Set<ApprovalChecklistItem["id"]>
+): boolean {
+  return BLOCKER_GROUP_CHECKLIST_IDS[group].some((id) => failedChecklistIds.has(id));
+}
+
+/** Toast copy for an approval refused by the final invariants. */
+export function finalApprovalToastMessage(decision: FinalApprovalDecision): string {
+  if (decision.alreadyApproved) return "Review đã được phê duyệt trước đó.";
+  if (decision.failed.length === 0) return "Chưa đủ điều kiện phê duyệt.";
+  const first = decision.failed[0].message;
+  return decision.failed.length === 1
+    ? `Chưa đủ điều kiện phê duyệt: ${first}`
+    : `Chưa đủ điều kiện phê duyệt: ${first} (+${decision.failed.length - 1} mục khác)`;
+}
+
+/**
+ * Post-write invariants for a committed final approval. Checked inside the
+ * transaction so an inconsistent write rolls back instead of leaving a
+ * half-approved Review behind.
+ */
+export function isApprovalWriteConsistent(input: {
+  reviewStatus?: string | null;
+  reviewApprovedBy?: string | null;
+  reviewApprovedAt?: Date | string | null;
+  draftStatus?: string | null;
+  draftApprovedBy?: string | null;
+  draftVersion?: number | null;
+  expectedDraftVersion: number;
+  approveDecisions: number;
+}): boolean {
+  return (
+    input.reviewStatus === "APPROVED" &&
+    Boolean(input.reviewApprovedBy) &&
+    Boolean(input.reviewApprovedAt) &&
+    input.draftStatus === "APPROVED" &&
+    Boolean(input.draftApprovedBy) &&
+    input.draftVersion === input.expectedDraftVersion &&
+    input.approveDecisions === 1
+  );
+}
+
+/**
+ * Stages of the final approval request, in execution order. The stage that
+ * failed is the only implementation detail the reviewer is shown.
+ */
+export const APPROVAL_STAGE_LABELS = {
+  load_review: "tải phiên kiểm duyệt",
+  policy: "kiểm tra điều kiện phê duyệt",
+  render: "kết xuất bản nháp đã duyệt",
+  write_review_status: "ghi trạng thái phê duyệt",
+  write_draft_record: "ghi bản nháp đã duyệt",
+  write_version_snapshot: "lưu ảnh chụp phiên bản",
+  write_decision: "ghi quyết định kiểm duyệt",
+  verify: "xác minh sau khi ghi",
+  reload: "tải lại phiên kiểm duyệt",
+} as const;
+
+export type ApprovalStage = keyof typeof APPROVAL_STAGE_LABELS;
+
+/** Stages after which the interactive transaction has already committed. */
+const COMMITTED_STAGES: ApprovalStage[] = ["reload"];
+
+export type FinalApprovalFailure = {
+  ok: false;
+  code: "APPROVE_WRITE_FAILED";
+  message: string;
+  details: {
+    stage: ApprovalStage;
+    stageLabel: string;
+    errorCode: string;
+    rolledBack: boolean;
+  };
+};
+
+/**
+ * Client-facing shape for an unexpected approval failure: names the stage and
+ * an error code the reviewer can quote, and says whether anything was saved.
+ * Never carries stack traces, SQL, or row payloads.
+ */
+export function buildFinalApprovalFailure(input: {
+  stage: ApprovalStage;
+  errorName?: string | null;
+  errorCode?: string | null;
+}): FinalApprovalFailure {
+  const errorCode = input.errorCode || input.errorName || "UNKNOWN";
+  const rolledBack = !COMMITTED_STAGES.includes(input.stage);
+  const stageLabel = APPROVAL_STAGE_LABELS[input.stage];
+  return {
+    ok: false,
+    code: "APPROVE_WRITE_FAILED",
+    message:
+      `Phê duyệt thất bại ở bước "${stageLabel}" (mã ${errorCode}). ` +
+      (rolledBack
+        ? "Không có thay đổi nào được lưu — thử lại, nếu vẫn lỗi hãy gửi mã này cho kỹ thuật."
+        : "Dữ liệu đã được ghi nhưng không tải lại được — tải lại trang để xem trạng thái."),
+    details: { stage: input.stage, stageLabel, errorCode, rolledBack },
+  };
+}
+
 /** Short toast copy — details belong in the inline grouped panel. */
 export function approvalToastMessage(groups: ReviewBlockerGroupView[]): string {
   if (groups.length === 0) return "Chưa đủ điều kiện phê duyệt.";

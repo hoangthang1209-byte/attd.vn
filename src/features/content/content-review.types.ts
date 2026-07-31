@@ -10,6 +10,7 @@ import { sanitizeWritingSectionHtml } from "@/features/writing-engine/services/w
 import type {
   ApprovalChecklistItem,
   BulkApprovePlan,
+  FinalApprovalDecision,
   ReviewBlocker,
 } from "@/features/content/editorial/review-approval.policy";
 
@@ -41,7 +42,10 @@ export type ContentReviewIssueStatus = "OPEN" | "RESOLVED" | "DISMISSED";
 
 export type ContentReviewReadiness = {
   readyToStart: boolean;
+  /** Mirrors `approval.ok` — the canonical final approval gate. */
   readyToApprove: boolean;
+  /** Which final invariants refused approval, when `readyToApprove` is false. */
+  approval: FinalApprovalDecision;
   score: number;
   blockingIssues: string[];
   warnings: string[];

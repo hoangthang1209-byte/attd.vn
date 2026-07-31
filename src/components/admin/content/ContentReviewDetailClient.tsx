@@ -15,14 +15,27 @@ import {
   type ApprovalChecklistItem,
   type BulkApproveExclusionReason,
   type BulkApprovePlan,
+  type FinalApprovalDecision,
+  type FinalApprovalInvariant,
   type ReviewBlocker,
   type ReviewBlockerGroupView,
 } from "@/features/content/editorial/review-approval.policy";
 
 type Props = { reviewId: string };
 
+/** Codes whose message/invariants belong in the Decision panel, not just a toast. */
+const APPROVAL_ERROR_CODES = new Set([
+  "NOT_READY",
+  "APPROVE_WRITE_FAILED",
+  "APPROVE_VERIFY_FAILED",
+  "APPROVE_ROUTE_FAILED",
+  "REVIEW_NOT_EDITABLE",
+  "VERSION_MISMATCH",
+]);
+
 type Readiness = {
   readyToApprove: boolean;
+  approval: FinalApprovalDecision;
   score: number;
   blockingIssues: string[];
   warnings: string[];
@@ -74,6 +87,10 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
   const [showChanges, setShowChanges] = useState(false);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [submitGroups, setSubmitGroups] = useState<ReviewBlockerGroupView[] | null>(null);
+  const [approveError, setApproveError] = useState<{
+    message: string;
+    invariants: FinalApprovalInvariant[];
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,10 +153,25 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
           // Detailed blockers belong in the inline panel — the toast stays short.
           const groups = (json.groups as ReviewBlockerGroupView[] | undefined) ?? null;
           setSubmitGroups(groups);
-          toast.error(groups ? approvalToastMessage(groups) : (json.message ?? "Failed"));
+          // Final approval always answers with an actionable message: either the
+          // invariant that refused it or the write stage that failed.
+          if (typeof json.message === "string" && json.message) {
+            if (APPROVAL_ERROR_CODES.has(String(json.code))) {
+              setApproveError({
+                message: json.message,
+                invariants: Array.isArray(json.blockers)
+                  ? (json.blockers as FinalApprovalInvariant[])
+                  : [],
+              });
+            }
+            toast.error(json.message);
+            return null;
+          }
+          toast.error(groups ? approvalToastMessage(groups) : "Failed");
           return null;
         }
         setSubmitGroups(null);
+        setApproveError(null);
         toast.success(json.message ?? "OK");
         await load();
         return json;
@@ -767,9 +799,40 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
               </AdminLoadingButton>
             </div>
             {!readiness.readyToApprove && (
-              <p className="admin-field-hint" style={{ marginTop: 8 }}>
-                Nút Approve mở khóa khi mọi mục trong checklist đạt.
-              </p>
+              <>
+                <p className="admin-field-hint" style={{ marginTop: 8 }}>
+                  Nút Approve mở khóa khi mọi mục trong checklist đạt.
+                </p>
+                {(readiness.approval?.failed ?? []).length > 0 && (
+                  <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 12, color: "#b91c1c" }}>
+                    {readiness.approval.failed.map((item, i) => (
+                      <li key={`${item.code}-${i}`}>{item.message}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+            {approveError && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: 8,
+                  border: "1px solid #fecaca",
+                  borderRadius: 6,
+                  background: "#fef2f2",
+                  fontSize: 12,
+                }}
+              >
+                <strong>Phê duyệt không thành công</strong>
+                <p style={{ margin: "4px 0 0" }}>{approveError.message}</p>
+                {approveError.invariants.length > 0 && (
+                  <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                    {approveError.invariants.map((item, i) => (
+                      <li key={`${item.code}-${i}`}>{item.message}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             )}
             <p className="admin-field-hint" style={{ marginTop: 8 }}>
               <Link href="/admin/content/publishing">Mở Publishing</Link>
