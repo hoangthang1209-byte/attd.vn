@@ -136,6 +136,15 @@ export type BulkApproveSectionCandidate = {
   hasUnresolvedRequiredFact: boolean;
   hasUnsafeClaim: boolean;
   isStale: boolean;
+  /** Blocking/error QA codes for this section (empty when clean). */
+  qaCodes?: string[];
+  /** Required Knowledge fact IDs still unused by the section. */
+  missingRequiredFactIds?: string[];
+  /** Unsafe claim codes detected on the section. */
+  unsafeClaimCodes?: string[];
+  /** Current content hash of the draft section, when content exists. */
+  contentHash?: string | null;
+  required?: boolean;
 };
 
 export type BulkApproveExclusionReason =
@@ -145,7 +154,8 @@ export type BulkApproveExclusionReason =
   | "REQUIRED_FACT"
   | "UNSAFE_CLAIM"
   | "STALE"
-  | "NEEDS_DECISION";
+  | "NEEDS_DECISION"
+  | "MISSING_FROM_DRAFT";
 
 export const BULK_APPROVE_EXCLUSION_LABELS: Record<BulkApproveExclusionReason, string> = {
   ALREADY_APPROVED: "Đã duyệt",
@@ -155,17 +165,49 @@ export const BULK_APPROVE_EXCLUSION_LABELS: Record<BulkApproveExclusionReason, s
   UNSAFE_CLAIM: "Có tuyên bố chưa được phép",
   STALE: "Đoạn đã lệch phiên bản",
   NEEDS_DECISION: "Cần quyết định riêng (từ chối/yêu cầu sửa)",
+  MISSING_FROM_DRAFT: "Không có trong bản nháp hiện tại",
+};
+
+export type BulkApproveSkipDetail = {
+  sectionId: string;
+  heading: string;
+  reason: BulkApproveExclusionReason;
+  qa: string[];
+  requiredFact: string[];
+  unsafeClaim: string[];
+  stale: boolean;
+  hash: string | null;
+  required: boolean;
+};
+
+export type BulkApproveEligibleDetail = {
+  sectionId: string;
+  heading: string;
+  hash: string | null;
+  required: boolean;
+};
+
+export type BulkApproveCounts = {
+  total: number;
+  eligible: number;
+  excluded: number;
+  pending: number;
+  requiredPending: number;
+  optionalPending: number;
+  approved: number;
 };
 
 export type BulkApprovePlan = {
-  eligible: Array<{ sectionId: string; heading: string }>;
-  excluded: Array<{ sectionId: string; heading: string; reason: BulkApproveExclusionReason }>;
+  eligible: BulkApproveEligibleDetail[];
+  excluded: BulkApproveSkipDetail[];
   blockers: string[];
+  counts: BulkApproveCounts;
 };
 
 /**
  * Decide which sections a human may approve in one confirmed batch.
  * Only clean, current-version sections qualify — everything else stays manual.
+ * UI and API must both call this same function.
  */
 export function selectBulkApprovableSections(input: {
   reviewIsStale: boolean;
@@ -176,46 +218,84 @@ export function selectBulkApprovableSections(input: {
   const blockers = new Set<string>();
 
   for (const section of input.sections) {
-    const entry = { sectionId: section.sectionId, heading: section.heading };
-    const exclude = (reason: BulkApproveExclusionReason) => {
-      excluded.push({ ...entry, reason });
+    const skip = (
+      reason: BulkApproveExclusionReason
+    ): void => {
+      excluded.push({
+        sectionId: section.sectionId,
+        heading: section.heading,
+        reason,
+        qa: section.qaCodes ?? [],
+        requiredFact: section.missingRequiredFactIds ?? [],
+        unsafeClaim: section.unsafeClaimCodes ?? [],
+        stale: section.isStale || input.reviewIsStale,
+        hash: section.contentHash ?? null,
+        required: section.required === true,
+      });
       if (reason !== "ALREADY_APPROVED") {
         blockers.add(BULK_APPROVE_EXCLUSION_LABELS[reason]);
       }
     };
 
     if (input.reviewIsStale || section.isStale) {
-      exclude("STALE");
+      skip("STALE");
       continue;
     }
     if (section.status === "APPROVED") {
-      exclude("ALREADY_APPROVED");
+      skip("ALREADY_APPROVED");
       continue;
     }
     if (section.status === "REJECTED" || section.status === "CHANGES_REQUESTED") {
-      exclude("NEEDS_DECISION");
+      skip("NEEDS_DECISION");
       continue;
     }
     if (!section.hasContent) {
-      exclude("EMPTY_CONTENT");
+      skip("EMPTY_CONTENT");
       continue;
     }
     if (section.hasBlockingQaIssue) {
-      exclude("BLOCKING_QA");
+      skip("BLOCKING_QA");
       continue;
     }
     if (section.hasUnresolvedRequiredFact) {
-      exclude("REQUIRED_FACT");
+      skip("REQUIRED_FACT");
       continue;
     }
     if (section.hasUnsafeClaim) {
-      exclude("UNSAFE_CLAIM");
+      skip("UNSAFE_CLAIM");
       continue;
     }
-    eligible.push(entry);
+    eligible.push({
+      sectionId: section.sectionId,
+      heading: section.heading,
+      hash: section.contentHash ?? null,
+      required: section.required === true,
+    });
   }
 
-  return { eligible, excluded, blockers: [...blockers] };
+  const approved = input.sections.filter((s) => s.status === "APPROVED").length;
+  const pending = input.sections.filter((s) => s.status === "PENDING" || s.status === "LOCKED").length;
+  const requiredPending = input.sections.filter(
+    (s) => s.required && (s.status === "PENDING" || s.status === "LOCKED")
+  ).length;
+  const optionalPending = input.sections.filter(
+    (s) => !s.required && (s.status === "PENDING" || s.status === "LOCKED")
+  ).length;
+
+  return {
+    eligible,
+    excluded,
+    blockers: [...blockers],
+    counts: {
+      total: input.sections.length,
+      eligible: eligible.length,
+      excluded: excluded.length,
+      pending,
+      requiredPending,
+      optionalPending,
+      approved,
+    },
+  };
 }
 
 export type ApprovalChecklistItem = {
@@ -231,7 +311,10 @@ export type ApprovalChecklistItem = {
   detail: string | null;
 };
 
-/** Compact pre-approval checklist shown above the final Approve button. */
+/**
+ * Compact pre-approval checklist shown above the final Approve button.
+ * Section wording uses the same pending/required counts as the bulk panel.
+ */
 export function buildApprovalChecklist(input: {
   usesLatestDraft: boolean;
   requiredFactsSatisfied: boolean;
@@ -242,8 +325,12 @@ export function buildApprovalChecklist(input: {
   latestDraftVersion?: number | null;
   reviewDraftVersion?: number | null;
   pendingRequiredSections?: number;
+  pendingSections?: number;
+  totalSections?: number;
 }): ApprovalChecklistItem[] {
-  const pending = input.pendingRequiredSections ?? 0;
+  const pendingRequired = input.pendingRequiredSections ?? 0;
+  const pending = input.pendingSections ?? pendingRequired;
+  const total = input.totalSections ?? pending;
   return [
     {
       id: "latest_draft",
@@ -264,7 +351,10 @@ export function buildApprovalChecklist(input: {
       id: "sections",
       label: "Đã duyệt các đoạn bắt buộc",
       passed: input.requiredSectionsApproved,
-      detail: pending > 0 ? `${pending} đoạn bắt buộc chưa được duyệt` : null,
+      detail:
+        pending > 0
+          ? `${pending}/${total} đoạn chưa duyệt · ${pendingRequired} bắt buộc còn chờ`
+          : null,
     },
     { id: "qa", label: "Không còn lỗi QA chặn", passed: input.blockingQaCleared, detail: null },
     { id: "media", label: "Media sẵn sàng", passed: input.mediaReady, detail: null },
@@ -274,8 +364,13 @@ export function buildApprovalChecklist(input: {
 /**
  * Collapse repeated blockers (notably per-section approval errors) into
  * a small set of groups suitable for an inline panel.
+ * When `counts` is provided, the section summary uses the same numbers as
+ * the bulk panel and checklist (pending/total · required pending).
  */
-export function groupApprovalBlockers(blockers: ReviewBlocker[]): ReviewBlockerGroupView[] {
+export function groupApprovalBlockers(
+  blockers: ReviewBlocker[],
+  counts?: Pick<BulkApproveCounts, "pending" | "total" | "requiredPending">
+): ReviewBlockerGroupView[] {
   const order: ReviewBlockerGroup[] = [
     "DRAFT_VERSION",
     "REQUIRED_FACTS",
@@ -292,14 +387,21 @@ export function groupApprovalBlockers(blockers: ReviewBlocker[]): ReviewBlockerG
     const collapsed = group === "SECTION_APPROVALS" && items.length > 3;
     const notApproved = items.filter((i) => i.code === "SECTION_NOT_APPROVED").length;
 
+    let summary = items[0].message;
+    if (collapsed) {
+      if (counts) {
+        summary = `${counts.pending}/${counts.total} đoạn chưa duyệt · ${counts.requiredPending} bắt buộc còn chờ`;
+      } else if (notApproved > 0) {
+        summary = `${notApproved} đoạn bắt buộc chưa được duyệt`;
+      } else {
+        summary = `${items.length} vấn đề ở phần duyệt đoạn`;
+      }
+    }
+
     views.push({
       group,
       label: REVIEW_BLOCKER_GROUP_LABELS[group],
-      summary: collapsed
-        ? notApproved > 0
-          ? `${notApproved} đoạn bắt buộc chưa được duyệt`
-          : `${items.length} vấn đề ở phần duyệt đoạn`
-        : items[0].message,
+      summary,
       count: items.length,
       items: collapsed ? items.slice(0, 3).map((i) => i.message) : items.map((i) => i.message),
       collapsed,

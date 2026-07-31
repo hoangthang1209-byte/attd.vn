@@ -121,6 +121,18 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
             window.location.href = json.adminRoute;
             return null;
           }
+          // Bulk failures carry structured skip diagnostics — keep toast short,
+          // surface the server message (no longer a blank generic string).
+          if (json.code === "BULK_APPROVE_FAILED" || json.code === "NO_ELIGIBLE_SECTIONS") {
+            const skipped = Array.isArray(json.skipped) ? json.skipped.length : 0;
+            toast.error(
+              skipped > 0
+                ? `${json.message ?? "Duyệt hàng loạt thất bại"} (${skipped} đoạn loại trừ)`
+                : (json.message ?? "Duyệt hàng loạt thất bại"),
+            );
+            await load();
+            return null;
+          }
           // Detailed blockers belong in the inline panel — the toast stays short.
           const groups = (json.groups as ReviewBlockerGroupView[] | undefined) ?? null;
           setSubmitGroups(groups);
@@ -143,8 +155,24 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
 
   const readiness = data?.readiness as Readiness | undefined;
   const liveGroups = useMemo(
-    () => groupApprovalBlockers(readiness?.blockers ?? []),
-    [readiness?.blockers],
+    () =>
+      groupApprovalBlockers(
+        readiness?.blockers ?? [],
+        readiness?.bulkApprove?.counts
+          ? {
+              pending: readiness.bulkApprove.counts.pending,
+              total: readiness.bulkApprove.counts.total,
+              requiredPending: readiness.bulkApprove.counts.requiredPending,
+            }
+          : readiness?.sectionSummary
+            ? {
+                pending: readiness.sectionSummary.pending,
+                total: readiness.sectionSummary.total,
+                requiredPending: readiness.sectionSummary.pending,
+              }
+            : undefined,
+      ),
+    [readiness?.blockers, readiness?.bulkApprove?.counts, readiness?.sectionSummary],
   );
   const groups = submitGroups ?? liveGroups;
 
@@ -479,7 +507,9 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
           <section className="admin-sidebar-card" style={{ margin: 0 }}>
             <h3 className="admin-sidebar-title">Duyệt đoạn</h3>
             <p className="admin-field-hint" style={{ marginTop: 0 }}>
-              {bulk.eligible.length} đoạn đạt điều kiện · {bulk.excluded.length} đoạn loại trừ
+              {bulk.counts?.eligible ?? bulk.eligible.length}/{bulk.counts?.total ?? summary.total}{" "}
+              đạt điều kiện · {bulk.counts?.excluded ?? bulk.excluded.length} loại trừ ·{" "}
+              {bulk.counts?.requiredPending ?? summary.pending} bắt buộc còn chờ
             </p>
             <AdminLoadingButton
               pending={pending}
@@ -503,6 +533,11 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
               >
                 <strong>Xác nhận duyệt hàng loạt</strong>
                 <ul style={{ margin: "6px 0", paddingLeft: 18 }}>
+                  <li>
+                    Tổng: {bulk.counts?.total ?? summary.total} · Chờ duyệt:{" "}
+                    {bulk.counts?.pending ?? summary.pending} · Bắt buộc còn chờ:{" "}
+                    {bulk.counts?.requiredPending ?? "—"}
+                  </li>
                   <li>Sẽ duyệt: {bulk.eligible.length} đoạn</li>
                   <li>Loại trừ: {bulk.excluded.length} đoạn</li>
                   {Object.entries(excludedByReason).map(([reason, count]) => (
@@ -513,6 +548,23 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
                   ))}
                   {bulk.blockers.length > 0 && <li>Vướng mắc: {bulk.blockers.join(", ")}</li>}
                 </ul>
+                {bulk.excluded.length > 0 && (
+                  <details style={{ marginBottom: 8 }}>
+                    <summary>Chi tiết đoạn loại trừ</summary>
+                    <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 12 }}>
+                      {bulk.excluded.map((e) => (
+                        <li key={e.sectionId}>
+                          {e.heading}: {e.reason}
+                          {e.qa?.length ? ` · QA ${e.qa.join(",")}` : ""}
+                          {e.requiredFact?.length ? ` · fact ${e.requiredFact.join(",")}` : ""}
+                          {e.unsafeClaim?.length ? ` · claim ${e.unsafeClaim.join(",")}` : ""}
+                          {e.stale ? " · stale" : ""}
+                          {e.hash ? ` · hash ${e.hash.slice(0, 8)}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
                 <p style={{ margin: "0 0 8px" }}>
                   Đây là hành động phê duyệt của con người. Bạn xác nhận đã đọc và chịu trách nhiệm
                   cho nội dung các đoạn được duyệt.

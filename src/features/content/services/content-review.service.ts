@@ -361,7 +361,20 @@ export async function evaluateContentReviewReadiness(
       reviewDraftVersion: 0,
       latestDraftVersion: null,
       checklist: [],
-      bulkApprove: { eligible: [], excluded: [], blockers: [] },
+      bulkApprove: {
+        eligible: [],
+        excluded: [],
+        blockers: [],
+        counts: {
+          total: 0,
+          eligible: 0,
+          excluded: 0,
+          pending: 0,
+          requiredPending: 0,
+          optionalPending: 0,
+          approved: 0,
+        },
+      },
       sectionSummary: {
         total: 0,
         approved: 0,
@@ -477,7 +490,6 @@ export async function evaluateContentReviewReadiness(
   );
 
   const staleSectionIds = new Set<string>();
-  let pendingRequiredSections = 0;
 
   for (const section of session.sections) {
     const isRequired = requiredSectionIds.size === 0 || requiredSectionIds.has(section.sectionId);
@@ -500,7 +512,6 @@ export async function evaluateContentReviewReadiness(
         );
       }
       if (section.status === "PENDING" || section.status === "LOCKED") {
-        pendingRequiredSections += 1;
         addBlocker(
           "SECTION_APPROVALS",
           "SECTION_NOT_APPROVED",
@@ -543,6 +554,7 @@ export async function evaluateContentReviewReadiness(
     const missingFacts = (requiredFactBySection.get(section.sectionId) ?? []).filter(
       (factId) => !(draftSection?.factIdsUsed ?? []).includes(factId)
     );
+    const isRequired = requiredSectionIds.size === 0 || requiredSectionIds.has(section.sectionId);
     return {
       sectionId: section.sectionId,
       heading: section.heading,
@@ -552,6 +564,11 @@ export async function evaluateContentReviewReadiness(
       hasUnresolvedRequiredFact: missingFacts.length > 0,
       hasUnsafeClaim: unsafeClaims.length > 0,
       isStale: staleSectionIds.has(section.sectionId),
+      qaCodes: sectionIssues.map((i) => i.code),
+      missingRequiredFactIds: missingFacts,
+      unsafeClaimCodes: unsafeClaims.map((i) => i.code),
+      contentHash: draftSection ? hashSectionContent(draftSection) : null,
+      required: isRequired,
     };
   });
 
@@ -598,7 +615,9 @@ export async function evaluateContentReviewReadiness(
     mediaReady,
     latestDraftVersion: draft?.version ?? null,
     reviewDraftVersion: session.writingDraftVersion,
-    pendingRequiredSections,
+    pendingRequiredSections: bulkApprove.counts.requiredPending,
+    pendingSections: bulkApprove.counts.pending,
+    totalSections: bulkApprove.counts.total,
   });
 
   const blockingIssues = blockers.map((b) => b.message);
@@ -900,12 +919,31 @@ export async function restartContentReview(input: {
 
 export type BulkApproveResult = {
   approvedSectionIds: string[];
-  skipped: Array<{ sectionId: string; heading: string; reason: string }>;
+  skipped: Array<{
+    sectionId: string;
+    heading: string;
+    reason: string;
+    qa: string[];
+    requiredFact: string[];
+    unsafeClaim: string[];
+    stale: boolean;
+    hash: string | null;
+  }>;
+  counts: {
+    total: number;
+    eligible: number;
+    excluded: number;
+    approved: number;
+    skipped: number;
+  };
 };
 
 /**
  * Explicit human bulk approval of sections that are clean on the current Draft
  * version. Requires confirmation and never runs automatically.
+ *
+ * Eligibility is computed once via evaluateContentReviewReadiness — the same
+ * source the UI renders — so eligible/excluded cannot diverge.
  */
 export async function bulkApproveEligibleSections(input: {
   reviewId: string;
@@ -923,11 +961,24 @@ export async function bulkApproveEligibleSections(input: {
 
   const { draft } = await assertReviewEditable(input.reviewId);
   const readiness = await evaluateContentReviewReadiness(input.reviewId);
+
+  const skipped = readiness.bulkApprove.excluded.map((e) => ({
+    sectionId: e.sectionId,
+    heading: e.heading,
+    reason: e.reason,
+    qa: e.qa,
+    requiredFact: e.requiredFact,
+    unsafeClaim: e.unsafeClaim,
+    stale: e.stale,
+    hash: e.hash,
+  }));
+
   if (readiness.stale) {
     throw new ContentReviewError(
       "Draft version changed — tạo review mới",
       "VERSION_MISMATCH",
-      409
+      409,
+      { skipped, counts: readiness.bulkApprove.counts }
     );
   }
 
@@ -936,68 +987,129 @@ export async function bulkApproveEligibleSections(input: {
     throw new ContentReviewError(
       "Không có đoạn nào đủ điều kiện duyệt hàng loạt.",
       "NO_ELIGIBLE_SECTIONS",
-      422
+      422,
+      { skipped, counts: readiness.bulkApprove.counts }
     );
   }
 
   const structured = parseDraftJson(draft as never);
+  const missingFromDraft: typeof skipped = [];
+  const toApprove: Array<{
+    sectionId: string;
+    heading: string;
+    contentHash: string;
+  }> = [];
 
-  await prisma.$transaction(async (tx) => {
-    let locks = parseSectionLocks(draft.sectionLocks);
-    for (const target of eligible) {
-      const section = structured.sections.find((s) => s.sectionId === target.sectionId);
-      if (!section) continue;
-      const contentHash = hashSectionContent(section);
-
-      await tx.contentReviewSection.update({
-        where: {
-          reviewSessionId_sectionId: {
-            reviewSessionId: input.reviewId,
-            sectionId: target.sectionId,
-          },
-        },
-        data: {
-          status: "APPROVED",
-          reviewerId: input.actorId,
-          reviewerNotes: input.note ?? null,
-          reviewedAt: new Date(),
-          approvedContentHash: contentHash,
-        },
+  for (const target of eligible) {
+    const section = structured.sections.find((s) => s.sectionId === target.sectionId);
+    if (!section) {
+      missingFromDraft.push({
+        sectionId: target.sectionId,
+        heading: target.heading,
+        reason: "MISSING_FROM_DRAFT",
+        qa: [],
+        requiredFact: [],
+        unsafeClaim: [],
+        stale: false,
+        hash: null,
       });
+      continue;
+    }
+    toApprove.push({
+      sectionId: target.sectionId,
+      heading: target.heading,
+      contentHash: hashSectionContent(section),
+    });
+  }
 
-      await tx.contentReviewDecision.create({
-        data: {
+  if (toApprove.length === 0) {
+    throw new ContentReviewError(
+      "Không có đoạn nào đủ điều kiện duyệt hàng loạt.",
+      "NO_ELIGIBLE_SECTIONS",
+      422,
+      {
+        skipped: [...skipped, ...missingFromDraft],
+        counts: readiness.bulkApprove.counts,
+      }
+    );
+  }
+
+  // Contract: when the UI showed eligible==N and excluded==0, the write must
+  // succeed for those N sections (minus any that vanished from the draft).
+  let locks = parseSectionLocks(draft.sectionLocks);
+  for (const target of toApprove) {
+    locks = lockSection(
+      locks,
+      target.sectionId,
+      "USER_APPROVED",
+      input.actorId,
+      "Bulk approved in review"
+    );
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await Promise.all(
+        toApprove.map((target) =>
+          tx.contentReviewSection.update({
+            where: {
+              reviewSessionId_sectionId: {
+                reviewSessionId: input.reviewId,
+                sectionId: target.sectionId,
+              },
+            },
+            data: {
+              status: "APPROVED",
+              reviewerId: input.actorId,
+              reviewerNotes: input.note ?? null,
+              reviewedAt: new Date(),
+              approvedContentHash: target.contentHash,
+            },
+          })
+        )
+      );
+
+      await tx.contentReviewDecision.createMany({
+        data: toApprove.map((target) => ({
           reviewSessionId: input.reviewId,
-          decisionType: "APPROVE_SECTION",
+          decisionType: "APPROVE_SECTION" as const,
           sectionId: target.sectionId,
           actorId: input.actorId,
           note: input.note ?? "Bulk approval (human confirmed)",
-          metadata: { contentHash, bulk: true },
-        },
+          metadata: { contentHash: target.contentHash, bulk: true } as Prisma.InputJsonValue,
+        })),
       });
 
-      locks = lockSection(
-        locks,
-        target.sectionId,
-        "USER_APPROVED",
-        input.actorId,
-        "Bulk approved in review"
-      );
-    }
-
-    await tx.writingDraftRecord.update({
-      where: { id: draft.id },
-      data: { sectionLocks: locks as Prisma.InputJsonValue },
-    });
-  });
+      await tx.writingDraftRecord.update({
+        where: { id: draft.id },
+        data: { sectionLocks: locks as Prisma.InputJsonValue },
+      });
+    }, REVIEW_TX_OPTIONS);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Bulk approve transaction failed";
+    throw new ContentReviewError(
+      `Duyệt hàng loạt thất bại: ${message}`,
+      "BULK_APPROVE_FAILED",
+      500,
+      {
+        skipped: [...skipped, ...missingFromDraft],
+        attempted: toApprove.map((t) => t.sectionId),
+        counts: readiness.bulkApprove.counts,
+        cause: message,
+      }
+    );
+  }
 
   return {
-    approvedSectionIds: eligible.map((e) => e.sectionId),
-    skipped: readiness.bulkApprove.excluded.map((e) => ({
-      sectionId: e.sectionId,
-      heading: e.heading,
-      reason: e.reason,
-    })),
+    approvedSectionIds: toApprove.map((e) => e.sectionId),
+    skipped: [...skipped, ...missingFromDraft],
+    counts: {
+      total: readiness.bulkApprove.counts.total,
+      eligible: eligible.length,
+      excluded: readiness.bulkApprove.counts.excluded,
+      approved: toApprove.length,
+      skipped: skipped.length + missingFromDraft.length,
+    },
     review: await getContentReviewSession(input.reviewId),
   };
 }
@@ -1148,7 +1260,7 @@ export async function approveWritingDraftReview(input: {
 
   const readiness = await evaluateContentReviewReadiness(input.reviewId);
   if (!readiness.readyToApprove) {
-    const groups = groupApprovalBlockers(readiness.blockers);
+    const groups = groupApprovalBlockers(readiness.blockers, readiness.bulkApprove.counts);
     throw new ContentReviewError(approvalToastMessage(groups), "NOT_READY", 422, {
       groups,
       stale: readiness.stale,

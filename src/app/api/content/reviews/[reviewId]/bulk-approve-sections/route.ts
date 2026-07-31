@@ -31,8 +31,31 @@ export async function POST(req: NextRequest, context: RouteContext) {
     });
   } catch (err) {
     if (err instanceof ContentReviewError) {
-      return NextResponse.json({ message: err.message, code: err.code }, { status: err.status });
+      return NextResponse.json(
+        {
+          message: err.message,
+          code: err.code,
+          ...(err.details ?? {}),
+        },
+        { status: err.status },
+      );
     }
-    return NextResponse.json({ message: "Duyệt hàng loạt thất bại" }, { status: 500 });
+    const cause = err instanceof Error ? err.message : "unknown";
+    console.error(
+      JSON.stringify({
+        op: "content.reviews.bulk_approve",
+        ok: false,
+        reviewId,
+        error: cause,
+      }),
+    );
+    return NextResponse.json(
+      {
+        message: `Duyệt hàng loạt thất bại: ${cause}`,
+        code: "BULK_APPROVE_FAILED",
+        cause,
+      },
+      { status: 500 },
+    );
   }
 }

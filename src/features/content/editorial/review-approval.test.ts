@@ -249,26 +249,51 @@ describe("Hotfix 13.5.2 — stale review & approval UX", () => {
     const plan = selectBulkApprovableSections({
       reviewIsStale: false,
       sections: [
-        candidate({ sectionId: "ok" }),
-        candidate({ sectionId: "empty", hasContent: false }),
-        candidate({ sectionId: "qa", hasBlockingQaIssue: true }),
-        candidate({ sectionId: "fact", hasUnresolvedRequiredFact: true }),
-        candidate({ sectionId: "claim", hasUnsafeClaim: true }),
-        candidate({ sectionId: "done", status: "APPROVED" }),
-        candidate({ sectionId: "returned", status: "CHANGES_REQUESTED" }),
+        candidate({ sectionId: "ok", required: true }),
+        candidate({
+          sectionId: "empty",
+          hasContent: false,
+          required: true,
+        }),
+        candidate({
+          sectionId: "qa",
+          hasBlockingQaIssue: true,
+          qaCodes: ["HEADING_HIERARCHY"],
+          required: true,
+        }),
+        candidate({
+          sectionId: "fact",
+          hasUnresolvedRequiredFact: true,
+          missingRequiredFactIds: ["kb-1"],
+          required: true,
+        }),
+        candidate({
+          sectionId: "claim",
+          hasUnsafeClaim: true,
+          unsafeClaimCodes: ["MOQ"],
+          required: true,
+        }),
+        candidate({ sectionId: "done", status: "APPROVED", required: true }),
+        candidate({ sectionId: "returned", status: "CHANGES_REQUESTED", required: true }),
       ],
     });
     assert.deepEqual(plan.eligible.map((e) => e.sectionId), ["ok"]);
     assert.equal(plan.excluded.length, 6);
-    assert.equal(
-      plan.excluded.find((e) => e.sectionId === "qa")!.reason,
-      "BLOCKING_QA",
-    );
-    assert.equal(
-      plan.excluded.find((e) => e.sectionId === "fact")!.reason,
-      "REQUIRED_FACT",
-    );
-    assert.ok(plan.blockers.length > 0);
+    assert.equal(plan.counts.eligible, 1);
+    assert.equal(plan.counts.excluded, 6);
+    assert.equal(plan.counts.total, 7);
+
+    const qaSkip = plan.excluded.find((e) => e.sectionId === "qa")!;
+    assert.equal(qaSkip.reason, "BLOCKING_QA");
+    assert.deepEqual(qaSkip.qa, ["HEADING_HIERARCHY"]);
+
+    const factSkip = plan.excluded.find((e) => e.sectionId === "fact")!;
+    assert.equal(factSkip.reason, "REQUIRED_FACT");
+    assert.deepEqual(factSkip.requiredFact, ["kb-1"]);
+
+    const claimSkip = plan.excluded.find((e) => e.sectionId === "claim")!;
+    assert.equal(claimSkip.reason, "UNSAFE_CLAIM");
+    assert.deepEqual(claimSkip.unsafeClaim, ["MOQ"]);
   });
 
   it("14. Bulk approve rejects a stale Review", () => {
@@ -278,17 +303,20 @@ describe("Hotfix 13.5.2 — stale review & approval UX", () => {
     });
     assert.equal(plan.eligible.length, 0);
     assert.ok(plan.excluded.every((e) => e.reason === "STALE"));
+    assert.ok(plan.excluded.every((e) => e.stale === true));
   });
 
   it("15. Final approval disabled while sections pending", () => {
     const checklist = buildApprovalChecklist({
       ...cleanChecklistInput,
       requiredSectionsApproved: false,
-      pendingRequiredSections: 27,
+      pendingRequiredSections: 26,
+      pendingSections: 27,
+      totalSections: 27,
     });
     const sections = checklist.find((i) => i.id === "sections")!;
     assert.equal(sections.passed, false);
-    assert.equal(sections.detail, "27 đoạn bắt buộc chưa được duyệt");
+    assert.equal(sections.detail, "27/27 đoạn chưa duyệt · 26 bắt buộc còn chờ");
     assert.equal(checklist.every((i) => i.passed), false);
 
     const clean = buildApprovalChecklist(cleanChecklistInput);
@@ -307,7 +335,7 @@ describe("Hotfix 13.5.2 — stale review & approval UX", () => {
         code: "MISSING_REQUIRED_FACT",
         message: "MISSING_REQUIRED_FACT: Required fact not used: kb-1",
       },
-      ...Array.from({ length: 27 }, (_, i) => ({
+      ...Array.from({ length: 26 }, (_, i) => ({
         group: "SECTION_APPROVALS" as const,
         code: "SECTION_NOT_APPROVED",
         message: `Required section not approved: Đoạn ${i + 1}`,
@@ -315,16 +343,119 @@ describe("Hotfix 13.5.2 — stale review & approval UX", () => {
       })),
     ];
 
-    const groups = groupApprovalBlockers(blockers);
+    const groups = groupApprovalBlockers(blockers, {
+      pending: 27,
+      total: 27,
+      requiredPending: 26,
+    });
     assert.equal(groups.length, 3);
     const sectionGroup = groups.find((g) => g.group === "SECTION_APPROVALS")!;
     assert.equal(sectionGroup.collapsed, true);
-    assert.equal(sectionGroup.summary, "27 đoạn bắt buộc chưa được duyệt");
+    assert.equal(sectionGroup.summary, "27/27 đoạn chưa duyệt · 26 bắt buộc còn chờ");
     assert.equal(sectionGroup.items.length, 3);
     assert.equal(
       approvalToastMessage(groups),
       "Chưa đủ điều kiện phê duyệt. Xem 3 nhóm vấn đề cần xử lý.",
     );
+  });
+
+  it("25. UI eligibility mirrors API: 27 eligible / 0 excluded succeeds contract", () => {
+    const sections = Array.from({ length: 27 }, (_, i) =>
+      candidate({
+        sectionId: `sec_${i + 1}`,
+        heading: `Đoạn ${i + 1}`,
+        required: i < 26,
+        contentHash: `hash_${i + 1}`,
+      }),
+    );
+    const plan = selectBulkApprovableSections({ reviewIsStale: false, sections });
+    assert.equal(plan.counts.eligible, 27);
+    assert.equal(plan.counts.excluded, 0);
+    assert.equal(plan.counts.pending, 27);
+    assert.equal(plan.counts.requiredPending, 26);
+    assert.equal(plan.counts.optionalPending, 1);
+    // Contract: when eligible==27 and excluded==0 the write path must attempt all 27.
+    assert.equal(plan.eligible.length, 27);
+  });
+
+  it("26. One blocked section is skipped with structured diagnostics", () => {
+    const plan = selectBulkApprovableSections({
+      reviewIsStale: false,
+      sections: [
+        ...Array.from({ length: 26 }, (_, i) =>
+          candidate({ sectionId: `sec_${i + 1}`, required: true, contentHash: `h${i}` }),
+        ),
+        candidate({
+          sectionId: "sec_blocked",
+          heading: "Blocked",
+          required: true,
+          hasBlockingQaIssue: true,
+          qaCodes: ["UNKNOWN_FACT"],
+          contentHash: "h_blocked",
+        }),
+      ],
+    });
+    assert.equal(plan.counts.eligible, 26);
+    assert.equal(plan.counts.excluded, 1);
+    const skip = plan.excluded[0];
+    assert.equal(skip.sectionId, "sec_blocked");
+    assert.equal(skip.reason, "BLOCKING_QA");
+    assert.deepEqual(skip.qa, ["UNKNOWN_FACT"]);
+    assert.equal(skip.hash, "h_blocked");
+    assert.equal(skip.stale, false);
+  });
+
+  it("27. Required-fact and unsafe-claim blocks emit skip fields", () => {
+    const plan = selectBulkApprovableSections({
+      reviewIsStale: false,
+      sections: [
+        candidate({
+          sectionId: "fact",
+          hasUnresolvedRequiredFact: true,
+          missingRequiredFactIds: ["kb-abc"],
+          contentHash: "hf",
+        }),
+        candidate({
+          sectionId: "claim",
+          hasUnsafeClaim: true,
+          unsafeClaimCodes: ["LEAD_TIME"],
+          contentHash: "hc",
+        }),
+      ],
+    });
+    assert.equal(plan.eligible.length, 0);
+    assert.deepEqual(plan.excluded.find((e) => e.sectionId === "fact")!.requiredFact, ["kb-abc"]);
+    assert.deepEqual(plan.excluded.find((e) => e.sectionId === "claim")!.unsafeClaim, ["LEAD_TIME"]);
+  });
+
+  it("28. Banner/checklist/bulk share one pending/required count source", () => {
+    const sections = Array.from({ length: 27 }, (_, i) =>
+      candidate({ sectionId: `sec_${i + 1}`, required: i < 26 }),
+    );
+    const plan = selectBulkApprovableSections({ reviewIsStale: false, sections });
+    const checklist = buildApprovalChecklist({
+      ...cleanChecklistInput,
+      requiredSectionsApproved: false,
+      pendingSections: plan.counts.pending,
+      pendingRequiredSections: plan.counts.requiredPending,
+      totalSections: plan.counts.total,
+    });
+    const groups = groupApprovalBlockers(
+      Array.from({ length: plan.counts.requiredPending }, (_, i) => ({
+        group: "SECTION_APPROVALS" as const,
+        code: "SECTION_NOT_APPROVED",
+        message: `Required section not approved: ${i}`,
+        sectionId: `sec_${i + 1}`,
+      })),
+      plan.counts,
+    );
+    const detail = checklist.find((i) => i.id === "sections")!.detail!;
+    const summary = groups.find((g) => g.group === "SECTION_APPROVALS")!.summary;
+    assert.match(detail, /27\/27/);
+    assert.match(detail, /26 bắt buộc/);
+    assert.match(summary, /27\/27/);
+    assert.match(summary, /26 bắt buộc/);
+    assert.equal(plan.counts.eligible, 27);
   });
 
   it("17. No automatic Review approval", () => {
