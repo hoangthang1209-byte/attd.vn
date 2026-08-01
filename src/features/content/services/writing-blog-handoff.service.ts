@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { toSlug } from "@/lib/slug";
+import { normalizeBlogContent } from "@/features/blog/content-normalizer";
 import { revalidateBlogPaths } from "@/features/blog/revalidate";
 import { assignContentMedia } from "@/features/content/services/content-media-assignment.service";
 import { parseDraftJson, parsePlanJson } from "@/features/writing-engine/services/writing-engine.wiring";
@@ -45,8 +46,13 @@ const DEFAULT_FIELDS: Required<BlogHandoffFieldOptions> = {
 
 type FaqEntry = { question: string; answer: string };
 
+/**
+ * Handoff is the only writer of governed Blog content, so it is the choke
+ * point that guarantees the Blog never stores markdown: sanitize the approved
+ * draft HTML, then convert any markdown island the model left behind.
+ */
 function sanitizeBlogContent(html: string): string {
-  return sanitizeBlogHandoffHtml(html);
+  return normalizeBlogContent(sanitizeBlogHandoffHtml(html));
 }
 
 function serializeFaq(entries: FaqEntry[]): string {

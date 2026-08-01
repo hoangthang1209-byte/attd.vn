@@ -75,12 +75,12 @@ describe("IA-4C list workspace states", () => {
     assert.match(source, /AdminLoadingState/);
     assert.doesNotMatch(source, /<p>Đang tải…<\/p>/);
     assert.match(source, /useState\(true\)/);
-    assert.match(source, /Không có nội dung chờ kiểm duyệt/);
-    assert.match(source, /Không có nội dung phù hợp với bộ lọc hiện tại/);
+    assert.match(source, /Chưa có bài chờ kiểm duyệt/);
+    assert.match(source, /Không có bài phù hợp với bộ lọc hiện tại/);
     assert.match(source, /WorkspaceToolbarEnd/);
-    assert.match(source, /Refresh/);
-    assert.match(source, /Assigned to me/);
-    assert.match(source, /admin-table/);
+    assert.match(source, /Làm mới/);
+    assert.match(source, /Gán cho tôi/);
+    assert.match(source, /href=\{primaryHref\}/);
     assert.doesNotMatch(source, /Thêm |Tạo mới|create CTA/i);
   });
 
@@ -88,16 +88,16 @@ describe("IA-4C list workspace states", () => {
     const source = read("src/components/admin/content/ContentPublishingDashboardClient.tsx");
     assert.match(source, /AdminLoadingState/);
     assert.match(source, /allQueuesEmpty/);
-    assert.match(source, /Không có nội dung trong hàng đợi xuất bản/);
-    assert.match(source, /Ready \/ Draft governed/);
+    assert.match(source, /Chưa có bài trong hàng đợi xuất bản/);
+    assert.match(source, /title: "Ready"/);
     assert.match(source, /WorkspaceToolbarEnd/);
-    assert.match(source, /Refresh/);
+    assert.match(source, /Làm mới/);
     const globalEmptyIdx = indexOfOrThrow(
       source,
-      "Không có nội dung trong hàng đợi xuất bản",
+      "Chưa có bài trong hàng đợi xuất bản",
       "global empty",
     );
-    const queuesRenderIdx = indexOfOrThrow(source, 'list("Ready / Draft governed"', "queues");
+    const queuesRenderIdx = indexOfOrThrow(source, 'renderQueue("ready")', "queues");
     assert.ok(globalEmptyIdx < queuesRenderIdx);
   });
 

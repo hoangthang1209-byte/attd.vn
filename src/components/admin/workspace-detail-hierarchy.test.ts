@@ -52,8 +52,9 @@ describe("IA-4D detail workspace hierarchy", () => {
   it("content review preserves moderation actions, queue nav, and no global h1", () => {
     const source = read("src/components/admin/content/ContentReviewDetailClient.tsx");
     assert.doesNotMatch(source, /<h1\b/);
-    assert.match(source, /<h2 className="admin-page-title">Review \{session\.id\.slice\(0, 8\)\}…<\/h2>/);
-    assert.match(source, /AdminLoadingState/);
+    assert.match(source, /<AdminPageTitle title=\{reviewLabel\} \/>/);
+    // Sprint 13.6 replaced the page-level loader with panel skeletons.
+    assert.match(source, /PanelSkeleton/);
     assert.match(source, /EmptyState/);
     assert.match(source, /StatusBadge/);
     assert.match(source, /\/admin\/content\/reviews/);

@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import { AdminLoadingState, EmptyState, StatusBadge } from "@/components/admin/AdminUi";
+import { EmptyState, StatusBadge } from "@/components/admin/AdminUi";
+import ReviewActivityTimeline from "@/components/admin/content/ReviewActivityTimeline";
+import ReviewTraceabilityTimeline from "@/components/admin/content/ReviewTraceabilityTimeline";
+import PanelSkeleton from "@/components/ui/loading/PanelSkeleton";
 import { REVIEW_STATUS_LABELS } from "@/features/content/editorial/editorial-ux";
 import {
   BULK_APPROVE_EXCLUSION_LABELS,
@@ -263,7 +266,51 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
   );
   const groups = submitGroups ?? liveGroups;
 
-  if (loading) return <AdminLoadingState label="Đang tải kiểm duyệt…" rows={4} />;
+  // Panel-level skeletons keep the workspace frame visible while data arrives.
+  if (loading) {
+    return (
+      <div className="admin-panel">
+        <div className="admin-section-header" style={{ alignItems: "flex-start" }}>
+          <div>
+            <p className="admin-field-hint" style={{ margin: 0 }}>
+              <Link href="/admin/content/reviews">← Hàng đợi kiểm duyệt</Link>
+            </p>
+            <PanelSkeleton label="Đang tải phiên kiểm duyệt…" lines={2} />
+          </div>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.4fr) minmax(280px, 0.9fr)",
+            gap: 16,
+            alignItems: "start",
+          }}
+          className="content-review-detail-layout"
+        >
+          <div style={{ display: "grid", gap: 12 }}>
+            <section className="admin-sidebar-card" style={{ margin: 0 }}>
+              <h3 className="admin-sidebar-title">Draft</h3>
+              <PanelSkeleton label="Đang tải nội dung bản nháp…" lines={3} withTitle={false} block />
+            </section>
+            <section className="admin-sidebar-card" style={{ margin: 0 }}>
+              <h3 className="admin-sidebar-title">Outline</h3>
+              <PanelSkeleton label="Đang tải outline…" lines={4} withTitle={false} />
+            </section>
+          </div>
+          <div style={{ display: "grid", gap: 12 }}>
+            <section className="admin-sidebar-card" style={{ margin: 0 }}>
+              <h3 className="admin-sidebar-title">QA</h3>
+              <PanelSkeleton label="Đang tải QA…" lines={3} withTitle={false} />
+            </section>
+            <section className="admin-sidebar-card" style={{ margin: 0 }}>
+              <h3 className="admin-sidebar-title">Activity</h3>
+              <PanelSkeleton label="Đang tải hoạt động…" lines={3} withTitle={false} />
+            </section>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (loadError || !data || !readiness) {
     return (
       <EmptyState
@@ -676,6 +723,18 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
           </section>
 
           <section className="admin-sidebar-card" style={{ margin: 0 }}>
+            <h3 className="admin-sidebar-title">Traceability</h3>
+            <ReviewTraceabilityTimeline
+              draftId={session.writingDraftId}
+              draftVersion={session.writingDraftVersion}
+              reviewId={session.id}
+              reviewStatus={session.status}
+              handoffRecordId={handoff?.blog?.sourceHandoffRecordId ?? null}
+              blog={handoff?.blog ?? null}
+            />
+          </section>
+
+          <section className="admin-sidebar-card" style={{ margin: 0 }}>
             <h3 className="admin-sidebar-title">Metadata</h3>
             <p className="admin-field-hint" style={{ margin: 0 }}>
               Title: {String(metadata?.title ?? structured?.title ?? "—")}
@@ -785,14 +844,16 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
           <section className="admin-sidebar-card" style={{ margin: 0 }}>
             <h3 className="admin-sidebar-title">QA</h3>
             <p className="admin-field-hint">Điểm {readiness.score} · {openIssues.length} vấn đề mở</p>
-            <AdminLoadingButton
-              pending={pending}
-              size="small"
-              variant="secondary"
-              onClick={() => void post(`/api/content/reviews/${reviewId}/rerun-qa`)}
-            >
-              Chạy lại QA
-            </AdminLoadingButton>
+            {!approved && (
+              <AdminLoadingButton
+                pending={pending}
+                size="small"
+                variant="secondary"
+                onClick={() => void post(`/api/content/reviews/${reviewId}/rerun-qa`)}
+              >
+                Chạy lại QA
+              </AdminLoadingButton>
+            )}
             <ul style={{ fontSize: 13, paddingLeft: 16, marginTop: 8 }}>
               {session.issues.length === 0 ? (
                 <li className="admin-field-hint">Không có vấn đề QA.</li>
@@ -800,7 +861,7 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
                 session.issues.map((i) => (
                   <li key={i.id} style={{ marginBottom: 6 }}>
                     <strong>{i.severity}</strong> · {i.message}
-                    {i.status === "OPEN" ? (
+                    {i.status === "OPEN" && !approved ? (
                       <span style={{ marginLeft: 6, display: "inline-flex", gap: 4 }}>
                         <button
                           type="button"
@@ -832,7 +893,11 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
 
           <section className="admin-sidebar-card" style={{ margin: 0 }}>
             <h3 className="admin-sidebar-title">Review comments</h3>
-            {currentSection ? (
+            {approved ? (
+              <p className="admin-field-hint">
+                Phiên đã phê duyệt — chỉ xem. Ghi chú biên tập tiếp theo thực hiện trên Blog Draft.
+              </p>
+            ) : currentSection ? (
               <>
                 <p className="admin-field-hint">Đoạn: {currentSection.heading}</p>
                 <textarea
@@ -950,6 +1015,14 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
                   {handoff.ctaLabel}
                 </AdminLoadingButton>
               )}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                <a href="#review-activity" className="admin-btn admin-btn--secondary admin-btn--small">
+                  Xem lịch sử
+                </a>
+                <a href="#review-sections" className="admin-btn admin-btn--secondary admin-btn--small">
+                  Xem nội dung đã duyệt
+                </a>
+              </div>
               <p className="admin-field-hint" style={{ marginTop: 8 }}>
                 <Link href="/admin/content/publishing">Mở Publishing</Link>
               </p>
@@ -1043,17 +1116,7 @@ export default function ContentReviewDetailClient({ reviewId }: Props) {
 
           <section className="admin-sidebar-card" style={{ margin: 0 }} id="review-activity">
             <h3 className="admin-sidebar-title">Activity</h3>
-            <ul style={{ fontSize: 12, paddingLeft: 16, margin: 0 }}>
-              {(session.decisions ?? [])
-                .slice()
-                .reverse()
-                .map((d, i) => (
-                  <li key={`${d.createdAt}-${i}`}>
-                    {d.decisionType} · {new Date(d.createdAt).toLocaleString("vi-VN")}
-                    {d.note ? ` — ${d.note}` : ""}
-                  </li>
-                ))}
-            </ul>
+            <ReviewActivityTimeline decisions={session.decisions ?? []} />
           </section>
         </div>
       </div>

@@ -1,9 +1,10 @@
-import { countPotentialInternalLinks } from "@/features/blog/internal-links";
-import { renderBlogPreviewFromMarkdown } from "@/features/blog/preview-content";
-import { isHtmlContent } from "@/features/blog/markdown";
+import { analyzeBlogContent } from "@/features/blog/content-metrics";
 
+/**
+ * Canonical internal-link count: links the reader will actually see, i.e.
+ * links authored in the body plus the ones the public page auto-injects.
+ */
 export function internalLinkCount(content: string): number {
   if (!content.trim()) return 0;
-  const html = isHtmlContent(content) ? content : renderBlogPreviewFromMarkdown(content);
-  return countPotentialInternalLinks(html);
+  return analyzeBlogContent({ content }).internalLinks.total;
 }

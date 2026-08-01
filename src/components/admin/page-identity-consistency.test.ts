@@ -29,25 +29,25 @@ describe("IA-3B page identity consistency", () => {
     const source = read("src/components/admin/content/ContentReviewsClient.tsx");
     assert.doesNotMatch(source, /<h1[^>]*>\s*Kiểm duyệt nội dung\s*<\/h1>/);
     assert.doesNotMatch(source, /admin-page-title/);
-    assert.match(source, /Assigned to me/);
-    assert.match(source, /Refresh/);
-    assert.match(source, /admin-table/);
+    assert.match(source, /Gán cho tôi/);
+    assert.match(source, /Làm mới/);
+    assert.match(source, /href=\{primaryHref\}/);
   });
 
   it("content publishing does not render duplicate page identity", () => {
     const source = read("src/components/admin/content/ContentPublishingDashboardClient.tsx");
     assert.doesNotMatch(source, /<h1[^>]*>\s*Xuất bản nội dung\s*<\/h1>/);
     assert.doesNotMatch(source, /admin-page-title/);
-    assert.match(source, /Refresh/);
-    assert.match(source, /Ready \/ Draft governed/);
-    assert.match(source, /Scheduled/);
+    assert.match(source, /Làm mới/);
+    assert.match(source, /title: "Ready"/);
+    assert.match(source, /title: "Scheduled"/);
   });
 
-  it("content review detail retains entity/workflow identity as non-page h1", () => {
+  it("content review detail delegates page identity to the admin shell", () => {
     const source = read("src/components/admin/content/ContentReviewDetailClient.tsx");
     assert.doesNotMatch(source, /<h1\b/);
-    assert.match(source, /<h2 className="admin-page-title">Review \{session\.id\.slice\(0, 8\)\}…<\/h2>/);
-    assert.match(source, /Status:/);
+    assert.match(source, /<AdminPageTitle title=\{reviewLabel\} \/>/);
+    assert.match(source, /<StatusBadge tone=\{reviewStatusTone\(session\.status\)\}>/);
     assert.match(source, /AdminLoadingButton|post\(/);
   });
 

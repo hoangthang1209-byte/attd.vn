@@ -72,9 +72,9 @@ describe("IA-4A workspace toolbar foundation", () => {
     const reviews = read("src/components/admin/content/ContentReviewsClient.tsx");
     const publishing = read("src/components/admin/content/ContentPublishingDashboardClient.tsx");
     assert.match(reviews, /WorkspaceToolbarEnd/);
-    assert.match(reviews, /Refresh/);
+    assert.match(reviews, /Làm mới/);
     assert.match(publishing, /WorkspaceToolbarEnd/);
-    assert.match(publishing, /Refresh/);
+    assert.match(publishing, /Làm mới/);
   });
 
   it("does not alter navigation, breadcrumbs, AdminShell, or globals.css in this sprint", () => {

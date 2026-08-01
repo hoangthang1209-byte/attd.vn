@@ -2,6 +2,10 @@ import {
   addHeadingIds,
   type TocHeading,
 } from "@/features/blog/content-processor";
+import {
+  hasMarkdownLeak,
+  normalizeMarkdownIslands,
+} from "@/features/blog/content-normalizer";
 import { applyInternalLinks } from "@/features/blog/internal-links";
 
 export type ProcessedBlogContent = {
@@ -15,7 +19,9 @@ export function prepareBlogArticleContent(content: string | null | undefined): P
     return { html: "", headings: [], internalLinkCount: 0 };
   }
 
-  const withIds = addHeadingIds(content);
+  // Legacy rows may still hold markdown; never render it as literal text.
+  const html = hasMarkdownLeak(content) ? normalizeMarkdownIslands(content) : content;
+  const withIds = addHeadingIds(html);
   const linked = applyInternalLinks(withIds.html, 5);
 
   return {

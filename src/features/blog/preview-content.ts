@@ -1,17 +1,11 @@
-import { isHtmlContent } from "@/features/blog/markdown";
-import { processSeoBlocksInMarkdown } from "@/features/blog/seo-blocks";
-import { markdownToHtml } from "@/features/blog/markdown";
-import { sanitizeBlogHtml } from "@/features/blog/sanitize-html";
+import { normalizeBlogContent } from "@/features/blog/content-normalizer";
 import { prepareBlogArticleContent } from "@/features/blog/prepare-content";
 
+/**
+ * The admin preview must show exactly what the public page renders, so it runs
+ * the same normalize → heading ids → internal links pipeline.
+ */
 export function renderBlogPreviewFromMarkdown(markdown: string): string {
   if (!markdown.trim()) return "";
-
-  if (isHtmlContent(markdown)) {
-    return prepareBlogArticleContent(sanitizeBlogHtml(markdown)).html;
-  }
-
-  const withBlocks = processSeoBlocksInMarkdown(markdown);
-  const html = sanitizeBlogHtml(markdownToHtml(withBlocks));
-  return prepareBlogArticleContent(html).html;
+  return prepareBlogArticleContent(normalizeBlogContent(markdown)).html;
 }

@@ -103,12 +103,12 @@ describe("IA-4E dashboard workspace hierarchy", () => {
     assert.doesNotMatch(source, /<h1\b/);
     assert.match(source, /AdminPageTitle/);
     assert.match(source, /EmptyState/);
-    assert.match(source, /Thử lại/);
-    assert.match(source, /admin-catalog-kpi-bar/);
+    assert.match(source, /Tải lại/);
+    assert.match(source, /admin-catalog-kpi/);
     assert.match(source, /auto-fit, minmax\(260px/);
     assert.doesNotMatch(source, /gridTemplateColumns: "1fr 1fr"/);
-    const actionsIdx = indexOfOrThrow(source, "Chiến lược SEO", "actions");
-    const kpiIdx = indexOfOrThrow(source, "admin-catalog-kpi-bar", "kpi");
+    const actionsIdx = indexOfOrThrow(source, "Lịch biên tập", "actions");
+    const kpiIdx = indexOfOrThrow(source, "admin-catalog-kpi", "kpi");
     assert.ok(actionsIdx < kpiIdx, "secondary nav actions should precede KPI metrics");
   });
 
@@ -117,9 +117,9 @@ describe("IA-4E dashboard workspace hierarchy", () => {
     assert.doesNotMatch(source, /<h1\b/);
     assert.match(source, /AdminLoadingState/);
     assert.match(source, /EmptyState/);
-    assert.match(source, /Không có mục trong hàng đợi/);
-    assert.match(source, /Không có nội dung trong hàng đợi xuất bản/);
-    assert.match(source, /Ready \/ Draft governed/);
+    assert.match(source, /Không có mục trong hàng đợi này/);
+    assert.match(source, /Chưa có bài trong hàng đợi xuất bản/);
+    assert.match(source, /title: "Ready"/);
     assert.doesNotMatch(source, />Trống</);
   });
 

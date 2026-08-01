@@ -49,6 +49,9 @@ function nodeToMarkdown(node: Node): string {
       const alt = el.getAttribute("alt") ?? "Ảnh minh họa";
       return `![${alt}](${src})\n\n`;
     }
+    case "figure":
+      // Markdown cannot express `data-media-id`, so keep the element verbatim.
+      return `\n${el.outerHTML}\n\n`;
     case "pre":
       return `\n\`\`\`\n${el.textContent?.trim() ?? ""}\n\`\`\`\n\n`;
     case "code":
@@ -128,17 +131,34 @@ function faqBlockToMarkdown(el: HTMLElement): string {
   return `\n:::faq\n${body}\n:::\n\n`;
 }
 
+/**
+ * Server-side path (no DOMParser). Blocks that markdown cannot express are
+ * parked verbatim so links, tables and media references survive the trip.
+ */
 function htmlFallbackToMarkdown(html: string): string {
+  const parked: string[] = [];
+  const park = (block: string) => {
+    parked.push(block);
+    return `\u0000PARKED${parked.length - 1}\u0000`;
+  };
+
   return html
+    .replace(/<(figure|table|section|aside)\b[\s\S]*?<\/\1>/gi, (block) => park(block))
     .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n# $1\n\n")
     .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n\n")
     .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, "\n### $1\n\n")
+    .replace(/<h4[^>]*>([\s\S]*?)<\/h4>/gi, "\n#### $1\n\n")
+    .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "- $1\n")
+    .replace(/<img[^>]*?alt=["']([^"']*)["'][^>]*?src=["']([^"']*)["'][^>]*>/gi, "![$1]($2)")
+    .replace(/<img[^>]*?src=["']([^"']*)["'][^>]*>/gi, "![Ảnh minh họa]($1)")
+    .replace(/<a[^>]*?href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, "[$2]($1)")
     .replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, "**$1**")
     .replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, "**$1**")
     .replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, "*$1*")
     .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, "$1\n\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, "")
+    .replace(/\u0000PARKED(\d+)\u0000/g, (_, index: string) => `\n${parked[Number(index)]}\n`)
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

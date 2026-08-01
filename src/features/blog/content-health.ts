@@ -1,5 +1,5 @@
-import { countH2InContent, countWordsInContent } from "@/features/blog/word-count";
-import { internalLinkCount } from "@/features/blog/seo-score-utils";
+import { READINESS_THRESHOLDS, formatThreshold } from "@/features/blog/blog-readiness";
+import { analyzeBlogContent } from "@/features/blog/content-metrics";
 import type { BlogFaqItem } from "@/features/blog/types";
 
 export type ContentHealthMetric = {
@@ -7,43 +7,44 @@ export type ContentHealthMetric = {
   value: number;
   ok: boolean;
   target?: number;
+  /** Pre-formatted "X / Recommended Y" so every surface reads identically. */
+  display: string;
 };
 
 export type ContentHealthResult = {
   metrics: ContentHealthMetric[];
 };
 
-function countMarkdownImages(content: string): number {
-  const markdownImages = content.match(/!\[[^\]]*]\([^)]+\)/g) ?? [];
-  const htmlImages = content.match(/<img[\s>]/gi) ?? [];
-  return markdownImages.length + htmlImages.length;
-}
-
-function countInlineFaqs(content: string): number {
-  return (content.match(/:::faq[\s\S]*?:::/g) ?? []).length;
-}
-
+/** Adapter over the canonical content analyzer — no separate counting rules. */
 export function calculateContentHealth(
   content: string,
   faqJson: BlogFaqItem[],
   tags: string[]
 ): ContentHealthResult {
-  const words = countWordsInContent(content);
-  const h2 = countH2InContent(content);
-  const images = countMarkdownImages(content);
-  const links = internalLinkCount(content);
-  const faqs = countInlineFaqs(content) + faqJson.filter((item) => item.question && item.answer).length;
+  const metrics = analyzeBlogContent({ content, faqJson });
   const tagCount = tags.filter(Boolean).length;
 
+  const rows: Array<{ label: string; value: number; threshold: { required: number; recommended: number } }> = [
+    { label: "Words", value: metrics.wordCount, threshold: READINESS_THRESHOLDS.wordCount },
+    { label: "H2", value: metrics.h2Count, threshold: READINESS_THRESHOLDS.h2Count },
+    { label: "Body Images", value: metrics.bodyImages, threshold: READINESS_THRESHOLDS.bodyImages },
+    {
+      label: "Internal Links",
+      value: metrics.internalLinks.total,
+      threshold: READINESS_THRESHOLDS.internalLinks,
+    },
+    { label: "FAQs", value: metrics.faq.total, threshold: READINESS_THRESHOLDS.faq },
+    { label: "Tags", value: tagCount, threshold: READINESS_THRESHOLDS.tags },
+  ];
+
   return {
-    metrics: [
-      { label: "Words", value: words, ok: words >= 1200, target: 1200 },
-      { label: "H2", value: h2, ok: h2 >= 3, target: 3 },
-      { label: "Images", value: images, ok: images >= 1, target: 1 },
-      { label: "Internal Links", value: links, ok: links >= 3, target: 3 },
-      { label: "FAQs", value: faqs, ok: faqs >= 1, target: 1 },
-      { label: "Tags", value: tagCount, ok: tagCount >= 1, target: 1 },
-    ],
+    metrics: rows.map((row) => ({
+      label: row.label,
+      value: row.value,
+      ok: row.value >= row.threshold.recommended,
+      target: row.threshold.recommended,
+      display: formatThreshold(row.value, row.threshold),
+    })),
   };
 }
 
@@ -52,12 +53,12 @@ export type PublishReadiness = {
   label: string;
 };
 
+/**
+ * Content-quality label for a 0–100 score. It intentionally says nothing about
+ * publishing: Publishing Readiness comes only from `evaluateBlogReadiness`.
+ */
 export function getPublishReadiness(score: number): PublishReadiness {
-  if (score >= 90) {
-    return { level: "green", label: "Sẵn sàng xuất bản" };
-  }
-  if (score >= 60) {
-    return { level: "yellow", label: "Gần hoàn thiện" };
-  }
+  if (score >= 90) return { level: "green", label: "Chất lượng tốt" };
+  if (score >= 60) return { level: "yellow", label: "Gần hoàn thiện" };
   return { level: "red", label: "Cần bổ sung" };
 }

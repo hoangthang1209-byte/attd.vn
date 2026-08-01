@@ -1,5 +1,11 @@
+import { normalizeMarkdownIslands } from "@/features/blog/content-normalizer";
 import type { WritingStructuredDraft } from "@/features/writing-engine/writing-engine.types";
 import { stripUnsafeHtml } from "@/features/writing-engine/writing-utils";
+
+/** Section bodies come from a model: convert any markdown it emitted to HTML. */
+function renderSectionBody(html: string): string {
+  return stripUnsafeHtml(normalizeMarkdownIslands(html));
+}
 
 export function renderWritingDraftHtml(draft: WritingStructuredDraft): string {
   const parts: string[] = [];
@@ -8,14 +14,14 @@ export function renderWritingDraftHtml(draft: WritingStructuredDraft): string {
   for (const section of draft.sections) {
     const level = Math.min(3, 2);
     parts.push(`<h${level}>${escapeHtml(section.heading)}</h${level}>`);
-    parts.push(stripUnsafeHtml(section.html));
+    parts.push(renderSectionBody(section.html));
   }
 
   if (draft.faq.length > 0) {
     parts.push("<h2>Câu hỏi thường gặp</h2>");
     for (const item of draft.faq) {
       parts.push(`<h3>${escapeHtml(item.question)}</h3>`);
-      parts.push(stripUnsafeHtml(item.answerHtml));
+      parts.push(renderSectionBody(item.answerHtml));
     }
   }
 

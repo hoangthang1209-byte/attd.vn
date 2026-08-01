@@ -151,11 +151,14 @@ export function extractStructuredDraft(raw: unknown): WritingStructuredDraft | n
   return raw as WritingStructuredDraft;
 }
 
-/** Sanitize approved HTML before Blog handoff (no publish). */
+/**
+ * Sanitize approved HTML before Blog handoff (no publish).
+ * The H1 element is dropped whole — the Blog renders its own title, and
+ * keeping the inner text would leave an orphan line above the article.
+ */
 export function sanitizeBlogHandoffHtml(html: string): string {
-  let out = sanitizeWritingSectionHtml(html);
-  out = out.replace(/<h1[\s\S]*?<\/h1>/gi, "");
-  return out.trim();
+  const withoutTitle = html.replace(/<h1\b[\s\S]*?<\/h1>/gi, "");
+  return sanitizeWritingSectionHtml(withoutTitle).trim();
 }
 
 export type BlogHandoffFieldOptions = {

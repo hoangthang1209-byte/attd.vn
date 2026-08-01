@@ -190,7 +190,7 @@ export default function BlogVisualModeEditor({ value, onChange }: BlogVisualMode
       />
 
       <div className="admin-visual-mode-toolbar">
-        <BlogQuickInsert onInsert={insertSnippet} />
+        <BlogQuickInsert onInsert={insertSnippet} compact />
         <div className="admin-visual-mode-toolbar-actions">
           <BlogSeoTemplatePicker onSelect={insertTemplate} />
           <button
@@ -265,7 +265,7 @@ export default function BlogVisualModeEditor({ value, onChange }: BlogVisualMode
               {selectedBlock && (
                 <div className="admin-block-edit">
                   <label className="admin-label">
-                    Chỉnh sửa [{selectedBlock.label}] — {selectedBlock.preview}
+                    Chỉnh sửa {selectedBlock.label} — {selectedBlock.preview}
                   </label>
                   <textarea
                     className="admin-textarea admin-block-edit-textarea"

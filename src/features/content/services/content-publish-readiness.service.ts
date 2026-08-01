@@ -1,6 +1,8 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { buildContentQualityWarnings } from "@/features/blog/blog-readiness";
+import type { BlogFaqItem } from "@/features/blog/types";
 import {
   emptyPublishChecks,
   hashBlogPublicContent,
@@ -132,6 +134,16 @@ export async function getContentPublishReadiness(
   const linkErrors = validatePublicContentLinks(post.content);
   checks.internalLinksValid = linkErrors.length === 0;
   errors.push(...linkErrors);
+
+  // Content-quality signals come from the same evaluator the editor renders,
+  // so the API and the workspace never disagree on a number.
+  warnings.push(
+    ...buildContentQualityWarnings({
+      content: post.content ?? "",
+      faqJson: Array.isArray(post.faqJson) ? (post.faqJson as BlogFaqItem[]) : [],
+      tags: Array.isArray(post.tags) ? (post.tags as string[]) : [],
+    })
+  );
 
   if (!post.ogImageUrl && !post.featuredImageUrl) {
     // Featured is enforced as blocker via media readiness; OG remains a warning when featured exists.
