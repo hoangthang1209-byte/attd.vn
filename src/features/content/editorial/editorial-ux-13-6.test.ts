@@ -55,8 +55,9 @@ describe("Sprint 13.6 — editorial UX production polish", () => {
   it("4. keeps the SEO sidebar sticky while editing", () => {
     assert.match(GLOBAL_CSS, /\.blog-workspace-sidebar\s*\{[^}]*position:\s*sticky/);
     assert.match(EDITOR, /blog-workspace-sidebar/);
-    assert.match(READINESS_SIDEBAR, /Publishing Readiness/);
-    assert.match(READINESS_SIDEBAR, /SEO Score/);
+    // Sprint 14.0 folded the three sidebar cards into one status card.
+    assert.match(READINESS_SIDEBAR, /readiness\.statusLabel/);
+    assert.match(READINESS_SIDEBAR, /SEO \{readiness\.quality\.score\}/);
     assert.match(READINESS_SIDEBAR, /Metadata/);
   });
 
@@ -80,9 +81,10 @@ describe("Sprint 13.6 — editorial UX production polish", () => {
     assert.match(GLOBAL_CSS, /\.blog-workspace-section--ai/);
   });
 
-  it("8. separates Featured Image, Body Images and Media References", () => {
-    assert.match(EDITOR, /Featured Image/);
-    assert.match(EDITOR, /Body Images hiện có/);
+  it("8. separates cover, in-content and advanced media", () => {
+    // Sprint 14.0 renamed these to Cover / In-content / Advanced.
+    assert.match(EDITOR, /Cover Image/);
+    assert.match(EDITOR, /In-content Images/);
     assert.match(EDITOR, /Media References/);
   });
 

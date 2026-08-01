@@ -13,9 +13,15 @@ import {
 type BlogEditorComposerProps = {
   value: string;
   onChange: (value: string) => void;
+  /** Focus mode strips the editor down to the writing surface. */
+  focusMode?: boolean;
 };
 
-export default function BlogEditorComposer({ value, onChange }: BlogEditorComposerProps) {
+export default function BlogEditorComposer({
+  value,
+  onChange,
+  focusMode = false,
+}: BlogEditorComposerProps) {
   const [mode, setMode] = useState<BlogEditorMode>("visual");
 
   useEffect(() => {
@@ -36,7 +42,7 @@ export default function BlogEditorComposer({ value, onChange }: BlogEditorCompos
       {mode === "markdown" ? (
         <BlogMarkdownEditor value={value} onChange={onChange} />
       ) : (
-        <BlogVisualModeEditor value={value} onChange={onChange} />
+        <BlogVisualModeEditor value={value} onChange={onChange} focusMode={focusMode} />
       )}
     </div>
   );

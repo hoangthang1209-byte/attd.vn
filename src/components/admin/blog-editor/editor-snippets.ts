@@ -21,20 +21,6 @@ export const QUICK_INSERT_SNIPPETS: EditorSnippet[] = [
   },
 ];
 
-export const SLASH_COMMANDS: EditorSnippet[] = [
-  { id: "slash-h2", label: "/h2", snippet: "## Tiêu đề\n\n" },
-  { id: "slash-h3", label: "/h3", snippet: "### Tiêu đề\n\n" },
-  { id: "slash-image", label: "/image", snippet: "![Mô tả ảnh](image-url)\n\n" },
-  { id: "slash-faq", label: "/faq", snippet: `${FAQ_BLOCK_SNIPPET}\n\n` },
-  { id: "slash-cta", label: "/cta", snippet: `${CTA_BLOCK_SNIPPET}\n\n` },
-  {
-    id: "slash-table",
-    label: "/table",
-    snippet: "| Cột 1 | Cột 2 |\n| --- | --- |\n| Giá trị | Giá trị |\n\n",
-  },
-  { id: "slash-list", label: "/list", snippet: "- Mục 1\n- Mục 2\n\n" },
-];
-
 export const EDITOR_SNIPPETS: EditorSnippet[] = [
   { id: "h1", label: "H1", snippet: "# Tiêu đề\n\n" },
   { id: "h2", label: "H2", snippet: "## Tiêu đề\n\n" },

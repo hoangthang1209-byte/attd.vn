@@ -9,6 +9,7 @@ import BlogOnboardingGuide from "@/components/admin/blog-editor/BlogOnboardingGu
 import BlogQuickInsert from "@/components/admin/blog-editor/BlogQuickInsert";
 import BlogSeoTemplatePicker from "@/components/admin/blog-editor/BlogSeoTemplatePicker";
 import BlogSlashMenu from "@/components/admin/blog-editor/BlogSlashMenu";
+import { filterEditorCommands } from "@/components/admin/blog-editor/editor-commands";
 import {
   insertSnippetIntoMarkdown,
   replaceContentWithConfirmation,
@@ -28,17 +29,23 @@ import {
 type BlogVisualModeEditorProps = {
   value: string;
   onChange: (value: string) => void;
+  focusMode?: boolean;
 };
 
 type MobileTab = "edit" | "preview";
 
-export default function BlogVisualModeEditor({ value, onChange }: BlogVisualModeEditorProps) {
+export default function BlogVisualModeEditor({
+  value,
+  onChange,
+  focusMode = false,
+}: BlogVisualModeEditorProps) {
   const blocks = useMemo(() => parseMarkdownBlocks(value), [value]);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [blockDraft, setBlockDraft] = useState("");
   const [mobileTab, setMobileTab] = useState<MobileTab>("edit");
   const [appendDraft, setAppendDraft] = useState("");
   const [slashFilter, setSlashFilter] = useState<string | null>(null);
+  const [slashCursor, setSlashCursor] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -113,9 +120,53 @@ export default function BlogVisualModeEditor({ value, onChange }: BlogVisualMode
       }
       setAppendDraft("");
       setSlashFilter(null);
+      setSlashCursor(0);
       appendRef.current?.focus();
     },
     [appendDraft, insertSnippet]
+  );
+
+  const slashOpen = slashFilter !== null;
+  const slashMatches = useMemo(
+    () => (slashOpen ? filterEditorCommands(slashFilter ?? "") : []),
+    [slashFilter, slashOpen]
+  );
+
+  const handleAppendKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (slashOpen && slashMatches.length > 0) {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          setSlashCursor((index) => Math.min(index + 1, slashMatches.length - 1));
+          return;
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          setSlashCursor((index) => Math.max(index - 1, 0));
+          return;
+        }
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          const command = slashMatches[Math.min(slashCursor, slashMatches.length - 1)];
+          if (command) handleSlashSelect(command.snippet);
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          setSlashFilter(null);
+          setSlashCursor(0);
+          return;
+        }
+      }
+
+      // Shift+Enter keeps the textarea's soft line break; plain Enter commits.
+      if (event.key === "Enter" && !event.shiftKey && !slashOpen) {
+        event.preventDefault();
+        handleAppendCommit();
+      }
+    },
+    [handleAppendCommit, handleSlashSelect, slashCursor, slashMatches, slashOpen]
   );
 
   const handleImageFiles = useCallback(
@@ -189,27 +240,29 @@ export default function BlogVisualModeEditor({ value, onChange }: BlogVisualMode
         aria-hidden
       />
 
-      <div className="admin-visual-mode-toolbar">
-        <BlogQuickInsert onInsert={insertSnippet} compact />
-        <div className="admin-visual-mode-toolbar-actions">
-          <BlogSeoTemplatePicker onSelect={insertTemplate} />
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary"
-            onClick={insertSeoStarter}
-          >
-            Insert SEO Template
-          </button>
-          <AdminLoadingButton
-            variant="secondary"
-            pending={uploading}
-            pendingLabel="Đang tải ảnh…"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Upload ảnh
-          </AdminLoadingButton>
+      {!focusMode && (
+        <div className="admin-visual-mode-toolbar">
+          <BlogQuickInsert onInsert={insertSnippet} compact />
+          <div className="admin-visual-mode-toolbar-actions">
+            <BlogSeoTemplatePicker onSelect={insertTemplate} />
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary"
+              onClick={insertSeoStarter}
+            >
+              Insert SEO Template
+            </button>
+            <AdminLoadingButton
+              variant="secondary"
+              pending={uploading}
+              pendingLabel="Đang tải ảnh…"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload ảnh
+            </AdminLoadingButton>
+          </div>
         </div>
-      </div>
+      )}
 
       <input
         ref={fileInputRef}
@@ -256,11 +309,13 @@ export default function BlogVisualModeEditor({ value, onChange }: BlogVisualMode
             <BlogOnboardingGuide />
           ) : (
             <>
-              <BlogBlockAssistant
-                blocks={blocks}
-                selectedBlockId={selectedBlockId}
-                onSelect={handleBlockSelect}
-              />
+              {!focusMode && (
+                <BlogBlockAssistant
+                  blocks={blocks}
+                  selectedBlockId={selectedBlockId}
+                  onSelect={handleBlockSelect}
+                />
+              )}
 
               {selectedBlock && (
                 <div className="admin-block-edit">
@@ -297,16 +352,16 @@ export default function BlogVisualModeEditor({ value, onChange }: BlogVisualMode
                   setAppendDraft(next);
                   const slashMatch = next.match(/\/([^\s]*)$/);
                   setSlashFilter(slashMatch ? slashMatch[1] : null);
+                  setSlashCursor(0);
                 }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && slashFilter === null) {
-                    event.preventDefault();
-                    handleAppendCommit();
-                  }
-                }}
+                onKeyDown={handleAppendKeyDown}
               />
               {slashFilter !== null && (
-                <BlogSlashMenu filter={slashFilter} onSelect={handleSlashSelect} />
+                <BlogSlashMenu
+                  filter={slashFilter}
+                  activeIndex={slashCursor}
+                  onSelect={handleSlashSelect}
+                />
               )}
             </div>
             <button type="button" className="admin-btn admin-btn--secondary" onClick={handleAppendCommit}>

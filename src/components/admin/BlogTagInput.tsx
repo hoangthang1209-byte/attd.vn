@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { tagToSlug } from "@/features/blog/content-processor";
 import { normalizeBlogTags, parseTagDraft } from "@/features/blog/tags";
 
@@ -9,12 +9,24 @@ type BlogTagInputProps = {
   onChange: (tags: string[]) => void;
 };
 
+/** Tags above this count collapse behind a search box instead of a chip wall. */
+const COLLAPSE_THRESHOLD = 6;
+
 export default function BlogTagInput({ tags, onChange }: BlogTagInputProps) {
   const [draft, setDraft] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const collapsed = tags.length > COLLAPSE_THRESHOLD && !expanded;
+  const visible = useMemo(() => {
+    if (collapsed) return [];
+    const needle = search.trim().toLowerCase();
+    if (!needle) return tags;
+    return tags.filter((tag) => tag.toLowerCase().includes(needle));
+  }, [collapsed, search, tags]);
 
   function addTags(raw: string) {
-    const next = normalizeBlogTags([...tags, ...parseTagDraft(raw)]);
-    onChange(next);
+    onChange(normalizeBlogTags([...tags, ...parseTagDraft(raw)]));
     setDraft("");
   }
 
@@ -34,27 +46,54 @@ export default function BlogTagInput({ tags, onChange }: BlogTagInputProps) {
 
   return (
     <div className="admin-tag-input">
-      <div className="admin-tag-chip-list">
-        {tags.map((tag) => (
-          <span key={tag} className="admin-tag-chip">
-            #{tagToSlug(tag)}
-            <button type="button" onClick={() => removeTag(tag)} aria-label={`Xóa ${tag}`}>
-              ×
-            </button>
-          </span>
-        ))}
-        <input
-          className="admin-tag-chip-input"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => {
-            if (draft.trim()) addTags(draft);
-          }}
-          placeholder={tags.length === 0 ? "nguon hang, ao thun tron, OEM" : "Thêm tag..."}
-        />
-      </div>
-      <p className="admin-field-hint">Nhấn Enter hoặc dấu phẩy để thêm tag.</p>
+      {tags.length > COLLAPSE_THRESHOLD && (
+        <div className="admin-tag-input__bar">
+          <button
+            type="button"
+            className="admin-tag-input__toggle"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {tags.length} Tags <span aria-hidden="true">{expanded ? "▾" : "▸"}</span>
+          </button>
+          {expanded && (
+            <input
+              className="admin-input admin-input--small"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Tìm tag…"
+              aria-label="Tìm trong tags"
+            />
+          )}
+        </div>
+      )}
+
+      {!collapsed && (
+        <div className="admin-tag-chip-list">
+          {visible.map((tag) => (
+            <span key={tag} className="admin-tag-chip">
+              #{tagToSlug(tag)}
+              <button type="button" onClick={() => removeTag(tag)} aria-label={`Xóa ${tag}`}>
+                ×
+              </button>
+            </span>
+          ))}
+          <input
+            className="admin-tag-chip-input"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => {
+              if (draft.trim()) addTags(draft);
+            }}
+            placeholder={tags.length === 0 ? "nguon hang, ao thun tron, OEM" : "Thêm tag..."}
+          />
+        </div>
+      )}
+
+      {!collapsed && (
+        <p className="admin-field-hint">Nhấn Enter hoặc dấu phẩy để thêm tag.</p>
+      )}
     </div>
   );
 }

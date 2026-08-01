@@ -309,6 +309,20 @@
   display: none;
 }
 
+/*
+ * Focus Mode (blog editor) hides the shell chrome so only the writing surface
+ * remains. The flag is set on <body> by the editor and cleared on exit.
+ */
+:global(body[data-editor-focus="on"]) .sidebar,
+:global(body[data-editor-focus="on"]) .header {
+  display: none;
+}
+
+:global(body[data-editor-focus="on"]) .content {
+  max-width: none;
+  padding: 32px 24px 48px;
+}
+
 @media (max-width: 900px) {
   .shell {
     display: block;

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { BlogPostStatus } from "@prisma/client";
@@ -12,15 +12,23 @@ import BlogSeoPanel from "@/components/admin/BlogSeoPanel";
 import BlogTagInput from "@/components/admin/BlogTagInput";
 import BlogClusterGenerator from "@/components/admin/BlogClusterGenerator";
 import AiContentFactory from "@/components/admin/blog-editor/AiContentFactory";
+import BlogCategorySelector from "@/components/admin/blog-editor/BlogCategorySelector";
+import BlogCommandPalette, {
+  type PaletteCommand,
+} from "@/components/admin/blog-editor/BlogCommandPalette";
 import BlogMediaWorkspace from "@/components/admin/blog-editor/BlogMediaWorkspace";
 import BlogReadinessSidebar from "@/components/admin/blog-editor/BlogReadinessSidebar";
+import BlogSaveStatus, { type SaveState } from "@/components/admin/blog-editor/BlogSaveStatus";
 import BlogTraceabilityTimeline from "@/components/admin/blog-editor/BlogTraceabilityTimeline";
 import BlogWorkspaceTabs, {
   WorkspaceSection,
   WorkspaceTabPanel,
   type WorkspaceTab,
 } from "@/components/admin/blog-editor/BlogWorkspaceTabs";
+import { EDITOR_COMMANDS } from "@/components/admin/blog-editor/editor-commands";
 import { useBlogReadiness } from "@/components/admin/blog-editor/useBlogReadiness";
+import { useEditorFocusMode } from "@/components/admin/blog-editor/useEditorFocusMode";
+import { useEditorShortcuts } from "@/components/admin/blog-editor/useEditorShortcuts";
 import type { ClusterArticle } from "@/features/blog/content-clusters";
 import type { ClusterType } from "@/features/blog/content-clusters-types";
 import { clusterArticleToHandoff, type ClusterHandoffRequest } from "@/features/blog/cluster-handoff";
@@ -55,20 +63,17 @@ type Props =
 
 type WorkspaceTabId = "editor" | "seo" | "publishing" | "ai" | "traceability";
 
+const TAB_LABELS: Array<{ id: WorkspaceTabId; label: string }> = [
+  { id: "editor", label: "Editor" },
+  { id: "seo", label: "SEO" },
+  { id: "publishing", label: "Publishing" },
+  { id: "ai", label: "AI Assistant" },
+  { id: "traceability", label: "Traceability" },
+];
+
 function toMediaValue(url: string | null): MediaPickerValue | null {
   if (!url) return null;
   return { id: url, url, filename: url.split("/").pop() ?? "image" };
-}
-
-function formatUpdatedAt(iso: string): string {
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(iso));
 }
 
 function statusBadgeClass(status: BlogPostStatus): string {
@@ -128,6 +133,8 @@ export default function BlogPostEditor(props: Props) {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(initial?.updatedAt ?? null);
   const [aiRecommendations, setAiRecommendations] = useState<SeoRecommendations | null>(null);
@@ -135,9 +142,10 @@ export default function BlogPostEditor(props: Props) {
   const factorySectionRef = useRef<HTMLDivElement>(null);
   const [clusterHandoff, setClusterHandoff] = useState<ClusterHandoffRequest | null>(null);
   const [aiMetadata, setAiMetadata] = useState<AiGenerationMetadata | null>(null);
-  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
-    null
-  );
+  const [notice, setNotice] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  const { focus: focusMode, setFocus, toggle: toggleFocus } = useEditorFocusMode();
 
   const { readiness, loading: readinessLoading, refresh: refreshReadiness } = useBlogReadiness({
     postId: initial?.id ?? null,
@@ -185,6 +193,7 @@ export default function BlogPostEditor(props: Props) {
 
   function markDirty() {
     setDirty(true);
+    setSaveState("idle");
   }
 
   function handleTitleChange(value: string) {
@@ -193,10 +202,11 @@ export default function BlogPostEditor(props: Props) {
     if (!slugEdited) setSlug(toSlug(value));
   }
 
-  function handleContentChange(value: string) {
+  const handleContentChange = useCallback((value: string) => {
     setMarkdown(value);
-    markDirty();
-  }
+    setDirty(true);
+    setSaveState("idle");
+  }, []);
 
   function applyAiArticle(result: GeneratedArticle, metadata: AiGenerationMetadata): boolean {
     const hasExisting = Boolean(title.trim() || markdown.trim());
@@ -256,15 +266,16 @@ export default function BlogPostEditor(props: Props) {
     setMarkdown(demo.markdown);
     setTags(normalizeBlogTags(demo.tags));
     markDirty();
-    setMessage({ type: "success", text: "Đã tạo bài demo markdown (~1.650 từ)." });
+    setNotice({ type: "success", text: "Đã tạo bài demo markdown (~1.650 từ)." });
   }
 
-  function toggleCategory(id: string) {
+  const toggleCategory = useCallback((id: string) => {
     setCategoryIds((prev) =>
       prev.includes(id) ? prev.filter((cid) => cid !== id) : [...prev, id]
     );
-    markDirty();
-  }
+    setDirty(true);
+    setSaveState("idle");
+  }, []);
 
   function handleInsertInlineHtml(html: string) {
     markDirty();
@@ -278,6 +289,12 @@ export default function BlogPostEditor(props: Props) {
     setMarkdown((prev) => (prev.trim() ? `${prev}\n\n${html}` : html));
   }
 
+  const appendSnippet = useCallback((snippet: string) => {
+    setMarkdown((prev) => (prev.trim() ? `${prev}\n\n${snippet}` : snippet));
+    setDirty(true);
+    setSaveState("idle");
+  }, []);
+
   async function copyArticleUrl() {
     const trimmedSlug = slug.trim();
     if (!trimmedSlug) return;
@@ -285,9 +302,9 @@ export default function BlogPostEditor(props: Props) {
     const url = buildCanonicalUrl(`/blog/${trimmedSlug}`);
     try {
       await navigator.clipboard.writeText(url);
-      setMessage({ type: "success", text: "Đã sao chép URL bài viết." });
+      setNotice({ type: "success", text: "Đã sao chép URL bài viết." });
     } catch {
-      setMessage({ type: "error", text: "Không thể sao chép URL." });
+      setNotice({ type: "error", text: "Không thể sao chép URL." });
     }
   }
 
@@ -298,14 +315,17 @@ export default function BlogPostEditor(props: Props) {
   }
 
   async function save(nextStatus?: BlogPostStatus) {
-    setMessage(null);
+    setNotice(null);
+    setSaveError(null);
 
     if (!title.trim()) {
-      setMessage({ type: "error", text: "Tiêu đề là bắt buộc." });
+      setSaveState("error");
+      setSaveError("Tiêu đề là bắt buộc");
       return;
     }
     if (!slug.trim()) {
-      setMessage({ type: "error", text: "Slug là bắt buộc." });
+      setSaveState("error");
+      setSaveError("Slug là bắt buộc");
       return;
     }
 
@@ -321,6 +341,7 @@ export default function BlogPostEditor(props: Props) {
     const normalizedTags = normalizeBlogTags(tags);
 
     setSaving(true);
+    setSaveState("saving");
     try {
       const payload = {
         title: title.trim(),
@@ -350,13 +371,14 @@ export default function BlogPostEditor(props: Props) {
       const data = await res.json();
 
       if (!res.ok) {
-        setMessage({ type: "error", text: data.message ?? "Lưu thất bại" });
+        setSaveState("error");
+        setSaveError(data.message ?? "Lưu thất bại");
         return;
       }
 
       setTags(normalizedTags);
       setDirty(false);
-      setMessage({ type: "success", text: isEdit ? "Đã lưu bài viết." : "Đã tạo bài viết." });
+      setSaveState("saved");
 
       if (typeof data.post?.updatedAt === "string") {
         setUpdatedAt(data.post.updatedAt);
@@ -372,11 +394,25 @@ export default function BlogPostEditor(props: Props) {
       void refreshReadiness();
       router.refresh();
     } catch {
-      setMessage({ type: "error", text: "Lỗi kết nối máy chủ." });
+      setSaveState("error");
+      setSaveError("Lỗi kết nối máy chủ");
     } finally {
       setSaving(false);
     }
   }
+
+  // Shortcuts and the palette call the latest `save` without re-binding on
+  // every keystroke.
+  const saveRef = useRef(save);
+  useEffect(() => {
+    saveRef.current = save;
+  });
+
+  useEditorShortcuts({
+    onSave: useCallback(() => void saveRef.current(), []),
+    onCommandPalette: useCallback(() => setPaletteOpen((value) => !value), []),
+    onEscape: useCallback(() => setPaletteOpen(false), []),
+  });
 
   const trimmedSlug = slug.trim();
   const publicArticlePath = trimmedSlug ? `/blog/${trimmedSlug}` : null;
@@ -396,12 +432,138 @@ export default function BlogPostEditor(props: Props) {
     ...(isEdit ? [{ id: "traceability" as const, label: "Traceability" }] : []),
   ];
 
+  const paletteCommands = useMemo<PaletteCommand[]>(() => {
+    const navigation: PaletteCommand[] = TAB_LABELS.filter(
+      (tab) => isEdit || tab.id !== "traceability",
+    ).map((tab) => ({
+      id: `nav-${tab.id}`,
+      label: `Mở ${tab.label}`,
+      section: "Điều hướng",
+      run: () => setActiveTab(tab.id),
+    }));
+
+    const actions: PaletteCommand[] = [
+      {
+        id: "action-save",
+        label: "Lưu bài viết",
+        hint: "Cmd+S",
+        section: "Hành động",
+        run: () => void saveRef.current(),
+      },
+      {
+        id: "action-focus",
+        label: focusMode ? "Thoát Focus Mode" : "Bật Focus Mode",
+        hint: "Esc để thoát",
+        section: "Hành động",
+        run: toggleFocus,
+      },
+      {
+        id: "action-readiness",
+        label: "Kiểm tra lại readiness",
+        section: "Hành động",
+        run: () => void refreshReadiness(),
+      },
+    ];
+
+    const inserts: PaletteCommand[] = EDITOR_COMMANDS.map((command) => ({
+      id: `insert-${command.id}`,
+      label: `Chèn ${command.label}`,
+      hint: command.hint,
+      section: "Chèn khối",
+      run: () => {
+        setActiveTab("editor");
+        appendSnippet(command.snippet);
+      },
+    }));
+
+    return [...navigation, ...actions, ...inserts];
+  }, [appendSnippet, focusMode, isEdit, refreshReadiness, toggleFocus]);
+
+  const saveStatus = (
+    <BlogSaveStatus
+      state={saveState}
+      dirty={dirty}
+      updatedAt={updatedAt}
+      errorText={saveError}
+    />
+  );
+
+  const focusToggle = (
+    <div className="blog-focus-switch" role="group" aria-label="Chế độ soạn thảo">
+      <button
+        type="button"
+        className={!focusMode ? "is-active" : ""}
+        aria-pressed={!focusMode}
+        onClick={() => setFocus(false)}
+      >
+        Normal
+      </button>
+      <button
+        type="button"
+        className={focusMode ? "is-active" : ""}
+        aria-pressed={focusMode}
+        onClick={() => setFocus(true)}
+      >
+        Focus
+      </button>
+    </div>
+  );
+
+  if (focusMode) {
+    return (
+      <div className="admin-panel blog-workspace blog-workspace--focus">
+        <header className="blog-focus-bar">
+          {focusToggle}
+          <div className="blog-focus-bar__status">
+            {saveStatus}
+            <span className="admin-field-hint">Esc để thoát Focus Mode</span>
+          </div>
+        </header>
+
+        <div className="blog-focus-canvas">
+          <input
+            className="blog-focus-title"
+            value={title}
+            onChange={(e) => handleTitleChange(e.target.value)}
+            placeholder="Tiêu đề bài viết"
+            aria-label="Tiêu đề"
+          />
+          <textarea
+            className="blog-focus-summary"
+            rows={2}
+            value={excerpt}
+            onChange={(e) => {
+              setExcerpt(e.target.value);
+              markDirty();
+            }}
+            placeholder="Tóm tắt ngắn"
+            aria-label="Tóm tắt"
+          />
+          <BlogVisualEditor value={markdown} onChange={handleContentChange} focusMode />
+        </div>
+
+        <div className="blog-focus-save">
+          <AdminLoadingButton
+            variant="primary"
+            pending={saving}
+            pendingLabel="Đang lưu…"
+            onClick={() => void save()}
+          >
+            {isEdit ? "Lưu" : "Tạo bài viết"}
+          </AdminLoadingButton>
+        </div>
+
+        <BlogCommandPalette
+          open={paletteOpen}
+          commands={paletteCommands}
+          onClose={() => setPaletteOpen(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="admin-panel blog-workspace">
-      {message && (
-        <p className={`admin-message admin-message--${message.type}`}>{message.text}</p>
-      )}
-
       <header className="blog-workspace-header">
         <div className="blog-workspace-header__identity">
           <Link href="/admin/blog" className="admin-btn admin-btn--secondary admin-btn--small">
@@ -413,12 +575,10 @@ export default function BlogPostEditor(props: Props) {
           <span className={`admin-publish-readiness admin-publish-readiness--${readinessTone}`}>
             {readiness.statusLabel}
           </span>
-          {updatedAt && (
-            <span className="admin-field-hint">Cập nhật {formatUpdatedAt(updatedAt)}</span>
-          )}
-          {dirty && <span className="admin-badge admin-badge--warning">Chưa lưu</span>}
+          {saveStatus}
         </div>
         <div className="blog-workspace-header__actions">
+          {focusToggle}
           <AdminLoadingButton
             variant="primary"
             size="small"
@@ -449,6 +609,8 @@ export default function BlogPostEditor(props: Props) {
           )}
         </div>
       </header>
+
+      {notice && <p className={`blog-workspace-notice is-${notice.type}`}>{notice.text}</p>}
 
       <BlogWorkspaceTabs
         tabs={tabs}
@@ -520,7 +682,13 @@ export default function BlogPostEditor(props: Props) {
               </div>
             </WorkspaceSection>
 
-            <WorkspaceSection title="FAQ" description="Câu hỏi thường gặp đi kèm bài viết (FAQ schema).">
+            <WorkspaceSection
+              title="FAQ"
+              description="Câu hỏi thường gặp đi kèm bài viết (FAQ schema)."
+              storageKey="faq"
+              defaultOpen={false}
+              summary={`${faqJson.length}`}
+            >
               <BlogFaqBuilder
                 items={faqJson}
                 onChange={(items) => {
@@ -532,12 +700,15 @@ export default function BlogPostEditor(props: Props) {
 
             <WorkspaceSection
               title="Images"
-              description="Featured Image dùng cho trang danh sách và OG; Body Images nằm trong thân bài; Media References là các ảnh gắn từ Media Bundle."
+              description="Cover Image hiển thị ngoài danh sách; In-content Images nằm trong thân bài."
+              storageKey="images"
+              defaultOpen={false}
+              summary={`${readiness.metrics.bodyImages + (featuredImage ? 1 : 0)}`}
             >
               <div className="blog-images-block">
-                <h4 className="blog-images-block__title">Featured Image</h4>
+                <h4 className="blog-images-block__title">Cover Image</h4>
                 <MediaPicker
-                  label="Featured Image"
+                  label="Cover Image"
                   folder="blog"
                   value={featuredImage}
                   onChange={(value) => {
@@ -545,75 +716,89 @@ export default function BlogPostEditor(props: Props) {
                     markDirty();
                   }}
                 />
-                <MediaPicker
-                  label="OG Image (tùy chọn)"
-                  folder="blog"
-                  value={ogImage}
-                  onChange={(value) => {
-                    setOgImage(value);
-                    markDirty();
-                  }}
-                />
+              </div>
+
+              <div className="blog-images-block">
+                <h4 className="blog-images-block__title">In-content Images</h4>
                 <p className="admin-field-hint">
-                  Body Images hiện có: {readiness.metrics.bodyImages} · Media References:{" "}
-                  {readiness.metrics.mediaReferences}
+                  {readiness.metrics.bodyImages} ảnh trong thân bài. Chèn thêm bằng lệnh
+                  {" "}<code>/image</code> hoặc <code>/gallery</code> trong trình soạn thảo.
                 </p>
               </div>
 
-              <BlogMediaWorkspace
-                postId={isEdit ? initial!.id : null}
-                title={title}
-                keywords={tags}
-                categoryNames={categories
-                  .filter((category) => categoryIds.includes(category.id))
-                  .map((category) => category.name)}
-                featuredImageUrl={featuredImage?.url ?? null}
-                ogImageUrl={ogImage?.url ?? null}
-                onFeaturedUrlChange={(url) => setFeaturedImage(toMediaValue(url))}
-                onOgUrlChange={(url) => setOgImage(toMediaValue(url))}
-                onInsertInlineHtml={handleInsertInlineHtml}
+              <details className="blog-images-advanced">
+                <summary>Advanced</summary>
+                <div className="blog-images-advanced__body">
+                  <MediaPicker
+                    label="OG Image (tùy chọn)"
+                    folder="blog"
+                    value={ogImage}
+                    onChange={(value) => {
+                      setOgImage(value);
+                      markDirty();
+                    }}
+                  />
+                  <p className="admin-field-hint">
+                    Media References: {readiness.metrics.mediaReferences}
+                  </p>
+                  <BlogMediaWorkspace
+                    postId={isEdit ? initial!.id : null}
+                    title={title}
+                    keywords={tags}
+                    categoryNames={categories
+                      .filter((category) => categoryIds.includes(category.id))
+                      .map((category) => category.name)}
+                    featuredImageUrl={featuredImage?.url ?? null}
+                    ogImageUrl={ogImage?.url ?? null}
+                    onFeaturedUrlChange={(url) => setFeaturedImage(toMediaValue(url))}
+                    onOgUrlChange={(url) => setOgImage(toMediaValue(url))}
+                    onInsertInlineHtml={handleInsertInlineHtml}
+                  />
+                </div>
+              </details>
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Tags"
+              description="Từ khóa hiển thị trên blog."
+              storageKey="tags"
+              defaultOpen={false}
+              summary={`${tags.length}`}
+            >
+              <BlogTagInput
+                tags={tags}
+                onChange={(next) => {
+                  setTags(next);
+                  markDirty();
+                }}
               />
             </WorkspaceSection>
 
-            <WorkspaceSection title="Phân loại" description="Tags và danh mục hiển thị trên blog.">
-              <div className="admin-field">
-                <label className="admin-label">Tags</label>
-                <BlogTagInput
-                  tags={tags}
-                  onChange={(next) => {
-                    setTags(next);
-                    markDirty();
-                  }}
+            <WorkspaceSection
+              title="Categories"
+              description="Danh mục điều hướng của bài viết."
+              storageKey="categories"
+              defaultOpen={false}
+              summary={`${categoryIds.length}`}
+            >
+              {categoriesLoading ? (
+                <PanelSkeleton label="Đang tải danh mục…" lines={3} withTitle={false} />
+              ) : categories.length === 0 ? (
+                <p className="admin-field-hint">
+                  Chưa có danh mục. <Link href="/admin/blog/categories">Tạo danh mục</Link>
+                </p>
+              ) : (
+                <BlogCategorySelector
+                  categories={categories}
+                  selectedIds={categoryIds}
+                  onToggle={toggleCategory}
                 />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Danh mục</label>
-                {categoriesLoading ? (
-                  <PanelSkeleton label="Đang tải danh mục…" lines={3} withTitle={false} />
-                ) : categories.length === 0 ? (
-                  <p className="admin-field-hint">
-                    Chưa có danh mục. <Link href="/admin/blog/categories">Tạo danh mục</Link>
-                  </p>
-                ) : (
-                  <div className="admin-checkbox-list">
-                    {categories.map((cat) => (
-                      <label key={cat.id} className="admin-checkbox-item">
-                        <input
-                          type="checkbox"
-                          checked={categoryIds.includes(cat.id)}
-                          onChange={() => toggleCategory(cat.id)}
-                        />
-                        <span>{cat.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
             </WorkspaceSection>
           </WorkspaceTabPanel>
 
           <WorkspaceTabPanel id="seo" active={activeTab === "seo"}>
-            <WorkspaceSection title="Metadata" description="Thẻ meta và canonical dùng cho Google.">
+            <WorkspaceSection title="Metadata" description="Thẻ meta dùng cho Google.">
               <div className="admin-field">
                 <label className="admin-label">Meta Title</label>
                 <input
@@ -640,6 +825,14 @@ export default function BlogPostEditor(props: Props) {
                   maxLength={500}
                 />
               </div>
+            </WorkspaceSection>
+
+            <WorkspaceSection
+              title="Advanced SEO"
+              description="Canonical và các thiết lập ít dùng."
+              storageKey="advanced-seo"
+              defaultOpen={false}
+            >
               <div className="admin-field">
                 <label className="admin-label">Canonical URL</label>
                 <input
@@ -786,7 +979,7 @@ export default function BlogPostEditor(props: Props) {
                   onApplyFaq={applyAiFaq}
                   onApplyTags={applyAiTags}
                   onRecommendationsChange={setAiRecommendations}
-                  onMessage={(text, type) => setMessage({ text, type })}
+                  onMessage={(text, type) => setNotice({ text, type })}
                   onScrollToEditor={() => {
                     setActiveTab("editor");
                     editorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -799,7 +992,7 @@ export default function BlogPostEditor(props: Props) {
               <WorkspaceSection title="Cluster" description="Sinh cụm nội dung liên quan." tone="ai">
                 <BlogClusterGenerator
                   onCreateArticle={handleClusterCreateArticle}
-                  onMessage={(text, type) => setMessage({ text, type })}
+                  onMessage={(text, type) => setNotice({ text, type })}
                 />
               </WorkspaceSection>
 
@@ -821,7 +1014,12 @@ export default function BlogPostEditor(props: Props) {
                 <BlogTraceabilityTimeline post={initial} />
               </WorkspaceSection>
 
-              <WorkspaceSection title="Chi tiết nguồn" description="Thông tin truy vết read-only.">
+              <WorkspaceSection
+                title="Chi tiết nguồn"
+                description="Thông tin truy vết read-only."
+                storageKey="traceability-detail"
+                defaultOpen={false}
+              >
                 <ul className="blog-trace-list">
                   <li>
                     Writing Draft: {initial.sourceWritingDraftId ?? "—"}
@@ -839,7 +1037,6 @@ export default function BlogPostEditor(props: Props) {
                   </li>
                   <li>Handoff: {initial.sourceHandoffRecordId ?? "—"}</li>
                   <li>Media Bundle: {initial.mediaBundleId ?? "—"}</li>
-                  <li>Last handoff: {initial.lastHandoffAt ? formatUpdatedAt(initial.lastHandoffAt) : "—"}</li>
                   {initial.contentModifiedAfterHandoff && (
                     <li className="is-warning">
                       Nội dung đã chỉnh sau handoff — không auto-sync từ Writing Draft mới.
@@ -858,12 +1055,19 @@ export default function BlogPostEditor(props: Props) {
             metaTitle={metaTitle}
             metaDescription={metaDescription}
             slug={slug}
+            content={markdown}
             onOpenSeo={() => setActiveTab("seo")}
             onOpenPublishing={() => setActiveTab("publishing")}
             onRefresh={isEdit ? () => void refreshReadiness() : undefined}
           />
         </aside>
       </div>
+
+      <BlogCommandPalette
+        open={paletteOpen}
+        commands={paletteCommands}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
   );
 }
