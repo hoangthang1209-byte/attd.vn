@@ -9,7 +9,7 @@ import {
 
 type BlogSlashMenuProps = {
   filter: string;
-  onSelect: (snippet: string) => void;
+  onSelect: (snippet: string, commandId?: string) => void;
   /** Reported so the host textarea can hand arrow keys to the menu. */
   onActiveChange?: (command: EditorCommand | null) => void;
   activeIndex?: number;
@@ -57,7 +57,7 @@ export default function BlogSlashMenu({
               onMouseLeave={() => setHovered(null)}
               onMouseDown={(event) => {
                 event.preventDefault();
-                onSelect(item.snippet);
+                onSelect(item.snippet, item.id);
               }}
             >
               <span className="admin-slash-menu-item__label">{item.label}</span>

@@ -540,7 +540,12 @@ export default function BlogPostEditor(props: Props) {
             placeholder="Tóm tắt ngắn"
             aria-label="Tóm tắt"
           />
-          <BlogVisualEditor value={markdown} onChange={handleContentChange} focusMode />
+          <BlogVisualEditor
+            value={markdown}
+            onChange={handleContentChange}
+            focusMode
+            postId={isEdit ? initial!.id : null}
+          />
         </div>
 
         <div className="blog-focus-save">
@@ -678,7 +683,11 @@ export default function BlogPostEditor(props: Props) {
                       Tạo bài demo
                     </button>
                   </div>
-                  <BlogVisualEditor value={markdown} onChange={handleContentChange} />
+                  <BlogVisualEditor
+                    value={markdown}
+                    onChange={handleContentChange}
+                    postId={isEdit ? initial!.id : null}
+                  />
                 </div>
               </div>
             </WorkspaceSection>

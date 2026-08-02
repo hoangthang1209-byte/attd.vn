@@ -101,10 +101,26 @@ export const EDITOR_COMMANDS: EditorCommand[] = [
   {
     id: "image",
     label: "Image",
-    hint: "Ảnh đơn",
+    hint: "Ảnh đơn (markdown)",
     group: "media",
-    keywords: ["anh", "image", "img", "hinh"],
+    keywords: ["anh", "image", "img", "hinh", "media"],
     snippet: "![Mô tả ảnh](image-url)\n\n",
+  },
+  {
+    id: "suggest-image",
+    label: "Gợi ý ảnh",
+    hint: "Lập kế hoạch ảnh nội dung thông minh",
+    group: "media",
+    keywords: ["goi y anh", "suggest", "suggest-image", "anh", "media", "placement"],
+    snippet: "",
+  },
+  {
+    id: "replace-image",
+    label: "Thay ảnh",
+    hint: "Mở thư viện để thay ảnh đang chọn",
+    group: "media",
+    keywords: ["thay anh", "replace", "replace-image", "anh"],
+    snippet: "",
   },
   {
     id: "gallery",

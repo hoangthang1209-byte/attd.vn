@@ -60,7 +60,8 @@ function selectedByLabel(block: PlanPlacement["block"]): string {
 }
 
 /**
- * Explicit inline media planner UI. Never auto-applies on mount.
+ * Explicit article-level media summary (secondary to inline document stream).
+ * Never auto-applies on mount.
  */
 export default function BlogInlineMediaPanel({
   postId,
@@ -201,6 +202,7 @@ export default function BlogInlineMediaPanel({
         <div>
           <strong>Ảnh trong nội dung</strong>
           <p className="admin-field-hint">
+            Trải nghiệm chính nằm trong khung soạn thảo (ảnh giữa các mục). Panel này là bản tóm tắt.
             Hiện có {currentBodyImageCount} ảnh thân bài
             {plan ? ` · đề xuất ${plan.proposedCount}/${plan.targetCount}` : ""}
             {missing > 0 && !plan ? ` · thiếu khoảng ${missing}` : ""}

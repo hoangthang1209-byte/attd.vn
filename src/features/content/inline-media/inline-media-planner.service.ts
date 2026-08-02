@@ -225,6 +225,7 @@ export async function planInlineMediaPlacement(
   ]);
   const reservedSections = new Set(lockedOrEditor.map((block) => block.placement.afterSectionId));
   const usedCollectionIds = new Map<string, number>();
+  const usedRoleCodes = new Set<string>();
   const rejected = new Set(input.rejectedMediaIds ?? []);
 
   // Preserve locked/editor blocks as proposed placements so the UI can show them.
@@ -381,6 +382,7 @@ export async function planInlineMediaPlacement(
         usedCollectionIds,
         coverMediaIds: ctx.coverMediaIds,
         rejectedMediaIds: rejected,
+        adjacentRoleCodes: usedRoleCodes,
       },
     });
 
@@ -436,6 +438,7 @@ export async function planInlineMediaPlacement(
     placements.push({ block, candidate: best.candidate, section, score: best.score });
     usedMediaIds.add(best.candidate.mediaAssetId);
     scores.push(best.score.total);
+    if (best.candidate.roleCode) usedRoleCodes.add(best.candidate.roleCode);
     for (const collectionId of best.candidate.collectionIds) {
       usedCollectionIds.set(collectionId, (usedCollectionIds.get(collectionId) ?? 0) + 1);
     }

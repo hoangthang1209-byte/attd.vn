@@ -14,6 +14,12 @@ type BlogBlockAssistantProps = {
   blocks: ContentBlock[];
   selectedBlockId: string | null;
   onSelect: (block: ContentBlock) => void;
+  mediaSummary?: {
+    suggestions: number;
+    accepted: number;
+    locked: number;
+    ignored: number;
+  };
 };
 
 function fold(value: string): string {
@@ -33,9 +39,13 @@ export default function BlogBlockAssistant({
   blocks,
   selectedBlockId,
   onSelect,
+  mediaSummary,
 }: BlogBlockAssistantProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [mediaFilter, setMediaFilter] = useState<
+    "all" | "accepted" | "locked" | "images" | "missing"
+  >("all");
   const [pinned, setPinned] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
 
@@ -73,11 +83,24 @@ export default function BlogBlockAssistant({
 
   const filtered = useMemo(() => {
     const needle = fold(query.trim());
-    if (!needle) return blocks;
-    return blocks.filter(
-      (block) => fold(block.label).includes(needle) || fold(block.preview).includes(needle),
+    let base = blocks;
+    if (mediaFilter === "accepted" || mediaFilter === "images") {
+      base = blocks.filter((block) => block.type === "inline-media" || block.type === "image");
+    } else if (mediaFilter === "locked") {
+      base = blocks.filter(
+        (block) => block.type === "inline-media" && /Đã khóa|data-inline-block-id/i.test(block.raw),
+      );
+    } else if (mediaFilter === "missing") {
+      base = blocks.filter((block) => block.type === "h2");
+    }
+    if (!needle) return base;
+    return base.filter(
+      (block) =>
+        fold(block.label).includes(needle) ||
+        fold(block.preview).includes(needle) ||
+        fold(block.raw).includes(needle),
     );
-  }, [blocks, query]);
+  }, [blocks, mediaFilter, query]);
 
   const pinnedBlocks = useMemo(
     () => filtered.filter((block) => pinned.includes(block.id)),
@@ -140,18 +163,41 @@ export default function BlogBlockAssistant({
       >
         <span>Block Assistant · {blocks.length} khối</span>
         <span className="admin-block-assistant__count">
-          {selectedIndex >= 0 ? `Đang chọn khối ${selectedIndex + 1}` : "Mở outline"}
+          {mediaSummary
+            ? `Ảnh ${mediaSummary.accepted} · gợi ý ${mediaSummary.suggestions} · khóa ${mediaSummary.locked}`
+            : selectedIndex >= 0
+              ? `Đang chọn khối ${selectedIndex + 1}`
+              : "Mở outline"}
           {open ? " ▲" : " ▼"}
         </span>
       </button>
 
       {open && (
         <div className="admin-block-assistant__body">
+          <div className="admin-block-assistant__media-filters" role="toolbar" aria-label="Lọc media">
+            {(
+              [
+                ["all", "Tất cả"],
+                ["images", "Accepted Images"],
+                ["locked", "Locked Images"],
+                ["missing", "Missing Image Opportunities"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={mediaFilter === id ? "is-active" : ""}
+                onClick={() => setMediaFilter(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <input
             className="admin-input admin-input--small"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm khối theo tiêu đề hoặc nội dung…"
+            placeholder="Tìm khối / ảnh theo tiêu đề, alt, role…"
             aria-label="Tìm khối nội dung"
           />
 

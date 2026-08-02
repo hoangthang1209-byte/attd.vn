@@ -4,6 +4,7 @@ export type BlockType =
   | "h3"
   | "paragraph"
   | "image"
+  | "inline-media"
   | "faq"
   | "cta"
   | "list"
@@ -28,6 +29,7 @@ function blockLabel(type: BlockType): string {
     h3: "H3",
     paragraph: "Đoạn văn",
     image: "Ảnh",
+    "inline-media": "Ảnh nội dung",
     faq: "FAQ",
     cta: "CTA",
     list: "Danh sách",
@@ -45,6 +47,8 @@ function classifyChunk(chunk: string): BlockType {
   if (trimmed.startsWith("### ")) return "h3";
   if (trimmed.startsWith(":::faq")) return "faq";
   if (trimmed.startsWith(":::cta")) return "cta";
+  // Structured DAM figures (Sprint 14.2+) — preferred over markdown images.
+  if (/<figure\b[^>]*\bdata-media-(?:asset-)?id=/i.test(trimmed)) return "inline-media";
   if (/^!\[[^\]]*]\([^)]+\)/.test(trimmed)) return "image";
   if (/^>\s/.test(trimmed)) return "quote";
   if (/^\|.+\|/.test(trimmed)) return "table";
@@ -60,6 +64,13 @@ function previewText(chunk: string, type: BlockType): string {
   if (type === "image") {
     const match = trimmed.match(/^!\[([^\]]*)]\([^)]+\)/);
     return match?.[1] || "Ảnh minh họa";
+  }
+  if (type === "inline-media") {
+    const alt = trimmed.match(/\balt=["']([^"']*)["']/i);
+    const caption = trimmed.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i);
+    if (alt?.[1]?.trim()) return alt[1].trim();
+    if (caption?.[1]) return caption[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+    return "Ảnh nội dung";
   }
   if (type === "faq") {
     const q = trimmed.match(/^Q:\s*(.+)$/im);
@@ -93,8 +104,9 @@ function splitMarkdownIntoChunks(markdown: string): { chunk: string; start: numb
     const rest = markdown.slice(index);
     const faqMatch = rest.match(/^:::faq[\s\S]*?:::/);
     const ctaMatch = rest.match(/^:::cta[\s\S]*?:::/);
+    const figureMatch = rest.match(/^<figure\b[^>]*\bdata-media-(?:asset-)?id=["'][^"']+["'][^>]*>[\s\S]*?<\/figure>/i);
 
-    if (faqMatch && (!ctaMatch || faqMatch.index === 0)) {
+    if (faqMatch && (!ctaMatch || faqMatch.index === 0) && (!figureMatch || faqMatch.index === 0)) {
       flushBuffer();
       const block = faqMatch[0];
       chunks.push({ chunk: block, start: index, end: index + block.length });
@@ -107,6 +119,16 @@ function splitMarkdownIntoChunks(markdown: string): { chunk: string; start: numb
     if (ctaMatch && ctaMatch.index === 0) {
       flushBuffer();
       const block = ctaMatch[0];
+      chunks.push({ chunk: block, start: index, end: index + block.length });
+      index += block.length;
+      while (markdown[index] === "\n") index += 1;
+      bufferStart = index;
+      continue;
+    }
+
+    if (figureMatch && figureMatch.index === 0) {
+      flushBuffer();
+      const block = figureMatch[0];
       chunks.push({ chunk: block, start: index, end: index + block.length });
       index += block.length;
       while (markdown[index] === "\n") index += 1;

@@ -15,12 +15,15 @@ type BlogEditorComposerProps = {
   onChange: (value: string) => void;
   /** Focus mode strips the editor down to the writing surface. */
   focusMode?: boolean;
+  /** Saved Blog post id — enables inline media apply/replace/lock. */
+  postId?: string | null;
 };
 
 export default function BlogEditorComposer({
   value,
   onChange,
   focusMode = false,
+  postId = null,
 }: BlogEditorComposerProps) {
   const [mode, setMode] = useState<BlogEditorMode>("visual");
 
@@ -42,7 +45,12 @@ export default function BlogEditorComposer({
       {mode === "markdown" ? (
         <BlogMarkdownEditor value={value} onChange={onChange} />
       ) : (
-        <BlogVisualModeEditor value={value} onChange={onChange} focusMode={focusMode} />
+        <BlogVisualModeEditor
+          value={value}
+          onChange={onChange}
+          focusMode={focusMode}
+          postId={postId}
+        />
       )}
     </div>
   );

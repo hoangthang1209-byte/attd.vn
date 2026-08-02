@@ -16,6 +16,8 @@ export type ScoreInlineCandidateInput = {
   usedCollectionIds: Map<string, number>;
   coverMediaIds?: Set<string>;
   rejectedMediaIds?: Set<string>;
+  /** Roles already used in nearby accepted placements. */
+  adjacentRoleCodes?: Set<string>;
 };
 
 function fold(value: string): string {
@@ -135,6 +137,11 @@ export function scoreInlineMediaCandidate(input: ScoreInlineCandidateInput): Inl
     add("role", 8, candidate.roleCode);
   } else if (candidate.roleCode && /GENERAL/i.test(candidate.roleCode)) {
     add("role_general", -6, "Generic GENERAL role");
+  }
+
+  // Adjacent same-role diversity (metadata only — no vision).
+  if (candidate.roleCode && input.adjacentRoleCodes?.has(candidate.roleCode)) {
+    add("adjacent_role", -10, `adjacent ${candidate.roleCode}`);
   }
 
   if (candidate.libraryCode && libraryMatchesIntent(candidate.libraryCode, input.intent)) {
