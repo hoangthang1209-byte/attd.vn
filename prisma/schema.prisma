@@ -1136,6 +1136,39 @@ enum MediaVisibility {
   PRIVATE
 }
 
+/// Governed content-asset lifecycle (Sprint 14.5). Separate from visibility.
+enum MediaLifecycleStatus {
+  ACTIVE
+  REVIEW_REQUIRED
+  DEPRECATED
+  ARCHIVED
+  RETIRED
+}
+
+enum MediaRightsStatus {
+  OWNED
+  LICENSED
+  CUSTOMER_PROVIDED
+  PARTNER_PROVIDED
+  UNKNOWN
+}
+
+enum MediaLifecycleAction {
+  MARK_REVIEW_REQUIRED
+  RESTORE
+  DEPRECATE
+  ARCHIVE
+  RETIRE
+  SELECT_REPLACEMENT
+  CLEAR_REPLACEMENT
+  SET_SUPERSEDES
+  SET_RIGHTS
+  SET_REVIEW_DATES
+  REPLACE_PLAN
+  REPLACE_APPLY
+  BULK_UPDATE
+}
+
 enum MediaOrientation {
   SQUARE
   LANDSCAPE
@@ -1513,12 +1546,35 @@ model MediaAsset {
   aiMetadataVersion        String?
   uploadedBy               String?
   metadata                 Json?
+  /// Sprint 14.5 — enterprise asset lifecycle (orthogonal to visibility).
+  lifecycleStatus          MediaLifecycleStatus      @default(ACTIVE)
+  deprecatedAt             DateTime?
+  deprecatedBy             String?
+  archivedAt               DateTime?
+  archivedBy               String?
+  retiredAt                DateTime?
+  retiredBy                String?
+  lifecycleReason          String?                   @db.Text
+  replacementAssetId       String?
+  supersedesAssetId        String?
+  rightsStatus             MediaRightsStatus         @default(UNKNOWN)
+  rightsExpiresAt          DateTime?
+  rightsOwner              String?
+  rightsNotes              String?                   @db.Text
+  usageRestriction         String?                   @db.Text
+  lastLifecycleReviewAt    DateTime?
+  nextLifecycleReviewAt    DateTime?
   createdAt                DateTime                  @default(now())
   updatedAt                DateTime                  @updatedAt
   library                  MediaLibrary?             @relation(fields: [libraryId], references: [id], onDelete: SetNull)
   role                     MediaRole?                @relation(fields: [roleId], references: [id], onDelete: SetNull)
   duplicateOf              MediaAsset?               @relation("MediaAssetDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
   duplicates               MediaAsset[]              @relation("MediaAssetDuplicates")
+  replacementAsset         MediaAsset?               @relation("MediaAssetReplacement", fields: [replacementAssetId], references: [id], onDelete: SetNull)
+  replacedAssets           MediaAsset[]              @relation("MediaAssetReplacement")
+  supersedesAsset          MediaAsset?               @relation("MediaAssetSupersession", fields: [supersedesAssetId], references: [id], onDelete: SetNull)
+  supersededBy             MediaAsset[]              @relation("MediaAssetSupersession")
+  lifecycleEvents          MediaAssetLifecycleEvent[]
   collections              MediaAssetCollection[]
   bundleSlotAssets         MediaBundleSlotAsset[]
   contentMediaAssignments  ContentMediaAssignment[]
@@ -1548,6 +1604,30 @@ model MediaAsset {
   @@index([seoReadinessStatus])
   @@index([aiProcessingStatus])
   @@index([seoScore])
+  @@index([lifecycleStatus])
+  @@index([rightsStatus])
+  @@index([rightsExpiresAt])
+  @@index([replacementAssetId])
+  @@index([supersedesAssetId])
+  @@index([nextLifecycleReviewAt])
+}
+
+/// Append-only lifecycle audit trail (Sprint 14.5). Never stores file bytes or secrets.
+model MediaAssetLifecycleEvent {
+  id                 String               @id @default(cuid())
+  mediaAssetId       String
+  action             MediaLifecycleAction
+  fromStatus         MediaLifecycleStatus?
+  toStatus           MediaLifecycleStatus?
+  actorId            String?
+  reason             String?              @db.Text
+  replacementAssetId String?
+  metadata           Json?
+  createdAt          DateTime             @default(now())
+  mediaAsset         MediaAsset           @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+
+  @@index([mediaAssetId, createdAt])
+  @@index([action, createdAt])
 }
 
 enum ManufacturingAssetStatus {

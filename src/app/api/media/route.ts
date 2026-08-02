@@ -178,6 +178,49 @@ export async function GET(request: Request) {
             | "published")
         : undefined;
     })(),
+    lifecycleStatus: (() => {
+      const raw = searchParams.get("lifecycleStatus");
+      const allowed = new Set([
+        "ACTIVE",
+        "REVIEW_REQUIRED",
+        "DEPRECATED",
+        "ARCHIVED",
+        "RETIRED",
+      ]);
+      return raw && allowed.has(raw)
+        ? (raw as
+            | "ACTIVE"
+            | "REVIEW_REQUIRED"
+            | "DEPRECATED"
+            | "ARCHIVED"
+            | "RETIRED")
+        : undefined;
+    })(),
+    rightsStatus: (() => {
+      const raw = searchParams.get("rightsStatus");
+      const allowed = new Set([
+        "OWNED",
+        "LICENSED",
+        "CUSTOMER_PROVIDED",
+        "PARTNER_PROVIDED",
+        "UNKNOWN",
+      ]);
+      return raw && allowed.has(raw)
+        ? (raw as
+            | "OWNED"
+            | "LICENSED"
+            | "CUSTOMER_PROVIDED"
+            | "PARTNER_PROVIDED"
+            | "UNKNOWN")
+        : undefined;
+    })(),
+    hasReplacement: parseBoolParam(searchParams.get("hasReplacement")),
+    rightsExpiringSoon:
+      parseBoolParam(searchParams.get("rightsExpiringSoon")) === true ? true : undefined,
+    rightsExpired:
+      parseBoolParam(searchParams.get("rightsExpired")) === true ? true : undefined,
+    needsLifecycleReview:
+      parseBoolParam(searchParams.get("needsLifecycleReview")) === true ? true : undefined,
   };
 
   if (paginated) {

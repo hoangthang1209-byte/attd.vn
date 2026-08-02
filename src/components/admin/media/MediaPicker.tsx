@@ -294,7 +294,11 @@ export default function MediaPicker(props: Props) {
       try {
         if (view === "all") {
           setFallbackStep("all");
-          const apiUrl = buildMediaLibraryApiUrl({ search: query, paginated: true });
+          const apiUrl = buildMediaLibraryApiUrl({
+            search: query,
+            paginated: true,
+            lifecycleStatus: "ACTIVE",
+          });
           const page = await fetchMediaLibraryPage(apiUrl);
           setAssets(page.assets);
           setNextCursor(page.nextCursor);
@@ -307,6 +311,7 @@ export default function MediaPicker(props: Props) {
             usageType: usageType !== "auto" ? usageType : undefined,
             search: query,
             paginated: true,
+            lifecycleStatus: "ACTIVE",
           });
           try {
             const page = await fetchMediaLibraryPage(apiUrl);

@@ -329,6 +329,7 @@ export async function findInlineMediaCandidates(
         visibility: "PUBLIC",
         mimeType: { startsWith: "image/" },
         duplicateOfId: null,
+        lifecycleStatus: { in: ["ACTIVE", "REVIEW_REQUIRED"] },
         id: excluded.size ? { notIn: [...excluded] } : undefined,
         OR: orFilters,
       },

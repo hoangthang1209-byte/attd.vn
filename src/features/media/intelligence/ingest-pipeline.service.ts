@@ -160,9 +160,15 @@ export function readIntelligentBag(
   return bag as IntelligentMediaMetaBag;
 }
 
-/** Exclude incomplete ingest assets from public suggestion surfaces. */
-export function isAssetReadyForSuggestion(status: string, visibility: string): boolean {
+export function isAssetReadyForSuggestion(status: string, visibility: string, lifecycleStatus?: string): boolean {
   if (visibility === "PRIVATE") return false;
   if (status === "QUEUED" || status === "PROCESSING") return false;
+  if (
+    lifecycleStatus === "ARCHIVED" ||
+    lifecycleStatus === "RETIRED" ||
+    lifecycleStatus === "DEPRECATED"
+  ) {
+    return false;
+  }
   return true;
 }

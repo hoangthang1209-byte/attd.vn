@@ -569,6 +569,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/media/lifecycle",
+    meta: {
+      breadcrumbs: ["MEDIA", "Asset Lifecycle"],
+      title: "Asset Lifecycle",
+      description: "Archive, deprecate, retire, rights và replacement — không xóa file vật lý.",
+    },
+  },
+  {
     path: "/admin/content/media-libraries",
     meta: {
       breadcrumbs: ["MEDIA", "Nhóm thư viện"],

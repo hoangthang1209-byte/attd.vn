@@ -13,6 +13,9 @@ export type MediaLibraryQuery = {
   cursor?: string | null;
   paginated?: boolean;
   limit?: number;
+  /** Default ACTIVE for picker — exclude archived/retired/deprecated. */
+  lifecycleStatus?: string;
+  visibility?: string;
 };
 
 export type ParsedMediaLibraryPage = {
@@ -30,6 +33,8 @@ export function buildMediaLibraryApiUrl(query: MediaLibraryQuery = {}): string {
   if (query.usageType) params.set("usageType", query.usageType);
   if (query.cursor) params.set("cursor", query.cursor);
   if (query.limit && query.limit > 0) params.set("limit", String(query.limit));
+  if (query.lifecycleStatus) params.set("lifecycleStatus", query.lifecycleStatus);
+  if (query.visibility) params.set("visibility", query.visibility);
   const qs = params.toString();
   return qs ? `/api/media?${qs}` : "/api/media?paginated=1";
 }

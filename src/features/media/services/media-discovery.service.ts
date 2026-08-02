@@ -457,6 +457,7 @@ export async function discoverMediaAssets(
   }
 
   // Public safety: never discover PRIVATE; never expose mid-ingest assets.
+  // Lifecycle: exclude DEPRECATED / ARCHIVED / RETIRED from new suggestions.
   if (visibility === "PRIVATE") {
     return [];
   }
@@ -464,6 +465,7 @@ export async function discoverMediaAssets(
   const where: Prisma.MediaAssetWhereInput = {
     visibility,
     aiProcessingStatus: { notIn: ["QUEUED", "PROCESSING"] },
+    lifecycleStatus: { in: ["ACTIVE", "REVIEW_REQUIRED"] },
     library: {
       isActive: true,
       ...((mergedLibraries.length ? mergedLibraries : libraryCodes).length

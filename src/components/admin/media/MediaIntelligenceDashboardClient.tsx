@@ -8,6 +8,7 @@ import type { MediaDashboardSnapshot } from "@/features/media/intelligence/intel
 
 export default function MediaIntelligenceDashboardClient() {
   const [data, setData] = useState<MediaDashboardSnapshot | null>(null);
+  const [lifecycle, setLifecycle] = useState<Record<string, number> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -15,10 +16,20 @@ export default function MediaIntelligenceDashboardClient() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/media/intelligence/dashboard");
-        const json = (await res.json()) as MediaDashboardSnapshot & { message?: string };
-        if (!res.ok) throw new Error(json.message || "Không tải được dashboard");
-        if (!cancelled) setData(json);
+        const [dashRes, lifeRes] = await Promise.all([
+          fetch("/api/media/intelligence/dashboard"),
+          fetch("/api/media/lifecycle?dashboard=1"),
+        ]);
+        const json = (await dashRes.json()) as MediaDashboardSnapshot & { message?: string };
+        const lifeJson = (await lifeRes.json()) as {
+          counts?: Record<string, number>;
+          message?: string;
+        };
+        if (!dashRes.ok) throw new Error(json.message || "Không tải được dashboard");
+        if (!cancelled) {
+          setData(json);
+          setLifecycle(lifeJson.counts ?? null);
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Lỗi tải dashboard");
       } finally {
@@ -40,8 +51,11 @@ export default function MediaIntelligenceDashboardClient() {
         <Link href="/admin/media/inbox" className="admin-btn admin-btn--secondary">
           Incoming / Review
         </Link>
+        <Link href="/admin/media/lifecycle" className="admin-btn admin-btn--secondary">
+          Lifecycle
+        </Link>
         <Link href="/admin/content/media-coverage" className="admin-btn admin-btn--secondary">
-          Độ phủ nội dung
+          Độ phủ hình ảnh
         </Link>
       </div>
 
@@ -104,6 +118,44 @@ export default function MediaIntelligenceDashboardClient() {
               </ul>
             </div>
           </section>
+
+          {lifecycle ? (
+            <section style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>
+                Lifecycle{" "}
+                <Link href="/admin/media/lifecycle" style={{ fontSize: 12, fontWeight: 400 }}>
+                  Open queues
+                </Link>
+              </h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {(
+                  [
+                    ["active", "Active"],
+                    ["reviewRequired", "Review"],
+                    ["deprecated", "Deprecated"],
+                    ["archived", "Archived"],
+                    ["retired", "Retired"],
+                    ["replacementPending", "Replace pending"],
+                    ["rightsExpiring", "Rights expiring"],
+                    ["rightsExpired", "Rights expired"],
+                    ["unknownRightsPublic", "Unknown rights"],
+                    ["unused", "Unused"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <div key={key}>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>{label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 600 }}>{lifecycle[key] ?? 0}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
             <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Bundle coverage gaps</h3>
