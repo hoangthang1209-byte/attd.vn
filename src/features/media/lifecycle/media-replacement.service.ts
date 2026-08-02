@@ -191,7 +191,7 @@ export async function applyMediaAssetReplacement(input: {
     if (input.mode === "APPLY_SUPPORTED") return item.decision === "AUTO";
     if (input.mode === "APPLY_SELECTED") {
       const key = `${item.referenceType}:${item.referenceId}:${item.field ?? ""}`;
-      return selected.has(key) && item.decision !== "BLOCKED";
+      return selected.has(key);
     }
     return false;
   };
