@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type {
   MediaAiProcessingStatus,
   MediaAssetType,
@@ -354,6 +356,7 @@ function computeMissingIntelligenceFields(asset: MediaAssetWithClassification): 
 
 export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boolean }) {
   const toast = useAdminToast();
+  const searchParams = useSearchParams();
   const [assets, setAssets] = useState<MediaAssetWithClassification[]>([]);
   const [libraries, setLibraries] = useState<ClassificationOption[]>([]);
   const [roles, setRoles] = useState<ClassificationOption[]>([]);
@@ -368,6 +371,12 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   const [filterContentSuitability, setFilterContentSuitability] = useState<
     MediaContentSuitability | ""
   >("");
+  const [workflowLane, setWorkflowLane] = useState("");
+  const [unusedOnly, setUnusedOnly] = useState(false);
+  const [recentlyUploadedDays, setRecentlyUploadedDays] = useState<number | "">("");
+  const [maximumSeoScore, setMaximumSeoScore] = useState<number | "">("");
+  const [duplicateStatusFilter, setDuplicateStatusFilter] = useState("");
+  const urlHydrated = useRef(false);
   const [uploadLibraryId, setUploadLibraryId] = useState("");
   const [uploadRoleId, setUploadRoleId] = useState("");
   const [uploadVisibility, setUploadVisibility] = useState<MediaVisibility>("PUBLIC");
@@ -542,6 +551,11 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
       if (hasAltText) params.set("hasAltText", hasAltText);
       if (search.trim()) params.set("search", search.trim());
       if (filterContentSuitability) params.set("contentSuitability", filterContentSuitability);
+      if (workflowLane) params.set("workflowLane", workflowLane);
+      if (unusedOnly) params.set("unusedOnly", "1");
+      if (recentlyUploadedDays !== "") params.set("recentlyUploadedDays", String(recentlyUploadedDays));
+      if (maximumSeoScore !== "") params.set("maximumSeoScore", String(maximumSeoScore));
+      if (duplicateStatusFilter) params.set("duplicateStatus", duplicateStatusFilter);
       const res = await fetch(`/api/media?${params.toString()}`);
       const data = (await res.json()) as MediaAssetWithClassification[] | { message?: string };
       const nextAssets = Array.isArray(data) ? data : [];
@@ -561,8 +575,30 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     hasAltText,
     search,
     filterContentSuitability,
+    workflowLane,
+    unusedOnly,
+    recentlyUploadedDays,
+    maximumSeoScore,
+    duplicateStatusFilter,
     loadReferenceCounts,
   ]);
+
+  useEffect(() => {
+    if (urlHydrated.current) return;
+    urlHydrated.current = true;
+    const lane = searchParams.get("workflowLane");
+    if (lane) setWorkflowLane(lane);
+    if (searchParams.get("unusedOnly") === "1") setUnusedOnly(true);
+    const days = searchParams.get("recentlyUploadedDays");
+    if (days && Number.isFinite(Number(days))) setRecentlyUploadedDays(Number(days));
+    const maxSeo = searchParams.get("maximumSeoScore");
+    if (maxSeo && Number.isFinite(Number(maxSeo))) setMaximumSeoScore(Number(maxSeo));
+    const dup = searchParams.get("duplicateStatus");
+    if (dup) setDuplicateStatusFilter(dup);
+    const alt = searchParams.get("hasAltText");
+    if (alt === "0" || alt === "false") setHasAltText("false");
+    if (alt === "1" || alt === "true") setHasAltText("true");
+  }, [searchParams]);
 
   useEffect(() => {
     void loadTaxonomy();
@@ -1511,6 +1547,29 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
 
   return (
     <div className="admin-media-page">
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <Link href="/admin/media/dashboard" className="admin-btn admin-btn--secondary admin-btn--xs">
+          Media Dashboard
+        </Link>
+        <Link href="/admin/media/inbox" className="admin-btn admin-btn--secondary admin-btn--xs">
+          Incoming / Review
+        </Link>
+        {(workflowLane || unusedOnly || recentlyUploadedDays !== "" || maximumSeoScore !== "" || duplicateStatusFilter) && (
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => {
+              setWorkflowLane("");
+              setUnusedOnly(false);
+              setRecentlyUploadedDays("");
+              setMaximumSeoScore("");
+              setDuplicateStatusFilter("");
+            }}
+          >
+            Xóa filter thông minh
+          </button>
+        )}
+      </div>
       <div className="admin-catalog-fieldset">
         <h3 className="admin-subtitle">Tải ảnh lên</h3>
         <div
@@ -1958,6 +2017,40 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                   disabled={selectedCount > BULK_MAX}
                 >
                   Sửa hàng loạt
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  disabled={selectedCount > BULK_MAX || bulkSaving}
+                  onClick={() => {
+                    void (async () => {
+                      setBulkSaving(true);
+                      try {
+                        const res = await fetch("/api/media/intelligence/bulk-review", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            mediaAssetIds: [...selectedIds],
+                            applySuggestions: true,
+                          }),
+                        });
+                        const data = (await res.json()) as { message?: string; reviewed?: number };
+                        if (!res.ok) {
+                          toast.error(data.message ?? "Bulk review thất bại");
+                          return;
+                        }
+                        toast.success(`Đã xác nhận metadata ${data.reviewed ?? selectedIds.size} ảnh`);
+                        clearSelection();
+                        await load();
+                      } catch {
+                        toast.error("Lỗi kết nối bulk review");
+                      } finally {
+                        setBulkSaving(false);
+                      }
+                    })();
+                  }}
+                >
+                  Duyệt metadata gợi ý
                 </button>
               </>
             )}

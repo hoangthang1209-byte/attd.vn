@@ -142,6 +142,17 @@ export type MediaAssetListFilters = {
   duplicateStatus?: string;
   contentSuitability?: MediaContentSuitability;
   search?: string;
+  /** Search 2.0 / workflow helpers */
+  unusedOnly?: boolean;
+  recentlyUploadedDays?: number;
+  maximumSeoScore?: number;
+  mediaBundleId?: string;
+  workflowLane?:
+    | "incoming"
+    | "waiting_review"
+    | "needs_metadata"
+    | "ready"
+    | "published";
 };
 
 export type MediaAssetListPage = {
@@ -269,6 +280,69 @@ function buildMediaAssetWhere(filters: MediaAssetListFilters): Prisma.MediaAsset
     andClauses.push({ NOT: { subjectTerms: { equals: [] } } });
   } else if (filters.hasSubject === false) {
     andClauses.push({ subjectTerms: { equals: [] } });
+  }
+
+  if (filters.unusedOnly) {
+    andClauses.push({
+      contentMediaAssignments: { none: {} },
+      bundleSlotAssets: { none: {} },
+    });
+  }
+
+  if (typeof filters.maximumSeoScore === "number") {
+    andClauses.push({ seoScore: { lte: filters.maximumSeoScore } });
+  }
+
+  if (typeof filters.recentlyUploadedDays === "number" && filters.recentlyUploadedDays > 0) {
+    andClauses.push({
+      createdAt: {
+        gte: new Date(Date.now() - filters.recentlyUploadedDays * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+
+  if (filters.mediaBundleId) {
+    andClauses.push({
+      bundleSlotAssets: {
+        some: { mediaBundleSlot: { mediaBundleId: filters.mediaBundleId } },
+      },
+    });
+  }
+
+  if (filters.workflowLane) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    switch (filters.workflowLane) {
+      case "incoming":
+        andClauses.push({
+          createdAt: { gte: sevenDaysAgo },
+          aiProcessingStatus: { in: ["QUEUED", "PROCESSING", "NOT_PROCESSED"] },
+        });
+        break;
+      case "waiting_review":
+        andClauses.push({
+          aiProcessingStatus: "COMPLETED",
+          seoReadinessStatus: { in: ["INCOMPLETE", "BASIC"] },
+        });
+        break;
+      case "needs_metadata":
+        andClauses.push({
+          OR: [{ altText: null }, { altText: "" }, { title: null }, { title: "" }],
+        });
+        break;
+      case "ready":
+        andClauses.push({
+          visibility: { in: ["PUBLIC", "INTERNAL"] },
+          seoReadinessStatus: { in: ["READY", "EXCELLENT"] },
+          aiProcessingStatus: { notIn: ["QUEUED", "PROCESSING"] },
+        });
+        break;
+      case "published":
+        andClauses.push({
+          visibility: "PUBLIC",
+          seoReadinessStatus: { in: ["READY", "EXCELLENT"] },
+        });
+        break;
+    }
   }
 
   if (filters.search) {
@@ -644,11 +718,29 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
         include: mediaClassificationInclude,
       });
     });
-    return {
-      asset,
-      warning,
-      duplicateOfId: exactDuplicate?.id ?? null,
-    };
+    // Fire ingest pipeline after commit. Failures leave FAILED status — never fail the upload.
+    try {
+      const { runMediaIngestPipeline } = await import(
+        "@/features/media/intelligence/ingest-pipeline.service"
+      );
+      await runMediaIngestPipeline(asset.id);
+      const refreshed = await prisma.mediaAsset.findUnique({
+        where: { id: asset.id },
+        include: mediaClassificationInclude,
+      });
+      return {
+        asset: refreshed ?? asset,
+        warning,
+        duplicateOfId: exactDuplicate?.id ?? null,
+      };
+    } catch (ingestError) {
+      console.error("[media] ingest pipeline failed:", ingestError);
+      return {
+        asset,
+        warning,
+        duplicateOfId: exactDuplicate?.id ?? null,
+      };
+    }
   } catch (err) {
     await storage.delete(result.url, result.storageKey);
     const detail = err instanceof Error ? err.message : String(err);

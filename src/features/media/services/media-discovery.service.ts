@@ -456,8 +456,14 @@ export async function discoverMediaAssets(
     });
   }
 
+  // Public safety: never discover PRIVATE; never expose mid-ingest assets.
+  if (visibility === "PRIVATE") {
+    return [];
+  }
+
   const where: Prisma.MediaAssetWhereInput = {
     visibility,
+    aiProcessingStatus: { notIn: ["QUEUED", "PROCESSING"] },
     library: {
       isActive: true,
       ...((mergedLibraries.length ? mergedLibraries : libraryCodes).length

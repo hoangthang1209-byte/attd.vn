@@ -146,6 +146,38 @@ export async function GET(request: Request) {
     duplicateStatus: searchParams.get("duplicateStatus") ?? undefined,
     contentSuitability,
     search,
+    unusedOnly: parseBoolParam(searchParams.get("unusedOnly")) === true ? true : undefined,
+    recentlyUploadedDays: (() => {
+      const raw = searchParams.get("recentlyUploadedDays");
+      if (!raw) return undefined;
+      const n = Number.parseInt(raw, 10);
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    })(),
+    maximumSeoScore: (() => {
+      const raw = searchParams.get("maximumSeoScore");
+      if (!raw) return undefined;
+      const n = Number.parseInt(raw, 10);
+      return Number.isFinite(n) ? n : undefined;
+    })(),
+    mediaBundleId: searchParams.get("mediaBundleId") ?? undefined,
+    workflowLane: (() => {
+      const raw = searchParams.get("workflowLane");
+      const allowed = new Set([
+        "incoming",
+        "waiting_review",
+        "needs_metadata",
+        "ready",
+        "published",
+      ]);
+      return raw && allowed.has(raw)
+        ? (raw as
+            | "incoming"
+            | "waiting_review"
+            | "needs_metadata"
+            | "ready"
+            | "published")
+        : undefined;
+    })(),
   };
 
   if (paginated) {

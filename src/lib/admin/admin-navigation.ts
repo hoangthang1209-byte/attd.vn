@@ -130,6 +130,8 @@ export const adminNavigationSections: AdminNavigationSection[] = [
     icon: "🖼️",
     platforms: domainItems([
       { label: "Thư viện tài sản", href: "/admin/media", status: "active", requiredPermissions: ["canManageProducts"] },
+      { label: "Media Dashboard", href: "/admin/media/dashboard", status: "active", requiredPermissions: ["canManageCms"] },
+      { label: "Incoming Assets", href: "/admin/media/inbox", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Bộ hình bài viết", href: "/admin/content/media-bundles", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Độ phủ hình ảnh", href: "/admin/content/media-coverage", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Bộ sưu tập", href: "/admin/content/media-collections", status: "active", requiredPermissions: ["canManageCms"] },

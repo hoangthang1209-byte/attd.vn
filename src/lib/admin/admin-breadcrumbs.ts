@@ -553,6 +553,22 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/media/dashboard",
+    meta: {
+      breadcrumbs: ["MEDIA", "Media Dashboard"],
+      title: "Media Dashboard",
+      description: "Tổng quan sức khỏe thư viện: review, coverage, duplicates, SEO.",
+    },
+  },
+  {
+    path: "/admin/media/inbox",
+    meta: {
+      breadcrumbs: ["MEDIA", "Incoming Assets"],
+      title: "Incoming Assets",
+      description: "Luồng photographer → metadata → editor review (không auto-publish).",
+    },
+  },
+  {
     path: "/admin/content/media-libraries",
     meta: {
       breadcrumbs: ["MEDIA", "Nhóm thư viện"],
