@@ -1,6 +1,9 @@
 import type { ContentContextPackage } from "@/features/content-context/content-context.types";
+import { resolveImageCountPolicy } from "@/features/content/inline-media/image-count-policy";
+import { deriveSectionMediaIntent } from "@/features/content/inline-media/section-media-intent";
 import type { WritingProfile } from "@/features/writing-engine/writing-profiles";
 import type {
+  WritingInlineMediaHints,
   WritingMediaPlan,
   WritingMediaPlacement,
   WritingSectionPlan,
@@ -20,6 +23,44 @@ const SLOT_PLACEMENT: Record<string, WritingMediaPlacement["placement"]> = {
   GALLERY: "GALLERY",
   BACKGROUND: "BACKGROUND",
 };
+
+function buildInlineHints(sections: WritingSectionPlan[]): WritingInlineMediaHints {
+  const estimatedWords = sections.reduce(
+    (sum, section) => sum + Math.round((section.targetWordCountMin + section.targetWordCountMax) / 2),
+    0,
+  );
+  const policy = resolveImageCountPolicy(estimatedWords);
+  const requiredIntents: string[] = [];
+  const preferredSectionPlacement: string[] = [];
+  const excludedSectionTypes: string[] = ["FAQ", "CTA", "CONCLUSION"];
+
+  for (const section of sections) {
+    const derived = deriveSectionMediaIntent({ heading: section.heading, sectionGoal: section.type });
+    if (derived.excluded) {
+      if (!excludedSectionTypes.includes(section.type)) excludedSectionTypes.push(section.type);
+      continue;
+    }
+    if (!requiredIntents.includes(derived.intent)) requiredIntents.push(derived.intent);
+    if (
+      ["INTRODUCTION", "MATERIAL", "PROCESS", "MANUFACTURING", "PRODUCT", "SIZING"].includes(
+        section.type,
+      ) ||
+      ["MATERIAL_DETAIL", "PRINT_METHOD", "PROCESS", "PRODUCT_OVERVIEW", "HERO_SUPPORT"].includes(
+        derived.intent,
+      )
+    ) {
+      preferredSectionPlacement.push(section.heading);
+    }
+  }
+
+  return {
+    requiredIntents,
+    recommendedImageCount: policy.recommended,
+    preferredSectionPlacement: preferredSectionPlacement.slice(0, 8),
+    excludedSectionTypes,
+    approvedMediaSources: ["BUNDLE", "ASSIGNMENT", "DISCOVERY"],
+  };
+}
 
 export function planMedia(
   pkg: ContentContextPackage,
@@ -71,7 +112,12 @@ export function planMedia(
     }
   }
 
-  return { placements, warnings };
+  const inlineHints = buildInlineHints(sections);
+  warnings.push(
+    `Inline media: khuyến nghị ${inlineHints.recommendedImageCount} ảnh nội dung (Bundle trước, discovery sau). Không chèn URL vào prompt.`,
+  );
+
+  return { placements, warnings, inlineHints };
 }
 
 function pickSectionForMedia(

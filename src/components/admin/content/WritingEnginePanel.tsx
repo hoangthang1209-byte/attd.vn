@@ -49,7 +49,16 @@ type WritingPlanLite = {
     status: string;
   }>;
   factPlan: { unallocatedFactIds: string[]; excludedFactIds: string[] };
-  mediaPlan: { placements: Array<{ id: string; placement: string; mediaAssetId: string; altText: string }> };
+  mediaPlan: {
+    placements: Array<{ id: string; placement: string; mediaAssetId: string; altText: string }>;
+    inlineHints?: {
+      requiredIntents: string[];
+      recommendedImageCount: number;
+      preferredSectionPlacement: string[];
+      excludedSectionTypes: string[];
+      approvedMediaSources: string[];
+    };
+  };
   internalLinkPlan: {
     placements: Array<{ id: string; url: string; anchorText: string; sectionId: string }>;
   };
@@ -125,7 +134,50 @@ export default function WritingEnginePanel({ topicId }: Props) {
   const [draftVersion, setDraftVersion] = useState(1);
   const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [reviewStatus, setReviewStatus] = useState<string | null>(null);
+  const [inlinePlanSummary, setInlinePlanSummary] = useState<string | null>(null);
+  const [inlinePlanBusy, setInlinePlanBusy] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const runInlineMediaPlan = useCallback(async () => {
+    if (!draft?.id) {
+      toast.error("Cần Writing Draft trước khi lập kế hoạch ảnh.");
+      return;
+    }
+    setInlinePlanBusy(true);
+    setInlinePlanSummary(null);
+    try {
+      const res = await fetch("/api/content/media-placement/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ writingDraftId: draft.id, topicId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Không lập được kế hoạch ảnh.");
+      const planData = data.plan as {
+        targetCount: number;
+        proposedCount: number;
+        placements: Array<{ section: { heading: string }; score: { total: number } }>;
+        gaps: string[];
+        warnings: string[];
+      };
+      const lines = planData.placements.map(
+        (row) => `• ${row.section.heading} (score ${row.score.total})`,
+      );
+      setInlinePlanSummary(
+        [
+          `Đề xuất ${planData.proposedCount}/${planData.targetCount} ảnh (chỉ xem — áp dụng sau Handoff Blog).`,
+          ...lines,
+          ...(planData.gaps.slice(0, 3) ?? []),
+          ...(planData.warnings.slice(0, 2) ?? []),
+        ].join("\n"),
+      );
+      toast.success("Đã lập kế hoạch ảnh nội dung (chưa áp dụng).");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Lỗi lập kế hoạch ảnh.");
+    } finally {
+      setInlinePlanBusy(false);
+    }
+  }, [draft?.id, topicId, toast]);
 
   const loadBuilds = useCallback(async () => {
     const res = await fetch(`/api/content/seo/topics/${topicId}/context-builds`);
@@ -593,6 +645,40 @@ export default function WritingEnginePanel({ topicId }: Props) {
                 {e.message}
               </p>
             ))}
+          </Section>
+
+          <Section id="inline-media" title="Ảnh trong nội dung">
+            <p className="admin-field-hint">
+              {plan.mediaPlan.inlineHints
+                ? `Khuyến nghị ${plan.mediaPlan.inlineHints.recommendedImageCount} ảnh · intents: ${plan.mediaPlan.inlineHints.requiredIntents.slice(0, 6).join(", ") || "—"}. Không tự chèn khi mở trang.`
+                : "Hoàn tất draft rồi lập kế hoạch ảnh. Áp dụng chính thức trong Blog Editor sau Handoff."}
+            </p>
+            {draft?.id ? (
+              <AdminLoadingButton
+                pending={inlinePlanBusy}
+                variant="secondary"
+                size="small"
+                onClick={() => void runInlineMediaPlan()}
+              >
+                Lập kế hoạch ảnh nội dung
+              </AdminLoadingButton>
+            ) : (
+              <p className="admin-field-hint">Tạo Draft shell / Generate trước khi lập kế hoạch ảnh.</p>
+            )}
+            {inlinePlanSummary && (
+              <pre
+                style={{
+                  marginTop: 8,
+                  fontSize: 12,
+                  whiteSpace: "pre-wrap",
+                  background: "#f7f7f7",
+                  padding: 8,
+                  borderRadius: 4,
+                }}
+              >
+                {inlinePlanSummary}
+              </pre>
+            )}
           </Section>
         </>
       )}

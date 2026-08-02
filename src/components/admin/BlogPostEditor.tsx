@@ -16,6 +16,7 @@ import BlogCategorySelector from "@/components/admin/blog-editor/BlogCategorySel
 import BlogCommandPalette, {
   type PaletteCommand,
 } from "@/components/admin/blog-editor/BlogCommandPalette";
+import BlogInlineMediaPanel from "@/components/admin/blog-editor/BlogInlineMediaPanel";
 import BlogMediaWorkspace from "@/components/admin/blog-editor/BlogMediaWorkspace";
 import BlogReadinessSidebar from "@/components/admin/blog-editor/BlogReadinessSidebar";
 import BlogSaveStatus, { type SaveState } from "@/components/admin/blog-editor/BlogSaveStatus";
@@ -724,6 +725,19 @@ export default function BlogPostEditor(props: Props) {
                   {readiness.metrics.bodyImages} ảnh trong thân bài. Chèn thêm bằng lệnh
                   {" "}<code>/image</code> hoặc <code>/gallery</code> trong trình soạn thảo.
                 </p>
+                <BlogInlineMediaPanel
+                  postId={isEdit ? initial!.id : null}
+                  contentHtml={markdown}
+                  currentBodyImageCount={readiness.metrics.bodyImages}
+                  onContentApplied={(html) => {
+                    setMarkdown(contentToEditorMarkdown(html));
+                    markDirty();
+                    setNotice({
+                      type: "success",
+                      text: "Đã chèn ảnh nội dung. Lưu bài để giữ thay đổi.",
+                    });
+                  }}
+                />
               </div>
 
               <details className="blog-images-advanced">

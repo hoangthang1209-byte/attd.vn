@@ -14,10 +14,13 @@ export type BlogMediaReadiness = {
 
 export type BlogMediaReadinessAssignment = {
   placement: ContentMediaPlacement;
+  mediaAssetId?: string;
   mediaAsset: {
     visibility: MediaVisibility;
     seoScore: number;
     altText: string | null;
+    width?: number | null;
+    height?: number | null;
   } | null;
 };
 
@@ -80,6 +83,53 @@ export function evaluateBlogMediaReadiness(input: BlogMediaReadinessInput): Blog
     warnings.push("Bài dài nên có ít nhất 2–3 ảnh nội dung (inline).");
   }
 
+  if ((input.contentLength ?? 0) > 3000 && inlineCount < 3) {
+    warnings.push("Bài rất dài (>3.000 từ ước lượng) nên có 3–6 ảnh nội dung.");
+  }
+
+  if ((input.contentLength ?? 0) > 2000 && inlineCount === 0) {
+    warnings.push("Bài dài chưa có ảnh nội dung trong body — dùng “Tự động chèn ảnh” để đề xuất.");
+  }
+
+  // Missing alt on used PUBLIC inline assets is a publish blocker.
+  for (const row of input.assignments) {
+    if (row.placement !== "INLINE" || !row.mediaAsset) continue;
+    if (!row.mediaAsset.altText?.trim()) {
+      if (input.status === "PUBLISHED") {
+        errors.push("Ảnh nội dung thiếu alt text bắt buộc.");
+      } else {
+        warnings.push("Ảnh nội dung thiếu alt text.");
+      }
+    }
+    if (row.mediaAsset.visibility !== "PUBLIC") {
+      errors.push("Ảnh nội dung không được dùng asset PRIVATE/INTERNAL.");
+    }
+    const minDim = Math.min(row.mediaAsset.width ?? 0, row.mediaAsset.height ?? 0);
+    if (minDim > 0 && minDim < 400) {
+      warnings.push("Một số ảnh nội dung có kích thước thấp (<400px).");
+    }
+  }
+
+  // Duplicate INLINE assets
+  const inlineIds = input.assignments
+    .filter((row) => row.placement === "INLINE")
+    .map((row) => row.mediaAssetId)
+    .filter((id): id is string => Boolean(id));
+  if (inlineIds.length !== new Set(inlineIds).size) {
+    warnings.push("Có ảnh nội dung bị trùng trong cùng bài.");
+  }
+
+  // Cover reused as INLINE without an explicit separate editorial choice signal
+  const coverIds = new Set(
+    input.assignments
+      .filter((row) => row.placement === "FEATURED" || row.placement === "COVER")
+      .map((row) => row.mediaAssetId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  if (inlineIds.some((id) => coverIds.has(id))) {
+    warnings.push("Ảnh Cover/Featured đang được tái sử dụng làm ảnh nội dung.");
+  }
+
   if (featuredAssigned || hasFeaturedUrl) {
     const featured = input.assignments.find((a) => a.placement === "FEATURED")?.mediaAsset;
     if (featured) {
@@ -111,19 +161,7 @@ export function evaluateBlogMediaReadiness(input: BlogMediaReadinessInput): Blog
     warnings.push("Media Bundle liên kết chưa đủ sức khỏe (health incomplete).");
   }
 
-  // Duplicate warnings: same asset used many times as INLINE
-  const inlineAssets = input.assignments.filter((a) => a.placement === "INLINE");
   void assetIdsByPlacement;
-  if (inlineAssets.length >= 3) {
-    const seen = new Set<string>();
-    let dup = 0;
-    for (const row of input.assignments) {
-      if (row.placement !== "INLINE" || !row.mediaAsset) continue;
-      // identity not available on simplified type — skip exact dup in unit path
-      void seen;
-      void dup;
-    }
-  }
 
   let score = 40;
   if (featuredAssigned || hasFeaturedUrl) score += 25;
@@ -149,25 +187,22 @@ export function evaluateBlogMediaReadiness(input: BlogMediaReadinessInput): Blog
   };
 }
 
-/** Build figure HTML for blog inline insertion (sanitizer preserves data-*). */
+import {
+  buildInlineMediaFigureHtml,
+} from "@/features/content/inline-media/inline-media-figure";
+
+/** Build figure HTML for blog inline insertion (sanitizer preserves data-media-id). */
 export function buildBlogInlineFigureHtml(params: {
   mediaAssetId: string;
   url: string;
   altText?: string | null;
   caption?: string | null;
 }): string {
-  const alt = escapeAttr(params.altText?.trim() || "");
-  const src = escapeAttr(params.url);
-  const id = escapeAttr(params.mediaAssetId);
-  const caption = params.caption?.trim();
-  const figcaption = caption ? `\n  <figcaption>${escapeHtml(caption)}</figcaption>` : "";
-  return `<figure data-media-asset-id="${id}">\n  <img src="${src}" alt="${alt}" loading="lazy" />${figcaption}\n</figure>`;
-}
-
-function escapeAttr(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return buildInlineMediaFigureHtml({
+    mediaAssetId: params.mediaAssetId,
+    url: params.url,
+    altText: params.altText ?? "",
+    caption: params.caption,
+    variant: "CONTENT_WIDTH",
+  });
 }

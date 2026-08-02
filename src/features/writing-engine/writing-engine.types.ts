@@ -171,9 +171,20 @@ export type WritingMediaPlacement = {
   warnings: string[];
 };
 
+/** Deterministic inline-image guidance for editors (no URLs in prompts). */
+export type WritingInlineMediaHints = {
+  requiredIntents: string[];
+  recommendedImageCount: number;
+  preferredSectionPlacement: string[];
+  excludedSectionTypes: string[];
+  approvedMediaSources: Array<"BUNDLE" | "ASSIGNMENT" | "DISCOVERY">;
+};
+
 export type WritingMediaPlan = {
   placements: WritingMediaPlacement[];
   warnings: string[];
+  /** Sprint 14.2 — section intents / count policy for later placement. */
+  inlineHints?: WritingInlineMediaHints;
 };
 
 export type WritingInternalLinkPlacement = {

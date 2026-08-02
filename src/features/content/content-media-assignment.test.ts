@@ -142,7 +142,7 @@ describe("inline figure HTML", () => {
       altText: 'áo polo "công ty"',
       caption: "Quy trình may",
     });
-    assert.match(html, /data-media-asset-id="asset_1"/);
+    assert.match(html, /data-media-id="asset_1"/);
     assert.match(html, /src="https:\/\/cdn\.example\/p\.jpg"/);
     assert.doesNotMatch(html, /data:image/);
     assert.match(html, /figcaption/);

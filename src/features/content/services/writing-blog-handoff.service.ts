@@ -534,15 +534,38 @@ export async function handoffApprovedWritingDraftToBlog(input: {
         };
         const blogPlacement = map[placement.placement] ?? "INLINE";
         try {
+          const isInline = blogPlacement === "INLINE";
           await assignContentMedia({
             entityType: "BLOG_POST",
             entityId: blogId,
             mediaAssetId: placement.mediaAssetId,
             placement: blogPlacement,
+            // Stable slotKey keeps re-handoff idempotent for INLINE rows.
+            slotKey: isInline ? placement.id : undefined,
             sortOrder: placement.sortOrder,
             altTextOverride: placement.altText,
             captionOverride: placement.caption ?? null,
             replaceExisting: blogPlacement === "FEATURED" || blogPlacement === "OG_IMAGE",
+            metadata: isInline
+              ? {
+                  inline: {
+                    blockId: placement.id,
+                    afterSectionId: placement.sectionId ?? "",
+                    position:
+                      placement.placement === "INLINE_BEFORE"
+                        ? "AFTER_HEADING"
+                        : "BETWEEN_PARAGRAPHS",
+                    variant: "CONTENT_WIDTH",
+                    sourceCredit: null,
+                    locked: false,
+                    selectedBy: "SYSTEM",
+                    selectionReason: "Writing plan handoff",
+                    score: null,
+                    sectionHeading: null,
+                  },
+                  source: "writing-handoff",
+                }
+              : undefined,
           });
         } catch {
           // Skip invalid/private assets without failing whole handoff
