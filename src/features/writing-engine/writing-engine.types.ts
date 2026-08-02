@@ -325,6 +325,8 @@ export type WritingSectionRequest = {
 export type WritingSectionDraft = {
   sectionId: string;
   heading: string;
+  /** Carried from the section plan so subsections render as H3, not H2. */
+  headingLevel?: 2 | 3;
   html: string;
   plainText: string;
   factIdsUsed: string[];

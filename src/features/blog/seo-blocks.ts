@@ -1,3 +1,5 @@
+import { renderArticleCtaHtml } from "@/features/blog/article-cta";
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -18,10 +20,12 @@ function parseKeyValueBlock(body: string): Record<string, string> {
 }
 
 function renderCtaHtml(fields: Record<string, string>): string {
-  const title = escapeHtml(fields.title ?? "Liên hệ ATTD");
-  const button = escapeHtml(fields.button ?? "Liên hệ ngay");
-  const url = escapeHtml(fields.url ?? "/lien-he");
-  return `<aside class="blog-cta-block"><h3 class="blog-cta-block__title">${title}</h3><a href="${url}" class="blog-cta-block__button">${button}</a></aside>`;
+  return renderArticleCtaHtml({
+    title: fields.title ?? "Liên hệ ATTD",
+    body: fields.body ? escapeHtml(fields.body) : undefined,
+    href: fields.url ?? "/lien-he",
+    buttonLabel: fields.button ?? "Liên hệ ngay",
+  });
 }
 
 function renderFaqBlockHtml(body: string): string {

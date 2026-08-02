@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ArticleReadingProgress from "@/components/blog/ArticleReadingProgress";
 import AuthorBox from "@/components/blog/AuthorBox";
 import BlogFaqSection from "@/components/blog/BlogFaqSection";
 import BlogTableOfContents from "@/components/blog/BlogTableOfContents";
@@ -84,7 +85,10 @@ export default async function BlogDetailPage({ params }: PageProps) {
   const faqItems = parseFaqJson("faqJson" in post ? post.faqJson : []);
   const tags = parseTagsJson("tags" in post ? post.tags : []);
   const readingMinutes = calculateReadingTime(post.content);
-  const processed = prepareBlogArticleContent(post.content);
+  const processed = prepareBlogArticleContent(post.content, {
+    canonicalFaqQuestions: faqItems.map((item) => item.question),
+    title: post.title,
+  });
 
   return (
     <main className="blog-article-page">
@@ -98,7 +102,9 @@ export default async function BlogDetailPage({ params }: PageProps) {
       />
       {faqItems.length > 0 && <FaqSchema items={faqItems} />}
 
-      <div className="blog-breadcrumb-bar">
+      <ArticleReadingProgress targetId="blog-article-body" />
+
+      <nav className="blog-breadcrumb-bar" aria-label="Đường dẫn">
         <div className="container blog-breadcrumb">
           <Link href="/">Trang chủ</Link>
           <span>/</span>
@@ -112,26 +118,29 @@ export default async function BlogDetailPage({ params }: PageProps) {
             </>
           )}
           <span>/</span>
-          <span className="blog-breadcrumb-current">{post.title}</span>
+          <span className="blog-breadcrumb-current" aria-current="page">
+            {post.title}
+          </span>
         </div>
-      </div>
+      </nav>
 
       <article>
         <section className="section blog-article-section">
           <div className="container blog-article-container">
             <header className="blog-article-header">
-              {categories.length > 0 && (
-                <Link
-                  href={`/blog/danh-muc/${categories[0].category.slug}`}
-                  className="blog-article-category"
-                >
-                  {categories[0].category.name}
-                </Link>
-              )}
-
-              <div className="blog-article-meta">
+              <div className="blog-article-eyebrow">
+                {categories.length > 0 && (
+                  <Link
+                    href={`/blog/danh-muc/${categories[0].category.slug}`}
+                    className="blog-article-category"
+                  >
+                    {categories[0].category.name}
+                  </Link>
+                )}
                 <time dateTime={publishedAt.toISOString()}>{formatDate(publishedAt)}</time>
-                <span className="blog-article-meta-sep">•</span>
+                <span className="blog-article-meta-sep" aria-hidden="true">
+                  •
+                </span>
                 <span>{formatReadingTime(readingMinutes)}</span>
               </div>
 
@@ -141,7 +150,14 @@ export default async function BlogDetailPage({ params }: PageProps) {
 
               {heroImage && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={heroImage} alt={post.title} className="blog-article-hero" />
+                <img
+                  src={heroImage}
+                  alt={post.title}
+                  className="blog-article-hero"
+                  width={1200}
+                  height={630}
+                  fetchPriority="high"
+                />
               )}
             </header>
 
@@ -154,7 +170,7 @@ export default async function BlogDetailPage({ params }: PageProps) {
             >
               <BlogTableOfContents headings={processed.headings} />
 
-              <div className="blog-article-body">
+              <div className="blog-article-body" id="blog-article-body">
                 {processed.html ? (
                   <div
                     className="prose-blog prose-blog--article"

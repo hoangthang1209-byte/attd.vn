@@ -12,7 +12,7 @@ export function renderWritingDraftHtml(draft: WritingStructuredDraft): string {
   parts.push(`<h1>${escapeHtml(draft.title)}</h1>`);
 
   for (const section of draft.sections) {
-    const level = Math.min(3, 2);
+    const level = section.headingLevel === 3 ? 3 : 2;
     parts.push(`<h${level}>${escapeHtml(section.heading)}</h${level}>`);
     parts.push(renderSectionBody(section.html));
   }
