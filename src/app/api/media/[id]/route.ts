@@ -9,9 +9,16 @@ import {
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const permission = await requireAdminPermission({
+    platform: "content",
+    action: "read",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await params;
   const asset = await getMediaAssetById(id);
   if (!asset) return NextResponse.json({ message: "Không tìm thấy" }, { status: 404 });

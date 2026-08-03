@@ -16,7 +16,10 @@ export {
 export {
   planMediaAssetReplacement,
   applyMediaAssetReplacement,
+  assertReplacementPlanFresh,
+  rewriteBlogHtmlMediaId,
 } from "@/features/media/lifecycle/media-replacement.service";
+export { recommendAssetNextAction } from "@/features/media/lifecycle/next-action.service";
 export {
   listLifecycleQueue,
   getLifecycleDashboardCounts,

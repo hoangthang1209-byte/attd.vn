@@ -65,17 +65,18 @@ export async function POST(
           : undefined,
         actorId,
         reason: typeof body.reason === "string" ? body.reason : null,
-        inheritBundleJoins: body.inheritBundleJoins === true,
-        inheritCollectionJoins: body.inheritCollectionJoins === true,
-      });
-      return NextResponse.json(result);
-    }
-
-    const plan = await planMediaAssetReplacement({
-      sourceAssetId: id,
-      replacementAssetId,
+      planToken: typeof body.planToken === "string" ? body.planToken : null,
+      inheritBundleJoins: body.inheritBundleJoins === true,
+      inheritCollectionJoins: body.inheritCollectionJoins === true,
     });
-    return NextResponse.json(plan);
+    return NextResponse.json(result);
+  }
+
+  const plan = await planMediaAssetReplacement({
+    sourceAssetId: id,
+    replacementAssetId,
+  });
+  return NextResponse.json(plan);
   } catch (err) {
     if (err instanceof MediaLifecycleError) {
       return NextResponse.json(

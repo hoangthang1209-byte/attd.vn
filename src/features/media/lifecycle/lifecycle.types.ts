@@ -23,7 +23,8 @@ export type LifecycleTransitionErrorCode =
   | "RIGHTS_EXPIRED"
   | "DELETE_BLOCKED"
   | "REASON_REQUIRED"
-  | "BATCH_TOO_LARGE";
+  | "BATCH_TOO_LARGE"
+  | "PLAN_STALE";
 
 export class MediaLifecycleError extends Error {
   readonly code: LifecycleTransitionErrorCode;
@@ -107,6 +108,12 @@ export type MediaReplacementPlan = {
   items: ReplacementPlanItem[];
   warnings: string[];
   blockers: string[];
+  /** Concurrency token — apply rejects when source/replacement/refs drift. */
+  planToken: string;
+  generatedAt: string;
+  sourceUpdatedAt: string;
+  replacementUpdatedAt: string;
+  referenceSnapshotHash: string;
 };
 
 export type MediaReplacementApplyMode = "PREVIEW" | "APPLY_SUPPORTED" | "APPLY_SELECTED";

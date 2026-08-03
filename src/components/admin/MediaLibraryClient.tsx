@@ -1554,6 +1554,9 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
         <Link href="/admin/media/inbox" className="admin-btn admin-btn--secondary admin-btn--xs">
           Incoming / Review
         </Link>
+        <Link href="/admin/media/lifecycle" className="admin-btn admin-btn--secondary admin-btn--xs">
+          Lifecycle
+        </Link>
         {(workflowLane || unusedOnly || recentlyUploadedDays !== "" || maximumSeoScore !== "" || duplicateStatusFilter) && (
           <button
             type="button"
@@ -2260,6 +2263,9 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                     {asset.visibility !== "PUBLIC" && (
                       <span className="admin-badge">{asset.visibility}</span>
                     )}
+                    {"lifecycleStatus" in asset && asset.lifecycleStatus !== "ACTIVE" ? (
+                      <span className="admin-badge">{String(asset.lifecycleStatus)}</span>
+                    ) : null}
                     <span className="admin-badge">SEO {asset.seoScore ?? 0}</span>
                   </p>
                   <div className="admin-media-actions">
@@ -2270,12 +2276,18 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
                     >
                       {copied === asset.id ? "✓ Đã copy" : "Sao chép URL"}
                     </button>
+                    <Link
+                      href={`/admin/media/${asset.id}`}
+                      className="admin-btn admin-btn--primary admin-btn--xs"
+                    >
+                      Workspace
+                    </Link>
                     <button
                       type="button"
                       className="admin-btn admin-btn--secondary admin-btn--xs"
                       onClick={() => openEdit(asset)}
                     >
-                      Sửa
+                      Sửa nhanh
                     </button>
                     <button
                       type="button"

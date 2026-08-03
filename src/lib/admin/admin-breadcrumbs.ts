@@ -577,6 +577,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/media/[id]",
+    meta: {
+      breadcrumbs: ["MEDIA", "Thư viện tài sản", "Asset Workspace"],
+      title: "Asset Workspace",
+      description: "Quản lý lifecycle, dependencies và replacement cho một MediaAsset.",
+    },
+  },
+  {
     path: "/admin/content/media-libraries",
     meta: {
       breadcrumbs: ["MEDIA", "Nhóm thư viện"],

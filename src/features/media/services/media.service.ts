@@ -462,7 +462,16 @@ export async function listMediaAssetsPage(
 export async function getMediaAssetById(id: string) {
   return prisma.mediaAsset.findUnique({
     where: { id },
-    include: mediaClassificationInclude,
+    include: {
+      ...mediaClassificationInclude,
+      _count: {
+        select: {
+          contentMediaAssignments: true,
+          bundleSlotAssets: true,
+          collections: true,
+        },
+      },
+    },
   });
 }
 

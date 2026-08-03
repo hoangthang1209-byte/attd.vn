@@ -25,22 +25,20 @@ const PUBLIC_TYPES = new Set([
 
 function mapRelationMode(ref: MediaReference): MediaRelationMode {
   if (ref.referenceMode === "URL_MATCH") return "EXACT_URL";
-  if (ref.type === "BLOG" || ref.field?.includes("INLINE") || ref.field === "FEATURED" || ref.field === "OG_IMAGE") {
-    // Content assignments use RELATION mode in legacy resolver
-    if (
-      ref.field === "FEATURED" ||
-      ref.field === "OG_IMAGE" ||
-      ref.field === "INLINE" ||
-      ref.field?.startsWith("INLINE") ||
-      ref.field === "COVER" ||
-      ref.field === "HERO" ||
-      ref.field === "GALLERY"
-    ) {
-      return "CONTENT_MEDIA_ASSIGNMENT";
-    }
-  }
+  if (ref.field === "content.data-media-id") return "STRUCTURED_MEDIA_ID";
   if (ref.field === "descriptionBlocks") {
     return ref.referenceMode === "RELATION" ? "STRUCTURED_MEDIA_ID" : "EXACT_URL";
+  }
+  if (
+    ref.field === "FEATURED" ||
+    ref.field === "OG_IMAGE" ||
+    ref.field === "INLINE" ||
+    ref.field?.startsWith("INLINE") ||
+    ref.field === "COVER" ||
+    ref.field === "HERO" ||
+    ref.field === "GALLERY"
+  ) {
+    return "CONTENT_MEDIA_ASSIGNMENT";
   }
   return "STRONG_FK";
 }

@@ -171,7 +171,7 @@ export default function MediaLifecycleQueueClient() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <Link
-                  href={`/admin/media?search=${encodeURIComponent(item.id)}`}
+                  href={`/admin/media/${item.id}?section=lifecycle`}
                   className="admin-btn admin-btn--secondary admin-btn--xs"
                 >
                   Open

@@ -40,9 +40,18 @@ function placementDedupeKey(ref: MediaReference): string | null {
       ? "FEATURED"
       : field === "ogImageUrl" || field === "OG_IMAGE"
         ? "OG_IMAGE"
-        : field.startsWith("INLINE") || field === "INLINE"
-          ? `INLINE:${field}`
+        : field === "content.data-media-id" ||
+            field.startsWith("INLINE") ||
+            field === "INLINE"
+          ? // Prefer assignment INLINE over HTML scan for same post
+            field === "content.data-media-id"
+            ? "INLINE:html"
+            : `INLINE:${field}`
           : field;
+  // HTML scan and INLINE assignment both represent inline use — collapse
+  if (normalized === "INLINE:html" || normalized.startsWith("INLINE:")) {
+    return `${ref.type}:${ref.entityId}:INLINE`;
+  }
   return `${ref.type}:${ref.entityId}:${normalized}`;
 }
 
@@ -504,6 +513,38 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
       route: `/admin/tech-pack/${asset.techPackId}`,
       referenceMode: "URL_MATCH",
     });
+  }
+
+  // Blog HTML islands: <figure data-media-id> — bounded contains scan, detail-only.
+  // Dedupe later prefers ContentMediaAssignment RELATION over this STRUCTURED hit.
+  try {
+    const { extractInlineMediaIdsFromHtml } = await import(
+      "@/features/content/inline-media/inline-media-figure"
+    );
+    const blogHtmlCandidates = await prisma.blogPost.findMany({
+      where: { content: { contains: assetId } },
+      select: { id: true, title: true, slug: true, content: true },
+      take: 40,
+      orderBy: { updatedAt: "desc" },
+    });
+    for (const post of blogHtmlCandidates) {
+      const html = post.content ?? "";
+      // Bound parse cost: skip absurdly large bodies for this path
+      if (html.length > 800_000) continue;
+      const ids = extractInlineMediaIdsFromHtml(html);
+      if (!ids.includes(assetId)) continue;
+      refs.push({
+        type: "BLOG",
+        entityId: post.id,
+        entityCode: post.slug,
+        entityTitle: post.title,
+        field: "content.data-media-id",
+        route: `/admin/blog/${post.id}`,
+        referenceMode: "RELATION",
+      });
+    }
+  } catch (err) {
+    console.error("[media-reference] blog HTML scan failed:", err);
   }
 
   // Product rich description blocks store mediaAssetId + imageUrl in JSON.

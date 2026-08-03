@@ -42,6 +42,30 @@ function rewriteDescriptionBlocksMediaId(
   return { next, changed };
 }
 
+/** Rewrite figure/img data-media-id and matching src inside Blog HTML. Bounded, deterministic. */
+export function rewriteBlogHtmlMediaId(
+  html: string,
+  fromId: string,
+  toId: string,
+  toUrl: string,
+): string {
+  if (!html || !fromId || !toId) return html;
+  const escaped = fromId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let next = html.replace(
+    new RegExp(`(data-media-(?:asset-)?id=["'])${escaped}(["'])`, "gi"),
+    `$1${toId}$2`,
+  );
+  // Update img src only inside figures that now reference the replacement id
+  next = next.replace(
+    new RegExp(
+      `(<figure\\b[^>]*\\bdata-media-(?:asset-)?id=["']${toId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'][^>]*>[\\s\\S]*?<img\\b[^>]*\\bsrc=["'])([^"']+)(["'])`,
+      "gi",
+    ),
+    `$1${toUrl}$3`,
+  );
+  return next;
+}
+
 export async function planMediaAssetReplacement(input: {
   sourceAssetId: string;
   replacementAssetId: string;
@@ -56,7 +80,15 @@ export async function planMediaAssetReplacement(input: {
   const [source, replacement] = await Promise.all([
     prisma.mediaAsset.findUnique({
       where: { id: input.sourceAssetId },
-      select: { id: true, url: true, visibility: true, lifecycleStatus: true },
+      select: {
+        id: true,
+        url: true,
+        visibility: true,
+        lifecycleStatus: true,
+        updatedAt: true,
+        rightsStatus: true,
+        rightsExpiresAt: true,
+      },
     }),
     prisma.mediaAsset.findUnique({
       where: { id: input.replacementAssetId },
@@ -65,6 +97,9 @@ export async function planMediaAssetReplacement(input: {
         url: true,
         visibility: true,
         lifecycleStatus: true,
+        updatedAt: true,
+        rightsStatus: true,
+        rightsExpiresAt: true,
       },
     }),
   ]);
@@ -86,17 +121,13 @@ export async function planMediaAssetReplacement(input: {
     if (!ref.replaceable || ref.relationMode === "LEGACY_URL") {
       decision = "UNSUPPORTED";
       warning = "Legacy / unsupported reference — manual review required";
-    } else if (
-      ref.publicImpact &&
-      replacement.visibility === "PRIVATE"
-    ) {
+    } else if (ref.publicImpact && replacement.visibility === "PRIVATE") {
       decision = "BLOCKED";
       warning = "Cannot replace public usage with PRIVATE asset";
       blockers.push(`${ref.referenceType}:${ref.referenceId}`);
     } else if (ref.relationMode === "EXACT_URL" || ref.relationMode === "STRUCTURED_MEDIA_ID") {
       decision = "MANUAL";
       warning = "Exact URL / structured ID — included in APPLY_SUPPORTED with care";
-      // Treat as AUTO for known fields (product/blog URL mirrors)
       if (
         ref.field === "featuredImage" ||
         ref.field === "gallery" ||
@@ -104,9 +135,11 @@ export async function planMediaAssetReplacement(input: {
         ref.field === "featuredImageUrl" ||
         ref.field === "ogImageUrl" ||
         ref.field === "previewUrl" ||
-        ref.field === "descriptionBlocks"
+        ref.field === "descriptionBlocks" ||
+        ref.field === "content.data-media-id"
       ) {
         decision = "AUTO";
+        warning = null;
       }
     }
 
@@ -120,6 +153,16 @@ export async function planMediaAssetReplacement(input: {
     blockers.push("Replacement must be ACTIVE");
   }
 
+  const referenceSnapshotHash = hashReferenceSnapshot(items);
+  const generatedAt = new Date().toISOString();
+  const planToken = [
+    source.id,
+    replacement.id,
+    source.updatedAt.toISOString(),
+    replacement.updatedAt.toISOString(),
+    referenceSnapshotHash,
+  ].join("|");
+
   return {
     sourceAssetId: source.id,
     replacementAssetId: replacement.id,
@@ -132,7 +175,43 @@ export async function planMediaAssetReplacement(input: {
     items,
     warnings,
     blockers,
+    planToken,
+    generatedAt,
+    sourceUpdatedAt: source.updatedAt.toISOString(),
+    replacementUpdatedAt: replacement.updatedAt.toISOString(),
+    referenceSnapshotHash,
   };
+}
+
+function hashReferenceSnapshot(items: ReplacementPlanItem[]): string {
+  const payload = items
+    .map((i) => `${i.referenceType}:${i.referenceId}:${i.field ?? ""}:${i.decision}`)
+    .sort()
+    .join(";");
+  let hash = 0;
+  for (let i = 0; i < payload.length; i += 1) {
+    hash = (hash * 31 + payload.charCodeAt(i)) | 0;
+  }
+  return `h${Math.abs(hash).toString(16)}`;
+}
+
+export async function assertReplacementPlanFresh(input: {
+  sourceAssetId: string;
+  replacementAssetId: string;
+  planToken?: string | null;
+}): Promise<MediaReplacementPlan> {
+  const fresh = await planMediaAssetReplacement({
+    sourceAssetId: input.sourceAssetId,
+    replacementAssetId: input.replacementAssetId,
+  });
+  if (input.planToken && input.planToken !== fresh.planToken) {
+    throw new MediaLifecycleError(
+      "PLAN_STALE",
+      "Kế hoạch thay thế đã lỗi thời — hãy tạo lại preview",
+      { expected: input.planToken, actual: fresh.planToken },
+    );
+  }
+  return fresh;
 }
 
 export async function applyMediaAssetReplacement(input: {
@@ -142,6 +221,7 @@ export async function applyMediaAssetReplacement(input: {
   selectedKeys?: string[];
   actorId?: string | null;
   reason?: string | null;
+  planToken?: string | null;
   /** When true, also add replacement into same bundles/collections (explicit). */
   inheritBundleJoins?: boolean;
   inheritCollectionJoins?: boolean;
@@ -163,7 +243,11 @@ export async function applyMediaAssetReplacement(input: {
     };
   }
 
-  const plan = await planMediaAssetReplacement(input);
+  const plan = await assertReplacementPlanFresh({
+    sourceAssetId: input.sourceAssetId,
+    replacementAssetId: input.replacementAssetId,
+    planToken: input.planToken,
+  });
   if (plan.blockers.length && input.mode !== "APPLY_SELECTED") {
     // Still allow APPLY_SELECTED to skip blocked items
   }
@@ -240,6 +324,26 @@ export async function applyMediaAssetReplacement(input: {
                 where: { id: item.referenceId },
                 data: { ogImageUrl: replacement.url },
               });
+            }
+            if (field === "INLINE") {
+              const post = await tx.blogPost.findUnique({
+                where: { id: item.referenceId },
+                select: { content: true },
+              });
+              if (post?.content) {
+                const next = rewriteBlogHtmlMediaId(
+                  post.content,
+                  source.id,
+                  replacement.id,
+                  replacement.url,
+                );
+                if (next !== post.content) {
+                  await tx.blogPost.update({
+                    where: { id: item.referenceId },
+                    data: { content: next },
+                  });
+                }
+              }
             }
           }
         } else if (item.relationMode === "STRONG_FK") {
@@ -565,6 +669,31 @@ async function applyUrlOrStructured(
         where: { id: item.referenceId, ogImageUrl: source.url },
         data: { ogImageUrl: replacement.url },
       });
+      return;
+    }
+    if (field === "content.data-media-id") {
+      const post = await tx.blogPost.findUnique({
+        where: { id: item.referenceId },
+        select: { content: true, status: true },
+      });
+      if (!post?.content) return;
+      const next = rewriteBlogHtmlMediaId(post.content, source.id, replacement.id, replacement.url);
+      if (next !== post.content) {
+        await tx.blogPost.update({
+          where: { id: item.referenceId },
+          data: { content: next },
+        });
+        // Keep ContentMediaAssignment in sync when present; do not unlock / change status.
+        await tx.contentMediaAssignment.updateMany({
+          where: {
+            entityType: "BLOG_POST",
+            entityId: item.referenceId,
+            mediaAssetId: source.id,
+            placement: "INLINE",
+          },
+          data: { mediaAssetId: replacement.id },
+        });
+      }
       return;
     }
   }
