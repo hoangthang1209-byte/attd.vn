@@ -48,10 +48,17 @@ type PickerBaseProps = {
   usageType?: MediaUsageType | "auto";
 };
 
+export type MediaPickerSelectedAsset = {
+  id: string;
+  url: string;
+};
+
 type SingleProps = PickerBaseProps & {
   multiple?: false;
   value?: string | null;
   onChange: (url: string) => void;
+  /** Sprint 14.7 — dual-write MediaAsset id when chosen from library / upload. */
+  onSelectAsset?: (asset: MediaPickerSelectedAsset | null) => void;
 };
 
 type MultiProps = PickerBaseProps & {
@@ -135,6 +142,15 @@ function normalizeAssetList(data: unknown): AssetRow[] {
 function extractUploadUrl(data: unknown): string | null {
   if (!data || typeof data !== "object") return null;
   return getAssetSelectableUrl(data as RawMediaItem);
+}
+
+function extractUploadAsset(data: unknown): MediaPickerSelectedAsset | null {
+  if (!data || typeof data !== "object") return null;
+  const raw = data as RawMediaItem;
+  const url = getAssetSelectableUrl(raw);
+  const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : null;
+  if (!url || !id) return null;
+  return { id, url };
 }
 
 function uploadUsageTypeForFolder(
@@ -428,8 +444,16 @@ export default function MediaPicker(props: Props) {
       console.log("[MediaPicker] selected", selectedUrl);
     }
 
-    (props as SingleProps).onChange(selectedUrl);
+    const single = props as SingleProps;
+    single.onChange(selectedUrl);
+    single.onSelectAsset?.({ id: asset.id, url: selectedUrl });
     setOpen(false);
+  }
+
+  function clearSingleSelection() {
+    const single = props as SingleProps;
+    single.onChange("");
+    single.onSelectAsset?.(null);
   }
 
   async function uploadNewImage(file: File) {
@@ -476,7 +500,9 @@ export default function MediaPicker(props: Props) {
         ]);
 
         if (!multiple) {
-          (props as SingleProps).onChange(uploadedUrl);
+          const single = props as SingleProps;
+          single.onChange(uploadedUrl);
+          single.onSelectAsset?.(extractUploadAsset(data));
           setOpen(false);
         } else {
           (props as MultiProps).onAdd([uploadedUrl]);
@@ -558,7 +584,7 @@ export default function MediaPicker(props: Props) {
                 <button
                   type="button"
                   className="admin-btn admin-btn--secondary admin-btn--xs"
-                  onClick={() => (props as SingleProps).onChange("")}
+                  onClick={clearSingleSelection}
                 >
                   Xóa ảnh
                 </button>

@@ -57,6 +57,7 @@ type CategoryForm = {
   seoTitle: string;
   seoDescription: string;
   imageUrl: string;
+  mediaAssetId: string | null;
   sortOrder: string;
   parentId: string;
   isActive: boolean;
@@ -71,6 +72,7 @@ const emptyForm = (): CategoryForm => ({
   seoTitle: "",
   seoDescription: "",
   imageUrl: "",
+  mediaAssetId: null,
   sortOrder: "0",
   parentId: "",
   isActive: true,
@@ -188,6 +190,7 @@ export default function CategoryAdminManager() {
       seoTitle: cat.seoTitle ?? "",
       seoDescription: cat.seoDescription ?? "",
       imageUrl: cat.imageUrl ?? "",
+      mediaAssetId: cat.mediaAssetId ?? null,
       sortOrder: String(cat.sortOrder),
       parentId: cat.parentId ?? "",
       isActive: cat.isActive !== false,
@@ -298,6 +301,7 @@ export default function CategoryAdminManager() {
       seoTitle: form.seoTitle.trim() || null,
       seoDescription: form.seoDescription.trim() || null,
       imageUrl: form.imageUrl.trim() || null,
+      mediaAssetId: form.mediaAssetId,
       sortOrder: Number(form.sortOrder) || 0,
       parentId: form.parentId.trim() || null,
       isActive: form.isActive,
@@ -527,15 +531,36 @@ export default function CategoryAdminManager() {
                 usageType="auto"
                 value={form.imageUrl || null}
                 onChange={(url) => {
-                  setForm((prev) => ({ ...prev, imageUrl: url }));
+                  setForm((prev) => ({
+                    ...prev,
+                    imageUrl: url,
+                    ...(url ? {} : { mediaAssetId: null }),
+                  }));
+                }}
+                onSelectAsset={(asset) => {
+                  if (!asset) {
+                    setForm((prev) => ({ ...prev, mediaAssetId: null }));
+                    return;
+                  }
+                  setForm((prev) => ({
+                    ...prev,
+                    mediaAssetId: asset.id,
+                    imageUrl: asset.url,
+                  }));
                 }}
               />
               <input
                 className={`admin-input${fieldErrors.imageUrl ? " admin-input--error" : ""}`}
                 data-field="imageUrl"
                 value={form.imageUrl}
-                onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
-                placeholder="Hoặc dán URL ảnh"
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    imageUrl: e.target.value,
+                    mediaAssetId: null,
+                  }))
+                }
+                placeholder="Hoặc dán URL ảnh (legacy)"
               />
               {form.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element

@@ -159,6 +159,29 @@ export type MediaDashboardSnapshot = {
   byVisibility: Record<MediaVisibility, number>;
   topUsed: Array<{ mediaAssetId: string; title: string | null; uses: number }>;
   coverageGaps: Array<{ bundleId: string; name: string; gaps: string[] }>;
+  canonicalCoverage?: {
+    overallMigrationPercent: number;
+    categoryPercent: number;
+    caseStudyPercent: number;
+    productPercent: number;
+    brokenUrlCount: number;
+    mediaAssetMissingCount: number;
+    category: {
+      canonical: number;
+      legacyOnly: number;
+      withMedia: number;
+    };
+    caseStudy: {
+      canonical: number;
+      legacyOnly: number;
+      withMedia: number;
+    };
+    product: {
+      canonical: number;
+      legacyOnly: number;
+      withMedia: number;
+    };
+  };
 };
 
 /** Stored under MediaAsset.metadata.intelligent */

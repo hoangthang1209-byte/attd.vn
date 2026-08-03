@@ -28,16 +28,21 @@ model Category {
   description          String?
   seoTitle             String?
   seoDescription       String?
+  /// Legacy URL mirror. Prefer mediaAssetId for new writes (Sprint 14.7).
   imageUrl             String?
+  mediaAssetId         String?
   sortOrder            Int                   @default(0)
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   parent               Category?             @relation("CategoryTree", fields: [parentId], references: [id])
   children             Category[]            @relation("CategoryTree")
+  mediaAsset           MediaAsset?           @relation("CategoryImage", fields: [mediaAssetId], references: [id], onDelete: SetNull)
   products             Product[]
   orderItems           OrderItem[]
   patterns             Pattern[]
   measurementTemplates MeasurementTemplate[]
+
+  @@index([mediaAssetId])
 }
 
 model Product {
@@ -1588,6 +1593,8 @@ model MediaAsset {
   homepageSourcingPathways HomepageSourcingPathway[] @relation("HomepagePathwayImage")
   homepageOemSettings      HomepageSettings[]        @relation("HomepageOemImage")
   homepageWorkshopMedia    HomepageWorkshopMedia[]   @relation("HomepageWorkshopImage")
+  categoryImages           Category[]                @relation("CategoryImage")
+  caseStudyImages          CaseStudyRecord[]         @relation("CaseStudyImage")
 
   @@index([folder])
   @@index([filename])
@@ -1872,17 +1879,22 @@ model ClientLogoRecord {
 }
 
 model CaseStudyRecord {
-  id        String   @id @default(cuid())
-  title     String
-  category  String
-  quantity  String
-  timeline  String
-  summary   String
-  imageUrl  String
-  isVisible Boolean  @default(false)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String      @id @default(cuid())
+  title        String
+  category     String
+  quantity     String
+  timeline     String
+  summary      String
+  /// Legacy URL mirror (required for historical rows). Prefer mediaAssetId for new writes.
+  imageUrl     String
+  mediaAssetId String?
+  isVisible    Boolean     @default(false)
+  sortOrder    Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  mediaAsset   MediaAsset? @relation("CaseStudyImage", fields: [mediaAssetId], references: [id], onDelete: SetNull)
+
+  @@index([mediaAssetId])
 }
 
 model CompanySettings {

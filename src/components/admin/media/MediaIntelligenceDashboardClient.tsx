@@ -96,6 +96,41 @@ export default function MediaIntelligenceDashboardClient() {
             ))}
           </section>
 
+          {data.canonicalCoverage ? (
+            <section style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Canonical media migration (14.7)</h3>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {[
+                  ["Overall %", `${data.canonicalCoverage.overallMigrationPercent}%`],
+                  ["Category %", `${data.canonicalCoverage.categoryPercent}%`],
+                  ["Case Study %", `${data.canonicalCoverage.caseStudyPercent}%`],
+                  ["Product %", `${data.canonicalCoverage.productPercent}%`],
+                  ["Broken URLs", data.canonicalCoverage.brokenUrlCount],
+                  ["Missing MediaAsset", data.canonicalCoverage.mediaAssetMissingCount],
+                  [
+                    "Cat canonical/legacy",
+                    `${data.canonicalCoverage.category.canonical}/${data.canonicalCoverage.category.legacyOnly}`,
+                  ],
+                  [
+                    "CS canonical/legacy",
+                    `${data.canonicalCoverage.caseStudy.canonical}/${data.canonicalCoverage.caseStudy.legacyOnly}`,
+                  ],
+                ].map(([label, value]) => (
+                  <div key={String(label)}>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>{label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 600 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>AI processing</h3>

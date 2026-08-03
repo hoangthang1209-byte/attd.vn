@@ -21,6 +21,8 @@ const PUBLIC_TYPES = new Set([
   "PRODUCT",
   "HOMEPAGE",
   "CONTENT_BUNDLE",
+  "CATEGORY",
+  "CASE_STUDY",
 ]);
 
 function mapRelationMode(ref: MediaReference): MediaRelationMode {
@@ -51,6 +53,8 @@ function isPublicImpact(ref: MediaReference, contentStatus: string | null): bool
   if (ref.type === "PRODUCT") return true;
   if (ref.type === "HOMEPAGE") return true;
   if (ref.type === "CONTENT_BUNDLE") return true;
+  if (ref.type === "CATEGORY") return true;
+  if (ref.type === "CASE_STUDY") return true;
   return false;
 }
 
@@ -115,7 +119,7 @@ async function resolveUnsupportedLegacyHints(
 
   try {
     const categories = await prisma.category.findMany({
-      where: { imageUrl: { in: urls } },
+      where: { imageUrl: { in: urls }, mediaAssetId: null },
       select: { id: true, name: true, slug: true },
       take: 20,
     });
@@ -124,7 +128,7 @@ async function resolveUnsupportedLegacyHints(
         referenceType: "CATEGORY",
         referenceId: row.id,
         referenceLabel: row.name,
-        referenceUrl: row.slug ? `/admin/categories/${row.id}` : null,
+        referenceUrl: row.slug ? `/admin/products/categories?editCategory=${row.id}` : null,
         field: "imageUrl",
         relationMode: "LEGACY_URL",
         contentStatus: null,
@@ -139,7 +143,7 @@ async function resolveUnsupportedLegacyHints(
 
   try {
     const caseStudies = await prisma.caseStudyRecord.findMany({
-      where: { imageUrl: { in: urls } },
+      where: { imageUrl: { in: urls }, mediaAssetId: null },
       select: { id: true, title: true },
       take: 20,
     });
@@ -148,7 +152,7 @@ async function resolveUnsupportedLegacyHints(
         referenceType: "CASE_STUDY",
         referenceId: row.id,
         referenceLabel: row.title,
-        referenceUrl: `/admin/case-studies/${row.id}`,
+        referenceUrl: `/admin/case-studies`,
         field: "imageUrl",
         relationMode: "LEGACY_URL",
         contentStatus: null,

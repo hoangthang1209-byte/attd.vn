@@ -38,6 +38,12 @@ function parseBody(raw: Record<string, unknown>): CategoryAdminInput | null {
         ? String(raw.seoDescription).trim().slice(0, 500) || null
         : null,
     imageUrl: raw.imageUrl != null ? String(raw.imageUrl).trim() || null : null,
+    mediaAssetId:
+      raw.mediaAssetId === undefined
+        ? undefined
+        : raw.mediaAssetId != null
+          ? String(raw.mediaAssetId).trim() || null
+          : null,
     sortOrder: raw.sortOrder != null ? Number(raw.sortOrder) || 0 : 0,
     parentId: raw.parentId != null ? String(raw.parentId).trim() || null : null,
     isActive: raw.isActive === undefined ? undefined : Boolean(raw.isActive),

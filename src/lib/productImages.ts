@@ -8,7 +8,7 @@ import {
   isAcceptableAspectRatio,
   type UploadFolder,
 } from "@/lib/imagePaths";
-import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
+import { resolveProductImageUrl } from "@/features/media/product-media-adapter";
 
 export type ProductImageRecord = {
   id?: string;
@@ -32,7 +32,7 @@ export function getProductGalleryImages(
 ): ProductImageRecord[] {
   return sortProductImages(images)
     .map((img) => {
-      const imageUrl = getPublicMediaUrl(img.imageUrl);
+      const imageUrl = resolveProductImageUrl(img.imageUrl);
       if (!imageUrl) return null;
       return { ...img, imageUrl };
     })
@@ -88,14 +88,14 @@ export function buildProductImages(
   if (legacyImages.length > 0) return legacyImages;
 
   const result: ProductImageRecord[] = [];
-  const featured = getPublicMediaUrl(product.featuredImage);
+  const featured = resolveProductImageUrl(product.featuredImage);
   if (featured) {
     result.push({ id: "featured", imageUrl: featured, altText: null, sortOrder: 0 });
   }
   const gallery = Array.isArray(product.gallery) ? (product.gallery as string[]) : [];
   const seen = new Set(featured ? [featured] : []);
   for (let i = 0; i < gallery.length; i++) {
-    const url = getPublicMediaUrl(gallery[i]);
+    const url = resolveProductImageUrl(gallery[i]);
     if (!url || seen.has(url)) continue;
     seen.add(url);
     result.push({ id: `gallery-${i}`, imageUrl: url, altText: null, sortOrder: i + 1 });
@@ -121,7 +121,7 @@ export function getProductCardHoverImageUrl(
 ): string | null {
   const gallery = getProductGalleryImages(images);
   const primary =
-    getPublicMediaUrl(primaryImageUrl) ?? gallery[0]?.imageUrl ?? null;
+    resolveProductImageUrl(primaryImageUrl) ?? gallery[0]?.imageUrl ?? null;
   if (!primary) return null;
 
   const primaryIndex = gallery.findIndex((img) => img.imageUrl === primary);

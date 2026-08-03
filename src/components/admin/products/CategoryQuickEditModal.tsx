@@ -37,6 +37,7 @@ export type CategoryQuickEditRecord = CategoryTreeItem & {
   seoTitle: string | null;
   seoDescription: string | null;
   imageUrl: string | null;
+  mediaAssetId?: string | null;
   productCount: number;
   isActive?: boolean;
   codeFormat?: "valid" | "legacy";
@@ -136,6 +137,9 @@ function CategoryQuickEditModalForm({
   const [parentId, setParentId] = useState(category.parentId ?? "");
   const [isActive, setIsActive] = useState(category.isActive !== false);
   const [imageUrl, setImageUrl] = useState(category.imageUrl ?? "");
+  const [mediaAssetId, setMediaAssetId] = useState<string | null>(
+    category.mediaAssetId ?? null,
+  );
   const [slugEdited, setSlugEdited] = useState(false);
   const [codePreview, setCodePreview] = useState<CategoryCodePreviewState>(emptyCategoryCodePreview());
   const [regenerateOnSave, setRegenerateOnSave] = useState(false);
@@ -230,6 +234,7 @@ function CategoryQuickEditModalForm({
       seoTitle: category.seoTitle,
       seoDescription: category.seoDescription,
       imageUrl: imageUrl.trim() || null,
+      mediaAssetId,
       sortOrder: Number(sortOrder) || 0,
       parentId: parentId.trim() || null,
       isActive,
@@ -353,14 +358,28 @@ function CategoryQuickEditModalForm({
                   folder="categories"
                   usageType="auto"
                   value={imageUrl || null}
-                  onChange={(url) => setImageUrl(url)}
+                  onChange={(url) => {
+                    setImageUrl(url);
+                    if (!url) setMediaAssetId(null);
+                  }}
+                  onSelectAsset={(asset) => {
+                    if (!asset) {
+                      setMediaAssetId(null);
+                      return;
+                    }
+                    setMediaAssetId(asset.id);
+                    setImageUrl(asset.url);
+                  }}
                 />
                 <input
                   className="admin-input"
                   value={imageUrl}
                   disabled={pending}
-                  onChange={(event) => setImageUrl(event.target.value)}
-                  placeholder="Hoặc dán URL ảnh"
+                  onChange={(event) => {
+                    setImageUrl(event.target.value);
+                    setMediaAssetId(null);
+                  }}
+                  placeholder="Hoặc dán URL ảnh (legacy)"
                 />
               </div>
             </div>

@@ -8,6 +8,10 @@ import {
 } from "@/features/categories/category-public-visibility";
 import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
 import { buildPublicProductVisibilityWhere, isDemoOrSampleProductMetadata } from "@/features/products/product-public-visibility";
+import {
+  MEDIA_ASSET_PUBLIC_SELECT,
+  resolveEntityMediaSrc,
+} from "@/features/media/resolve-media";
 
 export async function getCategories() {
   return prisma.category.findMany({
@@ -34,6 +38,7 @@ export type CmsCategoryTreeChild = {
   name: string;
   skuCode: string | null;
   imageUrl: string | null;
+  mediaAssetId: string | null;
   productCount: number;
   featuredImage: string | null;
   isActive: boolean;
@@ -47,6 +52,7 @@ export type CmsCategoryTreeNode = {
   name: string;
   skuCode: string | null;
   imageUrl: string | null;
+  mediaAssetId: string | null;
   productCount: number;
   featuredImage: string | null;
   isActive: boolean;
@@ -55,6 +61,7 @@ export type CmsCategoryTreeNode = {
 };
 
 const cmsCategoryInclude = {
+  mediaAsset: { select: MEDIA_ASSET_PUBLIC_SELECT },
   _count: {
     select: { products: { where: buildPublicProductVisibilityWhere() } },
   },
@@ -114,7 +121,13 @@ export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
     slug: parent.slug,
     name: parent.name,
     skuCode: parent.skuCode,
-    imageUrl: parent.imageUrl,
+    mediaAssetId: parent.mediaAssetId,
+    imageUrl:
+      resolveEntityMediaSrc({
+        mediaAsset: parent.mediaAsset,
+        mediaAssetId: parent.mediaAssetId,
+        imageUrl: parent.imageUrl,
+      }) ?? parent.imageUrl,
     featuredImage: parent.products[0]?.featuredImage ?? null,
     productCount: parent._count.products + sumDescendantProductCounts(parent.id),
     isActive: parent.isActive,
@@ -126,7 +139,13 @@ export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
       slug: child.slug,
       name: child.name,
       skuCode: child.skuCode,
-      imageUrl: child.imageUrl,
+      mediaAssetId: child.mediaAssetId,
+      imageUrl:
+        resolveEntityMediaSrc({
+          mediaAsset: child.mediaAsset,
+          mediaAssetId: child.mediaAssetId,
+          imageUrl: child.imageUrl,
+        }) ?? child.imageUrl,
       productCount: child._count.products,
       featuredImage: child.products[0]?.featuredImage ?? null,
       isActive: child.isActive,
@@ -291,6 +310,7 @@ export async function getCategoryBySlug(slug: string) {
   const category = await prisma.category.findUnique({
     where: { slug },
     include: {
+      mediaAsset: { select: MEDIA_ASSET_PUBLIC_SELECT },
       products: {
         where: buildPublicProductVisibilityWhere(),
         select: {
@@ -313,8 +333,15 @@ export async function getCategoryBySlug(slug: string) {
     },
   });
   if (!category) return null;
+  const resolvedImageUrl =
+    resolveEntityMediaSrc({
+      mediaAsset: category.mediaAsset,
+      mediaAssetId: category.mediaAssetId,
+      imageUrl: category.imageUrl,
+    }) ?? category.imageUrl;
   return {
     ...category,
+    imageUrl: resolvedImageUrl,
     products: category.products.filter(
       (product) => !isDemoOrSampleProductMetadata(product.metadata),
     ),

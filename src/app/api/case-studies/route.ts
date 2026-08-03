@@ -19,6 +19,10 @@ export async function POST(request: Request) {
     const timeline = typeof body.timeline === "string" ? body.timeline.trim() : "";
     const summary = typeof body.summary === "string" ? body.summary.trim() : "";
     const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+    const mediaAssetId =
+      typeof body.mediaAssetId === "string" && body.mediaAssetId.trim()
+        ? body.mediaAssetId.trim()
+        : null;
 
     if (!title || !category || !quantity || !timeline || !summary || !imageUrl) {
       return NextResponse.json(
@@ -41,6 +45,7 @@ export async function POST(request: Request) {
       timeline,
       summary,
       imageUrl,
+      mediaAssetId,
       isVisible: body.isVisible === true,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : 0,
     });

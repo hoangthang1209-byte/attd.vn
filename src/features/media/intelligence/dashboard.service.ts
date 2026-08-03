@@ -2,6 +2,7 @@ import type { MediaAiProcessingStatus, MediaVisibility } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { MediaDashboardSnapshot } from "@/features/media/intelligence/intelligence.types";
 import { listBundleCoverageGaps } from "@/features/media/intelligence/bundle-coverage.service";
+import { getCanonicalMediaCoverage } from "@/features/media/canonical-coverage.service";
 
 const EMPTY_AI: Record<MediaAiProcessingStatus, number> = {
   NOT_PROCESSED: 0,
@@ -34,6 +35,7 @@ export async function getMediaDashboardSnapshot(): Promise<MediaDashboardSnapsho
     visGroups,
     topUsedRaw,
     coverageGaps,
+    canonical,
   ] = await Promise.all([
     prisma.mediaAsset.count(),
     prisma.mediaAsset.count({ where: { visibility: "PUBLIC" } }),
@@ -92,6 +94,7 @@ export async function getMediaDashboardSnapshot(): Promise<MediaDashboardSnapsho
       take: 10,
     }),
     listBundleCoverageGaps(8),
+    getCanonicalMediaCoverage().catch(() => null),
   ]);
 
   const byAiStatus = { ...EMPTY_AI };
@@ -131,6 +134,31 @@ export async function getMediaDashboardSnapshot(): Promise<MediaDashboardSnapsho
       uses: row._count._all,
     })),
     coverageGaps,
+    canonicalCoverage: canonical
+      ? {
+          overallMigrationPercent: canonical.overallMigrationPercent,
+          categoryPercent: canonical.category.migrationPercent,
+          caseStudyPercent: canonical.caseStudy.migrationPercent,
+          productPercent: canonical.product.migrationPercent,
+          brokenUrlCount: canonical.brokenUrlCount,
+          mediaAssetMissingCount: canonical.mediaAssetMissingCount,
+          category: {
+            canonical: canonical.category.canonical,
+            legacyOnly: canonical.category.legacyOnly,
+            withMedia: canonical.category.withMedia,
+          },
+          caseStudy: {
+            canonical: canonical.caseStudy.canonical,
+            legacyOnly: canonical.caseStudy.legacyOnly,
+            withMedia: canonical.caseStudy.withMedia,
+          },
+          product: {
+            canonical: canonical.product.canonical,
+            legacyOnly: canonical.product.legacyOnly,
+            withMedia: canonical.product.withMedia,
+          },
+        }
+      : undefined,
   };
 }
 

@@ -16,6 +16,7 @@ export type CaseStudyFormData = {
 type Study = CaseStudyFormData & {
   id: string;
   imageUrl: string;
+  mediaAssetId?: string | null;
 };
 
 type Props = {
@@ -24,9 +25,16 @@ type Props = {
   onSaved: () => void;
 };
 
-function imageUrlToPickerValue(imageUrl: string): MediaPickerValue {
+function imageUrlToPickerValue(
+  imageUrl: string,
+  mediaAssetId?: string | null,
+): MediaPickerValue {
   const filename = imageUrl.split("/").pop()?.split("?")[0] ?? "image";
-  return { id: `existing-${filename}`, url: imageUrl, filename };
+  return {
+    id: mediaAssetId?.trim() || `existing-${filename}`,
+    url: imageUrl,
+    filename,
+  };
 }
 
 export default function CaseStudyEditModal({ study, onClose, onSaved }: Props) {
@@ -52,7 +60,7 @@ export default function CaseStudyEditModal({ study, onClose, onSaved }: Props) {
       summary: study.summary,
       isVisible: study.isVisible,
     });
-    setSelectedImage(imageUrlToPickerValue(study.imageUrl));
+    setSelectedImage(imageUrlToPickerValue(study.imageUrl, study.mediaAssetId));
     setError("");
   }, [study]);
 
@@ -84,6 +92,10 @@ export default function CaseStudyEditModal({ study, onClose, onSaved }: Props) {
         body: JSON.stringify({
           ...form,
           imageUrl: selectedImage.url,
+          mediaAssetId:
+            selectedImage.id && !selectedImage.id.startsWith("existing-")
+              ? selectedImage.id
+              : null,
         }),
       });
       const data = await res.json();

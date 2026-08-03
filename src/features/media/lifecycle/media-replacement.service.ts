@@ -517,6 +517,38 @@ async function applyStrongFk(
     });
     return;
   }
+  if (field === "mediaAssetId" && item.referenceType === "CATEGORY") {
+    const replacement = await tx.mediaAsset.findUnique({
+      where: { id: replacementId },
+      select: { url: true, thumbnailUrl: true },
+    });
+    await tx.category.updateMany({
+      where: { id: item.referenceId, mediaAssetId: sourceId },
+      data: {
+        mediaAssetId: replacementId,
+        ...(replacement?.url
+          ? { imageUrl: replacement.thumbnailUrl ?? replacement.url }
+          : {}),
+      },
+    });
+    return;
+  }
+  if (field === "mediaAssetId" && item.referenceType === "CASE_STUDY") {
+    const replacement = await tx.mediaAsset.findUnique({
+      where: { id: replacementId },
+      select: { url: true, thumbnailUrl: true },
+    });
+    await tx.caseStudyRecord.updateMany({
+      where: { id: item.referenceId, mediaAssetId: sourceId },
+      data: {
+        mediaAssetId: replacementId,
+        ...(replacement?.url
+          ? { imageUrl: replacement.thumbnailUrl ?? replacement.url }
+          : {}),
+      },
+    });
+    return;
+  }
   if (field === "avatarMediaAssetId") {
     await tx.salesRepresentative.updateMany({
       where: { id: item.referenceId, avatarMediaAssetId: sourceId },

@@ -207,6 +207,8 @@ const REF_TYPE_LABELS: Record<MediaReference["type"], string> = {
   TECH_PACK: "Tech pack",
   SALES: "Bán hàng",
   CONTENT_BUNDLE: "Bộ media nội dung",
+  CATEGORY: "Danh mục",
+  CASE_STUDY: "Dự án tiêu biểu",
   OTHER: "Khác",
 };
 

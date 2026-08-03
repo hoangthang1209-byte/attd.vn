@@ -14,6 +14,7 @@ type Study = {
   timeline: string;
   summary: string;
   imageUrl: string;
+  mediaAssetId?: string | null;
   isVisible: boolean;
 };
 
@@ -70,6 +71,10 @@ export default function CaseStudiesManager() {
       body: JSON.stringify({
         ...form,
         imageUrl: selectedImage.url,
+        mediaAssetId:
+          selectedImage.id && !selectedImage.id.startsWith("existing-")
+            ? selectedImage.id
+            : null,
       }),
     });
     const data = await res.json();

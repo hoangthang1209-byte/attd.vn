@@ -28,6 +28,7 @@ import {
   CATEGORY_NAME_VI_REQUIRED,
   isValidFourLetterCategoryCode,
 } from "@/features/categories/category-admin-constants";
+import { buildCanonicalMediaWrite } from "@/features/media/resolve-media";
 import {
   CategoryCodeGenerationError,
   generateUniqueCategoryCodeFromEnglishName,
@@ -1545,6 +1546,7 @@ export async function listProductCategories() {
     seoTitle: c.seoTitle,
     seoDescription: c.seoDescription,
     imageUrl: c.imageUrl,
+    mediaAssetId: c.mediaAssetId,
     sortOrder: c.sortOrder,
     isActive: c.isActive,
     parentId: c.parentId,
@@ -1576,6 +1578,7 @@ export async function getProductCategoryById(id: string) {
     seoTitle: c.seoTitle,
     seoDescription: c.seoDescription,
     imageUrl: c.imageUrl,
+    mediaAssetId: c.mediaAssetId,
     sortOrder: c.sortOrder,
     isActive: c.isActive,
     parentId: c.parentId,
@@ -1595,6 +1598,7 @@ export type CategoryAdminInput = {
   seoTitle?: string | null;
   seoDescription?: string | null;
   imageUrl?: string | null;
+  mediaAssetId?: string | null;
   sortOrder?: number;
   parentId?: string | null;
   isActive?: boolean;
@@ -1730,6 +1734,16 @@ export async function createProductCategory(data: CategoryAdminInput) {
   const parentId = await assertValidCategoryParent(null, data.parentId);
   const skuCode = await resolveCategorySkuCodeForCreate(data);
   const { nameVi, nameEn } = mapCategoryNameFields(data);
+  const media =
+    data.mediaAssetId !== undefined
+      ? buildCanonicalMediaWrite({
+          mediaAssetId: data.mediaAssetId,
+          url: data.imageUrl,
+        })
+      : {
+          mediaAssetId: null as string | null,
+          imageUrl: data.imageUrl ?? null,
+        };
 
   return prisma.category.create({
     data: {
@@ -1740,7 +1754,8 @@ export async function createProductCategory(data: CategoryAdminInput) {
       description: data.description ?? null,
       seoTitle: data.seoTitle ?? null,
       seoDescription: data.seoDescription ?? null,
-      imageUrl: data.imageUrl ?? null,
+      imageUrl: media.imageUrl,
+      mediaAssetId: media.mediaAssetId,
       sortOrder: data.sortOrder ?? 0,
       isActive: data.isActive ?? true,
       parentId,
@@ -1774,6 +1789,21 @@ export async function updateProductCategory(id: string, data: CategoryAdminInput
   const skuCode = await resolveCategorySkuCodeForUpdate(id, data);
   const { nameVi, nameEn } = mapCategoryNameFields(data);
 
+  const mediaPatch: { imageUrl?: string | null; mediaAssetId?: string | null } = {};
+  if (data.mediaAssetId !== undefined) {
+    const media = buildCanonicalMediaWrite({
+      mediaAssetId: data.mediaAssetId,
+      url: data.imageUrl,
+    });
+    mediaPatch.imageUrl = media.imageUrl;
+    mediaPatch.mediaAssetId = media.mediaAssetId;
+  } else if (data.imageUrl !== undefined) {
+    mediaPatch.imageUrl = data.imageUrl ?? null;
+    if (!data.imageUrl?.trim()) {
+      mediaPatch.mediaAssetId = null;
+    }
+  }
+
   return prisma.category.update({
     where: { id },
     data: {
@@ -1784,7 +1814,7 @@ export async function updateProductCategory(id: string, data: CategoryAdminInput
       description: data.description ?? null,
       seoTitle: data.seoTitle ?? null,
       seoDescription: data.seoDescription ?? null,
-      imageUrl: data.imageUrl ?? null,
+      ...mediaPatch,
       sortOrder: data.sortOrder ?? 0,
       ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       parentId,

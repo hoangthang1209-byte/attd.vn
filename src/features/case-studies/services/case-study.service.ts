@@ -4,11 +4,21 @@ import {
   type VisibleCaseStudy,
 } from "@/lib/caseStudies";
 import { resolveUploadImage, isValidImageSrc } from "@/lib/imagePaths";
+import {
+  MEDIA_ASSET_PUBLIC_SELECT,
+  resolveEntityMediaSrc,
+  buildCanonicalMediaWrite,
+} from "@/features/media/resolve-media";
+
+const caseStudyMediaInclude = {
+  mediaAsset: { select: MEDIA_ASSET_PUBLIC_SELECT },
+} as const;
 
 export async function listCaseStudies() {
   try {
     return await prisma.caseStudyRecord.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+      include: caseStudyMediaInclude,
     });
   } catch (err) {
     console.error("[case-study.service] listCaseStudies failed:", err);
@@ -17,7 +27,10 @@ export async function listCaseStudies() {
 }
 
 export async function getCaseStudyById(id: string) {
-  return prisma.caseStudyRecord.findUnique({ where: { id } });
+  return prisma.caseStudyRecord.findUnique({
+    where: { id },
+    include: caseStudyMediaInclude,
+  });
 }
 
 export async function createCaseStudy(data: {
@@ -27,10 +40,27 @@ export async function createCaseStudy(data: {
   timeline: string;
   summary: string;
   imageUrl: string;
+  mediaAssetId?: string | null;
   isVisible?: boolean;
   sortOrder?: number;
 }) {
-  return prisma.caseStudyRecord.create({ data });
+  const media = buildCanonicalMediaWrite({
+    mediaAssetId: data.mediaAssetId,
+    url: data.imageUrl,
+  });
+  return prisma.caseStudyRecord.create({
+    data: {
+      title: data.title,
+      category: data.category,
+      quantity: data.quantity,
+      timeline: data.timeline,
+      summary: data.summary,
+      imageUrl: media.imageUrl ?? data.imageUrl,
+      mediaAssetId: media.mediaAssetId,
+      isVisible: data.isVisible,
+      sortOrder: data.sortOrder,
+    },
+  });
 }
 
 export async function updateCaseStudy(
@@ -42,11 +72,27 @@ export async function updateCaseStudy(
     timeline: string;
     summary: string;
     imageUrl: string;
+    mediaAssetId: string | null;
     isVisible: boolean;
     sortOrder: number;
   }>
 ) {
-  return prisma.caseStudyRecord.update({ where: { id }, data });
+  const patch: Record<string, unknown> = { ...data };
+  if (data.imageUrl !== undefined || data.mediaAssetId !== undefined) {
+    const media = buildCanonicalMediaWrite({
+      mediaAssetId: data.mediaAssetId,
+      url: data.imageUrl,
+    });
+    if (data.imageUrl !== undefined) {
+      patch.imageUrl = media.imageUrl ?? data.imageUrl;
+    }
+    if (data.mediaAssetId !== undefined) {
+      patch.mediaAssetId = media.mediaAssetId;
+    } else if (data.imageUrl !== undefined && media.mediaAssetId) {
+      patch.mediaAssetId = media.mediaAssetId;
+    }
+  }
+  return prisma.caseStudyRecord.update({ where: { id }, data: patch });
 }
 
 export async function deleteCaseStudy(id: string) {
@@ -61,6 +107,7 @@ function isCompleteRecord(row: {
   summary: string;
   imageUrl: string;
   isVisible: boolean;
+  resolvedSrc: string | null;
 }): boolean {
   return (
     row.isVisible &&
@@ -69,7 +116,7 @@ function isCompleteRecord(row: {
     Boolean(row.quantity?.trim()) &&
     Boolean(row.timeline?.trim()) &&
     Boolean(row.summary?.trim()) &&
-    isValidImageSrc(row.imageUrl)
+    Boolean(row.resolvedSrc && isValidImageSrc(row.resolvedSrc))
   );
 }
 
@@ -78,11 +125,21 @@ export async function getVisibleCaseStudiesFromDb(): Promise<VisibleCaseStudy[]>
     const rows = await prisma.caseStudyRecord.findMany({
       where: { isVisible: true },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+      include: caseStudyMediaInclude,
     });
 
     if (rows.length === 0) return getStaticVisibleCaseStudies();
 
     return rows
+      .map((row) => {
+        const resolvedSrc =
+          resolveEntityMediaSrc({
+            mediaAsset: row.mediaAsset,
+            mediaAssetId: row.mediaAssetId,
+            imageUrl: row.imageUrl,
+          }) ?? row.imageUrl;
+        return { ...row, resolvedSrc };
+      })
       .filter(isCompleteRecord)
       .map((row) => ({
         id: row.id,
@@ -91,9 +148,9 @@ export async function getVisibleCaseStudiesFromDb(): Promise<VisibleCaseStudy[]>
         quantity: row.quantity,
         timeline: row.timeline,
         summary: row.summary,
-        image: row.imageUrl,
+        image: row.resolvedSrc!,
         isVisible: row.isVisible,
-        imageSrc: row.imageUrl,
+        imageSrc: row.resolvedSrc!,
       }));
   } catch {
     return getStaticVisibleCaseStudies();

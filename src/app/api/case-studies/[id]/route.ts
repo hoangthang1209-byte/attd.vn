@@ -58,6 +58,13 @@ export async function PATCH(
       }
     }
 
+    const mediaAssetIdPatch =
+      body.mediaAssetId === null
+        ? { mediaAssetId: null as string | null }
+        : typeof body.mediaAssetId === "string"
+          ? { mediaAssetId: body.mediaAssetId.trim() || null }
+          : {};
+
     const study = await updateCaseStudy(id, {
       ...(typeof body.title === "string" ? { title: body.title.trim() } : {}),
       ...(typeof body.category === "string" ? { category: body.category.trim() } : {}),
@@ -65,6 +72,7 @@ export async function PATCH(
       ...(typeof body.timeline === "string" ? { timeline: body.timeline.trim() } : {}),
       ...(typeof body.summary === "string" ? { summary: body.summary.trim() } : {}),
       ...(typeof body.imageUrl === "string" ? { imageUrl: body.imageUrl.trim() } : {}),
+      ...mediaAssetIdPatch,
       ...(typeof body.isVisible === "boolean" ? { isVisible: body.isVisible } : {}),
       ...(typeof body.sortOrder === "number" ? { sortOrder: body.sortOrder } : {}),
     });

@@ -16,6 +16,8 @@ export type MediaReferenceType =
   | "TECH_PACK"
   | "SALES"
   | "CONTENT_BUNDLE"
+  | "CATEGORY"
+  | "CASE_STUDY"
   | "OTHER";
 
 export type MediaReference = {
@@ -117,6 +119,10 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
     blogOg,
     techPackAssets,
     contentAssignments,
+    categoryFk,
+    caseStudyFk,
+    categoryUrl,
+    caseStudyUrl,
   ] = await Promise.all([
     prisma.quoteItem.findMany({
       where: { designMediaAssetId: assetId },
@@ -271,6 +277,30 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
       },
       take: 100,
     }),
+    prisma.category.findMany({
+      where: { mediaAssetId: assetId },
+      select: { id: true, name: true, slug: true },
+      take: 50,
+    }),
+    prisma.caseStudyRecord.findMany({
+      where: { mediaAssetId: assetId },
+      select: { id: true, title: true },
+      take: 50,
+    }),
+    urls.length
+      ? prisma.category.findMany({
+          where: { imageUrl: { in: urls }, mediaAssetId: null },
+          select: { id: true, name: true, slug: true },
+          take: 50,
+        })
+      : Promise.resolve([]),
+    urls.length
+      ? prisma.caseStudyRecord.findMany({
+          where: { imageUrl: { in: urls }, mediaAssetId: null },
+          select: { id: true, title: true },
+          take: 50,
+        })
+      : Promise.resolve([]),
   ]);
 
   const refs: MediaReference[] = [];
@@ -575,6 +605,52 @@ export async function resolveMediaReferences(assetId: string): Promise<MediaRefe
     });
   }
 
+  for (const row of categoryFk) {
+    refs.push({
+      type: "CATEGORY",
+      entityId: row.id,
+      entityCode: row.slug,
+      entityTitle: row.name,
+      field: "mediaAssetId",
+      route: `/admin/products/categories?editCategory=${row.id}`,
+      referenceMode: "RELATION",
+    });
+  }
+
+  for (const row of caseStudyFk) {
+    refs.push({
+      type: "CASE_STUDY",
+      entityId: row.id,
+      entityTitle: row.title,
+      field: "mediaAssetId",
+      route: `/admin/case-studies`,
+      referenceMode: "RELATION",
+    });
+  }
+
+  for (const row of categoryUrl) {
+    refs.push({
+      type: "CATEGORY",
+      entityId: row.id,
+      entityCode: row.slug,
+      entityTitle: row.name,
+      field: "imageUrl",
+      route: `/admin/products/categories?editCategory=${row.id}`,
+      referenceMode: "URL_MATCH",
+    });
+  }
+
+  for (const row of caseStudyUrl) {
+    refs.push({
+      type: "CASE_STUDY",
+      entityId: row.id,
+      entityTitle: row.title,
+      field: "imageUrl",
+      route: `/admin/case-studies`,
+      referenceMode: "URL_MATCH",
+    });
+  }
+
   return dedupe(refs);
 }
 
@@ -621,6 +697,8 @@ export async function countMediaReferencesBatch(
     deliveryProofs,
     bundleSlotAssetGroups,
     contentAssignmentGroups,
+    categoryFkGroups,
+    caseStudyFkGroups,
   ] = await Promise.all([
     prisma.quoteItem.groupBy({
       by: ["designMediaAssetId"],
@@ -682,6 +760,16 @@ export async function countMediaReferencesBatch(
       where: { mediaAssetId: { in: uniqueIds } },
       _count: { _all: true },
     }),
+    prisma.category.groupBy({
+      by: ["mediaAssetId"],
+      where: { mediaAssetId: { in: uniqueIds } },
+      _count: { _all: true },
+    }),
+    prisma.caseStudyRecord.groupBy({
+      by: ["mediaAssetId"],
+      where: { mediaAssetId: { in: uniqueIds } },
+      _count: { _all: true },
+    }),
   ]);
 
   for (const row of quoteGroups) {
@@ -706,9 +794,16 @@ export async function countMediaReferencesBatch(
   for (const row of deliveryProofs) bump(row.mediaAssetId, row._count._all);
   for (const row of bundleSlotAssetGroups) bump(row.mediaAssetId, row._count._all);
   for (const row of contentAssignmentGroups) bump(row.mediaAssetId, row._count._all);
+  for (const row of categoryFkGroups) {
+    if (row.mediaAssetId) bump(row.mediaAssetId, row._count._all);
+  }
+  for (const row of caseStudyFkGroups) {
+    if (row.mediaAssetId) bump(row.mediaAssetId, row._count._all);
+  }
 
   if (urls.length) {
-    const [featured, gallery, productImages, blogFeatured, blogOg, techPack] = await Promise.all([
+    const [featured, gallery, productImages, blogFeatured, blogOg, techPack, catUrl, csUrl] =
+      await Promise.all([
       prisma.product.findMany({
         where: { featuredImage: { in: urls } },
         select: { featuredImage: true },
@@ -732,6 +827,14 @@ export async function countMediaReferencesBatch(
       prisma.techPackAsset.findMany({
         where: { previewUrl: { in: urls } },
         select: { previewUrl: true },
+      }),
+      prisma.category.findMany({
+        where: { imageUrl: { in: urls }, mediaAssetId: null },
+        select: { imageUrl: true },
+      }),
+      prisma.caseStudyRecord.findMany({
+        where: { imageUrl: { in: urls }, mediaAssetId: null },
+        select: { imageUrl: true },
       }),
     ]);
 
@@ -758,6 +861,13 @@ export async function countMediaReferencesBatch(
     for (const row of techPack) {
       if (!row.previewUrl) continue;
       for (const id of urlToAssetIds.get(row.previewUrl) ?? []) bump(id);
+    }
+    for (const row of catUrl) {
+      if (!row.imageUrl) continue;
+      for (const id of urlToAssetIds.get(row.imageUrl) ?? []) bump(id);
+    }
+    for (const row of csUrl) {
+      for (const id of urlToAssetIds.get(row.imageUrl) ?? []) bump(id);
     }
   }
 
