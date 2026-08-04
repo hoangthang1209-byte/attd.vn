@@ -2738,6 +2738,36 @@ enum AiGenerationStatus {
 
 enum AiGenerationType {
   SEO_BRIEF
+  // Sprint 16.0 — Governed AI Content Engine Foundation (additive; suggestion-only)
+  BRIEF_SUGGESTION
+  OUTLINE_SUGGESTION
+  SECTION_DRAFT
+  SECTION_REWRITE
+  SECTION_SHORTEN
+  SECTION_EXPAND
+  SECTION_TONE_CHANGE
+  SECTION_EXAMPLE
+  FAQ_SUGGESTION
+  CTA_SUGGESTION
+  META_SUGGESTION
+  INTERNAL_LINK_SUGGESTION
+  MEDIA_SUGGESTION
+  ALT_CAPTION_SUGGESTION
+}
+
+/// Sprint 16.0 — governance workflow for AI content proposals. AI never
+/// transitions a proposal past GENERATED/VALIDATION_FAILED; only humans
+/// apply/reject/cancel via the proposal service.
+enum AiProposalStatus {
+  REQUESTED
+  RUNNING
+  GENERATED
+  VALIDATION_FAILED
+  APPLIED
+  EDITED_AND_APPLIED
+  REJECTED
+  FAILED
+  CANCELLED
 }
 
 model AiGenerationRun {
@@ -2765,10 +2795,28 @@ model AiGenerationRun {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
+  // Sprint 16.0 — governed content generation proposal fields (additive/nullable).
+  proposalStatus     AiProposalStatus?
+  appliedAt          DateTime?
+  appliedBy          String?
+  rejectedAt         DateTime?
+  rejectedBy         String?
+  sectionId          String?
+  writingDraftId     String?
+  writingPlanId      String?
+  contextBuildId     String?
+  templateId         String?
+  templateVersion    String?
+  factIdsUsed        Json?
+  mediaIdsUsed       Json?
+
   @@index([type, entityType, entityId, createdAt])
   @@index([status, createdAt])
   @@index([requestedBy, createdAt])
   @@index([inputHash])
+  @@index([proposalStatus, createdAt])
+  @@index([writingDraftId, createdAt])
+  @@index([contextBuildId])
 }
 
 // ---------------------------------------------------------------------------

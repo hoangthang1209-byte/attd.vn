@@ -93,6 +93,13 @@ type ProviderStatus = {
   configured: boolean;
 };
 
+type ContentGenerationSafeStatus = {
+  enabled: boolean;
+  provider: string;
+  model: string;
+  keyConfigured: boolean;
+};
+
 type RunStatus = {
   runId: string;
   status: string;
@@ -124,6 +131,7 @@ export default function WritingEnginePanel({ topicId }: Props) {
   const [mockEnabled, setMockEnabled] = useState(false);
   const [cacheHint, setCacheHint] = useState(false);
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
+  const [contentGenStatus, setContentGenStatus] = useState<ContentGenerationSafeStatus | null>(null);
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>([]);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
@@ -204,11 +212,22 @@ export default function WritingEnginePanel({ topicId }: Props) {
     if (res.ok) setProviderStatus(data.providerStatus as ProviderStatus);
   }, []);
 
+  const loadContentGenerationStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/content/generation/status");
+      const data = await res.json();
+      if (res.ok) setContentGenStatus(data.status?.contentGeneration as ContentGenerationSafeStatus);
+    } catch {
+      // Non-critical status widget — safe to ignore fetch failures here.
+    }
+  }, []);
+
   useEffect(() => {
     void loadBuilds();
     void loadPlans();
     void loadProviderStatus();
-  }, [loadBuilds, loadPlans, loadProviderStatus]);
+    void loadContentGenerationStatus();
+  }, [loadBuilds, loadPlans, loadProviderStatus, loadContentGenerationStatus]);
 
   useEffect(() => {
     if (!activeRunId) return;
@@ -471,6 +490,12 @@ export default function WritingEnginePanel({ topicId }: Props) {
             }`
           : "…"}
       </p>
+
+      {contentGenStatus && !contentGenStatus.enabled && (
+        <p className="admin-field-hint">
+          AI chưa được cấu hình. Bạn vẫn có thể viết và chỉnh sửa nội dung thủ công.
+        </p>
+      )}
 
       <div className="admin-field">
         <label className="admin-label">Context Build</label>
