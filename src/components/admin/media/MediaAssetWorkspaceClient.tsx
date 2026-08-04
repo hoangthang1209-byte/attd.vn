@@ -32,9 +32,7 @@ import {
   healthExplanation,
   healthLetterFromScore,
   humanAiStatus,
-  humanDuplicate,
   humanField,
-  humanHealthIssue,
   humanLifecycle,
   humanLifecycleAction,
   humanModule,
@@ -44,6 +42,7 @@ import {
   humanVisibility,
   lifecycleChipStyle,
   metadataCompletionPercent,
+  primaryTabShortcutLabel,
   previewFrameStyle,
   relativeTime,
   resolvePrimaryTab,
@@ -137,7 +136,39 @@ function betterQualityLabel(item: BetterImageCandidate): string {
   return /seo/i.test(item.reason) ? "Better SEO" : "Higher Quality";
 }
 
-const GRADE_LADDER: Array<"A+" | "A" | "B" | "C" | "D"> = ["A+", "A", "B", "C", "D"];
+const USAGE_GROUP_ORDER = [
+  { key: "PRODUCT", label: "Products" },
+  { key: "BLOG", label: "Blogs" },
+  { key: "CATEGORY", label: "Landing Pages" },
+  { key: "CASE_STUDY", label: "Case Studies" },
+  { key: "COLLECTION", label: "Collections" },
+] as const;
+
+function metadataFieldFill(value: string | null | undefined): number {
+  const length = (value || "").trim().length;
+  if (length === 0) return 0;
+  if (length >= 80) return 100;
+  return Math.max(25, Math.round((length / 80) * 100));
+}
+
+function SkeletonRows({ rows = 3 }: { rows?: number }) {
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {Array.from({ length: rows }).map((_, idx) => (
+        <div
+          key={idx}
+          style={{
+            height: 14,
+            borderRadius: 6,
+            background: "linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%)",
+            backgroundSize: "300% 100%",
+            animation: "ws-skeleton 1.2s ease-in-out infinite",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string }) {
   const toast = useAdminToast();
@@ -299,6 +330,20 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [primaryTab]);
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!event.altKey) return;
+      const digit = Number(event.key);
+      if (!Number.isInteger(digit) || digit < 1 || digit > WORKSPACE_PRIMARY_TABS.length) return;
+      const tab = WORKSPACE_PRIMARY_TABS[digit - 1];
+      if (!tab) return;
+      event.preventDefault();
+      setPrimaryTab(tab.id);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [setPrimaryTab]);
+
   const nextAction = useMemo(() => {
     if (!asset) return null;
     return recommendAssetNextAction({
@@ -387,6 +432,33 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
     }
     return rows.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   }, [asset, intelTimeline, lifecycleEvents]);
+
+  const usageGroups = useMemo(() => {
+    const grouped = new Map<string, UsageCardModel[]>();
+    for (const item of usageCards) {
+      const sourceType = item.key.split(":")[0] || "";
+      const groupKey =
+        sourceType === "PRODUCT"
+          ? "PRODUCT"
+          : sourceType === "BLOG"
+            ? "BLOG"
+            : sourceType === "CATEGORY"
+              ? "CATEGORY"
+              : sourceType === "CASE_STUDY"
+                ? "CASE_STUDY"
+                : sourceType === "COLLECTION"
+                  ? "COLLECTION"
+                  : null;
+      if (!groupKey) continue;
+      const existing = grouped.get(groupKey) ?? [];
+      existing.push(item);
+      grouped.set(groupKey, existing);
+    }
+    return USAGE_GROUP_ORDER.map((group) => ({
+      ...group,
+      items: grouped.get(group.key) ?? [],
+    }));
+  }, [usageCards]);
 
   async function transition(toStatus: string) {
     if (!reason.trim() && ["DEPRECATED", "ARCHIVED", "RETIRED"].includes(toStatus)) {
@@ -656,7 +728,7 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
   });
 
   return (
-    <div className="admin-media-workspace">
+    <div className="admin-media-workspace" style={{ overflowX: "hidden" }}>
       <div ref={topRef} tabIndex={-1} aria-hidden="true" />
       <AdminPageTitle title={asset.title || asset.filename || "Asset Workspace"} />
 
@@ -678,64 +750,90 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
         aria-label="Quick actions"
         style={{
           ...cardStyle,
-          display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
+          display: "grid",
+          gap: 12,
           padding: 12,
           marginBottom: 16,
         }}
       >
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary admin-btn--xs"
-          disabled={busy}
-          onClick={() => void generateSuggestions()}
-        >
-          <span aria-hidden="true">✦</span> Generate
-        </button>
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary admin-btn--xs"
-          onClick={() => setPrimaryTab("lifecycle")}
-        >
-          <span aria-hidden="true">⇄</span> Replace
-        </button>
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary admin-btn--xs"
-          onClick={() => {
-            void navigator.clipboard.writeText(asset.url);
-            toast.success("Đã copy URL");
-          }}
-        >
-          <span aria-hidden="true">⧉</span> Copy URL
-        </button>
-        <a
-          href={asset.url}
-          download={asset.filename}
-          className="admin-btn admin-btn--secondary admin-btn--xs"
-        >
-          <span aria-hidden="true">⬇</span> Download
-        </a>
-        <a
-          href={asset.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="admin-btn admin-btn--secondary admin-btn--xs"
-        >
-          <span aria-hidden="true">↗</span> Open Source
-        </a>
-        <button
-          type="button"
-          className="admin-btn admin-btn--secondary admin-btn--xs"
-          disabled={busy || asset.lifecycleStatus === "ARCHIVED"}
-          onClick={() => {
-            setPrimaryTab("lifecycle");
-            setReason((r) => r || "Archive from workspace");
-          }}
-        >
-          <span aria-hidden="true">▤</span> Archive
-        </button>
+        <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, textTransform: "uppercase" }}>AI</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+              disabled={busy}
+              onClick={() => void generateSuggestions()}
+            >
+              Generate Metadata
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+              disabled={busy || !suggested}
+              onClick={() => void approveSuggestions()}
+            >
+              Approve Metadata
+            </button>
+          </div>
+        </div>
+        <div style={{ height: 1, background: "#e5e7eb" }} />
+        <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, textTransform: "uppercase" }}>Use</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <a
+              href={asset.url}
+              download={asset.filename}
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+            >
+              Download
+            </a>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+              onClick={() => {
+                void navigator.clipboard.writeText(asset.url);
+                toast.success("Đã copy URL");
+              }}
+            >
+              Copy URL
+            </button>
+            <a
+              href={asset.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+            >
+              Open Source
+            </a>
+          </div>
+        </div>
+        <div style={{ height: 1, background: "#e5e7eb" }} />
+        <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, textTransform: "uppercase" }}>
+            Manage
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+              onClick={() => setPrimaryTab("lifecycle")}
+            >
+              Replace
+            </button>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+              disabled={busy || asset.lifecycleStatus === "ARCHIVED"}
+              onClick={() => {
+                setPrimaryTab("lifecycle");
+                setReason((r) => r || "Archive from workspace");
+              }}
+            >
+              Archive
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Primary tabs */}
@@ -744,7 +842,7 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
         aria-label="Workspace sections"
         style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}
       >
-        {WORKSPACE_PRIMARY_TABS.map((tab) => (
+        {WORKSPACE_PRIMARY_TABS.map((tab, index) => (
           <button
             key={tab.id}
             type="button"
@@ -753,7 +851,7 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
             className={`admin-btn admin-btn--xs ${primaryTab === tab.id ? "admin-btn--primary" : "admin-btn--secondary"}`}
             onClick={() => setPrimaryTab(tab.id)}
           >
-            {tab.label}
+            {tab.label} <span style={{ opacity: 0.7 }}>({primaryTabShortcutLabel(index)})</span>
           </button>
         ))}
       </nav>
@@ -840,84 +938,40 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
                 </div>
               </section>
 
-              <section style={cardStyle} aria-labelledby="ws-metadata-summary-title">
-                <h3 id="ws-metadata-summary-title" style={{ marginTop: 0 }}>
-                  Metadata Completion
+              <section style={cardStyle} aria-labelledby="ws-hero-summary-title">
+                <h3 id="ws-hero-summary-title" style={{ marginTop: 0 }}>
+                  Hero Summary
                 </h3>
-                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>{completionPct}% complete</div>
-                <div
-                  style={{
-                    height: 8,
-                    background: "#f3f4f6",
-                    borderRadius: 999,
-                    overflow: "hidden",
-                    marginBottom: 12,
-                  }}
-                  role="progressbar"
-                  aria-valuenow={completionPct}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                >
-                  <div
-                    style={{
-                      width: `${completionPct}%`,
-                      height: "100%",
-                      background: completionPct >= 75 ? "#15803d" : completionPct >= 40 ? "#a16207" : "#b91c1c",
-                      transition: "width .25s ease",
-                    }}
-                  />
+                <div style={{ display: "grid", gap: 8, fontSize: 13 }}>
+                  <div>
+                    Lifecycle <strong>{humanLifecycle(asset.lifecycleStatus)}</strong> · Visibility{" "}
+                    <strong>{humanVisibility(asset.visibility)}</strong> · Rights{" "}
+                    <strong>{humanRights(asset.rightsStatus)}</strong>
+                  </div>
+                  <div>
+                    SEO <strong>{asset.seoScore}</strong> · Completeness <strong>{completionPct}%</strong> · Uses{" "}
+                    <strong>{useCount}</strong>
+                  </div>
                 </div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, display: "grid", gap: 4 }}>
-                  {metaChecklist.map((item) => (
-                    <li key={item.id} style={{ color: item.done ? "#15803d" : "#b91c1c" }}>
-                      {item.done ? "✓" : "✗"} {item.done ? item.label : `Missing ${item.label}`}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--secondary admin-btn--xs"
-                  style={{ marginTop: 10 }}
-                  onClick={() => setPrimaryTab("metadata")}
-                >
-                  Go to Metadata →
-                </button>
               </section>
 
               <section style={cardStyle} aria-labelledby="ws-health-title">
                 <h3 id="ws-health-title" style={{ marginTop: 0 }}>
                   Health Summary
                 </h3>
-                {secondaryLoading && !health ? <InlineLoading title="Đang tải health…" /> : null}
+                {secondaryLoading && !health ? <SkeletonRows rows={4} /> : null}
                 <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 12 }}>
-                  <div style={{ fontSize: 48, fontWeight: 800, lineHeight: 1, color: healthColor(healthScore) }}>
-                    {healthLetter}
+                  <div style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: healthColor(healthScore) }}>
+                    {healthScore}
                   </div>
                   <div>
-                    <div style={{ fontSize: 20, fontWeight: 700 }}>{healthScore} /100</div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>Overall Score · {healthLetter}</div>
                     <div style={{ fontSize: 13, color: "#6b7280", maxWidth: 420 }}>{healthReasonText}</div>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 6, marginBottom: 14 }} aria-label="Grade ladder">
-                  {GRADE_LADDER.map((grade) => (
-                    <span
-                      key={grade}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        background: grade === healthLetter ? healthColor(healthScore) : "#f3f4f6",
-                        color: grade === healthLetter ? "#fff" : "#9ca3af",
-                      }}
-                    >
-                      {grade}
-                    </span>
-                  ))}
-                </div>
                 {health ? (
                   <>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }} aria-label="Health chips">
                       {healthGroups.map((group) => (
                         <span
                           key={group.id}
@@ -935,49 +989,64 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
                         </span>
                       ))}
                     </div>
-                    <div style={{ marginTop: 12, fontSize: 13, color: "#6b7280" }}>
-                      Duplicate: {humanDuplicate(asset.duplicateStatus)}
-                    </div>
-                    {health.issues.length ? (
-                      <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13 }}>
-                        {health.issues.map((issue) => (
-                          <li key={issue}>{humanHealthIssue(issue)}</li>
-                        ))}
-                      </ul>
-                    ) : null}
                   </>
                 ) : (
                   <p style={{ color: "#6b7280", fontSize: 13 }}>Chi tiết health sẽ hiển thị sau khi tải panel phụ.</p>
                 )}
               </section>
 
-              <section style={cardStyle} aria-labelledby="ws-ai-title">
-                <h3 id="ws-ai-title" style={{ marginTop: 0 }}>
-                  AI Recommendation
+              <section style={cardStyle} aria-labelledby="ws-warnings-title">
+                <h3 id="ws-warnings-title" style={{ marginTop: 0 }}>
+                  Warning Summary
                 </h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Best for</div>
-                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                      {(recommended.length ? recommended : ["Chưa có gợi ý"]).map((item) => (
-                        <li key={item}>✓ {item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Not recommended</div>
-                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                      {(notRecommended.length ? notRecommended : ["—"]).map((item) => (
-                        <li key={item}>✗ {item}</li>
-                      ))}
-                    </ul>
-                  </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {warningChecklist.map((w) => (
+                    <button
+                      key={w.id}
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      style={{ justifyContent: "flex-start" }}
+                      onClick={() => {
+                        setPrimaryTab(w.tab);
+                        topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                    >
+                      ⚠ {w.label}
+                    </button>
+                  ))}
+                  {!warningChecklist.length ? (
+                    <p style={{ margin: 0, color: "#15803d", fontSize: 13 }}>No active warnings.</p>
+                  ) : null}
                 </div>
-                {notRecommended.length ? (
-                  <p style={{ color: "#92400e", fontSize: 12, marginTop: 10 }}>
-                    Reason: resolution may be too low for hero banner / homepage cover placements.
-                  </p>
-                ) : null}
+              </section>
+
+              <section style={cardStyle} aria-labelledby="ws-overview-actions-title">
+                <h3 id="ws-overview-actions-title" style={{ marginTop: 0 }}>
+                  Quick Actions
+                </h3>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary admin-btn--xs"
+                    onClick={() => setPrimaryTab("metadata")}
+                  >
+                    Open Metadata
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary admin-btn--xs"
+                    onClick={() => setPrimaryTab("usage")}
+                  >
+                    Open Usage
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary admin-btn--xs"
+                    onClick={() => setPrimaryTab("lifecycle")}
+                  >
+                    Open Lifecycle
+                  </button>
+                </div>
               </section>
             </>
           ) : null}
@@ -990,50 +1059,63 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
               <h3 id="ws-usage-title" style={{ marginTop: 0 }}>
                 Usage
               </h3>
-              {depsLoading && !deps ? <InlineLoading title="Đang tải usage…" /> : null}
+              {depsLoading && !deps ? <SkeletonRows rows={5} /> : null}
               {deps ? (
                 <>
                   <p style={{ fontSize: 13, color: "#6b7280" }}>
                     Total {deps.total} · Public {deps.publicCount} · Internal {deps.internalCount} · Replaceable{" "}
                     {deps.replaceableCount}
                   </p>
-                  <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
-                    {usageCards.map((card) => (
-                      <article
-                        key={card.key}
-                        onClick={() => setHighlightedUsageKey(card.key)}
-                        style={{
-                          border: highlightedUsageKey === card.key ? "1px solid #6366f1" : "1px solid #f3f4f6",
-                          borderRadius: 8,
-                          padding: 12,
-                          background: highlightedUsageKey === card.key ? "#eef2ff" : "#fafafa",
-                          cursor: "pointer",
-                          transition: "background .15s ease, border-color .15s ease",
-                        }}
-                      >
-                        <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>
-                          {card.moduleLabel}
+                  <div style={{ display: "grid", gap: 14, marginBottom: 20 }}>
+                    {usageGroups.map((group) => (
+                      <div key={group.key}>
+                        <h4 style={{ margin: "0 0 8px", fontSize: 13 }}>{group.label}</h4>
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {group.items.map((card) => (
+                            <article
+                              key={card.key}
+                              onClick={() => setHighlightedUsageKey(card.key)}
+                              style={{
+                                border:
+                                  highlightedUsageKey === card.key ? "1px solid #6366f1" : "1px solid #f3f4f6",
+                                borderRadius: 8,
+                                padding: 12,
+                                background: highlightedUsageKey === card.key ? "#eef2ff" : "#fafafa",
+                                cursor: "pointer",
+                                transition: "background .15s ease, border-color .15s ease",
+                              }}
+                            >
+                              <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>
+                                {card.moduleLabel}
+                              </div>
+                              <div style={{ fontWeight: 600, marginTop: 2 }}>{card.title}</div>
+                              <div style={{ fontSize: 13, marginTop: 4 }}>
+                                {card.placement} ·{" "}
+                                <span style={{ color: usageStatusColor(card.statusTone), fontWeight: 600 }}>
+                                  {card.statusLabel}
+                                </span>
+                              </div>
+                              {card.href ? (
+                                <Link
+                                  href={card.href}
+                                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                                  style={{ marginTop: 8, display: "inline-flex" }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Open →
+                                </Link>
+                              ) : null}
+                            </article>
+                          ))}
+                          {!group.items.length ? (
+                            <p style={{ margin: 0, fontSize: 12, color: "#9ca3af" }}>No items.</p>
+                          ) : null}
                         </div>
-                        <div style={{ fontWeight: 600, marginTop: 2 }}>{card.title}</div>
-                        <div style={{ fontSize: 13, marginTop: 4 }}>
-                          {card.placement} ·{" "}
-                          <span style={{ color: usageStatusColor(card.statusTone), fontWeight: 600 }}>
-                            {card.statusLabel}
-                          </span>
-                        </div>
-                        {card.href ? (
-                          <Link
-                            href={card.href}
-                            className="admin-btn admin-btn--secondary admin-btn--xs"
-                            style={{ marginTop: 8, display: "inline-flex" }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            Open →
-                          </Link>
-                        ) : null}
-                      </article>
+                      </div>
                     ))}
-                    {usageCards.length === 0 ? <p style={{ color: "#6b7280" }}>Chưa có tham chiếu đã biết.</p> : null}
+                    {usageCards.length === 0 ? (
+                      <p style={{ color: "#6b7280", margin: 0 }}>Asset is not used anywhere.</p>
+                    ) : null}
                   </div>
 
                   <h4 style={{ margin: "0 0 8px", fontSize: 14 }}>Usage graph</h4>
@@ -1107,14 +1189,34 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
                   }}
                 />
               </div>
-              <ul style={{ margin: "0 0 16px", paddingLeft: 0, listStyle: "none", fontSize: 13, display: "grid", gap: 6 }}>
-                {metaChecklist.map((item) => (
-                  <li key={item.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <input type="checkbox" checked={item.done} readOnly disabled />
-                    {item.label}
-                  </li>
+              {secondaryLoading && !secondaryLoaded ? <SkeletonRows rows={4} /> : null}
+              <div style={{ margin: "0 0 16px", display: "grid", gap: 10 }}>
+                {[
+                  { label: "Title", pct: metadataFieldFill(asset.title) },
+                  { label: "Alt", pct: metadataFieldFill(asset.altText) },
+                  { label: "Caption", pct: metadataFieldFill(asset.caption) },
+                  {
+                    label: "Keywords",
+                    pct: asset.keywords && asset.keywords.length > 0 ? Math.min(100, asset.keywords.length * 25) : 0,
+                  },
+                ].map((field) => (
+                  <div key={field.label}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                      <span>{field.label}</span>
+                      <span>{field.pct}%</span>
+                    </div>
+                    <div style={{ height: 8, background: "#f3f4f6", borderRadius: 999, overflow: "hidden" }}>
+                      <div
+                        style={{
+                          width: `${field.pct}%`,
+                          height: "100%",
+                          background: field.pct >= 75 ? "#15803d" : field.pct >= 40 ? "#a16207" : "#b91c1c",
+                        }}
+                      />
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
                 <button
@@ -1280,8 +1382,9 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
                 <h3 id="ws-timeline-title" style={{ marginTop: 0 }}>
                   Timeline
                 </h3>
+                {secondaryLoading && !secondaryLoaded ? <SkeletonRows rows={4} /> : null}
                 <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
-                  {mergedTimeline.map((row) => (
+                  {mergedTimeline.map((row, idx) => (
                     <li
                       key={row.key}
                       style={{
@@ -1298,13 +1401,27 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
                           width: 28,
                           height: 28,
                           borderRadius: 999,
-                          background: "#f3f4f6",
+                          background: "#eef2ff",
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
+                          position: "relative",
                         }}
                       >
                         {row.icon}
+                        {idx < mergedTimeline.length - 1 ? (
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: 28,
+                              left: "50%",
+                              width: 2,
+                              height: 24,
+                              background: "#d1d5db",
+                              transform: "translateX(-50%)",
+                            }}
+                          />
+                        ) : null}
                       </span>
                       <div>
                         <div style={{ fontWeight: 600 }}>{row.summary}</div>
@@ -1511,81 +1628,119 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
           {primaryTab === "insights" ? (
             <section style={cardStyle} aria-labelledby="ws-insights-title">
               <h3 id="ws-insights-title" style={{ marginTop: 0 }}>
-                Similar & Alternatives
+                Insights
               </h3>
               {secondaryLoading && !similar.length && !better.length ? (
-                <InlineLoading title="Đang tải related assets…" />
+                <SkeletonRows rows={5} />
               ) : null}
 
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-                {asset.supersedesAssetId ? (
-                  <Link
-                    href={`/admin/media/${asset.supersedesAssetId}`}
-                    className="admin-btn admin-btn--secondary admin-btn--xs"
-                  >
-                    ← Previous version
-                  </Link>
-                ) : null}
-                {asset.replacementAssetId ? (
-                  <Link
-                    href={`/admin/media/${asset.replacementAssetId}`}
-                    className="admin-btn admin-btn--secondary admin-btn--xs"
-                  >
-                    Next version →
-                  </Link>
-                ) : null}
-              </div>
+              <section style={{ ...cardStyle, padding: 12, marginBottom: 16 }}>
+                <h4 style={{ marginTop: 0, marginBottom: 8, fontSize: 13 }}>AI Recommendation</h4>
+                {suggested || asset.aiProcessingStatus !== "NOT_PROCESSED" ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>Best for</div>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {(recommended.length ? recommended : ["Chưa có gợi ý"]).map((item) => (
+                          <li key={item}>✓ {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>Not recommended</div>
+                      <ul style={{ margin: 0, paddingLeft: 18 }}>
+                        {(notRecommended.length ? notRecommended : ["—"]).map((item) => (
+                          <li key={item}>✗ {item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <p style={{ margin: 0, color: "#6b7280", fontSize: 13 }}>No AI analysis available.</p>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      disabled={busy}
+                      onClick={() => void generateSuggestions()}
+                    >
+                      Generate Analysis
+                    </button>
+                  </div>
+                )}
+              </section>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                  gap: 10,
-                }}
-              >
-                {better.map((item) => (
-                  <Link
-                    key={`better-${item.mediaAssetId}`}
-                    href={`/admin/media/${item.mediaAssetId}`}
-                    style={{ textDecoration: "none", color: "inherit" }}
-                  >
-                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.thumbnailUrl || item.url}
-                        alt=""
-                        style={{ width: "100%", height: 88, objectFit: "cover" }}
-                      />
-                      <div style={{ padding: 8, fontSize: 12 }}>
-                        <div style={{ color: "#6b7280", fontSize: 11 }}>{betterQualityLabel(item)}</div>
-                        <div>{item.title || item.mediaAssetId.slice(0, 8)}</div>
-                        <div style={{ color: "#6b7280" }}>{item.reason}</div>
-                      </div>
+              <div style={{ display: "grid", gap: 14 }}>
+                {[
+                  { title: "Same Product", items: similar.filter((item) => item.relation === "SAME_PRODUCT"), type: "similar" as const },
+                  { title: "Same Session", items: similar.filter((item) => item.relation === "SAME_HASH"), type: "similar" as const },
+                  { title: "Higher Resolution", items: better, type: "better" as const },
+                  {
+                    title: "Portrait",
+                    items: [...similar, ...better].filter((item) =>
+                      /portrait|vertical/i.test(`${item.title || ""} ${"reason" in item ? item.reason : ""}`),
+                    ),
+                    type: "mixed" as const,
+                  },
+                  {
+                    title: "Landscape",
+                    items: [...similar, ...better].filter((item) =>
+                      /landscape|horizontal|banner/i.test(
+                        `${item.title || ""} ${"reason" in item ? item.reason : ""}`,
+                      ),
+                    ),
+                    type: "mixed" as const,
+                  },
+                  { title: "Alternative Hero", items: better.filter((item) => /hero/i.test(item.reason)), type: "better" as const },
+                  {
+                    title: "Duplicate Candidate",
+                    items: similar.filter((item) => item.relation === "DUPLICATE" || item.relation === "SAME_HASH"),
+                    type: "similar" as const,
+                  },
+                ].map((group) => (
+                  <div key={group.title}>
+                    <h4 style={{ margin: "0 0 8px", fontSize: 13 }}>{group.title}</h4>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                        gap: 10,
+                      }}
+                    >
+                      {group.items.map((item) => (
+                        <Link
+                          key={`${group.title}-${item.mediaAssetId}`}
+                          href={`/admin/media/${item.mediaAssetId}`}
+                          style={{ textDecoration: "none", color: "inherit" }}
+                        >
+                          <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={item.thumbnailUrl || item.url}
+                              alt={("altText" in item && item.altText) || ""}
+                              style={{ width: "100%", height: 88, objectFit: "cover" }}
+                            />
+                            <div style={{ padding: 8, fontSize: 12 }}>
+                              <div style={{ color: "#6b7280", fontSize: 11 }}>
+                                {"relation" in item
+                                  ? humanSimilarRelation(item.relation)
+                                  : "reason" in item
+                                    ? betterQualityLabel(item)
+                                    : "Related"}
+                              </div>
+                              <div>{item.title || item.mediaAssetId.slice(0, 8)}</div>
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
+                      {!group.items.length ? (
+                        <p style={{ margin: 0, color: "#9ca3af", fontSize: 12 }}>No items.</p>
+                      ) : null}
                     </div>
-                  </Link>
-                ))}
-                {similar.map((item) => (
-                  <Link
-                    key={item.mediaAssetId}
-                    href={`/admin/media/${item.mediaAssetId}`}
-                    style={{ textDecoration: "none", color: "inherit" }}
-                  >
-                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.thumbnailUrl || item.url}
-                        alt={item.altText || ""}
-                        style={{ width: "100%", height: 88, objectFit: "cover" }}
-                      />
-                      <div style={{ padding: 8, fontSize: 12 }}>
-                        <div style={{ color: "#6b7280", fontSize: 11 }}>{humanSimilarRelation(item.relation)}</div>
-                        <div>{item.title || item.mediaAssetId.slice(0, 8)}</div>
-                      </div>
-                    </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
-              {!similar.length && !better.length && !asset.replacementAssetId && !asset.supersedesAssetId ? (
+              {!similar.length && !better.length ? (
                 <p style={{ color: "#6b7280", fontSize: 13 }}>Chưa có similar / alternative.</p>
               ) : null}
             </section>
@@ -1598,7 +1753,7 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
           aria-label="Status summary and recommendations"
         >
           <div>
-            <h3 style={{ marginTop: 0, fontSize: 14 }}>Status Summary</h3>
+            <h3 style={{ marginTop: 0, fontSize: 14 }}>Status</h3>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
               <li>Lifecycle: {humanLifecycle(asset.lifecycleStatus)}</li>
               <li>Visibility: {humanVisibility(asset.visibility)}</li>
@@ -1613,19 +1768,17 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
             </ul>
           </div>
 
-          {nextAction ? (
-            <div>
-              <div style={{ fontSize: 12, color: "#6b7280" }}>Next Recommended Action</div>
-              <button
-                type="button"
-                className="admin-btn admin-btn--primary admin-btn--xs"
-                style={{ marginTop: 6, width: "100%" }}
-                onClick={() => setPrimaryTab(resolvePrimaryTab(nextAction.section))}
-              >
-                {nextAction.label}
-              </button>
-            </div>
-          ) : null}
+          <div>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>Recommendation</div>
+            <button
+              type="button"
+              className="admin-btn admin-btn--primary admin-btn--xs"
+              style={{ marginTop: 6, width: "100%" }}
+              onClick={() => setPrimaryTab(resolvePrimaryTab(nextAction?.section || "metadata"))}
+            >
+              {nextAction?.label || "Review metadata completeness"}
+            </button>
+          </div>
 
           {warningChecklist.length ? (
             <div>
@@ -1655,60 +1808,23 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
           ) : null}
 
           <div>
-            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, marginBottom: 8 }}>Related Assets</div>
+            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, marginBottom: 8 }}>Insights</div>
             <div style={{ display: "grid", gap: 8 }}>
               {similar.slice(0, 4).map((item) => (
-                <Link
+                <button
                   key={`side-${item.mediaAssetId}`}
-                  href={`/admin/media/${item.mediaAssetId}`}
-                  style={{ display: "flex", gap: 8, textDecoration: "none", color: "inherit", fontSize: 12 }}
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  style={{ justifyContent: "flex-start" }}
+                  onClick={() => setPrimaryTab("insights")}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.thumbnailUrl || item.url}
-                    alt=""
-                    style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 4 }}
-                  />
-                  <span>
-                    <span style={{ color: "#6b7280" }}>{humanSimilarRelation(item.relation)}</span>
-                    <br />
-                    {item.title || item.mediaAssetId.slice(0, 10)}
-                  </span>
-                </Link>
-              ))}
-              {better.slice(0, 2).map((item) => (
-                <Link
-                  key={`side-better-${item.mediaAssetId}`}
-                  href={`/admin/media/${item.mediaAssetId}`}
-                  style={{ display: "flex", gap: 8, textDecoration: "none", color: "inherit", fontSize: 12 }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.thumbnailUrl || item.url}
-                    alt=""
-                    style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 4 }}
-                  />
-                  <span>
-                    <span style={{ color: "#6b7280" }}>{betterQualityLabel(item)}</span>
-                    <br />
-                    {item.title || item.mediaAssetId.slice(0, 10)}
-                  </span>
-                </Link>
+                  {humanSimilarRelation(item.relation)}: {item.title || item.mediaAssetId.slice(0, 8)}
+                </button>
               ))}
               {!similar.length && !better.length ? (
                 <p style={{ margin: 0, fontSize: 12, color: "#9ca3af" }}>Chưa có gợi ý liên quan.</p>
               ) : null}
             </div>
-            {similar.length || better.length ? (
-              <button
-                type="button"
-                className="admin-btn admin-btn--secondary admin-btn--xs"
-                style={{ marginTop: 8, width: "100%" }}
-                onClick={() => setPrimaryTab("insights")}
-              >
-                Xem tất cả Insights →
-              </button>
-            ) : null}
           </div>
 
           <div>
@@ -1751,9 +1867,15 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
       </div>
 
       <style>{`
+        .admin-media-workspace-layout > * {
+          min-width: 0;
+        }
         @media (max-width: 900px) {
           .admin-media-workspace-layout {
             grid-template-columns: 1fr !important;
+          }
+          .admin-media-workspace-layout aside {
+            position: static !important;
           }
         }
         @media (prefers-reduced-motion: reduce) {
@@ -1763,6 +1885,10 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
           .admin-media-preview-frame {
             transition: none !important;
           }
+        }
+        @keyframes ws-skeleton {
+          0% { background-position: 100% 50%; }
+          100% { background-position: 0 50%; }
         }
       `}</style>
     </div>

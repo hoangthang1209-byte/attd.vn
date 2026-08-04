@@ -14,6 +14,7 @@ import {
   humanSimilarRelation,
   metadataCompletionPercent,
   qualityStars,
+  primaryTabShortcutLabel,
   resolvePrimaryTab,
   rightsHealthScore,
   toUsageCard,
@@ -69,6 +70,12 @@ describe("Sprint 15.1 workspace IA polish", () => {
     assert.equal(resolvePrimaryTab("replacement"), "lifecycle");
     assert.equal(resolvePrimaryTab("rights"), "lifecycle");
     assert.equal(resolvePrimaryTab("timeline"), "lifecycle");
+  });
+
+  it("returns tab keyboard shortcut labels", () => {
+    assert.equal(primaryTabShortcutLabel(0), "Alt+1");
+    assert.equal(primaryTabShortcutLabel(4), "Alt+5");
+    assert.equal(primaryTabShortcutLabel(8), "");
   });
 
   it("uses Vietnamese lifecycle labels", () => {

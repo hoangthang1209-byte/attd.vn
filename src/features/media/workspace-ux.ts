@@ -31,6 +31,12 @@ export const WORKSPACE_PRIMARY_TABS: Array<{ id: WorkspacePrimaryTab; label: str
   { id: "insights", label: "Insights" },
 ];
 
+export function primaryTabShortcutLabel(index: number): string {
+  const pos = index + 1;
+  if (pos < 1 || pos > WORKSPACE_PRIMARY_TABS.length) return "";
+  return `Alt+${pos}`;
+}
+
 /** Map legacy deep-links (?section=) and next-action sections → primary tab. */
 export function resolvePrimaryTab(raw: string | null | undefined): WorkspacePrimaryTab {
   switch (raw) {
