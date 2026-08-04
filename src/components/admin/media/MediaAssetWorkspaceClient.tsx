@@ -6,6 +6,9 @@ import { useSearchParams } from "next/navigation";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import { InlineLoading } from "@/components/ui/loading/ContextLoading";
+import MediaPicker, {
+  type MediaPickerSelectedAsset,
+} from "@/components/admin/media/MediaPicker";
 import type {
   AssetHealthBreakdown,
   BetterImageCandidate,
@@ -19,28 +22,40 @@ import type {
 } from "@/features/media/lifecycle/lifecycle.types";
 import { recommendAssetNextAction } from "@/features/media/lifecycle/next-action.service";
 import {
-  PREVIEW_MODES,
+  buildHealthGroups,
+  buildMetadataChecklist,
   buildUsageTree,
+  buildWarningChecklist,
   cardStyle,
   formatBytes,
   healthColor,
-  healthGradeLabel,
+  healthExplanation,
+  healthLetterFromScore,
   humanAiStatus,
   humanDuplicate,
   humanField,
   humanHealthIssue,
   humanLifecycle,
   humanLifecycleAction,
+  humanModule,
   humanRights,
   humanSeoReadiness,
   humanSimilarRelation,
   humanVisibility,
+  lifecycleChipStyle,
+  metadataCompletionPercent,
   previewFrameStyle,
-  qualityStars,
   relativeTime,
+  resolvePrimaryTab,
+  rightsHealthScore,
   timelineIcon,
+  toneColor,
   toUsageCard,
+  PREVIEW_MODES,
+  WORKSPACE_PRIMARY_TABS,
   type PreviewMode,
+  type UsageCardModel,
+  type WorkspacePrimaryTab,
 } from "@/features/media/workspace-ux";
 
 type WorkspaceAsset = {
@@ -90,31 +105,6 @@ type WorkspaceAsset = {
   };
 };
 
-type Section =
-  | "overview"
-  | "usage"
-  | "lifecycle"
-  | "replacement"
-  | "rights"
-  | "timeline"
-  | "health"
-  | "ai"
-  | "similar"
-  | "metadata";
-
-const SECTION_NAV: Array<{ id: Section; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "health", label: "Health" },
-  { id: "usage", label: "Usage" },
-  { id: "ai", label: "AI" },
-  { id: "metadata", label: "Metadata" },
-  { id: "similar", label: "Similar" },
-  { id: "timeline", label: "Timeline" },
-  { id: "lifecycle", label: "Lifecycle" },
-  { id: "replacement", label: "Replacement" },
-  { id: "rights", label: "Rights" },
-];
-
 function refKey(type: string, id: string, field: string | null) {
   return `${type}:${id}:${field ?? ""}`;
 }
@@ -128,21 +118,34 @@ function readSuggested(metadata: unknown): SuggestedMediaMetadata | null {
   return suggested as SuggestedMediaMetadata;
 }
 
-function sectionFromNextAction(
-  section: ReturnType<typeof recommendAssetNextAction>["section"],
-): Section {
-  if (section === "bundles") return "overview";
-  return section;
+function usageStatusColor(tone: UsageCardModel["statusTone"]): string {
+  switch (tone) {
+    case "published":
+      return "#15803d";
+    case "draft":
+      return "#a16207";
+    case "archived":
+      return "#6b7280";
+    case "internal":
+      return "#2563eb";
+    default:
+      return "#6b7280";
+  }
 }
+
+function betterQualityLabel(item: BetterImageCandidate): string {
+  return /seo/i.test(item.reason) ? "Better SEO" : "Higher Quality";
+}
+
+const GRADE_LADDER: Array<"A+" | "A" | "B" | "C" | "D"> = ["A+", "A", "B", "C", "D"];
 
 export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string }) {
   const toast = useAdminToast();
   const searchParams = useSearchParams();
-  const initialSection = (searchParams.get("section") as Section) || "overview";
-  const cardRefs = useRef<Partial<Record<Section, HTMLElement | null>>>({});
+  const topRef = useRef<HTMLDivElement | null>(null);
 
-  const [section, setSection] = useState<Section>(
-    SECTION_NAV.some((s) => s.id === initialSection) ? initialSection : "overview",
+  const [primaryTab, setPrimaryTabState] = useState<WorkspacePrimaryTab>(() =>
+    resolvePrimaryTab(searchParams.get("section")),
   );
   const [asset, setAsset] = useState<WorkspaceAsset | null>(null);
   const [deps, setDeps] = useState<MediaDependencySummary | null>(null);
@@ -169,8 +172,12 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingSuggestion, setPendingSuggestion] = useState<SuggestedMediaMetadata | null>(null);
+  const [showMetadataPreview, setShowMetadataPreview] = useState(false);
+  const [highlightedUsageKey, setHighlightedUsageKey] = useState<string | null>(null);
 
   const [replacementId, setReplacementId] = useState("");
+  const [replacementAsset, setReplacementAsset] = useState<MediaPickerSelectedAsset | null>(null);
+  const [showManualReplacementId, setShowManualReplacementId] = useState(false);
   const [plan, setPlan] = useState<MediaReplacementPlan | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [confirmApply, setConfirmApply] = useState(false);
@@ -182,13 +189,9 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
     verified: boolean;
   } | null>(null);
 
-  const scrollToSection = useCallback((id: Section) => {
-    setSection(id);
-    const el = cardRefs.current[id];
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      el.focus({ preventScroll: true });
-    }
+  const setPrimaryTab = useCallback((tab: WorkspacePrimaryTab) => {
+    setPrimaryTabState(tab);
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
   const loadAsset = useCallback(async () => {
@@ -291,17 +294,10 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
   }, [loading, asset, loadSecondary]);
 
   useEffect(() => {
-    if (section === "usage" || section === "replacement") void loadDeps();
-  }, [section, loadDeps]);
-
-  useEffect(() => {
-    if (!loading && asset) {
-      const t = window.setTimeout(() => scrollToSection(section), 100);
-      return () => window.clearTimeout(t);
-    }
-    // only on first load with deep-link
+    if (primaryTab === "usage" || primaryTab === "lifecycle") void loadDeps();
+    // Lazy on-demand load only — no change to automatic load-on-mount fetch count.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [primaryTab]);
 
   const nextAction = useMemo(() => {
     if (!asset) return null;
@@ -321,22 +317,27 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
     });
   }, [asset, deps]);
 
-  const warnings = useMemo(() => {
-    if (!asset) return [] as string[];
-    const list: string[] = [];
-    if (!asset.altText?.trim()) list.push("Thiếu alt text — ảnh công khai kém accessibility.");
-    if (asset.rightsStatus === "UNKNOWN" && asset.visibility === "PUBLIC") {
-      list.push("Quyền sử dụng chưa rõ trên ảnh PUBLIC.");
-    }
-    if (asset.duplicateStatus === "CONFIRMED_DUPLICATE" || asset.duplicateStatus === "POSSIBLE_DUPLICATE") {
-      list.push(`Trùng lặp: ${humanDuplicate(asset.duplicateStatus)}.`);
-    }
-    if (deps && deps.publicCount > 0 && asset.lifecycleStatus === "DEPRECATED") {
-      list.push(`DEPRECATED nhưng còn ${deps.publicCount} chỗ dùng công khai.`);
-    }
-    if ((asset.seoScore ?? 0) < 50) list.push("SEO score thấp — cần bổ sung metadata.");
-    return list;
-  }, [asset, deps]);
+  const metaChecklist = useMemo(() => {
+    if (!asset) return [];
+    return buildMetadataChecklist({
+      title: asset.title,
+      altText: asset.altText,
+      caption: asset.caption,
+      keywords: asset.keywords,
+    });
+  }, [asset]);
+
+  const completionPct = useMemo(() => metadataCompletionPercent(metaChecklist), [metaChecklist]);
+
+  const warningChecklist = useMemo(() => {
+    if (!asset) return [];
+    return buildWarningChecklist({
+      missingAlt: !asset.altText?.trim(),
+      missingCaption: !asset.caption?.trim(),
+      unknownRightsPublic: asset.rightsStatus === "UNKNOWN" && asset.visibility === "PUBLIC",
+      seoBelow: (asset.seoScore ?? 0) < 50,
+    });
+  }, [asset]);
 
   const usageCards = useMemo(() => {
     if (!deps) return [];
@@ -414,7 +415,7 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
 
   async function buildPlan() {
     if (!replacementId.trim()) {
-      toast.error("Nhập ID ảnh thay thế");
+      toast.error("Chọn ảnh thay thế từ thư viện Media");
       return;
     }
     setBusy(true);
@@ -449,7 +450,6 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
           .map((i) => refKey(i.referenceType, i.referenceId, i.field)),
       );
       setSelectedKeys(auto);
-      scrollToSection("replacement");
       toast.success(`Preview: ${data.replaceableAutomatically} có thể thay tự động`);
     } finally {
       setBusy(false);
@@ -561,6 +561,7 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
 
   async function rejectSuggestions() {
     setPendingSuggestion(null);
+    setShowMetadataPreview(false);
     toast.success("Đã bỏ gợi ý (không ghi đè dữ liệu hiện có).");
   }
 
@@ -619,11 +620,12 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
 
   const frame = previewFrameStyle(previewMode);
   const suggested = pendingSuggestion || (asset ? readSuggested(asset.metadata) : null);
-  const recommended = suggested?.suggestedSuitabilities?.slice(0, 6) ?? asset?.contentSuitabilities ?? [];
-  const notRecommended =
-    suggested && (asset?.width ?? 0) < 1200
-      ? ["Homepage Hero"]
-      : [];
+  const recommended = (
+    suggested?.suggestedSuitabilities?.length
+      ? suggested.suggestedSuitabilities
+      : [...(asset?.contentSuitabilities ?? []), ...(asset?.useCaseTerms ?? [])]
+  ).slice(0, 6);
+  const notRecommended = (asset?.width ?? 0) < 1200 ? ["Hero Banner", "Homepage Cover"] : [];
 
   if (loading) return <InlineLoading title="Đang tải Asset Workspace…" />;
   if (error || !asset) {
@@ -639,12 +641,23 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
   }
 
   const useCount = deps?.total ?? asset._count.contentMediaAssignments;
-  const openProduct = usageCards.find((c) => c.moduleLabel === "Sản phẩm" && c.href);
-  const openBlog = usageCards.find((c) => c.moduleLabel === "Blog" && c.href);
-  const openHomepage = usageCards.find((c) => c.moduleLabel === "Trang chủ" && c.href);
+  const healthScore = health?.total ?? asset.seoScore;
+  const healthLetter = healthLetterFromScore(healthScore);
+  const rightsScore = rightsHealthScore(asset.rightsStatus, asset.visibility);
+  const healthGroups = health ? buildHealthGroups(health, rightsScore) : [];
+  const healthReasonText = healthExplanation({
+    score: healthScore,
+    letter: healthLetter,
+    issues: health?.issues ?? [],
+    missingAlt: !asset.altText?.trim(),
+    missingCaption: !asset.caption?.trim(),
+    missingTitle: !asset.title?.trim(),
+    missingKeywords: !(asset.keywords && asset.keywords.length > 0),
+  });
 
   return (
     <div className="admin-media-workspace">
+      <div ref={topRef} tabIndex={-1} aria-hidden="true" />
       <AdminPageTitle title={asset.title || asset.filename || "Asset Workspace"} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
@@ -678,22 +691,15 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
           disabled={busy}
           onClick={() => void generateSuggestions()}
         >
-          Generate Alt / Caption
+          <span aria-hidden="true">✦</span> Generate
         </button>
         <button
           type="button"
           className="admin-btn admin-btn--secondary admin-btn--xs"
-          onClick={() => scrollToSection("replacement")}
+          onClick={() => setPrimaryTab("lifecycle")}
         >
-          Replace
+          <span aria-hidden="true">⇄</span> Replace
         </button>
-        <a
-          href={asset.url}
-          download={asset.filename}
-          className="admin-btn admin-btn--secondary admin-btn--xs"
-        >
-          Download
-        </a>
         <button
           type="button"
           className="admin-btn admin-btn--secondary admin-btn--xs"
@@ -702,855 +708,893 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
             toast.success("Đã copy URL");
           }}
         >
-          Copy URL
+          <span aria-hidden="true">⧉</span> Copy URL
         </button>
-        <button
-          type="button"
+        <a
+          href={asset.url}
+          download={asset.filename}
           className="admin-btn admin-btn--secondary admin-btn--xs"
-          onClick={() => {
-            void navigator.clipboard.writeText(asset.id);
-            toast.success("Đã copy Media ID");
-          }}
         >
-          Copy Media ID
-        </button>
+          <span aria-hidden="true">⬇</span> Download
+        </a>
+        <a
+          href={asset.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="admin-btn admin-btn--secondary admin-btn--xs"
+        >
+          <span aria-hidden="true">↗</span> Open Source
+        </a>
         <button
           type="button"
           className="admin-btn admin-btn--secondary admin-btn--xs"
           disabled={busy || asset.lifecycleStatus === "ARCHIVED"}
           onClick={() => {
-            scrollToSection("lifecycle");
+            setPrimaryTab("lifecycle");
             setReason((r) => r || "Archive from workspace");
           }}
         >
-          Archive
+          <span aria-hidden="true">▤</span> Archive
         </button>
-        {openProduct?.href ? (
-          <Link href={openProduct.href} className="admin-btn admin-btn--secondary admin-btn--xs">
-            Open Product
-          </Link>
-        ) : null}
-        {openBlog?.href ? (
-          <Link href={openBlog.href} className="admin-btn admin-btn--secondary admin-btn--xs">
-            Open Blog
-          </Link>
-        ) : null}
-        {openHomepage?.href ? (
-          <Link href={openHomepage.href} className="admin-btn admin-btn--secondary admin-btn--xs">
-            Open Homepage
-          </Link>
-        ) : null}
       </div>
 
-      <div className="admin-media-workspace-layout" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 300px", gap: 20, alignItems: "start" }}>
+      {/* Primary tabs */}
+      <nav
+        role="tablist"
+        aria-label="Workspace sections"
+        style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}
+      >
+        {WORKSPACE_PRIMARY_TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={primaryTab === tab.id}
+            className={`admin-btn admin-btn--xs ${primaryTab === tab.id ? "admin-btn--primary" : "admin-btn--secondary"}`}
+            onClick={() => setPrimaryTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <div
+        className="admin-media-workspace-layout"
+        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 300px", gap: 20, alignItems: "start" }}
+      >
         <div style={{ display: "grid", gap: 16 }}>
-          {/* Hero preview + header */}
-          <section
-            ref={(el) => {
-              cardRefs.current.overview = el;
-            }}
-            tabIndex={-1}
-            id="ws-overview"
-            aria-label="Asset preview"
-            style={cardStyle}
-          >
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-              {PREVIEW_MODES.map((mode) => (
-                <button
-                  key={mode.id}
-                  type="button"
-                  className={`admin-btn admin-btn--xs ${previewMode === mode.id ? "admin-btn--primary" : "admin-btn--secondary"}`}
-                  aria-pressed={previewMode === mode.id}
-                  onClick={() => setPreviewMode(mode.id)}
+          {/* ---------------------------------------------------------------- */}
+          {/* OVERVIEW TAB                                                    */}
+          {/* ---------------------------------------------------------------- */}
+          {primaryTab === "overview" ? (
+            <>
+              <section style={cardStyle} aria-labelledby="ws-overview-title">
+                <h3 id="ws-overview-title" style={{ marginTop: 0 }}>
+                  Preview
+                </h3>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                  {PREVIEW_MODES.map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      className={`admin-btn admin-btn--xs ${previewMode === mode.id ? "admin-btn--primary" : "admin-btn--secondary"}`}
+                      aria-pressed={previewMode === mode.id}
+                      onClick={() => setPreviewMode(mode.id)}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  className="admin-media-preview-frame"
+                  style={{
+                    maxWidth: frame.maxWidth,
+                    height: frame.height,
+                    margin: "0 auto 16px",
+                    background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "1px solid #e5e7eb",
+                    transition: "max-width .25s ease, height .25s ease",
+                  }}
                 >
-                  {mode.label}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={asset.thumbnailUrl || asset.url}
+                    alt={asset.altText || asset.title || asset.filename}
+                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                  />
+                </div>
+
+                <h2 style={{ margin: "0 0 6px", fontSize: 22 }}>{asset.title || asset.filename}</h2>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>{asset.filename}</div>
+                <div
+                  style={{ fontSize: 12, color: "#9ca3af", marginTop: 4, fontFamily: "ui-monospace, monospace" }}
+                >
+                  ID {asset.id}
+                </div>
+
+                <div
+                  style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12, alignItems: "center" }}
+                  aria-label="Asset status badges"
+                >
+                  <span style={lifecycleChipStyle(asset.lifecycleStatus)}>
+                    {humanLifecycle(asset.lifecycleStatus)}
+                  </span>
+                  <span className="admin-badge">{humanVisibility(asset.visibility)}</span>
+                  {asset.role?.name ? <span className="admin-badge">{asset.role.name}</span> : null}
+                  {asset.library?.name ? <span className="admin-badge">{asset.library.name}</span> : null}
+                  <span className="admin-badge">
+                    {asset.width || "?"}×{asset.height || "?"}
+                  </span>
+                  <span className="admin-badge">{formatBytes(asset.sizeBytes)}</span>
+                  <span className="admin-badge" style={{ fontWeight: 700 }}>
+                    Quality {healthLetter}
+                  </span>
+                  <span className="admin-badge">SEO {asset.seoScore}</span>
+                  <span className="admin-badge">Completeness {completionPct}%</span>
+                  <span className="admin-badge">Used by {useCount}</span>
+                </div>
+              </section>
+
+              <section style={cardStyle} aria-labelledby="ws-metadata-summary-title">
+                <h3 id="ws-metadata-summary-title" style={{ marginTop: 0 }}>
+                  Metadata Completion
+                </h3>
+                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>{completionPct}% complete</div>
+                <div
+                  style={{
+                    height: 8,
+                    background: "#f3f4f6",
+                    borderRadius: 999,
+                    overflow: "hidden",
+                    marginBottom: 12,
+                  }}
+                  role="progressbar"
+                  aria-valuenow={completionPct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    style={{
+                      width: `${completionPct}%`,
+                      height: "100%",
+                      background: completionPct >= 75 ? "#15803d" : completionPct >= 40 ? "#a16207" : "#b91c1c",
+                      transition: "width .25s ease",
+                    }}
+                  />
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, display: "grid", gap: 4 }}>
+                  {metaChecklist.map((item) => (
+                    <li key={item.id} style={{ color: item.done ? "#15803d" : "#b91c1c" }}>
+                      {item.done ? "✓" : "✗"} {item.done ? item.label : `Missing ${item.label}`}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  style={{ marginTop: 10 }}
+                  onClick={() => setPrimaryTab("metadata")}
+                >
+                  Go to Metadata →
                 </button>
-              ))}
-            </div>
-            <div
-              style={{
-                maxWidth: frame.maxWidth,
-                height: frame.height,
-                margin: "0 auto 16px",
-                background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
-                borderRadius: 8,
-                overflow: "hidden",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "1px solid #e5e7eb",
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={asset.thumbnailUrl || asset.url}
-                alt={asset.altText || asset.title || asset.filename}
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                  objectFit: "contain",
-                }}
-              />
-            </div>
+              </section>
 
-            <h2 style={{ margin: "0 0 6px", fontSize: 22 }}>
-              {asset.title || asset.filename}
-            </h2>
-            <div style={{ fontSize: 13, color: "#6b7280" }}>{asset.filename}</div>
-            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4, fontFamily: "ui-monospace, monospace" }}>
-              ID {asset.id}
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
-                marginTop: 12,
-                alignItems: "center",
-              }}
-              aria-label="Asset status badges"
-            >
-              <span style={{ letterSpacing: 1, color: "#a16207" }} aria-label={`Quality ${qualityStars(asset.seoScore)}`}>
-                {qualityStars(asset.seoScore)}
-              </span>
-              <span className="admin-badge">{humanLifecycle(asset.lifecycleStatus)}</span>
-              <span className="admin-badge">{humanVisibility(asset.visibility)}</span>
-              <span className="admin-badge">SEO {asset.seoScore}</span>
-              <span className="admin-badge">
-                Quality {health ? healthGradeLabel(health.grade) : "—"}
-              </span>
-              <span className="admin-badge">Used by {useCount}</span>
-              <span className="admin-badge">{asset.orientation}</span>
-              {asset.role?.name ? <span className="admin-badge">{asset.role.name}</span> : null}
-              {asset.subjectTerms.slice(0, 2).map((t) => (
-                <span key={t} className="admin-badge">
-                  {t}
-                </span>
-              ))}
-              {asset.techniqueTerms?.slice(0, 2).map((t) => (
-                <span key={t} className="admin-badge">
-                  {t}
-                </span>
-              ))}
-              <span className="admin-badge">{humanAiStatus(asset.aiProcessingStatus)}</span>
-              <span className="admin-badge">{humanSeoReadiness(asset.seoReadinessStatus)}</span>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10, marginTop: 14, fontSize: 13 }}>
-              <div>
-                <div style={{ color: "#6b7280", fontSize: 11 }}>Dimensions</div>
-                <div>{asset.width || "?"}×{asset.height || "?"}</div>
-              </div>
-              <div>
-                <div style={{ color: "#6b7280", fontSize: 11 }}>Size</div>
-                <div>{formatBytes(asset.sizeBytes)}</div>
-              </div>
-              <div>
-                <div style={{ color: "#6b7280", fontSize: 11 }}>Role</div>
-                <div>{asset.role?.name || "—"}</div>
-              </div>
-              <div>
-                <div style={{ color: "#6b7280", fontSize: 11 }}>Library</div>
-                <div>{asset.library?.name || "—"}</div>
-              </div>
-              <div>
-                <div style={{ color: "#6b7280", fontSize: 11 }}>Completeness</div>
-                <div>{asset.metadataCompleteness}%</div>
-              </div>
-            </div>
-          </section>
-
-          <nav
-            aria-label="Workspace sections"
-            style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
-          >
-            {SECTION_NAV.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`admin-btn admin-btn--xs ${section === s.id ? "admin-btn--primary" : "admin-btn--secondary"}`}
-                aria-current={section === s.id ? "true" : undefined}
-                onClick={() => scrollToSection(s.id)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </nav>
-
-          {/* Health */}
-          <section
-            ref={(el) => {
-              cardRefs.current.health = el;
-            }}
-            tabIndex={-1}
-            id="ws-health"
-            style={cardStyle}
-            aria-labelledby="ws-health-title"
-          >
-            <h3 id="ws-health-title" style={{ marginTop: 0 }}>
-              Health
-            </h3>
-            {secondaryLoading && !health ? <InlineLoading title="Đang tải health…" /> : null}
-            {health ? (
-              <>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }}>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: healthColor(health.total) }}>
-                    {health.total}
+              <section style={cardStyle} aria-labelledby="ws-health-title">
+                <h3 id="ws-health-title" style={{ marginTop: 0 }}>
+                  Health Summary
+                </h3>
+                {secondaryLoading && !health ? <InlineLoading title="Đang tải health…" /> : null}
+                <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 12 }}>
+                  <div style={{ fontSize: 48, fontWeight: 800, lineHeight: 1, color: healthColor(healthScore) }}>
+                    {healthLetter}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 600 }}>Overall Health · {healthGradeLabel(health.grade)}</div>
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>
-                      Completeness {asset.metadataCompleteness}%
-                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 700 }}>{healthScore} /100</div>
+                    <div style={{ fontSize: 13, color: "#6b7280", maxWidth: 420 }}>{healthReasonText}</div>
                   </div>
                 </div>
+                <div style={{ display: "flex", gap: 6, marginBottom: 14 }} aria-label="Grade ladder">
+                  {GRADE_LADDER.map((grade) => (
+                    <span
+                      key={grade}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        background: grade === healthLetter ? healthColor(healthScore) : "#f3f4f6",
+                        color: grade === healthLetter ? "#fff" : "#9ca3af",
+                      }}
+                    >
+                      {grade}
+                    </span>
+                  ))}
+                </div>
+                {health ? (
+                  <>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {healthGroups.map((group) => (
+                        <span
+                          key={group.id}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 999,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            background: "#f8fafc",
+                            border: `1px solid ${toneColor[group.tone]}33`,
+                            color: toneColor[group.tone],
+                          }}
+                        >
+                          {group.label} · {group.score}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 12, fontSize: 13, color: "#6b7280" }}>
+                      Duplicate: {humanDuplicate(asset.duplicateStatus)}
+                    </div>
+                    {health.issues.length ? (
+                      <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13 }}>
+                        {health.issues.map((issue) => (
+                          <li key={issue}>{humanHealthIssue(issue)}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </>
+                ) : (
+                  <p style={{ color: "#6b7280", fontSize: 13 }}>Chi tiết health sẽ hiển thị sau khi tải panel phụ.</p>
+                )}
+              </section>
+
+              <section style={cardStyle} aria-labelledby="ws-ai-title">
+                <h3 id="ws-ai-title" style={{ marginTop: 0 }}>
+                  AI Recommendation
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Best for</div>
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {(recommended.length ? recommended : ["Chưa có gợi ý"]).map((item) => (
+                        <li key={item}>✓ {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Not recommended</div>
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {(notRecommended.length ? notRecommended : ["—"]).map((item) => (
+                        <li key={item}>✗ {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                {notRecommended.length ? (
+                  <p style={{ color: "#92400e", fontSize: 12, marginTop: 10 }}>
+                    Reason: resolution may be too low for hero banner / homepage cover placements.
+                  </p>
+                ) : null}
+              </section>
+            </>
+          ) : null}
+
+          {/* ---------------------------------------------------------------- */}
+          {/* USAGE TAB                                                       */}
+          {/* ---------------------------------------------------------------- */}
+          {primaryTab === "usage" ? (
+            <section style={cardStyle} aria-labelledby="ws-usage-title">
+              <h3 id="ws-usage-title" style={{ marginTop: 0 }}>
+                Usage
+              </h3>
+              {depsLoading && !deps ? <InlineLoading title="Đang tải usage…" /> : null}
+              {deps ? (
+                <>
+                  <p style={{ fontSize: 13, color: "#6b7280" }}>
+                    Total {deps.total} · Public {deps.publicCount} · Internal {deps.internalCount} · Replaceable{" "}
+                    {deps.replaceableCount}
+                  </p>
+                  <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+                    {usageCards.map((card) => (
+                      <article
+                        key={card.key}
+                        onClick={() => setHighlightedUsageKey(card.key)}
+                        style={{
+                          border: highlightedUsageKey === card.key ? "1px solid #6366f1" : "1px solid #f3f4f6",
+                          borderRadius: 8,
+                          padding: 12,
+                          background: highlightedUsageKey === card.key ? "#eef2ff" : "#fafafa",
+                          cursor: "pointer",
+                          transition: "background .15s ease, border-color .15s ease",
+                        }}
+                      >
+                        <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>
+                          {card.moduleLabel}
+                        </div>
+                        <div style={{ fontWeight: 600, marginTop: 2 }}>{card.title}</div>
+                        <div style={{ fontSize: 13, marginTop: 4 }}>
+                          {card.placement} ·{" "}
+                          <span style={{ color: usageStatusColor(card.statusTone), fontWeight: 600 }}>
+                            {card.statusLabel}
+                          </span>
+                        </div>
+                        {card.href ? (
+                          <Link
+                            href={card.href}
+                            className="admin-btn admin-btn--secondary admin-btn--xs"
+                            style={{ marginTop: 8, display: "inline-flex" }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Open →
+                          </Link>
+                        ) : null}
+                      </article>
+                    ))}
+                    {usageCards.length === 0 ? <p style={{ color: "#6b7280" }}>Chưa có tham chiếu đã biết.</p> : null}
+                  </div>
+
+                  <h4 style={{ margin: "0 0 8px", fontSize: 14 }}>Usage graph</h4>
+                  <p className="admin-field-hint" style={{ marginTop: 0 }}>
+                    Bấm vào một nhánh để làm nổi bật thẻ tương ứng phía trên.
+                  </p>
+                  <div
+                    style={{
+                      background: "#f8fafc",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 6,
+                      padding: 12,
+                      fontSize: 13,
+                    }}
+                  >
+                    {usageTree.map((mod) => (
+                      <div key={mod.module} style={{ marginBottom: 10 }}>
+                        <div style={{ fontWeight: 700 }}>{humanModule(mod.module)}</div>
+                        <ul style={{ listStyle: "none", margin: "4px 0 0", paddingLeft: 16 }}>
+                          {mod.children.map((child) => (
+                            <li key={child.key}>
+                              <button
+                                type="button"
+                                onClick={() => setHighlightedUsageKey(child.key)}
+                                style={{
+                                  border: "none",
+                                  background:
+                                    highlightedUsageKey === child.key ? "#e0e7ff" : "transparent",
+                                  color: highlightedUsageKey === child.key ? "#3730a3" : "#374151",
+                                  borderRadius: 4,
+                                  padding: "2px 6px",
+                                  margin: "1px 0",
+                                  cursor: "pointer",
+                                  fontSize: 13,
+                                  textAlign: "left",
+                                }}
+                              >
+                                └── {child.field}: {child.label}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </section>
+          ) : null}
+
+          {/* ---------------------------------------------------------------- */}
+          {/* METADATA TAB                                                    */}
+          {/* ---------------------------------------------------------------- */}
+          {primaryTab === "metadata" ? (
+            <section style={cardStyle} aria-labelledby="ws-metadata-title">
+              <h3 id="ws-metadata-title" style={{ marginTop: 0 }}>
+                Metadata Assistant
+              </h3>
+              <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>
+                {completionPct}% complete · AI: {humanAiStatus(asset.aiProcessingStatus)}
+              </div>
+              <div
+                style={{ height: 8, background: "#f3f4f6", borderRadius: 999, overflow: "hidden", marginBottom: 12 }}
+              >
+                <div
+                  style={{
+                    width: `${completionPct}%`,
+                    height: "100%",
+                    background: completionPct >= 75 ? "#15803d" : completionPct >= 40 ? "#a16207" : "#b91c1c",
+                    transition: "width .25s ease",
+                  }}
+                />
+              </div>
+              <ul style={{ margin: "0 0 16px", paddingLeft: 0, listStyle: "none", fontSize: 13, display: "grid", gap: 6 }}>
+                {metaChecklist.map((item) => (
+                  <li key={item.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input type="checkbox" checked={item.done} readOnly disabled />
+                    {item.label}
+                  </li>
+                ))}
+              </ul>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  disabled={busy}
+                  onClick={() => void generateSuggestions()}
+                >
+                  Generate
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--primary admin-btn--xs"
+                  disabled={busy || !suggested}
+                  onClick={() => void approveSuggestions()}
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  disabled={busy || !suggested}
+                  onClick={() => void rejectSuggestions()}
+                >
+                  Reject
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                  disabled={!suggested}
+                  onClick={() => setShowMetadataPreview((v) => !v)}
+                >
+                  {showMetadataPreview ? "Hide preview" : "Preview changes"}
+                </button>
+                {!asset.altText && suggested?.altText ? (
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary admin-btn--xs"
+                    disabled={busy}
+                    onClick={() => void patchField({ altText: suggested.altText })}
+                  >
+                    Apply alt only
+                  </button>
+                ) : null}
+              </div>
+
+              {showMetadataPreview && suggested ? (
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  {(
-                    [
-                      ["SEO Score", health.seo],
-                      ["Accessibility", health.accessibility],
-                      ["Resolution", health.resolution],
-                      ["Alt", health.alt],
-                      ["Caption", health.caption],
-                      ["Crop", health.crop],
-                      ["Duplicate", health.duplicate],
-                      ["Visibility", health.visibility],
-                      ["Bundle", health.bundle],
-                      ["Suitability", health.suitability],
-                      ["Usage", health.usage],
-                    ] as const
-                  ).map(([label, score]) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>{label}</div>
-                      <div style={{ fontWeight: 600, color: healthColor(score) }}>{score}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop: 12, fontSize: 13 }}>
-                  <div>
-                    <strong>Duplicate status:</strong> {humanDuplicate(asset.duplicateStatus)}
-                  </div>
-                  <div>
-                    <strong>Color profile:</strong> {asset.dominantColor || "—"}
-                  </div>
-                  <div>
-                    <strong>Aspect:</strong> {asset.orientation}
-                    {asset.width && asset.height
-                      ? ` · ${(asset.width / asset.height).toFixed(2)}`
-                      : ""}
-                  </div>
-                  {health.issues.length ? (
-                    <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-                      {health.issues.map((issue) => (
-                        <li key={issue}>{humanHealthIssue(issue)}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p style={{ color: "#15803d", marginBottom: 0 }}>Không có vấn đề lớn.</p>
-                  )}
-                </div>
-              </>
-            ) : (
-              <p style={{ color: "#6b7280", fontSize: 13 }}>Health sẽ hiển thị sau khi tải panel phụ.</p>
-            )}
-          </section>
-
-          {/* Usage */}
-          <section
-            ref={(el) => {
-              cardRefs.current.usage = el;
-            }}
-            tabIndex={-1}
-            id="ws-usage"
-            style={cardStyle}
-            aria-labelledby="ws-usage-title"
-          >
-            <h3 id="ws-usage-title" style={{ marginTop: 0 }}>
-              Usage
-            </h3>
-            {depsLoading && !deps ? <InlineLoading title="Đang tải usage…" /> : null}
-            {deps ? (
-              <>
-                <p style={{ fontSize: 13, color: "#6b7280" }}>
-                  Total {deps.total} · Public {deps.publicCount} · Internal {deps.internalCount} ·
-                  Replaceable {deps.replaceableCount}
-                </p>
-                <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
-                  {usageCards.map((card) => (
-                    <article
-                      key={card.key}
-                      style={{
-                        border: "1px solid #f3f4f6",
-                        borderRadius: 8,
-                        padding: 12,
-                        background: "#fafafa",
-                      }}
-                    >
-                      <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>
-                        {card.moduleLabel}
-                      </div>
-                      <div style={{ fontWeight: 600, marginTop: 2 }}>{card.title}</div>
-                      <div style={{ fontSize: 13, marginTop: 4 }}>
-                        {card.placement} ·{" "}
-                        <span style={{ color: card.statusTone === "public" ? "#15803d" : "#6b7280" }}>
-                          {card.statusLabel}
-                        </span>
-                      </div>
-                      {card.href ? (
-                        <Link
-                          href={card.href}
-                          className="admin-btn admin-btn--secondary admin-btn--xs"
-                          style={{ marginTop: 8, display: "inline-flex" }}
-                        >
-                          Open →
-                        </Link>
-                      ) : null}
-                    </article>
-                  ))}
-                  {usageCards.length === 0 ? (
-                    <p style={{ color: "#6b7280" }}>Chưa có tham chiếu đã biết.</p>
-                  ) : null}
-                </div>
-
-                <h4 style={{ margin: "0 0 8px", fontSize: 14 }}>Usage graph</h4>
-                <pre
-                  aria-label="Usage dependency tree"
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    lineHeight: 1.5,
-                    background: "#f8fafc",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 6,
-                    padding: 12,
-                    overflow: "auto",
-                  }}
-                >
-                  {`Media\n${usageTree
-                    .map((mod, mi) => {
-                      const branch = mi === usageTree.length - 1 ? "└──" : "├──";
-                      const childPad = mi === usageTree.length - 1 ? "    " : "│   ";
-                      const children = mod.children
-                        .map((ch, ci) => {
-                          const cBranch = ci === mod.children.length - 1 ? "└──" : "├──";
-                          return `${childPad}${cBranch} ${ch.field}: ${ch.label}`;
-                        })
-                        .join("\n");
-                      return `${branch} ${mod.label}\n${children}`;
-                    })
-                    .join("\n")}`}
-                </pre>
-              </>
-            ) : null}
-          </section>
-
-          {/* AI Recommendations */}
-          <section
-            ref={(el) => {
-              cardRefs.current.ai = el;
-            }}
-            tabIndex={-1}
-            id="ws-ai"
-            style={cardStyle}
-            aria-labelledby="ws-ai-title"
-          >
-            <h3 id="ws-ai-title" style={{ marginTop: 0 }}>
-              AI Recommendations
-            </h3>
-            <div style={{ fontSize: 20, color: "#a16207", marginBottom: 8 }}>
-              {qualityStars(suggested?.confidence ? suggested.confidence * 100 : asset.seoScore)}
-            </div>
-            <p style={{ fontSize: 13, marginTop: 0 }}>
-              AI thinks · Confidence{" "}
-              {suggested?.confidence != null
-                ? `${Math.round(suggested.confidence * 100)}%`
-                : "—"}{" "}
-              · {humanAiStatus(asset.aiProcessingStatus)}
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}>
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>Best usage</div>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {(recommended.length ? recommended : ["Chưa có gợi ý"]).map((item) => (
-                    <li key={item}>✓ {item}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>Not recommended</div>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {(notRecommended.length ? notRecommended : ["—"]).map((item) => (
-                    <li key={item}>✗ {item}</li>
-                  ))}
-                </ul>
-                {notRecommended.length ? (
-                  <p style={{ color: "#92400e", fontSize: 12 }}>
-                    Reason: độ phân giải có thể thấp cho hero.
-                  </p>
-                ) : null}
-              </div>
-            </div>
-            {suggested ? (
-              <div style={{ marginTop: 12, fontSize: 13, color: "#6b7280" }}>
-                Suggested title: {suggested.title || "—"} · Alt: {suggested.altText || "—"}
-              </div>
-            ) : null}
-          </section>
-
-          {/* Metadata Assistant */}
-          <section
-            ref={(el) => {
-              cardRefs.current.metadata = el;
-            }}
-            tabIndex={-1}
-            id="ws-metadata"
-            style={cardStyle}
-            aria-labelledby="ws-metadata-title"
-          >
-            <h3 id="ws-metadata-title" style={{ marginTop: 0 }}>
-              Metadata Assistant
-            </h3>
-            <dl style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "8px 12px", fontSize: 13 }}>
-              <dt>Title</dt>
-              <dd style={{ margin: 0 }}>
-                {asset.title || <span style={{ color: "#b91c1c" }}>Missing</span>}
-                {!asset.title && suggested?.title ? (
-                  <span style={{ color: "#6b7280" }}> · AI: {suggested.title}</span>
-                ) : null}
-              </dd>
-              <dt>Alt</dt>
-              <dd style={{ margin: 0 }}>
-                {asset.altText || <span style={{ color: "#b91c1c" }}>Missing</span>}
-                {!asset.altText && suggested?.altText ? (
-                  <span style={{ color: "#6b7280" }}> · AI: {suggested.altText}</span>
-                ) : null}
-              </dd>
-              <dt>Caption</dt>
-              <dd style={{ margin: 0 }}>
-                {asset.caption || <span style={{ color: "#b91c1c" }}>Missing</span>}
-                {!asset.caption && suggested?.caption ? (
-                  <span style={{ color: "#6b7280" }}> · AI: {suggested.caption}</span>
-                ) : null}
-              </dd>
-              <dt>Keywords</dt>
-              <dd style={{ margin: 0 }}>
-                {(asset.keywords && asset.keywords.length > 0
-                  ? asset.keywords.join(", ")
-                  : null) || <span style={{ color: "#b91c1c" }}>Missing</span>}
-              </dd>
-              <dt>Subjects</dt>
-              <dd style={{ margin: 0 }}>{asset.subjectTerms.join(", ") || "—"}</dd>
-              <dt>Collections / Bundles</dt>
-              <dd style={{ margin: 0 }}>
-                {asset._count.collections} / {asset._count.bundleSlotAssets}
-              </dd>
-            </dl>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-              <button
-                type="button"
-                className="admin-btn admin-btn--secondary admin-btn--xs"
-                disabled={busy}
-                onClick={() => void generateSuggestions()}
-              >
-                Generate
-              </button>
-              <button
-                type="button"
-                className="admin-btn admin-btn--primary admin-btn--xs"
-                disabled={busy || !suggested}
-                onClick={() => void approveSuggestions()}
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                className="admin-btn admin-btn--secondary admin-btn--xs"
-                disabled={busy || !suggested}
-                onClick={() => void rejectSuggestions()}
-              >
-                Reject
-              </button>
-              {!asset.altText && suggested?.altText ? (
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--secondary admin-btn--xs"
-                  disabled={busy}
-                  onClick={() => void patchField({ altText: suggested.altText })}
-                >
-                  Apply alt only
-                </button>
-              ) : null}
-            </div>
-            <p className="admin-field-hint" style={{ marginBottom: 0 }}>
-              Không tự áp dụng — editor phải Approve / Apply.
-            </p>
-          </section>
-
-          {/* Similar assets */}
-          <section
-            ref={(el) => {
-              cardRefs.current.similar = el;
-            }}
-            tabIndex={-1}
-            id="ws-similar"
-            style={cardStyle}
-            aria-labelledby="ws-similar-title"
-          >
-            <h3 id="ws-similar-title" style={{ marginTop: 0 }}>
-              Similar & Alternatives
-            </h3>
-            {secondaryLoading && !similar.length && !better.length ? (
-              <InlineLoading title="Đang tải related assets…" />
-            ) : null}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                gap: 10,
-              }}
-            >
-              {asset.supersedesAssetId ? (
-                <Link href={`/admin/media/${asset.supersedesAssetId}`} style={{ textDecoration: "none", color: "inherit" }}>
-                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                    <div style={{ fontSize: 11, color: "#6b7280" }}>Previous version</div>
-                    <div style={{ fontSize: 12 }}>Open →</div>
-                  </div>
-                </Link>
-              ) : null}
-              {asset.replacementAssetId ? (
-                <Link href={`/admin/media/${asset.replacementAssetId}`} style={{ textDecoration: "none", color: "inherit" }}>
-                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                    <div style={{ fontSize: 11, color: "#6b7280" }}>Next / Replacement</div>
-                    <div style={{ fontSize: 12 }}>Open →</div>
-                  </div>
-                </Link>
-              ) : null}
-              {better.map((item) => (
-                <Link
-                  key={`better-${item.mediaAssetId}`}
-                  href={`/admin/media/${item.mediaAssetId}`}
-                  style={{ textDecoration: "none", color: "inherit" }}
-                >
-                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.thumbnailUrl || item.url}
-                      alt=""
-                      style={{ width: "100%", height: 88, objectFit: "cover" }}
-                    />
-                    <div style={{ padding: 8, fontSize: 12 }}>
-                      <div style={{ color: "#6b7280", fontSize: 11 }}>Higher quality</div>
-                      <div>{item.title || item.mediaAssetId.slice(0, 8)}</div>
-                      <div style={{ color: "#6b7280" }}>{item.reason}</div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-              {similar.map((item) => (
-                <Link
-                  key={item.mediaAssetId}
-                  href={`/admin/media/${item.mediaAssetId}`}
-                  style={{ textDecoration: "none", color: "inherit" }}
-                >
-                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.thumbnailUrl || item.url}
-                      alt={item.altText || ""}
-                      style={{ width: "100%", height: 88, objectFit: "cover" }}
-                    />
-                    <div style={{ padding: 8, fontSize: 12 }}>
-                      <div style={{ color: "#6b7280", fontSize: 11 }}>
-                        {humanSimilarRelation(item.relation)}
-                      </div>
-                      <div>{item.title || item.mediaAssetId.slice(0, 8)}</div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-            {!similar.length && !better.length && !asset.replacementAssetId && !asset.supersedesAssetId ? (
-              <p style={{ color: "#6b7280", fontSize: 13 }}>Chưa có similar / alternative.</p>
-            ) : null}
-          </section>
-
-          {/* Timeline */}
-          <section
-            ref={(el) => {
-              cardRefs.current.timeline = el;
-            }}
-            tabIndex={-1}
-            id="ws-timeline"
-            style={cardStyle}
-            aria-labelledby="ws-timeline-title"
-          >
-            <h3 id="ws-timeline-title" style={{ marginTop: 0 }}>
-              Timeline
-            </h3>
-            <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {mergedTimeline.map((row) => (
-                <li
-                  key={row.key}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "28px 1fr",
-                    gap: 10,
-                    marginBottom: 12,
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                    marginBottom: 16,
                     fontSize: 13,
                   }}
                 >
-                  <span
-                    aria-hidden
-                    style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 999,
-                      background: "#f3f4f6",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {row.icon}
-                  </span>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{row.summary}</div>
-                    {row.detail ? (
-                      <div style={{ color: "#6b7280" }}>{row.detail}</div>
-                    ) : null}
-                    <div style={{ color: "#9ca3af", fontSize: 12 }}>
-                      {new Date(row.at).toLocaleString()} · {relativeTime(row.at)}
+                  <div style={{ border: "1px solid #f3f4f6", borderRadius: 8, padding: 12 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8, color: "#6b7280" }}>Current</div>
+                    <div>
+                      <strong>Title:</strong> {asset.title || "—"}
+                    </div>
+                    <div>
+                      <strong>Alt:</strong> {asset.altText || "—"}
+                    </div>
+                    <div>
+                      <strong>Caption:</strong> {asset.caption || "—"}
+                    </div>
+                    <div>
+                      <strong>Keywords:</strong> {asset.keywords?.join(", ") || "—"}
                     </div>
                   </div>
-                </li>
-              ))}
-            </ol>
-          </section>
+                  <div style={{ border: "1px solid #dbeafe", borderRadius: 8, padding: 12, background: "#f8fafc" }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8, color: "#1e40af" }}>Suggested (AI)</div>
+                    <div>
+                      <strong>Title:</strong> {suggested.title || "—"}
+                    </div>
+                    <div>
+                      <strong>Alt:</strong> {suggested.altText || "—"}
+                    </div>
+                    <div>
+                      <strong>Caption:</strong> {suggested.caption || "—"}
+                    </div>
+                    <div>
+                      <strong>Keywords:</strong> {suggested.keywords?.join(", ") || "—"}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
-          {/* Lifecycle — preserved */}
-          <section
-            ref={(el) => {
-              cardRefs.current.lifecycle = el;
-            }}
-            tabIndex={-1}
-            id="ws-lifecycle"
-            style={cardStyle}
-            aria-labelledby="ws-lifecycle-title"
-          >
-            <h3 id="ws-lifecycle-title" style={{ marginTop: 0 }}>
-              Lifecycle
-            </h3>
-            <p style={{ fontSize: 13 }}>
-              Status: <strong>{humanLifecycle(asset.lifecycleStatus)}</strong> ({asset.lifecycleStatus})
-              {asset.lifecycleReason ? ` — ${asset.lifecycleReason}` : ""}
-            </p>
-            {deps && deps.publicCount > 0 ? (
-              <p style={{ fontSize: 13, color: "#92400e" }}>
-                Ảnh đang được sử dụng tại {deps.publicCount} vị trí công khai. Lưu trữ không làm mất ảnh
-                hiện tại, nhưng ảnh sẽ không còn được đề xuất cho nội dung mới.
+              <dl style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: "8px 12px", fontSize: 13 }}>
+                <dt>Title</dt>
+                <dd style={{ margin: 0 }}>{asset.title || <span style={{ color: "#b91c1c" }}>Missing</span>}</dd>
+                <dt>Alt</dt>
+                <dd style={{ margin: 0 }}>{asset.altText || <span style={{ color: "#b91c1c" }}>Missing</span>}</dd>
+                <dt>Caption</dt>
+                <dd style={{ margin: 0 }}>{asset.caption || <span style={{ color: "#b91c1c" }}>Missing</span>}</dd>
+                <dt>Keywords</dt>
+                <dd style={{ margin: 0 }}>
+                  {(asset.keywords && asset.keywords.length > 0 ? asset.keywords.join(", ") : null) || (
+                    <span style={{ color: "#b91c1c" }}>Missing</span>
+                  )}
+                </dd>
+                <dt>Subjects</dt>
+                <dd style={{ margin: 0 }}>{asset.subjectTerms.join(", ") || "—"}</dd>
+                <dt>Collections / Bundles</dt>
+                <dd style={{ margin: 0 }}>
+                  {asset._count.collections} / {asset._count.bundleSlotAssets}
+                </dd>
+              </dl>
+
+              <p className="admin-field-hint" style={{ marginTop: 12, marginBottom: 0 }}>
+                Không tự áp dụng — editor phải Approve / Apply.
               </p>
-            ) : null}
-            <label className="admin-field-hint" style={{ display: "block", marginBottom: 10 }}>
-              Lý do
-              <input
-                className="admin-input"
-                style={{ display: "block", marginTop: 4, maxWidth: 420 }}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-              />
-            </label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {lifecycleActions.map((action) => (
-                <button
-                  key={action.to}
-                  type="button"
-                  className="admin-btn admin-btn--secondary admin-btn--xs"
-                  disabled={busy}
-                  onClick={() => void transition(action.to)}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          </section>
+            </section>
+          ) : null}
 
-          {/* Replacement — preserved */}
-          <section
-            ref={(el) => {
-              cardRefs.current.replacement = el;
-            }}
-            tabIndex={-1}
-            id="ws-replacement"
-            style={cardStyle}
-            aria-labelledby="ws-replacement-title"
-          >
-            <h3 id="ws-replacement-title" style={{ marginTop: 0 }}>
-              Replacement
-            </h3>
-            <p style={{ fontSize: 13, color: "#6b7280" }}>
-              Preview bắt buộc trước Apply. Không tự động thay thế. Không copy/move file.
-            </p>
-            <label className="admin-field-hint" style={{ display: "block", marginBottom: 8 }}>
-              Replacement asset ID
-              <input
-                className="admin-input"
-                style={{ display: "block", marginTop: 4, maxWidth: 420 }}
-                value={replacementId}
-                onChange={(e) => setReplacementId(e.target.value)}
-                placeholder="cuid của ảnh ACTIVE"
-              />
-            </label>
-            <button
-              type="button"
-              className="admin-btn admin-btn--primary admin-btn--xs"
-              disabled={busy}
-              onClick={() => void buildPlan()}
-            >
-              Build preview plan
-            </button>
-
-            {plan ? (
-              <div style={{ marginTop: 16 }}>
-                <p style={{ fontSize: 13 }}>
-                  Auto {plan.replaceableAutomatically} · Manual {plan.needsManualReview} · Unsupported{" "}
-                  {plan.unsupported} · Blocked {plan.blocked} · Public impact {plan.publicImpact}
+          {/* ---------------------------------------------------------------- */}
+          {/* LIFECYCLE TAB (Lifecycle + Timeline + Rights + Replacement)     */}
+          {/* ---------------------------------------------------------------- */}
+          {primaryTab === "lifecycle" ? (
+            <>
+              <section style={cardStyle} aria-labelledby="ws-lifecycle-title">
+                <h3 id="ws-lifecycle-title" style={{ marginTop: 0 }}>
+                  Lifecycle
+                </h3>
+                <p style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={lifecycleChipStyle(asset.lifecycleStatus)}>
+                    {humanLifecycle(asset.lifecycleStatus)}
+                  </span>
+                  {asset.lifecycleReason ? <span style={{ color: "#6b7280" }}>{asset.lifecycleReason}</span> : null}
                 </p>
-                {plan.warnings.map((w) => (
-                  <p key={w} style={{ fontSize: 12, color: "#92400e", margin: "4px 0" }}>
-                    ⚠ {w}
+                {deps && deps.publicCount > 0 ? (
+                  <p style={{ fontSize: 13, color: "#92400e" }}>
+                    Ảnh đang được sử dụng tại {deps.publicCount} vị trí công khai. Lưu trữ không làm mất ảnh hiện
+                    tại, nhưng ảnh sẽ không còn được đề xuất cho nội dung mới.
                   </p>
-                ))}
-                <div style={{ maxHeight: 320, overflow: "auto", border: "1px solid #f3f4f6", padding: 8 }}>
-                  {plan.items.map((item) => {
-                    const key = refKey(item.referenceType, item.referenceId, item.field);
-                    const disabled = item.decision === "UNSUPPORTED" || item.decision === "BLOCKED";
-                    return (
-                      <label
-                        key={key}
+                ) : null}
+                <label className="admin-field-hint" style={{ display: "block", marginBottom: 10 }}>
+                  Lý do
+                  <input
+                    className="admin-input"
+                    style={{ display: "block", marginTop: 4, maxWidth: 420 }}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {lifecycleActions.map((action) => (
+                    <button
+                      key={action.to}
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--xs"
+                      disabled={busy}
+                      onClick={() => void transition(action.to)}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section style={cardStyle} aria-labelledby="ws-timeline-title">
+                <h3 id="ws-timeline-title" style={{ marginTop: 0 }}>
+                  Timeline
+                </h3>
+                <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                  {mergedTimeline.map((row) => (
+                    <li
+                      key={row.key}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "28px 1fr",
+                        gap: 10,
+                        marginBottom: 12,
+                        fontSize: 13,
+                      }}
+                    >
+                      <span
+                        aria-hidden
                         style={{
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "flex-start",
-                          fontSize: 12,
-                          marginBottom: 6,
-                          opacity: disabled ? 0.55 : 1,
+                          width: 28,
+                          height: 28,
+                          borderRadius: 999,
+                          background: "#f3f4f6",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
                       >
-                        <input
-                          type="checkbox"
-                          disabled={disabled}
-                          checked={selectedKeys.has(key)}
-                          onChange={() => {
-                            setSelectedKeys((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(key)) next.delete(key);
-                              else next.add(key);
-                              return next;
-                            });
-                          }}
-                        />
-                        <span>
-                          <strong>{item.referenceType}</strong> {item.referenceLabel} ·{" "}
-                          {humanField(item.field)} · {item.decision}
-                          {item.publicImpact ? " · PUBLIC" : ""}
-                          {item.warning ? ` — ${item.warning}` : ""}
-                          <br />
-                          <span style={{ color: "#6b7280" }}>
-                            Before: {assetId} → After: {plan.replacementAssetId}
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
+                        {row.icon}
+                      </span>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{row.summary}</div>
+                        {row.detail ? <div style={{ color: "#6b7280" }}>{row.detail}</div> : null}
+                        <div style={{ color: "#9ca3af", fontSize: 12 }}>
+                          {new Date(row.at).toLocaleString()} · {relativeTime(row.at)}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+
+              <section style={cardStyle} aria-labelledby="ws-rights-title">
+                <h3 id="ws-rights-title" style={{ marginTop: 0 }}>
+                  Rights
+                </h3>
+                <dl style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "8px 12px", fontSize: 13 }}>
+                  <dt>Status</dt>
+                  <dd style={{ margin: 0 }}>{humanRights(asset.rightsStatus)}</dd>
+                  <dt>Owner</dt>
+                  <dd style={{ margin: 0 }}>{asset.rightsOwner || "—"}</dd>
+                  <dt>Expires</dt>
+                  <dd style={{ margin: 0 }}>{asset.rightsExpiresAt || "—"}</dd>
+                  <dt>Restriction</dt>
+                  <dd style={{ margin: 0 }}>{asset.usageRestriction || "—"}</dd>
+                  <dt>Notes</dt>
+                  <dd style={{ margin: 0 }}>{asset.rightsNotes || "—"}</dd>
+                </dl>
+                {asset.rightsStatus === "UNKNOWN" && asset.visibility === "PUBLIC" ? (
+                  <p style={{ fontSize: 13, color: "#92400e" }}>Unknown rights trên ảnh PUBLIC — cần editor review.</p>
+                ) : null}
+              </section>
+
+              <section style={cardStyle} aria-labelledby="ws-replacement-title">
+                <h3 id="ws-replacement-title" style={{ marginTop: 0 }}>
+                  Replacement
+                </h3>
+                <p style={{ fontSize: 13, color: "#6b7280" }}>
+                  Preview bắt buộc trước Apply. Không tự động thay thế. Không copy/move file.
+                </p>
+
+                <div style={{ marginBottom: 8 }}>
+                  <MediaPicker
+                    label="Ảnh thay thế"
+                    folder="general"
+                    usageType="auto"
+                    value={replacementAsset?.url ?? ""}
+                    onChange={(url) => {
+                      if (!url) {
+                        setReplacementAsset(null);
+                        setReplacementId("");
+                      }
+                    }}
+                    onSelectAsset={(sel) => {
+                      setReplacementAsset(sel);
+                      setReplacementId(sel?.id ?? "");
+                    }}
+                  />
                 </div>
 
-                <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, fontSize: 13 }}>
-                  <input
-                    type="checkbox"
-                    checked={confirmApply}
-                    onChange={(e) => setConfirmApply(e.target.checked)}
-                  />
-                  Tôi xác nhận Apply chỉ trên các tham chiếu đã chọn
-                </label>
-                {plan.publicImpact > 10 ? (
-                  <label className="admin-field-hint" style={{ display: "block", marginTop: 8 }}>
-                    Gõ REPLACE để xác nhận high-impact
-                    <input
-                      className="admin-input"
-                      style={{ display: "block", marginTop: 4, maxWidth: 220 }}
-                      value={highImpactConfirm}
-                      onChange={(e) => setHighImpactConfirm(e.target.value)}
-                    />
-                  </label>
-                ) : null}
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--primary"
-                  style={{ marginTop: 12 }}
-                  disabled={busy || !confirmApply || selectedKeys.size === 0}
-                  onClick={() => void applySelected()}
-                >
-                  Apply selected ({selectedKeys.size})
-                </button>
-                {applyResult ? (
-                  <p style={{ fontSize: 13, marginTop: 10 }}>
-                    Updated {applyResult.updated} · Skipped {applyResult.skipped} · Failed{" "}
-                    {applyResult.failed} · Verified {String(applyResult.verified)}
+                {replacementAsset ? (
+                  <p style={{ fontSize: 12, color: "#6b7280", fontFamily: "ui-monospace, monospace" }}>
+                    Đã chọn: {replacementAsset.id}
+                  </p>
+                ) : replacementId ? (
+                  <p style={{ fontSize: 12, color: "#6b7280", fontFamily: "ui-monospace, monospace" }}>
+                    Đã lưu trước đó: {replacementId}
                   </p>
                 ) : null}
-              </div>
-            ) : null}
-          </section>
 
-          {/* Rights — preserved */}
-          <section
-            ref={(el) => {
-              cardRefs.current.rights = el;
-            }}
-            tabIndex={-1}
-            id="ws-rights"
-            style={cardStyle}
-            aria-labelledby="ws-rights-title"
-          >
-            <h3 id="ws-rights-title" style={{ marginTop: 0 }}>
-              Rights
-            </h3>
-            <dl style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "8px 12px", fontSize: 13 }}>
-              <dt>Status</dt>
-              <dd style={{ margin: 0 }}>{humanRights(asset.rightsStatus)}</dd>
-              <dt>Owner</dt>
-              <dd style={{ margin: 0 }}>{asset.rightsOwner || "—"}</dd>
-              <dt>Expires</dt>
-              <dd style={{ margin: 0 }}>{asset.rightsExpiresAt || "—"}</dd>
-              <dt>Restriction</dt>
-              <dd style={{ margin: 0 }}>{asset.usageRestriction || "—"}</dd>
-              <dt>Notes</dt>
-              <dd style={{ margin: 0 }}>{asset.rightsNotes || "—"}</dd>
-            </dl>
-            {asset.rightsStatus === "UNKNOWN" && asset.visibility === "PUBLIC" ? (
-              <p style={{ fontSize: 13, color: "#92400e" }}>
-                Unknown rights trên ảnh PUBLIC — cần editor review.
-              </p>
-            ) : null}
-          </section>
+                <details style={{ marginBottom: 12 }} open={showManualReplacementId}>
+                  <summary
+                    style={{ cursor: "pointer", fontSize: 12, color: "#6b7280" }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowManualReplacementId((v) => !v);
+                    }}
+                  >
+                    Nâng cao: nhập Media ID thủ công
+                  </summary>
+                  <label className="admin-field-hint" style={{ display: "block", marginTop: 8 }}>
+                    Replacement asset ID
+                    <input
+                      className="admin-input"
+                      style={{ display: "block", marginTop: 4, maxWidth: 420 }}
+                      value={replacementId}
+                      onChange={(e) => {
+                        setReplacementId(e.target.value);
+                        setReplacementAsset(null);
+                      }}
+                      placeholder="cuid của ảnh ACTIVE"
+                    />
+                  </label>
+                </details>
+
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--primary admin-btn--xs"
+                  disabled={busy}
+                  onClick={() => void buildPlan()}
+                >
+                  Build preview plan
+                </button>
+
+                {plan ? (
+                  <div style={{ marginTop: 16 }}>
+                    <p style={{ fontSize: 13 }}>
+                      Auto {plan.replaceableAutomatically} · Manual {plan.needsManualReview} · Unsupported{" "}
+                      {plan.unsupported} · Blocked {plan.blocked} · Public impact {plan.publicImpact}
+                    </p>
+                    {plan.warnings.map((w) => (
+                      <p key={w} style={{ fontSize: 12, color: "#92400e", margin: "4px 0" }}>
+                        ⚠ {w}
+                      </p>
+                    ))}
+                    <div style={{ maxHeight: 320, overflow: "auto", border: "1px solid #f3f4f6", padding: 8 }}>
+                      {plan.items.map((item) => {
+                        const key = refKey(item.referenceType, item.referenceId, item.field);
+                        const disabled = item.decision === "UNSUPPORTED" || item.decision === "BLOCKED";
+                        return (
+                          <label
+                            key={key}
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              alignItems: "flex-start",
+                              fontSize: 12,
+                              marginBottom: 6,
+                              opacity: disabled ? 0.55 : 1,
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              disabled={disabled}
+                              checked={selectedKeys.has(key)}
+                              onChange={() => {
+                                setSelectedKeys((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(key)) next.delete(key);
+                                  else next.add(key);
+                                  return next;
+                                });
+                              }}
+                            />
+                            <span>
+                              <strong>{item.referenceType}</strong> {item.referenceLabel} · {humanField(item.field)} ·{" "}
+                              {item.decision}
+                              {item.publicImpact ? " · PUBLIC" : ""}
+                              {item.warning ? ` — ${item.warning}` : ""}
+                              <br />
+                              <span style={{ color: "#6b7280" }}>
+                                Before: {assetId} → After: {plan.replacementAssetId}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={confirmApply}
+                        onChange={(e) => setConfirmApply(e.target.checked)}
+                      />
+                      Tôi xác nhận Apply chỉ trên các tham chiếu đã chọn
+                    </label>
+                    {plan.publicImpact > 10 ? (
+                      <label className="admin-field-hint" style={{ display: "block", marginTop: 8 }}>
+                        Gõ REPLACE để xác nhận high-impact
+                        <input
+                          className="admin-input"
+                          style={{ display: "block", marginTop: 4, maxWidth: 220 }}
+                          value={highImpactConfirm}
+                          onChange={(e) => setHighImpactConfirm(e.target.value)}
+                        />
+                      </label>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--primary"
+                      style={{ marginTop: 12 }}
+                      disabled={busy || !confirmApply || selectedKeys.size === 0}
+                      onClick={() => void applySelected()}
+                    >
+                      Apply selected ({selectedKeys.size})
+                    </button>
+                    {applyResult ? (
+                      <p style={{ fontSize: 13, marginTop: 10 }}>
+                        Updated {applyResult.updated} · Skipped {applyResult.skipped} · Failed {applyResult.failed} ·
+                        Verified {String(applyResult.verified)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+            </>
+          ) : null}
+
+          {/* ---------------------------------------------------------------- */}
+          {/* INSIGHTS TAB                                                    */}
+          {/* ---------------------------------------------------------------- */}
+          {primaryTab === "insights" ? (
+            <section style={cardStyle} aria-labelledby="ws-insights-title">
+              <h3 id="ws-insights-title" style={{ marginTop: 0 }}>
+                Similar & Alternatives
+              </h3>
+              {secondaryLoading && !similar.length && !better.length ? (
+                <InlineLoading title="Đang tải related assets…" />
+              ) : null}
+
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+                {asset.supersedesAssetId ? (
+                  <Link
+                    href={`/admin/media/${asset.supersedesAssetId}`}
+                    className="admin-btn admin-btn--secondary admin-btn--xs"
+                  >
+                    ← Previous version
+                  </Link>
+                ) : null}
+                {asset.replacementAssetId ? (
+                  <Link
+                    href={`/admin/media/${asset.replacementAssetId}`}
+                    className="admin-btn admin-btn--secondary admin-btn--xs"
+                  >
+                    Next version →
+                  </Link>
+                ) : null}
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {better.map((item) => (
+                  <Link
+                    key={`better-${item.mediaAssetId}`}
+                    href={`/admin/media/${item.mediaAssetId}`}
+                    style={{ textDecoration: "none", color: "inherit" }}
+                  >
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.thumbnailUrl || item.url}
+                        alt=""
+                        style={{ width: "100%", height: 88, objectFit: "cover" }}
+                      />
+                      <div style={{ padding: 8, fontSize: 12 }}>
+                        <div style={{ color: "#6b7280", fontSize: 11 }}>{betterQualityLabel(item)}</div>
+                        <div>{item.title || item.mediaAssetId.slice(0, 8)}</div>
+                        <div style={{ color: "#6b7280" }}>{item.reason}</div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                {similar.map((item) => (
+                  <Link
+                    key={item.mediaAssetId}
+                    href={`/admin/media/${item.mediaAssetId}`}
+                    style={{ textDecoration: "none", color: "inherit" }}
+                  >
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.thumbnailUrl || item.url}
+                        alt={item.altText || ""}
+                        style={{ width: "100%", height: 88, objectFit: "cover" }}
+                      />
+                      <div style={{ padding: 8, fontSize: 12 }}>
+                        <div style={{ color: "#6b7280", fontSize: 11 }}>{humanSimilarRelation(item.relation)}</div>
+                        <div>{item.title || item.mediaAssetId.slice(0, 8)}</div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {!similar.length && !better.length && !asset.replacementAssetId && !asset.supersedesAssetId ? (
+                <p style={{ color: "#6b7280", fontSize: 13 }}>Chưa có similar / alternative.</p>
+              ) : null}
+            </section>
+          ) : null}
         </div>
 
         {/* Right sidebar */}
         <aside
-          style={{
-            ...cardStyle,
-            position: "sticky",
-            top: 16,
-            display: "grid",
-            gap: 16,
-          }}
+          style={{ ...cardStyle, position: "sticky", top: 16, display: "grid", gap: 16 }}
           aria-label="Status summary and recommendations"
         >
           <div>
@@ -1559,8 +1603,12 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
               <li>Lifecycle: {humanLifecycle(asset.lifecycleStatus)}</li>
               <li>Visibility: {humanVisibility(asset.visibility)}</li>
               <li>Rights: {humanRights(asset.rightsStatus)}</li>
-              <li>SEO: {asset.seoScore} · {humanSeoReadiness(asset.seoReadinessStatus)}</li>
-              <li>Uses: {useCount} (public {deps?.publicCount ?? "…"})</li>
+              <li>
+                SEO: {asset.seoScore} · {humanSeoReadiness(asset.seoReadinessStatus)}
+              </li>
+              <li>
+                Uses: {useCount} (public {deps?.publicCount ?? "…"})
+              </li>
               <li>Bundles: {asset._count.bundleSlotAssets}</li>
             </ul>
           </div>
@@ -1572,28 +1620,42 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
                 type="button"
                 className="admin-btn admin-btn--primary admin-btn--xs"
                 style={{ marginTop: 6, width: "100%" }}
-                onClick={() => scrollToSection(sectionFromNextAction(nextAction.section))}
+                onClick={() => setPrimaryTab(resolvePrimaryTab(nextAction.section))}
               >
                 {nextAction.label}
               </button>
             </div>
           ) : null}
 
-          {warnings.length ? (
+          {warningChecklist.length ? (
             <div>
-              <div style={{ fontSize: 12, color: "#92400e", fontWeight: 600 }}>Warnings</div>
-              <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12, color: "#92400e" }}>
-                {warnings.map((w) => (
-                  <li key={w}>{w}</li>
+              <div style={{ fontSize: 12, color: "#92400e", fontWeight: 600, marginBottom: 6 }}>Warnings</div>
+              <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 4 }}>
+                {warningChecklist.map((w) => (
+                  <li key={w.id}>
+                    <button
+                      type="button"
+                      onClick={() => setPrimaryTab(w.tab)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: "#92400e",
+                        fontSize: 12,
+                        padding: 0,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      ⚠ {w.label}
+                    </button>
+                  </li>
                 ))}
               </ul>
             </div>
           ) : null}
 
           <div>
-            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, marginBottom: 8 }}>
-              Related Assets
-            </div>
+            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, marginBottom: 8 }}>Related Assets</div>
             <div style={{ display: "grid", gap: 8 }}>
               {similar.slice(0, 4).map((item) => (
                 <Link
@@ -1627,7 +1689,7 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
                     style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 4 }}
                   />
                   <span>
-                    <span style={{ color: "#6b7280" }}>Higher quality</span>
+                    <span style={{ color: "#6b7280" }}>{betterQualityLabel(item)}</span>
                     <br />
                     {item.title || item.mediaAssetId.slice(0, 10)}
                   </span>
@@ -1637,33 +1699,51 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
                 <p style={{ margin: 0, fontSize: 12, color: "#9ca3af" }}>Chưa có gợi ý liên quan.</p>
               ) : null}
             </div>
+            {similar.length || better.length ? (
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-btn--xs"
+                style={{ marginTop: 8, width: "100%" }}
+                onClick={() => setPrimaryTab("insights")}
+              >
+                Xem tất cả Insights →
+              </button>
+            ) : null}
           </div>
 
           <div>
-            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, marginBottom: 6 }}>
-              Quick Actions
-            </div>
+            <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, marginBottom: 6 }}>Quick Actions</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <button
                 type="button"
                 className="admin-btn admin-btn--secondary admin-btn--xs"
-                onClick={() => scrollToSection("metadata")}
+                onClick={() => setPrimaryTab("metadata")}
               >
                 Metadata
               </button>
               <button
                 type="button"
                 className="admin-btn admin-btn--secondary admin-btn--xs"
-                onClick={() => scrollToSection("replacement")}
+                onClick={() => setPrimaryTab("usage")}
               >
-                Replace
+                Usage
               </button>
               <button
                 type="button"
                 className="admin-btn admin-btn--secondary admin-btn--xs"
-                onClick={() => scrollToSection("usage")}
+                onClick={() => setPrimaryTab("lifecycle")}
               >
-                Usage
+                Lifecycle / Replace
+              </button>
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-btn--xs"
+                onClick={() => {
+                  void navigator.clipboard.writeText(asset.id);
+                  toast.success("Đã copy Media ID");
+                }}
+              >
+                Copy Media ID
               </button>
             </div>
           </div>
@@ -1679,6 +1759,9 @@ export default function MediaAssetWorkspaceClient({ assetId }: { assetId: string
         @media (prefers-reduced-motion: reduce) {
           .admin-media-workspace * {
             scroll-behavior: auto !important;
+          }
+          .admin-media-preview-frame {
+            transition: none !important;
           }
         }
       `}</style>
