@@ -74,7 +74,7 @@ describe("Sprint 13.1 content editorial IA", () => {
 
   it("provides one primary next action per topic status", () => {
     assert.equal(getTopicNextAction("APPROVED").label, "Tạo Brief");
-    assert.equal(getTopicNextAction("DRAFTING").label, "Continue Draft");
+    assert.equal(getTopicNextAction("DRAFTING").label, "Tiếp tục viết");
     assert.equal(getTopicNextAction("DRAFTING").group, "needs_writing");
     assert.equal(getTopicNextAction("REVIEW").group, "needs_review");
     assert.equal(getTopicNextAction("DRAFTING").href("t1"), "/admin/content/topics/t1");
@@ -114,10 +114,15 @@ describe("Sprint 13.1 content editorial IA", () => {
   it("topic workspace route and client are document-first", () => {
     const page = read("src/app/(backend)/admin/content/topics/[id]/page.tsx");
     const client = read("src/components/admin/seo-content/SeoTopicDetailClient.tsx");
+    // Sprint 16.2 split the workspace into a document header/toolbar/canvas/rail
+    // component set — these markers now live in their respective files.
+    const canvas = read("src/components/admin/seo-content/topic-workspace/TopicWritingCanvas.tsx");
+    const rail = read("src/components/admin/seo-content/topic-workspace/TopicContextRail.tsx");
+    const editorialUx = read("src/features/content/editorial/editorial-ux.ts");
     assert.match(page, /SeoTopicDetailClient/);
     assert.match(client, /Editorial Workspace/);
-    assert.match(client, /Continue Writing/);
-    assert.match(client, /Knowledge \(tham khảo\)/);
-    assert.match(client, /id=\"writing\"/);
+    assert.match(editorialUx, /Tiếp tục viết/);
+    assert.match(rail, /Kiến thức|Knowledge/);
+    assert.match(canvas, /id=\"writing\"/);
   });
 });

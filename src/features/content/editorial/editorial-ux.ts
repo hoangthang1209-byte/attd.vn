@@ -1,4 +1,5 @@
 import type { SeoTopicStatus } from "@prisma/client";
+import { readBoolPref, writeBoolPref } from "@/features/blog/editor-preferences";
 
 /** Editorial status color tokens — reuse only these semantic families. */
 export const CONTENT_STATUS_COLORS = {
@@ -53,19 +54,19 @@ export function getTopicNextAction(status: SeoTopicStatus): EditorialNextAction 
       };
     case "DRAFTING":
       return {
-        label: "Continue Draft",
+        label: "Tiếp tục viết",
         href: topicWorkspaceHref,
         group: "needs_writing",
       };
     case "REVIEW":
       return {
-        label: "Needs Review",
+        label: "Mở kiểm duyệt",
         href: () => `/admin/content/reviews`,
         group: "needs_review",
       };
     case "PUBLISHED":
       return {
-        label: "Xem bài đã xuất bản",
+        label: "Xem bài đã đăng",
         href: topicWorkspaceHref,
         group: "recently_published",
       };
@@ -84,6 +85,77 @@ export function getTopicNextAction(status: SeoTopicStatus): EditorialNextAction 
         group: "needs_brief",
       };
   }
+}
+
+export type TopicPrimaryCta = {
+  label: string;
+  href: string | null;
+  /** True when the action should scroll within the current page instead of navigating. */
+  staysOnPage: boolean;
+  intent: string;
+};
+
+/**
+ * One primary call-to-action for the document header — display only. Never
+ * invents a workflow step; only surfaces a link/scroll target for the
+ * governed transition that is already available for the current status.
+ */
+export function resolveTopicPrimaryCta(input: {
+  status: SeoTopicStatus;
+  hasActiveReviewId?: string | null;
+  hasBlogDraft?: boolean;
+  publishedUrl?: string | null;
+}): TopicPrimaryCta {
+  const { status, hasActiveReviewId, hasBlogDraft, publishedUrl } = input;
+
+  if (status === "PUBLISHED") {
+    return {
+      label: "Xem bài đã đăng",
+      href: publishedUrl ?? null,
+      staysOnPage: !publishedUrl,
+      intent: "view_published",
+    };
+  }
+
+  if (status === "REVIEW") {
+    if (hasActiveReviewId) {
+      return {
+        label: "Mở kiểm duyệt",
+        href: `/admin/content/reviews/${hasActiveReviewId}`,
+        staysOnPage: false,
+        intent: "open_review",
+      };
+    }
+    if (hasBlogDraft) {
+      return {
+        label: "Mở Blog Draft",
+        href: "/admin/content/reviews",
+        staysOnPage: false,
+        intent: "open_blog_draft",
+      };
+    }
+    return {
+      label: "Mở kiểm duyệt",
+      href: "/admin/content/reviews",
+      staysOnPage: false,
+      intent: "open_review",
+    };
+  }
+
+  if (status === "DRAFTING") {
+    return { label: "Tiếp tục viết", href: null, staysOnPage: true, intent: "continue_writing" };
+  }
+
+  if (status === "BRIEF_READY") {
+    return { label: "Bắt đầu viết", href: null, staysOnPage: true, intent: "start_writing" };
+  }
+
+  if (status === "APPROVED") {
+    return { label: "Tạo Brief", href: null, staysOnPage: true, intent: "create_brief" };
+  }
+
+  const fallback = getTopicNextAction(status);
+  return { label: fallback.label, href: null, staysOnPage: true, intent: "review_topic" };
 }
 
 /** Display-only progress for topic rows / workspace header. */
@@ -171,9 +243,11 @@ export function deriveTopicDocumentNodes(status: SeoTopicStatus): Record<
   return result;
 }
 
+export type EditorialChecklistGroupKey = "content" | "seo" | "media" | "review" | "publish";
+
 export type EditorialChecklistItem = {
   id: string;
-  group: "content" | "seo" | "media" | "publish";
+  group: EditorialChecklistGroupKey;
   label: string;
   done: boolean;
 };
@@ -189,26 +263,59 @@ export function buildEditorialChecklist(input: {
   hasMediaBundle: boolean;
   mediaPlanOk: boolean;
   hasTargetUrl: boolean;
+  /** Only true when a real QA run has passed — never inferred. */
+  qaPassed?: boolean;
 }): EditorialChecklistItem[] {
   const writingStarted = ["DRAFTING", "REVIEW", "PUBLISHED"].includes(input.status);
   const reviewed = ["REVIEW", "PUBLISHED"].includes(input.status);
   const published = input.status === "PUBLISHED";
   return [
-    { id: "outline", group: "content", label: "Outline", done: input.outlineCount > 0 || input.briefApproved },
-    { id: "intro", group: "content", label: "Introduction", done: writingStarted },
-    { id: "sections", group: "content", label: "Sections", done: writingStarted },
-    { id: "cta", group: "content", label: "CTA", done: input.briefApproved },
-    { id: "title", group: "seo", label: "Title", done: input.hasMetaTitle || input.briefApproved },
-    { id: "meta", group: "seo", label: "Meta", done: input.hasMetaDescription },
-    { id: "links", group: "seo", label: "Internal links", done: input.internalLinkCount > 0 },
-    { id: "hero", group: "media", label: "Hero", done: input.hasMediaBundle && input.mediaPlanOk },
-    { id: "product", group: "media", label: "Product", done: input.hasMediaBundle },
-    { id: "process", group: "media", label: "Process", done: input.mediaPlanOk },
-    { id: "factory", group: "media", label: "Factory", done: input.mediaPlanOk },
-    { id: "review", group: "publish", label: "Review", done: reviewed },
-    { id: "blog", group: "publish", label: "Blog", done: published || Boolean(input.hasTargetUrl) },
-    { id: "publish", group: "publish", label: "Publish", done: published },
+    { id: "outline", group: "content", label: "Có dàn ý", done: input.outlineCount > 0 || input.briefApproved },
+    { id: "intro", group: "content", label: "Có phần mở đầu", done: writingStarted },
+    { id: "sections", group: "content", label: "Có nội dung các phần", done: writingStarted },
+    { id: "cta", group: "content", label: "Có CTA", done: input.briefApproved },
+    { id: "title", group: "seo", label: "Có tiêu đề SEO", done: input.hasMetaTitle || input.briefApproved },
+    { id: "meta", group: "seo", label: "Có mô tả meta", done: input.hasMetaDescription },
+    { id: "links", group: "seo", label: "Có liên kết nội bộ", done: input.internalLinkCount > 0 },
+    { id: "hero", group: "media", label: "Có ảnh bìa", done: input.hasMediaBundle && input.mediaPlanOk },
+    { id: "product", group: "media", label: "Có ảnh trong bài", done: input.hasMediaBundle },
+    { id: "process", group: "media", label: "Có ảnh quy trình", done: input.mediaPlanOk },
+    { id: "factory", group: "media", label: "Có ảnh nhà máy", done: input.mediaPlanOk },
+    { id: "qa", group: "review", label: "Đã chạy QA", done: Boolean(input.qaPassed) },
+    { id: "review", group: "review", label: "Đã được duyệt", done: reviewed },
+    { id: "blog", group: "publish", label: "Đã tạo bản nháp Blog", done: published || Boolean(input.hasTargetUrl) },
+    { id: "publish", group: "publish", label: "Sẵn sàng xuất bản", done: published },
   ];
+}
+
+export const EDITORIAL_CHECKLIST_GROUP_LABELS: Record<EditorialChecklistGroupKey, string> = {
+  content: "Nội dung",
+  seo: "SEO",
+  media: "Hình ảnh",
+  review: "Kiểm duyệt",
+  publish: "Xuất bản",
+};
+
+const CHECKLIST_GROUP_ORDER: EditorialChecklistGroupKey[] = ["content", "seo", "media", "review", "publish"];
+
+export type ChecklistGroupSummary = {
+  key: EditorialChecklistGroupKey;
+  label: string;
+  total: number;
+  done: number;
+  tone: "complete" | "needs_attention" | "blocked";
+};
+
+/** Compact 5-group readiness summary for the rail/header — display only. */
+export function summarizeChecklistGroups(items: EditorialChecklistItem[]): ChecklistGroupSummary[] {
+  return CHECKLIST_GROUP_ORDER.map((key) => {
+    const groupItems = items.filter((item) => item.group === key);
+    const total = groupItems.length;
+    const done = groupItems.filter((item) => item.done).length;
+    const tone: ChecklistGroupSummary["tone"] =
+      total === 0 || done === total ? "complete" : done === 0 ? "blocked" : "needs_attention";
+    return { key, label: EDITORIAL_CHECKLIST_GROUP_LABELS[key], total, done, tone };
+  }).filter((group) => group.total > 0);
 }
 
 export function topicStatusTone(status: SeoTopicStatus): keyof typeof CONTENT_STATUS_COLORS {
@@ -278,3 +385,160 @@ export const REVIEW_STATUS_LABELS: Record<string, string> = {
   REJECTED: "Từ chối",
   SUPERSEDED: "Đã thay thế",
 };
+
+// ── Sprint 16.2 — Editorial Workspace UX 2.0 ──────────────────────────────
+// Pure, additive display helpers for the document-first topic workspace.
+// None of these change workflow semantics; they only shape how existing
+// data is summarized in the header / toolbar / rail.
+
+const STAGE_LABELS: Record<SeoTopicStatus, string> = {
+  IDEA: "Ý tưởng",
+  RESEARCHING: "Đang nghiên cứu",
+  APPROVED: "Đã duyệt chủ đề",
+  BRIEF_READY: "Sẵn sàng viết",
+  DRAFTING: "Bản nháp",
+  REVIEW: "Kiểm duyệt",
+  PUBLISHED: "Đã xuất bản",
+  PAUSED: "Tạm dừng",
+  REJECTED: "Từ chối",
+  ARCHIVED: "Lưu trữ",
+};
+
+export type EditorialProgressSnapshot = {
+  stageLabel: string;
+  progressPercent: number;
+  wordCount: number | null;
+  wordTargetMin: number | null;
+  wordTargetMax: number | null;
+  sectionsWithContent: number | null;
+  sectionsTotal: number | null;
+  mediaReady: boolean;
+  mediaGaps: number | null;
+  internalLinkCount: number;
+  ctaReady: boolean;
+  qaBlockers: number | null;
+  qaWarnings: number | null;
+  reviewState: string | null;
+};
+
+/**
+ * Rich, display-only progress snapshot for the context rail. Every writing
+ * metric is optional — callers that don't have live draft data yet (e.g.
+ * before a Writing Plan exists) simply pass nothing and the UI shows dashes.
+ */
+export function buildEditorialProgressSnapshot(input: {
+  status: SeoTopicStatus;
+  wordCount?: number | null;
+  wordTargetMin?: number | null;
+  wordTargetMax?: number | null;
+  sectionsWithContent?: number | null;
+  sectionsTotal?: number | null;
+  mediaReady?: boolean;
+  mediaGaps?: number | null;
+  internalLinkCount?: number;
+  ctaReady?: boolean;
+  qaBlockers?: number | null;
+  qaWarnings?: number | null;
+  reviewState?: string | null;
+}): EditorialProgressSnapshot {
+  return {
+    stageLabel: STAGE_LABELS[input.status] ?? "—",
+    progressPercent: getTopicProgressPercent(input.status),
+    wordCount: input.wordCount ?? null,
+    wordTargetMin: input.wordTargetMin ?? null,
+    wordTargetMax: input.wordTargetMax ?? null,
+    sectionsWithContent: input.sectionsWithContent ?? null,
+    sectionsTotal: input.sectionsTotal ?? null,
+    mediaReady: Boolean(input.mediaReady),
+    mediaGaps: input.mediaGaps ?? null,
+    internalLinkCount: input.internalLinkCount ?? 0,
+    ctaReady: Boolean(input.ctaReady),
+    qaBlockers: input.qaBlockers ?? null,
+    qaWarnings: input.qaWarnings ?? null,
+    reviewState: input.reviewState ?? null,
+  };
+}
+
+export type SectionEditorialState = "empty" | "drafting" | "needs_attention" | "qa_ok" | "approved";
+
+export const SECTION_EDITORIAL_STATE_LABELS: Record<SectionEditorialState, string> = {
+  empty: "Chưa viết",
+  drafting: "Đang viết",
+  needs_attention: "Cần kiểm tra",
+  qa_ok: "Đạt QA",
+  approved: "Đã duyệt",
+};
+
+/**
+ * Derives a section's display state from real signals only — `approved` is
+ * reachable only through an explicit `reviewApproved: true`, never inferred
+ * from word count or QA alone.
+ */
+export function deriveSectionEditorialState(input: {
+  hasHtml: boolean;
+  wordCount?: number;
+  qaFailed?: boolean;
+  reviewApproved?: boolean;
+}): SectionEditorialState {
+  if (input.reviewApproved === true) return "approved";
+  if (!input.hasHtml) return "empty";
+  if (input.qaFailed === true) return "needs_attention";
+  if (input.qaFailed === false) return "qa_ok";
+  return "drafting";
+}
+
+export type OutlineNavItem = {
+  id: string;
+  level: "H2" | "H3";
+  heading: string;
+  depth: number;
+  index: number;
+};
+
+/** Flattens a brief outline into a navigable, indentable list (no repeated level text needed by the UI). */
+export function flattenOutlineForNav(
+  outline: Array<{ level: "H2" | "H3"; heading: string; sortOrder?: number }>,
+): OutlineNavItem[] {
+  return outline.map((row, index) => ({
+    id: `outline-${index}`,
+    level: row.level,
+    heading: row.heading.trim() || `Mục ${index + 1}`,
+    depth: row.level === "H3" ? 1 : 0,
+    index,
+  }));
+}
+
+export type EditorialActivityGroup = {
+  key: string;
+  text: string;
+  count: number;
+  at: string;
+};
+
+/** Groups duplicate activity entries (e.g. repeated autosave notes) and sorts newest-first. */
+export function groupEditorialActivity(
+  items: Array<{ at: string; text: string }>,
+): EditorialActivityGroup[] {
+  const map = new Map<string, EditorialActivityGroup>();
+  for (const item of items) {
+    const existing = map.get(item.text);
+    if (existing) {
+      existing.count += 1;
+      if (new Date(item.at).getTime() > new Date(existing.at).getTime()) existing.at = item.at;
+    } else {
+      map.set(item.text, { key: item.text, text: item.text, count: 1, at: item.at });
+    }
+  }
+  return [...map.values()].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+}
+
+/** localStorage key for whether the writer last preferred Focus mode on this workspace. */
+export const TOPIC_FOCUS_PREF_KEY = "attd.editor.topicFocus";
+
+export function readTopicFocusPreference(): boolean {
+  return readBoolPref(TOPIC_FOCUS_PREF_KEY) === true;
+}
+
+export function writeTopicFocusPreference(value: boolean): void {
+  writeBoolPref(TOPIC_FOCUS_PREF_KEY, value);
+}

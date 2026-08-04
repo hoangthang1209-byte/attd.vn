@@ -1,0 +1,655 @@
+/* Sprint 16.2 — Editorial Workspace UX 2.0.
+   Document-first layout: compact header, sticky toolbar, a writing canvas as
+   the primary surface, and a contextual right rail. Restrained admin palette
+   only (slate/blue) — no purple/glow theme, matches ai-writing module tone. */
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Document header ───────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.headerMain {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.headerTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.headerMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.headerMetaRow strong {
+  color: #334155;
+  font-weight: 600;
+}
+
+.statusChip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.aiStatusChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.headerProgressRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 280px;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.progressLabel {
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.overflowWrap {
+  position: relative;
+}
+
+.overflowMenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 190px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.14);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.overflowMenuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #1f2937;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.overflowMenuItem:hover,
+.overflowMenuItem:focus-visible {
+  background: #f1f5f9;
+  outline: none;
+}
+
+/* ── Sticky toolbar ────────────────────────────────────────────────────── */
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(6px);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.toolbarLeft,
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.toolbarDivider {
+  width: 1px;
+  align-self: stretch;
+  background: #e2e8f0;
+  margin: 0 2px;
+}
+
+.toolbarPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.toolbarButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.toolbarButton:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.toolbarButtonActive {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+/* ── Body grid: outline | canvas | rail ───────────────────────────────── */
+
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.outlineCol {
+  flex: 0 0 220px;
+  position: sticky;
+  top: 60px;
+  max-height: calc(100vh - 92px);
+  overflow: auto;
+}
+
+.mainCol {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.railCol {
+  flex: 0 0 320px;
+  position: sticky;
+  top: 60px;
+  max-height: calc(100vh - 92px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 1180px) {
+  .outlineCol,
+  .railCol {
+    display: none;
+  }
+}
+
+/* ── Writing canvas ────────────────────────────────────────────────────── */
+
+.canvas {
+  width: 100%;
+  max-width: 840px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.canvasBlock {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.canvasBlockSoft {
+  background: #fff;
+  border: 1px solid #eef1f5;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+/* ── Outline nav ───────────────────────────────────────────────────────── */
+
+.outlineNav {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.outlineNavTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  margin: 0 0 2px;
+}
+
+.outlineSearch {
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.outlineList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.outlineItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+  color: #475569;
+  cursor: pointer;
+}
+
+.outlineItem:hover {
+  background: #f8fafc;
+}
+
+.outlineItemActive {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.outlineItemDepth1 {
+  padding-left: 20px;
+  font-size: 12px;
+}
+
+.outlineDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: #cbd5e1;
+}
+
+.outlineEmpty {
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 4px 2px;
+}
+
+/* ── Context rail modules ──────────────────────────────────────────────── */
+
+.railModule {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.railModuleSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+  cursor: pointer;
+  list-style: none;
+}
+
+.railModuleSummary::-webkit-details-marker {
+  display: none;
+}
+
+.railModuleSummary:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: -2px;
+}
+
+.railModuleCaret {
+  color: #94a3b8;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+details[open] > .railModuleSummary .railModuleCaret {
+  transform: rotate(90deg);
+}
+
+.railModuleBody {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.railHint {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.railCtaButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid #1d4ed8;
+  background: #1d4ed8;
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.railCtaButton:hover {
+  background: #1e40af;
+}
+
+/* ── Progress module ───────────────────────────────────────────────────── */
+
+.progressStat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #475569;
+}
+
+.progressStat span:last-child {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+/* ── Checklist summary ─────────────────────────────────────────────────── */
+
+.checklistGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.checklistCard {
+  border-radius: 8px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+}
+
+.checklistCardComplete {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.checklistCardNeedsAttention {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.checklistCardBlocked {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.checklistCardLabel {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0 0 2px;
+}
+
+.checklistCardValue {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* ── Section document blocks (canvas mode) ────────────────────────────── */
+
+.sectionRow {
+  border: 1px solid #eef1f5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.sectionRow:hover {
+  border-color: #dbe4ee;
+  background: #fbfcfd;
+}
+
+.sectionRowHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sectionStateDot {
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sectionStateEmpty {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.sectionStateDrafting {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.sectionStateNeedsAttention {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.sectionStateQaOk {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.sectionStateApproved {
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.sectionAiWrap {
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.sectionRow:hover .sectionAiWrap,
+.sectionAiWrap:focus-within {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sectionAiWrap {
+    transition: none;
+  }
+}
+
+/* ── Mobile sheets ─────────────────────────────────────────────────────── */
+
+.mobileBar {
+  display: none;
+  gap: 8px;
+}
+
+@media (max-width: 1180px) {
+  .mobileBar {
+    display: flex;
+  }
+}
+
+.mobileSheetOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+}
+
+.mobileSheet {
+  width: 100%;
+  max-height: 82vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 14px 14px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  box-shadow: 0 -12px 30px rgba(15, 23, 42, 0.2);
+}
+
+.mobileSheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.mobileSheetTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.mobileSheetClose {
+  border: none;
+  background: #f1f5f9;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  color: #475569;
+}
+
+/* ── Focus mode ────────────────────────────────────────────────────────── */
+
+.workspace[data-focus="on"] .outlineCol,
+.workspace[data-focus="on"] .railCol,
+.workspace[data-focus="on"] .mobileBar {
+  display: none;
+}
+
+.workspace[data-focus="on"] .canvas {
+  max-width: 900px;
+}
+
+/* ── Accessibility / reduced motion ───────────────────────────────────── */
+
+.outlineItem:focus-visible,
+.toolbarButton:focus-visible,
+.railCtaButton:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .railModuleCaret {
+    transition: none;
+  }
+}

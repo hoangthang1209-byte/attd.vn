@@ -10,6 +10,12 @@ import AiGenerationQueue from "@/components/admin/content/ai-writing/AiGeneratio
 import AiHistoryTimeline, { type AiHistoryTimelineItem } from "@/components/admin/content/ai-writing/AiHistoryTimeline";
 import InlineTextAiToolbar from "@/components/admin/content/ai-writing/InlineTextAiToolbar";
 import { useAiWritingQueue } from "@/components/admin/content/ai-writing/useAiWritingQueue";
+import canvasStyles from "@/components/admin/seo-content/topic-workspace/TopicWorkspace.module.css";
+import {
+  deriveSectionEditorialState,
+  SECTION_EDITORIAL_STATE_LABELS,
+  type SectionEditorialState,
+} from "@/features/content/editorial/editorial-ux";
 
 type BuildHistoryItem = {
   id: string;
@@ -130,9 +136,17 @@ type RunStatus = {
   };
 };
 
-type Props = { topicId: string };
+type Props = { topicId: string; canvasMode?: boolean };
 
-export default function WritingEnginePanel({ topicId }: Props) {
+const SECTION_STATE_CLASS: Record<SectionEditorialState, string> = {
+  empty: canvasStyles.sectionStateEmpty,
+  drafting: canvasStyles.sectionStateDrafting,
+  needs_attention: canvasStyles.sectionStateNeedsAttention,
+  qa_ok: canvasStyles.sectionStateQaOk,
+  approved: canvasStyles.sectionStateApproved,
+};
+
+export default function WritingEnginePanel({ topicId, canvasMode = false }: Props) {
   const toast = useAdminToast();
   const [contextBuilds, setContextBuilds] = useState<BuildHistoryItem[]>([]);
   const [contextBuildId, setContextBuildId] = useState("");
@@ -573,13 +587,19 @@ export default function WritingEnginePanel({ topicId }: Props) {
     return "AI generated";
   }
 
-  return (
-    <div className="admin-sidebar-card" style={{ marginBottom: 16 }}>
-      <h3 className="admin-sidebar-title">Writing Engine</h3>
-      <p className="admin-field-hint">
-        Context → Plan → Generate → Start Review → Approve → Handoff Blog DRAFT. Không auto-publish.
-      </p>
+  /** Never marks a section "approved" without a real, already-persisted review approval. */
+  function sectionEditorialState(sectionId: string): SectionEditorialState {
+    const s = draft?.sections?.find((x) => x.sectionId === sectionId);
+    return deriveSectionEditorialState({
+      hasHtml: Boolean(s?.html?.trim()),
+      wordCount: s?.wordCount,
+      qaFailed: draft?.qa ? !draft.qa.passed : undefined,
+      reviewApproved: reviewStatus === "APPROVED" ? true : undefined,
+    });
+  }
 
+  const contentSetupFields = (
+    <>
       <p className="admin-field-hint">
         Provider: {providerStatus
           ? `${providerStatus.provider}/${providerStatus.model} · ${
@@ -587,14 +607,6 @@ export default function WritingEnginePanel({ topicId }: Props) {
             }`
           : "…"}
       </p>
-
-      {contentGenStatus && !aiConfigured && <AiEmptyState />}
-
-      {aiQueue.items.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <AiGenerationQueue items={aiQueue.items} onDismiss={aiQueue.remove} />
-        </div>
-      )}
 
       <div className="admin-field">
         <label className="admin-label">Context Build</label>
@@ -619,10 +631,52 @@ export default function WritingEnginePanel({ topicId }: Props) {
         </select>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        <AdminLoadingButton pending={building} variant="primary" size="small" onClick={() => void buildPlan(false)}>
-          Tạo Writing Plan
-        </AdminLoadingButton>
+      <AdminLoadingButton pending={building} variant="primary" size="small" onClick={() => void buildPlan(false)}>
+        Tạo Writing Plan
+      </AdminLoadingButton>
+
+      {planHistory.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <p className="admin-field-hint" style={{ fontWeight: 600, marginBottom: 4 }}>
+            Plan history
+          </p>
+          <ul style={{ fontSize: 12, paddingLeft: 16, margin: 0 }}>
+            {planHistory.slice(0, 6).map((p) => (
+              <li key={p.id}>
+                {p.id.slice(0, 8)}… · {p.status}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <div className={canvasMode ? canvasStyles.canvasBlockSoft : "admin-sidebar-card"} style={{ marginBottom: 16 }}>
+      <h3 className="admin-sidebar-title">Writing Engine</h3>
+      <p className="admin-field-hint">
+        Context → Plan → Generate → Start Review → Approve → Handoff Blog DRAFT. Không auto-publish.
+      </p>
+
+      {contentGenStatus && !aiConfigured && <AiEmptyState />}
+
+      {aiQueue.items.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <AiGenerationQueue items={aiQueue.items} onDismiss={aiQueue.remove} />
+        </div>
+      )}
+
+      {canvasMode ? (
+        <details style={{ margin: "8px 0" }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600 }}>Cài đặt tạo nội dung</summary>
+          <div style={{ marginTop: 8 }}>{contentSetupFields}</div>
+        </details>
+      ) : (
+        contentSetupFields
+      )}
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, marginBottom: 8 }}>
         {plan?.readiness.ready && (
           <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void createDraftShell()}>
             Draft shell
@@ -696,48 +750,57 @@ export default function WritingEnginePanel({ topicId }: Props) {
 
       {plan && (
         <>
-          <Section id="sections" title={`Sections (${plan.sections.length})`}>
-            <ul style={{ fontSize: 13, paddingLeft: 16, listStyle: "none" }}>
-              {plan.sections.map((s) => (
-                <li key={s.id} style={{ marginBottom: 8 }}>
-                  <label style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedSectionIds.includes(s.id)}
-                      onChange={(e) => {
-                        setSelectedSectionIds((prev) =>
-                          e.target.checked ? [...prev, s.id] : prev.filter((x) => x !== s.id)
-                        );
-                      }}
-                    />
-                    <span>
-                      <strong>{s.heading}</strong> · {sectionBadge(s.id)} · {s.targetWordCountMin}-{s.targetWordCountMax} từ
-                      <br />
-                      <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
-                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "generate")}>
-                          Generate
-                        </button>
-                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "retry")}>
-                          Retry
-                        </button>
-                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "regenerate")}>
-                          Regenerate
-                        </button>
-                        <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void toggleLock(s.id, !locks[s.id])}>
-                          {locks[s.id] ? "Unlock" : "Lock"}
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--secondary admin-btn--small"
-                          onClick={() => {
-                            setEditSectionId(s.id);
-                            setEditHtml(draft?.sections?.find((x) => x.sectionId === s.id)?.html ?? "");
-                          }}
-                        >
-                          Edit
-                        </button>
+          {canvasMode ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "8px 0" }}>
+              {plan.sections.map((s) => {
+                const state = sectionEditorialState(s.id);
+                return (
+                  <div key={s.id} className={canvasStyles.sectionRow}>
+                    <div className={canvasStyles.sectionRowHeading}>
+                      <input
+                        type="checkbox"
+                        checked={selectedSectionIds.includes(s.id)}
+                        onChange={(e) => {
+                          setSelectedSectionIds((prev) =>
+                            e.target.checked ? [...prev, s.id] : prev.filter((x) => x !== s.id),
+                          );
+                        }}
+                        aria-label={`Chọn section ${s.heading}`}
+                      />
+                      <strong>{s.heading}</strong>
+                      <span className={`${canvasStyles.sectionStateDot} ${SECTION_STATE_CLASS[state]}`}>
+                        {SECTION_EDITORIAL_STATE_LABELS[state]}
                       </span>
-                      {draft?.id && plan?.id && (
+                      <span className="admin-field-hint">
+                        {sectionBadge(s.id)} · {s.targetWordCountMin}-{s.targetWordCountMax} từ
+                      </span>
+                    </div>
+                    <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "generate")}>
+                        Generate
+                      </button>
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "retry")}>
+                        Retry
+                      </button>
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "regenerate")}>
+                        Regenerate
+                      </button>
+                      <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void toggleLock(s.id, !locks[s.id])}>
+                        {locks[s.id] ? "Unlock" : "Lock"}
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--secondary admin-btn--small"
+                        onClick={() => {
+                          setEditSectionId(s.id);
+                          setEditHtml(draft?.sections?.find((x) => x.sectionId === s.id)?.html ?? "");
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </div>
+                    {draft?.id && plan?.id && (
+                      <div className={canvasStyles.sectionAiWrap} style={{ marginTop: 6 }}>
                         <WritingSectionAiAssistant
                           topicId={topicId}
                           writingPlanId={plan.id}
@@ -759,13 +822,84 @@ export default function WritingEnginePanel({ topicId }: Props) {
                           onDraftMutated={() => void reloadDraftAfterAi()}
                           onQueueUpdate={aiQueue.upsert}
                         />
-                      )}
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </Section>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <Section id="sections" title={`Sections (${plan.sections.length})`}>
+              <ul style={{ fontSize: 13, paddingLeft: 16, listStyle: "none" }}>
+                {plan.sections.map((s) => (
+                  <li key={s.id} style={{ marginBottom: 8 }}>
+                    <label style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedSectionIds.includes(s.id)}
+                        onChange={(e) => {
+                          setSelectedSectionIds((prev) =>
+                            e.target.checked ? [...prev, s.id] : prev.filter((x) => x !== s.id)
+                          );
+                        }}
+                      />
+                      <span>
+                        <strong>{s.heading}</strong> · {sectionBadge(s.id)} · {s.targetWordCountMin}-{s.targetWordCountMax} từ
+                        <br />
+                        <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "generate")}>
+                            Generate
+                          </button>
+                          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "retry")}>
+                            Retry
+                          </button>
+                          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void generateOne(s.id, "regenerate")}>
+                            Regenerate
+                          </button>
+                          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => void toggleLock(s.id, !locks[s.id])}>
+                            {locks[s.id] ? "Unlock" : "Lock"}
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--secondary admin-btn--small"
+                            onClick={() => {
+                              setEditSectionId(s.id);
+                              setEditHtml(draft?.sections?.find((x) => x.sectionId === s.id)?.html ?? "");
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </span>
+                        {draft?.id && plan?.id && (
+                          <WritingSectionAiAssistant
+                            topicId={topicId}
+                            writingPlanId={plan.id}
+                            writingDraftId={draft.id}
+                            contextBuildId={contextBuildId || null}
+                            sectionId={s.id}
+                            sectionHeading={s.heading}
+                            currentHtml={draft.sections?.find((x) => x.sectionId === s.id)?.html ?? ""}
+                            draftVersion={draftVersion}
+                            aiEnabled={Boolean(contentGenStatus?.enabled)}
+                            aiConfigured={aiConfigured}
+                            statusSummary={contentGenStatus ? { provider: contentGenStatus.provider, model: contentGenStatus.model } : null}
+                            contextCounts={{
+                              facts: s.requiredFactIds.length + s.optionalFactIds.length,
+                              media: s.mediaAssetIds.length,
+                              links: s.internalLinkIds.length,
+                            }}
+                            qaIssues={draft?.qa?.issues.map((issue) => ({ code: issue.code, severity: "WARN", message: issue.message }))}
+                            onDraftMutated={() => void reloadDraftAfterAi()}
+                            onQueueUpdate={aiQueue.upsert}
+                          />
+                        )}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
           {editSectionId && (
             <Section id="edit" title="Manual edit">
@@ -863,17 +997,6 @@ export default function WritingEnginePanel({ topicId }: Props) {
         </Section>
       )}
 
-      {planHistory.length > 0 && (
-        <Section id="history" title="Plan history">
-          <ul style={{ fontSize: 12, paddingLeft: 16 }}>
-            {planHistory.slice(0, 6).map((p) => (
-              <li key={p.id}>
-                {p.id.slice(0, 8)}… · {p.status}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
     </div>
   );
 }

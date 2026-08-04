@@ -247,3 +247,103 @@ did not enable `CONTENT_GENERATION_ENABLED`**.
   `seo-brief-apply.service`); inline-edited brief output
   (`applyProposal({ editedOutput })`) is not yet threaded through for brief
   suggestions the way it is for section proposals.
+
+## Sprint 16.2 — Editorial Workspace UX 2.0
+
+Sprint 16.1 made AI assistance feel native to the Writing Engine; Sprint 16.2
+reworks the surrounding page (`/admin/content/topics/[id]`,
+`SeoTopicDetailClient.tsx`) from a vertical stack of full-width admin cards
+into a **document-first** workspace, so the writing canvas — not the admin
+metadata — is the visual center of the page. This sprint is UI/IA only: it did
+**not** enable AI, call a paid provider, change Review/Handoff/Publish
+semantics, add a migration, or introduce a second editor.
+
+### Information architecture
+
+```
+Compact document header   (title, keyword, status, progress mini, one primary CTA)
+Sticky editor toolbar     (save state, word count, outline toggle, Focus mode)
+┌───────────────────────────────┬──────────────────────────┐
+│ Outline nav (collapsible)     │ Writing canvas (primary)  │  Context rail
+│                                │ id="writing"              │  (Next action,
+│                                │ Brief & dàn ý (collapsed) │   Progress, AI,
+│                                │ WritingEnginePanel        │   Knowledge, Media,
+│                                │   canvasMode              │   SEO/QA, Activity)
+│                                │ Chi tiết kế hoạch (collapsed)│
+└───────────────────────────────┴──────────────────────────┘
+Cài đặt nâng cao (drawer: system IDs, scores, keywords, existing-content match, internal links)
+```
+
+Components live under
+`src/components/admin/seo-content/topic-workspace/`: `TopicDocumentHeader`,
+`TopicEditorToolbar`, `TopicWritingCanvas`, `TopicOutlineNav`,
+`TopicContextRail` (with `NextActionModule` / `ProgressModule` /
+`AiAssistantModule` / `KnowledgeModule` / `MediaModule` / `SeoQaModule` /
+`ActivityModule`), `TopicProjectDetails`, `TopicChecklistSummary`,
+`TopicAdvancedDrawer`, `TopicPublishedSummary`, and `TopicMobileSheets`
+(bottom sheets for Outline/Context on small screens). Layout and rhythm live
+in `TopicWorkspace.module.css`, reusing existing admin design tokens rather
+than introducing a new visual theme.
+
+### Primary CTA and progress helpers
+
+`src/features/content/editorial/editorial-ux.ts` gained pure, presentation-only
+helpers so the workspace never has more than one primary call-to-action:
+
+- `resolveTopicPrimaryCta({ status, hasActiveReviewId, hasBlogDraft, publishedUrl })`
+  returns exactly one `{ label, href, staysOnPage, intent }` per status —
+  e.g. **"Tiếp tục viết"** (stays on page, scrolls to the canvas) for
+  `DRAFTING`, **"Mở kiểm duyệt"** for `REVIEW` (still routes to
+  `/admin/content/reviews[/id]` — the Review workflow itself is untouched),
+  and **"Xem bài đã đăng"** for `PUBLISHED`.
+- `summarizeChecklistGroups()` compacts the existing checklist items into 5
+  groups for the rail/header (Nội dung, SEO, Hình ảnh, Kiểm duyệt, Xuất bản),
+  splitting the old single "publish" group into review vs. publish items.
+- `buildEditorialProgressSnapshot()` and `deriveSectionEditorialState()`
+  produce a richer progress view (word targets, media/CTA/link readiness,
+  per-section state chips) but always degrade to `null`/neutral state when
+  the underlying data isn't known yet — nothing is fabricated. In particular,
+  a section can only be reported "Đã duyệt" when a real
+  `reviewApproved: true` is passed in; it is never inferred from QA passing.
+- `flattenOutlineForNav()` and `groupEditorialActivity()` are small pure
+  helpers for the outline navigator and the rail's activity timeline.
+- Focus mode's on/off preference persists via `attd.editor.topicFocus`
+  (`readBoolPref`/`writeBoolPref` from `@/features/blog/editor-preferences`,
+  the same pattern the Blog editor already uses).
+
+### WritingEnginePanel `canvasMode`
+
+`WritingEnginePanel` gained an optional `canvasMode?: boolean` prop (default
+`false`, so the panel is unchanged wherever it's reused outside the new
+workspace). In `canvasMode`, generation settings (context build, content
+type, "Tạo Writing Plan", plan history) collapse into a single
+`<details>` labeled "Cài đặt tạo nội dung", and sections render as plain
+document blocks with a derived status chip instead of being wrapped in the
+generic collapsible `Section` card. No generate/edit/AI-assistant
+functionality was removed — `WritingSectionAiAssistant` and every existing
+action are still present, just visually quieter.
+
+### What did not change
+
+- Review, Handoff, and Publish workflows and their API routes/hrefs are
+  unchanged; the Review CTA still routes to `/admin/content/reviews`.
+- `CONTENT_GENERATION_ENABLED` is not set to `true` anywhere by this sprint,
+  and the rail's `AiAssistantModule` always renders the existing
+  `AiEmptyState` ("AI chưa được cấu hình…") because `aiConfigured` is passed
+  as `false` from the page.
+- No new database migration, and no second/parallel editor — `id="writing"`
+  still marks the single writing canvas used for scroll targets.
+- All existing state, data loading, and save handlers in
+  `SeoTopicDetailClient.tsx` were preserved; this sprint only restructured
+  the JSX returned by the component.
+
+### Known gaps
+
+- `WritingEnginePanel` still owns the active review id and live draft
+  word/section counts locally and does not lift them up to the parent yet,
+  so `resolveTopicPrimaryCta`/`buildEditorialProgressSnapshot` are called
+  with `hasActiveReviewId: null` and fall back to status-derived data rather
+  than the panel's live counts. Lifting that state up is a follow-up.
+- `TopicContextRail`'s `KnowledgeModule` links out to the existing Knowledge
+  surface rather than embedding a live `ContentContextPanel`, to avoid
+  duplicating that panel's data-fetching inside the rail in this sprint.
