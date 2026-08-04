@@ -9,8 +9,26 @@ import { createContentProposal } from "@/features/content-generation/services/pr
 import { toSafeProposalDetail } from "@/features/content-generation/services/history.service";
 import { mapContentGenerationError } from "@/app/api/content/generation/_shared";
 
+/**
+ * Sprint 16.1 — the inline "✨ AI" section menu also offers a few
+ * non-section-scoped suggestion types (FAQ/CTA/internal link/media) from
+ * the same section context. They still validate/apply through the same
+ * governed proposal pipeline; only the allow-list here needed to grow.
+ */
+const ADDITIONAL_ALLOWED_SECTION_ROUTE_TYPES: ContentGenerationType[] = [
+  "FAQ_SUGGESTION",
+  "CTA_SUGGESTION",
+  "INTERNAL_LINK_SUGGESTION",
+  "MEDIA_SUGGESTION",
+];
+
+const ALLOWED_SECTION_ROUTE_TYPES: string[] = [
+  ...CONTENT_GENERATION_SECTION_TYPES,
+  ...ADDITIONAL_ALLOWED_SECTION_ROUTE_TYPES,
+];
+
 function parseSectionType(raw: unknown): ContentGenerationType {
-  if (typeof raw === "string" && (CONTENT_GENERATION_SECTION_TYPES as string[]).includes(raw)) {
+  if (typeof raw === "string" && ALLOWED_SECTION_ROUTE_TYPES.includes(raw)) {
     return raw as ContentGenerationType;
   }
   return "SECTION_DRAFT";

@@ -4,6 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import WritingSectionAiAssistant from "@/components/admin/content/ai-writing/WritingSectionAiAssistant";
+import AiEmptyState from "@/components/admin/content/ai-writing/AiEmptyState";
+import AiGenerationQueue from "@/components/admin/content/ai-writing/AiGenerationQueue";
+import AiHistoryTimeline, { type AiHistoryTimelineItem } from "@/components/admin/content/ai-writing/AiHistoryTimeline";
+import InlineTextAiToolbar from "@/components/admin/content/ai-writing/InlineTextAiToolbar";
+import { useAiWritingQueue } from "@/components/admin/content/ai-writing/useAiWritingQueue";
 
 type BuildHistoryItem = {
   id: string;
@@ -100,6 +106,14 @@ type ContentGenerationSafeStatus = {
   keyConfigured: boolean;
 };
 
+/** Mirrors `isContentGenerationConfigured` — true only when a real provider can actually run. */
+function isAiConfigured(status: ContentGenerationSafeStatus | null): boolean {
+  if (!status?.enabled) return false;
+  if (status.provider === "test") return true;
+  if (status.provider === "openai") return status.keyConfigured;
+  return false;
+}
+
 type RunStatus = {
   runId: string;
   status: string;
@@ -145,6 +159,12 @@ export default function WritingEnginePanel({ topicId }: Props) {
   const [inlinePlanSummary, setInlinePlanSummary] = useState<string | null>(null);
   const [inlinePlanBusy, setInlinePlanBusy] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Sprint 16.1 — inline AI writing experience.
+  const aiQueue = useAiWritingQueue();
+  const [aiHistory, setAiHistory] = useState<AiHistoryTimelineItem[]>([]);
+  const editTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const aiConfigured = isAiConfigured(contentGenStatus);
 
   const runInlineMediaPlan = useCallback(async () => {
     if (!draft?.id) {
@@ -228,6 +248,83 @@ export default function WritingEnginePanel({ topicId }: Props) {
     void loadProviderStatus();
     void loadContentGenerationStatus();
   }, [loadBuilds, loadPlans, loadProviderStatus, loadContentGenerationStatus]);
+
+  const loadAiHistory = useCallback(async () => {
+    const query = draft?.id ? `writingDraftId=${draft.id}` : `topicId=${topicId}`;
+    try {
+      const res = await fetch(`/api/content/generation/history?${query}&limit=20`);
+      const data = await res.json();
+      if (res.ok) setAiHistory((data.items as AiHistoryTimelineItem[]) ?? []);
+    } catch {
+      // History timeline is a convenience view — safe to ignore fetch failures here.
+    }
+  }, [draft?.id, topicId]);
+
+  useEffect(() => {
+    void loadAiHistory();
+  }, [loadAiHistory]);
+
+  /**
+   * After an AI proposal is applied to a section, re-runs QA against the
+   * already-persisted draft (same governed path as the "Full QA" button) to
+   * pull the latest section HTML/qa issues back into local state — the AI
+   * apply endpoint itself only returns {writingDraftId, sectionId, version}.
+   */
+  const reloadDraftAfterAi = useCallback(async () => {
+    if (!draft?.id) return;
+    try {
+      const res = await fetch(`/api/content/writing-drafts/${draft.id}/qa`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setDraft(data.draft as DraftLite);
+        setDraftVersion((v) => v + 1);
+      }
+    } catch {
+      // Best-effort refresh — the AI apply itself already succeeded server-side.
+    }
+    void loadAiHistory();
+  }, [draft?.id, loadAiHistory]);
+
+  const runInlineTextAiRewrite = useCallback(
+    async (instruction: string, selectedText: string) => {
+      if (!draft?.id || !plan?.id || !editSectionId) return;
+      if (!aiConfigured) {
+        toast.info("AI chưa được cấu hình. Bạn vẫn có thể chỉnh sửa nội dung thủ công.");
+        return;
+      }
+      setBuilding(true);
+      try {
+        const res = await fetch("/api/content/generation/section", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "SECTION_REWRITE",
+            topicId,
+            writingPlanId: plan.id,
+            writingDraftId: draft.id,
+            sectionId: editSectionId,
+            contextBuildId: contextBuildId || null,
+            editorInstruction: `${instruction} Đoạn cần áp dụng: "${selectedText}"`,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message ?? "AI rewrite thất bại.");
+        const output = data.proposal?.output as { html?: string; plainText?: string } | undefined;
+        const replacement = output?.plainText ?? output?.html ?? "";
+        if (replacement && editHtml.includes(selectedText)) {
+          setEditHtml(editHtml.replace(selectedText, replacement));
+          toast.success("Đã thay đoạn được chọn — bấm Lưu & khóa để áp dụng.");
+        } else {
+          toast.info("AI đã tạo đề xuất nhưng không khớp đoạn đã chọn để thay tự động.");
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "AI rewrite thất bại.");
+      } finally {
+        setBuilding(false);
+      }
+    },
+    [aiConfigured, contextBuildId, draft?.id, editHtml, editSectionId, plan?.id, toast, topicId],
+  );
 
   useEffect(() => {
     if (!activeRunId) return;
@@ -491,10 +588,12 @@ export default function WritingEnginePanel({ topicId }: Props) {
           : "…"}
       </p>
 
-      {contentGenStatus && !contentGenStatus.enabled && (
-        <p className="admin-field-hint">
-          AI chưa được cấu hình. Bạn vẫn có thể viết và chỉnh sửa nội dung thủ công.
-        </p>
+      {contentGenStatus && !aiConfigured && <AiEmptyState />}
+
+      {aiQueue.items.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <AiGenerationQueue items={aiQueue.items} onDismiss={aiQueue.remove} />
+        </div>
       )}
 
       <div className="admin-field">
@@ -638,6 +737,29 @@ export default function WritingEnginePanel({ topicId }: Props) {
                           Edit
                         </button>
                       </span>
+                      {draft?.id && plan?.id && (
+                        <WritingSectionAiAssistant
+                          topicId={topicId}
+                          writingPlanId={plan.id}
+                          writingDraftId={draft.id}
+                          contextBuildId={contextBuildId || null}
+                          sectionId={s.id}
+                          sectionHeading={s.heading}
+                          currentHtml={draft.sections?.find((x) => x.sectionId === s.id)?.html ?? ""}
+                          draftVersion={draftVersion}
+                          aiEnabled={Boolean(contentGenStatus?.enabled)}
+                          aiConfigured={aiConfigured}
+                          statusSummary={contentGenStatus ? { provider: contentGenStatus.provider, model: contentGenStatus.model } : null}
+                          contextCounts={{
+                            facts: s.requiredFactIds.length + s.optionalFactIds.length,
+                            media: s.mediaAssetIds.length,
+                            links: s.internalLinkIds.length,
+                          }}
+                          qaIssues={draft?.qa?.issues.map((issue) => ({ code: issue.code, severity: "WARN", message: issue.message }))}
+                          onDraftMutated={() => void reloadDraftAfterAi()}
+                          onQueueUpdate={aiQueue.upsert}
+                        />
+                      )}
                     </span>
                   </label>
                 </li>
@@ -648,11 +770,18 @@ export default function WritingEnginePanel({ topicId }: Props) {
           {editSectionId && (
             <Section id="edit" title="Manual edit">
               <textarea
+                ref={editTextareaRef}
                 className="admin-input"
                 rows={5}
                 value={editHtml}
                 onChange={(e) => setEditHtml(e.target.value)}
                 placeholder="HTML section body"
+              />
+              <InlineTextAiToolbar
+                textareaRef={editTextareaRef}
+                disabled={!aiConfigured}
+                disabledReason="AI chưa được cấu hình."
+                onRequestRewrite={(instruction, selectedText) => void runInlineTextAiRewrite(instruction, selectedText)}
               />
               <AdminLoadingButton pending={building} variant="primary" size="small" onClick={() => void saveEdit()}>
                 Lưu & khóa
@@ -704,6 +833,10 @@ export default function WritingEnginePanel({ topicId }: Props) {
                 {inlinePlanSummary}
               </pre>
             )}
+          </Section>
+
+          <Section id="ai-history" title={`Lịch sử AI (${aiHistory.length})`}>
+            <AiHistoryTimeline items={aiHistory} />
           </Section>
         </>
       )}

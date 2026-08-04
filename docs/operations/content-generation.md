@@ -136,6 +136,101 @@ and redeploy. All proposal-creation endpoints immediately throw
 Existing `AiGenerationRun` proposal history is untouched and still viewable
 via `GET /api/content/generation/history`.
 
+## Sprint 16.1 — Editor experience
+
+Sprint 16.0 shipped the governed proposal pipeline; Sprint 16.1 makes it feel
+like part of the writing surface instead of a separate tool. The writing
+surface (`WritingEnginePanel`) stays primary — AI is secondary, inline, and
+always optional. This sprint added **no new page/workflow, no migration, and
+did not enable `CONTENT_GENERATION_ENABLED`**.
+
+### What changed
+
+- **Inline "✨ AI" menu per section** (`SectionAiMenu`) — a compact button
+  that appears on hover/focus of a section row, instead of a chat popup.
+  Actions map to the same `ContentGenerationType`s from 16.0 (Viết bản
+  nháp/lại, Rút gọn, Mở rộng, Đổi giọng văn, Thêm ví dụ/bảng/FAQ, Gợi ý
+  CTA/liên kết/hình ảnh) — see
+  `src/features/content-generation/ux/ai-menu-actions.ts`.
+- **`SectionProposalPanel`** — an inline panel (never a modal) rendered
+  directly under the section row: current content → AI proposal → line/word
+  diff (`ProposalDiffView`, `text-diff.ts`) → **Apply / Edit before Apply /
+  Retry / Reject**. Apply and Edit-before-Apply are the only actions that
+  call `POST /api/content/generation/[id]/apply` — this sprint changed
+  nothing about that endpoint's human-only semantics.
+- **Transparency widgets** — `ProposalStatusBar` (provider/model/tokens,
+  expandable to time/cost/counts — cost shows "Chưa xác định" when unknown,
+  never a fabricated number), `ProposalContextChips` (Knowledge/Media/
+  Internal Links counts, Brand Rules/Claim Safety indicators, expandable to
+  truncated ids — never raw JSON), and `WhyReasoningPanel` (why the AI used
+  each fact/media/link, sourced from `factIdsUsed`/suggestion `reason`
+  fields).
+- **`SectionQualityChips`** — heuristic, network-free SEO/Readability/
+  Evidence/CTA/Internal Links/Media signals
+  (`ux/section-quality.ts`) to help an editor decide *whether* to ask AI for
+  help. These are a cheap client-side hint, not a replacement for the
+  governed Writing QA pipeline.
+- **Accept-only suggestion UIs** — `InlineMediaSuggestions`,
+  `InlineLinkSuggestions`, `InlineCtaFaqProposal` preview suggestions with
+  Accept/Insert/Apply buttons that only call a parent callback; consistent
+  with the 16.0 "accepted-only" semantics for FAQ/CTA/media/link proposals.
+- **`AiGenerationQueue`** — a small non-blocking queue so an editor can fire
+  a few section proposals and keep writing/editing other sections while they
+  resolve; purely client-side UI state (`useAiWritingQueue`), not a new
+  server model.
+- **`AiHistoryTimeline`** — renders `GET /api/content/generation/history`
+  results (Generated → Applied/Rejected, with draft-version notes) inside
+  the writing panel instead of a separate page.
+- **`InlineTextAiToolbar`** (P1) — selecting text inside the manual-edit
+  textarea shows Rewrite/Explain/Simplify/Professional/Shorter/Longer/Add
+  example; each emits a `SECTION_REWRITE` request with an `editorInstruction`
+  built from the selection. The result only replaces the selected substring
+  in the textarea — the editor still clicks "Lưu & khóa" to persist it
+  (still human-in-the-loop, still goes through the governed sanitize/QA path
+  on save).
+- **Keyboard shortcuts** (`useAiWritingShortcuts`) — Cmd/Ctrl+J opens the AI
+  menu, Cmd/Ctrl+Enter generates/applies, Esc cancels/closes — scoped to
+  elements marked `data-ai-section-active="true"` so shortcuts never hijack
+  typing in unrelated fields.
+- **`AiEmptyState`** — "AI chưa được cấu hình. Bạn vẫn có thể tiếp tục viết
+  bài bình thường." shown wherever AI is off/unconfigured, replacing the
+  previous plain-text hint. Writing is never blocked by AI being off.
+- **Streaming architecture placeholder** (`ux/streaming.ts`) —
+  `isStreamingEnabled()` always returns `false` today; the shape exists so a
+  future streaming provider can be wired in without changing the proposal
+  panel's contract.
+- **API**: `POST /api/content/generation/section`'s `parseSectionType` now
+  also accepts `FAQ_SUGGESTION` / `CTA_SUGGESTION` /
+  `INTERNAL_LINK_SUGGESTION` / `MEDIA_SUGGESTION` (previously only the six
+  `CONTENT_GENERATION_SECTION_TYPES`), so the inline section menu can request
+  these directly from a section's context. Validation, policy gating, and
+  claim safety are unchanged — only the allow-list grew.
+
+### What did not change
+
+- **Apply is still human-only.** No new endpoint bypasses
+  `proposal.service`'s `GENERATED`-only apply gate or the staleness check
+  against `WritingDraftRecord.version`.
+- **AI is still OFF by default.** This sprint did not set
+  `CONTENT_GENERATION_ENABLED=true` anywhere, and no test in
+  `content-generation-16-1.test.ts` calls a paid provider.
+- **Review/Handoff/Publish are unchanged** — this sprint only touches the
+  Writing Engine step of the pipeline.
+- FAQ/CTA/media/link apply remain **accepted-only** (see Known gaps below) —
+  16.1 previews them inline but does not add a new write path.
+
+### Known gaps carried into 16.1
+
+- `AiHistoryTimeline`'s "Xem diff" action only lights up when the caller
+  already holds the proposal's `output` locally (the list endpoint returns
+  safe summaries without `output` to keep history payloads small) — opening
+  a diff for an older, no-longer-in-memory history item needs a
+  proposal-detail-by-id endpoint, which doesn't exist yet.
+- `InlineTextAiToolbar` replaces the selected substring via a plain string
+  match against the manual-edit textarea value; if the selection happens to
+  repeat elsewhere in the section it edits the first occurrence, not
+  necessarily the exact selected range.
+
 ## Known gaps / follow-up sprints
 
 - `FAQ_SUGGESTION` and `CTA_SUGGESTION` apply only records acceptance; they
