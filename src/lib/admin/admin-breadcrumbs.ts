@@ -445,6 +445,22 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/generation/:id",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "AI vận hành", "Chi tiết đề xuất"],
+      title: "Chi tiết đề xuất AI",
+      description: "Xem đề xuất AI: nội dung gốc/đề xuất, ngữ cảnh, chi phí, và lịch sử trạng thái.",
+    },
+  },
+  {
+    path: "/admin/content/ai",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "AI vận hành"],
+      title: "AI vận hành",
+      description: "Cấu hình provider, giai đoạn triển khai, hạn mức, sức khỏe provider và usage ledger AI.",
+    },
+  },
+  {
     path: "/admin/content/publishing",
     meta: {
       breadcrumbs: ["NỘI DUNG", "Xuất bản"],

@@ -13,10 +13,20 @@ import {
   type GovernedGenerationContext,
 } from "@/features/content-generation/contracts/generation.types";
 import { assertGenerationAllowed } from "@/features/content-generation/contracts/policy";
+import { estimateGenerationCost } from "@/features/content-generation/services/cost-engine.service";
+import { assertQuotaAllowed, type QuotaUsageDeps } from "@/features/content-generation/services/quota-engine.service";
 import { getPromptTemplate } from "@/features/content-generation/prompts/prompt-registry";
 import type { ContentGenerationProvider } from "@/features/content-generation/providers/content-generation-provider";
 import type { AssembleContentGenerationContextInput } from "@/features/content-generation/services/context-assembler.service";
 import { extractUsedIds, validateStructuredOutput } from "@/features/content-generation/services/structured-output.service";
+
+/** Sprint 18.0 — optional text-selection anchor for section-scoped requests, persisted in inputSummary and re-checked at apply time. */
+export type ContentGenerationSelection = {
+  start: number;
+  end: number;
+  textHash: string;
+  draftVersion: number;
+};
 
 export type ProposalRunRecord = {
   id: string;
@@ -92,7 +102,10 @@ export type ProposalStore = {
   markValidationFailed(id: string, errorMessage: string): Promise<ProposalRunRecord>;
   markFailed(id: string, errorMessage: string): Promise<ProposalRunRecord>;
   getById(id: string): Promise<ProposalRunRecord | null>;
-  markApplied(id: string, data: { appliedBy: string | null; edited: boolean }): Promise<ProposalRunRecord>;
+  markApplied(
+    id: string,
+    data: { appliedBy: string | null; edited: boolean; rollbackSnapshot?: unknown },
+  ): Promise<ProposalRunRecord>;
   markRejected(id: string, rejectedBy: string | null): Promise<ProposalRunRecord>;
   markCancelled(id: string): Promise<ProposalRunRecord>;
 };
@@ -116,6 +129,13 @@ export type ProposalServiceDeps = {
   applyBriefProposal?: (run: ProposalRunRecord, input: ApplyProposalInput) => Promise<unknown>;
   applySectionProposal?: (run: ProposalRunRecord, input: ApplyProposalInput) => Promise<unknown>;
   applyMetaLikeProposal?: (run: ProposalRunRecord, input: ApplyProposalInput) => Promise<unknown>;
+  /**
+   * Sprint 18.0 — when supplied, createProposal calls assertQuotaAllowed
+   * right before the provider call. Omitted in most direct unit tests
+   * (which don't exercise createProposal) and in any deps that don't need
+   * DB-backed quota enforcement.
+   */
+  quotaUsageDeps?: QuotaUsageDeps;
 };
 
 export type CreateProposalInput = {
@@ -128,6 +148,8 @@ export type CreateProposalInput = {
   sectionId?: string | null;
   editorInstruction?: string | null;
   requestedBy?: string | null;
+  /** Sprint 18.0 — section-scoped text selection anchor, persisted for stale-apply detection. */
+  selection?: ContentGenerationSelection | null;
 };
 
 const VALIDATION_ERROR_CODES: GenerationErrorCode[] = [
@@ -192,12 +214,20 @@ export async function createProposal(
       mediaCount: context.media.length,
       linkCount: context.links.length,
       draftVersionAtCreation,
+      selection: input.selection ?? null,
     },
     requestedBy: input.requestedBy ?? null,
   });
 
   try {
     run = await deps.store.markRunning(run.id);
+
+    if (deps.quotaUsageDeps) {
+      await assertQuotaAllowed(
+        { type: input.type, topicId: input.topicId, userId: input.requestedBy ?? null, config },
+        deps.quotaUsageDeps,
+      );
+    }
 
     const request: ContentGenerationRequest = {
       type: input.type,
@@ -218,10 +248,30 @@ export async function createProposal(
     const validated = validateStructuredOutput(input.type, result.output, context);
     const { factIdsUsed, mediaIdsUsed } = extractUsedIds(input.type, validated);
 
+    // Providers (e.g. the deterministic TEST provider) don't always report a
+    // cost; fall back to the static cost-engine rate table rather than
+    // persisting a fabricated $0 or leaving it null when it's computable.
+    const usage: ContentGenerationUsage =
+      result.usage.estimatedCostUsd != null
+        ? result.usage
+        : {
+            ...result.usage,
+            estimatedCostUsd: estimateGenerationCost({
+              provider: providerName,
+              model: config.model,
+              inputTokens: result.usage.inputTokens,
+              outputTokens: result.usage.outputTokens,
+            }).estimatedCostUsd,
+          };
+
+    // Safe, non-secret audit hints appended to warnings — provider/rollout
+    // context only, never a raw provider response body or key.
+    const providerHealthHints = [`provider:${providerName}`, `rolloutStage:${config.rolloutStage}`];
+
     return await deps.store.markGenerated(run.id, {
       output: validated,
-      warnings: result.warnings,
-      usage: result.usage,
+      warnings: [...result.warnings, ...providerHealthHints],
+      usage,
       factIdsUsed,
       mediaIdsUsed,
     });
@@ -297,9 +347,18 @@ export async function applyProposal(
     throw new ContentGenerationError("Loại đề xuất không hỗ trợ apply.", "PROPOSAL_NOT_APPLICABLE");
   }
 
+  // Sprint 18.0 — applySectionProposal may return a `rollback` payload
+  // (see applySectionProposalAdapter in proposal.wiring.ts); when present,
+  // persist it into the run's warnings so /rollback can recover it later.
+  const rollbackSnapshot =
+    result && typeof result === "object" && "rollback" in (result as Record<string, unknown>)
+      ? (result as Record<string, unknown>).rollback
+      : undefined;
+
   const updated = await deps.store.markApplied(id, {
     appliedBy: input.appliedBy ?? null,
     edited: input.editedOutput !== undefined,
+    rollbackSnapshot,
   });
 
   return { run: updated, result };

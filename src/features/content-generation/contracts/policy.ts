@@ -1,10 +1,12 @@
 import {
   getContentGenerationConfig,
   type ContentGenerationConfig,
+  type ContentGenerationRolloutStage,
 } from "@/features/content-generation/contracts/config";
 import {
   CONTENT_GENERATION_TYPES,
   ContentGenerationError,
+  type ContentGenerationProviderMode,
   type ContentGenerationType,
 } from "@/features/content-generation/contracts/generation.types";
 
@@ -28,6 +30,49 @@ export const PROHIBITED_CLAIM_CATEGORIES = [
 ] as const;
 
 export type ProhibitedClaimCategory = (typeof PROHIBITED_CLAIM_CATEGORIES)[number];
+
+/**
+ * Sprint 18.0 — rollout-stage / provider compatibility matrix, independent
+ * from the `enabled`/`provider` config knobs:
+ *  - OFF: nothing may run, even the TEST provider.
+ *  - TEST: only the TEST provider may run — the production-safe default so
+ *    `CONTENT_GENERATION_ENABLED=true` can ship without any OpenAI exposure.
+ *  - OPENAI_INTERNAL / OPENAI_EDITOR / OPENAI_ALL: OpenAI is allowed (still
+ *    gated on `apiKeyConfigured` — see assertGenerationAllowed), and TEST
+ *    remains allowed too (it never calls a paid API, so it's always safe).
+ */
+export function isRolloutStageAllowingProvider(
+  stage: ContentGenerationRolloutStage,
+  provider: ContentGenerationProviderMode,
+): boolean {
+  if (stage === "OFF") return false;
+  if (stage === "TEST") return provider === "TEST";
+  return provider === "TEST" || provider === "OPENAI";
+}
+
+/** Throws GENERATION_DISABLED/PROVIDER_NOT_CONFIGURED per isRolloutStageAllowingProvider. */
+export function assertRolloutAllowsProvider(config: ContentGenerationConfig): void {
+  if (isRolloutStageAllowingProvider(config.rolloutStage, config.provider)) return;
+
+  if (config.rolloutStage === "OFF") {
+    throw new ContentGenerationError(
+      "Giai đoạn triển khai AI đang ở mức OFF — chưa cho phép tạo đề xuất.",
+      "GENERATION_DISABLED",
+    );
+  }
+
+  if (config.rolloutStage === "TEST") {
+    throw new ContentGenerationError(
+      "Giai đoạn triển khai hiện tại chỉ cho phép provider TEST (chưa mở OpenAI).",
+      "PROVIDER_NOT_CONFIGURED",
+    );
+  }
+
+  throw new ContentGenerationError(
+    `Provider "${config.provider}" chưa được phép ở giai đoạn triển khai hiện tại.`,
+    "PROVIDER_NOT_CONFIGURED",
+  );
+}
 
 /**
  * Governance gate every proposal creation must pass through before a
@@ -60,14 +105,17 @@ export function assertGenerationAllowed(
     throw new ContentGenerationError(`Loại đề xuất "${type}" chưa được cho phép.`, "TYPE_NOT_ALLOWED");
   }
 
+  assertRolloutAllowsProvider(config);
+
   if (config.provider === "OPENAI" && !config.apiKeyConfigured) {
     throw new ContentGenerationError("Thiếu OPENAI_API_KEY cho provider OpenAI.", "PROVIDER_NOT_CONFIGURED");
   }
 
-  // Daily-run-limit / monthly-budget enforcement is placeholder-only in this
-  // foundation sprint: full aggregation lives in history.service once a
-  // production usage ledger is wired. Providers must still respect
-  // config.maxOutputTokens / config.timeoutMs per call.
+  // Daily-run-limit / monthly-budget / per-user / per-topic hard stops now
+  // live in quota-engine.service.ts (assertQuotaAllowed), wired into
+  // proposal.service.ts's createProposal right before the provider call —
+  // this function only gates enabled/provider/type/rollout, which never
+  // require a database read.
 }
 
 /** True when the given category requires fact IDs to be present to be safe. */

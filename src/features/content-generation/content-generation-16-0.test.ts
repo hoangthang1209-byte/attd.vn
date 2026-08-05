@@ -45,6 +45,9 @@ function baseConfig(overrides: Partial<ContentGenerationConfig> = {}): ContentGe
     timeoutMs: 30_000,
     retryLimit: 1,
     configurationVersion: "content-generation-config-v1",
+    rolloutStage: "TEST",
+    dailyLimitPerUser: 20,
+    dailyLimitPerTopic: 10,
     ...overrides,
   };
 }

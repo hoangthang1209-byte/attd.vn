@@ -5,6 +5,7 @@ import {
   CONTENT_GENERATION_SECTION_TYPES,
   type ContentGenerationType,
 } from "@/features/content-generation/contracts/generation.types";
+import type { ContentGenerationSelection } from "@/features/content-generation/services/proposal.service";
 import { createContentProposal } from "@/features/content-generation/services/proposal.wiring";
 import { toSafeProposalDetail } from "@/features/content-generation/services/history.service";
 import { mapContentGenerationError } from "@/app/api/content/generation/_shared";
@@ -34,6 +35,26 @@ function parseSectionType(raw: unknown): ContentGenerationType {
   return "SECTION_DRAFT";
 }
 
+/**
+ * Sprint 18.0 — optional text-selection anchor. Only accepted when every
+ * field is present and well-typed; a malformed/partial selection is
+ * dropped (never persisted half-formed) rather than rejecting the whole
+ * request.
+ */
+function parseSelection(raw: unknown): ContentGenerationSelection | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (
+    typeof o.start === "number" &&
+    typeof o.end === "number" &&
+    typeof o.textHash === "string" &&
+    typeof o.draftVersion === "number"
+  ) {
+    return { start: o.start, end: o.end, textHash: o.textHash, draftVersion: o.draftVersion };
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   const permission = await requireAdminPermission({ platform: "content", action: "update", request: req });
   if (!permission.ok) return permission.response;
@@ -61,6 +82,7 @@ export async function POST(req: NextRequest) {
       sectionId,
       contextBuildId: typeof raw.contextBuildId === "string" ? raw.contextBuildId : null,
       editorInstruction: typeof raw.editorInstruction === "string" ? raw.editorInstruction.slice(0, 2000) : null,
+      selection: parseSelection(raw.selection),
       requestedBy: permission.user.userId ?? permission.user.username ?? null,
     });
 

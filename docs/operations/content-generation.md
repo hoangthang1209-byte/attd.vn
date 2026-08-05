@@ -60,10 +60,13 @@ parallel workflow:
 | `OPENAI_API_KEY` | unset | Required when provider=`openai` |
 | `CONTENT_GENERATION_MAX_OUTPUT_TOKENS` | `1200` | |
 | `CONTENT_GENERATION_MAX_SECTIONS_PER_RUN` | `3` | |
-| `CONTENT_GENERATION_DAILY_LIMIT` | `50` | Placeholder gate; full usage-ledger enforcement is a follow-up. |
-| `CONTENT_GENERATION_MONTHLY_BUDGET_USD` | unset | |
+| `CONTENT_GENERATION_DAILY_LIMIT` | `50` | Workspace-wide hard stop, enforced by `quota-engine.service.ts` against real `AiGenerationRun` totals (see Sprint 18.0 below). |
+| `CONTENT_GENERATION_MONTHLY_BUDGET_USD` | unset | Hard stop on `estimatedCostUsd` summed for the current UTC month. |
 | `CONTENT_GENERATION_TIMEOUT_MS` | `30000` | |
 | `CONTENT_GENERATION_RETRY_LIMIT` | `1` | Capped at 3. |
+| `CONTENT_GENERATION_ROLLOUT_STAGE` | `OFF` (or `TEST` when `ENABLED=true` + `PROVIDER=test`) | `OFF` \| `TEST` \| `OPENAI_INTERNAL` \| `OPENAI_EDITOR` \| `OPENAI_ALL` — see Sprint 18.0 below. |
+| `CONTENT_GENERATION_DAILY_LIMIT_PER_USER` | `20` | Per-`requestedBy` hard stop. |
+| `CONTENT_GENERATION_DAILY_LIMIT_PER_TOPIC` | `10` | Per-topic (`entityId`) hard stop. |
 
 Never commit real API keys. `getContentGenerationSafeStatus()` /
 `GET /api/content/generation/status` return `keyConfigured: boolean` only —
@@ -347,3 +350,128 @@ action are still present, just visually quieter.
 - `TopicContextRail`'s `KnowledgeModule` links out to the existing Knowledge
   surface rather than embedding a live `ContentContextPanel`, to avoid
   duplicating that panel's data-fetching inside the rail in this sprint.
+
+## Sprint 18.0 — Governed production enablement (TEST-only rollout default)
+
+Sprint 18.0 turns the daily/monthly limits from Sprint 16.0 into a real,
+DB-backed hard-stop, adds a **staged rollout gate** so `CONTENT_GENERATION_ENABLED=true`
+can ship safely with zero OpenAI exposure, and adds usage/cost visibility,
+proposal detail/timeline, retry, and rollback. It does **not** change any
+apply/review/handoff/publish mutation semantics, and does **not** add a
+migration — everything reuses `AiGenerationRun`'s existing columns
+(`warnings`/`inputSummary` as structured JSON) plus new pure/read-only
+services.
+
+### Rollout stages
+
+`CONTENT_GENERATION_ROLLOUT_STAGE` is a gate independent from
+`CONTENT_GENERATION_ENABLED`/`CONTENT_GENERATION_PROVIDER`:
+
+| Stage | TEST provider | OPENAI provider |
+|---|---|---|
+| `OFF` (default) | ❌ | ❌ |
+| `TEST` | ✅ | ❌ |
+| `OPENAI_INTERNAL` / `OPENAI_EDITOR` / `OPENAI_ALL` | ✅ | ✅ (still requires `OPENAI_API_KEY`) |
+
+`assertRolloutAllowsProvider` (`contracts/policy.ts`) enforces this before
+every proposal creation, in addition to the existing enabled/provider/type
+checks. **OpenAI remains unreachable until an operator explicitly moves the
+stage past `TEST` — this sprint ships with `TEST` as the de-facto production
+default** (`CONTENT_GENERATION_ENABLED=true` + `CONTENT_GENERATION_PROVIDER=test`
+resolves to `rolloutStage=TEST` even without setting the env var explicitly).
+
+### Usage ledger, cost engine, quota engine
+
+- **`cost-engine.service.ts`** — static USD/1k-token rate table for
+  OpenAI/Claude/Gemini models (TEST is always $0). `estimateGenerationCost()`
+  is a pure function; `createProposal` calls it as a fallback whenever a
+  provider's own usage payload doesn't already include a cost. Unknown
+  provider/model pairs return `estimatedCostUsd: null, rateTableAvailable:
+  false` — never a fabricated number.
+- **`usage-ledger.service.ts`** (+ `usage-ledger.mapping.ts` for the
+  Prisma-free aggregation logic) — `getUsageLedgerSummary()` powers
+  `GET /api/content/generation/usage` (today/month totals, top users/topics,
+  status counts); `getUsageForWorkspaceToday`/`getUsageForUserToday`/
+  `getUsageForTopicToday` back the quota engine.
+- **`quota-engine.service.ts`** — `assertQuotaAllowed()` is called from
+  `createProposal` right before the provider call (only when
+  `quotaUsageDeps` is wired — see `createLedgerQuotaUsageDeps` in
+  `proposal.wiring.ts`). Enforces, in order: workspace daily limit, monthly
+  budget, per-user daily limit, per-topic daily limit — each throws
+  `ContentGenerationError` (`DAILY_LIMIT` / `MONTHLY_BUDGET_EXCEEDED`) with a
+  Vietnamese message. This **replaces** the "placeholder-only" limitation
+  called out in the Sprint 16.0 known-gaps section above.
+
+### Selection offsets + stale detection
+
+Section-scoped generation requests may include an optional
+`selection: { start, end, textHash, draftVersion }`, persisted into
+`AiGenerationRun.inputSummary.selection`. At apply time,
+`stale-check.ts`'s `assertSelectionNotStale()` rejects the apply with
+`GENERATION_STALE` if either the draft version captured at proposal-creation
+time, *or* the finer-grained selection's `draftVersion`, no longer matches
+the current `WritingDraftRecord.version` — preventing an AI proposal from
+silently overwriting a newer human edit.
+
+### Rollback (no schema change)
+
+Before `applySectionProposalAdapter` overwrites a section via
+`saveHumanEditedSection`, it captures a `RollbackSnapshot` (previous
+html/plainText/version) and returns it in the apply result. `applyProposal`
+then persists it into `AiGenerationRun.warnings` (via
+`run-warnings.ts`'s `withRollbackSnapshot` — the column stays backward
+compatible: readers that expect the legacy `string[]` shape still get a
+`messages: string[]` via `normalizeRunWarnings`). `POST
+/api/content/generation/[id]/rollback` restores that exact html through the
+same governed `saveHumanEditedSection` path — it is a content operation, not
+a new proposal-lifecycle state (the proposal itself stays
+`APPLIED`/`EDITED_AND_APPLIED`).
+
+### Retry
+
+`POST /api/content/generation/[id]/retry` creates a **brand-new** proposal
+from a prior run's type/topic/section/context/editorInstruction
+(`retry-mapping.ts`'s `mapPriorRunToRetryInput`) — it never mutates or
+replaces the original run. Both runs are cross-linked via
+`retryOfRunId`/`retriedByRunId` in `warnings`. The new proposal goes through
+the exact same governance gates (policy, quota, claim safety) as any other
+proposal creation.
+
+### New read APIs
+
+- `GET /api/content/generation/usage` — usage ledger summary.
+- `GET /api/content/generation/[id]` — safe proposal detail: output,
+  `inputSummary`, latency, status timeline (`proposal-detail.service.ts`),
+  rollback availability/snapshot, retry links.
+- `GET /api/content/generation/providers/status` — provider health snapshot
+  (`available`, `keyConfigured: boolean` only, recent run/failure counts,
+  avg latency, last success/failure) — never a secret.
+- `GET /api/content/generation/status` now also returns `rolloutStage`,
+  `dailyLimitPerUser`, `dailyLimitPerTopic`, and `todayUsage`/`monthUsage`
+  snapshots from the ledger.
+
+### Admin UI
+
+- `/admin/content/ai` (`ContentAiAdminClient`) — provider settings, rollout
+  stage, quota/limits, provider health, usage dashboard (today/month, top
+  users/topics, status counts), and a read-only prompt-registry summary.
+- `/admin/content/generation/[id]` (`ContentGenerationDetailClient`) —
+  original/proposal diff (reuses `ProposalDiffView` against the rollback
+  snapshot when available), context usage counts, provider/cost/latency,
+  status timeline, and Retry/Rollback actions.
+- `WritingEnginePanel`'s header shows a compact rollout-stage badge + "today"
+  usage snapshot with a link to `/admin/content/ai`, next to the existing
+  `AiEmptyState` fallback.
+- Nav: **NỘI DUNG → AI vận hành** (`/admin/content/ai`).
+
+### What did not change
+
+- Apply/Reject/Cancel semantics and the human-only approval workflow
+  documented above are unchanged. Retry and Rollback are additive
+  operations on top of the same governed write paths — neither auto-applies
+  a proposal.
+- No new database migration — rollback snapshots and retry links live in
+  the existing `warnings`/`inputSummary` JSON columns.
+- OpenAI wiring remains off by default; every test in
+  `content-generation-18-0.test.ts` runs against the pure services above
+  with in-memory fixtures — no paid provider is ever called.

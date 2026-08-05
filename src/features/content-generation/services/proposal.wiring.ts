@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getContentGenerationConfig } from "@/features/content-generation/contracts/config";
 import {
   ContentGenerationError,
   type BriefResult,
@@ -9,6 +10,27 @@ import {
   type SectionResult,
 } from "@/features/content-generation/contracts/generation.types";
 import { resolveContentGenerationProvider } from "@/features/content-generation/providers/registry";
+import {
+  buildProviderStatusSnapshot,
+  type ProviderHealthSnapshot,
+  type ProviderStatusRunRow,
+} from "@/features/content-generation/services/provider-status.service";
+import { buildProposalDetail, type ProposalDetailView } from "@/features/content-generation/services/proposal-detail.service";
+import { mapPriorRunToRetryInput } from "@/features/content-generation/services/retry-mapping";
+import {
+  normalizeRunWarnings,
+  withRetriedByRunId,
+  withRetryOfRunId,
+  withRollbackSnapshot,
+  type RollbackSnapshot,
+} from "@/features/content-generation/services/run-warnings";
+import { assertSelectionNotStale, type StaleCheckInputSummary } from "@/features/content-generation/services/stale-check";
+import {
+  getUsageForTopicToday,
+  getUsageForUserToday,
+  getUsageForWorkspaceToday,
+  getUsageLedgerSummary,
+} from "@/features/content-generation/services/usage-ledger.service";
 import {
   assembleContentGenerationContext,
   type ContentGenerationContextDeps,
@@ -123,12 +145,18 @@ export function createPrismaProposalStore(): ProposalStore {
       return row ? mapRun(row) : null;
     },
     async markApplied(id, data) {
+      let warnings: Prisma.InputJsonValue | undefined;
+      if (data.rollbackSnapshot !== undefined) {
+        const current = await prisma.aiGenerationRun.findUnique({ where: { id }, select: { warnings: true } });
+        warnings = withRollbackSnapshot(current?.warnings, data.rollbackSnapshot as RollbackSnapshot) as Prisma.InputJsonValue;
+      }
       const row = await prisma.aiGenerationRun.update({
         where: { id },
         data: {
           proposalStatus: data.edited ? "EDITED_AND_APPLIED" : "APPLIED",
           appliedAt: new Date(),
           appliedBy: data.appliedBy,
+          ...(warnings !== undefined ? { warnings } : {}),
         },
       });
       return mapRun(row);
@@ -248,18 +276,28 @@ async function applySectionProposalAdapter(run: ProposalRunRecord, input: ApplyP
     throw new ContentGenerationError("Không tìm thấy bản nháp.", "DRAFT_NOT_FOUND");
   }
 
-  const inputSummary = (run.inputSummary ?? {}) as { draftVersionAtCreation?: number | null };
-  if (inputSummary.draftVersionAtCreation != null && inputSummary.draftVersionAtCreation !== draftRow.version) {
-    throw new ContentGenerationError(
-      "Bản nháp đã thay đổi kể từ khi tạo đề xuất — cần tạo lại đề xuất mới.",
-      "GENERATION_STALE",
-    );
-  }
+  const inputSummary = (run.inputSummary ?? {}) as StaleCheckInputSummary;
+  assertSelectionNotStale(inputSummary, draftRow.version);
 
   const output = (input.editedOutput ?? run.output) as SectionResult | null;
   if (!output?.html) {
     throw new ContentGenerationError("Đề xuất section không có nội dung html.", "PROPOSAL_NOT_APPLICABLE");
   }
+
+  // Sprint 18.0 — capture a rollback snapshot of the section BEFORE
+  // overwriting it, so POST /api/content/generation/[id]/rollback can
+  // restore this exact html/version later without a migration (stored in
+  // AiGenerationRun.warnings by applyProposal → store.markApplied).
+  const structuredBefore = draftRow.structuredDraft as WritingStructuredDraft;
+  const previousSection = structuredBefore.sections.find((s) => s.sectionId === run.sectionId);
+  const rollback: RollbackSnapshot = {
+    draftId: run.writingDraftId,
+    sectionId: run.sectionId,
+    previousHtml: previousSection?.html ?? null,
+    previousPlainText: previousSection?.plainText ?? null,
+    previousVersion: draftRow.version,
+    capturedAt: new Date().toISOString(),
+  };
 
   try {
     const { draft, version } = await saveHumanEditedSection(
@@ -273,7 +311,13 @@ async function applySectionProposalAdapter(run: ProposalRunRecord, input: ApplyP
       },
       store,
     );
-    return { writingDraftId: run.writingDraftId, sectionId: run.sectionId, version, draftStatus: draft.status };
+    return {
+      writingDraftId: run.writingDraftId,
+      sectionId: run.sectionId,
+      version,
+      draftStatus: draft.status,
+      rollback,
+    };
   } catch (err) {
     if (err instanceof WritingGenerationError) {
       throw new ContentGenerationError(err.message, "APPLY_CONFLICT", err.status);
@@ -318,6 +362,28 @@ async function applyMetaLikeProposalAdapter(run: ProposalRunRecord, input: Apply
   return { writingDraftId: run.writingDraftId, metaTitle: next.metaTitle, metaDescription: next.metaDescription };
 }
 
+/** Sprint 18.0 — real DB-backed quota lookups, injected into proposal.service.ts's pure assertQuotaAllowed. */
+function createLedgerQuotaUsageDeps() {
+  return {
+    async getWorkspaceToday() {
+      const usage = await getUsageForWorkspaceToday();
+      return { totalRuns: usage.totalRuns, totalCostUsd: usage.totalCostUsd };
+    },
+    async getUserToday(userId: string) {
+      const usage = await getUsageForUserToday(userId);
+      return { totalRuns: usage.totalRuns, totalCostUsd: usage.totalCostUsd };
+    },
+    async getTopicToday(topicId: string) {
+      const usage = await getUsageForTopicToday(topicId);
+      return { totalRuns: usage.totalRuns, totalCostUsd: usage.totalCostUsd };
+    },
+    async getMonthToDate() {
+      const summary = await getUsageLedgerSummary();
+      return { totalRuns: summary.month.totalRuns, totalCostUsd: summary.month.totalCostUsd };
+    },
+  };
+}
+
 export function createDefaultProposalServiceDeps(): ProposalServiceDeps {
   const contextDeps = createPrismaContentGenerationContextDeps();
   return {
@@ -334,6 +400,7 @@ export function createDefaultProposalServiceDeps(): ProposalServiceDeps {
     applyBriefProposal: applyBriefLikeProposalAdapter,
     applySectionProposal: applySectionProposalAdapter,
     applyMetaLikeProposal: applyMetaLikeProposalAdapter,
+    quotaUsageDeps: createLedgerQuotaUsageDeps(),
   };
 }
 
@@ -354,4 +421,120 @@ export async function rejectContentProposal(id: string, rejectedBy: string | nul
 
 export async function cancelContentProposal(id: string): Promise<ProposalRunRecord> {
   return cancelProposal(id, createDefaultProposalServiceDeps());
+}
+
+/** GET /api/content/generation/[id] — safe detail + status timeline. */
+export async function getProposalDetail(id: string): Promise<ProposalDetailView> {
+  const run = await createPrismaProposalStore().getById(id);
+  if (!run) {
+    throw new ContentGenerationError("Không tìm thấy đề xuất.", "PROPOSAL_NOT_FOUND");
+  }
+  return buildProposalDetail(run);
+}
+
+/**
+ * POST /api/content/generation/[id]/rollback — reapplies the previousHtml
+ * captured at apply time (see applySectionProposalAdapter) through the same
+ * governed saveHumanEditedSection path used for every other section write.
+ * Does not change proposalStatus (the proposal stays APPLIED/
+ * EDITED_AND_APPLIED) — rollback is a content operation, not a new
+ * proposal-lifecycle state.
+ */
+export async function rollbackContentProposal(
+  id: string,
+  actorId: string | null,
+): Promise<{ run: ProposalRunRecord; result: unknown }> {
+  const store = createPrismaProposalStore();
+  const run = await store.getById(id);
+  if (!run) {
+    throw new ContentGenerationError("Không tìm thấy đề xuất.", "PROPOSAL_NOT_FOUND");
+  }
+  if (run.proposalStatus !== "APPLIED" && run.proposalStatus !== "EDITED_AND_APPLIED") {
+    throw new ContentGenerationError("Chỉ khôi phục được đề xuất đã áp dụng.", "PROPOSAL_NOT_APPLICABLE");
+  }
+  if (!run.writingDraftId || !run.sectionId) {
+    throw new ContentGenerationError("Đề xuất này không có nội dung section để khôi phục.", "PROPOSAL_NOT_APPLICABLE");
+  }
+
+  const snapshot = normalizeRunWarnings(run.warnings).rollbackSnapshot;
+  if (!snapshot || snapshot.previousHtml == null) {
+    throw new ContentGenerationError("Không có dữ liệu khôi phục cho đề xuất này.", "PROPOSAL_NOT_APPLICABLE");
+  }
+
+  const orchestratorStore = createPrismaGenerationOrchestratorStore();
+  try {
+    const { draft, version } = await saveHumanEditedSection(
+      {
+        draftId: run.writingDraftId,
+        sectionId: run.sectionId,
+        html: snapshot.previousHtml,
+        plainText: snapshot.previousPlainText ?? undefined,
+        lockAfterSave: true,
+        editedBy: actorId,
+      },
+      orchestratorStore,
+    );
+    return {
+      run,
+      result: {
+        writingDraftId: run.writingDraftId,
+        sectionId: run.sectionId,
+        version,
+        draftStatus: draft.status,
+        rolledBackToVersion: snapshot.previousVersion,
+      },
+    };
+  } catch (err) {
+    if (err instanceof WritingGenerationError) {
+      throw new ContentGenerationError(err.message, "APPLY_CONFLICT", err.status);
+    }
+    throw err;
+  }
+}
+
+/**
+ * POST /api/content/generation/[id]/retry — creates a brand-new proposal
+ * from the prior run's type/topic/section/context/editorInstruction (see
+ * retry-mapping.ts). Never mutates or replaces the original run; both runs
+ * are cross-linked via `retryOfRunId`/`retriedByRunId` in `warnings`.
+ */
+export async function retryContentProposal(id: string, requestedBy: string | null): Promise<ProposalRunRecord> {
+  const store = createPrismaProposalStore();
+  const prior = await store.getById(id);
+  if (!prior) {
+    throw new ContentGenerationError("Không tìm thấy đề xuất.", "PROPOSAL_NOT_FOUND");
+  }
+
+  const retryInput = mapPriorRunToRetryInput(prior, requestedBy);
+  if (!retryInput.topicId) {
+    throw new ContentGenerationError("Đề xuất gốc thiếu topicId hợp lệ để tạo lại.", "INVALID_REQUEST");
+  }
+
+  const next = await createContentProposal(retryInput);
+
+  const [patchedNext] = await Promise.all([
+    prisma.aiGenerationRun.update({
+      where: { id: next.id },
+      data: { warnings: withRetryOfRunId(next.warnings, prior.id) as Prisma.InputJsonValue },
+    }),
+    prisma.aiGenerationRun.update({
+      where: { id: prior.id },
+      data: { warnings: withRetriedByRunId(prior.warnings, next.id) as Prisma.InputJsonValue },
+    }),
+  ]);
+
+  return mapRun(patchedNext);
+}
+
+const PROVIDER_STATUS_WINDOW = 50;
+
+/** GET /api/content/generation/providers/status — heuristic health snapshot, no secrets. */
+export async function getProviderStatusSnapshot(): Promise<ProviderHealthSnapshot> {
+  const config = getContentGenerationConfig();
+  const rows = (await prisma.aiGenerationRun.findMany({
+    orderBy: { createdAt: "desc" },
+    take: PROVIDER_STATUS_WINDOW,
+    select: { status: true, startedAt: true, completedAt: true },
+  })) as ProviderStatusRunRow[];
+  return buildProviderStatusSnapshot(config, rows);
 }

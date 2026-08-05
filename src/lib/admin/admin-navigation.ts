@@ -119,6 +119,7 @@ export const adminNavigationSections: AdminNavigationSection[] = [
       { label: "Hiệu quả nội dung", href: "/admin/content/performance", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Hướng dẫn biên tập", href: "/admin/content/launch", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Kiểm duyệt", href: "/admin/content/reviews", status: "active", requiredPermissions: ["canManageCms"] },
+      { label: "AI vận hành", href: "/admin/content/ai", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Blog", href: "/admin/blog", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Xuất bản", href: "/admin/content/publishing", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Landing Page", href: "/admin/landing-pages", status: "active", requiredPermissions: ["canManageCms"] },

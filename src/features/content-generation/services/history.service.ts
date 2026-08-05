@@ -2,88 +2,18 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import type { ProposalRunRecord } from "@/features/content-generation/services/proposal.service";
+import {
+  toSafeProposalDetail,
+  toSafeProposalSummary,
+  type SafeProposalSummary,
+} from "@/features/content-generation/services/proposal-summary.mapping";
 
-export type SafeProposalSummary = {
-  id: string;
-  type: string;
-  status: string;
-  proposalStatus: string | null;
-  provider: string;
-  model: string;
-  promptVersion: string;
-  entityType: string;
-  entityId: string;
-  sectionId: string | null;
-  writingDraftId: string | null;
-  writingPlanId: string | null;
-  contextBuildId: string | null;
-  templateId: string | null;
-  templateVersion: string | null;
-  factIdsUsed: unknown;
-  mediaIdsUsed: unknown;
-  warnings: unknown;
-  errorMessage: string | null;
-  usage: {
-    inputTokens: number | null;
-    outputTokens: number | null;
-    totalTokens: number | null;
-    estimatedCostUsd: number | null;
-  };
-  requestedBy: string | null;
-  appliedAt: Date | null;
-  appliedBy: string | null;
-  rejectedAt: Date | null;
-  rejectedBy: string | null;
-  startedAt: Date | null;
-  completedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-/** Safe summary — never includes provider API keys/secrets or raw stack traces. */
-export function toSafeProposalSummary(run: ProposalRunRecord): SafeProposalSummary {
-  return {
-    id: run.id,
-    type: run.type,
-    status: run.status,
-    proposalStatus: run.proposalStatus,
-    provider: run.provider,
-    model: run.model,
-    promptVersion: run.promptVersion,
-    entityType: run.entityType,
-    entityId: run.entityId,
-    sectionId: run.sectionId,
-    writingDraftId: run.writingDraftId,
-    writingPlanId: run.writingPlanId,
-    contextBuildId: run.contextBuildId,
-    templateId: run.templateId,
-    templateVersion: run.templateVersion,
-    factIdsUsed: run.factIdsUsed,
-    mediaIdsUsed: run.mediaIdsUsed,
-    warnings: run.warnings,
-    errorMessage: run.errorMessage,
-    usage: {
-      inputTokens: run.inputTokens,
-      outputTokens: run.outputTokens,
-      totalTokens: run.totalTokens,
-      estimatedCostUsd: run.estimatedCostUsd,
-    },
-    requestedBy: run.requestedBy,
-    appliedAt: run.appliedAt,
-    appliedBy: run.appliedBy,
-    rejectedAt: run.rejectedAt,
-    rejectedBy: run.rejectedBy,
-    startedAt: run.startedAt,
-    completedAt: run.completedAt,
-    createdAt: run.createdAt,
-    updatedAt: run.updatedAt,
-  };
-}
-
-/** Adds the validated structured output — still no secrets/raw provider bodies. */
-export function toSafeProposalDetail(run: ProposalRunRecord): SafeProposalSummary & { output: unknown } {
-  return { ...toSafeProposalSummary(run), output: run.output };
-}
+// Re-exported for backward compatibility — every existing API route imports
+// these two from history.service.ts. The actual (pure, prisma-free)
+// implementation now lives in proposal-summary.mapping.ts so
+// proposal-detail.service.ts and unit tests can use it without a database.
+export { toSafeProposalDetail, toSafeProposalSummary };
+export type { SafeProposalSummary };
 
 export type ListProposalHistoryInput = {
   topicId?: string | null;

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
+import { StatusBadge } from "@/components/admin/AdminUi";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import WritingSectionAiAssistant from "@/components/admin/content/ai-writing/WritingSectionAiAssistant";
 import AiEmptyState from "@/components/admin/content/ai-writing/AiEmptyState";
@@ -105,11 +106,34 @@ type ProviderStatus = {
   configured: boolean;
 };
 
+type ContentGenerationUsageSnapshot = {
+  totalRuns: number;
+  completedRuns: number;
+  failedRuns: number;
+  appliedRuns: number;
+  totalTokens: number | null;
+  totalCostUsd: number | null;
+  avgLatencyMs: number | null;
+};
+
 type ContentGenerationSafeStatus = {
   enabled: boolean;
   provider: string;
   model: string;
   keyConfigured: boolean;
+  /** Sprint 18.0 — staged production rollout gate, independent from provider/enabled. */
+  rolloutStage?: string;
+  dailyLimit?: number;
+  dailyLimitPerUser?: number;
+  todayUsage?: ContentGenerationUsageSnapshot | null;
+};
+
+const ROLLOUT_STAGE_LABELS_COMPACT: Record<string, string> = {
+  OFF: "Tắt",
+  TEST: "Chỉ TEST",
+  OPENAI_INTERNAL: "OpenAI nội bộ",
+  OPENAI_EDITOR: "OpenAI biên tập viên",
+  OPENAI_ALL: "OpenAI toàn bộ",
 };
 
 /** Mirrors `isContentGenerationConfigured` — true only when a real provider can actually run. */
@@ -658,6 +682,29 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
       <p className="admin-field-hint">
         Context → Plan → Generate → Start Review → Approve → Handoff Blog DRAFT. Không auto-publish.
       </p>
+
+      {contentGenStatus?.rolloutStage && (
+        <p style={{ margin: "0 0 8px", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          <StatusBadge tone={contentGenStatus.rolloutStage === "OFF" ? "neutral" : contentGenStatus.rolloutStage === "TEST" ? "info" : "warning"}>
+            AI: {ROLLOUT_STAGE_LABELS_COMPACT[contentGenStatus.rolloutStage] ?? contentGenStatus.rolloutStage}
+          </StatusBadge>
+          {contentGenStatus.todayUsage && (
+            <span className="admin-field-hint">
+              Hôm nay: {contentGenStatus.todayUsage.totalRuns}
+              {typeof contentGenStatus.dailyLimit === "number" && contentGenStatus.dailyLimit > 0
+                ? `/${contentGenStatus.dailyLimit}`
+                : ""}{" "}
+              lượt · {contentGenStatus.todayUsage.failedRuns} lỗi
+              {contentGenStatus.todayUsage.totalCostUsd != null
+                ? ` · $${contentGenStatus.todayUsage.totalCostUsd.toFixed(4)}`
+                : ""}
+            </span>
+          )}
+          <Link href="/admin/content/ai" className="admin-field-hint">
+            Xem AI vận hành →
+          </Link>
+        </p>
+      )}
 
       {contentGenStatus && !aiConfigured && <AiEmptyState />}
 

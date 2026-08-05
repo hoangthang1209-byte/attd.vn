@@ -12,7 +12,56 @@ export type ContentGenerationConfig = {
   timeoutMs: number;
   retryLimit: number;
   configurationVersion: string;
+  /** Sprint 18.0 — staged production rollout. See CONTENT_GENERATION_ROLLOUT_STAGES. */
+  rolloutStage: ContentGenerationRolloutStage;
+  dailyLimitPerUser: number;
+  dailyLimitPerTopic: number;
 };
+
+/**
+ * Sprint 18.0 — staged rollout gate, independent from `provider`/`enabled`.
+ * OFF disables every provider (even TEST). TEST only allows the TEST
+ * provider — this is the safe default for "production enabled" without any
+ * paid-provider exposure. OPENAI_* stages progressively widen who can
+ * trigger real OpenAI calls (enforced elsewhere — this enum only records
+ * *intent*, actual editor/role targeting is out of scope for this sprint).
+ */
+export const CONTENT_GENERATION_ROLLOUT_STAGES = [
+  "OFF",
+  "TEST",
+  "OPENAI_INTERNAL",
+  "OPENAI_EDITOR",
+  "OPENAI_ALL",
+] as const;
+
+export type ContentGenerationRolloutStage = (typeof CONTENT_GENERATION_ROLLOUT_STAGES)[number];
+
+export function isContentGenerationRolloutStage(value: unknown): value is ContentGenerationRolloutStage {
+  return typeof value === "string" && (CONTENT_GENERATION_ROLLOUT_STAGES as readonly string[]).includes(value);
+}
+
+/** Aggregated AiGenerationRun totals for a time window — always null-safe. */
+export type ContentGenerationUsageSnapshot = {
+  totalRuns: number;
+  completedRuns: number;
+  failedRuns: number;
+  appliedRuns: number;
+  totalTokens: number | null;
+  totalCostUsd: number | null;
+  avgLatencyMs: number | null;
+};
+
+export function emptyContentGenerationUsageSnapshot(): ContentGenerationUsageSnapshot {
+  return {
+    totalRuns: 0,
+    completedRuns: 0,
+    failedRuns: 0,
+    appliedRuns: 0,
+    totalTokens: null,
+    totalCostUsd: null,
+    avgLatencyMs: null,
+  };
+}
 
 /** Never includes the API key or any secret value. Safe to return from an API. */
 export type ContentGenerationSafeStatus = {
@@ -27,6 +76,13 @@ export type ContentGenerationSafeStatus = {
   rateTableAvailable: boolean;
   costEstimateSupported: boolean;
   configurationVersion: string;
+  /** Sprint 18.0 additions — still no secrets, only rollout/quota shape. */
+  rolloutStage: ContentGenerationRolloutStage;
+  dailyLimitPerUser: number;
+  dailyLimitPerTopic: number;
+  /** Populated only when the caller injects a ledger snapshot (see getContentGenerationSafeStatus). */
+  todayUsage: ContentGenerationUsageSnapshot | null;
+  monthUsage: ContentGenerationUsageSnapshot | null;
 };
 
 function envBool(name: string, fallback: boolean): boolean {
@@ -55,6 +111,24 @@ function resolveProviderMode(raw: string): ContentGenerationProviderMode {
   if (normalized === "test") return "TEST";
   if (normalized === "manual") return "MANUAL";
   return "DISABLED";
+}
+
+/**
+ * Resolves the rollout stage. Defaults to OFF, EXCEPT when the master switch
+ * is on and the provider is TEST — that combination defaults to TEST so a
+ * `CONTENT_GENERATION_ENABLED=true` + `CONTENT_GENERATION_PROVIDER=test`
+ * environment (the sprint's target "production-safe" default) doesn't also
+ * require a second env var to be set. Any explicit env value always wins.
+ */
+function resolveRolloutStage(
+  raw: string | undefined,
+  enabled: boolean,
+  provider: ContentGenerationProviderMode,
+): ContentGenerationRolloutStage {
+  const normalized = raw?.trim().toUpperCase();
+  if (normalized && isContentGenerationRolloutStage(normalized)) return normalized;
+  if (enabled && provider === "TEST") return "TEST";
+  return "OFF";
 }
 
 /**
@@ -88,7 +162,10 @@ export function getContentGenerationConfig(): ContentGenerationConfig {
     monthlyBudgetUsd: envFloat("CONTENT_GENERATION_MONTHLY_BUDGET_USD"),
     timeoutMs: envInt("CONTENT_GENERATION_TIMEOUT_MS", 30_000),
     retryLimit: Math.min(3, envInt("CONTENT_GENERATION_RETRY_LIMIT", 1)),
-    configurationVersion: "content-generation-config-v1",
+    configurationVersion: "content-generation-config-v2",
+    rolloutStage: resolveRolloutStage(process.env.CONTENT_GENERATION_ROLLOUT_STAGE, enabled, provider),
+    dailyLimitPerUser: envInt("CONTENT_GENERATION_DAILY_LIMIT_PER_USER", 20),
+    dailyLimitPerTopic: envInt("CONTENT_GENERATION_DAILY_LIMIT_PER_TOPIC", 10),
   };
 }
 
@@ -103,9 +180,16 @@ export function isContentGenerationConfigured(config: ContentGenerationConfig = 
 /**
  * Client-safe status — NEVER include process.env.OPENAI_API_KEY or any
  * secret. Only a boolean `keyConfigured` flag is exposed.
+ *
+ * `usage` is an optional injection point: callers with server/DB access
+ * (the status API route) pass in a ledger snapshot (see
+ * usage-ledger.service.ts); callers without it (most tests, and any
+ * pure/offline caller) get `todayUsage`/`monthUsage: null` rather than a
+ * fabricated number.
  */
 export function getContentGenerationSafeStatus(
   config: ContentGenerationConfig = getContentGenerationConfig(),
+  usage?: { today?: ContentGenerationUsageSnapshot | null; month?: ContentGenerationUsageSnapshot | null },
 ): ContentGenerationSafeStatus {
   return {
     enabled: config.enabled,
@@ -116,9 +200,16 @@ export function getContentGenerationSafeStatus(
     maxSectionsPerRun: config.maxSectionsPerRun,
     dailyLimit: config.dailyLimit,
     monthlyBudgetUsd: config.monthlyBudgetUsd,
-    // Foundation sprint: no live per-token rate table or cost ledger yet.
-    rateTableAvailable: false,
-    costEstimateSupported: config.provider === "OPENAI",
+    // Sprint 18.0 — cost-engine.service.ts now provides a static rate table
+    // for OPENAI/CLAUDE/GEMINI; TEST is always free. Unknown model/provider
+    // combinations still safely report rateTableAvailable:false per-call.
+    rateTableAvailable: config.provider === "OPENAI" || config.provider === "TEST",
+    costEstimateSupported: config.provider === "OPENAI" || config.provider === "TEST",
     configurationVersion: config.configurationVersion,
+    rolloutStage: config.rolloutStage,
+    dailyLimitPerUser: config.dailyLimitPerUser,
+    dailyLimitPerTopic: config.dailyLimitPerTopic,
+    todayUsage: usage?.today ?? null,
+    monthUsage: usage?.month ?? null,
   };
 }
