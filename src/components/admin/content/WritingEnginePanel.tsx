@@ -11,6 +11,7 @@ import AiGenerationQueue from "@/components/admin/content/ai-writing/AiGeneratio
 import AiHistoryTimeline, { type AiHistoryTimelineItem } from "@/components/admin/content/ai-writing/AiHistoryTimeline";
 import InlineTextAiToolbar from "@/components/admin/content/ai-writing/InlineTextAiToolbar";
 import { useAiWritingQueue } from "@/components/admin/content/ai-writing/useAiWritingQueue";
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
 import canvasStyles from "@/components/admin/seo-content/topic-workspace/TopicWorkspace.module.css";
 import {
   deriveSectionEditorialState,
@@ -172,6 +173,7 @@ const SECTION_STATE_CLASS: Record<SectionEditorialState, string> = {
 
 export default function WritingEnginePanel({ topicId, canvasMode = false }: Props) {
   const toast = useAdminToast();
+  const { developerMode } = useWorkspaceMode();
   const [contextBuilds, setContextBuilds] = useState<BuildHistoryItem[]>([]);
   const [contextBuildId, setContextBuildId] = useState("");
   const [contentType, setContentType] = useState("SEO_ARTICLE");
@@ -624,13 +626,15 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
 
   const contentSetupFields = (
     <>
-      <p className="admin-field-hint">
-        Provider: {providerStatus
-          ? `${providerStatus.provider}/${providerStatus.model} · ${
-              providerStatus.configured ? "sẵn sàng" : providerStatus.enabled ? "thiếu key" : "tắt"
-            }`
-          : "…"}
-      </p>
+      {developerMode && (
+        <p className="admin-field-hint">
+          Provider: {providerStatus
+            ? `${providerStatus.provider}/${providerStatus.model} · ${
+                providerStatus.configured ? "sẵn sàng" : providerStatus.enabled ? "thiếu key" : "tắt"
+              }`
+            : "…"}
+        </p>
+      )}
 
       <div className="admin-field">
         <label className="admin-label">Context Build</label>
@@ -683,7 +687,7 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
         Context → Plan → Generate → Start Review → Approve → Handoff Blog DRAFT. Không auto-publish.
       </p>
 
-      {contentGenStatus?.rolloutStage && (
+      {developerMode && contentGenStatus?.rolloutStage && (
         <p style={{ margin: "0 0 8px", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
           <StatusBadge tone={contentGenStatus.rolloutStage === "OFF" ? "neutral" : contentGenStatus.rolloutStage === "TEST" ? "info" : "warning"}>
             AI: {ROLLOUT_STAGE_LABELS_COMPACT[contentGenStatus.rolloutStage] ?? contentGenStatus.rolloutStage}
@@ -703,6 +707,12 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
           <Link href="/admin/content/ai" className="admin-field-hint">
             Xem AI vận hành →
           </Link>
+        </p>
+      )}
+
+      {!developerMode && contentGenStatus && (
+        <p className="admin-field-hint" style={{ margin: "0 0 8px" }}>
+          {aiConfigured ? "✨ AI Ready" : "⚠ AI unavailable"}
         </p>
       )}
 
@@ -783,12 +793,21 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
         </p>
       )}
 
-      {runStatus && (
+      {runStatus && developerMode && (
         <p className="admin-field-hint">
           Run {runStatus.status}: gen {runStatus.generated}/{runStatus.totalSections} · fail {runStatus.failed} ·
           tokens {runStatus.usage.totalTokens ?? "—"} · cost{" "}
           {runStatus.usage.estimatedCostUsd != null ? `$${runStatus.usage.estimatedCostUsd}` : "n/a"} ·{" "}
           {runStatus.usage.latencyMs ?? "—"}ms
+        </p>
+      )}
+      {runStatus && !developerMode && (
+        <p className="admin-field-hint">
+          {runStatus.status === "COMPLETED"
+            ? "✨ AI Ready"
+            : runStatus.status === "FAILED"
+              ? "⚠ AI unavailable"
+              : `Đang tạo nội dung… (${runStatus.generated}/${runStatus.totalSections})`}
         </p>
       )}
 
@@ -859,7 +878,7 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
                           draftVersion={draftVersion}
                           aiEnabled={Boolean(contentGenStatus?.enabled)}
                           aiConfigured={aiConfigured}
-                          statusSummary={contentGenStatus ? { provider: contentGenStatus.provider, model: contentGenStatus.model } : null}
+                          statusSummary={developerMode && contentGenStatus ? { provider: contentGenStatus.provider, model: contentGenStatus.model } : null}
                           contextCounts={{
                             facts: s.requiredFactIds.length + s.optionalFactIds.length,
                             media: s.mediaAssetIds.length,
@@ -929,7 +948,7 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
                             draftVersion={draftVersion}
                             aiEnabled={Boolean(contentGenStatus?.enabled)}
                             aiConfigured={aiConfigured}
-                            statusSummary={contentGenStatus ? { provider: contentGenStatus.provider, model: contentGenStatus.model } : null}
+                            statusSummary={developerMode && contentGenStatus ? { provider: contentGenStatus.provider, model: contentGenStatus.model } : null}
                             contextCounts={{
                               facts: s.requiredFactIds.length + s.optionalFactIds.length,
                               media: s.mediaAssetIds.length,

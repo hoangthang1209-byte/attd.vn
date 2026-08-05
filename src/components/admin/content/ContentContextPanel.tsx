@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
 
 type Readiness = {
   ready: boolean;
@@ -79,6 +80,7 @@ type Props = {
 
 export default function ContentContextPanel({ topicId }: Props) {
   const toast = useAdminToast();
+  const { developerMode } = useWorkspaceMode();
   const [building, setBuilding] = useState(false);
   const [cacheHit, setCacheHit] = useState(false);
   const [readiness, setReadiness] = useState<Readiness | null>(null);
@@ -210,23 +212,23 @@ export default function ContentContextPanel({ topicId }: Props) {
         >
           Open Retrieval Context
         </Link>
+        {pkg && developerMode && (
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--small"
+            onClick={() => void copyText("json")}
+          >
+            Copy context JSON
+          </button>
+        )}
         {pkg && (
-          <>
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary admin-btn--small"
-              onClick={() => void copyText("json")}
-            >
-              Copy context JSON
-            </button>
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary admin-btn--small"
-              onClick={() => void copyText("text")}
-            >
-              Copy context text
-            </button>
-          </>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--small"
+            onClick={() => void copyText("text")}
+          >
+            Copy context text
+          </button>
         )}
       </div>
 
@@ -363,31 +365,35 @@ export default function ContentContextPanel({ topicId }: Props) {
             </p>
           </Section>
 
-          <Section id="sources" title={`Sources (${pkg.sourceManifest.length})`}>
-            <ul style={{ fontSize: 13, paddingLeft: 16 }}>
-              {pkg.sourceManifest.slice(0, 30).map((s) => (
-                <li key={s.factId}>
-                  {s.sourceType} · {s.visibility} · {s.title}
-                </li>
-              ))}
-            </ul>
-          </Section>
+          {developerMode && (
+            <Section id="sources" title={`Sources (${pkg.sourceManifest.length})`}>
+              <ul style={{ fontSize: 13, paddingLeft: 16 }}>
+                {pkg.sourceManifest.slice(0, 30).map((s) => (
+                  <li key={s.factId}>
+                    {s.sourceType} · {s.visibility} · {s.title}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
-          <Section id="budget" title="Budget">
-            <p className="admin-field-hint">
-              {pkg.budget.actualCharacters}/{pkg.budget.requestedMaxCharacters} chars · ~{" "}
-              {pkg.budget.estimatedInputTokens ?? "—"} tokens · dropped facts{" "}
-              {pkg.budget.factsDropped} / media {pkg.budget.mediaDropped}
-            </p>
-            {pkg.budget.sectionsTrimmed.length > 0 && (
-              <p>Trimmed: {pkg.budget.sectionsTrimmed.join(", ")}</p>
-            )}
-            <p>
-              Diagnostics: facts {pkg.diagnostics.factCount} · conflicts{" "}
-              {pkg.diagnostics.conflictCount} (blocking{" "}
-              {pkg.diagnostics.blockingConflictCount})
-            </p>
-          </Section>
+          {developerMode && (
+            <Section id="budget" title="Budget">
+              <p className="admin-field-hint">
+                {pkg.budget.actualCharacters}/{pkg.budget.requestedMaxCharacters} chars · ~{" "}
+                {pkg.budget.estimatedInputTokens ?? "—"} tokens · dropped facts{" "}
+                {pkg.budget.factsDropped} / media {pkg.budget.mediaDropped}
+              </p>
+              {pkg.budget.sectionsTrimmed.length > 0 && (
+                <p>Trimmed: {pkg.budget.sectionsTrimmed.join(", ")}</p>
+              )}
+              <p>
+                Diagnostics: facts {pkg.diagnostics.factCount} · conflicts{" "}
+                {pkg.diagnostics.conflictCount} (blocking{" "}
+                {pkg.diagnostics.blockingConflictCount})
+              </p>
+            </Section>
+          )}
 
           <Section id="preview" title="Context preview">
             <pre

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import styles from "@/components/admin/content/ai-writing/AiWriting.module.css";
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
 
 export type ProposalStatusBarData = {
   provider: string;
@@ -27,15 +28,26 @@ type Props = {
  * response bodies) — only the safe numeric/string fields passed in.
  */
 export default function ProposalStatusBar({ data, defaultExpanded = false, onExpandedChange }: Props) {
+  const { developerMode } = useWorkspaceMode();
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   function toggle() {
+    // Solo (non-developer) mode never drills into provider/token/cost internals.
+    if (!developerMode) return;
     const next = !expanded;
     setExpanded(next);
     onExpandedChange?.(next);
   }
 
   const costLabel = data.estimatedCostUsd != null ? `$${data.estimatedCostUsd.toFixed(4)}` : "Chưa xác định";
+
+  if (!developerMode) {
+    return (
+      <div className={styles.statusBar}>
+        <span className={styles.statusBarToggle}>✨ AI đã tạo đề xuất</span>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.statusBar}>

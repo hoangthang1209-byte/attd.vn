@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import { EmptyState, StatusBadge } from "@/components/admin/AdminUi";
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
+import SoloContentHome from "@/components/admin/seo-content/SoloContentHome";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
 import {
   fetchDashboardJson,
@@ -140,6 +142,7 @@ export default function SeoDashboardClient() {
   const toast = useAdminToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
+  const { isSolo } = useWorkspaceMode();
 
   const [core, setCore] = useState<SectionLoadState<DashboardData>>({ status: "loading" });
   const [reviews, setReviews] = useState<SectionLoadState<ReviewRow[]>>({ status: "loading" });
@@ -340,6 +343,27 @@ export default function SeoDashboardClient() {
   const coreFailed = core.status === "error";
   const coreLoading = core.status === "loading";
 
+  // Sprint 19.0 — Solo Founder home summary, derived from the same data the
+  // dense Team dashboard already loads (no extra fetches, no new fields).
+  const soloHomeData = useMemo(() => {
+    if (!data) return null;
+    const draftingTopics = data.priorityTopics.filter((topic) => topic.status === "DRAFTING");
+    const continueTopic = draftingTopics[0]
+      ? { id: draftingTopics[0].id, title: draftingTopics[0].title }
+      : null;
+    const recentlyPublishedTitles = (queues?.recent ?? [])
+      .slice(0, 3)
+      .map((row) => String(row.title ?? row.id ?? ""))
+      .filter(Boolean);
+    return {
+      continueTopic,
+      draftingCount: data.counts.draftingTopics,
+      recentlyPublishedCount: recentlyPublished,
+      recentlyPublishedTitles,
+      missingMediaCount: data.counts.missingMediaTopics,
+    };
+  }, [data, queues, recentlyPublished]);
+
   return (
     <>
       <AdminPageTitle title="Content Dashboard" />
@@ -389,6 +413,8 @@ export default function SeoDashboardClient() {
 
         {coreLoading ? (
           <SectionLoading label="Đang tải Content Dashboard…" />
+        ) : data && isSolo && soloHomeData ? (
+          <SoloContentHome {...soloHomeData} />
         ) : data ? (
           <>
             <section className="admin-section-card" style={{ marginBottom: 16 }}>

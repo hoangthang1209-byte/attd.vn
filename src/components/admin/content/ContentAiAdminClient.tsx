@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import { EmptyState, StatusBadge } from "@/components/admin/AdminUi";
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
 import PanelSkeleton from "@/components/ui/loading/PanelSkeleton";
 
 type UsageSnapshot = {
@@ -162,6 +163,7 @@ function UsageSnapshotRow({ label, usage }: { label: string; usage: UsageSnapsho
 
 export default function ContentAiAdminClient({ prompts }: { prompts: PromptSummary[] }) {
   const toast = useAdminToast();
+  const { developerMode } = useWorkspaceMode();
   const [status, setStatus] = useState<AggregatedStatus | null>(null);
   const [providerHealth, setProviderHealth] = useState<ProviderHealthSnapshot | null>(null);
   const [usage, setUsage] = useState<UsageLedgerSummary | null>(null);
@@ -231,6 +233,12 @@ export default function ContentAiAdminClient({ prompts }: { prompts: PromptSumma
   return (
     <div className="admin-panel">
       <div style={{ display: "grid", gap: 16 }}>
+        {!developerMode && (
+          <p className="admin-message admin-message--warning" role="status">
+            Developer Mode recommended — trang này hiển thị cấu hình provider, rollout và chi phí AI kỹ thuật. Bật
+            Developer Mode ở thanh trên để xem đầy đủ, trang vẫn hoạt động bình thường nếu để tắt.
+          </p>
+        )}
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <Link href="/admin/content/ai/smoke" className="admin-btn admin-btn--secondary">
             Mở AI Smoke Workspace

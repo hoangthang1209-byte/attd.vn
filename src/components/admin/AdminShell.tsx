@@ -6,11 +6,14 @@ import { Suspense, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import AdminScrollRestoration from "@/components/admin/AdminScrollRestoration";
+import AdminCommandPalette from "@/components/admin/AdminCommandPalette";
 import { AdminTitleProvider, useAdminTitle } from "@/components/admin/AdminTitleContext";
 import { useAdminPermissions, type AdminPermissionFlags } from "@/components/admin/AdminPermissionsContext";
+import { WorkspaceModeProvider, useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
 import {
   adminDashboardNavItem,
   adminNavigationSections,
+  filterNavigationForWorkspaceMode,
   type AdminNavigationItem,
 } from "@/lib/admin/admin-navigation";
 import { getAdminBreadcrumbMeta } from "@/lib/admin/admin-breadcrumbs";
@@ -53,6 +56,7 @@ function AdminShellNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { permissions, loading } = useAdminPermissions();
+  const { isSolo } = useWorkspaceMode();
 
   const visibleNavigation = useMemo(() => {
     if (loading) {
@@ -64,7 +68,9 @@ function AdminShellNav() {
         ? adminDashboardNavItem
         : null;
 
-    const sections = adminNavigationSections
+    const modeFilteredSections = filterNavigationForWorkspaceMode(adminNavigationSections, isSolo);
+
+    const sections = modeFilteredSections
       .map((section) => ({
         ...section,
         platforms: section.platforms
@@ -83,7 +89,7 @@ function AdminShellNav() {
       .filter((section) => section.platforms.length > 0);
 
     return { dashboard, sections };
-  }, [permissions, loading]);
+  }, [permissions, loading, isSolo]);
 
   return (
     <nav className={styles.nav}>
@@ -152,6 +158,53 @@ function AdminNavItem({
   );
 }
 
+/** Sprint 19.0 — compact Solo/Team + Developer Mode control mounted in the shell header. */
+function WorkspaceModeToggle() {
+  const { mode, developerMode, toggleMode, toggleDeveloperMode } = useWorkspaceMode();
+
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 6 }}
+      title="Solo ẩn bớt màn hình vận hành nâng cao. Developer Mode hiện thông số kỹ thuật AI."
+    >
+      <button
+        type="button"
+        onClick={toggleMode}
+        aria-pressed={mode === "team"}
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "4px 10px",
+          borderRadius: 999,
+          border: "1px solid #e2e8f0",
+          background: mode === "solo" ? "#eef2ff" : "#f8fafc",
+          color: mode === "solo" ? "#4338ca" : "#475569",
+          cursor: "pointer",
+        }}
+      >
+        {mode === "solo" ? "Solo" : "Team"}
+      </button>
+      <button
+        type="button"
+        onClick={toggleDeveloperMode}
+        aria-pressed={developerMode}
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "4px 10px",
+          borderRadius: 999,
+          border: "1px solid #e2e8f0",
+          background: developerMode ? "#fef3c7" : "#f8fafc",
+          color: developerMode ? "#92400e" : "#475569",
+          cursor: "pointer",
+        }}
+      >
+        Dev {developerMode ? "ON" : "OFF"}
+      </button>
+    </div>
+  );
+}
+
 function AdminShellMain({
   children,
   onOpenNav,
@@ -189,6 +242,7 @@ function AdminShellMain({
           <p className={styles.description}>{pageMeta.description}</p>
         </div>
         <div className={styles.headerActions}>
+          <WorkspaceModeToggle />
           <span className={styles.statusPill}>
             <span className={styles.statusDot} aria-hidden="true" />
             IA v2.0
@@ -211,51 +265,54 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <AdminTitleProvider>
-      <div className={styles.shell}>
-        {mobileNavOpen ? (
-          <button
-            type="button"
-            className={styles.mobileOverlay}
-            onClick={() => setMobileNavOpen(false)}
-            aria-label="Đóng menu quản trị"
-          />
-        ) : null}
-        <aside
-          className={`${styles.sidebar}${mobileNavOpen ? ` ${styles.sidebarOpen}` : ""}`}
-          onClick={(event) => {
-            if ((event.target as HTMLElement).closest("a")) {
-              setMobileNavOpen(false);
-            }
-          }}
-        >
-          <div className={styles.sidebarTop}>
-            <Link href="/admin/dashboard" scroll={false} className={styles.brand}>
-              <span className={styles.brandMark}>ATTD CMS</span>
-              <span className={styles.brandSub}>Design Authority</span>
-            </Link>
-            <div className={styles.sidebarActions}>
-              <AdminLogoutButton />
-              <button
-                type="button"
-                className={styles.mobileToggle}
-                onClick={() => setMobileNavOpen((current) => !current)}
-                aria-expanded={mobileNavOpen}
-                aria-controls="admin-primary-navigation"
-                aria-label={mobileNavOpen ? "Đóng menu quản trị" : "Mở menu quản trị"}
-              >
-                {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
-              </button>
+    <WorkspaceModeProvider>
+      <AdminTitleProvider>
+        <AdminCommandPalette />
+        <div className={styles.shell}>
+          {mobileNavOpen ? (
+            <button
+              type="button"
+              className={styles.mobileOverlay}
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="Đóng menu quản trị"
+            />
+          ) : null}
+          <aside
+            className={`${styles.sidebar}${mobileNavOpen ? ` ${styles.sidebarOpen}` : ""}`}
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("a")) {
+                setMobileNavOpen(false);
+              }
+            }}
+          >
+            <div className={styles.sidebarTop}>
+              <Link href="/admin/dashboard" scroll={false} className={styles.brand}>
+                <span className={styles.brandMark}>ATTD CMS</span>
+                <span className={styles.brandSub}>Design Authority</span>
+              </Link>
+              <div className={styles.sidebarActions}>
+                <AdminLogoutButton />
+                <button
+                  type="button"
+                  className={styles.mobileToggle}
+                  onClick={() => setMobileNavOpen((current) => !current)}
+                  aria-expanded={mobileNavOpen}
+                  aria-controls="admin-primary-navigation"
+                  aria-label={mobileNavOpen ? "Đóng menu quản trị" : "Mở menu quản trị"}
+                >
+                  {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
+                </button>
+              </div>
             </div>
-          </div>
-          <div id="admin-primary-navigation" className={styles.navWrap}>
-            <Suspense fallback={null}>
-              <AdminShellNav />
-            </Suspense>
-          </div>
-        </aside>
-        <AdminShellMain onOpenNav={() => setMobileNavOpen(true)}>{children}</AdminShellMain>
-      </div>
-    </AdminTitleProvider>
+            <div id="admin-primary-navigation" className={styles.navWrap}>
+              <Suspense fallback={null}>
+                <AdminShellNav />
+              </Suspense>
+            </div>
+          </aside>
+          <AdminShellMain onOpenNav={() => setMobileNavOpen(true)}>{children}</AdminShellMain>
+        </div>
+      </AdminTitleProvider>
+    </WorkspaceModeProvider>
   );
 }

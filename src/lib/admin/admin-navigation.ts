@@ -220,3 +220,44 @@ export const adminNavigationSections: AdminNavigationSection[] = [
     ]),
   },
 ];
+
+/**
+ * Sprint 19.0 — Solo Founder Experience. These Content hrefs are
+ * enterprise-operations oriented (multi-editor pipeline, calendar,
+ * performance BI, AI ops console) and are hidden from the main nav in Solo
+ * mode. Nothing here changes routing, permissions or workflow — every route
+ * stays live and reachable by direct URL or the command palette.
+ */
+export const SOLO_HIDDEN_CONTENT_HREFS: readonly string[] = [
+  "/admin/content/operations",
+  "/admin/content/ai",
+  "/admin/content/calendar",
+  "/admin/content/performance",
+  "/admin/content/seo-strategies",
+  "/admin/content/launch",
+];
+
+/**
+ * Pure filter over the static navigation registry — never mutates
+ * `adminNavigationSections`. Team mode (or `isSolo=false`) returns the
+ * sections unchanged; Solo mode additionally drops the enterprise-ops
+ * Content items above.
+ */
+export function filterNavigationForWorkspaceMode(
+  sections: AdminNavigationSection[],
+  isSolo: boolean,
+): AdminNavigationSection[] {
+  if (!isSolo) return sections;
+  return sections.map((section) => {
+    if (section.label !== "NỘI DUNG") return section;
+    return {
+      ...section,
+      platforms: section.platforms.map((platform) => ({
+        ...platform,
+        items: platform.items.filter(
+          (item) => !item.href || !SOLO_HIDDEN_CONTENT_HREFS.includes(item.href),
+        ),
+      })),
+    };
+  });
+}

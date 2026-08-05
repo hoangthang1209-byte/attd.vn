@@ -18,6 +18,7 @@ import TopicOutlineNav from "@/components/admin/seo-content/topic-workspace/Topi
 import TopicContextRail from "@/components/admin/seo-content/topic-workspace/TopicContextRail";
 import TopicProjectDetails from "@/components/admin/seo-content/topic-workspace/TopicProjectDetails";
 import TopicAdvancedDrawer from "@/components/admin/seo-content/topic-workspace/TopicAdvancedDrawer";
+import TopicPublishAssistant from "@/components/admin/seo-content/topic-workspace/TopicPublishAssistant";
 import TopicPublishedSummary from "@/components/admin/seo-content/topic-workspace/TopicPublishedSummary";
 import TopicMobileSheets from "@/components/admin/seo-content/topic-workspace/TopicMobileSheets";
 import styles from "@/components/admin/seo-content/topic-workspace/TopicWorkspace.module.css";
@@ -1009,6 +1010,13 @@ export default function SeoTopicDetailClient({ topicId }: { topicId: string }) {
             </details>
 
             <WritingEnginePanel topicId={topicId} canvasMode />
+
+            <TopicPublishAssistant
+              checklistGroups={checklistGroups}
+              primaryCta={primaryCta}
+              onPrimaryCtaClick={handlePrimaryCtaClick}
+              onPreviewClick={() => scrollToSection("writing")}
+            />
 
             <TopicProjectDetails
               defaultOpen={false}
