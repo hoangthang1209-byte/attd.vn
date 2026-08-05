@@ -421,6 +421,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/operations",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "Trung tâm vận hành"],
+      title: "Trung tâm vận hành nội dung",
+      description: "Cockpit vận hành: pipeline, sức khỏe nội dung, hàng đợi kiểm duyệt và xuất bản — chỉ xem, không đổi trạng thái.",
+    },
+  },
+  {
     path: "/admin/content/reviews/:id",
     meta: {
       breadcrumbs: ["NỘI DUNG", "Kiểm duyệt", "Chi tiết"],

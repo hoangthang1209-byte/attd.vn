@@ -112,6 +112,7 @@ export const adminNavigationSections: AdminNavigationSection[] = [
     icon: "📝",
     platforms: domainItems([
       { label: "Dashboard", href: "/admin/content/seo", status: "active", requiredPermissions: ["canManageCms"] },
+      { label: "Trung tâm vận hành", href: "/admin/content/operations", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Chủ đề", href: "/admin/content/seo-topics", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Chiến lược", href: "/admin/content/seo-strategies", status: "active", requiredPermissions: ["canManageCms"] },
       { label: "Lịch biên tập", href: "/admin/content/calendar", status: "active", requiredPermissions: ["canManageCms"] },

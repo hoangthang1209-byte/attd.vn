@@ -23,6 +23,7 @@ describe("Sprint 13.1 content editorial IA", () => {
     assert.ok(content);
     const labels = content.platforms[0].items.map((i) => i.label);
     assert.ok(labels.includes("Dashboard"));
+    assert.ok(labels.includes("Trung tâm vận hành"));
     assert.ok(labels.includes("Chủ đề"));
     assert.ok(labels.includes("Lịch biên tập"));
     assert.ok(labels.includes("Hướng dẫn biên tập"));
