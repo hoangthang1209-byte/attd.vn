@@ -21,11 +21,31 @@ export type RollbackSnapshot = {
   capturedAt: string;
 };
 
+/**
+ * Sprint 18.1 — human quality feedback recorded against a GENERATED/APPLIED
+ * run, audit-only (never changes proposalStatus or triggers any mutation).
+ * Stored in the same `warnings` envelope as everything else in this file.
+ */
+export type QualityFeedback = {
+  rating: number;
+  helpful: boolean | null;
+  needsRewrite: boolean | null;
+  wrongFacts: boolean | null;
+  tooVerbose: boolean | null;
+  note: string | null;
+  submittedAt: string;
+  submittedBy: string | null;
+};
+
 export type RunWarningsPayload = {
   messages: string[];
   rollbackSnapshot?: RollbackSnapshot | null;
   retryOfRunId?: string | null;
   retriedByRunId?: string | null;
+  /** Sprint 18.1 — set only after a successful POST .../rollback, for prompt-metrics' rollback rate. */
+  rolledBackAt?: string | null;
+  /** Sprint 18.1 — latest human quality rating/feedback, see quality-feedback.ts. */
+  qualityFeedback?: QualityFeedback | null;
 };
 
 function isStringArray(value: unknown): value is string[] {
@@ -42,6 +62,8 @@ export function normalizeRunWarnings(raw: unknown): RunWarningsPayload {
       rollbackSnapshot: (o.rollbackSnapshot ?? null) as RollbackSnapshot | null,
       retryOfRunId: typeof o.retryOfRunId === "string" ? o.retryOfRunId : null,
       retriedByRunId: typeof o.retriedByRunId === "string" ? o.retriedByRunId : null,
+      rolledBackAt: typeof o.rolledBackAt === "string" ? o.rolledBackAt : null,
+      qualityFeedback: (o.qualityFeedback ?? null) as QualityFeedback | null,
     };
   }
 
@@ -58,4 +80,14 @@ export function withRetryOfRunId(raw: unknown, retryOfRunId: string): RunWarning
 
 export function withRetriedByRunId(raw: unknown, retriedByRunId: string): RunWarningsPayload {
   return { ...normalizeRunWarnings(raw), retriedByRunId };
+}
+
+/** Sprint 18.1 — marks that a rollback occurred, for prompt-metrics' rollback rate. Never removes other keys. */
+export function withRolledBackAt(raw: unknown, rolledBackAtIso: string): RunWarningsPayload {
+  return { ...normalizeRunWarnings(raw), rolledBackAt: rolledBackAtIso };
+}
+
+/** Sprint 18.1 — records the latest human quality rating/feedback. Audit-only; never mutates proposalStatus. */
+export function withQualityFeedback(raw: unknown, feedback: QualityFeedback): RunWarningsPayload {
+  return { ...normalizeRunWarnings(raw), qualityFeedback: feedback };
 }

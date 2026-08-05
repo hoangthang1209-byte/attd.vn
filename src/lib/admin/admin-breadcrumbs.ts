@@ -453,6 +453,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/content/ai/smoke",
+    meta: {
+      breadcrumbs: ["NỘI DUNG", "AI vận hành", "Smoke Workspace"],
+      title: "AI Smoke Workspace",
+      description: "Kiểm tra tiền điều kiện AI (PASS/WARNING/FAIL) và mô phỏng lỗi an toàn bằng provider TEST.",
+    },
+  },
+  {
     path: "/admin/content/ai",
     meta: {
       breadcrumbs: ["NỘI DUNG", "AI vận hành"],

@@ -35,10 +35,19 @@ type ContentGenerationSafeStatus = {
   monthUsage: UsageSnapshot | null;
 };
 
+type RolloutReadinessSummary = {
+  stage: string;
+  test: { eligible: boolean; reason: string };
+  openaiInternal: { eligible: boolean; reason: string; requiresApproval: true };
+  requiresHumanApprovalBeyondTest: true;
+  autoAdvanceAllowed: false;
+};
+
 type AggregatedStatus = {
   contentGeneration: ContentGenerationSafeStatus;
   writing: { enabled: boolean; configured: boolean };
   brief: { keyConfigured: boolean };
+  rolloutReadiness: RolloutReadinessSummary;
 };
 
 type ProviderHealthSnapshot = {
@@ -58,12 +67,28 @@ type ProviderHealthSnapshot = {
 
 type LedgerGroupRow = UsageSnapshot & { userId?: string; topicId?: string };
 
+type PromptVersionMetrics = {
+  promptVersion: string;
+  totalRuns: number;
+  generatedRuns: number;
+  appliedRuns: number;
+  retriedRuns: number;
+  rolledBackRuns: number;
+  acceptanceRate: number | null;
+  retryRate: number | null;
+  rollbackRate: number | null;
+  avgQualityRating: number | null;
+  qualityRatingCount: number;
+};
+
 type UsageLedgerSummary = {
   today: UsageSnapshot;
+  week: UsageSnapshot;
   month: UsageSnapshot;
   byUserToday: LedgerGroupRow[];
   byTopicToday: LedgerGroupRow[];
   statusCountsToday: Record<string, number>;
+  promptVersionMetrics: PromptVersionMetrics[];
   generatedAt: string;
 };
 
@@ -98,6 +123,16 @@ function fmtMs(v: number | null): string {
   if (v == null) return "—";
   if (v < 1000) return `${v}ms`;
   return `${(v / 1000).toFixed(1)}s`;
+}
+
+function fmtPct(v: number | null): string {
+  if (v == null) return "—";
+  return `${Math.round(v * 100)}%`;
+}
+
+function fmtAvgTokens(usage: UsageSnapshot): string {
+  if (usage.totalTokens == null || usage.completedRuns === 0) return "—";
+  return Math.round(usage.totalTokens / usage.completedRuns).toLocaleString("vi-VN");
 }
 
 function UsageSnapshotRow({ label, usage }: { label: string; usage: UsageSnapshot | null }) {
@@ -191,9 +226,17 @@ export default function ContentAiAdminClient({ prompts }: { prompts: PromptSumma
 
   const cg = status.contentGeneration;
 
+  const rr = status.rolloutReadiness;
+
   return (
     <div className="admin-panel">
       <div style={{ display: "grid", gap: 16 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Link href="/admin/content/ai/smoke" className="admin-btn admin-btn--secondary">
+            Mở AI Smoke Workspace
+          </Link>
+        </div>
+
         <section className="admin-sidebar-card" style={{ margin: 0 }}>
           <h3 className="admin-sidebar-title">Cấu hình provider</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
@@ -275,6 +318,31 @@ export default function ContentAiAdminClient({ prompts }: { prompts: PromptSumma
         </section>
 
         <section className="admin-sidebar-card" style={{ margin: 0 }}>
+          <h3 className="admin-sidebar-title">OPENAI Internal Pilot Readiness</h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <StatusBadge tone={cg.keyConfigured ? "success" : "neutral"}>
+              Key: {cg.keyConfigured ? "đã cấu hình" : "chưa cấu hình"}
+            </StatusBadge>
+            <StatusBadge tone={rolloutTone(rr.stage)}>Stage: {rr.stage}</StatusBadge>
+            <StatusBadge tone={providerHealth?.available ? "success" : "danger"}>
+              Provider health: {providerHealth?.available ? "OK" : "Chưa sẵn sàng"}
+            </StatusBadge>
+          </div>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 13, display: "grid", gap: 4 }}>
+            <li>
+              {rr.test.eligible ? "✅" : "❌"} TEST — {rr.test.reason}
+            </li>
+            <li>
+              {rr.openaiInternal.eligible ? "✅" : "❌"} OPENAI_INTERNAL — {rr.openaiInternal.reason}
+            </li>
+          </ul>
+          <p className="admin-field-hint" style={{ margin: "8px 0 0", color: "#b45309", fontWeight: 600 }}>
+            ⚠️ Cần phê duyệt thủ công rõ ràng để vượt qua TEST. Hệ thống không tự động nâng cấp lên
+            OPENAI_EDITOR/OPENAI_ALL.
+          </p>
+        </section>
+
+        <section className="admin-sidebar-card" style={{ margin: 0 }}>
           <h3 className="admin-sidebar-title">Usage ledger</h3>
           {usage ? (
             <>
@@ -294,9 +362,29 @@ export default function ContentAiAdminClient({ prompts }: { prompts: PromptSumma
                   </thead>
                   <tbody>
                     <UsageSnapshotRow label="Hôm nay" usage={usage.today} />
+                    <UsageSnapshotRow label="Tuần này" usage={usage.week} />
                     <UsageSnapshotRow label="Tháng này" usage={usage.month} />
                   </tbody>
                 </table>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 16 }}>
+                {(
+                  [
+                    ["Hôm nay", usage.today],
+                    ["Tuần này", usage.week],
+                    ["Tháng này", usage.month],
+                  ] as const
+                ).map(([label, snapshot]) => (
+                  <div key={label} className="admin-sidebar-card" style={{ margin: 0, padding: 12 }}>
+                    <p className="admin-field-hint" style={{ margin: "0 0 4px" }}>
+                      {label}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 13 }}>
+                      Tokens TB: {fmtAvgTokens(snapshot)} · Độ trễ TB: {fmtMs(snapshot.avgLatencyMs)}
+                    </p>
+                  </div>
+                ))}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
@@ -329,6 +417,42 @@ export default function ContentAiAdminClient({ prompts }: { prompts: PromptSumma
                     </ul>
                   )}
                 </div>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <h4 style={{ margin: "0 0 8px", fontSize: 13 }}>Top prompt version (tháng này) — đánh giá chất lượng</h4>
+                {usage.promptVersionMetrics.length === 0 ? (
+                  <p className="admin-field-hint">Chưa có dữ liệu.</p>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Prompt version</th>
+                          <th>Lượt</th>
+                          <th>Tỷ lệ chấp nhận</th>
+                          <th>Tỷ lệ retry</th>
+                          <th>Tỷ lệ rollback</th>
+                          <th>Đánh giá TB</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {usage.promptVersionMetrics.slice(0, 10).map((m) => (
+                          <tr key={m.promptVersion}>
+                            <td>{m.promptVersion}</td>
+                            <td>{m.totalRuns}</td>
+                            <td>{fmtPct(m.acceptanceRate)}</td>
+                            <td>{fmtPct(m.retryRate)}</td>
+                            <td>{fmtPct(m.rollbackRate)}</td>
+                            <td>
+                              {m.avgQualityRating != null ? `${m.avgQualityRating.toFixed(1)}/5 (${m.qualityRatingCount})` : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               <div style={{ marginTop: 16 }}>

@@ -475,3 +475,137 @@ proposal creation.
 - OpenAI wiring remains off by default; every test in
   `content-generation-18-0.test.ts` runs against the pure services above
   with in-memory fixtures — no paid provider is ever called.
+
+## Sprint 18.1 — Governed AI pilot rollout (TEST-only default, smoke workspace)
+
+Sprint 18.1 adds an operational readiness layer on top of 18.0's rollout
+gate: a smoke-test workspace, a well-known never-published AI test topic, a
+TEST-only Failure Lab, audit-only quality review, provider comparison, and
+richer cost/prompt-evaluation dashboards. **No mutation safeguard changes**
+— nothing here can auto-apply/auto-review/auto-handoff/auto-publish, and no
+new database migration was added (everything reuses `AiGenerationRun`'s
+existing `warnings` JSON column, same pattern as 18.0's rollback/retry
+links).
+
+### AI Smoke Workspace (`/admin/content/ai/smoke`)
+
+- `GET /api/content/generation/smoke` — read-only prerequisites/status:
+  provider health, rollout stage, rollout readiness forecast, quota
+  snapshot, usage snapshot, and whether the AI test topic exists.
+- `POST /api/content/generation/smoke` — runs 7 read-only checks
+  (`smoke-check.service.ts`'s `runSmokeChecks`), each classified
+  PASS/WARNING/FAIL: Health, Quota gate presence, Provider config safe,
+  Prompt registry available, Context retrieval ready, Ledger write
+  capability, Retry/rollback route availability. With `{ mode: "simulate" }`
+  it additionally runs the Failure Lab scenarios below (still read-only for
+  the checks; simulations touch no DB row). Missing prerequisites (e.g. no
+  test topic yet) resolve to WARNING, never a request failure.
+
+### AI test topic (never published)
+
+`ai-test-topic.service.ts` manages a single, well-known `SeoTopic`
+(`slug: "ai-test-smoke-topic"`, title prefixed `[AI TEST]`) used only to
+exercise the pipeline:
+
+- `ensureAiTestTopic()` — idempotent create-or-find. Picks the first
+  available `SeoTopicCluster`; if the workspace has zero clusters, it
+  returns a warning and creates nothing (never cascades into creating a
+  cluster/strategy).
+- `getAiTestTopic()` — read-only lookup.
+- `isAiTestTopicSafe()` — a checkable invariant: `status: DRAFTING`,
+  `targetUrl`/`existingUrl`/`publishedAt` all `null`, and both the
+  `[AI TEST]` title marker and `ai-test-` slug prefix present. Exposed via
+  `POST /api/content/generation/smoke/test-topic`'s `neverPublished` field.
+
+### Rollout readiness forecast (still human-gated)
+
+`getRolloutReadinessSummary()` (`contracts/policy.ts`) is a **read-only
+forecast**, distinct from the currently-active `rolloutStage`: it reports
+whether TEST and OPENAI_INTERNAL are technically eligible (master switch
+on; OpenAI additionally needs `apiKeyConfigured`). It always returns
+`autoAdvanceAllowed: false` and `requiresHumanApprovalBeyondTest: true` —
+this sprint adds **no** code path that moves `rolloutStage` automatically;
+an operator must still set `CONTENT_GENERATION_ROLLOUT_STAGE` explicitly.
+Surfaced in `GET /api/content/generation/status` and the AI admin page's
+new **"OPENAI Internal Pilot Readiness"** block (key configured?, stage,
+provider health, a persistent warning banner).
+
+### Failure Lab (TEST provider only, in-memory)
+
+`failure-lab.service.ts` proves the safety nets work, without ever calling
+OpenAI or writing an `AiGenerationRun` row:
+
+| Scenario | How it's proven |
+|---|---|
+| `timeout` / `provider_error` | TEST provider's magic-token throws the expected `ContentGenerationError` code. |
+| `malformed` | TEST provider returns a malformed payload; PASS requires `structured-output.service.ts` to reject it with `INVALID_PROVIDER_OUTPUT`. |
+| `quota_exceeded` | `assertQuotaAllowed` is called with strict **in-memory** mock limits/usage (never the real ledger) — PASS means it still throws `DAILY_LIMIT`. |
+| `invalid_key` | Readiness-only: checks `apiKeyConfigured`, never calls OpenAI to validate the key. |
+
+Provider-based scenarios run against `buildSyntheticSmokeContext()` — a
+fabricated `GovernedGenerationContext` for the AI test topic — so Failure
+Lab never depends on a real Content Context Build existing.
+
+### Quality review (audit-only)
+
+`POST /api/content/generation/[id]/quality` validates a `{ rating: 1-5,
+helpful?, needsRewrite?, wrongFacts?, tooVerbose?, note? }` payload
+(`quality-feedback.ts`) and merges it into
+`AiGenerationRun.warnings.qualityFeedback` (`run-warnings.ts`'s
+`withQualityFeedback`) — preserving every other warnings key. **Never**
+changes `proposalStatus` or triggers any apply/publish path. Submitted from
+a star-rating + checkbox form on the proposal detail page.
+
+### Provider comparison (read-only)
+
+`buildProviderComparison()` (`proposal-detail.service.ts`) compares the
+current run against the most recent run for the **same
+topic+section+type** but a **different provider**, if one exists —
+tokens/latency/cost plus a one-line diff summary. The DB lookup
+(`getProposalProviderComparison`, wired into `GET
+/api/content/generation/[id]` as `providerComparison`) is read-only and a
+lookup failure never fails the whole request (falls back to `null`).
+
+### Rollback now leaves a marker
+
+`rollbackContentProposal` additionally persists `warnings.rolledBackAt`
+(`run-warnings.ts`'s `withRolledBackAt`) after a successful rollback — used
+only by the prompt-evaluation rollback rate below. It still never changes
+`proposalStatus`.
+
+### Cost dashboard + prompt evaluation metrics
+
+- `getUsageLedgerSummary()` now also returns `week` (Monday-start UTC) next
+  to `today`/`month`, and `promptVersionMetrics` — per-`promptVersion`
+  acceptance rate (`applied / generated`), retry rate
+  (`retriedByRunId` presence), rollback rate (`rolledBackAt` presence /
+  applied), and average quality rating, computed by
+  `prompt-metrics.ts`'s pure `computePromptVersionMetrics()`. The AI admin
+  page renders average tokens/latency cards for today/week/month and a
+  "top prompt version" table (sorted by volume) from this same field.
+- `GET /api/content/generation/usage/export?format=csv|json` —
+  admin-only, read-only export (`usage-export.ts`) with columns
+  `id, requestedBy, provider, model, totalTokens, estimatedCostUsd, status,
+  proposalStatus, createdAt, startedAt, completedAt`. Capped at 5,000 most
+  recent rows.
+
+### Navigation
+
+- New page: `/admin/content/ai/smoke` (breadcrumb: NỘI DUNG → AI vận hành
+  → Smoke Workspace).
+- The AI admin page (`/admin/content/ai`) links to it via an "Mở AI Smoke
+  Workspace" button.
+
+### What did not change
+
+- Every mutation safeguard from 16.0/18.0 is unchanged: AI still only ever
+  proposes; apply/review/handoff/publish all remain human-triggered.
+  Nothing added in 18.1 calls `applyProposal`, the review-approval
+  pipeline, blog handoff, or any publish path — the only new mutations are
+  the audit-only quality-feedback merge and the rollback marker, both
+  confined to `AiGenerationRun.warnings`.
+- No new database migration.
+- `CONTENT_GENERATION_ROLLOUT_STAGE` still defaults to `OFF` unless
+  explicitly set (or `ENABLED=true` + `PROVIDER=test`, which resolves to
+  `TEST` per 18.0) — 18.1 adds zero code paths that write this env-derived
+  value or auto-advance it.

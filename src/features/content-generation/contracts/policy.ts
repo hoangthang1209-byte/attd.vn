@@ -122,3 +122,57 @@ export function assertGenerationAllowed(
 export function isProhibitedClaimCategory(value: string): value is ProhibitedClaimCategory {
   return (PROHIBITED_CLAIM_CATEGORIES as readonly string[]).includes(value);
 }
+
+/**
+ * Sprint 18.1 — read-only rollout-readiness forecast, distinct from the
+ * *currently active* `config.rolloutStage`. This answers "if an operator
+ * moved the stage, would it technically work?" for the two safest next
+ * steps (TEST, OPENAI_INTERNAL) — it never changes `rolloutStage` itself
+ * and never implies an automatic advancement.
+ */
+export type RolloutStageEligibility = {
+  eligible: boolean;
+  reason: string;
+};
+
+export type RolloutReadinessSummary = {
+  stage: ContentGenerationRolloutStage;
+  test: RolloutStageEligibility;
+  openaiInternal: RolloutStageEligibility & { requiresApproval: true };
+  /** Always true — OPENAI_EDITOR/OPENAI_ALL require an explicit human decision, never automatic. */
+  requiresHumanApprovalBeyondTest: true;
+  /** Always false in this sprint — documents intent for callers/tests, see policy comment above. */
+  autoAdvanceAllowed: false;
+};
+
+/**
+ * Pure/no-DB forecast used by the AI admin "OPENAI Internal Pilot Readiness"
+ * block and the smoke workspace. TEST is eligible whenever the master
+ * switch is on (it never calls a paid API); OPENAI_INTERNAL additionally
+ * requires `apiKeyConfigured` — but reaching OPENAI_INTERNAL (or beyond)
+ * still requires an operator to explicitly set
+ * CONTENT_GENERATION_ROLLOUT_STAGE, never an automatic transition.
+ */
+export function getRolloutReadinessSummary(config: ContentGenerationConfig): RolloutReadinessSummary {
+  const testEligible = config.enabled;
+  const openaiInternalEligible = config.enabled && config.apiKeyConfigured;
+
+  return {
+    stage: config.rolloutStage,
+    test: {
+      eligible: testEligible,
+      reason: testEligible
+        ? "Có thể chạy provider TEST an toàn — không gọi API trả phí."
+        : "CONTENT_GENERATION_ENABLED=false — cần bật tính năng trước, kể cả cho TEST.",
+    },
+    openaiInternal: {
+      eligible: openaiInternalEligible,
+      reason: openaiInternalEligible
+        ? "Đã cấu hình OPENAI_API_KEY — đủ điều kiện kỹ thuật cho OPENAI_INTERNAL."
+        : "Thiếu OPENAI_API_KEY hoặc tính năng đang tắt — chưa đủ điều kiện kỹ thuật cho OPENAI_INTERNAL.",
+      requiresApproval: true,
+    },
+    requiresHumanApprovalBeyondTest: true,
+    autoAdvanceAllowed: false,
+  };
+}

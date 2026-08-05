@@ -5,6 +5,7 @@ import {
   type ContentGenerationSafeStatus,
   type ContentGenerationUsageSnapshot,
 } from "@/features/content-generation/contracts/config";
+import { getRolloutReadinessSummary, type RolloutReadinessSummary } from "@/features/content-generation/contracts/policy";
 import {
   getWritingGenerationConfig,
   getWritingGenerationSafeStatus,
@@ -14,6 +15,8 @@ export type AggregatedContentGenerationStatus = {
   contentGeneration: ContentGenerationSafeStatus;
   writing: { enabled: boolean; configured: boolean };
   brief: { keyConfigured: boolean };
+  /** Sprint 18.1 — TEST/OPENAI_INTERNAL readiness forecast for the "OPENAI Internal Pilot Readiness" admin block. */
+  rolloutReadiness: RolloutReadinessSummary;
 };
 
 export type AggregatedStatusUsageInjection = {
@@ -34,7 +37,8 @@ export type AggregatedStatusUsageInjection = {
 export function getAggregatedContentGenerationStatus(
   usage?: AggregatedStatusUsageInjection,
 ): AggregatedContentGenerationStatus {
-  const contentGeneration = getContentGenerationSafeStatus(getContentGenerationConfig(), usage);
+  const config = getContentGenerationConfig();
+  const contentGeneration = getContentGenerationSafeStatus(config, usage);
   const writing = getWritingGenerationSafeStatus(getWritingGenerationConfig());
   const brief = getSeoBriefAiSafeStatus(getSeoBriefAiConfig());
 
@@ -42,5 +46,6 @@ export function getAggregatedContentGenerationStatus(
     contentGeneration,
     writing: { enabled: writing.enabled, configured: writing.configured },
     brief: { keyConfigured: brief.configured },
+    rolloutReadiness: getRolloutReadinessSummary(config),
   };
 }

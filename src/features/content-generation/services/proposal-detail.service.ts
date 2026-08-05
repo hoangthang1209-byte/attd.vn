@@ -106,6 +106,87 @@ export type ProposalDetailView = SafeProposalSummary & {
   retriedByRunId: string | null;
 };
 
+// ---------------------------------------------------------------------------
+// Sprint 18.1 — read-only provider comparison (same topic+section+type, a
+// different provider). Pure: the DB lookup for the candidate run lives in
+// proposal.wiring.ts's getProposalDetail; this module only shapes the diff.
+// ---------------------------------------------------------------------------
+
+export type ComparableRunSummary = {
+  id: string;
+  provider: string;
+  model: string;
+  totalTokens: number | null;
+  estimatedCostUsd: number | null;
+  latencyMs: number | null;
+  completedAt: string | null;
+};
+
+export type ProviderComparison = {
+  current: ComparableRunSummary;
+  comparison: ComparableRunSummary | null;
+  diffSummary: string | null;
+};
+
+type ComparableRunLike = {
+  id: string;
+  provider: string;
+  model: string;
+  totalTokens: number | null;
+  estimatedCostUsd: number | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+};
+
+function toComparableRunSummary(run: ComparableRunLike): ComparableRunSummary {
+  return {
+    id: run.id,
+    provider: run.provider,
+    model: run.model,
+    totalTokens: run.totalTokens,
+    estimatedCostUsd: run.estimatedCostUsd,
+    latencyMs: run.startedAt && run.completedAt ? Math.max(0, run.completedAt.getTime() - run.startedAt.getTime()) : null,
+    completedAt: run.completedAt ? run.completedAt.toISOString() : null,
+  };
+}
+
+function fmtSignedNumber(n: number): string {
+  return n >= 0 ? `+${n}` : `${n}`;
+}
+
+function fmtSignedCost(n: number): string {
+  return n >= 0 ? `+$${n.toFixed(4)}` : `-$${Math.abs(n).toFixed(4)}`;
+}
+
+function buildDiffSummary(current: ComparableRunSummary, other: ComparableRunSummary): string {
+  const tokenDiff = (current.totalTokens ?? 0) - (other.totalTokens ?? 0);
+  const latencyDiff = (current.latencyMs ?? 0) - (other.latencyMs ?? 0);
+  const costDiff = (current.estimatedCostUsd ?? 0) - (other.estimatedCostUsd ?? 0);
+  return `So với ${other.provider}/${other.model}: tokens ${fmtSignedNumber(tokenDiff)}, độ trễ ${fmtSignedNumber(latencyDiff)}ms, chi phí ${fmtSignedCost(costDiff)}.`;
+}
+
+/**
+ * Builds the read-only comparison view. `candidate` is the most recent run
+ * for the same topic+section+type but a DIFFERENT provider — when null (no
+ * such run exists yet), `comparison`/`diffSummary` are null rather than
+ * fabricated.
+ */
+export function buildProviderComparison(
+  current: ComparableRunLike,
+  candidate: ComparableRunLike | null,
+): ProviderComparison {
+  const currentSummary = toComparableRunSummary(current);
+  if (!candidate) {
+    return { current: currentSummary, comparison: null, diffSummary: null };
+  }
+  const candidateSummary = toComparableRunSummary(candidate);
+  return {
+    current: currentSummary,
+    comparison: candidateSummary,
+    diffSummary: buildDiffSummary(currentSummary, candidateSummary),
+  };
+}
+
 /** Full safe detail view for GET /api/content/generation/[id] and the proposal detail admin page. */
 export function buildProposalDetail(run: ProposalRunRecord): ProposalDetailView {
   const base = toSafeProposalDetail(run);

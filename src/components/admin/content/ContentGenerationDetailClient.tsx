@@ -36,6 +36,33 @@ type ProposalDisplay = {
   items?: unknown[];
 };
 
+type ComparableRunSummary = {
+  id: string;
+  provider: string;
+  model: string;
+  totalTokens: number | null;
+  estimatedCostUsd: number | null;
+  latencyMs: number | null;
+  completedAt: string | null;
+};
+
+type ProviderComparison = {
+  current: ComparableRunSummary;
+  comparison: ComparableRunSummary | null;
+  diffSummary: string | null;
+};
+
+type QualityFeedback = {
+  rating: number;
+  helpful: boolean | null;
+  needsRewrite: boolean | null;
+  wrongFacts: boolean | null;
+  tooVerbose: boolean | null;
+  note: string | null;
+  submittedAt: string;
+  submittedBy: string | null;
+};
+
 type ProposalDetail = {
   id: string;
   type: string;
@@ -81,6 +108,7 @@ type ProposalDetail = {
   selection: unknown;
   retryOfRunId: string | null;
   retriedByRunId: string | null;
+  providerComparison?: ProviderComparison | null;
 };
 
 function statusTone(status: string | null): "neutral" | "info" | "success" | "warning" | "danger" {
@@ -107,12 +135,27 @@ function fmtDate(v: string | null): string {
   return v ? new Date(v).toLocaleString("vi-VN") : "—";
 }
 
+function extractQualityFeedback(warnings: unknown): QualityFeedback | null {
+  if (!warnings || typeof warnings !== "object" || Array.isArray(warnings)) return null;
+  const feedback = (warnings as Record<string, unknown>).qualityFeedback;
+  if (!feedback || typeof feedback !== "object") return null;
+  return feedback as QualityFeedback;
+}
+
 export default function ContentGenerationDetailClient({ runId }: { runId: string }) {
   const toast = useAdminToast();
   const [data, setData] = useState<ProposalDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  const [ratingDraft, setRatingDraft] = useState(0);
+  const [helpfulDraft, setHelpfulDraft] = useState<boolean | null>(null);
+  const [needsRewriteDraft, setNeedsRewriteDraft] = useState(false);
+  const [wrongFactsDraft, setWrongFactsDraft] = useState(false);
+  const [tooVerboseDraft, setTooVerboseDraft] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [submittingQuality, setSubmittingQuality] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,6 +200,36 @@ export default function ContentGenerationDetailClient({ runId }: { runId: string
     },
     [load, toast],
   );
+
+  const submitQuality = useCallback(async () => {
+    if (ratingDraft < 1) {
+      toast.error("Vui lòng chọn đánh giá từ 1 đến 5 sao.");
+      return;
+    }
+    setSubmittingQuality(true);
+    try {
+      const res = await fetch(`/api/content/generation/${runId}/quality`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rating: ratingDraft,
+          helpful: helpfulDraft,
+          needsRewrite: needsRewriteDraft,
+          wrongFacts: wrongFactsDraft,
+          tooVerbose: tooVerboseDraft,
+          note: noteDraft.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? "Gửi đánh giá thất bại.");
+      toast.success(json.message ?? "Đã ghi nhận đánh giá.");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gửi đánh giá thất bại.");
+    } finally {
+      setSubmittingQuality(false);
+    }
+  }, [runId, ratingDraft, helpfulDraft, needsRewriteDraft, wrongFactsDraft, tooVerboseDraft, noteDraft, load, toast]);
 
   if (loading) {
     return (
@@ -280,6 +353,62 @@ export default function ContentGenerationDetailClient({ runId }: { runId: string
               <p style={{ margin: 0, color: "#b91c1c", fontSize: 13 }}>{data.errorMessage}</p>
             </section>
           )}
+
+          {data.providerComparison && (
+            <section className="admin-sidebar-card" style={{ margin: 0 }}>
+              <h3 className="admin-sidebar-title">So sánh provider</h3>
+              {data.providerComparison.comparison ? (
+                <>
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th></th>
+                          <th>Hiện tại</th>
+                          <th>Gần nhất khác provider</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>Provider / model</td>
+                          <td>
+                            {data.providerComparison.current.provider}/{data.providerComparison.current.model}
+                          </td>
+                          <td>
+                            {data.providerComparison.comparison.provider}/{data.providerComparison.comparison.model}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>Tokens</td>
+                          <td>{data.providerComparison.current.totalTokens ?? "—"}</td>
+                          <td>{data.providerComparison.comparison.totalTokens ?? "—"}</td>
+                        </tr>
+                        <tr>
+                          <td>Độ trễ</td>
+                          <td>{fmtMs(data.providerComparison.current.latencyMs)}</td>
+                          <td>{fmtMs(data.providerComparison.comparison.latencyMs)}</td>
+                        </tr>
+                        <tr>
+                          <td>Chi phí</td>
+                          <td>{fmtCost(data.providerComparison.current.estimatedCostUsd)}</td>
+                          <td>{fmtCost(data.providerComparison.comparison.estimatedCostUsd)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  {data.providerComparison.diffSummary && (
+                    <p className="admin-field-hint" style={{ margin: "8px 0 0" }}>
+                      {data.providerComparison.diffSummary}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="admin-field-hint" style={{ margin: 0 }}>
+                  Chưa có lượt tạo nào khác cùng chủ đề/section/loại với provider khác để so sánh.
+                </p>
+              )}
+            </section>
+          )}
         </div>
 
         <div style={{ display: "grid", gap: 12, position: "sticky", top: 12 }}>
@@ -325,6 +454,81 @@ export default function ContentGenerationDetailClient({ runId }: { runId: string
                 <Link href={`/admin/content/seo-topics/${data.entityId}`}>Mở workspace chủ đề</Link>
               </p>
             )}
+          </section>
+
+          <section className="admin-sidebar-card" style={{ margin: 0 }}>
+            <h3 className="admin-sidebar-title">Đánh giá chất lượng (audit-only)</h3>
+            {(() => {
+              const existing = extractQualityFeedback(data.warnings);
+              return existing ? (
+                <p className="admin-field-hint" style={{ margin: "0 0 8px" }}>
+                  Đã đánh giá gần nhất: {existing.rating}/5 · {fmtDate(existing.submittedAt)}
+                  {existing.submittedBy ? ` · bởi ${existing.submittedBy}` : ""}
+                  {existing.note ? ` · "${existing.note}"` : ""}
+                </p>
+              ) : (
+                <p className="admin-field-hint" style={{ margin: "0 0 8px" }}>
+                  Chưa có đánh giá nào. Đánh giá chỉ mang tính ghi nhận — không thay đổi trạng thái đề xuất.
+                </p>
+              );
+            })()}
+
+            <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRatingDraft(star)}
+                  aria-label={`${star} sao`}
+                  style={{
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    fontSize: 20,
+                    color: star <= ratingDraft ? "#f59e0b" : "#d1d5db",
+                    padding: 0,
+                  }}
+                >
+                  ★
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 8, fontSize: 13 }}>
+              <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={helpfulDraft === true}
+                  onChange={(e) => setHelpfulDraft(e.target.checked ? true : null)}
+                />
+                Hữu ích
+              </label>
+              <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input type="checkbox" checked={needsRewriteDraft} onChange={(e) => setNeedsRewriteDraft(e.target.checked)} />
+                Cần viết lại
+              </label>
+              <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input type="checkbox" checked={wrongFactsDraft} onChange={(e) => setWrongFactsDraft(e.target.checked)} />
+                Sai fact
+              </label>
+              <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input type="checkbox" checked={tooVerboseDraft} onChange={(e) => setTooVerboseDraft(e.target.checked)} />
+                Dài dòng
+              </label>
+            </div>
+
+            <textarea
+              className="admin-textarea"
+              placeholder="Ghi chú (tuỳ chọn)…"
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              rows={2}
+              style={{ width: "100%", marginBottom: 8 }}
+            />
+
+            <AdminLoadingButton pending={submittingQuality} size="small" onClick={() => void submitQuality()}>
+              Gửi đánh giá
+            </AdminLoadingButton>
           </section>
         </div>
       </div>

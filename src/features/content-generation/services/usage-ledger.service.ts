@@ -8,10 +8,17 @@ import {
   groupLedgerRowsByUser,
   startOfUtcDay,
   startOfUtcMonth,
+  startOfUtcWeek,
   summarizeLedgerRows,
   type LedgerGroupSummary,
   type LedgerRunRow,
 } from "@/features/content-generation/services/usage-ledger.mapping";
+import {
+  computePromptVersionMetrics,
+  type PromptMetricsRow,
+  type PromptVersionMetrics,
+} from "@/features/content-generation/services/prompt-metrics";
+import type { UsageExportRow } from "@/features/content-generation/services/usage-export";
 
 const LEDGER_SELECT = {
   id: true,
@@ -50,10 +57,14 @@ function toLedgerRow(row: LedgerSelectRow): LedgerRunRow {
 
 export type UsageLedgerSummary = {
   today: ContentGenerationUsageSnapshot;
+  /** Sprint 18.1 — Monday-start UTC week. */
+  week: ContentGenerationUsageSnapshot;
   month: ContentGenerationUsageSnapshot;
   byUserToday: Array<LedgerGroupSummary<"userId">>;
   byTopicToday: Array<LedgerGroupSummary<"topicId">>;
   statusCountsToday: Record<string, number>;
+  /** Sprint 18.1 — per-promptVersion acceptance/retry/rollback/quality metrics, month-to-date, sorted by volume desc. */
+  promptVersionMetrics: PromptVersionMetrics[];
   generatedAt: string;
 };
 
@@ -64,22 +75,36 @@ export type UsageLedgerSummary = {
  */
 export async function getUsageLedgerSummary({ now = new Date() }: { now?: Date } = {}): Promise<UsageLedgerSummary> {
   const dayStart = startOfUtcDay(now);
+  const weekStart = startOfUtcWeek(now);
   const monthStart = startOfUtcMonth(now);
+  // Week can start before the month (e.g. the 1st falling mid-week) — fetch
+  // from whichever is earliest so the week card is never short a few days.
+  const queryStart = weekStart.getTime() < monthStart.getTime() ? weekStart : monthStart;
 
-  const rows = (await prisma.aiGenerationRun.findMany({
-    where: { createdAt: { gte: monthStart } },
-    select: LEDGER_SELECT,
-  })) as LedgerSelectRow[];
+  const [rows, promptMetricsRows] = await Promise.all([
+    prisma.aiGenerationRun.findMany({
+      where: { createdAt: { gte: queryStart } },
+      select: LEDGER_SELECT,
+    }) as Promise<LedgerSelectRow[]>,
+    prisma.aiGenerationRun.findMany({
+      where: { createdAt: { gte: monthStart } },
+      select: { promptVersion: true, status: true, proposalStatus: true, warnings: true },
+    }) as Promise<PromptMetricsRow[]>,
+  ]);
 
   const mapped = rows.map(toLedgerRow);
+  const monthRows = mapped.filter((row) => row.createdAt >= monthStart);
+  const weekRows = mapped.filter((row) => row.createdAt >= weekStart);
   const todayRows = mapped.filter((row) => row.createdAt >= dayStart);
 
   return {
     today: summarizeLedgerRows(todayRows),
-    month: summarizeLedgerRows(mapped),
+    week: summarizeLedgerRows(weekRows),
+    month: summarizeLedgerRows(monthRows),
     byUserToday: groupLedgerRowsByUser(todayRows),
     byTopicToday: groupLedgerRowsByTopic(todayRows),
     statusCountsToday: countLedgerRowsByStatus(todayRows),
+    promptVersionMetrics: computePromptVersionMetrics(promptMetricsRows),
     generatedAt: new Date().toISOString(),
   };
 }
@@ -114,4 +139,42 @@ export async function getUsageForWorkspaceToday(): Promise<ContentGenerationUsag
     select: LEDGER_SELECT,
   })) as LedgerSelectRow[];
   return summarizeLedgerRows(rows.map(toLedgerRow));
+}
+
+const MAX_EXPORT_ROWS = 5_000;
+
+/**
+ * Sprint 18.1 — admin-only export rows for GET
+ * /api/content/generation/usage/export. Capped at MAX_EXPORT_ROWS (most
+ * recent first) to avoid an unbounded export; callers narrow with
+ * `since`/`until` when they need a specific window.
+ */
+export async function getUsageExportRows(opts: { since?: Date; until?: Date } = {}): Promise<UsageExportRow[]> {
+  const createdAtFilter: { gte?: Date; lte?: Date } = {};
+  if (opts.since) createdAtFilter.gte = opts.since;
+  if (opts.until) createdAtFilter.lte = opts.until;
+
+  const rows = await prisma.aiGenerationRun.findMany({
+    where: Object.keys(createdAtFilter).length > 0 ? { createdAt: createdAtFilter } : {},
+    orderBy: { createdAt: "desc" },
+    take: MAX_EXPORT_ROWS,
+    select: {
+      id: true,
+      requestedBy: true,
+      provider: true,
+      model: true,
+      status: true,
+      proposalStatus: true,
+      totalTokens: true,
+      estimatedCostUsd: true,
+      createdAt: true,
+      startedAt: true,
+      completedAt: true,
+    },
+  });
+
+  return rows.map((row) => ({
+    ...row,
+    estimatedCostUsd: row.estimatedCostUsd == null ? null : Number(row.estimatedCostUsd as never),
+  }));
 }

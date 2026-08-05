@@ -121,3 +121,11 @@ export function startOfUtcDay(now: Date): Date {
 export function startOfUtcMonth(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
+
+/** Sprint 18.1 — Monday-start UTC week, for the AI admin cost dashboard's "this week" card. */
+export function startOfUtcWeek(now: Date): Date {
+  const dayStart = startOfUtcDay(now);
+  const dayOfWeek = dayStart.getUTCDay(); // 0=Sun..6=Sat
+  const daysSinceMonday = (dayOfWeek + 6) % 7; // Mon=0
+  return new Date(dayStart.getTime() - daysSinceMonday * 24 * 60 * 60 * 1000);
+}

@@ -15,15 +15,23 @@ import {
   type ProviderHealthSnapshot,
   type ProviderStatusRunRow,
 } from "@/features/content-generation/services/provider-status.service";
-import { buildProposalDetail, type ProposalDetailView } from "@/features/content-generation/services/proposal-detail.service";
+import {
+  buildProposalDetail,
+  buildProviderComparison,
+  type ProposalDetailView,
+  type ProviderComparison,
+} from "@/features/content-generation/services/proposal-detail.service";
 import { mapPriorRunToRetryInput } from "@/features/content-generation/services/retry-mapping";
 import {
   normalizeRunWarnings,
+  withQualityFeedback,
   withRetriedByRunId,
   withRetryOfRunId,
   withRollbackSnapshot,
+  withRolledBackAt,
   type RollbackSnapshot,
 } from "@/features/content-generation/services/run-warnings";
+import { buildQualityFeedback, validateQualityFeedbackInput } from "@/features/content-generation/services/quality-feedback";
 import { assertSelectionNotStale, type StaleCheckInputSummary } from "@/features/content-generation/services/stale-check";
 import {
   getUsageForTopicToday,
@@ -433,6 +441,41 @@ export async function getProposalDetail(id: string): Promise<ProposalDetailView>
 }
 
 /**
+ * Sprint 18.1 — safe, read-only provider comparison: the most recent run
+ * for the same topic+section+type but a DIFFERENT provider, if any. Never
+ * writes anything; used only by the proposal detail admin page.
+ */
+export async function getProposalProviderComparison(id: string): Promise<ProviderComparison> {
+  const run = await createPrismaProposalStore().getById(id);
+  if (!run) {
+    throw new ContentGenerationError("Không tìm thấy đề xuất.", "PROPOSAL_NOT_FOUND");
+  }
+
+  const candidate = await prisma.aiGenerationRun.findFirst({
+    where: {
+      entityType: run.entityType,
+      entityId: run.entityId,
+      type: run.type as never,
+      sectionId: run.sectionId,
+      provider: { not: run.provider },
+      id: { not: run.id },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      provider: true,
+      model: true,
+      totalTokens: true,
+      estimatedCostUsd: true,
+      startedAt: true,
+      completedAt: true,
+    },
+  });
+
+  return buildProviderComparison(run, candidate ? { ...candidate, estimatedCostUsd: candidate.estimatedCostUsd == null ? null : Number(candidate.estimatedCostUsd as never) } : null);
+}
+
+/**
  * POST /api/content/generation/[id]/rollback — reapplies the previousHtml
  * captured at apply time (see applySectionProposalAdapter) through the same
  * governed saveHumanEditedSection path used for every other section write.
@@ -474,6 +517,16 @@ export async function rollbackContentProposal(
       },
       orchestratorStore,
     );
+
+    // Sprint 18.1 — marks that a rollback occurred (for prompt-metrics'
+    // rollback rate). Never changes proposalStatus — rollback stays a
+    // content operation, not a new proposal-lifecycle state.
+    const rolledBackAt = new Date().toISOString();
+    await prisma.aiGenerationRun.update({
+      where: { id: run.id },
+      data: { warnings: withRolledBackAt(run.warnings, rolledBackAt) as Prisma.InputJsonValue },
+    });
+
     return {
       run,
       result: {
@@ -524,6 +577,31 @@ export async function retryContentProposal(id: string, requestedBy: string | nul
   ]);
 
   return mapRun(patchedNext);
+}
+
+/**
+ * Sprint 18.1 — POST /api/content/generation/[id]/quality. Audit-only:
+ * merges a human rating/feedback into `warnings.qualityFeedback`, never
+ * touches `proposalStatus` or any apply/publish path.
+ */
+export async function recordProposalQualityFeedback(
+  id: string,
+  raw: unknown,
+  submittedBy: string | null,
+): Promise<ProposalRunRecord> {
+  const input = validateQualityFeedbackInput(raw);
+  const store = createPrismaProposalStore();
+  const run = await store.getById(id);
+  if (!run) {
+    throw new ContentGenerationError("Không tìm thấy đề xuất.", "PROPOSAL_NOT_FOUND");
+  }
+
+  const feedback = buildQualityFeedback(input, submittedBy);
+  const row = await prisma.aiGenerationRun.update({
+    where: { id },
+    data: { warnings: withQualityFeedback(run.warnings, feedback) as Prisma.InputJsonValue },
+  });
+  return mapRun(row);
 }
 
 const PROVIDER_STATUS_WINDOW = 50;
