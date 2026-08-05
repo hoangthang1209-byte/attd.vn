@@ -7,17 +7,33 @@ import {
   type CampaignHealth,
   type ClusterLeaf,
   type ClusterNode,
+  type EditorWorkload,
   type HealthMetric,
   type KnowledgeCoverageSummary,
   type MediaCoverageSummary,
+  type OperationsDeepLink,
   type OperationsFilters,
   type OperationsPipelineColumnKey,
   type OperationsPipelineSummaryEntry,
   type OperationsTopicInput,
   type OpsTopicCard,
   type OwnerWorkload,
+  type PublishInbox,
+  type PublishInboxGroups,
+  type PublishInboxItem,
+  type PublishOpsStats,
   type PublishQueueItemLike,
   type PublishQueueSummary,
+  type QueueHealth,
+  type RefreshCampaign,
+  type RefreshInbox,
+  type RefreshInboxCard,
+  type RefreshReasonKey,
+  type ReviewerWorkload,
+  type ReviewInbox,
+  type ReviewInboxGroupKey,
+  type ReviewInboxGroups,
+  type ReviewInboxItem,
   type ReviewQueueItemLike,
   type ReviewQueueSummary,
   type SeoOpsSummary,
@@ -41,6 +57,10 @@ function daysBetween(from: Date, to: Date): number {
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function isSameCalendarDay(a: Date, b: Date): boolean {
+  return startOfDay(a).getTime() === startOfDay(b).getTime();
 }
 
 function emptyColumnCounts(): Record<OperationsPipelineColumnKey, number> {
@@ -443,4 +463,320 @@ export function groupOperationsActivity(events: ActivityEventInput[]): ActivityG
     }
   }
   return [...map.values()].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+}
+
+// ---------------------------------------------------------------------------
+// Sprint 17.1 — Operational Queues & Audit Foundation.
+//
+// Everything below stays a pure reshape: no Prisma import, no fetch, no
+// writes. Servers assemble `ReviewInboxItem[]` / `PublishInboxItem[]` /
+// `OperationsTopicInput[]` from existing governed tables and hand them to
+// these builders.
+// ---------------------------------------------------------------------------
+
+export function buildQueueHealth(input: {
+  total: number;
+  blocked: number;
+  overdue: number;
+  waiting: number;
+  completedToday: number;
+}): QueueHealth {
+  return { ...input };
+}
+
+const REVIEW_OVERDUE_WAIT_DAYS = 3;
+const RECENTLY_SUBMITTED_HOURS = 24;
+
+/**
+ * Groups are additive triage buckets (Gmail-style) rather than a partition —
+ * a review can be both `high_priority` and `overdue` at once.
+ */
+export function buildReviewInbox(items: ReviewInboxItem[], now: Date = new Date()): ReviewInbox {
+  const groups: ReviewInboxGroups = {
+    high_priority: [],
+    waiting_today: [],
+    overdue: [],
+    recently_submitted: [],
+  };
+
+  for (const item of items) {
+    if (item.priority === "HIGH" || item.priority === "CRITICAL") groups.high_priority.push(item);
+    if (item.waitingDays <= 0) groups.waiting_today.push(item);
+    if (item.waitingDays > REVIEW_OVERDUE_WAIT_DAYS) groups.overdue.push(item);
+    const createdMs = now.getTime() - new Date(item.createdAt).getTime();
+    if (createdMs >= 0 && createdMs <= RECENTLY_SUBMITTED_HOURS * 60 * 60 * 1000) {
+      groups.recently_submitted.push(item);
+    }
+  }
+
+  for (const key of Object.keys(groups) as ReviewInboxGroupKey[]) {
+    groups[key].sort((a, b) => b.waitingDays - a.waitingDays);
+  }
+
+  const blocked = items.filter((i) => i.status === "REJECTED" || i.status === "SUPERSEDED").length;
+  const waiting = items.filter((i) => i.status === "IN_REVIEW" || i.status === "CHANGES_REQUESTED").length;
+  const completedToday = items.filter(
+    (i) => i.status === "APPROVED" && isSameCalendarDay(new Date(i.updatedAt), now),
+  ).length;
+
+  return {
+    groups,
+    items,
+    health: buildQueueHealth({
+      total: items.length,
+      blocked,
+      overdue: groups.overdue.length,
+      waiting,
+      completedToday,
+    }),
+  };
+}
+
+export function buildReviewerWorkload(
+  reviews: Array<Pick<ReviewInboxItem, "assignedReviewerId" | "status" | "blockingIssues">>,
+): ReviewerWorkload[] {
+  const map = new Map<string, ReviewerWorkload>();
+  for (const review of reviews) {
+    const reviewerId = review.assignedReviewerId?.trim() || "Chưa gán";
+    if (!map.has(reviewerId)) {
+      map.set(reviewerId, {
+        reviewerId,
+        total: 0,
+        inReviewCount: 0,
+        changesRequestedCount: 0,
+        approvedCount: 0,
+        blockingIssuesTotal: 0,
+      });
+    }
+    const entry = map.get(reviewerId)!;
+    entry.total += 1;
+    if (review.status === "IN_REVIEW") entry.inReviewCount += 1;
+    if (review.status === "CHANGES_REQUESTED") entry.changesRequestedCount += 1;
+    if (review.status === "APPROVED") entry.approvedCount += 1;
+    entry.blockingIssuesTotal += review.blockingIssues;
+  }
+  return [...map.values()].sort((a, b) => b.total - a.total);
+}
+
+/**
+ * Buckets a flat publish-queue item list. Failed items are recognized either
+ * by an explicit `status: "FAILED"` (ContentPublishEvent) or a non-null
+ * `errorMessage`; everything else buckets off BlogPostStatus + `modified`.
+ */
+export function buildPublishInbox(items: PublishInboxItem[], now: Date = new Date()): PublishInbox {
+  const groups: PublishInboxGroups = {
+    ready_today: [],
+    scheduled: [],
+    failed: [],
+    waiting: [],
+    published_today: [],
+  };
+
+  for (const item of items) {
+    if (item.status === "FAILED" || item.errorMessage) {
+      groups.failed.push(item);
+      continue;
+    }
+    if (item.status === "SCHEDULED") {
+      groups.scheduled.push(item);
+      continue;
+    }
+    if (item.status === "PUBLISHED") {
+      if (item.publishedAt && isSameCalendarDay(new Date(item.publishedAt), now)) {
+        groups.published_today.push(item);
+      }
+      continue;
+    }
+    if (item.modified) {
+      groups.waiting.push(item);
+      continue;
+    }
+    groups.ready_today.push(item);
+  }
+
+  groups.scheduled.sort(
+    (a, b) => (a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0) - (b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0),
+  );
+  groups.failed.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  groups.published_today.sort(
+    (a, b) => (b.publishedAt ? new Date(b.publishedAt).getTime() : 0) - (a.publishedAt ? new Date(a.publishedAt).getTime() : 0),
+  );
+
+  return { groups };
+}
+
+export function buildPublishOpsStats(groups: PublishInboxGroups): PublishOpsStats {
+  return {
+    readyCount: groups.ready_today.length,
+    scheduledCount: groups.scheduled.length,
+    failedCount: groups.failed.length,
+    publishedTodayCount: groups.published_today.length,
+    waitingCount: groups.waiting.length,
+  };
+}
+
+/** Vietnamese labels for the machine-readable refresh reason keys — UI-only lookup. */
+export const REFRESH_REASON_LABELS: Record<RefreshReasonKey, string> = {
+  outdated: "Nội dung cũ",
+  missing_cta: "Thiếu CTA",
+  missing_faq: "Thiếu FAQ",
+  missing_hero: "Thiếu ảnh bìa",
+  missing_links: "Thiếu internal link",
+  missing_images: "Thiếu hình ảnh",
+  low_seo: "SEO yếu",
+};
+
+/** Ordered worst → least severe; also drives the numeric severity weight below. */
+const REFRESH_REASON_ORDER: RefreshReasonKey[] = [
+  "outdated",
+  "missing_cta",
+  "missing_faq",
+  "missing_hero",
+  "missing_links",
+  "missing_images",
+  "low_seo",
+];
+
+function computeRefreshReasons(topic: OperationsTopicInput, now: Date): RefreshReasonKey[] {
+  const reasons: RefreshReasonKey[] = [];
+  if (topic.publishedAt) {
+    const days = daysBetween(new Date(topic.publishedAt), now);
+    if (days > REFRESH_STALE_DAYS) reasons.push("outdated");
+  }
+  if (!topic.ctaText?.trim() && !topic.ctaType?.trim()) reasons.push("missing_cta");
+  if ((topic.questionsCount ?? 0) === 0) reasons.push("missing_faq");
+  if (!topic.mediaBundleId) reasons.push("missing_hero");
+  if ((topic.internalLinkCount ?? 0) === 0) reasons.push("missing_links");
+  if (
+    topic.mediaBundleId &&
+    (topic.mediaPlanStatus === "CRITICAL" ||
+      (topic.mediaPlanScore != null && topic.mediaPlanScore < LOW_MEDIA_SCORE_THRESHOLD))
+  ) {
+    reasons.push("missing_images");
+  }
+  if (!topic.metaTitle?.trim() || !topic.metaDescription?.trim()) reasons.push("low_seo");
+  return reasons;
+}
+
+function refreshSeverity(reasons: RefreshReasonKey[]): number {
+  return reasons.reduce((sum, reason) => sum + (REFRESH_REASON_ORDER.length - REFRESH_REASON_ORDER.indexOf(reason)), 0);
+}
+
+/**
+ * Published topics only, each annotated with machine-readable reason keys
+ * (`outdated`, `missing_cta`, …) — the UI is responsible for localizing the
+ * keys into chips. Sorted worst-first (severity), then oldest-first (age).
+ */
+export function buildRefreshInbox(topics: OperationsTopicInput[], now: Date = new Date()): RefreshInbox {
+  const items: RefreshInboxCard[] = topics
+    .filter((t) => t.status === "PUBLISHED")
+    .map((topic) => {
+      const reasons = computeRefreshReasons(topic, now);
+      const ageDays = topic.publishedAt ? daysBetween(new Date(topic.publishedAt), now) : null;
+      return {
+        ...mapToOpsTopicCard(topic, now),
+        reasons,
+        severity: refreshSeverity(reasons),
+        ageDays,
+      };
+    })
+    .filter((card) => card.reasons.length > 0);
+
+  items.sort((a, b) => {
+    if (b.severity !== a.severity) return b.severity - a.severity;
+    return (b.ageDays ?? 0) - (a.ageDays ?? 0);
+  });
+
+  return { items };
+}
+
+export function buildRefreshCampaigns(cards: RefreshInboxCard[]): RefreshCampaign[] {
+  const map = new Map<string, RefreshCampaign>();
+  for (const card of cards) {
+    if (!map.has(card.campaignId)) {
+      map.set(card.campaignId, { campaignId: card.campaignId, campaign: card.campaign, total: 0, reasonCounts: {} });
+    }
+    const entry = map.get(card.campaignId)!;
+    entry.total += 1;
+    for (const reason of card.reasons) {
+      entry.reasonCounts[reason] = (entry.reasonCounts[reason] ?? 0) + 1;
+    }
+  }
+  return [...map.values()].sort((a, b) => b.total - a.total);
+}
+
+export function buildEditorWorkload(
+  topics: OpsTopicCard[],
+  reviews: Array<Pick<ReviewInboxItem, "assignedReviewerId">>,
+): EditorWorkload[] {
+  const map = new Map<string, EditorWorkload>();
+  const ensure = (owner: string): EditorWorkload => {
+    if (!map.has(owner)) {
+      map.set(owner, { owner, draftingCount: 0, reviewCount: 0, overdueCount: 0, total: 0 });
+    }
+    return map.get(owner)!;
+  };
+
+  for (const topic of topics) {
+    const entry = ensure(topic.owner?.trim() || "Chưa gán");
+    entry.total += 1;
+    if (topic.pipelineColumn === "writing" || topic.pipelineColumn === "qa") entry.draftingCount += 1;
+    if (topic.pipelineColumn === "review") entry.reviewCount += 1;
+    if (topic.flags.overdue) entry.overdueCount += 1;
+  }
+  for (const review of reviews) {
+    const entry = ensure(review.assignedReviewerId?.trim() || "Chưa gán");
+    entry.reviewCount += 1;
+  }
+
+  return [...map.values()].sort((a, b) => b.total - a.total);
+}
+
+/** Pure helper backing the calendar range query — anchor is publishedAt ?? dueDate, inclusive bounds. */
+export function filterOpsTopicsByDateRange(
+  topics: OperationsTopicInput[],
+  range: { from: string; to: string },
+): OperationsTopicInput[] {
+  const fromTime = new Date(range.from).getTime();
+  const toTime = new Date(range.to).getTime();
+  return topics.filter((topic) => {
+    const anchor = topic.publishedAt ?? topic.dueDate;
+    if (!anchor) return false;
+    const time = new Date(anchor).getTime();
+    return time >= fromTime && time <= toTime;
+  });
+}
+
+const HEALTH_FILTER_KEYS = new Set([
+  "missingCta",
+  "missingMeta",
+  "missingMedia",
+  "missingFaq",
+  "overdue",
+  "blocked",
+  "needsRefresh",
+]);
+
+const INBOX_SCOPES = new Set(["review", "publish", "refresh", "calendar", "kanban"]);
+
+/**
+ * Builds a deep-linkable `path` + `query` for the operations center from a
+ * single filter key, e.g. `"review:overdue"` → `?inbox=review&group=overdue`,
+ * `"missingCta"` → `?inbox=kanban&filter=missingCta`.
+ */
+export function buildDeepLink(filterKey: string): OperationsDeepLink {
+  const path = "/admin/content/operations";
+  const [scope, group] = filterKey.split(":");
+
+  if (INBOX_SCOPES.has(scope)) {
+    const query: Record<string, string> = { inbox: scope };
+    if (group) query.group = group;
+    return { path, query };
+  }
+
+  if (HEALTH_FILTER_KEYS.has(scope)) {
+    return { path, query: { inbox: "kanban", filter: scope } };
+  }
+
+  return { path, query: { inbox: "kanban" } };
 }

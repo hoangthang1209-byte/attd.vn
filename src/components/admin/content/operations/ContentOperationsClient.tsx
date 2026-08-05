@@ -22,19 +22,58 @@ import OperationsSeoOps from "@/components/admin/content/operations/OperationsSe
 import OperationsMediaCoverage from "@/components/admin/content/operations/OperationsMediaCoverage";
 import OperationsKnowledgeCoverage from "@/components/admin/content/operations/OperationsKnowledgeCoverage";
 import OperationsRightRail from "@/components/admin/content/operations/OperationsRightRail";
+import OperationsReviewInbox from "@/components/admin/content/operations/OperationsReviewInbox";
+import OperationsPublishInbox from "@/components/admin/content/operations/OperationsPublishInbox";
+import OperationsRefreshInbox from "@/components/admin/content/operations/OperationsRefreshInbox";
+import OperationsReviewerWorkload from "@/components/admin/content/operations/OperationsReviewerWorkload";
+import OperationsPublishOps from "@/components/admin/content/operations/OperationsPublishOps";
+import OperationsRefreshCampaigns from "@/components/admin/content/operations/OperationsRefreshCampaigns";
+import OperationsEditorLoad from "@/components/admin/content/operations/OperationsEditorLoad";
+import OperationsNamedViews from "@/components/admin/content/operations/OperationsNamedViews";
+import OperationsTopicTimeline from "@/components/admin/content/operations/OperationsTopicTimeline";
 import {
+  buildDeepLink,
   filterOperationsTopics,
   searchOperationsTopics,
 } from "@/features/content/operations/content-operations.mapping";
 import {
   OPERATIONS_PIPELINE_COLUMNS,
+  REVIEW_INBOX_GROUP_KEYS,
+  PUBLISH_INBOX_GROUP_KEYS,
   type ContentOperationsCommandCenter,
+  type OperationsCalendarView,
   type OperationsFilters,
+  type OperationsInboxTab,
+  type OperationsNamedView,
   type OperationsPipelineColumnKey,
   type OpsTopicCard,
+  type PublishInboxGroupKey,
+  type ReviewInboxGroupKey,
 } from "@/features/content/operations/content-operations.types";
 
-type MainView = "kanban" | "calendar";
+const MAIN_TABS: Array<{ key: OperationsInboxTab; label: string }> = [
+  { key: "kanban", label: "Kanban" },
+  { key: "calendar", label: "Lịch" },
+  { key: "review", label: "Kiểm duyệt" },
+  { key: "publish", label: "Xuất bản" },
+  { key: "refresh", label: "Làm mới" },
+];
+
+function isReviewGroupKey(v: string): v is ReviewInboxGroupKey {
+  return (REVIEW_INBOX_GROUP_KEYS as readonly string[]).includes(v);
+}
+
+function isPublishGroupKey(v: string): v is PublishInboxGroupKey {
+  return (PUBLISH_INBOX_GROUP_KEYS as readonly string[]).includes(v);
+}
+
+function isInboxTab(v: string): v is OperationsInboxTab {
+  return v === "kanban" || v === "calendar" || v === "review" || v === "publish" || v === "refresh";
+}
+
+function isCalendarView(v: string): v is OperationsCalendarView {
+  return v === "month" || v === "week" || v === "agenda";
+}
 
 function Section({
   id,
@@ -72,10 +111,33 @@ function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/** Reads a shallow query-string snapshot without pulling in next/navigation (avoids a Suspense boundary requirement for a client-only, no-SSR-data page). */
+function readDeepLinkQuery(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const params = new URLSearchParams(window.location.search);
+  const out: Record<string, string> = {};
+  params.forEach((value, key) => {
+    out[key] = value;
+  });
+  return out;
+}
+
+function writeDeepLinkQuery(query: Record<string, string>): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.search = "";
+  for (const [key, value] of Object.entries(query)) {
+    if (value) url.searchParams.set(key, value);
+  }
+  window.history.replaceState(null, "", url.toString());
+}
+
 /**
- * Read-only operational cockpit — no workflow mutations. Single fetch of the
- * bounded summary payload; all filtering/search/kanban grouping below is
- * client-side over the already-fetched `topics` array.
+ * Read-only operational cockpit — no workflow mutations. The command-center
+ * summary is fetched once for kanban/health/pipeline; the review, publish,
+ * refresh, and calendar tabs each lazily fetch their own bounded endpoint
+ * only when opened (Sprint 17.1), so opening this page never re-triggers the
+ * summary fetch and each inbox loads independently.
  */
 export default function ContentOperationsClient() {
   const toast = useAdminToast();
@@ -84,7 +146,11 @@ export default function ContentOperationsClient() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<OperationsFilters>({});
   const [search, setSearch] = useState("");
-  const [mainView, setMainView] = useState<MainView>("kanban");
+  const [mainView, setMainView] = useState<OperationsInboxTab>("kanban");
+  const [reviewGroup, setReviewGroup] = useState<ReviewInboxGroupKey | null>(null);
+  const [publishGroup, setPublishGroup] = useState<PublishInboxGroupKey | null>(null);
+  const [calendarView, setCalendarView] = useState<OperationsCalendarView | undefined>(undefined);
+  const [timelineTopicId, setTimelineTopicId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,6 +172,22 @@ export default function ContentOperationsClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Deep-link intake — runs once on mount: `?inbox=review|publish|refresh|calendar|kanban&group=...&filter=...&view=...`.
+  useEffect(() => {
+    const query = readDeepLinkQuery();
+    if (query.inbox && isInboxTab(query.inbox)) setMainView(query.inbox);
+    if (query.group) {
+      if (isReviewGroupKey(query.group)) setReviewGroup(query.group);
+      if (isPublishGroupKey(query.group)) setPublishGroup(query.group);
+    }
+    if (query.view && isCalendarView(query.view)) setCalendarView(query.view);
+    if (query.filter) {
+      const key = query.filter as keyof OperationsFilters;
+      setFilters((prev) => ({ ...prev, [key]: true }) as OperationsFilters);
+      if (!query.inbox) setMainView("kanban");
+    }
+  }, []);
 
   const cards: OpsTopicCard[] = useMemo(() => summary?.topics ?? [], [summary]);
 
@@ -143,13 +225,31 @@ export default function ContentOperationsClient() {
     return flagKeys.find((key) => filters[key]) ?? null;
   }, [filters]);
 
+  /** Health metrics are deep-link keys under the hood — clicking one both applies the facet filter and updates the shareable URL. */
   const handleHealthSelect = (hrefFilter: string) => {
     const key = hrefFilter as keyof OperationsFilters;
+    const turningOn = !filters[key];
     setFilters((prev) => ({ ...prev, [key]: prev[key] ? undefined : true }) as OperationsFilters);
+    setMainView("kanban");
+    const deepLink = buildDeepLink(hrefFilter);
+    writeDeepLinkQuery(turningOn ? deepLink.query : {});
   };
 
   const handlePipelineSelect = (column: OperationsPipelineColumnKey | undefined) => {
     setFilters((prev) => ({ ...prev, pipelineColumn: column }));
+  };
+
+  const handleApplyNamedView = (view: OperationsNamedView) => {
+    setMainView(view.inbox);
+    setFilters(view.filters);
+    setReviewGroup(view.group && isReviewGroupKey(view.group) ? view.group : null);
+    setPublishGroup(view.group && isPublishGroupKey(view.group) ? view.group : null);
+    writeDeepLinkQuery({ inbox: view.inbox, ...(view.group ? { group: view.group } : {}) });
+  };
+
+  const handleMainTabChange = (tab: OperationsInboxTab) => {
+    setMainView(tab);
+    writeDeepLinkQuery({ inbox: tab });
   };
 
   const scrollTo = (id: string) => {
@@ -213,6 +313,8 @@ export default function ContentOperationsClient() {
           </div>
         </div>
 
+        <OperationsNamedViews currentInbox={mainView} currentFilters={filters} currentGroup={reviewGroup ?? publishGroup} onApply={handleApplyNamedView} />
+
         <OperationsFilterBar filters={filters} onChange={setFilters} filtersMeta={summary.filtersMeta} />
 
         <OperationsPipeline
@@ -224,22 +326,24 @@ export default function ContentOperationsClient() {
         <div className={styles.mainGrid}>
           <div>
             <div className={styles.mainTabs}>
-              <button
-                type="button"
-                className={mainView === "kanban" ? "admin-btn admin-btn--primary admin-btn--small" : "admin-btn admin-btn--secondary admin-btn--small"}
-                onClick={() => setMainView("kanban")}
-              >
-                Kanban
-              </button>
-              <button
-                type="button"
-                className={mainView === "calendar" ? "admin-btn admin-btn--primary admin-btn--small" : "admin-btn admin-btn--secondary admin-btn--small"}
-                onClick={() => setMainView("calendar")}
-              >
-                Lịch
-              </button>
+              {MAIN_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={mainView === tab.key ? "admin-btn admin-btn--primary admin-btn--small" : "admin-btn admin-btn--secondary admin-btn--small"}
+                  onClick={() => handleMainTabChange(tab.key)}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            {mainView === "kanban" ? <OperationsKanban kanban={kanban} /> : <OperationsCalendar topics={filtered} />}
+            {mainView === "kanban" ? <OperationsKanban kanban={kanban} /> : null}
+            {mainView === "calendar" ? <OperationsCalendar initialView={calendarView} /> : null}
+            {mainView === "review" ? (
+              <OperationsReviewInbox initialGroup={reviewGroup} onOpenTimeline={setTimelineTopicId} searchQuery={search} />
+            ) : null}
+            {mainView === "publish" ? <OperationsPublishInbox initialGroup={publishGroup} searchQuery={search} /> : null}
+            {mainView === "refresh" ? <OperationsRefreshInbox searchQuery={search} /> : null}
           </div>
 
           <OperationsRightRail
@@ -264,6 +368,22 @@ export default function ContentOperationsClient() {
           <OperationsOwners owners={summary.owners} />
         </Section>
 
+        <Section id="ops-editor-load" title="Tải công việc biên tập" defaultOpen={false}>
+          <OperationsEditorLoad topics={cards} />
+        </Section>
+
+        <Section id="ops-reviewer-workload" title="Tải trọng người duyệt" defaultOpen={false}>
+          <OperationsReviewerWorkload />
+        </Section>
+
+        <Section id="ops-publish-ops" title="Thống kê xuất bản" defaultOpen={false}>
+          <OperationsPublishOps />
+        </Section>
+
+        <Section id="ops-refresh-campaigns" title="Chiến dịch cần làm mới" defaultOpen={false}>
+          <OperationsRefreshCampaigns />
+        </Section>
+
         <Section id="ops-campaigns" title="Theo chiến dịch">
           <OperationsCampaigns campaigns={summary.campaigns} />
         </Section>
@@ -272,11 +392,11 @@ export default function ContentOperationsClient() {
           <OperationsClusters clusters={summary.clusters} />
         </Section>
 
-        <Section id="ops-review" title="Kiểm duyệt" defaultOpen={false}>
+        <Section id="ops-review" title="Kiểm duyệt (tóm tắt)" defaultOpen={false}>
           <OperationsReviewQueue summary={summary.reviewQueue} />
         </Section>
 
-        <Section id="ops-publish" title="Xuất bản" defaultOpen={false}>
+        <Section id="ops-publish" title="Xuất bản (tóm tắt)" defaultOpen={false}>
           <OperationsPublishQueue summary={summary.publishQueue} />
         </Section>
 
@@ -292,6 +412,8 @@ export default function ContentOperationsClient() {
           <OperationsKnowledgeCoverage summary={summary.knowledgeCoverage} />
         </Section>
       </div>
+
+      <OperationsTopicTimeline topicId={timelineTopicId} onClose={() => setTimelineTopicId(null)} />
     </>
   );
 }

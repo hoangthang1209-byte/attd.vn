@@ -55,6 +55,12 @@ export type OperationsTopicInput = {
    * no draft exists yet or the join was skipped. Never inferred.
    */
   qaFailed: boolean | null;
+  /**
+   * Accepted + implemented internal links touching this topic. Optional —
+   * only populated by queries that join it (e.g. the refresh inbox); other
+   * callers leave it undefined and it is simply treated as unknown.
+   */
+  internalLinkCount?: number | null;
 };
 
 export type OpsTopicCardFlags = {
@@ -225,6 +231,193 @@ export type FiltersMeta = {
   owners: string[];
   campaigns: Array<{ id: string; name: string }>;
   clusters: Array<{ id: string; name: string }>;
+};
+
+// ---------------------------------------------------------------------------
+// Sprint 17.1 — Operational Queues & Audit Foundation.
+//
+// Still pure display types only. Every new shape below is a read-only view
+// model derived from existing governed tables (ContentReviewDecision,
+// ContentPublishEvent, ContentHandoffRecord, AiGenerationRun,
+// WritingGenerationRun, WritingDraftVersion, SeoTopic) — no new event-log
+// table, no migration.
+// ---------------------------------------------------------------------------
+
+export type OpsActivityKind =
+  | "DRAFT_CREATED"
+  | "DRAFT_UPDATED"
+  | "REVIEW_STARTED"
+  | "REVIEW_DECISION"
+  | "HANDOFF"
+  | "PUBLISHED"
+  | "PUBLISH_FAILED"
+  | "SCHEDULED"
+  | "GENERATION"
+  | "REFRESH_SUGGESTED"
+  | "MEDIA_UPDATED"
+  | "TOPIC_UPDATED";
+
+/** Normalized, read-only audit/activity event derived from an existing governed row. */
+export type OpsActivityEvent = {
+  id: string;
+  at: string;
+  kind: OpsActivityKind;
+  actorId: string | null;
+  topicId: string | null;
+  entityType: string;
+  entityId: string;
+  href: string | null;
+  text: string;
+  sourceTable: string;
+};
+
+export type QueueHealth = {
+  total: number;
+  blocked: number;
+  overdue: number;
+  waiting: number;
+  completedToday: number;
+};
+
+export type ReviewInboxItem = {
+  id: string;
+  status: string;
+  topicId: string | null;
+  topicTitle: string | null;
+  blockingIssues: number;
+  assignedReviewerId: string | null;
+  updatedAt: string;
+  startedAt: string | null;
+  createdAt: string;
+  readyForHandoff: boolean;
+  priority: SeoTopicPriority | null;
+  owner: string | null;
+  campaign: string | null;
+  cluster: string | null;
+  qaScore: number | null;
+  /** Days since the review started (or was created, when never started). */
+  waitingDays: number;
+};
+
+export const REVIEW_INBOX_GROUP_KEYS = [
+  "high_priority",
+  "waiting_today",
+  "overdue",
+  "recently_submitted",
+] as const;
+export type ReviewInboxGroupKey = (typeof REVIEW_INBOX_GROUP_KEYS)[number];
+export type ReviewInboxGroups = Record<ReviewInboxGroupKey, ReviewInboxItem[]>;
+
+/** Inbox groups are additive triage buckets (an item may appear in more than one), not a partition. */
+export type ReviewInbox = {
+  groups: ReviewInboxGroups;
+  items: ReviewInboxItem[];
+  health: QueueHealth;
+};
+
+export type PublishInboxItem = {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+  scheduledAt: string | null;
+  publishedAt: string | null;
+  updatedAt: string;
+  errorMessage: string | null;
+  /** Content changed after governed handoff — needs editorial re-confirmation before publish. */
+  modified: boolean;
+};
+
+export const PUBLISH_INBOX_GROUP_KEYS = [
+  "ready_today",
+  "scheduled",
+  "failed",
+  "waiting",
+  "published_today",
+] as const;
+export type PublishInboxGroupKey = (typeof PUBLISH_INBOX_GROUP_KEYS)[number];
+export type PublishInboxGroups = Record<PublishInboxGroupKey, PublishInboxItem[]>;
+
+export type PublishInbox = {
+  groups: PublishInboxGroups;
+};
+
+export type RefreshReasonKey =
+  | "outdated"
+  | "missing_cta"
+  | "missing_faq"
+  | "missing_hero"
+  | "missing_links"
+  | "missing_images"
+  | "low_seo";
+
+export type RefreshInboxCard = OpsTopicCard & {
+  reasons: RefreshReasonKey[];
+  severity: number;
+  ageDays: number | null;
+};
+
+export type RefreshInbox = {
+  items: RefreshInboxCard[];
+};
+
+export type ReviewerWorkload = {
+  reviewerId: string;
+  total: number;
+  inReviewCount: number;
+  changesRequestedCount: number;
+  approvedCount: number;
+  blockingIssuesTotal: number;
+};
+
+export type PublishOpsStats = {
+  readyCount: number;
+  scheduledCount: number;
+  failedCount: number;
+  publishedTodayCount: number;
+  waitingCount: number;
+};
+
+export type RefreshCampaign = {
+  campaignId: string;
+  campaign: string;
+  total: number;
+  reasonCounts: Partial<Record<RefreshReasonKey, number>>;
+};
+
+export type EditorWorkload = {
+  owner: string;
+  draftingCount: number;
+  reviewCount: number;
+  overdueCount: number;
+  total: number;
+};
+
+export type OperationsCalendarView = "month" | "week" | "agenda";
+
+export type OperationsCalendarRangeResult = {
+  from: string;
+  to: string;
+  view: OperationsCalendarView;
+  topics: OpsTopicCard[];
+  total: number;
+  truncated: boolean;
+};
+
+export type OperationsInboxTab = "kanban" | "calendar" | "review" | "publish" | "refresh";
+
+/** Named view over inbox tab + facet filters, persisted client-side only. */
+export type OperationsNamedView = {
+  id: string;
+  name: string;
+  inbox: OperationsInboxTab;
+  filters: OperationsFilters;
+  group?: string | null;
+};
+
+export type OperationsDeepLink = {
+  path: string;
+  query: Record<string, string>;
 };
 
 /** Top-level, read-only payload served by GET /api/content/operations/summary. */

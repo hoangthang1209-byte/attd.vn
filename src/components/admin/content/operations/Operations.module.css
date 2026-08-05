@@ -558,3 +558,215 @@
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px;
 }
+
+/* ── Sprint 17.1 — Dense operational inboxes ─────────────────────────── */
+
+.queueHealthStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.queueHealthItem {
+  flex: 1 1 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-right: 1px solid #f1f5f9;
+}
+
+.queueHealthItem:last-child {
+  border-right: none;
+}
+
+.queueHealthValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.queueHealthLabel {
+  font-size: 10.5px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.queueHealthItemDanger .queueHealthValue {
+  color: #b91c1c;
+}
+
+.queueHealthItemWarn .queueHealthValue {
+  color: #c2410c;
+}
+
+.inboxGroupTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.inboxGroupHeading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.inboxGroupCount {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 999px;
+  padding: 1px 7px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.inboxList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inboxRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+}
+
+.inboxRowMain {
+  flex: 2 1 220px;
+  min-width: 0;
+}
+
+.inboxRowTitle {
+  font-weight: 600;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inboxRowMeta {
+  margin-top: 2px;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.inboxRowError {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #b91c1c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inboxRowStat {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 64px;
+  color: #334155;
+}
+
+.inboxRowStatLabel {
+  font-size: 9.5px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.inboxRowActions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+@media (max-width: 900px) {
+  .inboxRow {
+    flex-wrap: wrap;
+  }
+  .inboxRowActions {
+    margin-left: 0;
+  }
+}
+
+/* ── Topic timeline drawer ───────────────────────────────────────────── */
+
+.timelinePanelOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 60;
+}
+
+.timelinePanel {
+  width: min(420px, 100%);
+  height: 100%;
+  background: #fff;
+  box-shadow: -8px 0 24px rgba(15, 23, 42, 0.12);
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timelinePanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.timelineList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.timelineItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 2px solid #e2e8f0;
+}
+
+.timelineTime {
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
+.timelineText {
+  font-size: 12.5px;
+  color: #0f172a;
+}
