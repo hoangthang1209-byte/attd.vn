@@ -82,117 +82,115 @@ const content: Record<string, WholesaleContent> = {
   // Focus: inventory, stock availability, warehouse
   // ───────────────────────────────────────────────────────────────────────────
   "kho-ao-thun-tron": {
-    seoTitle: "Kho Áo Thun Trơn Số Lượng Lớn | Tồn Kho Sẵn Sàng | ATTD",
+    seoTitle: "Kho áo thun trơn sẵn kho | Nguồn hàng áo trơn B2B | ATTD.vn",
     metaDescription:
-      "Kho áo thun trơn ATTD — tồn kho lớn, hàng chục màu sắc, đủ size S-4XL, giao hàng nhanh toàn quốc. Nguồn hàng ổn định cho đại lý, xưởng in và doanh nghiệp.",
-    h1: "Kho Áo Thun Trơn Số Lượng Lớn",
+      "Kho áo thun trơn ATTD cho xưởng in, đại lý và agency. Kiểm tra danh mục thực tế, đối chiếu màu/size và nhận báo giá theo tồn kho tại thời điểm yêu cầu.",
+    h1: "Kho áo thun trơn sẵn kho",
     heroIntro:
-      "ATTD duy trì kho áo thun trơn lớn với tồn kho thường trực — hàng chục màu sắc, đầy đủ size S-4XL, sẵn sàng xuất hàng ngay khi nhận đơn. Giải pháp nguồn hàng ổn định cho đại lý, xưởng in và doanh nghiệp trên toàn quốc.",
-    intro: `<p>Bài toán khó nhất của xưởng in và đại lý không phải là thiếu đơn hàng — mà là <strong>thiếu hàng trơn khi có đơn</strong>. Khi khách đặt gấp, khi sự kiện sắp đến, khi mùa cao điểm bùng nổ — việc không tìm được nguồn có đủ hàng đúng màu đúng size có thể khiến bạn mất đơn, mất khách và mất uy tín. Đây chính là vấn đề mà kho áo thun trơn ATTD được xây dựng để giải quyết.</p>
+      "ATTD vận hành nguồn áo thun trơn theo hướng hàng sẵn kho: bạn xem catalogue thật, gửi nhu cầu màu/size, rồi nhận tư vấn và báo giá theo tồn kho hiện có — không cam kết số liệu cố định trên trang.",
+    intro: `<p>Xưởng in và đại lý thường gặp đúng một vấn đề: <strong>thiếu áo thun trơn đúng màu/size khi đơn đến</strong>. Trang kho này giúp bạn hiểu cách ATTD tổ chức nguồn hàng áo trơn sẵn kho — tập trung vào kiểm tra catalogue, lấy mẫu khi cần, và tái nhập màu core — thay vì hứa số ngày giao hay số màu cố định.</p>
 
-<p>ATTD duy trì <strong>kho áo thun trơn thường trực</strong> với số lượng lớn cho từng màu cơ bản — trắng, đen, xám, navy, đỏ, xanh royal và nhiều màu trendng theo mùa. Mỗi màu đều có sẵn đủ dải size từ S đến 4XL, không phải chờ sản xuất hay chờ nhập hàng. Điều này giúp đối tác của ATTD có thể nhận đơn mà không cần lo về tồn kho phía sau.</p>
+<p>Hàng trong kho được phản ánh qua <a href="/ao-thun-tron">danh mục áo thun trơn</a> và các dòng sản phẩm đang ACTIVE. Tồn kho thay đổi theo đơn; vì vậy ATTD gửi bảng tồn/báo giá theo thời điểm bạn hỏi, không niêm yết “luôn đủ mọi màu/size” trên landing.</p>
 
-<p>Kho hàng ATTD được quản lý theo hệ thống FIFO (first in, first out) nghiêm ngặt — đảm bảo tính đồng đều về màu sắc trong từng lô hàng. Mỗi khi lô mới nhập về, đội ngũ QC kiểm tra màu vải, trọng lượng gsm và form dáng trước khi đưa vào kệ. Đây là quy trình đảm bảo rằng bạn không bao giờ nhận được hàng chênh màu giữa các chiếc trong cùng một đơn hàng.</p>
+<p>Khi nhập từ kho, ưu tiên màu core (trắng, đen, xám, navy…) và size curve dựa trên lịch sử đơn của bạn. Màu campaign chỉ nên ôm khi đã có brief. Xem thêm hub thương mại <a href="/ao-thun-tron-si">áo thun trơn sỉ</a> nếu bạn đang so sánh góc mua sỉ.</p>
 
-<p>Bên cạnh kho tồn thường xuyên, ATTD cũng vận hành hệ thống <strong>dự báo tồn kho theo mùa</strong> — tăng dự trữ trước Tết, mùa hội nghị cuối năm và các dịp cao điểm như khai trường. Đối tác thường xuyên có thể đăng ký thông báo tồn kho ưu tiên — nhận thông tin sớm khi màu sắp hết để kịp thời đặt hàng trước mùa cao điểm.</p>`,
+<p>Điều kiện MOQ, lịch giao và phí vận chuyển phụ thuộc sản phẩm, số lượng và địa chỉ nhận — trao đổi qua <a href="/lien-he">yêu cầu báo giá</a>.</p>`,
     suitableCustomers: [
       {
-        title: "Xưởng in và in ấn",
+        title: "Xưởng in",
         description:
-          "Xưởng in cần nguồn hàng trơn ổn định để nhận đơn liên tục mà không lo đứt hàng. Kho ATTD đảm bảo bạn luôn có áo thun trơn đúng màu, đúng size ngay khi cần — không chờ sản xuất, không chờ nhập hàng từ xa.",
+          "Cần nguồn áo thun trơn để nhận đơn in; ưu tiên màu/size core tái nhập được và mẫu thử trước khi đổ vốn.",
       },
       {
         title: "Đại lý đồng phục",
         description:
-          "Đại lý đồng phục cần tồn kho đệm để đáp ứng đơn gấp. Với kho hàng lớn của ATTD và giao hàng 2-3 ngày làm việc, đại lý có thể nhận đơn khách tự tin mà không cần duy trì kho hàng cồng kềnh của riêng mình.",
+          "Nhập đệm kho hoặc giao thẳng theo đơn khách; cần catalogue rõ và hỗ trợ tái đơn theo màu đã bán.",
       },
       {
-        title: "Xưởng thêu vi tính",
+        title: "Xưởng thêu",
         description:
-          "Thêu vi tính đòi hỏi vải mịn, bề mặt đều và màu sắc chuẩn để đường thêu không bị nhấp nhô. Áo thun trơn trong kho ATTD đáp ứng đầy đủ tiêu chí này với chất liệu cotton cao cấp được kiểm định trước khi nhập kho.",
+          "Cần phôi trơn ổn định mặt vải/cổ áo để thêu logo; nên lấy mẫu thêu trên đúng dòng sẽ nhập.",
       },
       {
-        title: "Công ty quảng cáo và agency",
+        title: "Agency & shop in",
         description:
-          "Agency thường có deadline ngặt nghèo từ phía khách hàng. Kho hàng sẵn sàng của ATTD giúp agency đáp ứng đơn sự kiện, activation và roadshow mà không cần lo về thời gian sản xuất hàng mới.",
+          "Nhiều brief ngắn hạn: cần linh hoạt màu theo campaign và báo giá theo từng dự án.",
       },
       {
-        title: "Local brand và thương hiệu thời trang",
+        title: "Local brand",
         description:
-          "Brand nhỏ cần nguồn áo trơn để tạo BST theo mùa mà không muốn bỏ vốn sản xuất lớn. Kho ATTD cho phép local brand mua số lượng vừa phải, thử phản ứng thị trường rồi tái đặt nhanh khi bán chạy.",
+          "Dùng hàng sẵn để ra drop nhanh; chuyển OEM khi cần tem/nhãn hoặc form riêng.",
       },
       {
-        title: "Doanh nghiệp cần đồng phục gấp",
+        title: "Doanh nghiệp mua số lượng lớn",
         description:
-          "Khai trương, sự kiện nội bộ, tuyển dụng lớn — doanh nghiệp cần đồng phục nhanh trong 3-5 ngày. Kho hàng sẵn ATTD đáp ứng đơn gấp mà không cần chờ sản xuất, đảm bảo có hàng đúng thời điểm cần.",
+          "Đồng phục hoặc quà tặng nội bộ — cần tư vấn chất liệu, size curve và lộ trình lấy mẫu trước khi chốt.",
       },
     ],
     whyAttd: [
       {
-        title: "Tồn kho lớn, giao nhanh",
+        title: "Catalogue gắn với hàng thực",
         description:
-          "Hàng tồn kho thường trực cho tất cả màu cơ bản và size S-4XL. Đơn hàng dưới 200 chiếc giao trong 2-3 ngày làm việc, không cần chờ sản xuất. Kho dự trữ được tăng cường trước mùa cao điểm để không bao giờ hết hàng đúng lúc bạn cần nhất.",
+          "Bạn đối chiếu sản phẩm/category đang vận hành trước khi yêu cầu báo giá — giảm rủi ro “có ảnh nhưng không có hàng”.",
       },
       {
-        title: "Màu sắc đồng nhất theo lô",
+        title: "Tư vấn theo mục đích in-thêu",
         description:
-          "Quy trình QC nghiêm ngặt đảm bảo không có chênh màu trong từng đơn hàng. Hệ thống quản lý lô hàng FIFO giúp đối tác tái đặt hàng bổ sung luôn nhận được màu khớp hoàn toàn với đơn trước — quan trọng cho xưởng in và đồng phục.",
+          "Regular/oversize, cotton/CVC/polyester — chọn theo kỹ thuật trang trí và khách cuối, không chỉ theo giá.",
       },
       {
-        title: "Đa dạng màu sắc và size",
+        title: "Báo giá theo tồn kho thời điểm",
         description:
-          "Hàng chục màu sắc từ basic trắng, đen, xám đến seasonal tone. Đủ dải size S-4XL trong kho — không cần đặt riêng size đặc biệt và chờ nhập hàng. Danh mục màu được cập nhật theo xu hướng mỗi quý.",
+          "Không công bố MOQ hay lead time cố định trên trang. Điều kiện thương mại đi kèm báo giá/CRM.",
       },
       {
-        title: "Ưu tiên kho cho đối tác thường xuyên",
+        title: "Kết nối sang sỉ / đại lý / OEM",
         description:
-          "Đối tác đặt hàng định kỳ được ưu tiên thông báo tồn kho sớm trước mùa cao điểm. Hệ thống đặt trước (pre-order) giúp bạn đảm bảo có hàng đúng màu đúng số lượng ngay cả khi thị trường đang khan hàng.",
+          "Cùng hệ thống nguồn hàng: bắt đầu từ kho áo trơn, mở rộng kênh đại lý hoặc OEM khi brief yêu cầu.",
       },
     ],
     process: standardProcess,
     faq: [
       {
-        question: "Kho ATTD có bao nhiêu màu áo thun trơn luôn có sẵn?",
+        question: "Làm sao biết màu/size nào đang có trong kho?",
         answer:
-          "ATTD duy trì kho thường trực cho khoảng 20-25 màu cơ bản và seasonal, bao gồm trắng, đen, xám nhạt, xám đậm, navy, xanh royal, đỏ, cam, vàng, xanh lá, hồng pastel và nhiều màu khác. Danh sách màu chính xác và số lượng tồn kho theo từng size được cập nhật trong báo giá — liên hệ ATTD để nhận bảng tồn kho mới nhất.",
+          "Gửi nhu cầu qua form liên hệ hoặc xem danh mục sản phẩm trước. ATTD phản hồi theo tồn kho tại thời điểm báo giá — không niêm yết bảng tồn công khai cố định trên trang này.",
       },
       {
-        question:
-          "Đặt hàng kho ATTD có thể giao trong bao nhiêu ngày làm việc?",
+        question: "Thời gian giao hàng từ kho là bao lâu?",
         answer:
-          "Đơn hàng áo trơn (không in ấn) dưới 200 chiếc: 2-3 ngày làm việc. Đơn 200-500 chiếc: 3-5 ngày. Đơn trên 500 chiếc: lên kế hoạch giao hàng cụ thể khi xác nhận đơn. Thời gian trên tính từ lúc xác nhận đơn và đặt cọc.",
+          "Phụ thuộc sản phẩm còn hàng, số lượng, địa chỉ nhận và lịch điều phối. Thời gian cụ thể được xác nhận khi báo giá — không cam kết số ngày cố định trên landing.",
       },
       {
-        question: "Khi màu sắc mình cần đang tạm hết kho, ATTD có thể làm gì?",
+        question: "Nếu màu cần tạm hết thì sao?",
         answer:
-          "ATTD sẽ thông báo ngay khi màu cần thiết sắp về kho — thường trong vòng 5-10 ngày làm việc. Bạn có thể đặt trước (pre-order) để được ưu tiên trong lô hàng kế tiếp. Ngoài ra, ATTD tư vấn màu tương đồng có sẵn nếu deadline gấp và bạn cần giải pháp thay thế ngay.",
+          "ATTD có thể gợi ý màu tương đương đang có, hoặc trao đổi phương án chờ nhập/tái cung ứng tùy từng dòng. Không nên mặc định mọi màu luôn sẵn.",
       },
       {
-        question:
-          "ATTD có hỗ trợ đặt hàng nhiều màu khác nhau trong cùng một đơn không?",
+        question: "Có đặt nhiều màu trong một đơn được không?",
         answer:
-          "Có. Đơn đa màu rất phổ biến tại ATTD — bạn chỉ cần cung cấp bảng phân bổ số lượng theo màu và size. ATTD đóng gói và xuất kho theo từng màu riêng hoặc trộn theo yêu cầu. MOQ cho mỗi màu tối thiểu 30 chiếc.",
+          "Được, nếu phân bổ màu/size rõ. Điều kiện theo từng màu phụ thuộc tồn kho và chính sách báo giá của đơn.",
       },
       {
-        question:
-          "Có thể tái đặt hàng bổ sung sau 3-6 tháng với màu giống hệt lô cũ không?",
+        question: "Có lấy mẫu trước khi nhập số lượng lớn không?",
         answer:
-          "Có. ATTD lưu thông tin lô hàng và mã màu cho từng đối tác. Khi cần bổ sung, chỉ cần cung cấp mã đơn hàng trước để ATTD tìm đúng lô màu tương đương — đảm bảo không chênh màu giữa đơn cũ và mới. Tính năng này đặc biệt quan trọng cho xưởng in có đơn tái tục.",
+          "Nên lấy mẫu để kiểm form, cảm giác vải và thử in/thêu. Điều kiện mẫu trao đổi theo dòng sản phẩm.",
       },
       {
-        question:
-          "Giá mua từ kho ATTD có bao gồm phí vận chuyển không?",
+        question: "Giá kho có gồm vận chuyển không?",
         answer:
-          "Giá báo cho hàng tại kho (ex-warehouse). Phí vận chuyển tính riêng theo trọng lượng đơn hàng và địa điểm giao hàng. Đơn từ 300 chiếc trở lên được hỗ trợ một phần phí vận chuyển. Đơn hàng định kỳ theo hợp đồng được đàm phán chi phí logistics riêng.",
+          "Báo giá nêu rõ phạm vi (hàng tại kho hay đã gồm vận chuyển). Phí giao nhận được tính theo địa điểm và quy mô đơn khi chốt.",
       },
     ],
-    ctaTitle: "Cần kiểm tra tồn kho áo thun trơn?",
+    ctaTitle: "Cần kiểm tra kho áo thun trơn?",
     ctaDescription:
-      "Liên hệ ATTD để nhận bảng tồn kho hiện tại, báo giá sỉ và đặt hàng ngay hôm nay. Hàng có sẵn kho, giao hàng toàn quốc trong 2-5 ngày làm việc.",
+      "Gửi màu/size và mục đích in-thêu — ATTD đối chiếu tồn kho và gửi báo giá phù hợp xưởng in, đại lý hoặc agency.",
+    primaryCta: { label: "Yêu cầu báo giá", href: "/lien-he" },
+    secondaryCta: { label: "Tìm nguồn hàng", href: "/ao-thun-tron-si" },
     internalLinks: [
       { label: "Áo thun trơn sỉ", href: "/ao-thun-tron-si" },
       { label: "Nguồn hàng áo thun trơn", href: "/nguon-hang-ao-thun-tron" },
-      { label: "Kho áo polo trơn", href: "/kho-ao-polo-tron" },
+      { label: "Danh mục áo thun trơn", href: "/ao-thun-tron" },
     ],
   },
 
@@ -321,117 +319,115 @@ const content: Record<string, WholesaleContent> = {
   // Focus: supply chain, reliability for print shops, B2B sourcing
   // ───────────────────────────────────────────────────────────────────────────
   "nguon-hang-ao-thun-tron": {
-    seoTitle:
-      "Nguồn Hàng Áo Thun Trơn Cho Xưởng In Và Đại Lý | ATTD",
+    seoTitle: "Nguồn hàng áo thun trơn cho xưởng in & đại lý | ATTD.vn",
     metaDescription:
-      "Nguồn hàng áo thun trơn B2B ổn định — nhà cung cấp trực tiếp, chất liệu chuẩn cho in thêu, tồn kho sẵn sàng, giao hàng toàn quốc. Liên hệ ATTD ngay.",
-    h1: "Nguồn Hàng Áo Thun Trơn Cho Xưởng In Và Đại Lý",
+      "Nguồn hàng áo thun trơn B2B cho xưởng in, đại lý và agency. Tư vấn form, chất liệu, tương thích in-thêu và báo giá theo nhu cầu — không bịa MOQ hay lead time.",
+    h1: "Nguồn hàng áo thun trơn cho xưởng in và đại lý",
     heroIntro:
-      "Tìm được nguồn hàng áo thun trơn ổn định, chất lượng nhất quán và giá cạnh tranh là nền tảng quan trọng của mọi xưởng in và đại lý thành công. ATTD là nhà cung cấp B2B trực tiếp — không qua trung gian, đảm bảo chất lượng từ gốc đến tay bạn.",
-    intro: `<p>Một xưởng in hay đại lý đồng phục thành công phụ thuộc rất lớn vào chất lượng <strong>nguồn hàng áo thun trơn</strong> đầu vào. Áo thun không đạt chuẩn — vải nhăn, màu không đều, gsm không đủ — trực tiếp ảnh hưởng đến chất lượng thành phẩm in ấn và uy tín với khách hàng. Đây là lý do lựa chọn nhà cung cấp phù hợp là một trong những quyết định kinh doanh quan trọng nhất.</p>
+      "Chọn nguồn áo thun trơn ổn định quan trọng hơn so đơn giá thấp nhất. ATTD hỗ trợ xưởng in và đại lý đối chiếu catalogue, lấy mẫu và nhận báo giá theo nhu cầu thực tế.",
+    intro: `<p>Chất lượng <strong>nguồn hàng áo thun trơn</strong> quyết định phần lớn rủi ro của xưởng in: form lệch làm lệch vị trí in, màu không đều giữa hai lô, hoặc vải không chịu được kỹ thuật bạn đang bán. Trang này tập trung vào tiêu chí chọn nguồn — không thay hub mua sỉ <a href="/ao-thun-tron-si">áo thun trơn sỉ</a>.</p>
 
-<p>ATTD là <strong>nhà cung cấp nguồn hàng áo thun trơn B2B</strong> với định hướng phục vụ xưởng in, xưởng thêu và đại lý là ưu tiên hàng đầu. Chúng tôi làm việc trực tiếp với nhà máy sản xuất — không qua nhà phân phối trung gian — để đảm bảo giá tốt nhất và kiểm soát chất lượng chặt chẽ nhất. Mỗi lô hàng nhập về đều được QC về trọng lượng gsm, độ bền màu, form dáng và chất lượng may trước khi vào kho.</p>
+<p>ATTD định vị là nguồn hàng áo trơn B2B gắn với catalogue sản phẩm đang ACTIVE. Bạn nên bắt đầu từ nhu cầu in/thêu và khách cuối, rồi mới chọn form và chất liệu. Các bài hướng dẫn trong cụm R1 giải thích góc xưởng in, chất liệu và form regular/oversize.</p>
 
-<p>Điều quan trọng nhất khi chọn nguồn hàng cho xưởng in là <strong>tính ổn định màu theo lô</strong>. Nếu màu vải thay đổi giữa các lô, đơn hàng in tiếp theo không thể match với đơn hàng tái tục — gây ra vấn đề về màu sắc thành phẩm, khiếu nại từ khách và lãng phí công in. ATTD giải quyết vấn đề này bằng cách kiểm soát kenh sản xuất riêng và lưu mẫu màu chuẩn cho từng SKU để đảm bảo tính nhất quán tuyệt đối.</p>
+<p>ATTD không công bố trên trang này các cam kết số học về MOQ, chiết khấu, tỷ lệ chênh màu hay lịch nhập cố định. Mọi điều kiện thương mại đi kèm báo giá sau khi xác nhận sản phẩm và số lượng.</p>
 
-<p>Ngoài áo thun trơn, ATTD cũng cung cấp <strong>áo polo trơn, nón, tote và bình giữ nhiệt</strong> — giúp xưởng in và đại lý có thể đơn giản hóa chuỗi cung ứng bằng cách làm việc với một đối tác thay vì phân tán nhiều nhà cung cấp khác nhau. Quản lý ít đối tác hơn, quy trình đặt hàng đơn giản hơn và dịch vụ tốt hơn — đây là mô hình cung ứng tối ưu cho doanh nghiệp vừa và nhỏ.</p>`,
+<p>Nếu bạn cần kiểm tra hướng hàng sẵn kho, xem thêm <a href="/kho-ao-thun-tron">kho áo thun trơn</a> và <a href="/ao-thun-tron">danh mục áo thun trơn</a>.</p>`,
     suitableCustomers: [
       {
-        title: "Xưởng in lụa và in kỹ thuật số",
+        title: "Xưởng in lụa / DTF",
         description:
-          "Nguồn hàng áo thun trơn ATTD được thiết kế đặc biệt cho xưởng in — bề mặt vải phẳng mịn nhận mực tốt, màu sắc ổn định giữa các lô, form dáng chuẩn đảm bảo vị trí in nhất quán trên từng chiếc áo.",
+          "Cần phôi trơn phù hợp mặt in, ổn định form và tái nhập màu core để nhận đơn liên tục.",
       },
       {
-        title: "Xưởng thêu vi tính",
+        title: "Xưởng thêu",
         description:
-          "Chất liệu cotton mịn của ATTD phù hợp cho thêu vi tính mật độ cao. Vải không bị nhăn, căng đều trên khung thêu — đảm bảo đường thêu sắc nét và bám chắc không bị nhấp nhô. Phù hợp cả thêu flat và thêu 3D.",
+          "Cần cổ áo và thân vải đủ ổn định để thêu logo; nên thử thêu trên mẫu đúng dòng nhập.",
       },
       {
-        title: "Đại lý tìm nguồn hàng ổn định",
+        title: "Đại lý nguồn hàng",
         description:
-          "Đại lý cần nguồn hàng trơn để tự in/thêu hoặc bán lại cho xưởng con. ATTD là nhà cung cấp trực tiếp với giá tốt hơn so với mua qua trung gian, đồng thời đảm bảo chất lượng nhất quán cho uy tín của đại lý với khách hàng cuối.",
+          "Nhập để bán lại hoặc cung cấp cho xưởng con; ưu tiên catalogue rõ và hỗ trợ tái đơn.",
       },
       {
-        title: "Công ty quảng cáo và sản xuất merchandise",
+        title: "Agency merchandise",
         description:
-          "Agency và công ty merchandise cần nguồn hàng trơn chất lượng cao để sản xuất sản phẩm branded. ATTD cung cấp áo thun trơn phù hợp cho in in UV, in sublimation và các kỹ thuật in chuyên nghiệp khác.",
+          "Nhiều brief ngắn: cần linh hoạt màu/form theo campaign và báo giá theo dự án.",
       },
       {
-        title: "Nhà phân phối vùng và khu vực",
+        title: "Shop in áo",
         description:
-          "Nhà phân phối khu vực tìm nguồn hàng trực tiếp từ ATTD để phân phối lại cho xưởng in và đại lý trong vùng. Giá sỉ tốt từ nguồn trực tiếp giúp nhà phân phối duy trì biên lợi nhuận cạnh tranh.",
+          "Cần hàng trơn sẵn để nhận đơn lẻ/gấp; ưu tiên màu bán chạy và size curve thực tế.",
       },
       {
-        title: "Local brand mới tạo sản phẩm",
+        title: "Local brand",
         description:
-          "Brand mới tìm nguồn áo trơn chất lượng để tạo dòng sản phẩm đầu tiên. ATTD hỗ trợ brand với MOQ thấp, tư vấn chất liệu phù hợp với định vị thương hiệu và cung cấp mẫu thử trước khi đặt số lượng lớn.",
+          "Dùng hàng sẵn để ra mắt nhanh; chuyển OEM khi cần nhãn/form riêng.",
       },
     ],
     whyAttd: [
       {
-        title: "Nhà cung cấp trực tiếp, không qua trung gian",
+        title: "Góc nhìn sourcing cho người mua B2B",
         description:
-          "ATTD làm việc trực tiếp với nhà máy sản xuất — loại bỏ chi phí trung gian, đảm bảo bạn nhận được giá tốt nhất và thông tin về nguồn gốc, chất lượng vật liệu rõ ràng nhất. Không qua đại lý, không qua nhập khẩu, không qua trung gian.",
+          "Tư vấn theo kỹ thuật trang trí và phân khúc khách cuối — không chỉ đẩy một dòng “rẻ nhất”.",
       },
       {
-        title: "Chất liệu chuẩn hóa cho in ấn",
+        title: "Sản phẩm là nguồn sự thật",
         description:
-          "Áo thun trơn ATTD được chuẩn hóa về gsm, loại cotton, cách dệt và xử lý hoàn tất — tất cả đều nhằm tối ưu cho in ấn và thêu thùa. Không phải thử nghiệm mực in hay điều chỉnh thông số máy thêu khi đổi lô hàng.",
+          "Catalogue và tồn kho thực dẫn dắt báo giá. Landing không thay dữ liệu sản phẩm.",
       },
       {
-        title: "Màu sắc ổn định tuyệt đối",
+        title: "Mẫu trước khi đổ vốn",
         description:
-          "ATTD lưu mẫu màu chuẩn cho từng SKU và kiểm tra màu sắc theo lô. Tỷ lệ chênh màu giữa các lô dưới 1% — đảm bảo xưởng in không bao giờ gặp vấn đề màu sắc khi tái sản xuất đơn hàng có màu cụ thể.",
+          "Khuyến nghị lấy mẫu và thử in/thêu trước khi nhập màu chủ lực số lượng lớn.",
       },
       {
-        title: "Hỗ trợ kỹ thuật in ấn",
+        title: "Mở rộng khi brief đổi",
         description:
-          "Đội ngũ ATTD tư vấn kỹ thuật in phù hợp cho từng loại vải và từng kiểu thiết kế — giúp xưởng in tối ưu thông số in để đạt màu sắc và độ sắc nét tốt nhất, giảm hao phí mực và thời gian setup.",
+          "Từ áo trơn sẵn kho sang đại lý dài hạn hoặc OEM khi cần tem/nhãn và form riêng.",
       },
     ],
     process: standardProcess,
     faq: [
       {
-        question: "Áo thun trơn ATTD phù hợp với những kỹ thuật in nào?",
+        question: "Áo thun trơn ATTD phù hợp kỹ thuật in nào?",
         answer:
-          "Áo thun cotton của ATTD phù hợp cho tất cả kỹ thuật in phổ biến: in lụa (screen printing) cho đơn màu đồng nhất, in kỹ thuật số (DTG/DTF) cho thiết kế nhiều màu phức tạp, in chuyển nhiệt (heat transfer) cho đơn nhỏ và in UV cho chất lượng cao cấp. Mỗi kỹ thuật cho ra chất lượng thành phẩm khác nhau — ATTD tư vấn kỹ thuật phù hợp dựa trên yêu cầu cụ thể của bạn.",
+          "Tùy dòng vải và định lượng. In lụa, DTF, chuyển nhiệt hoặc thêu đều cần thử trên mẫu đúng sản phẩm sẽ nhập — không suy diễn từ tên chất liệu chung.",
       },
       {
-        question: "Gsm (trọng lượng vải) của áo thun trơn ATTD là bao nhiêu?",
+        question: "Gsm áo thun trơn ATTD là bao nhiêu?",
         answer:
-          "ATTD cung cấp áo thun ở 3 mức gsm: 160gsm (nhẹ, phù hợp sự kiện và mùa hè), 190gsm (cân bằng giữa chất lượng và giá, phổ biến nhất), và 220gsm (dày, bền, phù hợp đồng phục dài hạn). Mỗi mức gsm phù hợp với một phân khúc sử dụng và giá thành khác nhau.",
+          "Gsm theo từng sản phẩm trong catalogue (ví dụ các dòng cotton có ghi định lượng trên trang sản phẩm). Không có một “gsm chuẩn duy nhất” cho mọi SKU trên landing này.",
       },
       {
-        question:
-          "Làm thế nào để đảm bảo màu vải không thay đổi giữa các lô hàng?",
+        question: "Làm sao giảm rủi ro lệch màu giữa các lần nhập?",
         answer:
-          "ATTD lưu mẫu màu chuẩn (physical swatch) cho từng SKU và kiểm tra màu sắc của từng lô nhập về bằng cách so sánh trực tiếp với mẫu chuẩn. Nếu có chênh màu vượt ngưỡng chấp nhận, lô đó không được đưa vào kho. Tỷ lệ lô hàng bị từ chối vì chênh màu là dưới 3% — con số này minh chứng cho độ nghiêm ngặt của quy trình QC.",
+          "Giữ cùng mã sản phẩm, ghi nhận lô/màu đã dùng, và xác nhận tồn kho trước khi tái đơn. Khi đổi nhà cung cấp hoặc đổi mã vải, luôn lấy mẫu lại.",
       },
       {
-        question: "ATTD có cung cấp mẫu thử (sample) trước khi đặt hàng lớn không?",
+        question: "Có hỗ trợ mẫu trước khi đặt lớn không?",
         answer:
-          "Có. Khách hàng mới có thể yêu cầu mẫu thử (1-3 chiếc) để kiểm tra chất liệu, màu sắc và form dáng trước khi đặt đơn hàng lớn. Chi phí mẫu được tính vào đơn hàng đầu tiên khi hai bên tiến hành hợp tác. Liên hệ qua Zalo hoặc form để yêu cầu mẫu.",
+          "Có thể yêu cầu mẫu theo dòng quan tâm. Điều kiện mẫu được trao đổi khi liên hệ — không niêm yết phí/số lượng mẫu cố định tại đây.",
       },
       {
-        question:
-          "Bao lâu thì ATTD nhập lô hàng mới? Làm sao theo dõi tồn kho?",
+        question: "Nguồn hàng sẵn khác OEM chỗ nào?",
         answer:
-          "ATTD nhập hàng định kỳ mỗi 2-4 tuần tùy mùa vụ và nhu cầu. Đối tác thường xuyên được đăng ký nhận thông báo tồn kho qua Zalo — nhận thông tin sớm khi một màu sắp về và khi có lô hàng mới. Bảng tồn kho realtime có thể yêu cầu qua email hoặc Zalo bất kỳ lúc nào.",
+          "Hàng sẵn phù hợp giao theo tồn kho và ra drop nhanh. OEM phù hợp khi cần màu/tem/form riêng theo brief — xem thêm trang OEM khi brief yêu cầu.",
       },
       {
-        question:
-          "Nếu chất lượng áo thun nhận được khác với mẫu, ATTD xử lý thế nào?",
+        question: "Bắt đầu tìm nguồn từ đâu?",
         answer:
-          "ATTD cam kết đổi toàn bộ hàng không đạt tiêu chuẩn so với mẫu đã xác nhận trong vòng 7 ngày nhận hàng. Cần cung cấp ảnh/video chứng minh sự khác biệt. Nếu lỗi từ phía ATTD, toàn bộ chi phí vận chuyển đổi hàng do ATTD chịu. Trường hợp tranh chấp được giải quyết bằng kiểm tra mẫu lưu (physical swatch) tại kho.",
+          "Xác định kỹ thuật in-thêu và khách cuối → chọn form/chất liệu → xem danh mục → gửi yêu cầu báo giá qua form liên hệ.",
       },
     ],
-    ctaTitle: "Tìm nguồn hàng áo thun trơn ổn định?",
+    ctaTitle: "Tìm nguồn hàng áo thun trơn?",
     ctaDescription:
-      "Liên hệ ATTD để nhận báo giá B2B, tư vấn chất liệu phù hợp cho xưởng in và đặt mẫu thử chất lượng trước khi đặt số lượng lớn.",
+      "Gửi brief in-thêu, form và màu/size dự kiến — ATTD tư vấn nguồn hàng và báo giá theo catalogue thực tế.",
+    primaryCta: { label: "Nhận tư vấn nguồn hàng", href: "/lien-he" },
+    secondaryCta: { label: "Xem áo thun trơn sỉ", href: "/ao-thun-tron-si" },
     internalLinks: [
       { label: "Kho áo thun trơn", href: "/kho-ao-thun-tron" },
       { label: "Áo thun trơn sỉ", href: "/ao-thun-tron-si" },
-      { label: "Xem danh mục", href: "/ao-thun-tron" },
+      { label: "Danh mục áo thun trơn", href: "/ao-thun-tron" },
     ],
   },
 

@@ -123,7 +123,6 @@ async function rewriteBlogsAsDraft() {
   const fabricHtml = buildR1FabricHtml();
 
   console.log("[blog] rewrite -> DRAFT", {
-    from: R1_BLOG_XUONG_IN.previousSlug,
     to: R1_BLOG_XUONG_IN.slug,
     title: R1_BLOG_XUONG_IN.title,
     chars: xuongHtml.length,

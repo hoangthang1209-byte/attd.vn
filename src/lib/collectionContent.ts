@@ -49,93 +49,95 @@ const content: Record<string, CollectionContent> = {
   // ÁO THUN TRƠN
   // ─────────────────────────────────────────────────────────────────────────
   "ao-thun-tron": {
-    seoTitle:
-      "Nguồn Sỉ Áo Thun Trơn Giá Tốt Cho Đại Lý Và Xưởng In | ATTD",
+    seoTitle: "Áo thun trơn | Danh mục nguồn hàng áo trơn | ATTD.vn",
     metaDescription:
-      "Áo thun trơn sỉ giá tốt — đa màu, đủ size S-4XL, cotton cao cấp. Nguồn hàng ổn định cho đại lý, xưởng in và doanh nghiệp. Giao hàng toàn quốc nhanh chóng.",
+      "Danh mục áo thun trơn ATTD cho xưởng in, đại lý, agency và local brand. Xem sản phẩm thực, chọn form/chất liệu rồi yêu cầu báo giá theo nhu cầu.",
+    displayName: "Áo thun trơn",
     shortIntro:
-      "Nguồn hàng áo thun trơn số lượng lớn — cotton cao cấp, đa màu, đủ size. Dành cho đại lý, xưởng in và doanh nghiệp trên toàn quốc.",
-    intro: `<p>ATTD là đơn vị cung cấp <strong>áo thun trơn sỉ</strong> số lượng lớn cho đại lý, xưởng in và doanh nghiệp trên toàn quốc. Với kho hàng phong phú luôn sẵn sàng, đa dạng màu sắc và size từ S đến 4XL, ATTD đáp ứng nhu cầu từ vài chục đến vài nghìn sản phẩm mỗi đơn hàng mà không làm đứt gãy chuỗi cung ứng của đối tác.</p>
+      "Danh mục áo thun trơn sẵn kho — điểm vào để chọn sản phẩm thật trước khi yêu cầu báo giá nguồn hàng.",
+    intro: `<p><strong>Áo thun trơn</strong> là category thương mại gắn với sản phẩm đang ACTIVE tại ATTD. Đây là nơi xem form, chất liệu và dòng hàng cụ thể — khác hub mua sỉ <a href="/ao-thun-tron-si">áo thun trơn sỉ</a> (góc giao dịch) và khác blog giáo dục (cách chọn nguồn/chất liệu/form).</p>
 
-<p>Chất liệu áo thun trơn tại ATTD được chọn lọc kỹ càng: cotton 100% cổ điển, cotton pique độ bền cao và cotton 4 chiều co giãn tốt. Từng loại vải đều phù hợp cho kỹ thuật in lụa, in nhiệt và in kỹ thuật số, đảm bảo màu sắc bám vải ổn định qua nhiều lần giặt.</p>
+<p>Khi chọn áo thun trơn cho xưởng in hoặc đại lý, hãy đối chiếu mục đích trang trí (in lụa, DTF, thêu), cảm giác mặc của khách cuối và khả năng tái nhập màu/size. Đừng chỉ so ảnh catalogue.</p>
 
-<p>Áo thun trơn của ATTD đặc biệt phù hợp cho <strong>xưởng in thêu</strong> cần nguồn hàng nhập liên tục — mẫu vải chuẩn, màu sắc ổn định theo lô, form dáng đều qua từng size. Đối với <strong>đại lý bán lẻ</strong>, ATTD hỗ trợ chính sách chiết khấu bậc thang và ưu tiên giao hàng trong mùa cao điểm như dịp Tết, khai trường và các sự kiện lớn.</p>
+<p>ATTD không niêm yết trên trang category các số liệu thương mại cố định như MOQ, chiết khấu hay lead time. Điều kiện đi kèm <a href="/lien-he">yêu cầu báo giá</a> theo sản phẩm và số lượng thực tế.</p>
 
-<p>Mỗi lô hàng đều được kiểm định về trọng lượng vải, độ bền màu và form dáng trước khi xuất kho — cam kết đảm bảo chất lượng đồng đều từng chiếc áo. Đây là tiêu chuẩn ATTD duy trì để xây dựng quan hệ đối tác lâu dài với hơn 200 đại lý và xưởng in trên cả nước.</p>`,
+<p>Cần góc kho hoặc sourcing? Xem thêm <a href="/kho-ao-thun-tron">kho áo thun trơn</a> và <a href="/nguon-hang-ao-thun-tron">nguồn hàng áo thun trơn</a>.</p>`,
     benefits: [
       {
-        title: "Đa dạng màu sắc và size",
+        title: "Sản phẩm là nguồn sự thật",
         description:
-          "Hàng chục màu sắc từ basic trắng, đen, xám đến các tone pastel và nâng cao. Đầy đủ size từ S đến 4XL — đáp ứng mọi nhu cầu bán lẻ và đặt in theo yêu cầu. Màu sắc ổn định theo lô giúp xưởng in không lo chênh màu giữa các đơn hàng.",
+          "Mỗi dòng trong danh mục phản ánh catalogue đang vận hành — bạn chọn SKU cụ thể trước khi hỏi giá.",
       },
       {
-        title: "Chất liệu bền, thấm hút tốt",
+        title: "Phù hợp nhiều kỹ thuật trang trí",
         description:
-          "Cotton cao cấp đảm bảo độ bền màu, thoáng mát, thấm hút mồ hôi tốt — phù hợp với khí hậu nhiệt đới Việt Nam. Vải mịn đều, bề mặt phẳng giúp in ấn sắc nét và thêu logo chắc chắn không bong tróc.",
+          "Cotton, CVC hay blend — chọn theo brief in/thêu và thử trên mẫu đúng dòng sẽ nhập.",
       },
       {
-        title: "Giá sỉ cạnh tranh",
+        title: "Kết nối hub sỉ & kho",
         description:
-          "Chính sách giá theo bậc — càng mua nhiều càng tiết kiệm. Đại lý chính thức được hưởng chiết khấu từ 10-20% so với giá niêm yết, cùng hỗ trợ ưu tiên giao hàng và tư vấn nguồn hàng theo mùa.",
+          "Từ category đi sang áo thun trơn sỉ hoặc kho áo thun trơn tùy intent mua hàng hay kiểm tra hướng sẵn kho.",
       },
       {
-        title: "Giao hàng toàn quốc nhanh chóng",
+        title: "Báo giá theo nhu cầu",
         description:
-          "Đối tác vận chuyển uy tín với kho hàng tại Hà Nội và TP.HCM. Thời gian giao hàng thông thường 1-3 ngày làm việc cho các tỉnh thành lớn, 3-5 ngày cho địa bàn xa. Đơn hàng lớn được hỗ trợ vận chuyển ưu đãi.",
+          "Không chiết khấu/MOQ cố định trên trang. Báo giá theo màu, size, số lượng và điều kiện giao nhận.",
       },
     ],
     applications: [
       {
-        title: "Xưởng in và in ấn",
+        title: "Xưởng in",
         description:
-          "Áo thun trơn của ATTD là lựa chọn hàng đầu của hàng trăm xưởng in trên toàn quốc nhờ chất liệu nhận mực tốt, bề mặt đều, form dáng chuẩn chỉnh. Sự ổn định màu theo lô giúp xưởng in không phải lo lắng về chênh màu giữa các đơn hàng liên tiếp.",
+          "Chọn phôi trơn theo kỹ thuật in và giữ màu core để nhận đơn nhanh.",
       },
       {
-        title: "Đại lý thời trang",
+        title: "Đại lý",
         description:
-          "Với giá sỉ cạnh tranh và chính sách đại lý hấp dẫn, ATTD hỗ trợ đại lý mở rộng kinh doanh mà không cần lo về nguồn hàng. Đại lý chính thức được hưởng ưu tiên đặt hàng, hỗ trợ marketing và tư vấn xu hướng màu sắc theo mùa.",
+          "Nhập các dòng bán chạy, theo dõi tái đơn theo size curve thực tế.",
       },
       {
-        title: "Đồng phục nhân viên",
+        title: "Đồng phục / merchandise",
         description:
-          "Nhiều doanh nghiệp chọn áo thun trơn làm đồng phục nội bộ hoặc trang phục làm việc nhờ tính đơn giản, thoải mái và giá thành hợp lý. Đặc biệt phổ biến tại các chuỗi F&B, cửa hàng bán lẻ và cơ sở dịch vụ.",
+          "Dùng áo thun trơn làm nền in logo cho nội bộ, event hoặc quà tặng.",
       },
       {
-        title: "Quà tặng và sự kiện",
+        title: "Local brand",
         description:
-          "Áo thun trơn in logo là lựa chọn phổ biến cho sự kiện, hội nghị, teambuilding và quà tặng doanh nghiệp. Với số lượng lớn và giá tốt, đây là giải pháp quà tặng thực dụng có giá trị nhận diện thương hiệu cao.",
+          "Ra drop từ hàng sẵn; chuyển OEM khi cần tem/form riêng.",
       },
     ],
     faq: [
       {
-        question: "MOQ (số lượng đặt tối thiểu) của áo thun trơn là bao nhiêu?",
+        question: "MOQ áo thun trơn là bao nhiêu?",
         answer:
-          "ATTD linh hoạt về MOQ cho đại lý và xưởng in. Với đơn hàng thông thường, MOQ bắt đầu từ 50 chiếc/màu. Đối với đại lý chính thức và đối tác lâu dài, ATTD có thể thương lượng MOQ thấp hơn tùy trường hợp. Liên hệ trực tiếp để được tư vấn cụ thể theo nhu cầu của bạn.",
+          "MOQ phụ thuộc sản phẩm, màu/size và tồn kho lúc báo giá. Category không công bố một con số cố định — hãy gửi nhu cầu để nhận điều kiện cụ thể.",
       },
       {
-        question: "Áo thun có bị co rút sau khi giặt không?",
+        question: "Làm sao chọn đúng dòng trong danh mục?",
         answer:
-          "Tất cả sản phẩm tại ATTD đều qua quy trình xử lý định hình (pre-shrunk) trước khi xuất xưởng. Với sản phẩm cotton 100%, mức co rút sau lần giặt đầu tiên dưới 3% — nằm trong tiêu chuẩn ngành dệt may. Để giữ form dáng tốt nhất, khuyến nghị giặt với nước lạnh và tránh sấy ở nhiệt độ cao.",
+          "Xác định khách cuối và kỹ thuật in-thêu trước, rồi lọc theo form (regular/oversize) và chất liệu. Lấy mẫu khi đơn lớn hoặc kỹ thuật khó.",
       },
       {
-        question: "ATTD có cung cấp mẫu thử (sample) trước khi đặt hàng không?",
+        question: "Có lấy mẫu trước khi đặt không?",
         answer:
-          "Có. Đối tác mới có thể yêu cầu mẫu thử để kiểm tra chất liệu, form dáng và màu sắc trước khi đặt đơn hàng lớn. Chi phí mẫu sẽ được tính vào đơn hàng đầu tiên nếu hai bên tiến hành hợp tác. Liên hệ qua Zalo hoặc form liên hệ để yêu cầu mẫu.",
+          "Nên lấy mẫu để kiểm form và thử in/thêu. Điều kiện mẫu trao đổi khi liên hệ.",
       },
       {
-        question: "Thời gian giao hàng là bao lâu?",
+        question: "Thời gian giao hàng thế nào?",
         answer:
-          "Với hàng có sẵn trong kho, thời gian chuẩn bị và giao hàng từ 2-5 ngày làm việc tùy địa điểm nhận. Với đơn hàng OEM hoặc đặt màu riêng, thời gian sản xuất từ 15-30 ngày tùy số lượng và yêu cầu kỹ thuật. ATTD sẽ xác nhận thời gian cụ thể khi nhận đơn hàng.",
+          "Phụ thuộc tồn kho, số lượng và địa chỉ nhận. Thời gian cụ thể xác nhận trong báo giá — không cam kết số ngày cố định tại đây.",
       },
     ],
-    ctaTitle: "Cần nguồn hàng áo thun trơn số lượng lớn?",
+    ctaTitle: "Cần nguồn áo thun trơn?",
     ctaDescription:
-      "Liên hệ ATTD để nhận báo giá sỉ theo số lượng, chính sách đại lý và tư vấn nguồn hàng phù hợp nhu cầu của bạn. Giao hàng toàn quốc, hàng có sẵn kho.",
+      "Chọn sản phẩm trong danh mục hoặc gửi nhu cầu — ATTD tư vấn và báo giá theo tồn kho thực tế.",
+    primaryCta: { label: "Yêu cầu báo giá", href: "/lien-he" },
+    secondaryCta: { label: "Xem áo thun trơn sỉ", href: "/ao-thun-tron-si" },
     wholesaleCluster: {
       title: "Nguồn hàng áo thun trơn",
       links: [
-        { label: "Kho áo thun trơn số lượng lớn", href: "/kho-ao-thun-tron" },
-        { label: "Áo thun trơn sỉ giá tốt", href: "/ao-thun-tron-si" },
+        { label: "Áo thun trơn sỉ", href: "/ao-thun-tron-si" },
+        { label: "Kho áo thun trơn", href: "/kho-ao-thun-tron" },
         { label: "Nguồn hàng cho xưởng in", href: "/nguon-hang-ao-thun-tron" },
       ],
     },
