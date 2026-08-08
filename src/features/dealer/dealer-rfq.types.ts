@@ -39,7 +39,7 @@ export const DEALER_RFQ_ARTWORK_STATUSES: DealerRFQArtworkStatus[] = [
 ];
 
 export const DEALER_RFQ_PROJECT_TYPE_LABELS: Record<DealerRFQProjectType, string> = {
-  BLANK_APPAREL: "Áo trơn / blank",
+  BLANK_APPAREL: "Áo trơn",
   UNIFORM: "Đồng phục",
   CORPORATE_GIFT: "Quà tặng doanh nghiệp",
   EVENT_MERCH: "Merch sự kiện",

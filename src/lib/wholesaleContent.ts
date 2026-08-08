@@ -1,14 +1,11 @@
 /**
- * Static content registry for wholesale blank apparel SEO cluster.
+ * Static content registry for wholesale áo trơn SEO cluster.
  *
- * Five pages each targeting a distinct commercial search intent within the
+ * Pages each target a distinct commercial search intent within the
  * kho / trơn / sỉ / nguồn hàng keyword cluster.
  *
- * Content similarity is kept below 35% across pages by varying:
- *  - primary keyword angle (inventory, price, supply chain, polo-specific)
- *  - intro paragraph focus
- *  - benefit framing
- *  - FAQ questions
+ * Commercial claims (MOQ, price tiers, discounts, lead time, capacity,
+ * partner counts) must stay safe — quote via CRM, do not invent numbers.
  */
 
 import type { FaqItem } from "@/components/seo/FaqSchema";
@@ -49,33 +46,33 @@ export interface WholesaleContent {
 const standardProcess: ProcessStep[] = [
   {
     step: 1,
-    title: "Liên hệ và tư vấn",
+    title: "Gửi nhu cầu nguồn hàng",
     description:
-      "Gửi yêu cầu qua Zalo, form liên hệ hoặc email. Đội ngũ ATTD phản hồi trong vòng 2 giờ làm việc, tư vấn về chủng loại sản phẩm, màu sắc, size range và chính sách giá phù hợp với quy mô của bạn.",
+      "Cho ATTD biết nhóm khách (xưởng in, đại lý, agency, local brand), form áo, chất liệu quan tâm, màu/size dự kiến và mục đích sử dụng (in lụa, DTF, thêu, bán lại).",
   },
   {
     step: 2,
-    title: "Nhận báo giá chi tiết",
+    title: "Nhận tư vấn và báo giá",
     description:
-      "ATTD gửi bảng báo giá sỉ theo bậc số lượng — càng mua nhiều, giá càng tốt. Báo giá bao gồm đơn giá, chi phí vận chuyển dự kiến và thời gian giao hàng cụ thể.",
+      "Team ATTD đối chiếu tồn kho thực tế, gợi ý form/chất liệu phù hợp kỹ thuật in-thêu, rồi gửi báo giá theo số lượng và điều kiện giao nhận cụ thể của đơn.",
   },
   {
     step: 3,
-    title: "Xác nhận và đặt cọc",
+    title: "Xác nhận mẫu và phân bổ",
     description:
-      "Xác nhận đơn hàng qua email hoặc Zalo với thông tin chi tiết về màu sắc, size, số lượng và địa chỉ giao hàng. Đơn hàng lớn yêu cầu đặt cọc 30-50% để ưu tiên lịch sản xuất và kho hàng.",
+      "Chốt mẫu khi cần, xác nhận bảng màu/size và địa chỉ giao. Đơn lớn có thể chia nhiều đợt theo kế hoạch sản xuất in/thêu của bạn.",
   },
   {
     step: 4,
     title: "Chuẩn bị và kiểm hàng",
     description:
-      "ATTD kiểm tra chất lượng và đóng gói từng đơn hàng theo tiêu chuẩn xuất kho. Đơn hàng lớn từ 300 chiếc trở lên được kiểm tra QC toàn phần với báo cáo gửi cho khách hàng theo yêu cầu.",
+      "ATTD chuẩn bị hàng theo đơn đã xác nhận, kiểm đếm màu/size trước khi xuất kho và đóng gói phù hợp vận chuyển B2B.",
   },
   {
     step: 5,
-    title: "Giao hàng toàn quốc",
+    title: "Giao hàng và hỗ trợ tái nhập",
     description:
-      "Đối tác vận chuyển uy tín với coverage toàn 63 tỉnh thành. Mã vận đơn được gửi ngay khi bàn giao cho đơn vị vận chuyển. Đơn hàng giao thành công được xác nhận qua Zalo — hỗ trợ khiếu nại và đổi hàng nhanh chóng nếu phát sinh.",
+      "Giao theo địa chỉ đã chốt. Sau đơn đầu, ATTD hỗ trợ tái nhập màu/size bán chạy để bạn giữ nguồn áo trơn ổn định cho các đợt sau.",
   },
 ];
 
@@ -204,115 +201,118 @@ const content: Record<string, WholesaleContent> = {
   // Focus: wholesale price tiers, dealer registration, buying wholesale
   // ───────────────────────────────────────────────────────────────────────────
   "ao-thun-tron-si": {
-    seoTitle: "Áo Thun Trơn Sỉ Giá Tốt | Chính Sách Đại Lý Hấp Dẫn | ATTD",
+    seoTitle: "Áo thun trơn sỉ | Nguồn hàng áo trơn sẵn kho | ATTD.vn",
     metaDescription:
-      "Áo thun trơn sỉ ATTD — giá bậc thang theo số lượng, chiết khấu đại lý 10-20%, nhiều màu sẵn kho. Nguồn hàng B2B đáng tin cậy cho đại lý và xưởng in toàn quốc.",
-    h1: "Áo Thun Trơn Sỉ Giá Tốt",
+      "Nguồn áo thun trơn sỉ sẵn kho cho xưởng in, đại lý, agency và local brand. Tư vấn form, chất liệu, màu/size và nhận báo giá theo nhu cầu thực tế.",
+    h1: "Áo thun trơn sỉ — nguồn hàng áo trơn sẵn kho",
     heroIntro:
-      "Mua sỉ áo thun trơn từ ATTD — chính sách giá bậc thang minh bạch, chiết khấu đại lý lên đến 20%, hàng sẵn kho nhiều màu nhiều size. Đối tác tin cậy của hàng trăm đại lý và xưởng in trên toàn quốc.",
-    intro: `<p>Khi bạn tìm kiếm <strong>áo thun trơn sỉ</strong>, điều quan trọng nhất không chỉ là giá thấp — mà là tổng chi phí thực sự bao gồm chất lượng hàng, độ ổn định nguồn cung, thời gian giao hàng và dịch vụ sau bán. ATTD xây dựng chính sách mua sỉ minh bạch, rõ ràng theo từng bậc số lượng — giúp bạn tính toán chi phí chính xác và lập kế hoạch kinh doanh hiệu quả hơn.</p>
+      "ATTD cung cấp nguồn áo thun trơn sỉ cho xưởng in, đại lý, agency và local brand. Tập trung hàng sẵn kho, form/chất liệu phù hợp in-thêu, và báo giá theo nhu cầu thực tế — không chỉ so giá đơn chiếc.",
+    intro: `<p>Khi tìm <strong>áo thun trơn sỉ</strong>, điều quan trọng không chỉ là đơn giá thấp nhất. Xưởng in và đại lý cần nguồn hàng ổn định: form đều giữa các lô, màu/size tái nhập được, và chất liệu phù hợp kỹ thuật in lụa, DTF hay thêu. ATTD định vị là <strong>nguồn hàng áo trơn B2B</strong> — kết nối kho thực tế với nhu cầu nhập theo dự án hoặc nhập định kỳ.</p>
 
-<p>Chính sách giá sỉ của ATTD hoạt động theo cơ chế bậc thang: số lượng mua càng nhiều, đơn giá mỗi chiếc càng thấp. <strong>Bậc 1</strong> từ 50-99 chiếc, <strong>bậc 2</strong> từ 100-299 chiếc, <strong>bậc 3</strong> từ 300-499 chiếc và <strong>bậc đặc biệt</strong> từ 500 chiếc trở lên với giá thương lượng. Đại lý chính thức đăng ký tài khoản còn được hưởng mức chiết khấu cố định 10-20% so với giá niêm yết bất kể số lượng — một lợi thế đáng kể trong dài hạn.</p>
+<p>Trên trang này bạn sẽ tìm được hướng đi thương mại: chọn form regular hoặc oversize, đối chiếu chất liệu cotton/CVC/polyester theo mục đích in, rồi chuyển sang danh mục sản phẩm và yêu cầu báo giá. Các bài hướng dẫn đi kèm giải thích tiêu chí chọn nguồn cho xưởng in và cách cân nhắc chất liệu khi nhập số lượng lớn.</p>
 
-<p>Ngoài giá cả, ATTD cam kết <strong>ổn định giá sỉ trong thời gian dài</strong>. Đối tác ký hợp đồng cung cấp 6 tháng hoặc 1 năm được bảo đảm giá không tăng trong thời gian hợp đồng — dù chi phí nguyên liệu hay vận chuyển có biến động. Đây là cam kết quan trọng giúp đại lý và xưởng in dự báo chi phí sản phẩm và định giá bán chính xác hơn.</p>
+<p>ATTD không công bố MOQ, bậc giá hay chiết khấu cố định trên trang công khai vì điều kiện phụ thuộc tồn kho, màu/size và quy mô đơn. Bạn nhận <strong>báo giá cụ thể</strong> sau khi gửi nhu cầu — kèm tư vấn phân bổ màu/size để giảm rủi ro ứ kho hoặc thiếu size bán chạy.</p>
 
-<p>Với kinh nghiệm phục vụ hơn 200 đối tác sỉ trên toàn quốc, ATTD hiểu rõ rằng mua sỉ không phải chỉ về giá đầu vào. Chúng tôi đồng hành cùng đối tác trong việc phân tích xu hướng màu sắc theo mùa, tư vấn phân bổ đơn hàng tối ưu để tận dụng bậc giá tốt nhất, và hỗ trợ kế hoạch nhập hàng định kỳ giúp đối tác luôn có hàng mà không ứ đọng vốn không cần thiết.</p>`,
+<p>Nếu bạn cần mở rộng sang áo polo trơn, OEM hoặc đăng ký đại lý, các liên kết nội bộ bên dưới giữ đúng vai trò: trang này là <strong>commercial hub</strong> cho cụm “áo thun trơn sỉ / nguồn hàng áo trơn”, còn blog hỗ trợ intent giáo dục.</p>`,
     suitableCustomers: [
       {
-        title: "Đại lý đồng phục và thời trang",
+        title: "Xưởng in",
         description:
-          "Đại lý mua sỉ áo thun trơn để bán lẻ hoặc tái phân phối. Chính sách giá bậc thang và chiết khấu đại lý chính thức của ATTD tạo biên lợi nhuận tốt — thường 30-50% tùy kênh phân phối và thị trường địa phương.",
+          "Cần áo thun trơn sẵn kho để nhận đơn in nhanh, giữ màu/size core và tái nhập ổn định theo mùa cao điểm.",
       },
       {
-        title: "Xưởng in nhận đơn hàng lẻ",
+        title: "Đại lý / nhà phân phối",
         description:
-          "Xưởng in mua sỉ áo trơn để tích lũy tồn kho, sẵn sàng nhận đơn in khẩn từ khách hàng bán lẻ. Giá sỉ tốt từ ATTD giúp xưởng in định giá dịch vụ cạnh tranh hơn trong thị trường in ấn địa phương.",
+          "Nhập sỉ để bán lại hoặc cung cấp cho shop in. Ưu tiên nguồn có catalogue rõ, form ổn định và hỗ trợ tái đơn.",
       },
       {
-        title: "Xưởng thêu và gia công",
+        title: "Agency & shop in áo",
         description:
-          "Xưởng thêu nhập áo sỉ để cung cấp gói trọn gói (áo + thêu) cho doanh nghiệp. Biên lợi nhuận từ chênh lệch giá sỉ áo thun và giá bán trọn gói thường là nguồn doanh thu ổn định cho xưởng thêu quy mô nhỏ và vừa.",
+          "Triển khai nhiều campaign/event: cần linh hoạt màu, chia size theo brief và báo giá theo từng dự án.",
       },
       {
-        title: "Công ty quảng cáo và event",
+        title: "Local brand",
         description:
-          "Agency thường đặt áo thun trơn sỉ cho nhiều dự án cùng lúc để tận dụng bậc giá tốt nhất. ATTD hỗ trợ đặt hàng linh hoạt cho từng dự án riêng biệt mà vẫn được cộng dồn số lượng vào hạn mức bậc giá đã thoả thuận.",
+          "Dùng hàng sẵn để ra drop nhanh, hoặc chuyển dần sang OEM khi cần tem/nhãn và form riêng.",
       },
       {
-        title: "Local brand độc lập",
+        title: "Xưởng thêu / gia công",
         description:
-          "Local brand mua sỉ áo trơn để làm nền tảng cho BST hoặc drop riêng. Giá sỉ tốt + chất lượng vải ổn định giúp brand tập trung vào thiết kế và marketing mà không cần lo về chất lượng đầu vào.",
+          "Cần phôi trơn ổn định độ dày cổ, đường may và mặt vải phù hợp thêu logo đồng phục hoặc merchandise.",
       },
       {
         title: "Doanh nghiệp mua số lượng lớn",
         description:
-          "Doanh nghiệp đặt đồng phục nội bộ số lượng lớn thường một lần mỗi năm. Bậc giá đặc biệt từ 500 chiếc và khả năng đàm phán giá theo hợp đồng giúp phòng mua hàng tối ưu ngân sách đồng phục hiệu quả.",
+          "Đặt áo trơn cho đồng phục nội bộ hoặc quà tặng — cần tư vấn chất liệu, size curve và lộ trình lấy mẫu trước khi chốt.",
       },
     ],
     whyAttd: [
       {
-        title: "Chính sách giá sỉ minh bạch",
+        title: "Hàng áo trơn sẵn kho",
         description:
-          "Bảng giá bậc thang rõ ràng — bạn biết chính xác mình trả bao nhiêu cho từng bậc số lượng. Không có phụ phí ẩn, không thay đổi giá sau khi đã báo — ATTD cam kết giữ giá từ lúc xác nhận đến lúc giao hàng.",
+          "Tập trung các dòng áo thun trơn đang vận hành trong catalogue — bạn kiểm tra sản phẩm/category thực tế trước khi yêu cầu báo giá.",
       },
       {
-        title: "Chiết khấu đại lý chính thức",
+        title: "Tư vấn theo kỹ thuật in-thêu",
         description:
-          "Đăng ký trở thành đại lý chính thức ATTD để nhận chiết khấu 10-20% cố định, ưu tiên tồn kho trong mùa cao điểm và hỗ trợ tư vấn xu hướng màu sắc theo mùa. Quy trình đăng ký đơn giản, không yêu cầu cam kết doanh thu tối thiểu.",
+          "Cotton, CVC hay polyester; regular hay oversize — ATTD hỗ trợ chọn theo mục đích in lụa, DTF, thêu và điều kiện sử dụng.",
       },
       {
-        title: "Cộng dồn số lượng theo đại lý",
+        title: "Báo giá theo nhu cầu thật",
         description:
-          "ATTD tính bậc giá dựa trên tổng số lượng đặt hàng trong tháng hoặc quý — không phải theo từng đơn riêng lẻ. Agency và nhà phân phối có nhiều khách hàng nhỏ được hưởng bậc giá tốt hơn nhờ cộng dồn số lượng.",
+          "Không niêm yết số liệu thương mại chung chung. Báo giá dựa trên màu/size, số lượng dự kiến và điều kiện giao nhận của đơn.",
       },
       {
-        title: "Ổn định giá trong thời gian hợp đồng",
+        title: "Kết nối đại lý & OEM khi cần",
         description:
-          "Đối tác ký hợp đồng cung cấp được bảo đảm giá không tăng trong thời gian hợp đồng. Đây là lợi thế quan trọng để lập kế hoạch tài chính và định giá bán ổn định mà không bị ảnh hưởng bởi biến động thị trường.",
+          "Cùng một hệ thống nguồn hàng: bắt đầu từ áo trơn sỉ sẵn kho, mở rộng sang chính sách đại lý hoặc OEM/private label khi brief yêu cầu.",
       },
     ],
     process: standardProcess,
     faq: [
       {
-        question:
-          "Mua sỉ áo thun trơn ATTD, số lượng tối thiểu là bao nhiêu?",
+        question: "ATTD có bán áo thun trơn sỉ cho xưởng in không?",
         answer:
-          "Bắt đầu từ 50 chiếc/đơn để được giá sỉ. Đơn dưới 50 chiếc vẫn được phục vụ nhưng theo giá lẻ. MOQ cho mỗi màu riêng là 30 chiếc — tức là đơn 90 chiếc có thể chia thành 3 màu khác nhau.",
+          "Có. Xưởng in là nhóm khách chính của cụm nguồn hàng áo trơn. Bạn có thể xem danh mục áo thun trơn và gửi nhu cầu để nhận tư vấn form/chất liệu phù hợp kỹ thuật in.",
       },
       {
-        question: "Chính sách giá sỉ theo bậc số lượng cụ thể như thế nào?",
+        question: "MOQ áo thun trơn sỉ là bao nhiêu?",
         answer:
-          "ATTD có 4 bậc giá: bậc 1 (50-99 chiếc), bậc 2 (100-299 chiếc), bậc 3 (300-499 chiếc) và bậc đặc biệt (500+ chiếc). Mỗi bậc có mức giảm giá riêng so với giá niêm yết. Liên hệ để nhận bảng giá chi tiết theo từng sản phẩm và số lượng cụ thể.",
+          "MOQ phụ thuộc sản phẩm, màu/size và tồn kho tại thời điểm báo giá. ATTD không công bố một con số cố định trên trang này — hãy gửi nhu cầu để nhận điều kiện cụ thể.",
       },
       {
-        question: "Đăng ký đại lý ATTD có điều kiện gì không?",
+        question: "Giá sỉ có theo bậc số lượng không?",
         answer:
-          "Đại lý chính thức ATTD không yêu cầu cam kết doanh thu tối thiểu hay phí đăng ký. Chỉ cần điền form đăng ký, cung cấp thông tin doanh nghiệp và được phê duyệt. Sau khi được chấp thuận, đại lý được hưởng giá chiết khấu ngay từ đơn đầu tiên.",
+          "Đơn lớn thường được xem xét theo quy mô và điều kiện hợp tác. Bảng giá chi tiết được gửi qua báo giá/CRM sau khi xác nhận sản phẩm và số lượng.",
       },
       {
-        question: "ATTD có chương trình khuyến mãi hay flash sale định kỳ không?",
+        question: "Có thể lấy mẫu trước khi nhập số lượng lớn không?",
         answer:
-          "ATTD có chương trình ưu đãi theo mùa — giảm giá thêm hoặc tặng kèm sản phẩm cho đơn hàng lớn vào dịp Tết, mùa khai trường và cuối năm. Đại lý đăng ký danh sách nhận tin được thông báo sớm trước khi ưu đãi mở rộng ra thị trường.",
+          "Nên lấy mẫu để kiểm tra form, cảm giác vải và độ phù hợp với kỹ thuật in/thêu. Điều kiện mẫu được trao đổi theo từng dòng sản phẩm.",
       },
       {
-        question:
-          "Có thể trả hàng hoặc đổi size nếu đặt nhầm số lượng không?",
+        question: "Regular và oversize khác nhau thế nào khi nhập sỉ?",
         answer:
-          "ATTD chấp nhận đổi size trong vòng 7 ngày nhận hàng cho sản phẩm còn nguyên tem, chưa qua in ấn. Phí vận chuyển đổi hàng do khách chịu. Không nhận trả hàng với lý do đổi ý nếu hàng không có lỗi sản xuất. Khuyến nghị xác nhận kỹ phân bổ size trước khi đặt hàng.",
+          "Regular phù hợp đồng phục và nhiều đơn in tiêu chuẩn. Oversize thường dùng cho local brand, streetwear và một số campaign. Chọn form theo khách cuối, không chỉ theo xu hướng ảnh.",
       },
       {
-        question: "ATTD có hỗ trợ thanh toán trả chậm hoặc công nợ không?",
+        question: "Làm sao để nhận báo giá hoặc đăng ký đại lý?",
         answer:
-          "Với đối tác đại lý chính thức đã hợp tác từ 3 tháng trở lên và có lịch sử đặt hàng tốt, ATTD có thể xem xét hạn mức công nợ ngắn hạn (7-14 ngày) theo từng trường hợp. Liên hệ trực tiếp để thảo luận điều kiện cụ thể.",
+          "Dùng CTA “Yêu cầu báo giá” hoặc “Tìm nguồn hàng” trên trang để vào form liên hệ/CRM. Nếu bạn cần kênh đại lý dài hạn, chuyển sang trang đăng ký đại lý sau khi đã xác định nhóm sản phẩm.",
       },
     ],
-    ctaTitle: "Muốn nhận bảng giá sỉ áo thun trơn?",
+    ctaTitle: "Cần nguồn áo thun trơn sỉ?",
     ctaDescription:
-      "Liên hệ ATTD để nhận bảng giá sỉ chi tiết theo số lượng, tìm hiểu chính sách đại lý và đăng ký trở thành đối tác chính thức ngay hôm nay.",
+      "Gửi nhu cầu theo form/chất liệu/màu-size — ATTD tư vấn nguồn hàng sẵn kho và gửi báo giá phù hợp xưởng in, đại lý, agency hoặc local brand.",
+    primaryCta: { label: "Yêu cầu báo giá", href: "/lien-he" },
+    secondaryCta: { label: "Tìm nguồn hàng", href: "/ao-thun-tron" },
     internalLinks: [
+      { label: "Danh mục áo thun trơn", href: "/ao-thun-tron" },
       { label: "Kho áo thun trơn", href: "/kho-ao-thun-tron" },
       { label: "Nguồn hàng áo thun trơn", href: "/nguon-hang-ao-thun-tron" },
+      { label: "Áo polo trơn", href: "/ao-polo-tron" },
       { label: "Đăng ký đại lý", href: "/dai-ly" },
+      { label: "OEM & Private Label", href: "/oem" },
     ],
   },
 

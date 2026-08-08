@@ -10,7 +10,7 @@ export const SOURCING_PROCESS = {
     {
       step: 1,
       title: "Chọn sản phẩm",
-      description: "Chọn dòng blank phù hợp từ danh mục áo thun, polo và quà tặng DN.",
+      description: "Chọn dòng áo trơn phù hợp từ danh mục áo thun, polo và quà tặng DN.",
     },
     {
       step: 2,

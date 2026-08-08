@@ -31,7 +31,7 @@ const CSS = read("src/app/globals.css");
  * closing tags, so the browser extended each link across the rest of the page.
  */
 const BROKEN_FRAGMENT = [
-  '<p>Nếu bạn đang so sánh phôi trơn, xem thêm <a href="/blog/cach-chon-ao-polo-tron-dong-phuc">cách chọn áo polo trơn để phân biệt phôi blank.</p>',
+  '<p>Nếu bạn đang so sánh phôi trơn, xem thêm <a href="/ao-polo-tron">áo polo trơn</a> để phân biệt áo trơn.</p>',
   '<h2 id="vi-sao">Vì sao áo polo phù hợp?</h2>',
   "<p>Áo polo giữ vẻ chỉnh chu hơn áo thun cổ tròn.</p>",
   '<p><a href="/lien-he">Chuẩn bị số lượng, đối tượng, môi trường mặc, màu, logo và thời điểm cần nhận để nhận tư vấn báo giá.</p>',

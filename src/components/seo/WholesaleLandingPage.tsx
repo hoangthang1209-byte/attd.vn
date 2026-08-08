@@ -1,5 +1,5 @@
 /**
- * Shared layout component for wholesale blank apparel SEO cluster pages.
+ * Shared layout component for wholesale áo trơn SEO cluster pages.
  *
  * Reuses CollectionSchema, FaqSchema, Breadcrumb.
  * Renders 8 sections: Hero → Suitable customers → Why ATTD →
@@ -148,7 +148,7 @@ export default function WholesaleLandingPage({
             }}
           >
             <Link
-              href="/dai-ly"
+              href={content.primaryCta?.href ?? "/lien-he"}
               style={{
                 display: "inline-block",
                 padding: "13px 28px",
@@ -160,10 +160,10 @@ export default function WholesaleLandingPage({
                 textDecoration: "none",
               }}
             >
-              Đăng ký đại lý
+              {content.primaryCta?.label ?? "Yêu cầu báo giá"}
             </Link>
             <Link
-              href="/lien-he"
+              href={content.secondaryCta?.href ?? "/dai-ly"}
               style={{
                 display: "inline-block",
                 padding: "13px 28px",
@@ -176,7 +176,7 @@ export default function WholesaleLandingPage({
                 textDecoration: "none",
               }}
             >
-              Liên hệ báo giá
+              {content.secondaryCta?.label ?? "Nhận tư vấn"}
             </Link>
           </div>
         </div>
@@ -239,8 +239,8 @@ export default function WholesaleLandingPage({
               lineHeight: "1.7",
             }}
           >
-            ATTD cung cấp đầy đủ các mặt hàng trơn blank phổ biến nhất cho
-            xưởng in, đại lý và doanh nghiệp:
+            ATTD cung cấp các nhóm hàng áo trơn phổ biến cho xưởng in, đại lý
+            và doanh nghiệp:
           </p>
           <div
             style={{
@@ -429,7 +429,7 @@ export default function WholesaleLandingPage({
             }}
           >
             <Link
-              href={content.primaryCta?.href ?? "/dai-ly"}
+              href={content.primaryCta?.href ?? "/lien-he"}
               style={{
                 display: "inline-block",
                 padding: "13px 28px",
@@ -441,10 +441,10 @@ export default function WholesaleLandingPage({
                 textDecoration: "none",
               }}
             >
-              {content.primaryCta?.label ?? "Đăng ký đại lý"}
+              {content.primaryCta?.label ?? "Yêu cầu báo giá"}
             </Link>
             <Link
-              href={content.secondaryCta?.href ?? "/lien-he"}
+              href={content.secondaryCta?.href ?? "/dai-ly"}
               style={{
                 display: "inline-block",
                 padding: "13px 28px",
@@ -457,7 +457,7 @@ export default function WholesaleLandingPage({
                 textDecoration: "none",
               }}
             >
-              {content.secondaryCta?.label ?? "Liên hệ tư vấn"}
+              {content.secondaryCta?.label ?? "Nhận tư vấn"}
             </Link>
           </div>
 

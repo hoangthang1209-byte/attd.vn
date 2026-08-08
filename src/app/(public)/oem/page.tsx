@@ -59,7 +59,7 @@ export default async function OemPage() {
         <div className="container">
           <h2 className="section-title">ATTD OEM hỗ trợ gì?</h2>
           <p className="section-description">
-            Nguồn hàng blank apparel phù hợp cho thương hiệu cần sản phẩm gắn nhãn riêng.
+            Nguồn hàng áo trơn phù hợp cho thương hiệu cần sản phẩm gắn nhãn riêng.
           </p>
 
           <div

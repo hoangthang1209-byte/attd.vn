@@ -16,17 +16,17 @@ export const FIRST_ARTICLE_INTERNAL_LINKS = [
   {
     href: "/ao-polo-tron",
     anchor: "áo polo trơn",
-    reason: "Category/product entry for polo blanks",
+    reason: "Category/product entry for áo polo trơn",
   },
   {
-    href: "/blog/cach-chon-ao-polo-tron-dong-phuc",
-    anchor: "cách chọn áo polo trơn cho đồng phục doanh nghiệp",
-    reason: "Related published guide — differentiate blank vs full uniform selection",
+    href: "/ao-thun-tron-si",
+    anchor: "áo thun trơn sỉ",
+    reason: "Commercial hub for nguồn hàng áo trơn cluster",
   },
   {
-    href: "/blog/nguon-hang-ao-thun-polo-huong-dan-b2b-cho-dai-ly-va-doanh-nghiep",
-    anchor: "nguồn hàng áo thun polo B2B",
-    reason: "Sourcing angle for dealers/agencies",
+    href: "/blog/ao-thun-cvc-tc-cotton-khac-nhau",
+    anchor: "cotton, CVC và polyester khi nhập áo trơn",
+    reason: "R1 supporting educational article on fabrics",
   },
   {
     href: "/vai-cotton-2-chieu",
@@ -50,7 +50,7 @@ export const FIRST_ARTICLE_SECTION_HTML: Record<string, string> = {
   intro: `
 <p>Chọn <strong>áo polo đồng phục công ty</strong> không chỉ là chọn một kiểu áo đẹp. Với doanh nghiệp, đây là quyết định mua hàng B2B: cần cân bằng hình ảnh thương hiệu, độ bền khi giặt nhiều lần, trải nghiệm mặc của nhân viên và khả năng kiểm soát ngân sách theo số lượng.</p>
 <p>Bài viết này dành cho người phụ trách mua hàng, HR/Admin, agency và đại lý đồng phục. Bạn sẽ có checklist tiêu chí chọn áo polo, cách cân nhắc chất liệu và kỹ thuật logo, quy trình đặt hàng thực tế, cùng các lỗi thường gặp khi chỉ so sánh giá báo thấp nhất.</p>
-<p>Nếu bạn đang so sánh phôi trơn, có thể xem thêm hướng dẫn <a href="/blog/cach-chon-ao-polo-tron-dong-phuc">cách chọn áo polo trơn cho đồng phục doanh nghiệp</a> để phân biệt góc nhìn phôi blank và bộ đồng phục hoàn thiện.</p>
+<p>Nếu bạn đang so sánh phôi trơn, có thể xem thêm danh mục <a href="/ao-polo-tron">áo polo trơn</a> để phân biệt góc nhìn áo trơn và bộ đồng phục hoàn thiện.</p>
 `.trim(),
 
   why_polo: `
