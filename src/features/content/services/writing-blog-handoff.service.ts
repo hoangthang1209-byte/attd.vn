@@ -488,6 +488,7 @@ export async function handoffApprovedWritingDraftToBlog(input: {
             content: fields.content ? contentHtml : null,
             metaTitle: fields.seoMetadata ? structured.metaTitle ?? null : null,
             metaDescription: fields.seoMetadata ? structured.metaDescription ?? null : null,
+            canonicalUrl: `https://www.attd.vn/blog/${intendedSlug}`,
             status: "DRAFT",
             faqJson: fields.faq ? (draftFaq as unknown as Prisma.InputJsonValue) : [],
             tags,

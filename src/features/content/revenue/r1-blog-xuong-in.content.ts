@@ -30,7 +30,7 @@ export const R1_BLOG_XUONG_IN = {
     {
       question: "Xưởng in nên ưu tiên hàng sẵn kho hay đặt sản xuất?",
       answer:
-        "Đơn cần giao theo tồn kho và màu phổ biến thường phù hợp hàng sẵn. Đặt sản xuất hợp lý khi cần màu/tem/form riêng hoặc lịch cố định số lượng lớn.",
+        "Đơn cần giao theo tồn kho và màu phổ biến thường phù hợp hàng sẵn. Đặt sản xuất hợp lý khi cần màu, tem hoặc form riêng, hoặc khi đã có lịch cố định số lượng lớn.",
     },
     {
       question: "Có bắt buộc lấy mẫu trước khi nhập lớn không?",
@@ -40,17 +40,22 @@ export const R1_BLOG_XUONG_IN = {
     {
       question: "Bắt đầu yêu cầu báo giá thế nào?",
       answer:
-        "Gửi form áo, chất liệu quan tâm, màu/size dự kiến và kỹ thuật trang trí qua form liên hệ. ATTD phản hồi theo catalogue và tồn kho thời điểm.",
+        "Gửi form áo, chất liệu quan tâm, màu/size dự kiến và kỹ thuật trang trí qua trang liên hệ. ATTD phản hồi theo dòng hàng đang có và tồn kho thời điểm.",
     },
   ],
+} as const;
+
+export const R1_XUONG_IN_INLINE_BLOCK_IDS = {
+  oversize: "r1-xuong-in-inline-oversize",
+  regular: "r1-xuong-in-inline-regular",
 } as const;
 
 export function buildR1XuongInHtml(): string {
   const img1 = R1_MEDIA.khoOversize;
   const img2 = R1_MEDIA.regularDetail;
   return `
-<p>Xưởng in không thiếu brief — thường thiếu <strong>nguồn áo thun trơn</strong> đủ ổn định để nhận đơn, giữ chất lượng giữa các lô và tái nhập đúng màu/size. Bài viết này là checklist mua hàng cho xưởng in và shop in áo: form, vải, màu, size, tương thích kỹ thuật và rủi ro vận hành.</p>
-<p>Góc thương mại xem hub <a href="${R1_SLUGS.hub}">áo thun trơn sỉ</a> và danh mục <a href="${R1_SLUGS.category}">áo thun trơn</a>. Bài này giữ intent giáo dục.</p>
+<p>Xưởng in không thiếu brief — thường thiếu <strong>nguồn áo thun trơn</strong> đủ ổn định để nhận đơn, giữ chất lượng giữa các lô và tái nhập đúng màu/size. Bài này là checklist mua hàng thực tế: form, vải, màu, size, tương thích kỹ thuật và rủi ro vận hành.</p>
+<p>Nếu bạn đang tìm nguồn để phục vụ đơn in, có thể tham khảo <a href="${R1_SLUGS.hub}">áo thun trơn sỉ</a> và <a href="${R1_SLUGS.category}">danh mục áo thun trơn</a> song song với checklist dưới đây.</p>
 
 <h2>Xưởng in cần gì ở nguồn áo trơn?</h2>
 <p>Áo thun trơn với xưởng in là nguyên liệu đầu vào. Tiêu chí quyết định thường là:</p>
@@ -62,14 +67,18 @@ export function buildR1XuongInHtml(): string {
 </ul>
 <p>Đơn giá thấp không bù được chi phí in lại, đổi hàng hoặc mất khách vì lệch form/màu.</p>
 
-${r1Figure(img1.url, img1.alt, "Oversize trơn — thường gặp ở local brand và campaign.")}
+${r1Figure(img1, "Oversize trơn — thường gặp ở local brand và campaign.", {
+  blockId: R1_XUONG_IN_INLINE_BLOCK_IDS.oversize,
+})}
 
 <h2>Form: regular hay oversize?</h2>
-<p><strong>Regular</strong> phù hợp đồng phục, event tiêu chuẩn và nhiều đơn logo doanh nghiệp — dễ chia size, dễ giải thích khách cuối.</p>
-<p><strong>Oversize</strong> hợp streetwear/local brand; cần bảng size riêng và thử vị trí in vì diện tích và cảm giác mặc khác regular.</p>
-<p>Quy tắc: chọn theo khách cuối và kỹ thuật trang trí. Chi tiết quyết định form xem <a href="${R1_SLUGS.article4}">regular hay oversize cho xưởng in</a>. Catalogue: <a href="${R1_SLUGS.regular}">áo thun regular</a>, <a href="${R1_SLUGS.oversize}">áo thun oversized</a>.</p>
+<p><strong>Regular</strong> phù hợp đồng phục, event tiêu chuẩn và nhiều đơn logo cần dễ mặc cho đa số — dễ chia size, dễ giải thích cho khách cuối.</p>
+<p><strong>Oversize</strong> hợp streetwear và local brand; cần bảng size riêng và thử vị trí in vì diện tích cùng cảm giác mặc khác regular.</p>
+<p>Chọn theo khách cuối và kỹ thuật trang trí. Chi tiết quyết định form xem <a href="${R1_SLUGS.article4}">regular hay oversize cho xưởng in</a>. Bạn cũng có thể đối chiếu <a href="${R1_SLUGS.regular}">áo thun regular</a> và <a href="${R1_SLUGS.oversize}">áo thun oversized</a> trước khi nhập.</p>
 
-${r1Figure(img2.url, img2.alt, "Regular — nền phổ biến cho đồng phục và merchandise.")}
+${r1Figure(img2, "Regular — nền phổ biến cho đồng phục và merchandise.", {
+  blockId: R1_XUONG_IN_INLINE_BLOCK_IDS.regular,
+})}
 
 <h2>Chất liệu và kỹ thuật trang trí</h2>
 <p>Cotton, CVC hay polyester không “tốt/xấu tuyệt đối” — phụ thuộc brief. So sánh góc người mua xem <a href="${R1_SLUGS.article2}">cotton, CVC hay polyester khi nhập áo trơn</a>.</p>
@@ -85,22 +94,22 @@ ${r1Figure(img2.url, img2.alt, "Regular — nền phổ biến cho đồng phụ
 
 <h2>Câu hỏi cần hỏi nhà cung cấp</h2>
 <ul>
-<li>Màu/size nào đang có — catalogue có khớp hàng thật?</li>
+<li>Màu/size nào đang có — danh mục có khớp hàng thật?</li>
 <li>Có hỗ trợ mẫu và thử in/thêu trước khi nhập lớn?</li>
 <li>Khi thiếu size, phương án bù hàng thế nào?</li>
 <li>Có mở rộng OEM/tem riêng khi brand khách lớn dần không?</li>
 </ul>
-<p>MOQ, giá và lịch giao thuộc điều kiện báo giá — không niêm yết số cố định trong bài giáo dục. Góc sourcing: <a href="${R1_SLUGS.sourcing}">nguồn hàng áo thun trơn</a>; góc kho: <a href="${R1_SLUGS.warehouse}">kho áo thun trơn</a>.</p>
+<p>MOQ, giá và lịch giao thuộc điều kiện báo giá — không niêm yết số cố định trong bài giáo dục. Góc sourcing xem thêm <a href="${R1_SLUGS.sourcing}">nguồn hàng áo thun trơn</a>; góc kho xem <a href="${R1_SLUGS.warehouse}">kho áo thun trơn</a>.</p>
 
 <h2>Lộ trình chọn nguồn cho xưởng in</h2>
 <ol>
-<li>Chốt khách cuối + kỹ thuật in/thêu chính.</li>
+<li>Chốt khách cuối và kỹ thuật in/thêu chính.</li>
 <li>Chọn 1–2 form và 1–2 chất liệu để lấy mẫu.</li>
 <li>Thử in/thêu, ghi nhận lỗi.</li>
-<li>Chốt màu core + size curve đợt đầu.</li>
-<li>Gửi nhu cầu qua <a href="${R1_SLUGS.hub}">áo thun trơn sỉ</a> / <a href="${R1_SLUGS.contact}">yêu cầu báo giá</a>, rồi theo dõi tái nhập.</li>
+<li>Chốt màu core và size curve đợt đầu.</li>
+<li>Gửi nhu cầu qua <a href="${R1_SLUGS.contact}">yêu cầu báo giá</a> hoặc xem tiếp <a href="${R1_SLUGS.hub}">áo thun trơn sỉ</a>, rồi theo dõi tái nhập.</li>
 </ol>
 
-<aside class="blog-cta-block"><p class="blog-cta-block__title">Tìm nguồn áo thun trơn cho xưởng in</p><p class="blog-cta-block__body">Gửi form, chất liệu, màu/size và kỹ thuật in — ATTD tư vấn nguồn hàng sẵn kho và báo giá theo nhu cầu.</p><a class="blog-cta-block__button" href="${R1_SLUGS.contact}">Yêu cầu báo giá</a><a class="blog-cta-block__secondary" href="${R1_SLUGS.hub}">Xem áo thun trơn sỉ</a></aside>
+<aside class="blog-cta-block"><p class="blog-cta-block__title">Tìm nguồn áo thun trơn cho xưởng in</p><p class="blog-cta-block__body">Gửi form áo, chất liệu, màu/size và kỹ thuật in — ATTD tư vấn nguồn hàng sẵn kho và báo giá theo nhu cầu.</p><a class="blog-cta-block__button" href="${R1_SLUGS.contact}">Yêu cầu báo giá</a><a class="blog-cta-block__secondary" href="${R1_SLUGS.hub}">Xem áo thun trơn sỉ</a></aside>
 `.trim();
 }

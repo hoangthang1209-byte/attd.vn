@@ -353,7 +353,7 @@ export default function BlogPostEditor(props: Props) {
         ogImageUrl: ogImage?.url ?? null,
         metaTitle: metaTitle.trim() || null,
         metaDescription: metaDescription.trim() || null,
-        canonicalUrl: canonicalUrl.trim() || null,
+        canonicalUrl: canonicalUrl.trim() || buildCanonicalUrl(`/blog/${slug.trim()}`),
         status: nextStatus ?? status,
         categoryIds,
         faqJson,

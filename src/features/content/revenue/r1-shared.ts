@@ -3,6 +3,8 @@
  * Blogs stay DRAFT until human publish. Hub links stay on commercial URLs only.
  */
 
+import { buildInlineMediaFigureHtml } from "@/features/content/inline-media/inline-media-figure";
+
 export const R1_SLUGS = {
   hub: "/ao-thun-tron-si",
   category: "/ao-thun-tron",
@@ -40,8 +42,20 @@ export const R1_MEDIA = {
   },
 } as const;
 
-export function r1Figure(url: string, alt: string, caption: string): string {
-  return `<figure><img src="${url}" alt="${alt}" loading="lazy" /><figcaption>${caption}</figcaption></figure>`;
+/** Canonical inline figure: data-media-id so editor + ContentMediaAssignment stay aligned. */
+export function r1Figure(
+  media: { id: string; url: string; alt: string },
+  caption: string,
+  opts?: { blockId?: string },
+): string {
+  return buildInlineMediaFigureHtml({
+    mediaAssetId: media.id,
+    url: media.url,
+    altText: media.alt,
+    caption,
+    blockId: opts?.blockId ?? null,
+    variant: "CONTENT_WIDTH",
+  });
 }
 
 export function countWordsFromHtml(html: string): number {

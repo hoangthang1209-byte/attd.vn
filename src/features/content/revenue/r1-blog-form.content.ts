@@ -9,6 +9,7 @@ import {
 } from "@/features/content/revenue/r1-shared";
 
 export const R1_BLOG_FORM = {
+  id: "cmsk0932x0005rwjijj5udpl5",
   title: "Regular hay oversize: xưởng in nên nhập form áo trơn nào?",
   slug: "regular-hay-oversize-xuong-in-nen-nhap-form-nao",
   excerpt:
@@ -44,15 +45,20 @@ export const R1_BLOG_FORM = {
   ],
 } as const;
 
+export const R1_FORM_INLINE_BLOCK_IDS = {
+  regular: "r1-form-inline-regular",
+  stock: "r1-form-inline-stock",
+} as const;
+
 export function buildR1FormHtml(): string {
   const img1 = R1_MEDIA.regularDetail;
   const img2 = R1_MEDIA.khoThun;
   return `
-<p>Không có form áo trơn nào “tốt hơn” cho mọi xưởng in. <strong>Regular</strong> và <strong>oversize</strong> phục vụ phân khúc khác nhau — quyết định nhập phải dựa trên khách cuối, diện tích trang trí, size mix và rủi ro tồn kho.</p>
-<p>Hub: <a href="${R1_SLUGS.hub}">áo thun trơn sỉ</a>. Catalogue: <a href="${R1_SLUGS.regular}">áo thun regular</a>, <a href="${R1_SLUGS.oversize}">áo thun oversized</a>.</p>
+<p>Không có form áo trơn nào “tốt hơn” cho mọi xưởng in. <strong>Regular</strong> và <strong>oversize</strong> phục vụ phân khúc khác nhau — quyết định nhập nên dựa trên khách cuối, diện tích trang trí, size mix và rủi ro tồn kho.</p>
+<p>Bạn có thể bắt đầu từ <a href="${R1_SLUGS.hub}">áo thun trơn sỉ</a>, rồi đối chiếu <a href="${R1_SLUGS.regular}">áo thun regular</a> và <a href="${R1_SLUGS.oversize}">áo thun oversized</a> trước khi nhập.</p>
 
 <h2>Regular: khi nào hợp lý?</h2>
-<p>Regular phù hợp đồng phục, event tiêu chuẩn, merchandise doanh nghiệp và nhiều đơn logo cần dễ mặc cho đa số.</p>
+<p>Regular phù hợp đồng phục, event tiêu chuẩn, merchandise cho doanh nghiệp và nhiều đơn logo cần dễ mặc cho đa số.</p>
 <ul>
 <li>Dễ giải thích size cho khách cuối.</li>
 <li>Vị trí in ngực/tay quen thuộc, dễ chuẩn hóa file.</li>
@@ -60,7 +66,9 @@ export function buildR1FormHtml(): string {
 </ul>
 <p>Với agency làm đồng phục sự kiện, regular giúp giảm câu hỏi “mặc có rộng quá không?” và giữ trải nghiệm đồng đều cho nhóm lớn.</p>
 
-${r1Figure(img1.url, img1.alt, "Regular — nền phổ biến cho đồng phục và merchandise.")}
+${r1Figure(img1, "Regular — nền phổ biến cho đồng phục và merchandise.", {
+  blockId: R1_FORM_INLINE_BLOCK_IDS.regular,
+})}
 
 <h2>Oversize: khi nào hợp lý?</h2>
 <p>Oversize hợp local brand, streetwear, campaign giới trẻ và một số brief muốn form rộng.</p>
@@ -69,13 +77,15 @@ ${r1Figure(img1.url, img1.alt, "Regular — nền phổ biến cho đồng phụ
 <li>Cần bảng size và mẫu mặc; đừng dùng size chart regular.</li>
 <li>Rủi ro tồn cao hơn nếu ôm nhiều màu trend trước khi có đơn.</li>
 </ul>
-<p>Nếu bạn chủ yếu nhận đơn đồng phục DN mà mở oversize “cho đủ catalogue”, vốn dễ nằm ở size/màu khó xoay.</p>
+<p>Nếu bạn chủ yếu nhận đơn đồng phục doanh nghiệp mà mở oversize chỉ để “cho đủ danh mục”, vốn dễ nằm ở size và màu khó xoay.</p>
 
-${r1Figure(img2.url, img2.alt, "Nhập form theo dữ liệu đơn thật, không chỉ theo ảnh trend.")}
+${r1Figure(img2, "Nhập form theo dữ liệu đơn thật, không chỉ theo ảnh trend.", {
+  blockId: R1_FORM_INLINE_BLOCK_IDS.stock,
+})}
 
 <h2>Diện tích trang trí và kỹ thuật</h2>
-<p>Regular thường thuận cho logo ngực nhỏ/vừa và đồng phục. Oversize cần đo lại vị trí in/thêu vì tỷ lệ thân đổi. Kết hợp kỹ thuật: <a href="${R1_SLUGS.article3}">áo trơn cho in lụa, DTF và thêu</a>.</p>
-<p>Một file in “chuẩn regular” đặt lên oversize có thể thấp/cao hơn kỳ vọng trên người — luôn fit trên mẫu đúng form.</p>
+<p>Regular thường thuận cho logo ngực nhỏ/vừa và đồng phục. Oversize cần đo lại vị trí in/thêu vì tỷ lệ thân đổi. Khi chọn kỹ thuật, xem thêm hướng dẫn <a href="${R1_SLUGS.article3}">áo trơn cho in lụa, DTF và thêu</a>.</p>
+<p>Một file in “chuẩn regular” đặt lên oversize có thể thấp hoặc cao hơn kỳ vọng trên người — luôn fit trên mẫu đúng form.</p>
 
 <h2>Size mix, tồn kho và tái đơn</h2>
 <table>
@@ -83,13 +93,13 @@ ${r1Figure(img2.url, img2.alt, "Nhập form theo dữ liệu đơn thật, khôn
 <tr><th>Yếu tố</th><th>Regular</th><th>Oversize</th></tr>
 </thead>
 <tbody>
-<tr><td>Phân khúc</td><td>Đồng phục, event, DN</td><td>Local brand, streetwear, campaign</td></tr>
+<tr><td>Phân khúc</td><td>Đồng phục, event, doanh nghiệp</td><td>Local brand, streetwear, campaign</td></tr>
 <tr><td>Rủi ro tồn</td><td>Thường thấp hơn nếu màu core</td><td>Cao hơn nếu nhiều màu trend</td></tr>
 <tr><td>Tái đơn</td><td>Dễ chuẩn hóa theo lịch sử</td><td>Cần theo dõi size thực tế từng drop</td></tr>
 <tr><td>Định vị</td><td>Thực dụng, dễ bán rộng</td><td>Thời trang, phân khúc hẹp hơn</td></tr>
 </tbody>
 </table>
-<p>Chiến lược thực tế: giữ màu core trên form form chiếm ≥ phần lớn doanh thu in; form thứ hai chỉ mở khi có brief/đơn đủ để xoay vòng vốn.</p>
+<p>Chiến lược thực tế: giữ màu core trên form đang mang phần lớn doanh thu in; form thứ hai chỉ mở khi có brief hoặc đơn đủ để xoay vòng vốn.</p>
 
 <h2>Quyết định nhập theo checklist</h2>
 <ol>
@@ -99,7 +109,7 @@ ${r1Figure(img2.url, img2.alt, "Nhập form theo dữ liệu đơn thật, khôn
 <li>Vốn có chịu được ôm hai form song song không?</li>
 <li>Đã thử in/thêu trên mẫu đúng form chưa?</li>
 </ol>
-<p>Chọn nguồn tổng: <a href="${R1_SLUGS.article1}">nguồn áo thun trơn cho xưởng in</a>. Chất liệu: <a href="${R1_SLUGS.article2}">cotton / CVC / polyester</a>. Danh mục: <a href="${R1_SLUGS.category}">áo thun trơn</a>.</p>
+<p>Nếu bạn đang chọn nguồn hàng, đọc thêm <a href="${R1_SLUGS.article1}">cách chọn nguồn áo thun trơn cho xưởng in</a>. Khi đã chốt form, đối chiếu chất liệu qua bài <a href="${R1_SLUGS.article2}">cotton / CVC / polyester khác nhau thế nào</a>, rồi xem lại <a href="${R1_SLUGS.category}">danh mục áo thun trơn</a>.</p>
 
 <aside class="blog-cta-block"><p class="blog-cta-block__title">Tìm nguồn áo trơn theo form</p><p class="blog-cta-block__body">Cho ATTD biết phân khúc khách và kỹ thuật in — nhận gợi ý regular/oversize kèm báo giá theo tồn kho.</p><a class="blog-cta-block__button" href="${R1_SLUGS.contact}">Yêu cầu báo giá</a><a class="blog-cta-block__secondary" href="${R1_SLUGS.category}">Xem danh mục áo thun trơn</a></aside>
 `.trim();

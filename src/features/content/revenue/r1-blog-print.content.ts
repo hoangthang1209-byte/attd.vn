@@ -9,6 +9,7 @@ import {
 } from "@/features/content/revenue/r1-shared";
 
 export const R1_BLOG_PRINT = {
+  id: "cmsk092ym0004rwjie0as3q5g",
   title: "Chọn áo trơn để in lụa, DTF và thêu khác nhau thế nào?",
   slug: "chon-ao-tron-de-in-lua-dtf-va-theu",
   excerpt:
@@ -39,9 +40,14 @@ export const R1_BLOG_PRINT = {
     {
       question: "Nên lấy mẫu thế nào trước khi nhập lớn?",
       answer:
-        "Lấy đúng form + chất liệu + màu nền dự kiến, chạy thử kỹ thuật chính, giặt mẫu nếu brief yêu cầu độ bền, rồi mới chốt màu core.",
+        "Lấy đúng form, chất liệu và màu nền dự kiến, chạy thử kỹ thuật chính, giặt mẫu nếu brief yêu cầu độ bền, rồi mới chốt màu core.",
     },
   ],
+} as const;
+
+export const R1_PRINT_INLINE_BLOCK_IDS = {
+  stock: "r1-print-inline-stock",
+  oversize: "r1-print-inline-oversize",
 } as const;
 
 export function buildR1PrintHtml(): string {
@@ -49,7 +55,7 @@ export function buildR1PrintHtml(): string {
   const img2 = R1_MEDIA.khoOversize;
   return `
 <p>Chọn <strong>áo trơn để in</strong> sai kỹ thuật sẽ đội chi phí setup, tăng tỷ lệ lỗi và làm khách cuối không hài lòng dù artwork đẹp. Bài viết giúp xưởng in, agency và local brand chọn áo thun trơn trước khi trang trí bằng <strong>in lụa, DTF hoặc thêu</strong>.</p>
-<p>Hub mua sỉ: <a href="${R1_SLUGS.hub}">áo thun trơn sỉ</a>. Chất liệu tổng quan: <a href="${R1_SLUGS.article2}">cotton / CVC / polyester</a>. Form: <a href="${R1_SLUGS.article4}">regular hay oversize</a>.</p>
+<p>Khi tìm nguồn mua sỉ, bắt đầu từ <a href="${R1_SLUGS.hub}">áo thun trơn sỉ</a>. Để chọn chất liệu, xem <a href="${R1_SLUGS.article2}">cotton / CVC / polyester</a>. Để chọn form, xem <a href="${R1_SLUGS.article4}">regular hay oversize</a>.</p>
 
 <h2>Trước khi chọn kỹ thuật: bốn yếu tố của áo trơn</h2>
 <ul>
@@ -59,7 +65,9 @@ export function buildR1PrintHtml(): string {
 <li><strong>Form áo</strong> — diện tích in, vị trí ngực/tay, cảm giác mặc sau khi trang trí.</li>
 </ul>
 
-${r1Figure(img1.url, img1.alt, "Kiểm tra mặt vải và form trên hàng kho trước khi chốt kỹ thuật.")}
+${r1Figure(img1, "Kiểm tra mặt vải và form trên hàng kho trước khi chốt kỹ thuật.", {
+  blockId: R1_PRINT_INLINE_BLOCK_IDS.stock,
+})}
 
 <h2>In lụa (screen print)</h2>
 <p>In lụa hợp đơn màu lớn, màu đặc, số lượng lặp. Áo trơn cần mặt tương đối ổn định để khung in tiếp xúc đều.</p>
@@ -85,20 +93,22 @@ ${r1Figure(img1.url, img1.alt, "Kiểm tra mặt vải và form trên hàng kho 
 <li>Oversize có thể đòi hỏi vị trí thêu khác regular — đo trên mẫu mặc.</li>
 </ul>
 
-${r1Figure(img2.url, img2.alt, "Oversize thay đổi diện tích và vị trí trang trí so với regular.")}
+${r1Figure(img2, "Oversize thay đổi diện tích và vị trí trang trí so với regular.", {
+  blockId: R1_PRINT_INLINE_BLOCK_IDS.oversize,
+})}
 
 <h2>Artwork và ứng dụng thực tế</h2>
 <p>Chia brief thành: kích thước artwork, số màu, vị trí, nền áo sáng/tối, yêu cầu giặt. Từ đó chọn kỹ thuật rồi mới chọn áo — không chọn áo rồi “cố” kỹ thuật.</p>
-<p>Khi brief nghiêng đồng phục chỉnh chu hơn áo thun, có thể xem thêm <a href="/ao-polo-tron">áo polo trơn</a> (không thuộc cụm R1 blog này).</p>
+<p>Khi brief nghiêng đồng phục chỉnh chu hơn áo thun, có thể xem thêm <a href="/ao-polo-tron">áo polo trơn</a>.</p>
 
 <h2>Lỗi sourcing thường gặp</h2>
 <ul>
 <li>Chọn áo theo ảnh đẹp, không thử trên máy thật.</li>
 <li>Đổi mã vải giữa hai đợt nhưng giữ cùng file in.</li>
-<li>Ôm màu nền đậm/nhiều màu campaign trước khi có đơn.</li>
+<li>Ôm màu nền đậm hoặc nhiều màu campaign trước khi có đơn.</li>
 <li>Bỏ qua size curve — thiếu size bán chạy làm trễ giao.</li>
 </ul>
-<p>Checklist chọn nguồn tổng: <a href="${R1_SLUGS.article1}">nguồn áo thun trơn cho xưởng in</a>. Danh mục: <a href="${R1_SLUGS.category}">áo thun trơn</a>.</p>
+<p>Nếu cần checklist chọn nguồn tổng, đọc <a href="${R1_SLUGS.article1}">nguồn áo thun trơn cho xưởng in</a>. Để xem dòng hàng hiện có, mở <a href="${R1_SLUGS.category}">danh mục áo thun trơn</a>.</p>
 
 <aside class="blog-cta-block"><p class="blog-cta-block__title">Tìm nguồn áo trơn theo kỹ thuật in-thêu</p><p class="blog-cta-block__body">Cho ATTD biết kỹ thuật chính, màu nền và form — nhận gợi ý dòng áo trơn và báo giá theo tồn kho.</p><a class="blog-cta-block__button" href="${R1_SLUGS.contact}">Yêu cầu báo giá</a><a class="blog-cta-block__secondary" href="${R1_SLUGS.hub}">Xem áo thun trơn sỉ</a></aside>
 `.trim();

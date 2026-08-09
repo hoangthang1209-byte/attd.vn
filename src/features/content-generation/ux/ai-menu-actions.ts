@@ -6,6 +6,7 @@
 
 import type { ContentGenerationType } from "@/features/content-generation/contracts/generation.types";
 import { readAiWritingPreferences } from "@/features/content-generation/ux/ai-writing-preferences";
+import { ATTD_REWRITE_ACTIONS_VI } from "@/features/content/editorial/attd-editorial-voice";
 
 export type AiSectionMenuActionId =
   | "draft"
@@ -13,6 +14,9 @@ export type AiSectionMenuActionId =
   | "shorten"
   | "expand"
   | "tone-change"
+  | "natural"
+  | "practical"
+  | "attd-voice"
   | "example"
   | "table"
   | "faq"
@@ -39,7 +43,27 @@ const TONE_INSTRUCTION_VI: Record<string, string> = {
 export const AI_SECTION_MENU_ACTIONS: AiSectionMenuAction[] = [
   { id: "draft", label: "Viết bản nháp", type: "SECTION_DRAFT", sectionScoped: true },
   { id: "rewrite", label: "Viết lại", type: "SECTION_REWRITE", sectionScoped: true },
-  { id: "shorten", label: "Rút gọn", type: "SECTION_SHORTEN", sectionScoped: true },
+  {
+    id: "natural",
+    label: "Viết tự nhiên hơn",
+    type: "SECTION_REWRITE",
+    sectionScoped: true,
+    buildInstruction: () => ATTD_REWRITE_ACTIONS_VI.natural,
+  },
+  {
+    id: "shorten",
+    label: "Ngắn gọn hơn",
+    type: "SECTION_SHORTEN",
+    sectionScoped: true,
+    buildInstruction: () => ATTD_REWRITE_ACTIONS_VI.shorter,
+  },
+  {
+    id: "practical",
+    label: "Giải thích thực tế hơn",
+    type: "SECTION_REWRITE",
+    sectionScoped: true,
+    buildInstruction: () => ATTD_REWRITE_ACTIONS_VI.practical,
+  },
   { id: "expand", label: "Mở rộng", type: "SECTION_EXPAND", sectionScoped: true },
   {
     id: "tone-change",
@@ -51,7 +75,20 @@ export const AI_SECTION_MENU_ACTIONS: AiSectionMenuAction[] = [
       return TONE_INSTRUCTION_VI[prefs.tone] ?? null;
     },
   },
-  { id: "example", label: "Thêm ví dụ", type: "SECTION_EXAMPLE", sectionScoped: true },
+  {
+    id: "attd-voice",
+    label: "Viết lại theo giọng ATTD",
+    type: "SECTION_TONE_CHANGE",
+    sectionScoped: true,
+    buildInstruction: () => ATTD_REWRITE_ACTIONS_VI.voice,
+  },
+  {
+    id: "example",
+    label: "Thêm ví dụ",
+    type: "SECTION_EXAMPLE",
+    sectionScoped: true,
+    buildInstruction: () => ATTD_REWRITE_ACTIONS_VI.example,
+  },
   {
     id: "table",
     label: "Thêm bảng",

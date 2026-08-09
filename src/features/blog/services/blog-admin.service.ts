@@ -188,17 +188,23 @@ export async function getBlogPostById(id: string): Promise<BlogPostRecord | null
 export async function createBlogPost(input: BlogPostInput): Promise<BlogPostRecord> {
   const status = input.status ?? "DRAFT";
   const content = input.content ? normalizeBlogContent(input.content) : null;
+  const { resolveBlogCanonical } = await import("@/features/content/editorial/blog-canonical");
+  const slug = input.slug.trim();
+  const canonicalUrl = resolveBlogCanonical({
+    slug,
+    canonicalUrl: input.canonicalUrl,
+  });
 
   const row = await prisma.blogPost.create({
     data: {
       title: input.title.trim(),
-      slug: input.slug.trim(),
+      slug,
       excerpt: input.excerpt?.trim() || null,
       content,
       featuredImageUrl: input.featuredImageUrl?.trim() || null,
       metaTitle: input.metaTitle?.trim() || null,
       metaDescription: input.metaDescription?.trim() || null,
-      canonicalUrl: input.canonicalUrl?.trim() || null,
+      canonicalUrl,
       ogImageUrl: input.ogImageUrl?.trim() || null,
       status,
       publishedAt: status === "PUBLISHED" ? new Date() : null,
@@ -259,6 +265,23 @@ export async function updateBlogPost(
     }
   }
 
+  const { resolveBlogCanonical, isDefaultBlogCanonical } = await import(
+    "@/features/content/editorial/blog-canonical"
+  );
+  const nextSlug = input.slug !== undefined ? input.slug.trim() : existing.slug;
+  let nextCanonical: string | null =
+    input.canonicalUrl !== undefined ? input.canonicalUrl?.trim() || null : existing.canonicalUrl;
+  if (!nextCanonical) {
+    nextCanonical = resolveBlogCanonical({ slug: nextSlug, canonicalUrl: null });
+  } else if (
+    input.slug !== undefined &&
+    input.slug.trim() !== existing.slug &&
+    isDefaultBlogCanonical(existing.slug, existing.canonicalUrl)
+  ) {
+    // Follow slug when the previous value was the automatic self-canonical.
+    nextCanonical = resolveBlogCanonical({ slug: nextSlug, canonicalUrl: null });
+  }
+
   const row = await prisma.blogPost.update({
     where: { id },
     data: {
@@ -275,9 +298,7 @@ export async function updateBlogPost(
       ...(input.metaDescription !== undefined
         ? { metaDescription: input.metaDescription?.trim() || null }
         : {}),
-      ...(input.canonicalUrl !== undefined
-        ? { canonicalUrl: input.canonicalUrl?.trim() || null }
-        : {}),
+      canonicalUrl: nextCanonical,
       ...(input.ogImageUrl !== undefined ? { ogImageUrl: input.ogImageUrl?.trim() || null } : {}),
       ...(input.status !== undefined ? { status: input.status, publishedAt } : {}),
       ...(input.faqJson !== undefined ? { faqJson: input.faqJson } : {}),

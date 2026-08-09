@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import { StatusBadge } from "@/components/admin/AdminUi";
@@ -18,6 +18,8 @@ import {
   SECTION_EDITORIAL_STATE_LABELS,
   type SectionEditorialState,
 } from "@/features/content/editorial/editorial-ux";
+import { runEditorialQa } from "@/features/content/editorial/editorial-qa";
+import { buildDefaultBlogCanonical } from "@/features/content/editorial/blog-canonical";
 
 type BuildHistoryItem = {
   id: string;
@@ -205,6 +207,23 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
   const [aiHistory, setAiHistory] = useState<AiHistoryTimelineItem[]>([]);
   const editTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const aiConfigured = isAiConfigured(contentGenStatus);
+
+  const soloEditorialChecklist = useMemo(() => {
+    const html =
+      draft?.rendered?.html?.trim() ||
+      (draft?.sections ?? []).map((s) => s.html || `<h2>${s.heading}</h2><p>${s.plainText}</p>`).join("\n");
+    if (!html.trim()) return null;
+    const slug = plan?.metadataPlan?.slug?.trim() || "";
+    return runEditorialQa({
+      title: plan?.keywordPlan?.primaryKeyword ?? null,
+      content: html,
+      metaTitle: plan?.metadataPlan?.metaTitle ?? null,
+      metaDescription: plan?.metadataPlan?.metaDescription ?? null,
+      canonicalUrl: slug ? buildDefaultBlogCanonical(slug) : null,
+      faqCount: plan?.schemaPlan?.faqEnabled ? 1 : 0,
+      requireFaq: Boolean(plan?.schemaPlan?.faqEnabled),
+    });
+  }, [draft, plan]);
 
   const runInlineMediaPlan = useCallback(async () => {
     if (!draft?.id) {
@@ -736,13 +755,13 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, marginBottom: 8 }}>
         {plan?.readiness.ready && (
           <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void createDraftShell()}>
-            Draft shell
+            {canvasMode ? "Tạo khung bài" : "Draft shell"}
           </AdminLoadingButton>
         )}
         {draft?.id && (
           <>
             <AdminLoadingButton pending={building} variant="primary" size="small" onClick={() => void generate("ALL")}>
-              Generate all sections
+              {canvasMode ? "Viết bài bằng AI" : "Generate all sections"}
             </AdminLoadingButton>
             <AdminLoadingButton
               pending={building}
@@ -750,7 +769,7 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
               size="small"
               onClick={() => void generate("SELECTED")}
             >
-              Generate selected
+              {canvasMode ? "Viết các mục đã chọn" : "Generate selected"}
             </AdminLoadingButton>
             <AdminLoadingButton
               pending={building}
@@ -758,22 +777,22 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
               size="small"
               onClick={() => void generate("UNLOCKED_ONLY")}
             >
-              Generate unlocked
+              {canvasMode ? "Viết mục chưa khóa" : "Generate unlocked"}
             </AdminLoadingButton>
             <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void runQa()}>
-              Full QA
+              {canvasMode ? "Kiểm tra bài" : "Full QA"}
             </AdminLoadingButton>
             <AdminLoadingButton pending={building} variant="secondary" size="small" onClick={() => void renderPreview()}>
-              Render preview
+              Preview
             </AdminLoadingButton>
             {(draft.status === "REVIEW_READY" || draft.status === "QA_FAILED") && (
               <AdminLoadingButton pending={building} variant="primary" size="small" onClick={() => void startReview()}>
-                Start review
+                {canvasMode ? "Gửi kiểm duyệt" : "Start review"}
               </AdminLoadingButton>
             )}
             {activeRunId && (
               <AdminLoadingButton pending={false} variant="secondary" size="small" onClick={() => void cancelRun()}>
-                Cancel run
+                {canvasMode ? "Dừng" : "Cancel run"}
               </AdminLoadingButton>
             )}
           </>
@@ -813,6 +832,27 @@ export default function WritingEnginePanel({ topicId, canvasMode = false }: Prop
 
       {draft && <p className="admin-field-hint">Draft v{draftVersion} · {draft.status}</p>}
       {cacheHint && <p className="admin-field-hint">Plan cache hit.</p>}
+
+      {canvasMode && soloEditorialChecklist && (
+        <div className="admin-sidebar-card" style={{ margin: "8px 0", padding: 12 }}>
+          <p style={{ margin: "0 0 8px", fontWeight: 600 }}>
+            {soloEditorialChecklist.readyForReview ? "DRAFT READY" : "Cần chỉnh trước khi gửi duyệt"}
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18, listStyle: "none" }}>
+            {soloEditorialChecklist.checks.map((check) => (
+              <li key={check.id} style={{ marginBottom: 4 }}>
+                {check.ok ? "✓" : "!"} {check.label}
+                {!check.ok && check.warnings[0] ? ` — ${check.warnings[0]}` : ""}
+              </li>
+            ))}
+          </ul>
+          {developerMode && soloEditorialChecklist.details.length > 0 && (
+            <p className="admin-field-hint" style={{ marginTop: 8 }}>
+              Dev: {soloEditorialChecklist.details.join(", ")}
+            </p>
+          )}
+        </div>
+      )}
 
       {plan && (
         <>
