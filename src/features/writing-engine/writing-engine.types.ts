@@ -527,4 +527,4 @@ export type WritingReviewInput = {
 
 export const WRITING_SECTION_PROMPT_VERSION = "writing-section-v1";
 export const WRITING_SECTION_SCHEMA_VERSION = "writing-section-schema-v1";
-export const WRITING_GENERATION_CONFIG_VERSION = "writing-generation-config-v1";
+export const WRITING_GENERATION_CONFIG_VERSION = "writing-generation-config-v2";

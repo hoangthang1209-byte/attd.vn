@@ -146,8 +146,8 @@ export function getContentGenerationConfig(): ContentGenerationConfig {
       process.env.CONTENT_GENERATION_MODEL ??
       process.env.WRITING_MODEL ??
       process.env.AI_SEO_BRIEF_MODEL ??
-      "gpt-4o-mini"
-    ).trim() || "gpt-4o-mini";
+      "gpt-5.4-mini"
+    ).trim() || "gpt-5.4-mini";
 
   const apiKeyConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
 
@@ -157,15 +157,19 @@ export function getContentGenerationConfig(): ContentGenerationConfig {
     model,
     apiKeyConfigured,
     maxOutputTokens: envInt("CONTENT_GENERATION_MAX_OUTPUT_TOKENS", 1_200),
-    maxSectionsPerRun: envInt("CONTENT_GENERATION_MAX_SECTIONS_PER_RUN", 3),
-    dailyLimit: envInt("CONTENT_GENERATION_DAILY_LIMIT", 50),
-    monthlyBudgetUsd: envFloat("CONTENT_GENERATION_MONTHLY_BUDGET_USD"),
-    timeoutMs: envInt("CONTENT_GENERATION_TIMEOUT_MS", 30_000),
+    maxSectionsPerRun: envInt("CONTENT_GENERATION_MAX_SECTIONS_PER_RUN", 1),
+    dailyLimit: envInt("CONTENT_GENERATION_DAILY_LIMIT", 10),
+    monthlyBudgetUsd: envFloat("CONTENT_GENERATION_MONTHLY_BUDGET_USD") ?? (
+      // When OpenAI is explicitly enabled and no monthly budget is set, default
+      // to a conservative $5 hard cap for Solo Founder production safety.
+      enabled && provider === "OPENAI" ? 5 : null
+    ),
+    timeoutMs: envInt("CONTENT_GENERATION_TIMEOUT_MS", 60_000),
     retryLimit: Math.min(3, envInt("CONTENT_GENERATION_RETRY_LIMIT", 1)),
-    configurationVersion: "content-generation-config-v2",
+    configurationVersion: "content-generation-config-v3",
     rolloutStage: resolveRolloutStage(process.env.CONTENT_GENERATION_ROLLOUT_STAGE, enabled, provider),
-    dailyLimitPerUser: envInt("CONTENT_GENERATION_DAILY_LIMIT_PER_USER", 20),
-    dailyLimitPerTopic: envInt("CONTENT_GENERATION_DAILY_LIMIT_PER_TOPIC", 10),
+    dailyLimitPerUser: envInt("CONTENT_GENERATION_DAILY_LIMIT_PER_USER", 10),
+    dailyLimitPerTopic: envInt("CONTENT_GENERATION_DAILY_LIMIT_PER_TOPIC", 3),
   };
 }
 

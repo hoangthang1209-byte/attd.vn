@@ -22,6 +22,23 @@ export type ProviderRate = {
 };
 
 const RATE_TABLE: ProviderRate[] = [
+  // Official OpenAI list prices (USD per 1,000 tokens) — Sprint OpenAI enablement.
+  // Source: platform pricing for gpt-5.4-mini / gpt-5.4 (input / cached input / output).
+  {
+    provider: "OPENAI",
+    model: "gpt-5.4-mini",
+    inputPer1k: 0.00075,
+    outputPer1k: 0.0045,
+    cachedInputPer1k: 0.000075,
+  },
+  {
+    provider: "OPENAI",
+    model: "gpt-5.4",
+    inputPer1k: 0.0025,
+    outputPer1k: 0.015,
+    cachedInputPer1k: 0.00025,
+  },
+  // Legacy rows kept for older runs / rollback comparison — do not invent unverified rates.
   { provider: "OPENAI", model: "gpt-4o-mini", inputPer1k: 0.00015, outputPer1k: 0.0006, cachedInputPer1k: 0.000075 },
   { provider: "OPENAI", model: "gpt-4o", inputPer1k: 0.0025, outputPer1k: 0.01, cachedInputPer1k: 0.00125 },
   { provider: "OPENAI", model: "gpt-4.1-mini", inputPer1k: 0.0004, outputPer1k: 0.0016 },

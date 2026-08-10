@@ -200,9 +200,12 @@ describe("content-generation-16-1: ai-menu-actions", () => {
     const expected: Array<[string, string]> = [
       ["draft", "SECTION_DRAFT"],
       ["rewrite", "SECTION_REWRITE"],
+      ["natural", "SECTION_REWRITE"],
       ["shorten", "SECTION_SHORTEN"],
+      ["practical", "SECTION_REWRITE"],
       ["expand", "SECTION_EXPAND"],
       ["tone-change", "SECTION_TONE_CHANGE"],
+      ["attd-voice", "SECTION_TONE_CHANGE"],
       ["example", "SECTION_EXAMPLE"],
       ["table", "SECTION_EXPAND"],
       ["faq", "FAQ_SUGGESTION"],

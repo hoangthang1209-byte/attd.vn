@@ -5,13 +5,27 @@ import type {
   AiStructuredGenerateParams,
 } from "@/features/ai/providers/ai-provider";
 import { emptyUsage } from "@/features/ai/providers/ai-provider";
+import { estimateGenerationCost } from "@/features/content-generation/services/cost-engine.service";
 
+/**
+ * Official OpenAI Chat Completions + strict json_schema.
+ *
+ * Audit note (OpenAI production enablement):
+ * - Chat Completions with `response_format.json_schema` is already the supported
+ *   structured-output path used across Content Generation / Writing / SEO Brief.
+ * - Responses API (`/v1/responses`, `store: false`) was evaluated; we keep Chat
+ *   Completions to avoid a risky adapter rewrite on the first paid rollout.
+ * - Data retention follows the OpenAI organization account setting (Zero Data
+ *   Retention if enabled on the account). Chat Completions has no per-request
+ *   `store` flag; do not log prompts, keys, or raw provider payloads to clients.
+ */
 type OpenAiChatCompletionResponse = {
   choices?: Array<{ message?: { content?: string } }>;
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    prompt_tokens_details?: { cached_tokens?: number };
   };
   error?: { message?: string };
 };
@@ -25,17 +39,22 @@ function usageFromResponse(
   const totalTokens =
     usage?.total_tokens ??
     (inputTokens != null && outputTokens != null ? inputTokens + outputTokens : null);
+  const cachedTokens = usage?.prompt_tokens_details?.cached_tokens ?? null;
 
-  // Soft estimate only — gpt-4o-mini ballpark; never bill from this.
-  let estimatedCostUsd: number | null = null;
-  if (inputTokens != null && outputTokens != null) {
-    const isMini = model.includes("mini");
-    const inRate = isMini ? 0.15 / 1_000_000 : 2.5 / 1_000_000;
-    const outRate = isMini ? 0.6 / 1_000_000 : 10 / 1_000_000;
-    estimatedCostUsd = Number((inputTokens * inRate + outputTokens * outRate).toFixed(6));
-  }
+  const priced = estimateGenerationCost({
+    provider: "OPENAI",
+    model,
+    inputTokens,
+    outputTokens,
+    cachedTokens,
+  });
 
-  return { inputTokens, outputTokens, totalTokens, estimatedCostUsd };
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedCostUsd: priced.estimatedCostUsd,
+  };
 }
 
 export class OpenAiStructuredProvider implements AiProvider {
@@ -82,7 +101,11 @@ export class OpenAiStructuredProvider implements AiProvider {
 
       const payload = (await response.json()) as OpenAiChatCompletionResponse;
       if (!response.ok) {
-        throw new Error(payload.error?.message || `OpenAI request failed (${response.status})`);
+        const short =
+          typeof payload.error?.message === "string" && payload.error.message.trim()
+            ? payload.error.message.trim().slice(0, 180)
+            : `OpenAI request failed (${response.status})`;
+        throw new Error(short);
       }
 
       const rawText = payload.choices?.[0]?.message?.content?.trim() ?? "";

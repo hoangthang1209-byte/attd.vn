@@ -48,16 +48,18 @@ export function getWritingGenerationConfig(): WritingGenerationConfig {
   return {
     enabled: envBool("WRITING_GENERATION_ENABLED", false),
     provider,
-    model: (process.env.WRITING_MODEL ?? "gpt-4o-mini").trim() || "gpt-4o-mini",
+    model: (process.env.WRITING_MODEL ?? "gpt-5.4-mini").trim() || "gpt-5.4-mini",
     apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY?.trim()),
-    maxParallelSections: Math.min(3, Math.max(1, envInt("WRITING_MAX_PARALLEL_SECTIONS", 2))),
-    maxRetries: Math.min(3, Math.max(0, envInt("WRITING_MAX_RETRIES", 2))),
+    maxParallelSections: Math.min(3, Math.max(1, envInt("WRITING_MAX_PARALLEL_SECTIONS", 1))),
+    maxRetries: Math.min(3, Math.max(0, envInt("WRITING_MAX_RETRIES", 1))),
     timeoutMs: envInt("WRITING_TIMEOUT_MS", 60_000),
     maxOutputTokensPerSection: envInt("WRITING_MAX_OUTPUT_TOKENS_PER_SECTION", 1_200),
-    dailyRunLimit: envInt("WRITING_DAILY_RUN_LIMIT", 50),
-    monthlyBudgetUsd: envFloat("WRITING_MONTHLY_BUDGET_USD"),
-    maxSectionsPerRun: envInt("WRITING_MAX_SECTIONS_PER_RUN", 20),
-    configurationVersion: "writing-generation-config-v1",
+    dailyRunLimit: envInt("WRITING_DAILY_RUN_LIMIT", 10),
+    monthlyBudgetUsd: envFloat("WRITING_MONTHLY_BUDGET_USD") ?? (
+      envBool("WRITING_GENERATION_ENABLED", false) && provider === "openai" ? 5 : null
+    ),
+    maxSectionsPerRun: envInt("WRITING_MAX_SECTIONS_PER_RUN", 3),
+    configurationVersion: "writing-generation-config-v2",
   };
 }
 

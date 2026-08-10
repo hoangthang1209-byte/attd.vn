@@ -30,12 +30,14 @@ export function estimateGenerationCost(input: {
 }): number | null {
   if (input.inputTokens == null || input.outputTokens == null) return null;
   const rates: Record<string, { in: number; out: number }> = {
+    "gpt-5.4-mini": { in: 0.75 / 1_000_000, out: 4.5 / 1_000_000 },
+    "gpt-5.4": { in: 2.5 / 1_000_000, out: 15 / 1_000_000 },
     "gpt-4o-mini": { in: 0.15 / 1_000_000, out: 0.6 / 1_000_000 },
     "gpt-4o": { in: 2.5 / 1_000_000, out: 10 / 1_000_000 },
   };
   const rate =
     rates[input.model] ??
-    (input.model.includes("mini") ? rates["gpt-4o-mini"] : null);
+    (input.model.includes("mini") ? rates["gpt-5.4-mini"] : null);
   if (!rate) return null;
   return Number((input.inputTokens * rate.in + input.outputTokens * rate.out).toFixed(6));
 }
