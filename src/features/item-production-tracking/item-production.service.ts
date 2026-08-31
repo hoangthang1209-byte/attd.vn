@@ -20,6 +20,7 @@ import {
   deriveCurrentStageKey,
   deriveDeliveryStatus,
   deriveReadyQuantity,
+  isNextActionOverdue,
   validateQuantityUpdate,
 } from "@/features/item-production-tracking/progress-risk";
 import {
@@ -32,6 +33,7 @@ import {
   computeUnallocatedQuantity,
 } from "@/features/item-production-tracking/batch-aggregation";
 import { sortByExceptionFirst } from "@/features/item-production-tracking/lean-ops";
+import { resolveOrderItemTotalQuantity } from "@/features/orders/bom-calculations";
 
 export type { ProductionListFilters } from "@/features/item-production-tracking/types";
 
@@ -58,6 +60,7 @@ function recomputeFromStages(
     lastProgressAt: Date | null;
     hasSupplier: boolean;
     hasUnresolvedIssue?: boolean;
+    hasOverdueNextAction?: boolean;
   },
 ) {
   const progressPercent = computeWeightedProgressPercent(stages);
@@ -99,6 +102,7 @@ function recomputeFromStages(
     hasRejectedOrRework,
     hasSupplier: meta.hasSupplier,
     hasUnresolvedIssue: meta.hasUnresolvedIssue,
+    hasOverdueNextAction: meta.hasOverdueNextAction,
   });
   return {
     progressPercent,
@@ -286,6 +290,8 @@ export async function listProductionItems(filters: ProductionListFilters) {
         id: true,
         riskStatus: true,
         promisedDeliveryDate: true,
+        nextAction: true,
+        nextActionDueDate: true,
         issues: { where: { isResolved: false }, select: { id: true } },
       },
     }),
@@ -301,6 +307,8 @@ export async function listProductionItems(filters: ProductionListFilters) {
       riskStatus: row.riskStatus,
       promisedDeliveryDate: row.promisedDeliveryDate,
       openIssueCount: row.issues.length,
+      nextAction: row.nextAction,
+      nextActionDueDate: row.nextActionDueDate,
     })),
   ).map((row) => row.id);
 
@@ -452,7 +460,12 @@ export async function initializeFromOrder(input: {
   await ensureSystemWorkflowTemplates();
   const order = await prisma.order.findUnique({
     where: { id: input.orderId },
-    include: { items: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      items: {
+        orderBy: { sortOrder: "asc" },
+        include: { variants: true },
+      },
+    },
   });
   if (!order) throw new Error("Không tìm thấy đơn hàng");
   if (order.status === "CANCELLED") {
@@ -500,7 +513,8 @@ export async function initializeFromOrder(input: {
           };
         });
 
-      const qty = item.quantity;
+      // One tracking row per OrderItem — variant/size qty rolls into ordered total.
+      const qty = resolveOrderItemTotalQuantity(item);
       const tracking = await tx.itemProductionTracking.create({
         data: {
           orderItemId: item.id,
@@ -542,18 +556,32 @@ export async function updateProductionItem(
     note?: string | null;
     promisedDeliveryDate?: string | null;
     productionStatus?: ItemProductionStatus;
+    nextAction?: string | null;
+    nextActionDueDate?: string | null;
     expectedRowVersion?: number;
   },
 ) {
   return prisma.$transaction(async (tx) => {
     const current = await tx.itemProductionTracking.findUnique({
       where: { id },
-      include: { stages: true },
+      include: {
+        stages: true,
+        issues: { where: { isResolved: false }, select: { id: true } },
+      },
     });
     if (!current) throw new Error("Không tìm thấy item sản xuất");
     if (patch.expectedRowVersion != null && patch.expectedRowVersion !== current.rowVersion) {
       throw new Error("Dữ liệu đã được cập nhật bởi người khác. Vui lòng tải lại.");
     }
+
+    const nextAction =
+      patch.nextAction === undefined ? current.nextAction : patch.nextAction?.trim() || null;
+    const nextActionDueDate =
+      patch.nextActionDueDate === undefined
+        ? current.nextActionDueDate
+        : patch.nextActionDueDate
+          ? new Date(patch.nextActionDueDate)
+          : null;
 
     const stages = current.stages;
     const recomputed = recomputeFromStages(stages, {
@@ -566,6 +594,8 @@ export async function updateProductionItem(
             : null,
       lastProgressAt: current.lastProgressAt,
       hasSupplier: (patch.supplierId !== undefined ? patch.supplierId : current.supplierId) != null,
+      hasUnresolvedIssue: current.issues.length > 0,
+      hasOverdueNextAction: isNextActionOverdue(nextAction, nextActionDueDate),
     });
 
     return tx.itemProductionTracking.update({
@@ -580,11 +610,14 @@ export async function updateProductionItem(
             : patch.promisedDeliveryDate
               ? new Date(patch.promisedDeliveryDate)
               : null,
+        nextAction: patch.nextAction === undefined ? undefined : nextAction,
+        nextActionDueDate: patch.nextActionDueDate === undefined ? undefined : nextActionDueDate,
         productionStatus: recomputed.productionStatus,
         deliveryStatus: recomputed.deliveryStatus,
         riskStatus: recomputed.riskStatus,
         progressPercent: recomputed.progressPercent,
-        readyQuantity: recomputed.readyQuantity,
+        // Cap deliverable ready at ordered/planned — stage completed qty may still exceed.
+        readyQuantity: Math.min(recomputed.readyQuantity, current.plannedQuantity),
         currentStageKey: recomputed.currentStageKey,
         actualCompletedAt: recomputed.actualCompletedAt ?? undefined,
         rowVersion: { increment: 1 },
@@ -762,6 +795,7 @@ export async function applyStageProgress(input: {
       lastProgressAt: new Date(),
       hasSupplier: item.supplierId != null,
       hasUnresolvedIssue: openIssueCount > 0,
+      hasOverdueNextAction: isNextActionOverdue(item.nextAction, item.nextActionDueDate),
     });
 
     const updated = await tx.itemProductionTracking.update({

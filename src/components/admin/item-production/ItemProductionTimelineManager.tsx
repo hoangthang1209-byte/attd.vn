@@ -31,6 +31,8 @@ import ItemProductionQuickUpdateModal from "@/components/admin/item-production/I
 import ItemProductionIssueModal from "@/components/admin/item-production/ItemProductionIssueModal";
 import ItemProductionResolveIssueModal from "@/components/admin/item-production/ItemProductionResolveIssueModal";
 import ItemProductionOrderHeader from "@/components/admin/item-production/ItemProductionOrderHeader";
+import ItemProductionNextActionCell from "@/components/admin/item-production/ItemProductionNextActionCell";
+import { isNextActionOverdue } from "@/features/item-production-tracking/progress-risk";
 
 type StageCell = {
   id: string;
@@ -85,6 +87,8 @@ type ListItem = {
     usesBatchExecution: boolean;
   };
   sampleStatus?: ItemProductionSampleStatus;
+  nextAction?: string | null;
+  nextActionDueDate?: string | null;
   openIssueCount?: number;
   issues?: Array<{ id: string; issueType: ItemProductionIssueType; note: string | null }>;
 };
@@ -143,7 +147,7 @@ function isExceptionRow(item: ListItem) {
   return (
     item.riskStatus !== "ON_TRACK" ||
     (item.openIssueCount ?? 0) > 0 ||
-    item.sampleStatus !== "APPROVED"
+    isNextActionOverdue(item.nextAction, item.nextActionDueDate)
   );
 }
 
@@ -579,12 +583,13 @@ export default function ItemProductionTimelineManager() {
                   <th style={{ position: "sticky", left: orderFilterActive ? 220 : stickyOffsets.stage, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 150 }}>
                     Công đoạn
                   </th>
-                  <th style={{ minWidth: 90 }}>Sẵn sàng</th>
+                  <th style={{ minWidth: 80 }}>Sẵn sàng</th>
+                  <th style={{ minWidth: 160 }}>Việc tiếp theo</th>
                   <th style={{ minWidth: 90 }}>Hạn giao</th>
                   <th style={{ minWidth: 100 }}>PIC</th>
-                  <th style={{ minWidth: 100 }}>Rủi ro</th>
-                  <th style={{ minWidth: 90 }}>Vấn đề</th>
-                  <th style={{ minWidth: 140 }}>Thao tác</th>
+                  <th style={{ minWidth: 90 }}>Rủi ro</th>
+                  <th style={{ minWidth: 80 }} className="hide-on-narrow">Vấn đề</th>
+                  <th style={{ minWidth: 130 }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -654,7 +659,7 @@ export default function ItemProductionTimelineManager() {
                           </select>
                           {sampleWarning ? (
                             <div className="admin-field-hint" style={{ color: "#b45309" }}>
-                              Chưa duyệt mẫu
+                              {sampleStatus === "NEEDS_REVISION" ? "Cần chỉnh mẫu" : "Chưa duyệt mẫu"}
                             </div>
                           ) : null}
                         </td>
@@ -687,8 +692,20 @@ export default function ItemProductionTimelineManager() {
                         </td>
                         <td>
                           <strong>
-                            {item.readyQuantity}/{item.plannedQuantity}
+                            {item.readyQuantity}/{item.orderedQuantity}
                           </strong>
+                        </td>
+                        <td>
+                          <ItemProductionNextActionCell
+                            productionItemId={item.id}
+                            rowVersion={item.rowVersion}
+                            nextAction={item.nextAction ?? null}
+                            nextActionDueDate={item.nextActionDueDate ?? null}
+                            onSaved={() => {
+                              toast.success("Đã cập nhật việc tiếp theo");
+                              void load();
+                            }}
+                          />
                         </td>
                         <td>
                           <input
@@ -792,7 +809,7 @@ export default function ItemProductionTimelineManager() {
                       </tr>
                       {expandedId === item.id ? (
                         <tr key={`${item.id}-detail`}>
-                          <td colSpan={orderFilterActive ? 10 : 12} style={{ background: "#f9fafb", padding: 12 }}>
+                          <td colSpan={orderFilterActive ? 11 : 13} style={{ background: "#f9fafb", padding: 12 }}>
                             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
                               {item.stages
                                 .filter((s) => s.isApplicable && s.status !== "SKIPPED")

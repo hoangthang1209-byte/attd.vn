@@ -39,6 +39,8 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       promisedDeliveryDate?: string | null;
       productionStatus?: ItemProductionStatus;
       sampleStatus?: ItemProductionSampleStatus;
+      nextAction?: string | null;
+      nextActionDueDate?: string | null;
       expectedRowVersion?: number;
     };
     if ((body.supplierId !== undefined || body.assignedEmployeeId !== undefined) && !canAssign) {

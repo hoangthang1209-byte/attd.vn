@@ -101,11 +101,11 @@ export default function ItemProductionQuickUpdateModal({
               className="admin-input"
               type="number"
               min={0}
-              max={orderedQuantity}
               value={completed}
               onChange={(e) => setCompleted(Number(e.target.value) || 0)}
               autoFocus
             />
+            <span className="admin-field-hint">Có thể vượt SL đặt (hao hụt / dư sản xuất). Tiến độ % tối đa 100%.</span>
           </label>
           <label className="admin-label">
             Lỗi / làm lại <span className="admin-field-hint">(tùy chọn)</span>

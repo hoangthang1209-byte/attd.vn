@@ -100,13 +100,23 @@ describe("IA M1 item production tracking contracts", () => {
     );
     assert.match(read("prisma/schema.prisma"), /model ItemProductionIssue/);
     assert.match(read("prisma/schema.prisma"), /sampleStatus/);
+    assert.match(read("prisma/schema.prisma"), /nextAction/);
+    assert.match(read("prisma/schema.prisma"), /NEEDS_REVISION/);
     assert.match(
       read("src/components/admin/item-production/ItemProductionTimelineManager.tsx"),
       /ItemProductionQuickUpdateModal/,
     );
     assert.match(
+      read("src/components/admin/item-production/ItemProductionTimelineManager.tsx"),
+      /ItemProductionNextActionCell/,
+    );
+    assert.match(
       read("src/components/admin/item-production/OrderItemProductionPanel.tsx"),
       /production-timeline\?order=/,
+    );
+    assert.match(
+      read("src/components/admin/item-production/OrderItemProductionPanel.tsx"),
+      /ItemProductionInitModal/,
     );
   });
 });

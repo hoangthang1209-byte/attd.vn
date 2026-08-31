@@ -4,14 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
+import ItemProductionInitModal from "@/components/admin/item-production/ItemProductionInitModal";
 
 type Props = { orderId: string; orderStatus: string };
 
 export default function OrderItemProductionPanel({ orderId, orderStatus }: Props) {
   const { permissions } = useAdminPermissions();
   const [loading, setLoading] = useState(true);
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showInit, setShowInit] = useState(false);
   const [summary, setSummary] = useState<{
     total: number;
     averageProgressPercent: number;
@@ -47,25 +48,6 @@ export default function OrderItemProductionPanel({ orderId, orderStatus }: Props
       void load();
     });
   }, [load, permissions.canViewItemProduction]);
-
-  async function initialize() {
-    setPending(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/manufacturing/production-items/initialize-from-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message ?? "Khởi tạo thất bại");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Khởi tạo thất bại");
-    } finally {
-      setPending(false);
-    }
-  }
 
   if (!permissions.canViewItemProduction) return null;
 
@@ -107,13 +89,22 @@ export default function OrderItemProductionPanel({ orderId, orderStatus }: Props
           )}
           {permissions.canUpdateItemProduction && orderStatus !== "CANCELLED" ? (
             <div style={{ marginTop: 10 }}>
-              <AdminLoadingButton pending={pending} onClick={() => void initialize()}>
-                Khởi tạo theo dõi sản xuất
+              <AdminLoadingButton pending={false} onClick={() => setShowInit(true)}>
+                {summary && summary.total > 0 ? "Khởi tạo item còn thiếu" : "Khởi tạo theo dõi sản xuất"}
               </AdminLoadingButton>
             </div>
           ) : null}
         </>
       )}
+      {showInit ? (
+        <ItemProductionInitModal
+          orderId={orderId}
+          onClose={() => setShowInit(false)}
+          onInitialized={() => {
+            void load();
+          }}
+        />
+      ) : null}
     </section>
   );
 }

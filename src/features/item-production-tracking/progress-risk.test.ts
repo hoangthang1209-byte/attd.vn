@@ -96,6 +96,17 @@ describe("item production progress and risk", () => {
       }) ?? "",
       /âm/,
     );
+    assert.equal(
+      validateQuantityUpdate({
+        plannedQuantity: 100,
+        completedQuantity: 150,
+        acceptedQuantity: 140,
+        rejectedQuantity: 10,
+        reworkQuantity: 0,
+        wasteQuantity: 0,
+      }),
+      null,
+    );
   });
 
   it("marks delayed when due date passed and not ready", () => {

@@ -3,13 +3,18 @@ import type {
   ItemProductionRiskStatus,
   ItemProductionSampleStatus,
 } from "@prisma/client";
+import { isNextActionOverdue } from "@/features/item-production-tracking/progress-risk";
 
-/** Risk severity for exception-first board ordering (higher = more urgent). */
+/**
+ * Exception-first board ordering.
+ * Conceptual priority:
+ * DELAYED → AT_RISK → BLOCKED / open issues → overdue next action → NEEDS_ATTENTION → deadline → normal
+ */
 export const RISK_SORT_PRIORITY: Record<ItemProductionRiskStatus, number> = {
-  DELAYED: 5,
-  AT_RISK: 4,
-  NEEDS_ATTENTION: 3,
-  BLOCKED: 2,
+  DELAYED: 50,
+  AT_RISK: 40,
+  BLOCKED: 35,
+  NEEDS_ATTENTION: 20,
   ON_TRACK: 0,
 };
 
@@ -18,14 +23,22 @@ export function sortByExceptionFirst<
     riskStatus: ItemProductionRiskStatus;
     promisedDeliveryDate: Date | string | null;
     openIssueCount?: number;
+    nextAction?: string | null;
+    nextActionDueDate?: Date | string | null;
   },
->(items: T[]): T[] {
+>(items: T[], now: Date = new Date()): T[] {
   return [...items].sort((a, b) => {
     const riskDiff = RISK_SORT_PRIORITY[b.riskStatus] - RISK_SORT_PRIORITY[a.riskStatus];
     if (riskDiff !== 0) return riskDiff;
+
     const aIssue = a.openIssueCount ?? 0;
     const bIssue = b.openIssueCount ?? 0;
     if (bIssue !== aIssue) return bIssue - aIssue;
+
+    const aOverdue = isNextActionOverdue(a.nextAction, a.nextActionDueDate ?? null, now) ? 1 : 0;
+    const bOverdue = isNextActionOverdue(b.nextAction, b.nextActionDueDate ?? null, now) ? 1 : 0;
+    if (bOverdue !== aOverdue) return bOverdue - aOverdue;
+
     const aDue = a.promisedDeliveryDate ? new Date(a.promisedDeliveryDate).getTime() : Infinity;
     const bDue = b.promisedDeliveryDate ? new Date(b.promisedDeliveryDate).getTime() : Infinity;
     return aDue - bDue;
@@ -58,5 +71,13 @@ export type ResolveIssueInput = {
 export type UpdateSampleStatusInput = {
   productionItemId: string;
   sampleStatus: ItemProductionSampleStatus;
+  adminUserId?: string | null;
+};
+
+export type UpdateNextActionInput = {
+  productionItemId: string;
+  nextAction: string | null;
+  nextActionDueDate: string | null;
+  expectedRowVersion?: number;
   adminUserId?: string | null;
 };

@@ -11,6 +11,7 @@ import {
   deriveCurrentStageKey,
   deriveDeliveryStatus,
   deriveReadyQuantity,
+  isNextActionOverdue,
 } from "@/features/item-production-tracking/progress-risk";
 import type {
   QuickStageUpdateInput,
@@ -200,6 +201,7 @@ async function recomputeItemRiskWithIssues(productionItemId: string) {
     hasRejectedOrRework,
     hasSupplier: item.supplierId != null,
     hasUnresolvedIssue: openIssues > 0,
+    hasOverdueNextAction: isNextActionOverdue(item.nextAction, item.nextActionDueDate),
   });
 
   await prisma.itemProductionTracking.update({

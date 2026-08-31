@@ -5741,6 +5741,8 @@ model ItemProductionTracking {
   actualCompletedAt    DateTime?
   lastProgressAt       DateTime?
   sampleStatus         ItemProductionSampleStatus   @default(NOT_STARTED)
+  nextAction           String?
+  nextActionDueDate    DateTime?
   note                 String?                      @db.Text
   rowVersion           Int                          @default(1)
   createdAt            DateTime                     @default(now())
@@ -5764,6 +5766,7 @@ model ItemProductionTracking {
   @@index([currentStageKey])
   @@index([workflowTemplateId])
   @@index([sampleStatus])
+  @@index([nextActionDueDate])
 }
 
 model ItemProductionStage {
@@ -5972,6 +5975,7 @@ enum ItemProductionSampleStatus {
   NOT_STARTED
   IN_PROGRESS
   WAITING_CUSTOMER
+  NEEDS_REVISION
   APPROVED
 }
 

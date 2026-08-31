@@ -132,6 +132,8 @@ export type RiskInput = {
   hasRejectedOrRework: boolean;
   hasSupplier: boolean;
   hasUnresolvedIssue?: boolean;
+  /** Overdue operational next-action — surfaces as NEEDS_ATTENTION, not DELAYED. */
+  hasOverdueNextAction?: boolean;
   now?: Date;
 };
 
@@ -169,6 +171,8 @@ export function computeRiskStatus(input: RiskInput): ItemProductionRiskStatus {
     }
   }
 
+  if (input.hasOverdueNextAction) return "NEEDS_ATTENTION";
+
   const staleMs =
     ITEM_PRODUCTION_RISK_CONFIG.staleUpdateDays * 24 * 60 * 60 * 1000;
   const last = input.lastProgressAt;
@@ -185,6 +189,11 @@ export function computeRiskStatus(input: RiskInput): ItemProductionRiskStatus {
   return "ON_TRACK";
 }
 
+/**
+ * Quantity validation for stage updates.
+ * Completed quantity MAY exceed planned/ordered (production allowance).
+ * Progress contribution is capped separately via clamp01 / stageCompletionRatio.
+ */
 export function validateQuantityUpdate(input: {
   plannedQuantity: number;
   completedQuantity: number;
@@ -207,8 +216,19 @@ export function validateQuantityUpdate(input: {
   if (input.acceptedQuantity + input.rejectedQuantity > input.completedQuantity) {
     return "Tổng đạt + lỗi không được vượt quá số lượng hoàn thành.";
   }
-  if (input.plannedQuantity > 0 && input.completedQuantity > input.plannedQuantity) {
-    return "Số lượng hoàn thành không được vượt kế hoạch công đoạn.";
-  }
   return null;
+}
+
+/** True when nextAction is set and due date is before start of today (local). */
+export function isNextActionOverdue(
+  nextAction: string | null | undefined,
+  nextActionDueDate: Date | string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!nextAction?.trim() || !nextActionDueDate) return false;
+  const due = new Date(nextActionDueDate);
+  if (Number.isNaN(due.getTime())) return false;
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  return due.getTime() < startOfToday.getTime();
 }

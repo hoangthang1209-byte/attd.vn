@@ -59,4 +59,20 @@ describe("production lean ops", () => {
     });
     assert.equal(risk, "ON_TRACK");
   });
+
+  it("flags NEEDS_ATTENTION for overdue next action", () => {
+    const risk = computeRiskStatus({
+      promisedDeliveryDate: new Date("2026-12-01"),
+      progressPercent: 40,
+      readyQuantity: 0,
+      plannedQuantity: 550,
+      lastProgressAt: new Date(),
+      productionStatus: "IN_PRODUCTION",
+      hasBlockedStage: false,
+      hasRejectedOrRework: false,
+      hasSupplier: true,
+      hasOverdueNextAction: true,
+    });
+    assert.equal(risk, "NEEDS_ATTENTION");
+  });
 });

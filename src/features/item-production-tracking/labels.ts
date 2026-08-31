@@ -66,6 +66,7 @@ export const ITEM_PRODUCTION_SAMPLE_STATUS_LABELS: Record<
   NOT_STARTED: "Chưa làm mẫu",
   IN_PROGRESS: "Đang làm mẫu",
   WAITING_CUSTOMER: "Chờ khách duyệt",
+  NEEDS_REVISION: "Cần chỉnh mẫu",
   APPROVED: "Đã duyệt",
 };
 
