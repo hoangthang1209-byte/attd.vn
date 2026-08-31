@@ -22,6 +22,11 @@ import {
   listQcInspectionsForOrder,
 } from "@/features/orders/qc-inspection.service";
 import { listOrderProductionFiles } from "@/features/orders/production-pack.service";
+import {
+  loadLeanOpsTrackingsForOrder,
+  mapLeanOpsTrackingToStages,
+  resolveLeanOpsReadyQuantity,
+} from "@/features/orders/lean-ops-execution-bridge";
 
 export type OrderItemExecutionBundle = {
   orderItemId: string;
@@ -39,10 +44,15 @@ export type OrderItemExecutionBundle = {
     stateLabel: string;
   };
   activeFileCount: number;
+  /** Present when this item uses ItemProductionTracking as execution truth. */
+  usesLeanOps: boolean;
+  leanOpsReadyQuantity: number;
 };
 
 export type ProductionExecutionBundle = {
   isLegacy: boolean;
+  /** Order has ItemProductionTracking — Lean Ops is production execution truth. */
+  usesLeanOps: boolean;
   legacyStages: ProductionStageRecord[];
   legacyQc: QcInspectionRecord | null;
   items: OrderItemExecutionBundle[];
@@ -100,24 +110,26 @@ export async function buildProductionExecutionBundle(orderId: string): Promise<P
     throw new Error("Không tìm thấy đơn hàng.");
   }
 
-  const [allStages, allQc, files] = await Promise.all([
+  const [allStages, allQc, files, leanOpsByItem] = await Promise.all([
     listAllProductionStagesForOrder(orderId),
     listQcInspectionsForOrder(orderId),
     listOrderProductionFiles(orderId),
+    loadLeanOpsTrackingsForOrder(orderId),
   ]);
 
+  const usesLeanOps = leanOpsByItem.size > 0;
   const isLegacy = hasLegacyOrderLevelStages(allStages) || hasLegacyOrderLevelQc(allQc);
 
-  if (isLegacy && allStages.length === 0 && order.items.length > 0) {
+  // Do not seed competing OrderProductionStage rows when Lean Ops tracking exists.
+  if (!usesLeanOps && isLegacy && allStages.length === 0 && order.items.length > 0) {
     await ensureProductionStagesInitializedForOrder(orderId);
   }
 
   let stages = allStages.length > 0 ? allStages : await listAllProductionStagesForOrder(orderId);
-  let qcRecords = allQc;
+  const qcRecords = allQc;
+  const legacyData = isLegacy && !usesLeanOps;
 
-  const legacyData = isLegacy;
-
-  if (!legacyData && stages.length === 0) {
+  if (!usesLeanOps && !legacyData && stages.length === 0) {
     for (const item of order.items) {
       await ensureProductionStagesForOrderItem(orderId, item.id);
     }
@@ -126,17 +138,25 @@ export async function buildProductionExecutionBundle(orderId: string): Promise<P
 
   const stageGroups = groupStagesByItem(stages);
   const qcGroups = groupQcByItem(qcRecords);
-
   const activeFiles = files.filter((f) => f.status === "ACTIVE");
 
   const items: OrderItemExecutionBundle[] = await Promise.all(
     order.items.map(async (item) => {
       const orderedQuantity = resolveOrderItemTotalQuantity(item);
       const itemFiles = activeFiles.filter((f) => f.orderItemId === item.id);
-      const itemStages = legacyData
-        ? stageGroups.legacy
-        : stageGroups.byItem.get(item.id) ??
+      const leanTracking = leanOpsByItem.get(item.id);
+      const itemUsesLeanOps = Boolean(leanTracking);
+
+      let itemStages: ProductionStageRecord[];
+      if (leanTracking) {
+        itemStages = mapLeanOpsTrackingToStages(orderId, leanTracking);
+      } else if (legacyData) {
+        itemStages = stageGroups.legacy;
+      } else {
+        itemStages =
+          stageGroups.byItem.get(item.id) ??
           (await ensureProductionStagesForOrderItem(orderId, item.id));
+      }
 
       let itemQc = legacyData ? qcGroups.legacy : qcGroups.byItem.get(item.id) ?? null;
       if (!legacyData && !itemQc) {
@@ -166,6 +186,8 @@ export async function buildProductionExecutionBundle(orderId: string): Promise<P
         qc: itemQc,
         readiness,
         activeFileCount: itemFiles.length,
+        usesLeanOps: itemUsesLeanOps,
+        leanOpsReadyQuantity: leanTracking ? resolveLeanOpsReadyQuantity(leanTracking) : 0,
       };
     }),
   );
@@ -174,6 +196,7 @@ export async function buildProductionExecutionBundle(orderId: string): Promise<P
 
   return {
     isLegacy: legacyData,
+    usesLeanOps,
     legacyStages: legacyData ? stageGroups.legacy : [],
     legacyQc: legacyData ? qcGroups.legacy : null,
     items,
@@ -188,6 +211,12 @@ export async function getItemProductionStages(
   orderId: string,
   orderItemId: string,
 ): Promise<ProductionStageRecord[]> {
+  const leanOps = await loadLeanOpsTrackingsForOrder(orderId);
+  const tracking = leanOps.get(orderItemId);
+  if (tracking) {
+    return mapLeanOpsTrackingToStages(orderId, tracking);
+  }
+
   const legacyCount = await prisma.orderProductionStage.count({
     where: { orderId, orderItemId: null },
   });

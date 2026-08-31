@@ -5,6 +5,7 @@ import {
   PRODUCTION_STAGE_TYPE_LABELS,
   type HandoverReadinessState,
 } from "@/features/orders/production-execution-labels";
+import { LEAN_OPS_STAGE_KEY_TO_TYPE } from "@/features/orders/lean-ops-execution-bridge";
 import { computeStageProgressSummary } from "@/features/orders/production-stage.service";
 import { qcBoardStatusLabel } from "@/features/orders/qc-inspection.service";
 import { decimalToNumber } from "@/features/orders/production-quantity";
@@ -118,7 +119,7 @@ export async function batchGetProductionExecutionIndicators(
   const result = new Map<string, ProductionExecutionIndicators>();
   if (orderIds.length === 0) return result;
 
-  const [stages, qcs] = await Promise.all([
+  const [stages, qcs, leanStages] = await Promise.all([
     prisma.orderProductionStage.findMany({
       where: { orderId: { in: orderIds } },
       select: { orderId: true, stageType: true, status: true },
@@ -127,23 +128,46 @@ export async function batchGetProductionExecutionIndicators(
       where: { orderId: { in: orderIds } },
       select: { orderId: true, status: true, passedQuantity: true },
     }),
+    prisma.itemProductionStage.findMany({
+      where: {
+        productionItem: { orderItem: { orderId: { in: orderIds } } },
+        isApplicable: true,
+      },
+      select: {
+        stageKey: true,
+        status: true,
+        productionItem: { select: { orderItem: { select: { orderId: true } } } },
+      },
+    }),
   ]);
 
-  const stagesByOrder = new Map<string, typeof stages>();
+  const stagesByOrder = new Map<string, Array<{ stageType: string; status: string }>>();
   for (const stage of stages) {
     const list = stagesByOrder.get(stage.orderId) ?? [];
     list.push(stage);
     stagesByOrder.set(stage.orderId, list);
   }
 
+  const leanByOrder = new Map<string, Array<{ stageType: string; status: string }>>();
+  for (const stage of leanStages) {
+    const orderId = stage.productionItem.orderItem.orderId;
+    const list = leanByOrder.get(orderId) ?? [];
+    list.push({
+      stageType: LEAN_OPS_STAGE_KEY_TO_TYPE[stage.stageKey],
+      status: stage.status,
+    });
+    leanByOrder.set(orderId, list);
+  }
+
   const qcByOrder = new Map(qcs.map((q) => [q.orderId, q]));
 
   for (const order of orders) {
+    const lean = leanByOrder.get(order.id);
     result.set(
       order.id,
       computeIndicatorsFromRecords({
         orderStatus: order.status,
-        stages: stagesByOrder.get(order.id) ?? [],
+        stages: lean && lean.length > 0 ? lean : stagesByOrder.get(order.id) ?? [],
         qc: qcByOrder.get(order.id) ?? null,
       }),
     );

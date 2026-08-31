@@ -565,8 +565,14 @@ export async function updateOrderStatus(id: string, input: UpdateOrderStatusInpu
   });
 
   if (input.status === "IN_PRODUCTION" && !order.productionStartedAt) {
-    const stageCount = await prisma.orderProductionStage.count({ where: { orderId: id } });
-    if (stageCount === 0) {
+    const [stageCount, leanOpsCount] = await Promise.all([
+      prisma.orderProductionStage.count({ where: { orderId: id } }),
+      prisma.itemProductionTracking.count({
+        where: { orderItem: { orderId: id } },
+      }),
+    ]);
+    // Lean Ops tracking is the production execution truth — do not seed competing legacy stages.
+    if (stageCount === 0 && leanOpsCount === 0) {
       await initializeProductionStages(id);
     }
   }

@@ -12,7 +12,6 @@ import {
 } from "@/features/orders/production-execution-labels";
 import {
   computeStageProgressSummary,
-  ensureProductionStagesInitializedForOrder,
   type ProductionStageRecord,
 } from "@/features/orders/production-stage.service";
 import {
@@ -20,7 +19,6 @@ import {
   ProductionExecutionValidationError,
 } from "@/features/orders/production-quantity";
 import {
-  getQcInspection,
   qcBoardStatusLabel,
   type QcInspectionRecord,
 } from "@/features/orders/qc-inspection.service";
@@ -110,6 +108,9 @@ export async function evaluateHandoverReadiness(
     (sum, item) => sum + resolveOrderItemTotalQuantity(item),
     0,
   );
+  const leanOpsReadyQuantity = bundle.usesLeanOps
+    ? bundle.items.reduce((sum, item) => sum + item.leanOpsReadyQuantity, 0)
+    : 0;
 
   const missingConditions: string[] = [];
 
@@ -186,6 +187,18 @@ export async function evaluateHandoverReadiness(
     missingConditions.push("Chưa hoàn tất đóng gói.");
   }
 
+  // Order-level packing flags for Lean Ops: all items packing-ready.
+  const packingCompleted = bundle.usesLeanOps
+    ? packingOk && bundle.items.every((item) => {
+        const summary = computeStageProgressSummary(item.stages);
+        return summary.packingCompleted || summary.packingSkipped;
+      })
+    : stageSummary.packingCompleted;
+  const packingSkipped = bundle.usesLeanOps
+    ? packingOk &&
+      bundle.items.every((item) => computeStageProgressSummary(item.stages).packingSkipped)
+    : stageSummary.packingSkipped;
+
   if (stageSummary.hasBlocked) {
     const blocked = stages.filter((s) => s.status === "BLOCKED");
     for (const stage of blocked) {
@@ -221,16 +234,22 @@ export async function evaluateHandoverReadiness(
     isReady,
     missingConditions,
     expectedOrderQuantity,
-    productionCompletedQuantity: computeProductionCompletedQuantity(stages),
+    productionCompletedQuantity: bundle.usesLeanOps
+      ? leanOpsReadyQuantity
+      : computeProductionCompletedQuantity(stages),
     qcPassedQuantity: qcPassed,
     reworkQuantity: reworkQuantityFinal,
     defectAndScrapQuantity: defectAndScrapFinal,
-    packingCompleted: stageSummary.packingCompleted,
-    packingSkipped: stageSummary.packingSkipped,
+    packingCompleted,
+    packingSkipped,
     stageProgressLabel: stageSummary.progressLabel,
     qcStatusLabel: qcBoardStatusLabel(qcStatus),
     hasBlockedStage: stageSummary.hasBlocked,
-    partialDeliveryAllowed: expectedOrderQuantity > 0 && qcPassed > 0 && qcPassed < expectedOrderQuantity,
+    partialDeliveryAllowed:
+      expectedOrderQuantity > 0 &&
+      (bundle.usesLeanOps
+        ? leanOpsReadyQuantity > 0 && leanOpsReadyQuantity < expectedOrderQuantity
+        : qcPassed > 0 && qcPassed < expectedOrderQuantity),
     usedOverride: false,
     overrideReason: null,
   };
@@ -304,13 +323,15 @@ export async function getOrderExecutionSummary(orderId: string): Promise<OrderEx
     throw new ProductionExecutionValidationError("Không tìm thấy đơn hàng.");
   }
 
-  const stageCount = await prisma.orderProductionStage.count({ where: { orderId } });
-  const stages = stageCount > 0
-    ? await ensureProductionStagesInitializedForOrder(orderId)
-    : [];
-  const stageSummary = computeStageProgressSummary(stages);
-  const qc = await getQcInspection(orderId, null);
   const readiness = await evaluateHandoverReadiness(orderId);
+  const bundle = await buildProductionExecutionBundle(orderId);
+  const stages = bundle.isLegacy
+    ? bundle.legacyStages
+    : bundle.items.flatMap((item) => item.stages);
+  const stageSummary = computeStageProgressSummary(stages);
+  const qc = bundle.isLegacy
+    ? bundle.legacyQc
+    : bundle.items.map((item) => item.qc).find(Boolean) ?? null;
 
   const overrideActivity = await prisma.orderActivity.findFirst({
     where: {
@@ -322,10 +343,10 @@ export async function getOrderExecutionSummary(orderId: string): Promise<OrderEx
 
   return {
     stageProgressLabel: stages.length > 0 ? stageSummary.progressLabel : "—",
-    qcStatusLabel: qcBoardStatusLabel(qc?.status),
-    packingLabel: stageSummary.packingCompleted
+    qcStatusLabel: qcBoardStatusLabel(qc?.status ?? null),
+    packingLabel: readiness.packingCompleted
       ? "Đã đóng gói"
-      : stageSummary.packingSkipped
+      : readiness.packingSkipped
         ? "Bỏ qua đóng gói"
         : "Chưa đóng gói",
     handoverState: readiness.state,
