@@ -58,3 +58,30 @@ export const ITEM_PRODUCTION_BATCH_STATUS_LABELS: Record<ItemProductionBatchStat
   COMPLETED: "Hoàn thành",
   CANCELLED: "Đã hủy",
 };
+
+export const ITEM_PRODUCTION_SAMPLE_STATUS_LABELS: Record<
+  import("@prisma/client").ItemProductionSampleStatus,
+  string
+> = {
+  NOT_STARTED: "Chưa làm mẫu",
+  IN_PROGRESS: "Đang làm mẫu",
+  WAITING_CUSTOMER: "Chờ khách duyệt",
+  APPROVED: "Đã duyệt",
+};
+
+export const ITEM_PRODUCTION_ISSUE_TYPE_LABELS: Record<
+  import("@prisma/client").ItemProductionIssueType,
+  string
+> = {
+  MISSING_MATERIAL: "Thiếu nguyên liệu",
+  FACTORY_DELAY: "Xưởng chậm",
+  WRONG_COLOR: "Sai màu",
+  PRINT_DEFECT: "In lỗi",
+  EMBROIDERY_DEFECT: "Thêu lỗi",
+  WASH_DEFECT: "Wash lỗi",
+  SEWING_DEFECT: "May lỗi",
+  QC_DEFECT: "QC lỗi",
+  WAITING_CUSTOMER: "Chờ khách duyệt",
+  WAITING_SUPPLIER: "Chờ nhà cung cấp",
+  OTHER: "Khác",
+};

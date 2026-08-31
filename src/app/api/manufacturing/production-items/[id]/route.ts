@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import type { ItemProductionStatus } from "@prisma/client";
+import type { ItemProductionSampleStatus, ItemProductionStatus } from "@prisma/client";
 import { can } from "@/features/auth/admin-permissions";
+import { updateSampleStatus } from "@/features/item-production-tracking/item-production-lean-ops.service";
 import {
   getProductionItem,
   updateProductionItem,
@@ -37,12 +38,21 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       note?: string | null;
       promisedDeliveryDate?: string | null;
       productionStatus?: ItemProductionStatus;
+      sampleStatus?: ItemProductionSampleStatus;
       expectedRowVersion?: number;
     };
     if ((body.supplierId !== undefined || body.assignedEmployeeId !== undefined) && !canAssign) {
       return NextResponse.json({ message: "Không có quyền phân công" }, { status: 403 });
     }
-    const item = await updateProductionItem(id, body);
+    if (body.sampleStatus !== undefined) {
+      await updateSampleStatus({
+        productionItemId: id,
+        sampleStatus: body.sampleStatus,
+        adminUserId: auth.session.userId ?? null,
+      });
+    }
+    const { sampleStatus: _sample, ...rest } = body;
+    const item = await updateProductionItem(id, rest);
     return NextResponse.json({ item });
   } catch (err) {
     return NextResponse.json(

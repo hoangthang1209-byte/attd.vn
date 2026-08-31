@@ -30,6 +30,8 @@ export type ProductionListFilters = {
   unallocated?: boolean;
   batchStatus?: string;
   batchRiskStatus?: ItemProductionRiskStatus;
+  hasIssue?: boolean;
+  sampleStatus?: import("@prisma/client").ItemProductionSampleStatus;
   page?: number;
   pageSize?: number;
 };
@@ -137,6 +139,14 @@ export type ProductionItemListRowDTO = {
   stages: ProductionStageDTO[];
   orderItem: ProductionOrderItemDTO;
   batchSummary?: ProductionBatchSummaryDTO;
+  openIssueCount?: number;
+  sampleStatus?: import("@prisma/client").ItemProductionSampleStatus;
+  issues?: Array<{
+    id: string;
+    issueType: import("@prisma/client").ItemProductionIssueType;
+    note: string | null;
+    createdAt: string;
+  }>;
 };
 
 export type ProductionBatchSummaryDTO = {

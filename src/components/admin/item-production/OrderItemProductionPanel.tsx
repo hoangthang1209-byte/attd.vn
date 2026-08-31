@@ -17,6 +17,11 @@ export default function OrderItemProductionPanel({ orderId, orderStatus }: Props
     averageProgressPercent: number;
     readyQuantity: number;
     plannedQuantity: number;
+    totalOrderedQuantity?: number;
+    sampleApprovedCount?: number;
+    inProductionCount?: number;
+    qcCount?: number;
+    readyToShipCount?: number;
     atRiskCount: number;
     delayedCount: number;
   } | null>(null);
@@ -81,11 +86,20 @@ export default function OrderItemProductionPanel({ orderId, orderStatus }: Props
         <>
           {error ? <p className="admin-error">{error}</p> : null}
           {summary && summary.total > 0 ? (
-            <p className="admin-field-hint" style={{ margin: 0 }}>
-              {summary.total} item · tiến độ TB {summary.averageProgressPercent}% · sẵn sàng{" "}
-              {summary.readyQuantity}/{summary.plannedQuantity} · rủi ro {summary.atRiskCount} · trễ{" "}
-              {summary.delayedCount}
-            </p>
+            <div style={{ display: "grid", gap: 8 }}>
+              <p className="admin-field-hint" style={{ margin: 0 }}>
+                {summary.total} item · {summary.totalOrderedQuantity?.toLocaleString("vi-VN") ?? summary.plannedQuantity} pcs · tiến độ TB{" "}
+                {summary.averageProgressPercent}%
+              </p>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <span>Mẫu duyệt: {summary.sampleApprovedCount ?? 0}/{summary.total}</span>
+                <span>Đang SX: {summary.inProductionCount ?? 0}</span>
+                <span>QC: {summary.qcCount ?? 0}</span>
+                <span>Sẵn sàng: {summary.readyToShipCount ?? summary.readyQuantity}</span>
+                <span>Nguy cơ: {summary.atRiskCount ?? 0}</span>
+                <span>Trễ: {summary.delayedCount ?? 0}</span>
+              </div>
+            </div>
           ) : (
             <p className="admin-field-hint" style={{ margin: 0 }}>
               Chưa khởi tạo theo dõi sản xuất cho các item của đơn này.

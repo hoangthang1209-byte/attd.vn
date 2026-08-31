@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -11,16 +11,26 @@ import {
   WorkspaceToolbarEnd,
 } from "@/components/admin/AdminUi";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
-import { ITEM_PRODUCTION_STAGE_LABELS } from "@/features/item-production-tracking/config";
+import { ITEM_PRODUCTION_RISK_CONFIG, ITEM_PRODUCTION_STAGE_SHORT_LABELS } from "@/features/item-production-tracking/config";
 import {
   ITEM_PRODUCTION_RISK_LABELS,
+  ITEM_PRODUCTION_SAMPLE_STATUS_LABELS,
   ITEM_PRODUCTION_STATUS_LABELS,
 } from "@/features/item-production-tracking/labels";
-import type { ItemProductionRiskStatus, ItemProductionStageKey, ItemProductionStatus } from "@prisma/client";
+import type {
+  ItemProductionIssueType,
+  ItemProductionRiskStatus,
+  ItemProductionSampleStatus,
+  ItemProductionStageKey,
+  ItemProductionStatus,
+} from "@prisma/client";
 import ItemProductionStageDrawer from "@/components/admin/item-production/ItemProductionStageDrawer";
 import ItemProductionDetailDrawer from "@/components/admin/item-production/ItemProductionDetailDrawer";
 import ItemProductionBatchPanel from "@/components/admin/item-production/ItemProductionBatchPanel";
-import { ITEM_PRODUCTION_RISK_CONFIG } from "@/features/item-production-tracking/config";
+import ItemProductionQuickUpdateModal from "@/components/admin/item-production/ItemProductionQuickUpdateModal";
+import ItemProductionIssueModal from "@/components/admin/item-production/ItemProductionIssueModal";
+import ItemProductionResolveIssueModal from "@/components/admin/item-production/ItemProductionResolveIssueModal";
+import ItemProductionOrderHeader from "@/components/admin/item-production/ItemProductionOrderHeader";
 
 type StageCell = {
   id: string;
@@ -31,6 +41,8 @@ type StageCell = {
   status: string;
   plannedQuantity: number;
   completedQuantity: number;
+  rejectedQuantity: number;
+  reworkQuantity: number;
 };
 
 type ListItem = {
@@ -72,6 +84,9 @@ type ListItem = {
     supplierCount: number;
     usesBatchExecution: boolean;
   };
+  sampleStatus?: ItemProductionSampleStatus;
+  openIssueCount?: number;
+  issues?: Array<{ id: string; issueType: ItemProductionIssueType; note: string | null }>;
 };
 
 type Kpis = {
@@ -92,21 +107,6 @@ function riskTone(risk: ItemProductionRiskStatus): "neutral" | "info" | "success
   return "neutral";
 }
 
-function stageCellContent(stage: StageCell) {
-  if (!stage.isApplicable || stage.status === "SKIPPED") return "—";
-  if (stage.status === "BLOCKED") return "!";
-  if (stage.status === "COMPLETED") return "✓";
-  if (stage.status === "IN_PROGRESS") {
-    return "●";
-  }
-  return "—";
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString("vi-VN");
-}
-
 function toStartOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -114,27 +114,6 @@ function toStartOfDay(date: Date) {
 function differenceInDays(target: Date, now: Date) {
   const ms = toStartOfDay(target).getTime() - toStartOfDay(now).getTime();
   return Math.round(ms / (24 * 60 * 60 * 1000));
-}
-
-function relativeTime(value: string | null) {
-  if (!value) return "Chưa cập nhật";
-  const now = Date.now();
-  const ts = new Date(value).getTime();
-  const diffMs = Math.max(0, now - ts);
-  const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return "Vừa xong";
-  if (minutes < 60) return `${minutes} phút trước`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} giờ trước`;
-  const days = Math.floor(hours / 24);
-  return `${days} ngày trước`;
-}
-
-function stageTone(status: string): "neutral" | "info" | "warning" | "success" {
-  if (status === "COMPLETED") return "success";
-  if (status === "IN_PROGRESS") return "info";
-  if (status === "BLOCKED") return "warning";
-  return "neutral";
 }
 
 type FilterMap = Record<string, string>;
@@ -145,6 +124,34 @@ type AlertItem = {
   value: number;
   tone: "warning" | "danger" | "info";
   filter: FilterMap;
+};
+
+function getCurrentStage(item: ListItem) {
+  const applicable = item.stages.filter((s) => s.isApplicable && s.status !== "SKIPPED");
+  if (item.currentStageKey) {
+    const byKey = applicable.find((s) => s.stageKey === item.currentStageKey);
+    if (byKey) return byKey;
+  }
+  return (
+    applicable.find((s) => s.status === "IN_PROGRESS" || s.status === "BLOCKED") ??
+    applicable.find((s) => s.status === "NOT_STARTED") ??
+    null
+  );
+}
+
+function isExceptionRow(item: ListItem) {
+  return (
+    item.riskStatus !== "ON_TRACK" ||
+    (item.openIssueCount ?? 0) > 0 ||
+    item.sampleStatus !== "APPROVED"
+  );
+}
+
+type QuickUpdateTarget = {
+  productionItemId: string;
+  rowVersion: number;
+  orderedQuantity: number;
+  stage: StageCell;
 };
 
 export default function ItemProductionTimelineManager() {
@@ -160,6 +167,16 @@ export default function ItemProductionTimelineManager() {
   const [stageDrawerId, setStageDrawerId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [batchPanelId, setBatchPanelId] = useState<string | null>(null);
+  const [quickUpdate, setQuickUpdate] = useState<QuickUpdateTarget | null>(null);
+  const [issueItemId, setIssueItemId] = useState<string | null>(null);
+  const [resolveIssueTarget, setResolveIssueTarget] = useState<{
+    productionItemId: string;
+    issues: Array<{ id: string; issueType: ItemProductionIssueType; note: string | null }>;
+  } | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<Array<{ id: string; fullName: string }>>([]);
+
+  const orderFilter = searchParams.get("order") ?? searchParams.get("orderId") ?? "";
 
   const page = Number(searchParams.get("page") ?? "1") || 1;
   const pageSize = Number(searchParams.get("pageSize") ?? "20") || 20;
@@ -202,6 +219,24 @@ export default function ItemProductionTimelineManager() {
     });
   }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadEmployees() {
+      const res = await fetch("/api/employees?isActive=true&pageSize=100");
+      const json = await res.json();
+      if (!cancelled && res.ok) {
+        setEmployees((json.items ?? json.employees ?? []).map((e: { id: string; fullName: string }) => ({
+          id: e.id,
+          fullName: e.fullName,
+        })));
+      }
+    }
+    void loadEmployees();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function applyKpiFilter(filter: Record<string, string> | null) {
     const next = new URLSearchParams();
     if (filter) {
@@ -209,16 +244,6 @@ export default function ItemProductionTimelineManager() {
     }
     router.replace(`${pathname}?${next.toString()}`);
   }
-
-  const stageKeys = useMemo(() => {
-    const keys = new Set<ItemProductionStageKey>();
-    for (const item of items) {
-      for (const stage of item.stages) keys.add(stage.stageKey);
-    }
-    return (Object.keys(ITEM_PRODUCTION_STAGE_LABELS) as ItemProductionStageKey[]).filter((k) =>
-      keys.size === 0 ? true : keys.has(k),
-    );
-  }, [items]);
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const shippingToday = useMemo(
@@ -320,20 +345,39 @@ export default function ItemProductionTimelineManager() {
     });
   }, [items, searchParams]);
 
-  const stickyOffsets = { order: 0, product: 110, progress: 390, risk: 510 };
+  const stickyOffsets = { order: 0, product: 100, stage: 340 };
+  const orderFilterActive = Boolean(orderFilter);
+
+  async function patchItemField(
+    itemId: string,
+    patch: Record<string, string | null>,
+    rowVersion: number,
+  ) {
+    const res = await fetch(`/api/manufacturing/production-items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...patch, expectedRowVersion: rowVersion }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message ?? "Cập nhật thất bại");
+    toast.success("Đã cập nhật");
+    void load();
+  }
+
   return (
     <div className="admin-panel">
+      {orderFilterActive ? <ItemProductionOrderHeader orderId={orderFilter} /> : null}
       <div
         className="admin-catalog-kpi-bar"
         style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, marginBottom: 16 }}
       >
         {[
-          { key: "inProduction", label: "In Production", value: kpis?.inProduction ?? 0, tone: "#166534", bg: "#ecfdf3", filter: { productionStatus: "IN_PRODUCTION" } as FilterMap },
-          { key: "needsAttention", label: "Needs Attention", value: kpis?.needsAttention ?? 0, tone: "#a16207", bg: "#fffbeb", filter: { riskStatus: "NEEDS_ATTENTION" } as FilterMap },
-          { key: "delayed", label: "Delayed", value: kpis?.delayed ?? 0, tone: "#991b1b", bg: "#fef2f2", filter: { riskStatus: "DELAYED" } as FilterMap },
-          { key: "readyToShip", label: "Ready to Ship", value: kpis?.readyToShip ?? 0, tone: "#1d4ed8", bg: "#eff6ff", filter: { readyToShip: "1" } as FilterMap },
-          { key: "shippingToday", label: "Shipping Today", value: shippingToday, tone: "#0f766e", bg: "#f0fdfa", filter: { shippingToday: "1" } as FilterMap },
-          { key: "stale", label: "Overdue Updates", value: kpis?.stale ?? 0, tone: "#7c2d12", bg: "#fff7ed", filter: { onlyStale: "1" } as FilterMap },
+          { key: "inProduction", label: "Đang SX", value: kpis?.inProduction ?? 0, tone: "#166534", bg: "#ecfdf3", filter: { productionStatus: "IN_PRODUCTION" } as FilterMap },
+          { key: "needsAttention", label: "Cần chú ý", value: kpis?.needsAttention ?? 0, tone: "#a16207", bg: "#fffbeb", filter: { riskStatus: "NEEDS_ATTENTION" } as FilterMap },
+          { key: "delayed", label: "Đã trễ", value: kpis?.delayed ?? 0, tone: "#991b1b", bg: "#fef2f2", filter: { riskStatus: "DELAYED" } as FilterMap },
+          { key: "readyToShip", label: "Sẵn sàng giao", value: kpis?.readyToShip ?? 0, tone: "#1d4ed8", bg: "#eff6ff", filter: { readyToShip: "1" } as FilterMap },
+          { key: "shippingToday", label: "Giao hôm nay", value: shippingToday, tone: "#0f766e", bg: "#f0fdfa", filter: { shippingToday: "1" } as FilterMap },
+          { key: "stale", label: "Quá hạn cập nhật", value: kpis?.stale ?? 0, tone: "#7c2d12", bg: "#fff7ed", filter: { onlyStale: "1" } as FilterMap },
         ].map((card) => (
           <button
             key={card.key}
@@ -413,6 +457,46 @@ export default function ItemProductionTimelineManager() {
             </option>
           ))}
         </select>
+        <select
+          className="admin-select"
+          value={searchParams.get("currentStage") ?? ""}
+          onChange={(e) => setParam("currentStage", e.target.value || null)}
+        >
+          <option value="">Công đoạn</option>
+          {Object.entries(ITEM_PRODUCTION_STAGE_SHORT_LABELS).map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="admin-select"
+          value={searchParams.get("pic") ?? searchParams.get("assignedEmployeeId") ?? ""}
+          onChange={(e) => setParam("pic", e.target.value || null)}
+        >
+          <option value="">PIC</option>
+          {employees.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.fullName}
+            </option>
+          ))}
+        </select>
+        <label className="admin-field-hint" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={searchParams.get("hasIssue") === "1"}
+            onChange={(e) => setParam("hasIssue", e.target.checked ? "1" : null)}
+          />
+          Có vấn đề
+        </label>
+        <label className="admin-field-hint" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={searchParams.get("readyToShip") === "1"}
+            onChange={(e) => setParam("readyToShip", e.target.checked ? "1" : null)}
+          />
+          Sẵn sàng giao
+        </label>
         <label className="admin-field-hint" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
           <input
             type="checkbox"
@@ -481,32 +565,26 @@ export default function ItemProductionTimelineManager() {
             <table className="admin-table admin-table--compact">
               <thead>
                 <tr>
-                  <th style={{ position: "sticky", left: stickyOffsets.order, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 110 }}>
-                    Đơn
-                  </th>
-                  <th style={{ minWidth: 160 }}>Khách hàng</th>
-                  <th style={{ position: "sticky", left: stickyOffsets.product, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 280 }}>
-                    Sản phẩm / SKU
-                  </th>
-                  <th style={{ minWidth: 130 }}>Lô SX</th>
-                  <th style={{ minWidth: 130 }}>Xưởng</th>
-                  <th style={{ minWidth: 120 }}>PIC</th>
-                  <th style={{ position: "sticky", left: stickyOffsets.progress, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 120 }}>
-                    Tiến độ
-                  </th>
-                  <th style={{ position: "sticky", left: stickyOffsets.risk, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 130 }}>
-                    Rủi ro
-                  </th>
-                  <th style={{ minWidth: 110 }}>Số lượng</th>
-                  <th style={{ minWidth: 140 }}>Sẵn sàng giao</th>
-                  <th style={{ minWidth: 130 }}>ETA</th>
-                  <th style={{ minWidth: 110 }}>Ngày giao</th>
-                  <th style={{ minWidth: 120 }}>Cập nhật</th>
-                  {stageKeys.map((key) => (
-                    <th key={key} title={ITEM_PRODUCTION_STAGE_LABELS[key]}>
-                      {ITEM_PRODUCTION_STAGE_LABELS[key]}
+                  {!orderFilterActive ? (
+                    <th style={{ position: "sticky", left: stickyOffsets.order, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 90 }}>
+                      Đơn
                     </th>
-                  ))}
+                  ) : null}
+                  {!orderFilterActive ? <th style={{ minWidth: 120 }}>Khách</th> : null}
+                  <th style={{ position: "sticky", left: orderFilterActive ? 0 : stickyOffsets.product, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 220 }}>
+                    Sản phẩm
+                  </th>
+                  <th style={{ minWidth: 70 }}>SL đặt</th>
+                  <th style={{ minWidth: 110 }}>Mẫu</th>
+                  <th style={{ position: "sticky", left: orderFilterActive ? 220 : stickyOffsets.stage, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 150 }}>
+                    Công đoạn
+                  </th>
+                  <th style={{ minWidth: 90 }}>Sẵn sàng</th>
+                  <th style={{ minWidth: 90 }}>Hạn giao</th>
+                  <th style={{ minWidth: 100 }}>PIC</th>
+                  <th style={{ minWidth: 100 }}>Rủi ro</th>
+                  <th style={{ minWidth: 90 }}>Vấn đề</th>
+                  <th style={{ minWidth: 140 }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -521,148 +599,244 @@ export default function ItemProductionTimelineManager() {
                     item.orderItem.designMediaAsset?.thumbnailUrl ||
                     item.orderItem.designMediaAsset?.url ||
                     item.orderItem.designImageUrl;
-                  const progress = Number(item.progressPercent);
-                  const readyRatio = item.plannedQuantity > 0 ? Math.round((item.readyQuantity / item.plannedQuantity) * 100) : 0;
-                  const etaText = (() => {
-                    if (!item.promisedDeliveryDate) return "—";
-                    const days = differenceInDays(new Date(item.promisedDeliveryDate), now);
-                    if (days < 0) return `Trễ ${Math.abs(days)} ngày`;
-                    if (days === 0) return "Hôm nay";
-                    return `Còn ${days} ngày`;
-                  })();
-                  const stageMap = new Map(item.stages.map((s) => [s.stageKey, s]));
+                  const currentStage = getCurrentStage(item);
+                  const exception = isExceptionRow(item);
+                  const sampleStatus = item.sampleStatus ?? "NOT_STARTED";
+                  const sampleWarning = sampleStatus !== "APPROVED";
                   return (
-                    <tr key={item.id}>
-                      <td style={{ position: "sticky", left: stickyOffsets.order, background: "var(--admin-surface, #fff)", zIndex: 2 }}>
-                        <button type="button" className="admin-link" onClick={() => setDetailId(item.id)}>
-                          {item.orderItem.order.orderNo}
-                        </button>
-                      </td>
-                      <td>{customer}</td>
-                      <td style={{ position: "sticky", left: stickyOffsets.product, background: "var(--admin-surface, #fff)", zIndex: 2 }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          {image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={image} alt="" width={36} height={36} style={{ objectFit: "cover", borderRadius: 4 }} />
-                          ) : null}
-                          <div>
+                    <Fragment key={item.id}>
+                      <tr
+                        style={{
+                          background: exception ? (item.riskStatus === "DELAYED" || item.riskStatus === "BLOCKED" ? "#fef2f2" : "#fffbeb") : undefined,
+                        }}
+                      >
+                        {!orderFilterActive ? (
+                          <td style={{ position: "sticky", left: stickyOffsets.order, background: "inherit", zIndex: 2 }}>
                             <button type="button" className="admin-link" onClick={() => setDetailId(item.id)}>
-                              {item.orderItem.productNameSnapshot ?? "Item"}
+                              {item.orderItem.order.orderNo}
                             </button>
-                            <div className="admin-field-hint">
-                              {item.orderItem.colorSnapshot || item.orderItem.variantNameSnapshot || "—"} · SKU{" "}
-                              {item.orderItem.skuSnapshot || item.orderItem.id.slice(0, 8)}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        {item.batchSummary?.hasBatches ? (
-                          <div>
-                            <button type="button" className="admin-link" onClick={() => setBatchPanelId(item.id)}>
-                              {item.batchSummary.batchCount} lô
-                            </button>
-                            <div className="admin-field-hint">
-                              {item.batchSummary.allocatedQuantity.toLocaleString("vi-VN")} /{" "}
-                              {item.plannedQuantity.toLocaleString("vi-VN")} đã phân bổ
-                            </div>
-                            {item.batchSummary.unallocatedQuantity > 0 ? (
-                              <div className="admin-field-hint" style={{ color: "#b45309" }}>
-                                {item.batchSummary.unallocatedQuantity.toLocaleString("vi-VN")} chưa phân bổ
-                              </div>
+                          </td>
+                        ) : null}
+                        {!orderFilterActive ? <td>{customer}</td> : null}
+                        <td style={{ position: "sticky", left: orderFilterActive ? 0 : stickyOffsets.product, background: "inherit", zIndex: 2 }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            {image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={image} alt="" width={32} height={32} style={{ objectFit: "cover", borderRadius: 4 }} />
                             ) : null}
+                            <div>
+                              <strong>{item.orderItem.productNameSnapshot ?? "Item"}</strong>
+                              <div className="admin-field-hint">
+                                {item.orderItem.skuSnapshot || item.orderItem.id.slice(0, 8)}
+                              </div>
+                            </div>
                           </div>
-                        ) : (
-                          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setBatchPanelId(item.id)}>
-                            Chia lô sản xuất
-                          </button>
-                        )}
-                      </td>
-                      <td>
-                        {item.batchSummary?.usesBatchExecution
-                          ? `${item.batchSummary.supplierCount} xưởng`
-                          : item.supplier?.name ?? "—"}
-                      </td>
-                      <td>{item.assignedEmployee?.fullName ?? "—"}</td>
-                      <td style={{ position: "sticky", left: stickyOffsets.progress, background: "var(--admin-surface, #fff)", zIndex: 2 }}>
-                        <div style={{ display: "grid", gap: 5 }}>
-                          <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                            <div style={{ width: `${Math.min(100, Math.max(0, progress))}%`, height: "100%", background: "#2563eb" }} />
-                          </div>
-                          <strong>{progress.toLocaleString("vi-VN")}%</strong>
-                        </div>
-                      </td>
-                      <td style={{ position: "sticky", left: stickyOffsets.risk, background: "var(--admin-surface, #fff)", zIndex: 2 }}>
-                        <StatusBadge tone={riskTone(item.riskStatus)}>{ITEM_PRODUCTION_RISK_LABELS[item.riskStatus]}</StatusBadge>
-                      </td>
-                      <td>
-                        <div>{item.orderedQuantity}</div>
-                        <div className="admin-field-hint">{ITEM_PRODUCTION_STATUS_LABELS[item.productionStatus]}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 700 }}>
-                          {item.readyQuantity}/{item.plannedQuantity}
-                        </div>
-                        <div className="admin-field-hint">{readyRatio}%</div>
-                      </td>
-                      <td>{etaText}</td>
-                      <td>{formatDate(item.promisedDeliveryDate)}</td>
-                      <td>{relativeTime(item.lastProgressAt)}</td>
-                      {stageKeys.map((key) => {
-                        const stage = stageMap.get(key);
-                        if (!stage) {
-                          return (
-                            <td key={key} className="admin-field-hint">
-                              —
-                            </td>
-                          );
-                        }
-                        return (
-                          <td key={key}>
-                            {item.batchSummary?.usesBatchExecution ? (
-                              <span className="admin-field-hint">Lô</span>
-                            ) : (
+                        </td>
+                        <td>{item.orderedQuantity.toLocaleString("vi-VN")}</td>
+                        <td>
+                          <select
+                            className="admin-select admin-select--small"
+                            value={sampleStatus}
+                            onChange={(e) =>
+                              void patchItemField(
+                                item.id,
+                                { sampleStatus: e.target.value },
+                                item.rowVersion,
+                              ).catch((err) => toast.error(err instanceof Error ? err.message : "Lỗi"))
+                            }
+                            style={{ fontSize: 12, maxWidth: 130 }}
+                          >
+                            {Object.entries(ITEM_PRODUCTION_SAMPLE_STATUS_LABELS).map(([k, label]) => (
+                              <option key={k} value={k}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                          {sampleWarning ? (
+                            <div className="admin-field-hint" style={{ color: "#b45309" }}>
+                              Chưa duyệt mẫu
+                            </div>
+                          ) : null}
+                        </td>
+                        <td style={{ position: "sticky", left: orderFilterActive ? 220 : stickyOffsets.stage, background: "inherit", zIndex: 2 }}>
+                          {item.batchSummary?.usesBatchExecution ? (
+                            <button type="button" className="admin-link" onClick={() => setBatchPanelId(item.id)}>
+                              Theo dõi lô
+                            </button>
+                          ) : currentStage ? (
+                            <button
+                              type="button"
+                              className="admin-link"
+                              onClick={() =>
+                                setQuickUpdate({
+                                  productionItemId: item.id,
+                                  rowVersion: item.rowVersion,
+                                  orderedQuantity: item.orderedQuantity,
+                                  stage: currentStage,
+                                })
+                              }
+                              title="Cập nhật nhanh"
+                            >
+                              {ITEM_PRODUCTION_STAGE_SHORT_LABELS[currentStage.stageKey]} ·{" "}
+                              {currentStage.completedQuantity.toLocaleString("vi-VN")} /{" "}
+                              {item.plannedQuantity.toLocaleString("vi-VN")}
+                            </button>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td>
+                          <strong>
+                            {item.readyQuantity}/{item.plannedQuantity}
+                          </strong>
+                        </td>
+                        <td>
+                          <input
+                            className="admin-input"
+                            type="date"
+                            defaultValue={item.promisedDeliveryDate?.slice(0, 10) ?? ""}
+                            onBlur={(e) => {
+                              const v = e.target.value;
+                              void patchItemField(
+                                item.id,
+                                { promisedDeliveryDate: v || null },
+                                item.rowVersion,
+                              ).catch((err) => toast.error(err instanceof Error ? err.message : "Lỗi"));
+                            }}
+                            style={{ fontSize: 12, padding: "4px 6px", maxWidth: 130 }}
+                          />
+                        </td>
+                        <td>
+                          <select
+                            className="admin-select admin-select--small"
+                            value={item.assignedEmployee?.id ?? ""}
+                            onChange={(e) =>
+                              void patchItemField(
+                                item.id,
+                                { assignedEmployeeId: e.target.value || null },
+                                item.rowVersion,
+                              ).catch((err) => toast.error(err instanceof Error ? err.message : "Lỗi"))
+                            }
+                            style={{ fontSize: 12, maxWidth: 120 }}
+                          >
+                            <option value="">—</option>
+                            {employees.map((e) => (
+                              <option key={e.id} value={e.id}>
+                                {e.fullName}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          {item.riskStatus === "ON_TRACK" ? (
+                            <span className="admin-field-hint">{ITEM_PRODUCTION_RISK_LABELS[item.riskStatus]}</span>
+                          ) : (
+                            <StatusBadge tone={riskTone(item.riskStatus)}>
+                              {ITEM_PRODUCTION_RISK_LABELS[item.riskStatus]}
+                            </StatusBadge>
+                          )}
+                        </td>
+                        <td>
+                          {(item.openIssueCount ?? 0) > 0 ? (
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--link admin-btn--small"
+                              style={{ padding: 0 }}
+                              onClick={() =>
+                                setResolveIssueTarget({
+                                  productionItemId: item.id,
+                                  issues: item.issues ?? [],
+                                })
+                              }
+                            >
+                              <StatusBadge tone="warning">{item.openIssueCount} vấn đề</StatusBadge>
+                            </button>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            {currentStage && !item.batchSummary?.usesBatchExecution ? (
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn--primary admin-btn--small"
+                                onClick={() =>
+                                  setQuickUpdate({
+                                    productionItemId: item.id,
+                                    rowVersion: item.rowVersion,
+                                    orderedQuantity: item.orderedQuantity,
+                                    stage: currentStage,
+                                  })
+                                }
+                              >
+                                Cập nhật nhanh
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               className="admin-btn admin-btn--secondary admin-btn--small"
-                              onClick={() => setStageDrawerId(stage.id)}
-                              title={stage.labelSnapshot}
-                              style={{
-                                minWidth: 34,
-                                fontWeight: 700,
-                                borderColor:
-                                  stage.status === "BLOCKED"
-                                    ? "#f59e0b"
-                                    : stage.status === "COMPLETED"
-                                      ? "#16a34a"
-                                      : stage.status === "IN_PROGRESS"
-                                        ? "#2563eb"
-                                        : "#d1d5db",
-                                color:
-                                  stage.status === "BLOCKED"
-                                    ? "#b45309"
-                                    : stage.status === "COMPLETED"
-                                      ? "#166534"
-                                      : stage.status === "IN_PROGRESS"
-                                        ? "#1d4ed8"
-                                        : "#6b7280",
-                                background:
-                                  stageTone(stage.status) === "success"
-                                    ? "#ecfdf3"
-                                    : stageTone(stage.status) === "info"
-                                      ? "#eff6ff"
-                                      : stageTone(stage.status) === "warning"
-                                        ? "#fffbeb"
-                                        : "#fff",
-                              }}
+                              onClick={() => setIssueItemId(item.id)}
                             >
-                              {stageCellContent(stage)}
+                              Báo vấn đề
                             </button>
-                            )}
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--secondary admin-btn--small"
+                              onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                            >
+                              {expandedId === item.id ? "Thu gọn" : "Chi tiết"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {expandedId === item.id ? (
+                        <tr key={`${item.id}-detail`}>
+                          <td colSpan={orderFilterActive ? 10 : 12} style={{ background: "#f9fafb", padding: 12 }}>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                              {item.stages
+                                .filter((s) => s.isApplicable && s.status !== "SKIPPED")
+                                .map((s) => (
+                                  <span
+                                    key={s.id}
+                                    className="admin-field-hint"
+                                    style={{
+                                      padding: "4px 8px",
+                                      borderRadius: 6,
+                                      border: "1px solid #e5e7eb",
+                                      background:
+                                        s.status === "COMPLETED"
+                                          ? "#ecfdf3"
+                                          : s.status === "IN_PROGRESS" || s.status === "BLOCKED"
+                                            ? "#eff6ff"
+                                            : "#fff",
+                                      color: s.status === "NOT_STARTED" ? "#9ca3af" : undefined,
+                                    }}
+                                  >
+                                    {ITEM_PRODUCTION_STAGE_SHORT_LABELS[s.stageKey]}: {s.completedQuantity}
+                                    {s.status === "COMPLETED" ? " ✓" : ""}
+                                  </span>
+                                ))}
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setDetailId(item.id)}>
+                                Chi tiết đầy đủ
+                              </button>
+                              {currentStage ? (
+                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setStageDrawerId(currentStage.id)}>
+                                  Công đoạn nâng cao
+                                </button>
+                              ) : null}
+                              {item.batchSummary?.hasBatches ? (
+                                <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setBatchPanelId(item.id)}>
+                                  Quản lý lô
+                                </button>
+                              ) : null}
+                            </div>
                           </td>
-                        );
-                      })}
-                    </tr>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -695,6 +869,40 @@ export default function ItemProductionTimelineManager() {
         </>
       )}
 
+      {issueItemId ? (
+        <ItemProductionIssueModal
+          productionItemId={issueItemId}
+          onClose={() => setIssueItemId(null)}
+          onSaved={() => {
+            toast.success("Đã ghi nhận vấn đề");
+            void load();
+          }}
+        />
+      ) : null}
+      {resolveIssueTarget ? (
+        <ItemProductionResolveIssueModal
+          productionItemId={resolveIssueTarget.productionItemId}
+          issues={resolveIssueTarget.issues}
+          onClose={() => setResolveIssueTarget(null)}
+          onSaved={() => {
+            toast.success("Đã xử lý vấn đề");
+            void load();
+          }}
+        />
+      ) : null}
+      {quickUpdate ? (
+        <ItemProductionQuickUpdateModal
+          productionItemId={quickUpdate.productionItemId}
+          stage={quickUpdate.stage}
+          rowVersion={quickUpdate.rowVersion}
+          orderedQuantity={quickUpdate.orderedQuantity}
+          onClose={() => setQuickUpdate(null)}
+          onSaved={() => {
+            toast.success("Đã cập nhật tiến độ");
+            void load();
+          }}
+        />
+      ) : null}
       {stageDrawerId ? (
         <ItemProductionStageDrawer
           stageId={stageDrawerId}

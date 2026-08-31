@@ -131,6 +131,7 @@ export type RiskInput = {
   hasBlockedStage: boolean;
   hasRejectedOrRework: boolean;
   hasSupplier: boolean;
+  hasUnresolvedIssue?: boolean;
   now?: Date;
 };
 
@@ -143,6 +144,7 @@ export function computeRiskStatus(input: RiskInput): ItemProductionRiskStatus {
     return input.hasBlockedStage ? "BLOCKED" : "ON_TRACK";
   }
   if (input.hasBlockedStage) return "BLOCKED";
+  if (input.hasUnresolvedIssue) return "NEEDS_ATTENTION";
 
   const due = input.promisedDeliveryDate;
   const notReady = input.readyQuantity < Math.max(1, input.plannedQuantity);

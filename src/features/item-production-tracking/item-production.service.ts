@@ -2,6 +2,7 @@ import type {
   ItemProductionDeliveryStatus,
   ItemProductionProgressEventType,
   ItemProductionRiskStatus,
+  ItemProductionSampleStatus,
   ItemProductionStageKey,
   ItemProductionStageStatus,
   ItemProductionStatus,
@@ -30,6 +31,7 @@ import {
   computeAllocatedQuantity,
   computeUnallocatedQuantity,
 } from "@/features/item-production-tracking/batch-aggregation";
+import { sortByExceptionFirst } from "@/features/item-production-tracking/lean-ops";
 
 export type { ProductionListFilters } from "@/features/item-production-tracking/types";
 
@@ -55,6 +57,7 @@ function recomputeFromStages(
     promisedDeliveryDate: Date | null;
     lastProgressAt: Date | null;
     hasSupplier: boolean;
+    hasUnresolvedIssue?: boolean;
   },
 ) {
   const progressPercent = computeWeightedProgressPercent(stages);
@@ -95,6 +98,7 @@ function recomputeFromStages(
     hasBlockedStage,
     hasRejectedOrRework,
     hasSupplier: meta.hasSupplier,
+    hasUnresolvedIssue: meta.hasUnresolvedIssue,
   });
   return {
     progressPercent,
@@ -142,6 +146,11 @@ const trackingInclude = {
       riskStatus: true,
     },
   },
+  issues: {
+    where: { isResolved: false },
+    select: { id: true, issueType: true, note: true, createdAt: true },
+    take: 3,
+  },
 } satisfies Prisma.ItemProductionTrackingInclude;
 
 export async function listProductionItems(filters: ProductionListFilters) {
@@ -160,6 +169,11 @@ export async function listProductionItems(filters: ProductionListFilters) {
   if (filters.currentStage) where.currentStageKey = filters.currentStage;
   if (filters.riskStatus) where.riskStatus = filters.riskStatus;
   if (filters.assignedEmployeeId) where.assignedEmployeeId = filters.assignedEmployeeId;
+  if (filters.currentStage) where.currentStageKey = filters.currentStage;
+  if (filters.sampleStatus) where.sampleStatus = filters.sampleStatus;
+  if (filters.hasIssue) {
+    where.issues = { some: { isResolved: false } };
+  }
   if (filters.promisedFrom || filters.promisedTo) {
     where.promisedDeliveryDate = {};
     if (filters.promisedFrom) where.promisedDeliveryDate.gte = new Date(filters.promisedFrom);
@@ -264,20 +278,42 @@ export async function listProductionItems(filters: ProductionListFilters) {
     where.id = { in: matchedIds.length > 0 ? matchedIds : ["__none__"] };
   }
 
-  const [total, items, kpiGroups] = await Promise.all([
+  const [total, allMatchingIds, kpiGroups] = await Promise.all([
     prisma.itemProductionTracking.count({ where }),
     prisma.itemProductionTracking.findMany({
       where,
-      include: trackingInclude,
-      orderBy: [{ lastProgressAt: "desc" }, { updatedAt: "desc" }],
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      select: {
+        id: true,
+        riskStatus: true,
+        promisedDeliveryDate: true,
+        issues: { where: { isResolved: false }, select: { id: true } },
+      },
     }),
     prisma.itemProductionTracking.groupBy({
       by: ["productionStatus", "riskStatus", "deliveryStatus", "currentStageKey"],
       _count: { _all: true },
     }),
   ]);
+
+  const sortedIds = sortByExceptionFirst(
+    allMatchingIds.map((row) => ({
+      id: row.id,
+      riskStatus: row.riskStatus,
+      promisedDeliveryDate: row.promisedDeliveryDate,
+      openIssueCount: row.issues.length,
+    })),
+  ).map((row) => row.id);
+
+  const pageIds = sortedIds.slice((page - 1) * pageSize, page * pageSize);
+  const items =
+    pageIds.length === 0
+      ? []
+      : await prisma.itemProductionTracking.findMany({
+          where: { id: { in: pageIds } },
+          include: trackingInclude,
+        });
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+  const orderedItems = pageIds.map((id) => itemsById.get(id)).filter(Boolean) as typeof items;
 
   const kpis = {
     total: await prisma.itemProductionTracking.count(),
@@ -304,7 +340,7 @@ export async function listProductionItems(filters: ProductionListFilters) {
     if (row.riskStatus === "DELAYED") kpis.delayed += c;
   }
 
-  const itemsWithBatchSummary = items.map((item) => {
+  const itemsWithBatchSummary = orderedItems.map((item) => {
     const nonCancelled = item.batches.filter((b) => b.status !== "CANCELLED");
     const allocatedQuantity = computeAllocatedQuantity(item.batches);
     const unallocatedQuantity = computeUnallocatedQuantity(item.plannedQuantity, item.batches);
@@ -314,6 +350,7 @@ export async function listProductionItems(filters: ProductionListFilters) {
     const activeBatches = item.batches.filter((b) => b.status === "ACTIVE");
     return {
       ...item,
+      openIssueCount: item.issues.length,
       batchSummary: {
         hasBatches: nonCancelled.length > 0,
         batchCount: nonCancelled.length,
@@ -348,6 +385,16 @@ export async function getProductionItem(id: string) {
 }
 
 export async function getOrderProductionSummary(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      orderNo: true,
+      customerNameSnapshot: true,
+      customerCompanyName: true,
+      customer: { select: { name: true } },
+    },
+  });
   const items = await prisma.itemProductionTracking.findMany({
     where: { orderItem: { orderId } },
     select: {
@@ -355,9 +402,13 @@ export async function getOrderProductionSummary(orderId: string) {
       progressPercent: true,
       readyQuantity: true,
       plannedQuantity: true,
+      orderedQuantity: true,
       riskStatus: true,
       productionStatus: true,
       deliveryStatus: true,
+      currentStageKey: true,
+      sampleStatus: true,
+      issues: { where: { isResolved: false }, select: { id: true } },
     },
   });
   const total = items.length;
@@ -368,12 +419,25 @@ export async function getOrderProductionSummary(orderId: string) {
           (items.reduce((s, i) => s + Number(i.progressPercent), 0) / total) * 100,
         ) / 100;
   return {
+    order,
     total,
+    totalOrderedQuantity: items.reduce((s, i) => s + i.orderedQuantity, 0),
     averageProgressPercent: avgProgress,
     readyQuantity: items.reduce((s, i) => s + i.readyQuantity, 0),
     plannedQuantity: items.reduce((s, i) => s + i.plannedQuantity, 0),
-    atRiskCount: items.filter((i) => i.riskStatus === "AT_RISK" || i.riskStatus === "NEEDS_ATTENTION").length,
+    sampleApprovedCount: items.filter((i) => i.sampleStatus === "APPROVED").length,
+    inProductionCount: items.filter(
+      (i) => i.productionStatus === "IN_PRODUCTION" || i.productionStatus === "FINISHING",
+    ).length,
+    qcCount: items.filter((i) => i.currentStageKey === "QC").length,
+    readyToShipCount: items.filter(
+      (i) => i.deliveryStatus === "READY" || i.deliveryStatus === "PARTIALLY_READY",
+    ).length,
+    atRiskCount: items.filter(
+      (i) => i.riskStatus === "AT_RISK" || i.riskStatus === "NEEDS_ATTENTION",
+    ).length,
     delayedCount: items.filter((i) => i.riskStatus === "DELAYED").length,
+    openIssueCount: items.reduce((s, i) => s + i.issues.length, 0),
     items,
   };
 }
@@ -689,11 +753,15 @@ export async function applyStageProgress(input: {
       where: { productionItemId: item.id },
       orderBy: { sequence: "asc" },
     });
+    const openIssueCount = await tx.itemProductionIssue.count({
+      where: { productionItemId: item.id, isResolved: false },
+    });
     const recomputed = recomputeFromStages(refreshedStages, {
       productionStatus: item.productionStatus === "DRAFT" ? "IN_PRODUCTION" : item.productionStatus,
       promisedDeliveryDate: item.promisedDeliveryDate,
       lastProgressAt: new Date(),
       hasSupplier: item.supplierId != null,
+      hasUnresolvedIssue: openIssueCount > 0,
     });
 
     const updated = await tx.itemProductionTracking.update({

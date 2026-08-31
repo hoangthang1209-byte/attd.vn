@@ -84,4 +84,29 @@ describe("IA M1 item production tracking contracts", () => {
       /ItemProductionBatchPanel/,
     );
   });
+
+  it("exposes lean ops quick update and issue APIs", () => {
+    assert.match(
+      read("src/app/api/manufacturing/production-stages/[id]/quick-update/route.ts"),
+      /applyQuickStageUpdate/,
+    );
+    assert.match(
+      read("src/app/api/manufacturing/production-items/[id]/issues/route.ts"),
+      /reportProductionIssue/,
+    );
+    assert.match(
+      read("src/app/api/manufacturing/production-items/[id]/issues/[issueId]/route.ts"),
+      /resolveProductionIssue/,
+    );
+    assert.match(read("prisma/schema.prisma"), /model ItemProductionIssue/);
+    assert.match(read("prisma/schema.prisma"), /sampleStatus/);
+    assert.match(
+      read("src/components/admin/item-production/ItemProductionTimelineManager.tsx"),
+      /ItemProductionQuickUpdateModal/,
+    );
+    assert.match(
+      read("src/components/admin/item-production/OrderItemProductionPanel.tsx"),
+      /production-timeline\?order=/,
+    );
+  });
 });

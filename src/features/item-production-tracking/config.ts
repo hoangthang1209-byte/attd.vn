@@ -25,6 +25,20 @@ export const ITEM_PRODUCTION_STAGE_LABELS: Record<ItemProductionStageKey, string
   READY_TO_SHIP: "Sẵn sàng giao",
 };
 
+/** Compact labels for production board stage strip */
+export const ITEM_PRODUCTION_STAGE_SHORT_LABELS: Record<ItemProductionStageKey, string> = {
+  MATERIAL_SYNC: "NPL",
+  CUTTING: "Cắt",
+  PRINT_EMBROIDERY: "In/Thêu",
+  SEWING: "May",
+  WASHING: "Wash",
+  FINISHING: "HT",
+  IRONING: "Ủi",
+  QC: "QC",
+  PACKING: "ĐG",
+  READY_TO_SHIP: "Ready",
+};
+
 export const ITEM_PRODUCTION_DEFAULT_WEIGHTS: Record<ItemProductionStageKey, number> = {
   MATERIAL_SYNC: 10,
   CUTTING: 10,

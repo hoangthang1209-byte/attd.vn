@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import type { ItemProductionDeliveryStatus, ItemProductionRiskStatus, ItemProductionStageKey, ItemProductionStatus } from "@prisma/client";
+import type { ItemProductionDeliveryStatus, ItemProductionRiskStatus, ItemProductionSampleStatus, ItemProductionStageKey, ItemProductionStatus } from "@prisma/client";
 import { can } from "@/features/auth/admin-permissions";
 import { listProductionItems } from "@/features/item-production-tracking/item-production.service";
 import { requireProductionView } from "@/lib/admin-auth/require-production-api";
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     currentStage: (sp.get("currentStage") as ItemProductionStageKey | null) ?? undefined,
     riskStatus: (sp.get("riskStatus") as ItemProductionRiskStatus | null) ?? undefined,
     supplierId: sp.get("supplierId") ?? undefined,
-    assignedEmployeeId: sp.get("assignedUser") ?? sp.get("assignedEmployeeId") ?? undefined,
+    assignedEmployeeId: sp.get("assignedUser") ?? sp.get("assignedEmployeeId") ?? sp.get("pic") ?? undefined,
     promisedFrom: sp.get("promisedFrom") ?? undefined,
     promisedTo: sp.get("promisedTo") ?? undefined,
     onlyDelayed: sp.get("onlyDelayed") === "1" || sp.get("onlyDelayed") === "true",
@@ -38,6 +38,8 @@ export async function GET(req: NextRequest) {
     partiallyAllocated: sp.get("partiallyAllocated") === "1" || sp.get("partiallyAllocated") === "true",
     fullyAllocated: sp.get("fullyAllocated") === "1" || sp.get("fullyAllocated") === "true",
     unallocated: sp.get("unallocated") === "1" || sp.get("unallocated") === "true",
+    hasIssue: sp.get("hasIssue") === "1" || sp.get("hasIssue") === "true",
+    sampleStatus: (sp.get("sampleStatus") as ItemProductionSampleStatus | null) ?? undefined,
     page: Number(sp.get("page") ?? "1") || 1,
     pageSize: Number(sp.get("pageSize") ?? "20") || 20,
   });

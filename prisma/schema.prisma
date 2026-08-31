@@ -4996,6 +4996,8 @@ model AdminUser {
   itemProductionBatchAuditEntries   ItemProductionBatchAuditEntry[] @relation("BatchAuditActor")
   itemProductionBatchesCreated      ItemProductionBatch[]           @relation("BatchCreatedBy")
   itemProductionBatchesUpdated      ItemProductionBatch[]           @relation("BatchUpdatedBy")
+  itemProductionIssuesCreated       ItemProductionIssue[]           @relation("IssueCreatedBy")
+  itemProductionIssuesResolved      ItemProductionIssue[]            @relation("IssueResolvedBy")
 
   @@index([username])
   @@index([roleId])
@@ -5738,6 +5740,7 @@ model ItemProductionTracking {
   promisedDeliveryDate DateTime?
   actualCompletedAt    DateTime?
   lastProgressAt       DateTime?
+  sampleStatus         ItemProductionSampleStatus   @default(NOT_STARTED)
   note                 String?                      @db.Text
   rowVersion           Int                          @default(1)
   createdAt            DateTime                     @default(now())
@@ -5749,6 +5752,7 @@ model ItemProductionTracking {
   assignedEmployee Employee?                       @relation("ItemProductionAssignee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
   stages           ItemProductionStage[]
   batches          ItemProductionBatch[]
+  issues           ItemProductionIssue[]
 
   @@index([productionStatus])
   @@index([deliveryStatus])
@@ -5759,6 +5763,7 @@ model ItemProductionTracking {
   @@index([lastProgressAt])
   @@index([currentStageKey])
   @@index([workflowTemplateId])
+  @@index([sampleStatus])
 }
 
 model ItemProductionStage {
@@ -5961,4 +5966,47 @@ model ItemProductionBatchAuditEntry {
   @@index([batchId, createdAt])
   @@index([createdByAdminUserId])
   @@index([action])
+}
+
+enum ItemProductionSampleStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING_CUSTOMER
+  APPROVED
+}
+
+enum ItemProductionIssueType {
+  MISSING_MATERIAL
+  FACTORY_DELAY
+  WRONG_COLOR
+  PRINT_DEFECT
+  EMBROIDERY_DEFECT
+  WASH_DEFECT
+  SEWING_DEFECT
+  QC_DEFECT
+  WAITING_CUSTOMER
+  WAITING_SUPPLIER
+  OTHER
+}
+
+model ItemProductionIssue {
+  id                    String                    @id @default(cuid())
+  productionItemId      String
+  issueType             ItemProductionIssueType
+  note                  String?                   @db.Text
+  isResolved            Boolean                   @default(false)
+  resolvedNote          String?                   @db.Text
+  resolvedAt            DateTime?
+  createdByAdminUserId  String?
+  resolvedByAdminUserId String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  productionItem      ItemProductionTracking @relation(fields: [productionItemId], references: [id], onDelete: Cascade)
+  createdByAdminUser  AdminUser?             @relation("IssueCreatedBy", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+  resolvedByAdminUser AdminUser?             @relation("IssueResolvedBy", fields: [resolvedByAdminUserId], references: [id], onDelete: SetNull)
+
+  @@index([productionItemId, isResolved])
+  @@index([createdAt])
+  @@index([issueType])
 }
