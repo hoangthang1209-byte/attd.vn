@@ -4197,6 +4197,7 @@ model Employee {
   adminUser                  AdminUser?
   productionPlans            ProductionPlan[]          @relation("ProductionPlanOwner")
   itemProductionAssignments  ItemProductionTracking[]  @relation("ItemProductionAssignee")
+  itemProductionBatchAssignments ItemProductionBatch[]   @relation("ItemProductionBatchPic")
 
   @@index([employeeCode])
   @@index([isActive])
@@ -4991,6 +4992,10 @@ model AdminUser {
   role                          AdminRole?                    @relation(fields: [roleId], references: [id], onDelete: SetNull)
   assignedDealerRfqs            DealerRFQ[]
   itemProductionProgressEntries ItemProductionProgressEntry[]
+  itemProductionBatchProgressEntries ItemProductionBatchProgressEntry[]
+  itemProductionBatchAuditEntries   ItemProductionBatchAuditEntry[] @relation("BatchAuditActor")
+  itemProductionBatchesCreated      ItemProductionBatch[]           @relation("BatchCreatedBy")
+  itemProductionBatchesUpdated      ItemProductionBatch[]           @relation("BatchUpdatedBy")
 
   @@index([username])
   @@index([roleId])
@@ -5550,6 +5555,8 @@ model ProductionSupplier {
   patterns                Pattern[]
   itemProductionTrackings ItemProductionTracking[]
   itemProductionStages    ItemProductionStage[]
+  itemProductionBatches   ItemProductionBatch[]
+  itemProductionBatchStages ItemProductionBatchStage[]
 
   @@index([code])
   @@index([isActive])
@@ -5741,6 +5748,7 @@ model ItemProductionTracking {
   supplier         ProductionSupplier?             @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   assignedEmployee Employee?                       @relation("ItemProductionAssignee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
   stages           ItemProductionStage[]
+  batches          ItemProductionBatch[]
 
   @@index([productionStatus])
   @@index([deliveryStatus])
@@ -5811,4 +5819,146 @@ model ItemProductionProgressEntry {
   @@index([productionStageId, happenedAt])
   @@index([createdByAdminUserId])
   @@index([eventType])
+}
+
+enum ItemProductionBatchStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ItemProductionBatchAuditAction {
+  CREATED
+  QUANTITY_CHANGED
+  SUPPLIER_ASSIGNED
+  SUPPLIER_REASSIGNED
+  PIC_ASSIGNED
+  PIC_CHANGED
+  ACTIVATED
+  COMPLETED
+  CANCELLED
+  NOTES_CHANGED
+  PLANNED_DATES_CHANGED
+}
+
+model ItemProductionBatch {
+  id                     String                    @id @default(cuid())
+  code                   String
+  itemProductionTrackingId String
+  sequence               Int
+  name                   String?
+  plannedQuantity        Int
+  supplierId             String?
+  picEmployeeId          String?
+  status                 ItemProductionBatchStatus @default(DRAFT)
+  progressPercent        Decimal                   @default(0) @db.Decimal(5, 2)
+  readyQuantity          Int                       @default(0)
+  riskStatus             ItemProductionRiskStatus  @default(ON_TRACK)
+  currentStageKey        ItemProductionStageKey?
+  plannedStartAt         DateTime?
+  plannedEndAt           DateTime?
+  actualStartAt          DateTime?
+  actualEndAt            DateTime?
+  lastProgressAt         DateTime?
+  notes                  String?                   @db.Text
+  metadata               Json?
+  createdByAdminUserId   String?
+  updatedByAdminUserId   String?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  itemProductionTracking ItemProductionTracking @relation(fields: [itemProductionTrackingId], references: [id], onDelete: Cascade)
+  supplier               ProductionSupplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  picEmployee            Employee?                @relation("ItemProductionBatchPic", fields: [picEmployeeId], references: [id], onDelete: SetNull)
+  createdByAdminUser     AdminUser?               @relation("BatchCreatedBy", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+  updatedByAdminUser     AdminUser?               @relation("BatchUpdatedBy", fields: [updatedByAdminUserId], references: [id], onDelete: SetNull)
+  stages                 ItemProductionBatchStage[]
+  auditEntries           ItemProductionBatchAuditEntry[]
+
+  @@unique([itemProductionTrackingId, code])
+  @@index([itemProductionTrackingId])
+  @@index([supplierId])
+  @@index([status])
+  @@index([plannedEndAt])
+  @@index([updatedAt])
+  @@index([itemProductionTrackingId, sequence])
+}
+
+model ItemProductionBatchStage {
+  id                 String                    @id @default(cuid())
+  batchId            String
+  stageKey           ItemProductionStageKey
+  labelSnapshot      String
+  sequence           Int
+  isApplicable       Boolean                   @default(true)
+  weight             Int                       @default(10)
+  status             ItemProductionStageStatus @default(NOT_STARTED)
+  plannedQuantity    Int                       @default(0)
+  receivedQuantity   Int                       @default(0)
+  inProgressQuantity Int                       @default(0)
+  completedQuantity  Int                       @default(0)
+  acceptedQuantity   Int                       @default(0)
+  rejectedQuantity   Int                       @default(0)
+  reworkQuantity     Int                       @default(0)
+  wasteQuantity      Int                       @default(0)
+  plannedStartAt     DateTime?
+  plannedEndAt       DateTime?
+  actualStartAt      DateTime?
+  actualEndAt        DateTime?
+  supplierId         String?
+  note               String?                   @db.Text
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  batch    ItemProductionBatch                 @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  supplier ProductionSupplier?                 @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  history  ItemProductionBatchProgressEntry[]
+
+  @@unique([batchId, stageKey])
+  @@index([batchId, sequence])
+  @@index([status])
+  @@index([supplierId])
+}
+
+model ItemProductionBatchProgressEntry {
+  id                    String                          @id @default(cuid())
+  batchStageId          String
+  eventType             ItemProductionProgressEventType
+  quantityDelta         Int                             @default(0)
+  acceptedQuantityDelta Int                             @default(0)
+  rejectedQuantityDelta Int                             @default(0)
+  reworkQuantityDelta   Int                             @default(0)
+  wasteQuantityDelta    Int                             @default(0)
+  previousStatus        ItemProductionStageStatus?
+  nextStatus            ItemProductionStageStatus?
+  note                  String?                         @db.Text
+  happenedAt            DateTime                        @default(now())
+  createdByAdminUserId  String?
+  createdAt             DateTime                        @default(now())
+
+  batchStage         ItemProductionBatchStage @relation(fields: [batchStageId], references: [id], onDelete: Cascade)
+  createdByAdminUser AdminUser?               @relation(fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+
+  @@index([batchStageId, happenedAt])
+  @@index([createdByAdminUserId])
+  @@index([eventType])
+}
+
+model ItemProductionBatchAuditEntry {
+  id                   String                         @id @default(cuid())
+  batchId              String
+  action               ItemProductionBatchAuditAction
+  previousValue        String?                        @db.Text
+  newValue             String?                        @db.Text
+  note                 String?                        @db.Text
+  createdByAdminUserId String?
+  createdAt            DateTime                       @default(now())
+
+  batch              ItemProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  createdByAdminUser AdminUser?          @relation("BatchAuditActor", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+
+  @@index([batchId, createdAt])
+  @@index([createdByAdminUserId])
+  @@index([action])
 }

@@ -1,4 +1,5 @@
 import type {
+  ItemProductionBatchStatus,
   ItemProductionDeliveryStatus,
   ItemProductionProgressEventType,
   ItemProductionRiskStatus,
@@ -49,4 +50,11 @@ export const ITEM_PRODUCTION_EVENT_LABELS: Record<ItemProductionProgressEventTyp
   REOPEN: "Mở lại công đoạn",
   SKIP: "Bỏ qua công đoạn",
   NOTE: "Ghi chú",
+};
+
+export const ITEM_PRODUCTION_BATCH_STATUS_LABELS: Record<ItemProductionBatchStatus, string> = {
+  DRAFT: "Nháp",
+  ACTIVE: "Đang hoạt động",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy",
 };

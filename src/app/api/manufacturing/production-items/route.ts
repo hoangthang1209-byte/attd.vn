@@ -31,6 +31,13 @@ export async function GET(req: NextRequest) {
     onlyDelayed: sp.get("onlyDelayed") === "1" || sp.get("onlyDelayed") === "true",
     onlyStale: sp.get("onlyStale") === "1" || sp.get("onlyStale") === "true",
     readyToShip: sp.get("readyToShip") === "1" || sp.get("readyToShip") === "true",
+    batchRiskStatus: (sp.get("batchRiskStatus") as ItemProductionRiskStatus | null) ?? undefined,
+    batchStatus: sp.get("batchStatus") ?? undefined,
+    hasBatches: sp.get("hasBatches") === "1" || sp.get("hasBatches") === "true",
+    noBatches: sp.get("noBatches") === "1" || sp.get("noBatches") === "true",
+    partiallyAllocated: sp.get("partiallyAllocated") === "1" || sp.get("partiallyAllocated") === "true",
+    fullyAllocated: sp.get("fullyAllocated") === "1" || sp.get("fullyAllocated") === "true",
+    unallocated: sp.get("unallocated") === "1" || sp.get("unallocated") === "true",
     page: Number(sp.get("page") ?? "1") || 1,
     pageSize: Number(sp.get("pageSize") ?? "20") || 20,
   });

@@ -26,6 +26,10 @@ import {
   listWorkflowTemplates,
 } from "@/features/item-production-tracking/workflow-templates";
 import type { ProductionListFilters } from "@/features/item-production-tracking/types";
+import {
+  computeAllocatedQuantity,
+  computeUnallocatedQuantity,
+} from "@/features/item-production-tracking/batch-aggregation";
 
 export type { ProductionListFilters } from "@/features/item-production-tracking/types";
 
@@ -127,6 +131,17 @@ const trackingInclude = {
   assignedEmployee: { select: { id: true, employeeCode: true, fullName: true } },
   workflowTemplate: { select: { id: true, code: true, name: true } },
   stages: { orderBy: { sequence: "asc" as const } },
+  batches: {
+    select: {
+      id: true,
+      status: true,
+      plannedQuantity: true,
+      supplierId: true,
+      progressPercent: true,
+      readyQuantity: true,
+      riskStatus: true,
+    },
+  },
 } satisfies Prisma.ItemProductionTrackingInclude;
 
 export async function listProductionItems(filters: ProductionListFilters) {
@@ -144,7 +159,6 @@ export async function listProductionItems(filters: ProductionListFilters) {
   if (filters.deliveryStatus) where.deliveryStatus = filters.deliveryStatus;
   if (filters.currentStage) where.currentStageKey = filters.currentStage;
   if (filters.riskStatus) where.riskStatus = filters.riskStatus;
-  if (filters.supplierId) where.supplierId = filters.supplierId;
   if (filters.assignedEmployeeId) where.assignedEmployeeId = filters.assignedEmployeeId;
   if (filters.promisedFrom || filters.promisedTo) {
     where.promisedDeliveryDate = {};
@@ -176,7 +190,78 @@ export async function listProductionItems(filters: ProductionListFilters) {
       { orderItem: { colorSnapshot: { contains: q, mode: "insensitive" } } },
       { orderItem: { id: { contains: q, mode: "insensitive" } } },
       { supplier: { name: { contains: q, mode: "insensitive" } } },
+      { batches: { some: { code: { contains: q, mode: "insensitive" } } } },
     ];
+  }
+
+  if (filters.supplierId) {
+    const supplierMatch: Prisma.ItemProductionTrackingWhereInput = {
+      OR: [
+        { supplierId: filters.supplierId },
+        { batches: { some: { supplierId: filters.supplierId, status: { not: "CANCELLED" } } } },
+      ],
+    };
+    if (where.OR) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        { OR: Array.isArray(where.OR) ? where.OR : [where.OR] },
+        supplierMatch,
+      ];
+      delete where.OR;
+    } else {
+      where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), supplierMatch];
+    }
+  }
+
+  if (filters.batchRiskStatus) {
+    where.batches = {
+      ...(where.batches as Prisma.ItemProductionBatchListRelationFilter | undefined),
+      some: { riskStatus: filters.batchRiskStatus as ItemProductionRiskStatus, status: "ACTIVE" },
+    };
+  }
+
+  if (filters.batchStatus) {
+    where.batches = {
+      ...(where.batches as Prisma.ItemProductionBatchListRelationFilter | undefined),
+      some: { status: filters.batchStatus as Prisma.EnumItemProductionBatchStatusFilter["equals"] },
+    };
+  }
+
+  if (filters.hasBatches) {
+    where.batches = {
+      ...(where.batches as Prisma.ItemProductionBatchListRelationFilter | undefined),
+      some: { status: { not: "CANCELLED" } },
+    };
+  }
+
+  if (filters.noBatches) {
+    where.batches = {
+      ...(where.batches as Prisma.ItemProductionBatchListRelationFilter | undefined),
+      none: { status: { not: "CANCELLED" } },
+    };
+  }
+
+  if (filters.partiallyAllocated || filters.fullyAllocated || filters.unallocated) {
+    const candidates = await prisma.itemProductionTracking.findMany({
+      where,
+      select: {
+        id: true,
+        plannedQuantity: true,
+        batches: { select: { status: true, plannedQuantity: true } },
+      },
+    });
+    const matchedIds = candidates
+      .filter((item) => {
+        const allocated = computeAllocatedQuantity(item.batches);
+        const unallocated = computeUnallocatedQuantity(item.plannedQuantity, item.batches);
+        const hasNonCancelled = item.batches.some((b) => b.status !== "CANCELLED");
+        if (filters.partiallyAllocated) return hasNonCancelled && unallocated > 0 && allocated > 0;
+        if (filters.fullyAllocated) return hasNonCancelled && unallocated === 0;
+        if (filters.unallocated) return unallocated > 0;
+        return true;
+      })
+      .map((i) => i.id);
+    where.id = { in: matchedIds.length > 0 ? matchedIds : ["__none__"] };
   }
 
   const [total, items, kpiGroups] = await Promise.all([
@@ -219,7 +304,28 @@ export async function listProductionItems(filters: ProductionListFilters) {
     if (row.riskStatus === "DELAYED") kpis.delayed += c;
   }
 
-  return { items, total, page, pageSize, kpis };
+  const itemsWithBatchSummary = items.map((item) => {
+    const nonCancelled = item.batches.filter((b) => b.status !== "CANCELLED");
+    const allocatedQuantity = computeAllocatedQuantity(item.batches);
+    const unallocatedQuantity = computeUnallocatedQuantity(item.plannedQuantity, item.batches);
+    const supplierIds = new Set(
+      nonCancelled.map((b) => b.supplierId).filter((id): id is string => id != null),
+    );
+    const activeBatches = item.batches.filter((b) => b.status === "ACTIVE");
+    return {
+      ...item,
+      batchSummary: {
+        hasBatches: nonCancelled.length > 0,
+        batchCount: nonCancelled.length,
+        allocatedQuantity,
+        unallocatedQuantity,
+        supplierCount: supplierIds.size,
+        usesBatchExecution: activeBatches.length > 0,
+      },
+    };
+  });
+
+  return { items: itemsWithBatchSummary, total, page, pageSize, kpis };
 }
 
 export async function getProductionItem(id: string) {
@@ -442,11 +548,21 @@ export async function applyStageProgress(input: {
   return prisma.$transaction(async (tx) => {
     const stage = await tx.itemProductionStage.findUnique({
       where: { id: input.stageId },
-      include: { productionItem: { include: { stages: true } } },
+      include: {
+        productionItem: {
+          include: {
+            stages: true,
+            batches: { where: { status: "ACTIVE" }, select: { id: true } },
+          },
+        },
+      },
     });
     if (!stage) throw new Error("Không tìm thấy công đoạn");
     if (!stage.isApplicable) throw new Error("Công đoạn không áp dụng cho item này");
     const item = stage.productionItem;
+    if (item.batches.length > 0) {
+      throw new Error("Item đang theo dõi theo lô. Vui lòng cập nhật tiến độ ở cấp lô.");
+    }
     if (input.expectedRowVersion != null && input.expectedRowVersion !== item.rowVersion) {
       throw new Error("Dữ liệu đã được cập nhật bởi người khác. Vui lòng tải lại.");
     }

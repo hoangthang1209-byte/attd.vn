@@ -23,6 +23,13 @@ export type ProductionListFilters = {
   onlyDelayed?: boolean;
   onlyStale?: boolean;
   readyToShip?: boolean;
+  hasBatches?: boolean;
+  noBatches?: boolean;
+  partiallyAllocated?: boolean;
+  fullyAllocated?: boolean;
+  unallocated?: boolean;
+  batchStatus?: string;
+  batchRiskStatus?: ItemProductionRiskStatus;
   page?: number;
   pageSize?: number;
 };
@@ -129,6 +136,16 @@ export type ProductionItemListRowDTO = {
   workflowTemplate: { id: string; code: string; name: string } | null;
   stages: ProductionStageDTO[];
   orderItem: ProductionOrderItemDTO;
+  batchSummary?: ProductionBatchSummaryDTO;
+};
+
+export type ProductionBatchSummaryDTO = {
+  hasBatches: boolean;
+  batchCount: number;
+  allocatedQuantity: number;
+  unallocatedQuantity: number;
+  supplierCount: number;
+  usesBatchExecution: boolean;
 };
 
 /** Full detail shape returned from `GET /api/manufacturing/production-items/[id]`, stages include history. */

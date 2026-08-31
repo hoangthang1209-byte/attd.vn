@@ -59,9 +59,29 @@ describe("IA M1 item production tracking contracts", () => {
   it("migration and schema define unique orderItem tracking", () => {
     assert.match(read("prisma/schema.prisma"), /model ItemProductionTracking/);
     assert.match(read("prisma/schema.prisma"), /orderItemId\s+String\s+@unique/);
+    assert.match(read("prisma/schema.prisma"), /model ItemProductionBatch/);
     assert.match(
       read("prisma/migrations/0084_sprint_m1_item_production_progress_tracking/migration.sql"),
       /ItemProductionProgressEntry/,
+    );
+    assert.match(
+      read("prisma/migrations/0088_sprint_m2_production_batches/migration.sql"),
+      /ItemProductionBatch/,
+    );
+  });
+
+  it("exposes batch manufacturing APIs", () => {
+    assert.match(
+      read("src/app/api/manufacturing/production-items/[id]/batches/route.ts"),
+      /createBatch/,
+    );
+    assert.match(
+      read("src/app/api/manufacturing/production-batches/[batchId]/route.ts"),
+      /activateBatch/,
+    );
+    assert.match(
+      read("src/components/admin/item-production/ItemProductionTimelineManager.tsx"),
+      /ItemProductionBatchPanel/,
     );
   });
 });

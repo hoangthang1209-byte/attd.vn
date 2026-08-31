@@ -19,6 +19,7 @@ import {
 import type { ItemProductionRiskStatus, ItemProductionStageKey, ItemProductionStatus } from "@prisma/client";
 import ItemProductionStageDrawer from "@/components/admin/item-production/ItemProductionStageDrawer";
 import ItemProductionDetailDrawer from "@/components/admin/item-production/ItemProductionDetailDrawer";
+import ItemProductionBatchPanel from "@/components/admin/item-production/ItemProductionBatchPanel";
 import { ITEM_PRODUCTION_RISK_CONFIG } from "@/features/item-production-tracking/config";
 
 type StageCell = {
@@ -62,6 +63,14 @@ type ListItem = {
       customerCompanyName: string | null;
       customer: { name: string; code: string | null } | null;
     };
+  };
+  batchSummary?: {
+    hasBatches: boolean;
+    batchCount: number;
+    allocatedQuantity: number;
+    unallocatedQuantity: number;
+    supplierCount: number;
+    usesBatchExecution: boolean;
   };
 };
 
@@ -150,6 +159,7 @@ export default function ItemProductionTimelineManager() {
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [stageDrawerId, setStageDrawerId] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [batchPanelId, setBatchPanelId] = useState<string | null>(null);
 
   const page = Number(searchParams.get("page") ?? "1") || 1;
   const pageSize = Number(searchParams.get("pageSize") ?? "20") || 20;
@@ -229,7 +239,12 @@ export default function ItemProductionTimelineManager() {
     const missingSupplier = items.filter(
       (item) =>
         (item.productionStatus === "IN_PRODUCTION" || item.productionStatus === "FINISHING") &&
-        !item.supplier,
+        !item.supplier &&
+        !item.batchSummary?.usesBatchExecution,
+    ).length;
+    const unallocated = items.filter((item) => (item.batchSummary?.unallocatedQuantity ?? 0) > 0).length;
+    const batchNoSupplier = items.filter((item) =>
+      item.batchSummary?.usesBatchExecution && item.batchSummary.supplierCount === 0,
     ).length;
     const stale = items.filter((item) => {
       if (!item.lastProgressAt) return true;
@@ -268,6 +283,22 @@ export default function ItemProductionTimelineManager() {
         value: shippingToday,
         tone: "info" as const,
         filter: { shippingToday: "1" } as FilterMap,
+      },
+      {
+        key: "unallocated",
+        label: "Chưa phân bổ lô",
+        description: "Còn số lượng chưa chia lô.",
+        value: unallocated,
+        tone: "warning" as const,
+        filter: { unallocated: "1" } as FilterMap,
+      },
+      {
+        key: "batch-no-supplier",
+        label: "Lô thiếu xưởng",
+        description: "Lô đang hoạt động chưa gán xưởng.",
+        value: batchNoSupplier,
+        tone: "warning" as const,
+        filter: { hasBatches: "1" } as FilterMap,
       },
       {
         key: "stale",
@@ -398,6 +429,22 @@ export default function ItemProductionTimelineManager() {
           />
           Giao hôm nay
         </label>
+        <label className="admin-field-hint" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={searchParams.get("unallocated") === "1"}
+            onChange={(e) => setParam("unallocated", e.target.checked ? "1" : null)}
+          />
+          Chưa phân bổ
+        </label>
+        <label className="admin-field-hint" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={searchParams.get("hasBatches") === "1"}
+            onChange={(e) => setParam("hasBatches", e.target.checked ? "1" : null)}
+          />
+          Có lô
+        </label>
         <WorkspaceToolbarEnd>
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
             Làm mới
@@ -441,6 +488,7 @@ export default function ItemProductionTimelineManager() {
                   <th style={{ position: "sticky", left: stickyOffsets.product, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 280 }}>
                     Sản phẩm / SKU
                   </th>
+                  <th style={{ minWidth: 130 }}>Lô SX</th>
                   <th style={{ minWidth: 130 }}>Xưởng</th>
                   <th style={{ minWidth: 120 }}>PIC</th>
                   <th style={{ position: "sticky", left: stickyOffsets.progress, background: "var(--admin-surface, #fff)", zIndex: 3, minWidth: 120 }}>
@@ -508,7 +556,33 @@ export default function ItemProductionTimelineManager() {
                           </div>
                         </div>
                       </td>
-                      <td>{item.supplier?.name ?? "—"}</td>
+                      <td>
+                        {item.batchSummary?.hasBatches ? (
+                          <div>
+                            <button type="button" className="admin-link" onClick={() => setBatchPanelId(item.id)}>
+                              {item.batchSummary.batchCount} lô
+                            </button>
+                            <div className="admin-field-hint">
+                              {item.batchSummary.allocatedQuantity.toLocaleString("vi-VN")} /{" "}
+                              {item.plannedQuantity.toLocaleString("vi-VN")} đã phân bổ
+                            </div>
+                            {item.batchSummary.unallocatedQuantity > 0 ? (
+                              <div className="admin-field-hint" style={{ color: "#b45309" }}>
+                                {item.batchSummary.unallocatedQuantity.toLocaleString("vi-VN")} chưa phân bổ
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <button type="button" className="admin-btn admin-btn--secondary admin-btn--small" onClick={() => setBatchPanelId(item.id)}>
+                            Chia lô sản xuất
+                          </button>
+                        )}
+                      </td>
+                      <td>
+                        {item.batchSummary?.usesBatchExecution
+                          ? `${item.batchSummary.supplierCount} xưởng`
+                          : item.supplier?.name ?? "—"}
+                      </td>
                       <td>{item.assignedEmployee?.fullName ?? "—"}</td>
                       <td style={{ position: "sticky", left: stickyOffsets.progress, background: "var(--admin-surface, #fff)", zIndex: 2 }}>
                         <div style={{ display: "grid", gap: 5 }}>
@@ -545,6 +619,9 @@ export default function ItemProductionTimelineManager() {
                         }
                         return (
                           <td key={key}>
+                            {item.batchSummary?.usesBatchExecution ? (
+                              <span className="admin-field-hint">Lô</span>
+                            ) : (
                             <button
                               type="button"
                               className="admin-btn admin-btn--secondary admin-btn--small"
@@ -581,6 +658,7 @@ export default function ItemProductionTimelineManager() {
                             >
                               {stageCellContent(stage)}
                             </button>
+                            )}
                           </td>
                         );
                       })}
@@ -625,6 +703,13 @@ export default function ItemProductionTimelineManager() {
             toast.success("Đã cập nhật tiến độ");
             void load();
           }}
+        />
+      ) : null}
+      {batchPanelId ? (
+        <ItemProductionBatchPanel
+          productionItemId={batchPanelId}
+          onClose={() => setBatchPanelId(null)}
+          onUpdated={() => void load()}
         />
       ) : null}
       {detailId ? (
