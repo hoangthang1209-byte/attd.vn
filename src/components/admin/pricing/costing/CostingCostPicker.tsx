@@ -2,17 +2,18 @@
 
 import { useMemo, useState } from "react";
 import {
-  COST_LIBRARY,
   COST_LIBRARY_CATEGORY_LABELS,
   type CostLibraryCategory,
+  type CostLibraryItem,
 } from "@/features/pricing/cost-library";
 import { formatPricingCurrency } from "@/features/pricing/format";
 
 type Props = {
   open: boolean;
+  items: CostLibraryItem[];
   onClose: () => void;
   onPickLibraryItem: (itemId: string) => void;
-  onAddCustom: () => void;
+  onOpenCustomForm: () => void;
 };
 
 const CATEGORY_ORDER: Array<CostLibraryCategory | "ALL"> = [
@@ -27,18 +28,24 @@ const CATEGORY_ORDER: Array<CostLibraryCategory | "ALL"> = [
   "OTHER",
 ];
 
-export default function CostingCostPicker({ open, onClose, onPickLibraryItem, onAddCustom }: Props) {
+export default function CostingCostPicker({
+  open,
+  items,
+  onClose,
+  onPickLibraryItem,
+  onOpenCustomForm,
+}: Props) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CostLibraryCategory | "ALL">("ALL");
 
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("vi-VN");
-    return COST_LIBRARY.filter((item) => {
+    return items.filter((item) => {
       if (category !== "ALL" && item.category !== category) return false;
       if (!query) return true;
       return item.name.toLocaleLowerCase("vi-VN").includes(query);
     });
-  }, [category, search]);
+  }, [category, items, search]);
 
   if (!open) return null;
 
@@ -110,14 +117,7 @@ export default function CostingCostPicker({ open, onClose, onPickLibraryItem, on
         </div>
 
         <div className="costing-picker__footer">
-          <button
-            type="button"
-            className="admin-btn admin-btn--secondary"
-            onClick={() => {
-              onAddCustom();
-              onClose();
-            }}
-          >
+          <button type="button" className="admin-btn admin-btn--secondary" onClick={onOpenCustomForm}>
             + Chi phí tùy chỉnh
           </button>
         </div>

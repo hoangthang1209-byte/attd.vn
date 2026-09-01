@@ -3690,6 +3690,23 @@ model PricingCalculation {
   @@index([createdAt])
 }
 
+model PricingCostLibraryItem {
+  id                    String   @id @default(cuid())
+  name                  String
+  nameNormalized        String
+  category              String
+  defaultUnitCost       Decimal  @db.Decimal(12, 2)
+  defaultQuantityFactor Decimal  @default(1) @db.Decimal(8, 4)
+  defaultNote           String?  @db.Text
+  description           String?  @db.Text
+  createdByUserId       String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([nameNormalized, category])
+  @@index([category])
+}
+
 model PricingCalculationItem {
   id                   String             @id @default(cuid())
   pricingCalculationId String

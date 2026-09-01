@@ -31701,6 +31701,28 @@ body:has(.blog-article-page) .floating-contact {
   border-top: 1px solid var(--admin-border, #e5e7eb);
 }
 
+.costing-picker--form {
+  width: min(420px, 100%);
+}
+
+.costing-custom-cost-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.costing-custom-cost-form__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.costing-custom-cost-form__actions {
+  margin-top: 4px;
+}
+
 @media (max-width: 1100px) {
   .costing-workspace {
     grid-template-columns: 1fr;

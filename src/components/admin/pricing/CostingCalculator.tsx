@@ -2,17 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import CostingBomQuickStart from "@/components/admin/pricing/costing/CostingBomQuickStart";
 import CostingComponentTable, {
   type CostingComponentRow,
 } from "@/components/admin/pricing/costing/CostingComponentTable";
 import CostingCostPicker from "@/components/admin/pricing/costing/CostingCostPicker";
+import CostingCustomCostForm, {
+  type CustomCostFormValues,
+} from "@/components/admin/pricing/costing/CostingCustomCostForm";
 import CostingSummaryPanel from "@/components/admin/pricing/costing/CostingSummaryPanel";
 import { formatPricingCurrency } from "@/features/pricing/format";
 import {
-  COST_LIBRARY,
+  BUILTIN_COST_LIBRARY,
   costLibraryCategoryToComponentType,
+  type CostLibraryItem,
 } from "@/features/pricing/cost-library";
 import {
   COSTING_BOM_PRESETS,
@@ -75,8 +80,26 @@ function toNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function emptyComponent(): CostingComponentRow {
-  return { label: "", type: "OTHER", unitCost: "", totalCost: "", quantityFactor: "1", note: "" };
+function libraryItemToComponentRow(item: CostLibraryItem): CostingComponentRow {
+  return {
+    label: item.name,
+    type: costLibraryCategoryToComponentType(item.category, item.name),
+    unitCost: String(item.defaultUnitCost),
+    totalCost: "",
+    quantityFactor: String(item.defaultQuantityFactor ?? 1),
+    note: item.defaultNote ?? item.description ?? "",
+  };
+}
+
+function customValuesToComponentRow(values: CustomCostFormValues): CostingComponentRow {
+  return {
+    label: values.name.trim(),
+    type: costLibraryCategoryToComponentType(values.category, values.name),
+    unitCost: values.defaultUnitCost.trim(),
+    totalCost: "",
+    quantityFactor: "1",
+    note: values.note.trim(),
+  };
 }
 
 function variantLabel(variant: VariantOption | undefined): string | null {
@@ -86,6 +109,7 @@ function variantLabel(variant: VariantOption | undefined): string | null {
 
 export default function CostingCalculator() {
   const router = useRouter();
+  const { permissions } = useAdminPermissions();
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [variantsMap, setVariantsMap] = useState<Record<string, VariantOption[]>>({});
   const [leads, setLeads] = useState<LeadOption[]>([]);
@@ -123,6 +147,27 @@ export default function CostingCalculator() {
   const [error, setError] = useState<string | null>(null);
   const [costPickerOpen, setCostPickerOpen] = useState(false);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
+  const [customCostOpen, setCustomCostOpen] = useState(false);
+  const [customCostBusy, setCustomCostBusy] = useState(false);
+  const [customCostError, setCustomCostError] = useState<string | null>(null);
+  const [libraryItems, setLibraryItems] = useState<CostLibraryItem[]>(BUILTIN_COST_LIBRARY);
+  const [canManageLibrary, setCanManageLibrary] = useState(permissions.canAccessPricing);
+
+  async function loadCostLibrary() {
+    try {
+      const res = await fetch("/api/pricing/cost-library");
+      const data = await res.json() as {
+        items?: CostLibraryItem[];
+        canManageLibrary?: boolean;
+        message?: string;
+      };
+      if (!res.ok) throw new Error(data.message ?? "Không thể tải thư viện chi phí");
+      setLibraryItems(data.items ?? BUILTIN_COST_LIBRARY);
+      if (data.canManageLibrary != null) setCanManageLibrary(data.canManageLibrary);
+    } catch {
+      setLibraryItems(BUILTIN_COST_LIBRARY);
+    }
+  }
 
   const derivedFabricCost = useMemo(() => {
     const price = toNumber(fabricPrice) ?? 0;
@@ -191,6 +236,7 @@ export default function CostingCalculator() {
   );
 
   useEffect(() => {
+    void loadCostLibrary();
     void Promise.all([
       fetch("/api/admin/products?pageSize=200").then((r) => r.json()),
       fetch("/api/crm/leads?limit=100").then((r) => r.json()),
@@ -308,19 +354,81 @@ export default function CostingCalculator() {
   }
 
   function appendCostLibraryItem(itemId: string) {
-    const item = COST_LIBRARY.find((entry) => entry.id === itemId);
+    const item = libraryItems.find((entry) => entry.id === itemId);
     if (!item) return;
-    setComponents((prev) => [
-      ...prev,
-      {
-        label: item.name,
-        type: costLibraryCategoryToComponentType(item.category, item.name),
-        unitCost: String(item.defaultUnitCost),
-        totalCost: "",
-        quantityFactor: String(item.defaultQuantityFactor ?? 1),
-        note: item.defaultNote ?? item.description ?? "",
-      },
-    ]);
+    setComponents((prev) => [...prev, libraryItemToComponentRow(item)]);
+  }
+
+  async function handleCustomCostSubmit(values: CustomCostFormValues) {
+    setCustomCostBusy(true);
+    setCustomCostError(null);
+    const unitCost = toNumber(values.defaultUnitCost);
+    if (unitCost == null || unitCost < 0) {
+      setCustomCostError("Cost mặc định phải >= 0.");
+      setCustomCostBusy(false);
+      return;
+    }
+    if (!values.name.trim()) {
+      setCustomCostError("Tên chi phí là bắt buộc.");
+      setCustomCostBusy(false);
+      return;
+    }
+
+    try {
+      if (values.saveToLibrary && canManageLibrary) {
+        const res = await fetch("/api/pricing/cost-library", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: values.name.trim(),
+            category: values.category,
+            defaultUnitCost: unitCost,
+            defaultNote: values.note.trim() || null,
+            defaultQuantityFactor: 1,
+          }),
+        });
+        const data = await res.json() as {
+          item?: CostLibraryItem;
+          existingItem?: CostLibraryItem | null;
+          message?: string;
+        };
+
+        if (res.status === 409 && data.existingItem) {
+          setComponents((prev) => [...prev, libraryItemToComponentRow(data.existingItem!)]);
+          await loadCostLibrary();
+          setCustomCostOpen(false);
+          setCostPickerOpen(false);
+          return;
+        }
+
+        if (!res.ok) {
+          const code = (data as { code?: string }).code;
+          if (code === "DUPLICATE_BUILTIN" && data.existingItem) {
+            setComponents((prev) => [...prev, libraryItemToComponentRow(data.existingItem!)]);
+            setCustomCostOpen(false);
+            setCostPickerOpen(false);
+            return;
+          }
+          throw new Error(data.message ?? "Không thể lưu vào thư viện chi phí");
+        }
+
+        if (data.item) {
+          setComponents((prev) => [...prev, libraryItemToComponentRow(data.item!)]);
+          await loadCostLibrary();
+        } else {
+          setComponents((prev) => [...prev, customValuesToComponentRow(values)]);
+        }
+      } else {
+        setComponents((prev) => [...prev, customValuesToComponentRow(values)]);
+      }
+
+      setCustomCostOpen(false);
+      setCostPickerOpen(false);
+    } catch (err) {
+      setCustomCostError(err instanceof Error ? err.message : "Không thể thêm chi phí");
+    } finally {
+      setCustomCostBusy(false);
+    }
   }
 
   function applyBomPreset(presetKey: string) {
@@ -841,9 +949,22 @@ export default function CostingCalculator() {
 
       <CostingCostPicker
         open={costPickerOpen}
+        items={libraryItems}
         onClose={() => setCostPickerOpen(false)}
         onPickLibraryItem={appendCostLibraryItem}
-        onAddCustom={() => setComponents((prev) => [...prev, emptyComponent()])}
+        onOpenCustomForm={() => {
+          setCustomCostError(null);
+          setCustomCostOpen(true);
+        }}
+      />
+
+      <CostingCustomCostForm
+        open={customCostOpen}
+        busy={customCostBusy}
+        error={customCostError}
+        canSaveToLibrary={canManageLibrary}
+        onClose={() => setCustomCostOpen(false)}
+        onSubmit={(values) => void handleCustomCostSubmit(values)}
       />
 
       <CostingBomQuickStart

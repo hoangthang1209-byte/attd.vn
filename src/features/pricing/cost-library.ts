@@ -95,3 +95,28 @@ export const COST_LIBRARY: CostLibraryItem[] = [
   { id: "other-sample", name: "Sample", category: "OTHER", defaultUnitCost: 150000, defaultNote: "Phí mẫu" },
   { id: "other-setup", name: "Setup", category: "OTHER", defaultUnitCost: 500000, defaultNote: "Phí setup máy/in" },
 ];
+
+/** Built-in seed entries shipped with the app (not user-editable). */
+export const BUILTIN_COST_LIBRARY: CostLibraryItem[] = COST_LIBRARY;
+
+export function normalizeCostLibraryName(name: string): string {
+  return name
+    .trim()
+    .toLocaleLowerCase("vi-VN")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+export function isCostLibraryCategory(value: string): value is CostLibraryCategory {
+  return (
+    value === "PRINTING" ||
+    value === "EMBROIDERY" ||
+    value === "SEWING" ||
+    value === "CUTTING" ||
+    value === "PACKAGING" ||
+    value === "LOGISTICS" ||
+    value === "ACCESSORY" ||
+    value === "OTHER"
+  );
+}
