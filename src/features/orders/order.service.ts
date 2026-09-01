@@ -26,6 +26,7 @@ import {
   resolveSalesEmployeeSnapshot,
 } from "@/features/employees/employee.service";
 import { copyProductBomToOrderItems } from "@/features/orders/production-pack.service";
+import { aggregateOrderQuotedCommercialSummary } from "@/features/orders/order-quoted-cost";
 import {
   sanitizeOrderColorSnapshot,
   validateStockBackedOrderItem,
@@ -132,6 +133,57 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
   const totalAmount = row.totalAmount.toNumber();
   const financials = computeOrderFinancials(totalAmount, payments);
 
+  const items = row.items.map((item) => ({
+    id: item.id,
+    productNameSnapshot: item.productNameSnapshot,
+    variantNameSnapshot: item.variantNameSnapshot,
+    description: item.description,
+    designImageUrl: item.designImageUrl,
+    skuSnapshot: item.skuSnapshot,
+    colorId: item.colorId,
+    categoryId: item.categoryId,
+    gender: item.gender,
+    colorSnapshot: item.colorSnapshot,
+    categorySnapshot: item.categorySnapshot,
+    genderSnapshot: item.genderSnapshot,
+    moqSnapshot: item.moqSnapshot,
+    itemNote: item.itemNote,
+    productionLeadTime: item.productionLeadTime,
+    quantity: item.quantity,
+    unit: item.unit,
+    unitPrice: item.unitPrice.toNumber(),
+    lineTotal: item.lineTotal.toNumber(),
+    quotedUnitCost: item.quotedUnitCost?.toNumber() ?? null,
+    quotedTotalCost: item.quotedTotalCost?.toNumber() ?? null,
+    quotedMarginAmount: item.quotedMarginAmount?.toNumber() ?? null,
+    quotedMarginRate: item.quotedMarginRate?.toNumber() ?? null,
+    pricingCalculationItemId: item.pricingCalculationItemId,
+    sortOrder: item.sortOrder,
+    supplySource: item.supplySource,
+    processingMethod: item.processingMethod,
+    revenueCategoryId: item.revenueCategoryId,
+    revenueCategoryNameSnapshot: item.revenueCategoryNameSnapshot,
+    revenueCategoryCodeSnapshot: item.revenueCategoryCodeSnapshot,
+    variants: item.variants.map((variant) => ({
+      id: variant.id,
+      colorId: variant.colorId,
+      colorNameSnapshot: variant.colorNameSnapshot,
+      sizeValue: variant.sizeValue,
+      skuSnapshot: variant.skuSnapshot,
+      quantity: variant.quantity,
+      unit: variant.unit,
+      sortOrder: variant.sortOrder,
+    })),
+  }));
+
+  const quotedCommercial = aggregateOrderQuotedCommercialSummary(
+    items.map((item) => ({
+      lineTotal: item.lineTotal,
+      quotedTotalCost: item.quotedTotalCost,
+      quotedMarginAmount: item.quotedMarginAmount,
+    })),
+  );
+
   return {
     id: row.id,
     orderNo: row.orderNo,
@@ -210,43 +262,8 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
     updatedAt: row.updatedAt.toISOString(),
     customer: row.customer,
     quote: row.quote,
-    items: row.items.map((item) => ({
-      id: item.id,
-      productNameSnapshot: item.productNameSnapshot,
-      variantNameSnapshot: item.variantNameSnapshot,
-      description: item.description,
-      designImageUrl: item.designImageUrl,
-      skuSnapshot: item.skuSnapshot,
-      colorId: item.colorId,
-      categoryId: item.categoryId,
-      gender: item.gender,
-      colorSnapshot: item.colorSnapshot,
-      categorySnapshot: item.categorySnapshot,
-      genderSnapshot: item.genderSnapshot,
-      moqSnapshot: item.moqSnapshot,
-      itemNote: item.itemNote,
-      productionLeadTime: item.productionLeadTime,
-      quantity: item.quantity,
-      unit: item.unit,
-      unitPrice: item.unitPrice.toNumber(),
-      lineTotal: item.lineTotal.toNumber(),
-      sortOrder: item.sortOrder,
-      supplySource: item.supplySource,
-      processingMethod: item.processingMethod,
-      revenueCategoryId: item.revenueCategoryId,
-      revenueCategoryNameSnapshot: item.revenueCategoryNameSnapshot,
-      revenueCategoryCodeSnapshot: item.revenueCategoryCodeSnapshot,
-      variants: item.variants.map((variant) => ({
-        id: variant.id,
-        colorId: variant.colorId,
-        colorNameSnapshot: variant.colorNameSnapshot,
-        sizeValue: variant.sizeValue,
-        skuSnapshot: variant.skuSnapshot,
-        quantity: variant.quantity,
-        unit: variant.unit,
-        sortOrder: variant.sortOrder,
-      })),
-    })),
+    items,
+    quotedCommercial,
     payments,
     activities: row.activities.map((activity) => ({
       id: activity.id,

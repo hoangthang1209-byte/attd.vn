@@ -146,6 +146,9 @@ export type PricingCalculationListRecord = {
   leadLabel: string | null;
   customerLabel: string | null;
   priceGroupName: string | null;
+  isFinal: boolean;
+  finalizedAt: string | null;
+  revisionLabel: string | null;
   createdAt: string;
 };
 

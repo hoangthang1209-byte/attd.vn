@@ -8,6 +8,10 @@ import type {
   PricingCalculationListRecord,
 } from "@/features/pricing/types";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
+import {
+  deriveRevisionLabel,
+  extractCostingRevisionContext,
+} from "@/features/pricing/pricing-calculation-revision";
 
 function mapListRow(row: {
   id: string;
@@ -19,6 +23,9 @@ function mapListRow(row: {
   totalAmount: { toNumber(): number };
   manualOverride: boolean;
   manualTotalAmount: { toNumber(): number } | null;
+  isFinal: boolean;
+  finalizedAt: Date | null;
+  revisionLabel: string | null;
   createdAt: Date;
   lead?: { fullName: string; company: string | null; companyName: string | null } | null;
   customer?: { name: string } | null;
@@ -40,6 +47,9 @@ function mapListRow(row: {
     leadLabel,
     customerLabel: row.customer?.name ?? null,
     priceGroupName: row.priceGroup?.name ?? null,
+    isFinal: row.isFinal,
+    finalizedAt: row.finalizedAt?.toISOString() ?? null,
+    revisionLabel: row.revisionLabel,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -189,6 +199,9 @@ export async function getPricingCalculationDetail(id: string) {
     manualTotalAmount: row.manualTotalAmount?.toNumber() ?? null,
     manualOverrideReason: row.manualOverrideReason,
     internalNote: row.internalNote,
+    isFinal: row.isFinal,
+    finalizedAt: row.finalizedAt?.toISOString() ?? null,
+    revisionLabel: row.revisionLabel,
     inputSnapshot: row.inputSnapshot,
     resultSnapshot: row.resultSnapshot,
     createdAt: row.createdAt.toISOString(),
@@ -226,4 +239,63 @@ function extractWarnings(snapshot: unknown): string[] {
   if (!snapshot || typeof snapshot !== "object") return [];
   const warnings = (snapshot as { warnings?: unknown }).warnings;
   return Array.isArray(warnings) ? warnings.filter((w): w is string => typeof w === "string") : [];
+}
+
+export async function finalizePricingCalculation(id: string) {
+  const calc = await prisma.pricingCalculation.findUnique({
+    where: { id },
+    include: { items: { orderBy: { createdAt: "asc" }, take: 1 } },
+  });
+  if (!calc) throw new PricingValidationError("Không tìm thấy bản tính giá.");
+  if (calc.isFinal) return getPricingCalculationDetail(id);
+
+  const firstItem = calc.items[0];
+  const context = extractCostingRevisionContext(
+    calc.inputSnapshot,
+    firstItem?.productId ?? null,
+    firstItem?.productNameSnapshot ?? null,
+  );
+
+  const revisionSequence = await prisma.pricingCalculation.count({
+    where: {
+      customerId: calc.customerId,
+      createdAt: { lte: calc.createdAt },
+      ...(context.productId
+        ? { items: { some: { productId: context.productId } } }
+        : context.customProductName
+          ? { items: { some: { productNameSnapshot: context.customProductName } } }
+          : {}),
+    },
+  });
+
+  const revisionLabel = calc.revisionLabel?.trim() || deriveRevisionLabel(revisionSequence);
+
+  await prisma.$transaction(async (tx) => {
+    const siblingFilter = {
+      customerId: calc.customerId,
+      isFinal: true,
+      id: { not: id },
+      ...(context.productId
+        ? { items: { some: { productId: context.productId } } }
+        : context.customProductName
+          ? { items: { some: { productNameSnapshot: context.customProductName } } }
+          : {}),
+    };
+
+    await tx.pricingCalculation.updateMany({
+      where: siblingFilter,
+      data: { isFinal: false, finalizedAt: null },
+    });
+
+    await tx.pricingCalculation.update({
+      where: { id },
+      data: {
+        isFinal: true,
+        finalizedAt: new Date(),
+        revisionLabel,
+      },
+    });
+  });
+
+  return getPricingCalculationDetail(id);
 }

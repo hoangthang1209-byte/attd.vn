@@ -23,9 +23,21 @@ export type OrderDetailOperationalView = Omit<
   | "payments"
   | "financials"
   | "priceVatType"
+  | "quotedCommercial"
   | "items"
 > & {
-  items: Array<Omit<OrderItemRecord, "unitPrice" | "lineTotal">>;
+  items: Array<
+    Omit<
+      OrderItemRecord,
+      | "unitPrice"
+      | "lineTotal"
+      | "quotedUnitCost"
+      | "quotedTotalCost"
+      | "quotedMarginAmount"
+      | "quotedMarginRate"
+      | "pricingCalculationItemId"
+    >
+  >;
 };
 
 export type OrderListOperationalView = Omit<
@@ -49,6 +61,7 @@ export function omitOrderDetailFinancialFields(order: OrderDetailRecord): OrderD
     payments: _payments,
     financials: _financials,
     priceVatType: _priceVatType,
+    quotedCommercial: _quotedCommercial,
     items,
     activities,
     ...rest
@@ -56,9 +69,18 @@ export function omitOrderDetailFinancialFields(order: OrderDetailRecord): OrderD
 
   return {
     ...rest,
-    items: items.map(({ unitPrice: _unitPrice, lineTotal: _lineTotal, ...item }) => item) as Array<
-      Omit<OrderItemRecord, "unitPrice" | "lineTotal">
-    >,
+    items: items.map(
+      ({
+        unitPrice: _unitPrice,
+        lineTotal: _lineTotal,
+        quotedUnitCost: _quotedUnitCost,
+        quotedTotalCost: _quotedTotalCost,
+        quotedMarginAmount: _quotedMarginAmount,
+        quotedMarginRate: _quotedMarginRate,
+        pricingCalculationItemId: _pricingCalculationItemId,
+        ...item
+      }) => item,
+    ) as OrderDetailOperationalView["items"],
     activities: activities.filter((activity) => !PAYMENT_ACTIVITY_TYPES.has(activity.type)),
   };
 }

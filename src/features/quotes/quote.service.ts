@@ -20,6 +20,10 @@ import {
   salesRepToQuoteSnapshots,
 } from "@/features/sales/services/sales-representative.service";
 import type { CreateQuoteInput, QuoteItemInput, QuoteListRecord } from "@/features/quotes/types";
+import {
+  assertQuoteFinancialFieldsImmutable,
+  QuoteFinancialLockError,
+} from "@/features/orders/order-quoted-cost";
 
 async function validateQuoteCustomerContact(
   customerId: string | null | undefined,
@@ -492,7 +496,10 @@ export async function createQuoteFromPricingCalculation(
 }
 
 export async function updateQuote(id: string, input: Partial<CreateQuoteInput>) {
-  const existing = await prisma.quote.findUnique({ where: { id } });
+  const existing = await prisma.quote.findUnique({
+    where: { id },
+    include: { items: { orderBy: { sortOrder: "asc" } } },
+  });
   if (!existing) throw new QuoteValidationError("Không tìm thấy báo giá.");
   if (!input.items?.length) throw new QuoteValidationError("Cần ít nhất một dòng sản phẩm/dịch vụ.");
   validateQuoteItems(input.items);
@@ -509,6 +516,44 @@ export async function updateQuote(id: string, input: Partial<CreateQuoteInput>) 
         ? input.manualTotalAmount
         : decimalToNum(existing.manualTotalAmount),
   });
+
+  const incomingFinancialItems = input.items.map((rawItem, index) => {
+    const computed = items[index];
+    return {
+      id: rawItem.id ?? existing.items[index]?.id ?? null,
+      sortOrder: rawItem.sortOrder ?? index,
+      quantity: computed.quantity,
+      unitPrice: computed.unitPrice,
+      costEstimate: rawItem.costEstimate ?? null,
+      marginAmount: rawItem.marginAmount ?? null,
+      marginRate: rawItem.marginRate ?? null,
+      pricingSnapshot: rawItem.pricingSnapshot ?? null,
+    };
+  });
+
+  const existingFinancialItems = existing.items.map((item) => ({
+    id: item.id,
+    sortOrder: item.sortOrder,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice.toNumber(),
+    costEstimate: item.costEstimate?.toNumber() ?? null,
+    marginAmount: item.marginAmount?.toNumber() ?? null,
+    marginRate: item.marginRate?.toNumber() ?? null,
+    pricingSnapshot: item.pricingSnapshot,
+  }));
+
+  try {
+    assertQuoteFinancialFieldsImmutable(
+      existing.status,
+      existingFinancialItems,
+      incomingFinancialItems,
+    );
+  } catch (err) {
+    if (err instanceof QuoteFinancialLockError) {
+      throw new QuoteValidationError(err.message);
+    }
+    throw err;
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.quoteItem.deleteMany({ where: { quoteId: id } });

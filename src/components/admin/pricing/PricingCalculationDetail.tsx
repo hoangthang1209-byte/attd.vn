@@ -10,6 +10,9 @@ type CalculationDetail = {
   id: string;
   code: string;
   status: string;
+  isFinal: boolean;
+  finalizedAt: string | null;
+  revisionLabel: string | null;
   subtotal: number;
   serviceTotal: number;
   setupTotal: number;
@@ -51,17 +54,41 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
   const [calc, setCalc] = useState<CalculationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [finalizing, setFinalizing] = useState(false);
 
-  useEffect(() => {
-    void fetch(`/api/pricing/calculations/${id}`)
+  const load = () =>
+    fetch(`/api/pricing/calculations/${id}`)
       .then(async (res) => {
         const data = await res.json() as { calculation?: CalculationDetail; message?: string };
         if (!res.ok) throw new Error(data.message ?? "Không tìm thấy");
         setCalc(data.calculation ?? null);
-      })
+      });
+
+  useEffect(() => {
+    void load()
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function handleFinalize() {
+    if (!calc || calc.isFinal) return;
+    setFinalizing(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/pricing/calculations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "finalize" }),
+      });
+      const data = await res.json() as { calculation?: CalculationDetail; message?: string };
+      if (!res.ok) throw new Error(data.message ?? "Không thể chốt giá vốn");
+      setCalc(data.calculation ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể chốt giá vốn");
+    } finally {
+      setFinalizing(false);
+    }
+  }
 
   if (loading) return <AdminLoadingState label="Đang tải chi tiết bản tính…" />;
   if (error || !calc) {
@@ -82,7 +109,15 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
       <div className="admin-section-header">
         <div>
           <h3 className="admin-subtitle" style={{ margin: 0 }}>{calc.code}</h3>
-          <p className="admin-field-hint">{getPricingStatusLabel(calc.status as never)} · {formatPricingDateTime(calc.createdAt)}</p>
+          <p className="admin-field-hint">
+            {getPricingStatusLabel(calc.status as never)} · {formatPricingDateTime(calc.createdAt)}
+            {calc.revisionLabel && (
+              <> · <strong>{calc.isFinal ? `${calc.revisionLabel} — FINAL` : calc.revisionLabel}</strong></>
+            )}
+            {calc.isFinal && !calc.revisionLabel && (
+              <> · <strong>FINAL</strong></>
+            )}
+          </p>
         </div>
         <Link href="/admin/pricing/history" className="admin-btn admin-btn--secondary">← Lịch sử</Link>
       </div>
@@ -169,7 +204,17 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
         )}
       </fieldset>
 
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: 24, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {!calc.isFinal && (
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary"
+            disabled={finalizing}
+            onClick={() => void handleFinalize()}
+          >
+            {finalizing ? "Đang chốt…" : "Chốt giá vốn"}
+          </button>
+        )}
         <Link
           href={`/admin/quotes/new?pricingCalculationId=${id}`}
           className="admin-btn admin-btn--primary"

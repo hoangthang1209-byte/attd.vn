@@ -6,6 +6,7 @@ import { getOrderDetail } from "@/features/orders/order.service";
 import {
   enrichOrderInputFromCrmSnapshots,
 } from "@/features/crm/order-customer-snapshot";
+import { buildOrderItemQuotedCostSnapshot } from "@/features/orders/order-quoted-cost";
 
 export class OrderConversionError extends Error {
   constructor(message: string) {
@@ -84,6 +85,10 @@ async function buildQuoteConversionItems(
     unit: string;
     unitPrice: Prisma.Decimal;
     lineTotal: Prisma.Decimal;
+    costEstimate: Prisma.Decimal | null;
+    marginAmount: Prisma.Decimal | null;
+    marginRate: Prisma.Decimal | null;
+    pricingCalculationItemId: string | null;
     sortOrder: number;
     revenueCategoryId: string | null;
     revenueCategoryNameSnapshot: string | null;
@@ -116,6 +121,14 @@ async function buildQuoteConversionItems(
       });
     }
 
+    const quotedCost = buildOrderItemQuotedCostSnapshot({
+      quantity: item.quantity,
+      costEstimate: item.costEstimate?.toNumber() ?? null,
+      marginAmount: item.marginAmount?.toNumber() ?? null,
+      marginRate: item.marginRate?.toNumber() ?? null,
+      pricingCalculationItemId: item.pricingCalculationItemId,
+    });
+
     return {
       productId: item.productId,
       variantId: item.variantId,
@@ -135,6 +148,15 @@ async function buildQuoteConversionItems(
       unit: item.unit,
       unitPrice: item.unitPrice,
       lineTotal: item.lineTotal,
+      quotedUnitCost:
+        quotedCost.quotedUnitCost != null ? new Prisma.Decimal(quotedCost.quotedUnitCost) : null,
+      quotedTotalCost:
+        quotedCost.quotedTotalCost != null ? new Prisma.Decimal(quotedCost.quotedTotalCost) : null,
+      quotedMarginAmount:
+        quotedCost.quotedMarginAmount != null ? new Prisma.Decimal(quotedCost.quotedMarginAmount) : null,
+      quotedMarginRate:
+        quotedCost.quotedMarginRate != null ? new Prisma.Decimal(quotedCost.quotedMarginRate) : null,
+      pricingCalculationItemId: quotedCost.pricingCalculationItemId,
       sortOrder: item.sortOrder ?? index,
       revenueCategoryId: item.revenueCategoryId,
       revenueCategoryNameSnapshot: item.revenueCategoryNameSnapshot,

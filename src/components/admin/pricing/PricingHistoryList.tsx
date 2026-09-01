@@ -71,6 +71,7 @@ export default function PricingHistoryList() {
                 <th>Khách hàng</th>
                 <th>Nhóm giá</th>
                 <th>Tổng tiền</th>
+                <th>Phiên bản</th>
                 <th>Trạng thái</th>
                 <th>Ngày tạo</th>
               </tr>
@@ -83,6 +84,15 @@ export default function PricingHistoryList() {
                   <td>{r.customerLabel ?? "—"}</td>
                   <td>{r.priceGroupName ?? "—"}</td>
                   <td>{formatPricingCurrency(r.manualOverride && r.manualTotalAmount != null ? r.manualTotalAmount : r.totalAmount)}</td>
+                  <td>
+                    {r.revisionLabel
+                      ? r.isFinal
+                        ? `${r.revisionLabel} — FINAL`
+                        : r.revisionLabel
+                      : r.isFinal
+                        ? "FINAL"
+                        : "—"}
+                  </td>
                   <td>{getPricingStatusLabel(r.status)}</td>
                   <td>{formatPricingDateTime(r.createdAt)}</td>
                 </tr>

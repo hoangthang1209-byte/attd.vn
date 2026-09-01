@@ -6,6 +6,7 @@ import { formatOrderDate, formatOrderDateTime } from "@/features/orders/order-fo
 import { ORDER_STATUS_LABELS } from "@/features/orders/order-labels";
 import type { OrderDetailRecord } from "@/features/orders/order.types";
 import type { EmployeeRecord } from "@/features/employees/employee.service";
+import OrderCommercialItemsTable from "./OrderCommercialItemsTable";
 
 type ProductionFields = {
   productionOwnerId: string;
@@ -181,6 +182,15 @@ export default function OrderWorkspaceInfoTab({
             <pre className="admin-field-hint" style={{ whiteSpace: "pre-wrap" }}>{order.productionNote}</pre>
           )}
         </>
+      ),
+    },
+    {
+      title: "Giá bán & giá vốn báo giá",
+      defaultOpen: canViewFinancials,
+      content: canViewFinancials ? (
+        <OrderCommercialItemsTable items={order.items} currency={order.currency} />
+      ) : (
+        <p className="admin-field-hint">Không có quyền xem giá vốn / biên lợi nhuận.</p>
       ),
     },
     {

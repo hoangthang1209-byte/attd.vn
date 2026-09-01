@@ -3669,6 +3669,9 @@ model PricingCalculation {
   internalNote         String?                  @db.Text
   inputSnapshot        Json?
   resultSnapshot       Json?
+  isFinal              Boolean                  @default(false)
+  finalizedAt          DateTime?
+  revisionLabel        String?
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
   lead                 Lead?                    @relation(fields: [leadId], references: [id], onDelete: SetNull)
@@ -3716,6 +3719,7 @@ model PricingCalculationItem {
   product              Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
   variant              ProductVariant?    @relation(fields: [variantId], references: [id], onDelete: SetNull)
   quoteItems           QuoteItem[]
+  orderItems           OrderItem[]
 
   @@index([pricingCalculationId])
   @@index([productId])
@@ -4265,6 +4269,11 @@ model OrderItem {
   unit                        String                         @default("cái")
   unitPrice                   Decimal                        @default(0) @db.Decimal(12, 2)
   lineTotal                   Decimal                        @default(0) @db.Decimal(12, 2)
+  quotedUnitCost              Decimal?                       @db.Decimal(12, 2)
+  quotedTotalCost             Decimal?                       @db.Decimal(12, 2)
+  quotedMarginAmount          Decimal?                       @db.Decimal(12, 2)
+  quotedMarginRate            Decimal?                       @db.Decimal(8, 4)
+  pricingCalculationItemId    String?
   sortOrder                   Int                            @default(0)
   supplySource                OrderItemSupplySource?
   processingMethod            OrderItemProcessingMethod?
@@ -4280,6 +4289,7 @@ model OrderItem {
   category                    Category?                      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   designMediaAsset            MediaAsset?                    @relation(fields: [designMediaAssetId], references: [id], onDelete: SetNull)
   revenueCategory             RevenueCategory?               @relation(fields: [revenueCategoryId], references: [id], onDelete: SetNull)
+  pricingCalculationItem      PricingCalculationItem?        @relation(fields: [pricingCalculationItemId], references: [id], onDelete: SetNull)
   variants                    OrderItemVariant[]
   productionFiles             OrderProductionFile[]
   productionStages            OrderProductionStage[]
@@ -4296,6 +4306,7 @@ model OrderItem {
   @@index([colorId])
   @@index([categoryId])
   @@index([revenueCategoryId])
+  @@index([pricingCalculationItemId])
 }
 
 model OrderItemVariant {

@@ -65,6 +65,11 @@ export type OrderItemRecord = {
   unit: string;
   unitPrice: number;
   lineTotal: number;
+  quotedUnitCost: number | null;
+  quotedTotalCost: number | null;
+  quotedMarginAmount: number | null;
+  quotedMarginRate: number | null;
+  pricingCalculationItemId: string | null;
   sortOrder: number;
   supplySource: OrderItemSupplySource | null;
   processingMethod: OrderItemProcessingMethod | null;
@@ -72,6 +77,14 @@ export type OrderItemRecord = {
   revenueCategoryNameSnapshot: string | null;
   revenueCategoryCodeSnapshot: string | null;
   variants: OrderItemVariantRecord[];
+};
+
+export type OrderQuotedCommercialSummary = {
+  revenue: number;
+  quotedTotalCost: number | null;
+  expectedProfit: number | null;
+  expectedMarginRate: number | null;
+  hasQuotedCost: boolean;
 };
 
 export type OrderPaymentRecord = {
@@ -176,6 +189,7 @@ export type OrderDetailRecord = {
   customer: { id: string; name: string; code: string } | null;
   quote: { id: string; quoteNo: string } | null;
   items: OrderItemRecord[];
+  quotedCommercial: OrderQuotedCommercialSummary | null;
   payments: OrderPaymentRecord[];
   activities: OrderActivityRecord[];
   financials: OrderFinancialSummary;

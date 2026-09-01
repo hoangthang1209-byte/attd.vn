@@ -8,6 +8,7 @@ import { orderCarrierDisplay } from "@/features/orders/order-status";
 import { deriveOrderMilestones } from "@/features/orders/order-workspace-milestones";
 import type { ProductionExecutionBundle } from "@/features/orders/production-execution.service";
 import type { OrderWorkspaceTab } from "./order-workspace.types";
+import OrderCommercialCostStrip from "./OrderCommercialCostStrip";
 
 type Props = {
   order: OrderDetailRecord;
@@ -70,6 +71,8 @@ export default function OrderWorkspaceSummaryCards({
           </button>
         </article>
       )}
+
+      {canViewFinancials && <OrderCommercialCostStrip order={order} />}
 
       <article className="order-workspace-summary-card">
         <h3 className="order-workspace-summary-card__title">Tiến độ đơn hàng</h3>
