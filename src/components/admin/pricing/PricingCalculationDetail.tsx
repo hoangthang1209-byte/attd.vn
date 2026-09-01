@@ -205,6 +205,12 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
       </fieldset>
 
       <div style={{ marginTop: 24, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Link
+          href={`/admin/pricing/costing?fromCalculation=${id}`}
+          className="admin-btn admin-btn--primary"
+        >
+          Tạo phiên bản mới
+        </Link>
         {!calc.isFinal && (
           <button
             type="button"

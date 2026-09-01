@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AdminLoadingState } from "@/components/admin/AdminUi";
+import {
+  buildCostingWorkspaceClone,
+  type CostingCalculationCloneRecord,
+  type CostingWorkspaceClone,
+} from "@/features/pricing/costing-calculation-clone";
 import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import CostingBomQuickStart from "@/components/admin/pricing/costing/CostingBomQuickStart";
@@ -109,6 +115,8 @@ function variantLabel(variant: VariantOption | undefined): string | null {
 
 export default function CostingCalculator() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromCalculationId = searchParams.get("fromCalculation");
   const { permissions } = useAdminPermissions();
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [variantsMap, setVariantsMap] = useState<Record<string, VariantOption[]>>({});
@@ -152,6 +160,35 @@ export default function CostingCalculator() {
   const [customCostError, setCustomCostError] = useState<string | null>(null);
   const [libraryItems, setLibraryItems] = useState<CostLibraryItem[]>(BUILTIN_COST_LIBRARY);
   const [canManageLibrary, setCanManageLibrary] = useState(permissions.canAccessPricing);
+  const [revisionCloneSource, setRevisionCloneSource] = useState<{
+    code: string;
+    revisionDisplay: string;
+  } | null>(null);
+  const [loadingClone, setLoadingClone] = useState(false);
+
+  function applyCostingWorkspaceClone(workspace: CostingWorkspaceClone) {
+    setProductId(workspace.productId);
+    setVariantId(workspace.variantId);
+    setCustomProductName(workspace.customProductName);
+    setQuantity(workspace.quantity);
+    setUnit(workspace.unit);
+    setMaterialName(workspace.materialName);
+    setGsm(workspace.gsm);
+    setFabricPrice(workspace.fabricPrice);
+    setFabricConsumption(workspace.fabricConsumption);
+    setFabricCostPerUnit(workspace.fabricCostPerUnit);
+    setRibCostPerUnit(workspace.ribCostPerUnit);
+    setComponents(workspace.components.length ? workspace.components : defaultComponents);
+    setOverheadRate(workspace.overheadRate);
+    setTargetMarginRate(workspace.targetMarginRate);
+    setVatRate(workspace.vatRate);
+    setLeadId(workspace.leadId);
+    setCustomerId(workspace.customerId);
+    setContactId(workspace.contactId);
+    setPriceGroupId(workspace.priceGroupId);
+    setInternalNote(workspace.internalNote);
+    setQuantityTiers(workspace.quantityTiers);
+  }
 
   async function loadCostLibrary() {
     try {
@@ -249,11 +286,54 @@ export default function CostingCalculator() {
         setCustomers((customersData as { customers?: CustomerOption[] }).customers ?? []);
         const nextGroups = (groupsData as { priceGroups?: PriceGroupOption[] }).priceGroups ?? [];
         setGroups(nextGroups);
-        const defaultGroup = nextGroups.find((group) => group.isDefault);
-        if (defaultGroup) setPriceGroupId(defaultGroup.id);
+        if (!fromCalculationId) {
+          const defaultGroup = nextGroups.find((group) => group.isDefault);
+          if (defaultGroup) setPriceGroupId(defaultGroup.id);
+        }
       })
       .catch(() => setError("Không thể tải dữ liệu nền cho bộ tính giá."));
-  }, []);
+  }, [fromCalculationId]);
+
+  useEffect(() => {
+    if (!fromCalculationId) return;
+
+    let cancelled = false;
+    setLoadingClone(true);
+    setError(null);
+
+    void fetch(`/api/pricing/calculations/${fromCalculationId}`)
+      .then(async (res) => {
+        const data = await res.json() as {
+          calculation?: CostingCalculationCloneRecord;
+          message?: string;
+        };
+        if (!res.ok) throw new Error(data.message ?? "Không thể tải bản tính giá nguồn");
+        if (!data.calculation) throw new Error("Không tìm thấy bản tính giá nguồn");
+
+        const workspace = buildCostingWorkspaceClone(data.calculation);
+        if (!workspace) throw new Error("Bản tính giá này không có dữ liệu costing để sao chép.");
+        if (cancelled) return;
+
+        applyCostingWorkspaceClone(workspace);
+        setRevisionCloneSource({
+          code: workspace.sourceCode,
+          revisionDisplay: workspace.sourceRevisionDisplay,
+        });
+        setResult(null);
+        setQuantityBreaks([]);
+        if (workspace.productId) void loadVariants(workspace.productId);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingClone(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fromCalculationId]);
 
   useEffect(() => {
     if (!customerId) {
@@ -528,9 +608,21 @@ export default function CostingCalculator() {
 
   const parsedQuantity = Math.max(1, toNumber(quantity) ?? 1);
 
+  if (loadingClone && fromCalculationId) {
+    return <AdminLoadingState label="Đang tải bản tính giá nguồn…" />;
+  }
+
   return (
     <div className="costing-workspace">
       <div className="costing-workspace__main">
+        {revisionCloneSource && (
+          <p
+            className="admin-kb-badge admin-kb-badge--ai"
+            style={{ display: "block", marginBottom: 16, padding: "10px 12px" }}
+          >
+            Đang tạo phiên bản mới từ {revisionCloneSource.code} · {revisionCloneSource.revisionDisplay}
+          </p>
+        )}
         {error && <p className="admin-error">{error}</p>}
 
         <section className="costing-section">
