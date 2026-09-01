@@ -29,6 +29,7 @@ const CATEGORY_OPTIONS: CostLibraryCategory[] = [
   "EMBROIDERY",
   "SEWING",
   "CUTTING",
+  "FINISHING",
   "PACKAGING",
   "LOGISTICS",
   "ACCESSORY",

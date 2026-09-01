@@ -22,6 +22,7 @@ const CATEGORY_ORDER: Array<CostLibraryCategory | "ALL"> = [
   "EMBROIDERY",
   "SEWING",
   "CUTTING",
+  "FINISHING",
   "PACKAGING",
   "LOGISTICS",
   "ACCESSORY",

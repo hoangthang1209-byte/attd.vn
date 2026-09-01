@@ -38,4 +38,15 @@ describe("costing preview", () => {
     assert.equal(wash?.totalCost, 500000);
     assert.equal(wash?.unitCost, 5000);
   });
+
+  it("preserves FINISHING component type in breakdown", () => {
+    const result = previewCostingCalculation({
+      quantity: 270,
+      components: [{ label: "Ủi", type: "FINISHING", unitCost: 3500 }],
+    });
+    const ironing = result.components.find((c) => c.label === "Ủi");
+    assert.equal(ironing?.type, "FINISHING");
+    assert.equal(ironing?.unitCost, 3500);
+    assert.ok(result.processCostPerUnit >= 3500);
+  });
 });

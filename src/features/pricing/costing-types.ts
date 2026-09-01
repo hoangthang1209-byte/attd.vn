@@ -6,6 +6,7 @@ export type CostingComponentType =
   | "PRINTING"
   | "EMBROIDERY"
   | "WASH"
+  | "FINISHING"
   | "PACKAGING"
   | "LOGISTICS"
   | "OTHER";

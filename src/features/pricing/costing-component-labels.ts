@@ -6,6 +6,7 @@ export const COSTING_COMPONENT_TYPE_OPTIONS: Array<{ value: CostingComponentType
   { value: "PRINTING", label: "In" },
   { value: "EMBROIDERY", label: "Thêu" },
   { value: "WASH", label: "Wash" },
+  { value: "FINISHING", label: "Hoàn thiện" },
   { value: "PACKAGING", label: "Đóng gói" },
   { value: "LOGISTICS", label: "Logistics" },
   { value: "OTHER", label: "Khác" },

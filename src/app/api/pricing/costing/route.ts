@@ -20,6 +20,7 @@ const COMPONENT_TYPES: CostingComponentType[] = [
   "PRINTING",
   "EMBROIDERY",
   "WASH",
+  "FINISHING",
   "PACKAGING",
   "LOGISTICS",
   "OTHER",

@@ -5,6 +5,7 @@ export type CostLibraryCategory =
   | "EMBROIDERY"
   | "SEWING"
   | "CUTTING"
+  | "FINISHING"
   | "PACKAGING"
   | "LOGISTICS"
   | "ACCESSORY"
@@ -25,6 +26,7 @@ export const COST_LIBRARY_CATEGORY_LABELS: Record<CostLibraryCategory, string> =
   EMBROIDERY: "Thêu",
   SEWING: "May",
   CUTTING: "Cắt",
+  FINISHING: "Hoàn thiện",
   PACKAGING: "Đóng gói",
   LOGISTICS: "Logistics",
   ACCESSORY: "Phụ liệu",
@@ -114,6 +116,7 @@ export function isCostLibraryCategory(value: string): value is CostLibraryCatego
     value === "EMBROIDERY" ||
     value === "SEWING" ||
     value === "CUTTING" ||
+    value === "FINISHING" ||
     value === "PACKAGING" ||
     value === "LOGISTICS" ||
     value === "ACCESSORY" ||
