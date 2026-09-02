@@ -161,7 +161,11 @@ export async function POST(req: NextRequest) {
     const mode = asString(raw.mode) ?? "calculate";
 
     if (mode === "save" || mode === "createQuote") {
-      const saved = await saveCostingCalculation({ ...input, createQuote: mode === "createQuote" || input.createQuote });
+      const batchItemId = asString(raw.batchItemId);
+      const saved = await saveCostingCalculation(
+        { ...input, createQuote: mode === "createQuote" || input.createQuote },
+        batchItemId ? { batchItemId } : undefined,
+      );
       return NextResponse.json({ saved }, { status: 201 });
     }
 

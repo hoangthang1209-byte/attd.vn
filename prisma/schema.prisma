@@ -294,6 +294,7 @@ model Lead {
   activities          CRMActivity[]
   productInterests    CRMProductInterest[]
   pricingCalculations PricingCalculation[]
+  pricingCostingBatches PricingCostingBatch[]
   quotes              Quote[]
   salesOpportunities  SalesOpportunity[]
   dealerRfq           DealerRFQ?
@@ -378,6 +379,7 @@ model Customer {
   activities               CRMActivity[]
   productInterests         CRMProductInterest[]
   pricingCalculations      PricingCalculation[]
+  pricingCostingBatches    PricingCostingBatch[]
   quotes                   Quote[]
   orders                   Order[]
   techPacks                TechPack[]
@@ -429,6 +431,7 @@ model Contact {
   leads               Lead[]
   activities          CRMActivity[]
   pricingCalculations PricingCalculation[]
+  pricingCostingBatches PricingCostingBatch[]
   quotes              Quote[]
   orders              Order[]
   salesOpportunities  SalesOpportunity[]
@@ -3559,6 +3562,12 @@ enum PricingCalculationStatus {
   ARCHIVED
 }
 
+enum PricingCostingBatchStatus {
+  WORKING
+  QUOTED
+  ARCHIVED
+}
+
 enum PricingServiceType {
   PRINT_DTF
   PRINT_SILK
@@ -3682,6 +3691,7 @@ model PricingCalculation {
   quotes               Quote[]
   dealerRfqs           DealerRFQ[]
   salesOpportunities   SalesOpportunity[]
+  costingBatchItem     PricingCostingBatchItem?
 
   @@index([code])
   @@index([leadId])
@@ -3741,6 +3751,47 @@ model PricingCalculationItem {
   @@index([pricingCalculationId])
   @@index([productId])
   @@index([variantId])
+}
+
+model PricingCostingBatch {
+  id           String                    @id @default(cuid())
+  code         String                    @unique
+  title        String?
+  status       PricingCostingBatchStatus @default(WORKING)
+  leadId       String?
+  customerId   String?
+  contactId    String?
+  quoteId      String?                   @unique
+  internalNote String?                   @db.Text
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  lead         Lead?                     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer     Customer?                 @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contact      Contact?                  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  quote        Quote?                    @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  items        PricingCostingBatchItem[]
+
+  @@index([code])
+  @@index([customerId])
+  @@index([leadId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PricingCostingBatchItem {
+  id                   String              @id @default(cuid())
+  batchId              String
+  pricingCalculationId String?             @unique
+  sortOrder            Int                 @default(0)
+  groupLabel           String?
+  label                String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  batch                PricingCostingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  pricingCalculation   PricingCalculation? @relation(fields: [pricingCalculationId], references: [id], onDelete: SetNull)
+
+  @@index([batchId])
+  @@index([sortOrder])
 }
 
 // ── Sprint 26.2.0 — Quotation Builder MVP ─────────────────────────────────────
@@ -3880,6 +3931,7 @@ model Quote {
   order                        Order?
   dealerRfq                    DealerRFQ?
   salesOpportunities           SalesOpportunity[]
+  costingBatch                 PricingCostingBatch?
 
   @@index([quoteNo])
   @@index([salesRepresentativeId])

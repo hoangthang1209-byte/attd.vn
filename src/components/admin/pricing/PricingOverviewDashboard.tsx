@@ -73,6 +73,9 @@ export default function PricingOverviewDashboard() {
         <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">
           Costing & báo giá nhanh
         </Link>
+        <Link href="/admin/pricing/costing/batch" className="admin-btn admin-btn--primary">
+          Costing batch (nhiều style)
+        </Link>
         <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary">
           Bộ tính giá
         </Link>

@@ -74,6 +74,7 @@ export type CreateQuoteInput = {
   sampleLeadTime?: string | null;
   sampleRefundCondition?: string | null;
   items: QuoteItemInput[];
+  pricingCalculationIds?: string[];
 };
 
 export type QuoteTotals = {

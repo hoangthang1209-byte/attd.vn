@@ -259,7 +259,10 @@ export async function calculateCostingQuantityBreaks(
   return breakResults;
 }
 
-export async function saveCostingCalculation(input: CostingCalculatorInput): Promise<CostingSaveResult> {
+export async function saveCostingCalculation(
+  input: CostingCalculatorInput,
+  options?: { batchItemId?: string },
+): Promise<CostingSaveResult> {
   const result = await calculateCosting(input);
   const quantityBreaks = (input.quantityBreaks ?? [])
     .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
@@ -329,6 +332,13 @@ export async function saveCostingCalculation(input: CostingCalculatorInput): Pro
 
     return calc;
   });
+
+  if (options?.batchItemId) {
+    const { linkBatchItemToCalculation } = await import(
+      "@/features/pricing/services/costing-batch.service"
+    );
+    await linkBatchItemToCalculation(options.batchItemId, calculation.id);
+  }
 
   if (!input.createQuote) {
     return { calculationId: calculation.id, calculationCode: calculation.code };

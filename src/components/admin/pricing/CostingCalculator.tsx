@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminLoadingState } from "@/components/admin/AdminUi";
 import {
@@ -117,6 +118,8 @@ export default function CostingCalculator() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromCalculationId = searchParams.get("fromCalculation");
+  const batchId = searchParams.get("batchId");
+  const batchItemId = searchParams.get("batchItemId");
   const { permissions } = useAdminPermissions();
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [variantsMap, setVariantsMap] = useState<Record<string, VariantOption[]>>({});
@@ -406,7 +409,10 @@ export default function CostingCalculator() {
       const res = await fetch("/api/pricing/costing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          batchItemId: batchItemId || undefined,
+        }),
       });
       const data = await res.json() as {
         result?: CostingCalculatorResult;
@@ -419,7 +425,11 @@ export default function CostingCalculator() {
       } else if (mode === "createQuote" && data.saved?.quoteId) {
         router.push(`/admin/quotes/${data.saved.quoteId}`);
       } else if (data.saved?.calculationId) {
-        router.push(`/admin/pricing/history/${data.saved.calculationId}`);
+        if (batchId) {
+          router.push(`/admin/pricing/costing/batch/${batchId}`);
+        } else {
+          router.push(`/admin/pricing/history/${data.saved.calculationId}`);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi bộ tính giá");
@@ -621,6 +631,17 @@ export default function CostingCalculator() {
             style={{ display: "block", marginBottom: 16, padding: "10px 12px" }}
           >
             Đang tạo phiên bản mới từ {revisionCloneSource.code} · {revisionCloneSource.revisionDisplay}
+          </p>
+        )}
+        {batchId && (
+          <p
+            className="admin-kb-badge admin-kb-badge--medium"
+            style={{ display: "block", marginBottom: 16, padding: "10px 12px" }}
+          >
+            Costing trong batch
+            {batchItemId && <> · dòng {batchItemId.slice(0, 8)}…</>}
+            {" · "}
+            <Link href={`/admin/pricing/costing/batch/${batchId}`}>Quay lại batch</Link>
           </p>
         )}
         {error && <p className="admin-error">{error}</p>}

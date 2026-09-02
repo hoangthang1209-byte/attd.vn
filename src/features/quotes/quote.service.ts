@@ -393,7 +393,12 @@ export async function createQuote(input: CreateQuoteInput) {
 
     await tx.quoteItem.createMany({ data: buildItemCreateData(created.id, items) });
 
-    if (input.pricingCalculationId) {
+    if (input.pricingCalculationIds?.length) {
+      await tx.pricingCalculation.updateMany({
+        where: { id: { in: input.pricingCalculationIds } },
+        data: { status: "USED_FOR_QUOTE" },
+      });
+    } else if (input.pricingCalculationId) {
       await tx.pricingCalculation.update({
         where: { id: input.pricingCalculationId },
         data: { status: "USED_FOR_QUOTE" },
@@ -414,47 +419,45 @@ export async function createQuote(input: CreateQuoteInput) {
   return getQuoteDetail(quote.id);
 }
 
-export async function createQuoteFromPricingCalculation(
-  pricingCalculationId: string,
-  overrides?: Partial<CreateQuoteInput>
-) {
-  const calc = await getPricingCalculationDetail(pricingCalculationId);
-  if (!calc) throw new QuoteValidationError("Không tìm thấy bản tính giá.");
+type PricingCalcDetail = NonNullable<Awaited<ReturnType<typeof getPricingCalculationDetail>>>;
+type PricingCalcItem = PricingCalcDetail["items"][number];
 
-  const calcResult = (calc.resultSnapshot && typeof calc.resultSnapshot === "object")
-    ? (calc.resultSnapshot as Record<string, unknown>)
-    : null;
-  const calcQuantityBreaks = Array.isArray(calcResult?.quantityBreaks)
-    ? calcResult.quantityBreaks
-    : [];
+function buildCostingQuoteItemDescription(item: PricingCalcItem): string {
+  return [
+    (() => {
+      const materialName = (item.pricingSnapshot as { materialName?: unknown } | null)?.materialName;
+      return typeof materialName === "string" && materialName.trim()
+        ? `VL: ${materialName.trim()}`
+        : null;
+    })(),
+    (() => {
+      const gsm = (item.pricingSnapshot as { gsm?: unknown } | null)?.gsm;
+      return typeof gsm === "number" && Number.isFinite(gsm) ? `GSM: ${gsm}` : null;
+    })(),
+    `SL: ${item.quantity.toLocaleString("vi-VN")} ${item.unit}`,
+    (() => {
+      const targetMarginRate = (item.pricingSnapshot as { targetMarginRate?: unknown } | null)?.targetMarginRate;
+      return typeof targetMarginRate === "number" && Number.isFinite(targetMarginRate)
+        ? `Target margin: ${targetMarginRate}%`
+        : null;
+    })(),
+    "Giá từ Costing Calculator",
+  ].filter(Boolean).join(" | ");
+}
 
-  const items: QuoteItemInput[] = calc.items.map((item, index) => ({
+function mapPricingCalculationItemToQuoteItem(
+  item: PricingCalcItem,
+  calcQuantityBreaks: unknown[],
+  sortOrder: number,
+): QuoteItemInput {
+  return {
     pricingSnapshot: item.pricingSnapshot as Record<string, unknown> | null,
     pricingCalculationItemId: item.id,
     productId: item.productId,
     variantId: item.variantId,
     productNameSnapshot: item.productNameSnapshot,
     variantNameSnapshot: item.variantNameSnapshot,
-    description: [
-      (() => {
-        const materialName = (item.pricingSnapshot as { materialName?: unknown } | null)?.materialName;
-        return typeof materialName === "string" && materialName.trim()
-          ? `VL: ${materialName.trim()}`
-          : null;
-      })(),
-      (() => {
-        const gsm = (item.pricingSnapshot as { gsm?: unknown } | null)?.gsm;
-        return typeof gsm === "number" && Number.isFinite(gsm) ? `GSM: ${gsm}` : null;
-      })(),
-      `SL: ${item.quantity.toLocaleString("vi-VN")} ${item.unit}`,
-      (() => {
-        const targetMarginRate = (item.pricingSnapshot as { targetMarginRate?: unknown } | null)?.targetMarginRate;
-        return typeof targetMarginRate === "number" && Number.isFinite(targetMarginRate)
-          ? `Target margin: ${targetMarginRate}%`
-          : null;
-      })(),
-      "Giá từ Costing Calculator",
-    ].filter(Boolean).join(" | "),
+    description: buildCostingQuoteItemDescription(item),
     itemNote: calcQuantityBreaks.length > 0
       ? "Có bảng giá theo số lượng trong costing snapshot."
       : null,
@@ -470,8 +473,101 @@ export async function createQuoteFromPricingCalculation(
     costEstimate: item.costEstimate,
     marginAmount: item.marginAmount,
     marginRate: item.marginRate,
-    sortOrder: index,
-  }));
+    sortOrder,
+  };
+}
+
+export async function createQuoteFromPricingCalculations(
+  pricingCalculationIds: string[],
+  overrides?: Partial<CreateQuoteInput>,
+) {
+  if (!pricingCalculationIds.length) {
+    throw new QuoteValidationError("Cần ít nhất một bản tính giá.");
+  }
+
+  const calcs = await Promise.all(
+    pricingCalculationIds.map((id) => getPricingCalculationDetail(id)),
+  );
+  const missingIndex = calcs.findIndex((calc) => !calc);
+  if (missingIndex >= 0) {
+    throw new QuoteValidationError(
+      `Không tìm thấy bản tính giá (${pricingCalculationIds[missingIndex]}).`,
+    );
+  }
+
+  const pricingCalculationItemIds: string[] = [];
+  let sortOrder = 0;
+  const items: QuoteItemInput[] = [];
+
+  for (const calc of calcs) {
+    if (!calc) continue;
+    const calcResult =
+      calc.resultSnapshot && typeof calc.resultSnapshot === "object"
+        ? (calc.resultSnapshot as Record<string, unknown>)
+        : null;
+    const calcQuantityBreaks = Array.isArray(calcResult?.quantityBreaks)
+      ? calcResult.quantityBreaks
+      : [];
+    for (const item of calc.items) {
+      pricingCalculationItemIds.push(item.id);
+      items.push(mapPricingCalculationItemToQuoteItem(item, calcQuantityBreaks, sortOrder));
+      sortOrder += 1;
+    }
+  }
+
+  const existingQuoteItems = await prisma.quoteItem.findMany({
+    where: { pricingCalculationItemId: { in: pricingCalculationItemIds } },
+    select: { pricingCalculationItemId: true },
+  });
+  if (existingQuoteItems.length > 0) {
+    throw new QuoteValidationError("Một hoặc nhiều dòng đã được dùng trong báo giá khác.");
+  }
+
+  const firstCalc = calcs[0]!;
+  const vatRate =
+    overrides?.vatRate ??
+    Math.max(...calcs.map((calc) => calc?.vatRate ?? 0));
+
+  return createQuote({
+    sourceType: "PRICING_CALCULATION",
+    pricingCalculationId: pricingCalculationIds.length === 1 ? pricingCalculationIds[0] : null,
+    pricingCalculationIds,
+    leadId: overrides?.leadId ?? firstCalc.lead?.id ?? null,
+    customerId: overrides?.customerId ?? firstCalc.customer?.id ?? null,
+    contactId: overrides?.contactId ?? firstCalc.contact?.id ?? null,
+    priceGroupId: overrides?.priceGroupId ?? firstCalc.priceGroup?.id ?? null,
+    title: overrides?.title ?? "Báo giá sản phẩm ATTD",
+    validUntil: overrides?.validUntil ?? defaultValidUntil().toISOString(),
+    discountAmount: overrides?.discountAmount ?? 0,
+    shippingFee: overrides?.shippingFee ?? 0,
+    vatRate,
+    manualTotalAmount: overrides?.manualTotalAmount ?? null,
+    manualOverrideReason: overrides?.manualOverrideReason ?? null,
+    customerNote: overrides?.customerNote ?? null,
+    internalNote: overrides?.internalNote ?? firstCalc.internalNote,
+    terms: overrides?.terms,
+    status: overrides?.status ?? "DRAFT",
+    items: overrides?.items ?? items,
+  });
+}
+
+export async function createQuoteFromPricingCalculation(
+  pricingCalculationId: string,
+  overrides?: Partial<CreateQuoteInput>
+) {
+  const calc = await getPricingCalculationDetail(pricingCalculationId);
+  if (!calc) throw new QuoteValidationError("Không tìm thấy bản tính giá.");
+
+  const calcResult = (calc.resultSnapshot && typeof calc.resultSnapshot === "object")
+    ? (calc.resultSnapshot as Record<string, unknown>)
+    : null;
+  const calcQuantityBreaks = Array.isArray(calcResult?.quantityBreaks)
+    ? calcResult.quantityBreaks
+    : [];
+
+  const items: QuoteItemInput[] = calc.items.map((item, index) =>
+    mapPricingCalculationItemToQuoteItem(item, calcQuantityBreaks, index),
+  );
 
   return createQuote({
     sourceType: "PRICING_CALCULATION",

@@ -279,3 +279,62 @@ export function buildCostingWorkspaceClone(record: CostingCalculationCloneRecord
     quantityTiers: quantityTiersFromBreaks(input.quantityBreaks),
   };
 }
+
+function parseComponentRowToInput(row: {
+  label: string;
+  type: string;
+  unitCost: string;
+  totalCost: string;
+  quantityFactor: string;
+  note: string;
+}): CostingComponentInput {
+  const unitCost = asNumber(row.unitCost);
+  const totalCost = asNumber(row.totalCost);
+  const quantityFactor = asNumber(row.quantityFactor);
+  return {
+    label: row.label.trim() || "Chi phí khác",
+    type: isComponentType(row.type) ? row.type : "OTHER",
+    unitCost,
+    totalCost,
+    quantityFactor,
+    note: row.note.trim() || undefined,
+  };
+}
+
+export function costingWorkspaceToCalculatorInput(
+  workspace: CostingWorkspaceClone,
+  context?: {
+    leadId?: string;
+    customerId?: string;
+    contactId?: string;
+    priceGroupId?: string;
+    internalNote?: string;
+  },
+): CostingCalculatorInput {
+  const components = workspace.components
+    .filter((row) => row.label.trim() || row.unitCost.trim() || row.totalCost.trim())
+    .map(parseComponentRowToInput);
+
+  return {
+    productId: workspace.productId || undefined,
+    variantId: workspace.variantId || undefined,
+    customProductName: workspace.customProductName.trim() || undefined,
+    quantity: Math.max(1, asNumber(workspace.quantity) ?? 1),
+    unit: workspace.unit.trim() || "cái",
+    materialName: workspace.materialName.trim() || undefined,
+    gsm: asNumber(workspace.gsm),
+    fabricPrice: asNumber(workspace.fabricPrice),
+    fabricConsumption: asNumber(workspace.fabricConsumption),
+    fabricCostPerUnit: asNumber(workspace.fabricCostPerUnit),
+    ribCostPerUnit: asNumber(workspace.ribCostPerUnit),
+    components,
+    overheadRate: asNumber(workspace.overheadRate),
+    targetMarginRate: asNumber(workspace.targetMarginRate),
+    vatRate: asNumber(workspace.vatRate),
+    leadId: context?.leadId ?? (workspace.leadId || undefined),
+    customerId: context?.customerId ?? (workspace.customerId || undefined),
+    contactId: context?.contactId ?? (workspace.contactId || undefined),
+    priceGroupId: context?.priceGroupId ?? (workspace.priceGroupId || undefined),
+    internalNote: context?.internalNote ?? (workspace.internalNote.trim() || undefined),
+  };
+}
