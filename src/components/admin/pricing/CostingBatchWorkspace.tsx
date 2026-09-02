@@ -1,31 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminLoadingState } from "@/components/admin/AdminUi";
 import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
+import CostingBatchSpreadsheetTable from "@/components/admin/pricing/CostingBatchSpreadsheetTable";
 import { minimalCustomerRecord } from "@/features/crm/customer-quick-create";
 import type { CrmContactRecord, CrmCustomerRecord } from "@/features/crm/types";
 import {
   formatPricingCurrency,
   formatPricingPercent,
 } from "@/features/pricing/format";
-import type {
-  CostingBatchDetail,
-  CostingBatchRowView,
-} from "@/features/pricing/services/costing-batch.service";
-
-function groupRows(rows: CostingBatchRowView[]) {
-  const groups = new Map<string, CostingBatchRowView[]>();
-  for (const row of rows) {
-    const key = row.groupLabel?.trim() || "";
-    const list = groups.get(key) ?? [];
-    list.push(row);
-    groups.set(key, list);
-  }
-  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b, "vi"));
-}
+import type { CostingBatchDetail } from "@/features/pricing/services/costing-batch.service";
 
 export default function CostingBatchWorkspace({ batchId }: { batchId: string }) {
   const router = useRouter();
@@ -39,7 +26,6 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
   const [cloneSourceId, setCloneSourceId] = useState<string | null>(null);
   const [cloneLabel, setCloneLabel] = useState("");
   const [cloneTargets, setCloneTargets] = useState("");
-  const [sellEdits, setSellEdits] = useState<Record<string, string>>({});
 
   const load = useCallback(() => {
     setLoading(true);
@@ -49,15 +35,6 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
         const data = await res.json() as { batch?: CostingBatchDetail; message?: string };
         if (!res.ok) throw new Error(data.message ?? "Không thể tải batch");
         setBatch(data.batch ?? null);
-        if (data.batch) {
-          const nextSell: Record<string, string> = {};
-          for (const row of data.batch.rows) {
-            if (row.sellingPricePerUnit != null) {
-              nextSell[row.itemId] = String(row.sellingPricePerUnit);
-            }
-          }
-          setSellEdits(nextSell);
-        }
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -79,8 +56,6 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
     );
   }, [batch?.customer?.id, batch?.customer?.name, batch?.customer?.code, batch?.customer]);
 
-  const grouped = useMemo(() => (batch ? groupRows(batch.rows) : []), [batch]);
-
   function toggleRow(itemId: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -97,46 +72,6 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
       setSelected(new Set());
     } else {
       setSelected(new Set(costed.map((r) => r.itemId)));
-    }
-  }
-
-  async function addRow() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/pricing/costing-batches/${batchId}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json() as { batch?: CostingBatchDetail; message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Không thể thêm dòng");
-      setBatch(data.batch ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể thêm dòng");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function saveSellingPrice(itemId: string) {
-    const raw = sellEdits[itemId]?.trim();
-    if (!raw) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/pricing/costing-batches/${batchId}/items/${itemId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "sellingPrice", sellingPricePerUnit: Number(raw) }),
-      });
-      const data = await res.json() as { batch?: CostingBatchDetail; message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Không thể cập nhật giá bán");
-      setBatch(data.batch ?? null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể cập nhật giá bán");
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -245,15 +180,6 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
     }
   }
 
-  function costingHref(row: CostingBatchRowView) {
-    const params = new URLSearchParams({
-      batchId,
-      batchItemId: row.itemId,
-    });
-    if (row.calculationId) params.set("fromCalculation", row.calculationId);
-    return `/admin/pricing/costing?${params.toString()}`;
-  }
-
   if (loading) return <AdminLoadingState label="Đang tải batch costing…" />;
   if (error && !batch) {
     return (
@@ -284,9 +210,6 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
             <Link href="/admin/pricing/costing/batch" className="admin-btn admin-btn--secondary">
               ← Danh sách batch
             </Link>
-            <button type="button" className="admin-btn admin-btn--secondary" disabled={busy} onClick={() => void addRow()}>
-              Thêm style
-            </button>
             {!batch.quoteId && (
               <button
                 type="button"
@@ -356,147 +279,22 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
 
       {error && <p className="admin-error" style={{ marginTop: 12 }}>{error}</p>}
 
-      <div className="admin-table-wrap costing-batch-table-wrap" style={{ marginTop: 16 }}>
-        <table className="admin-table costing-batch-table">
-          <thead>
-            <tr>
-              <th>
-                <input
-                  type="checkbox"
-                  aria-label="Chọn tất cả"
-                  onChange={() => toggleAllCosted()}
-                  checked={
-                    batch.rows.filter((r) => r.calculationId).length > 0 &&
-                    selected.size === batch.rows.filter((r) => r.calculationId).length
-                  }
-                />
-              </th>
-              <th>Style / SP</th>
-              <th>SL</th>
-              <th>Cost / SP</th>
-              <th>Tổng cost</th>
-              <th>Giá bán / SP</th>
-              <th>Doanh thu</th>
-              <th>Lợi nhuận</th>
-              <th>Margin</th>
-              <th>Revision</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {grouped.flatMap(([groupLabel, rows]) => {
-              const header =
-                groupLabel
-                  ? (
-                      <tr key={`group-${groupLabel}`} className="costing-batch-table__group-row">
-                        <td colSpan={11}><strong>{groupLabel}</strong></td>
-                      </tr>
-                    )
-                  : null;
-              const rowNodes = rows.map((row) => (
-                <tr key={row.itemId}>
-                  <td>
-                    {row.calculationId && (
-                      <input
-                        type="checkbox"
-                        checked={selected.has(row.itemId)}
-                        onChange={() => toggleRow(row.itemId)}
-                        aria-label={`Chọn ${row.productName}`}
-                      />
-                    )}
-                  </td>
-                  <td>
-                    <strong>{row.productName}</strong>
-                    {row.calculationCode && (
-                      <span className="admin-field-hint"> · {row.calculationCode}</span>
-                    )}
-                  </td>
-                  <td>{row.quantity != null ? `${row.quantity} ${row.unit ?? ""}` : "—"}</td>
-                  <td>{row.costPerUnit != null ? formatPricingCurrency(row.costPerUnit) : "—"}</td>
-                  <td>{row.totalCost != null ? formatPricingCurrency(row.totalCost) : "—"}</td>
-                  <td>
-                    {row.calculationId ? (
-                      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                        <input
-                          className="admin-input admin-input--xs"
-                          type="number"
-                          min="0"
-                          value={sellEdits[row.itemId] ?? ""}
-                          onChange={(e) =>
-                            setSellEdits((prev) => ({ ...prev, [row.itemId]: e.target.value }))
-                          }
-                          style={{ width: 110 }}
-                        />
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--xs admin-btn--secondary"
-                          disabled={busy}
-                          onClick={() => void saveSellingPrice(row.itemId)}
-                        >
-                          Lưu
-                        </button>
-                      </div>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>{row.revenue != null ? formatPricingCurrency(row.revenue) : "—"}</td>
-                  <td>{row.profit != null ? formatPricingCurrency(row.profit) : "—"}</td>
-                  <td>{formatPricingPercent(row.marginRate)}</td>
-                  <td>
-                    {row.revisionDisplay ?? "—"}
-                    {row.isFinal && <span className="admin-kb-badge admin-kb-badge--verified">FINAL</span>}
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      <Link href={costingHref(row)} className="admin-btn admin-btn--xs admin-btn--secondary">
-                        {row.calculationId ? "Sửa costing" : "Tính giá"}
-                      </Link>
-                      {row.calculationId && !row.isFinal && (
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--xs admin-btn--secondary"
-                          disabled={busy}
-                          onClick={() => void finalizeRow(row.itemId)}
-                        >
-                          Chốt
-                        </button>
-                      )}
-                      {row.calculationId && (
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--xs admin-btn--secondary"
-                          disabled={busy}
-                          onClick={() => {
-                            setCloneSourceId(row.itemId);
-                            setCloneLabel("");
-                            setCloneTargets("");
-                          }}
-                        >
-                          Nhân bản
-                        </button>
-                      )}
-                      {row.calculationId && (
-                        <Link
-                          href={`/admin/pricing/history/${row.calculationId}`}
-                          className="admin-btn admin-btn--xs admin-btn--secondary"
-                        >
-                          Chi tiết
-                        </Link>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ));
-              return header ? [header, ...rowNodes] : rowNodes;
-            })}
-            {batch.rows.length === 0 && (
-              <tr>
-                <td colSpan={11} className="admin-field-hint">Chưa có dòng. Thêm style để bắt đầu.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div style={{ marginTop: 16 }}>
+        <CostingBatchSpreadsheetTable
+          batchId={batchId}
+          batch={batch}
+          selected={selected}
+          onBatchUpdate={setBatch}
+          onError={setError}
+          onToggleRow={toggleRow}
+          onToggleAllCosted={toggleAllCosted}
+          onCloneStart={(itemId) => {
+            setCloneSourceId(itemId);
+            setCloneLabel("");
+            setCloneTargets("");
+          }}
+          onFinalizeRow={(itemId) => void finalizeRow(itemId)}
+        />
       </div>
 
       {cloneSourceId && (

@@ -31770,3 +31770,131 @@ body:has(.blog-article-page) .floating-contact {
     font-size: 11px;
   }
 }
+
+/* Costing batch spreadsheet (C3.2) */
+.costing-batch-table-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 280px);
+}
+
+.costing-batch-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f9fafb;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.costing-batch-table td,
+.costing-batch-table th {
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+
+.costing-batch-table__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.costing-batch-table__group-row td {
+  background: #f3f4f6;
+  font-size: 12px;
+}
+
+.costing-batch-table__draft-row td {
+  background: #fffbeb;
+}
+
+.costing-batch-cell-input {
+  width: 100%;
+  min-width: 72px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 13px;
+  background: transparent;
+}
+
+.costing-batch-cell-input:hover {
+  border-color: var(--admin-border, #e5e7eb);
+  background: #fff;
+}
+
+.costing-batch-cell-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.costing-batch-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.costing-batch-spreadsheet-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.costing-batch-spreadsheet-toolbar__preview {
+  margin-left: auto;
+}
+
+.costing-batch-style-cell {
+  position: relative;
+  min-width: 160px;
+}
+
+.costing-batch-style-cell__catalog {
+  display: block;
+  font-size: 10px;
+}
+
+.costing-batch-style-cell__dropdown {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.costing-batch-style-cell__option {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.costing-batch-style-cell__option:hover {
+  background: #f3f4f6;
+}
+
+.costing-batch-style-cell__option--custom {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.costing-batch-style-cell__empty {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #6b7280;
+}

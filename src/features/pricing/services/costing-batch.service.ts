@@ -4,13 +4,18 @@ import { prisma } from "@/lib/prisma";
 import {
   buildCostingWorkspaceClone,
   costingWorkspaceToCalculatorInput,
+  parseCostingCalculatorInputSnapshot,
   type CostingCalculationCloneRecord,
 } from "@/features/pricing/costing-calculation-clone";
 import { generateCostingBatchCode } from "@/features/pricing/costing-batch-code";
 import { computeSellingPriceCommercials } from "@/features/pricing/costing-batch-selling-price";
 import { formatRevisionDisplayLabel } from "@/features/pricing/pricing-calculation-revision";
 import { finalizePricingCalculation } from "@/features/pricing/services/pricing-calculation.service";
-import { saveCostingCalculation } from "@/features/pricing/services/costing-calculator.service";
+import {
+  calculateCosting,
+  saveCostingCalculation,
+} from "@/features/pricing/services/costing-calculator.service";
+import type { CostingCalculatorInput } from "@/features/pricing/costing-types";
 import { createQuoteFromPricingCalculations } from "@/features/quotes/quote.service";
 
 export class CostingBatchValidationError extends Error {
@@ -27,6 +32,9 @@ export type CostingBatchRowView = {
   label: string | null;
   calculationId: string | null;
   calculationCode: string | null;
+  productId: string | null;
+  variantId: string | null;
+  customProductName: string | null;
   productName: string;
   quantity: number | null;
   unit: string | null;
@@ -40,6 +48,7 @@ export type CostingBatchRowView = {
   revisionDisplay: string | null;
   isFinal: boolean;
   calculationStatus: string | null;
+  isIncomplete: boolean;
 };
 
 export type CostingBatchDetail = {
@@ -79,6 +88,8 @@ function mapRowView(item: {
     items: Array<{
       quantity: number;
       unit: string;
+      productId: string | null;
+      variantId: string | null;
       productNameSnapshot: string | null;
       costEstimate: Prisma.Decimal | null;
       unitPrice: Prisma.Decimal;
@@ -106,6 +117,9 @@ function mapRowView(item: {
       label: item.label,
       calculationId: null,
       calculationCode: null,
+      productId: null,
+      variantId: null,
+      customProductName: item.label?.trim() || null,
       productName,
       quantity: null,
       unit: null,
@@ -119,6 +133,7 @@ function mapRowView(item: {
       revisionDisplay: null,
       isFinal: false,
       calculationStatus: null,
+      isIncomplete: true,
     };
   }
 
@@ -144,6 +159,9 @@ function mapRowView(item: {
     label: item.label,
     calculationId: calc.id,
     calculationCode: calc.code,
+    productId: line.productId,
+    variantId: line.variantId,
+    customProductName: line.productId ? null : line.productNameSnapshot?.trim() || null,
     productName,
     quantity,
     unit: line.unit,
@@ -157,19 +175,36 @@ function mapRowView(item: {
     revisionDisplay: formatRevisionDisplayLabel(calc.revisionLabel, 1, calc.isFinal),
     isFinal: calc.isFinal,
     calculationStatus: calc.status,
+    isIncomplete: false,
   };
 }
 
 function computeBatchTotals(rows: CostingBatchRowView[]) {
-  const ready = rows.filter((row) => row.quantity != null && row.revenue != null && row.totalCost != null);
-  const totalQuantity = ready.reduce((sum, row) => sum + (row.quantity ?? 0), 0);
-  const totalRevenue = ready.reduce((sum, row) => sum + (row.revenue ?? 0), 0);
-  const totalCost = ready.reduce((sum, row) => sum + (row.totalCost ?? 0), 0);
-  const totalProfit = roundMoney(totalRevenue - totalCost);
-  const averageMarginRate =
-    totalRevenue > 0 ? roundMoney((totalProfit / totalRevenue) * 100) : null;
+  let totalQuantity = 0;
+  let totalRevenue = 0;
+  let totalCost = 0;
+  let hasCostRows = false;
 
-  return { totalQuantity, totalRevenue, totalCost, totalProfit, averageMarginRate };
+  for (const row of rows) {
+    if (row.quantity != null) totalQuantity += row.quantity;
+    if (row.revenue != null) totalRevenue += row.revenue;
+    if (row.totalCost != null) {
+      totalCost += row.totalCost;
+      hasCostRows = true;
+    }
+  }
+
+  const totalProfit = hasCostRows ? roundMoney(totalRevenue - totalCost) : 0;
+  const averageMarginRate =
+    hasCostRows && totalRevenue > 0 ? roundMoney((totalProfit / totalRevenue) * 100) : null;
+
+  return {
+    totalQuantity,
+    totalRevenue: roundMoney(totalRevenue),
+    totalCost: hasCostRows ? roundMoney(totalCost) : 0,
+    totalProfit: hasCostRows ? totalProfit : 0,
+    averageMarginRate,
+  };
 }
 
 function roundMoney(value: number): number {
@@ -577,4 +612,305 @@ export async function createQuoteFromCostingBatch(
   });
 
   return { quote, batch: await getCostingBatchDetail(batchId) };
+}
+
+export type PersistCostingBatchRowInput = {
+  productId?: string | null;
+  variantId?: string | null;
+  customProductName?: string | null;
+  quantity: number;
+  groupLabel?: string | null;
+  sellingPricePerUnit?: number;
+};
+
+async function loadBatchContext(batchId: string) {
+  const batch = await prisma.pricingCostingBatch.findUnique({ where: { id: batchId } });
+  if (!batch) throw new CostingBatchValidationError("Không tìm thấy batch costing.");
+  return batch;
+}
+
+function buildCalculatorInputFromBatch(
+  batch: { leadId: string | null; customerId: string | null; contactId: string | null },
+  input: PersistCostingBatchRowInput,
+  base?: CostingCalculatorInput | null,
+): CostingCalculatorInput {
+  const productId = input.productId ?? base?.productId ?? undefined;
+  const customProductName = productId
+    ? undefined
+    : (input.customProductName?.trim() || base?.customProductName?.trim() || undefined);
+
+  return {
+    ...base,
+    productId,
+    variantId: input.variantId ?? base?.variantId ?? undefined,
+    customProductName,
+    quantity: Math.max(1, Math.round(input.quantity)),
+    unit: base?.unit ?? "cái",
+    leadId: batch.leadId ?? base?.leadId ?? undefined,
+    customerId: batch.customerId ?? base?.customerId ?? undefined,
+    contactId: batch.contactId ?? base?.contactId ?? undefined,
+  };
+}
+
+async function applyCalculationResultToWorkingRow(
+  calculationId: string,
+  calcItemId: string,
+  result: Awaited<ReturnType<typeof calculateCosting>>,
+  inputSnapshot: CostingCalculatorInput,
+  sellingPricePerUnit?: number,
+) {
+  const useManualSell = sellingPricePerUnit != null && Number.isFinite(sellingPricePerUnit);
+  const commercials = useManualSell
+    ? computeSellingPriceCommercials({
+        quantity: result.quantity,
+        costEstimate: result.totalCost,
+        sellingPricePerUnit,
+      })
+    : null;
+
+  const unitPrice = commercials?.sellingPricePerUnit ?? result.suggestedSellingPricePerUnit;
+  const revenue = commercials?.revenue ?? result.revenueBeforeVat;
+  const profit = commercials?.profit ?? result.grossProfit;
+  const marginRate = commercials?.marginRate ?? result.actualMarginRate;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.pricingCalculationItem.update({
+      where: { id: calcItemId },
+      data: {
+        productId: result.productId,
+        variantId: result.variantId,
+        productNameSnapshot: result.productName,
+        variantNameSnapshot: result.variantName,
+        quantity: result.quantity,
+        unit: result.unit,
+        baseUnitPrice: unitPrice,
+        unitPrice,
+        lineSubtotal: revenue,
+        lineTotal: revenue,
+        costEstimate: result.totalCost,
+        marginAmount: profit,
+        marginRate,
+        pricingSnapshot: { ...result } as unknown as Prisma.InputJsonValue,
+        manualOverride: useManualSell,
+        manualUnitPrice: useManualSell ? unitPrice : null,
+        manualOverrideReason: useManualSell ? "Giá bán thương mại (batch)" : null,
+      },
+    });
+
+    await tx.pricingCalculation.update({
+      where: { id: calculationId },
+      data: {
+        subtotal: revenue,
+        totalAmount: result.finalQuotePrice,
+        manualOverride: useManualSell,
+        manualTotalAmount: useManualSell ? revenue : null,
+        inputSnapshot: { calculator: "costing", ...inputSnapshot } as Prisma.InputJsonValue,
+        resultSnapshot: { calculator: "costing", ...result } as unknown as Prisma.InputJsonValue,
+      },
+    });
+  });
+}
+
+export async function persistCostingBatchRow(
+  batchId: string,
+  input: PersistCostingBatchRowInput,
+  existingItemId?: string,
+) {
+  if (!Number.isFinite(input.quantity) || input.quantity <= 0) {
+    throw new CostingBatchValidationError("Số lượng phải > 0.");
+  }
+  if (!input.productId && !input.customProductName?.trim()) {
+    throw new CostingBatchValidationError("Cần style hoặc sản phẩm catalog.");
+  }
+
+  const batch = await loadBatchContext(batchId);
+  let batchItemId = existingItemId;
+
+  if (batchItemId) {
+    const existing = await prisma.pricingCostingBatchItem.findFirst({
+      where: { id: batchItemId, batchId },
+    });
+    if (!existing) throw new CostingBatchValidationError("Không tìm thấy dòng batch.");
+    if (existing.pricingCalculationId) {
+      throw new CostingBatchValidationError("Dòng đã có bản tính giá — dùng cập nhật inline.");
+    }
+    await prisma.pricingCostingBatchItem.update({
+      where: { id: batchItemId },
+      data: {
+        groupLabel: input.groupLabel?.trim() || null,
+        label: input.customProductName?.trim() || existing.label,
+      },
+    });
+  } else {
+    const maxSort = await prisma.pricingCostingBatchItem.aggregate({
+      where: { batchId },
+      _max: { sortOrder: true },
+    });
+    const created = await prisma.pricingCostingBatchItem.create({
+      data: {
+        batchId,
+        sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
+        groupLabel: input.groupLabel?.trim() || null,
+        label: input.customProductName?.trim() || null,
+      },
+    });
+    batchItemId = created.id;
+  }
+
+  const calculatorInput = buildCalculatorInputFromBatch(batch, input);
+  await saveCostingCalculation(calculatorInput, { batchItemId });
+
+  if (input.groupLabel !== undefined) {
+    await prisma.pricingCostingBatchItem.update({
+      where: { id: batchItemId },
+      data: {
+        groupLabel: input.groupLabel?.trim() || null,
+        label: input.customProductName?.trim() || input.groupLabel?.trim() || null,
+      },
+    });
+  }
+
+  if (input.sellingPricePerUnit != null) {
+    await updateBatchRowSellingPrice(batchId, batchItemId, input.sellingPricePerUnit);
+  }
+
+  return getCostingBatchDetail(batchId);
+}
+
+export async function persistCostingBatchRows(
+  batchId: string,
+  rows: PersistCostingBatchRowInput[],
+) {
+  if (!rows.length) throw new CostingBatchValidationError("Không có dòng để lưu.");
+  for (const row of rows) {
+    await persistCostingBatchRow(batchId, row);
+  }
+  return getCostingBatchDetail(batchId);
+}
+
+export async function updateCostingBatchRowFields(
+  batchId: string,
+  itemId: string,
+  input: {
+    productId?: string | null;
+    variantId?: string | null;
+    customProductName?: string | null;
+    quantity?: number;
+    groupLabel?: string | null;
+    sellingPricePerUnit?: number;
+  },
+) {
+  const item = await prisma.pricingCostingBatchItem.findFirst({
+    where: { id: itemId, batchId },
+    include: {
+      pricingCalculation: {
+        include: { items: { orderBy: { createdAt: "asc" }, take: 1 } },
+      },
+    },
+  });
+  if (!item) throw new CostingBatchValidationError("Không tìm thấy dòng batch.");
+
+  if (!item.pricingCalculationId || !item.pricingCalculation) {
+    return persistCostingBatchRow(
+      batchId,
+      {
+        productId: input.productId,
+        variantId: input.variantId,
+        customProductName: input.customProductName,
+        quantity: input.quantity ?? 1,
+        groupLabel: input.groupLabel,
+        sellingPricePerUnit: input.sellingPricePerUnit,
+      },
+      itemId,
+    );
+  }
+
+  const calc = item.pricingCalculation;
+  const calcItem = calc.items[0];
+  if (!calcItem) throw new CostingBatchValidationError("Bản tính giá không có dòng sản phẩm.");
+
+  const structuralChange =
+    input.productId !== undefined ||
+    input.variantId !== undefined ||
+    input.customProductName !== undefined ||
+    input.quantity !== undefined;
+
+  if (calc.isFinal && structuralChange) {
+    throw new CostingBatchValidationError(
+      "Bản tính giá FINAL không thể sửa style/số lượng inline. Tạo phiên bản mới từ Tính giá.",
+    );
+  }
+
+  if (input.groupLabel !== undefined) {
+    await prisma.pricingCostingBatchItem.update({
+      where: { id: itemId },
+      data: { groupLabel: input.groupLabel?.trim() || null },
+    });
+  }
+
+  if (input.sellingPricePerUnit != null && !structuralChange) {
+    return updateBatchRowSellingPrice(batchId, itemId, input.sellingPricePerUnit);
+  }
+
+  if (!structuralChange) {
+    return getCostingBatchDetail(batchId);
+  }
+
+  const batch = await loadBatchContext(batchId);
+  const existingInput =
+    parseCostingCalculatorInputSnapshot(calc.inputSnapshot) ?? { quantity: calcItem.quantity };
+  const merged = buildCalculatorInputFromBatch(batch, {
+    productId: input.productId ?? calcItem.productId,
+    variantId: input.variantId ?? calcItem.variantId,
+    customProductName: input.customProductName ?? calcItem.productNameSnapshot,
+    quantity: input.quantity ?? calcItem.quantity,
+  }, existingInput);
+
+  const result = await calculateCosting(merged);
+
+  const sellingPrice =
+    input.sellingPricePerUnit ??
+    (calcItem.manualOverride && calcItem.manualUnitPrice
+      ? calcItem.manualUnitPrice.toNumber()
+      : undefined);
+
+  await applyCalculationResultToWorkingRow(
+    calc.id,
+    calcItem.id,
+    result,
+    merged,
+    sellingPrice,
+  );
+
+  await prisma.pricingCostingBatchItem.update({
+    where: { id: itemId },
+    data: {
+      label: result.productName,
+      groupLabel:
+        input.groupLabel !== undefined ? input.groupLabel?.trim() || null : item.groupLabel,
+    },
+  });
+
+  if (input.sellingPricePerUnit != null) {
+    await updateBatchRowSellingPrice(batchId, itemId, input.sellingPricePerUnit);
+  }
+
+  return getCostingBatchDetail(batchId);
+}
+
+export async function removeCostingBatchItem(batchId: string, itemId: string) {
+  const item = await prisma.pricingCostingBatchItem.findFirst({
+    where: { id: itemId, batchId },
+    include: { pricingCalculation: { select: { isFinal: true } } },
+  });
+  if (!item) throw new CostingBatchValidationError("Không tìm thấy dòng batch.");
+
+  if (item.pricingCalculation?.isFinal) {
+    throw new CostingBatchValidationError(
+      "Không thể xóa dòng FINAL khỏi batch. Bản tính giá FINAL vẫn được giữ trong lịch sử.",
+    );
+  }
+
+  await prisma.pricingCostingBatchItem.delete({ where: { id: itemId } });
+  return getCostingBatchDetail(batchId);
 }
