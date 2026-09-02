@@ -27,6 +27,7 @@ export type AdminPermissionFlags = {
   canManageProducts: boolean;
   canManageCms: boolean;
   canViewCrm: boolean;
+  canCreateCustomers: boolean;
   canViewDashboard: boolean;
   canViewWarehouse: boolean;
   canViewReports: boolean;
@@ -60,6 +61,7 @@ const defaultFlags: AdminPermissionFlags = {
   canManageProducts: true,
   canManageCms: true,
   canViewCrm: true,
+  canCreateCustomers: true,
   canViewDashboard: true,
   canViewWarehouse: true,
   canViewReports: true,
@@ -120,6 +122,7 @@ export function AdminPermissionsProvider({ children }: { children: ReactNode }) 
           canManageProducts: data.flags?.canManageProducts ?? true,
           canManageCms: data.flags?.canManageCms ?? false,
           canViewCrm: data.flags?.canViewCrm ?? true,
+          canCreateCustomers: data.flags?.canCreateCustomers ?? true,
           canViewDashboard: data.flags?.canViewDashboard ?? true,
           canViewWarehouse: data.flags?.canViewWarehouse ?? true,
           canViewReports: data.flags?.canViewReports ?? true,

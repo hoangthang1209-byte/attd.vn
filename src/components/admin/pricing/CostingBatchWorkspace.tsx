@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminLoadingState } from "@/components/admin/AdminUi";
+import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
+import { minimalCustomerRecord } from "@/features/crm/customer-quick-create";
+import type { CrmContactRecord, CrmCustomerRecord } from "@/features/crm/types";
 import {
   formatPricingCurrency,
   formatPricingPercent,
@@ -12,8 +15,6 @@ import type {
   CostingBatchDetail,
   CostingBatchRowView,
 } from "@/features/pricing/services/costing-batch.service";
-
-type CustomerOption = { id: string; name: string; code: string };
 
 function groupRows(rows: CostingBatchRowView[]) {
   const groups = new Map<string, CostingBatchRowView[]>();
@@ -33,7 +34,8 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomerRecord | null>(null);
+  const pendingCustomerPickRef = useRef<CrmCustomerRecord | null>(null);
   const [cloneSourceId, setCloneSourceId] = useState<string | null>(null);
   const [cloneLabel, setCloneLabel] = useState("");
   const [cloneTargets, setCloneTargets] = useState("");
@@ -63,10 +65,19 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
 
   useEffect(() => {
     void load();
-    void fetch("/api/crm/customers?limit=200")
-      .then((r) => r.json())
-      .then((data: { customers?: CustomerOption[] }) => setCustomers(data.customers ?? []));
   }, [load]);
+
+  useEffect(() => {
+    if (!batch?.customer) {
+      setSelectedCustomer(null);
+      return;
+    }
+    setSelectedCustomer((prev) =>
+      prev?.id === batch.customer!.id
+        ? prev
+        : minimalCustomerRecord(batch.customer!),
+    );
+  }, [batch?.customer?.id, batch?.customer?.name, batch?.customer?.code, batch?.customer]);
 
   const grouped = useMemo(() => (batch ? groupRows(batch.rows) : []), [batch]);
 
@@ -208,13 +219,21 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
     }
   }
 
-  async function updateCustomer(customerId: string) {
+  async function updateCustomerSelection(
+    customer: CrmCustomerRecord | null,
+    contact: CrmContactRecord | null,
+  ) {
+    setSelectedCustomer(customer);
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch(`/api/pricing/costing-batches/${batchId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: customerId || null }),
+        body: JSON.stringify({
+          customerId: customer?.id ?? null,
+          contactId: contact?.id ?? null,
+        }),
       });
       const data = await res.json() as { batch?: CostingBatchDetail; message?: string };
       if (!res.ok) throw new Error(data.message ?? "Không thể cập nhật khách hàng");
@@ -283,18 +302,34 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
 
         <div className="admin-seo-brief-form-grid" style={{ marginTop: 12 }}>
           <div className="admin-field">
-            <label className="admin-label">Khách hàng</label>
-            <select
-              className="admin-input"
-              value={batch.customer?.id ?? ""}
-              onChange={(e) => void updateCustomer(e.target.value)}
+            <CustomerSearchField
+              value={selectedCustomer}
+              onSelect={(customer) => {
+                if (!customer) {
+                  pendingCustomerPickRef.current = null;
+                  void updateCustomerSelection(null, null);
+                  return;
+                }
+                pendingCustomerPickRef.current = customer;
+                setSelectedCustomer(customer);
+              }}
+              onContactSelect={(contact) => {
+                const customer = pendingCustomerPickRef.current;
+                if (!customer) return;
+                pendingCustomerPickRef.current = null;
+                void updateCustomerSelection(customer, contact);
+              }}
               disabled={busy}
-            >
-              <option value="">— Chọn khách hàng —</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
-              ))}
-            </select>
+              label="Khách hàng"
+              hideHint
+              allowQuickCreate
+              quickCreateContextLabel="batch costing này"
+            />
+            {batch.contact && (
+              <p className="admin-field-hint" style={{ marginTop: 6 }}>
+                Liên hệ: {batch.contact.fullName}
+              </p>
+            )}
           </div>
           <div>
             <span className="admin-field-hint">Tổng SL</span>

@@ -8,7 +8,9 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import type { CrmCustomerRecord } from "@/features/crm/types";
+import CustomerQuickCreateDialog from "@/components/admin/crm/CustomerQuickCreateDialog";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
+import type { CrmContactRecord, CrmCustomerRecord } from "@/features/crm/types";
 
 type Props = {
   value: CrmCustomerRecord | null;
@@ -17,6 +19,9 @@ type Props = {
   label?: string;
   hint?: string;
   hideHint?: boolean;
+  allowQuickCreate?: boolean;
+  quickCreateContextLabel?: string;
+  onContactSelect?: (contact: CrmContactRecord | null) => void;
 };
 
 export default function CustomerSearchField({
@@ -26,11 +31,18 @@ export default function CustomerSearchField({
   label = "Tìm khách hàng",
   hint = "Tự động điền từ hồ sơ khách hàng · Thông tin này chỉ lưu trên báo giá, không thay đổi hồ sơ CRM",
   hideHint = false,
+  allowQuickCreate = false,
+  quickCreateContextLabel = "phiên làm việc hiện tại",
+  onContactSelect,
 }: Props) {
+  const { permissions } = useAdminPermissions();
+  const canQuickCreate = allowQuickCreate && permissions.canCreateCustomers;
+
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CrmCustomerRecord[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
@@ -131,6 +143,14 @@ export default function CustomerSearchField({
     return parts.filter(Boolean).join(" · ");
   }
 
+  function handleQuickCreated(customer: CrmCustomerRecord, contact: CrmContactRecord | null) {
+    onSelect(customer);
+    onContactSelect?.(contact);
+    setOpen(false);
+    setQuery("");
+    void searchCustomers(customer.name);
+  }
+
   return (
     <div className="quote-customer-search" ref={containerRef}>
       <label className="admin-label">{label}</label>
@@ -146,6 +166,7 @@ export default function CustomerSearchField({
             disabled={disabled}
             onClick={() => {
               onSelect(null);
+              onContactSelect?.(null);
               setQuery("");
               setOpen(true);
             }}
@@ -159,7 +180,7 @@ export default function CustomerSearchField({
             ref={inputRef}
             className="admin-input"
             type="search"
-            placeholder="Nhập tên công ty, mã khách hàng, SĐT, email hoặc MST"
+            placeholder="Tìm khách hàng…"
             value={query}
             disabled={disabled}
             onChange={(e) => {
@@ -200,6 +221,11 @@ export default function CustomerSearchField({
                       className="quote-customer-search__option"
                       onClick={() => {
                         onSelect(customer);
+                        onContactSelect?.(
+                          customer.contacts?.find((c) => c.isPrimary) ??
+                            customer.contacts?.[0] ??
+                            null,
+                        );
                         setOpen(false);
                         setQuery("");
                       }}
@@ -213,6 +239,20 @@ export default function CustomerSearchField({
                     </button>
                   </li>
                 ))}
+              {canQuickCreate && !loading && (
+                <li>
+                  <button
+                    type="button"
+                    className="quote-customer-search__option quote-customer-search__option--create"
+                    onClick={() => {
+                      setOpen(false);
+                      setQuickCreateOpen(true);
+                    }}
+                  >
+                    + Tạo khách hàng mới
+                  </button>
+                </li>
+              )}
             </ul>,
             document.body,
           )}
@@ -223,6 +263,16 @@ export default function CustomerSearchField({
           {hint}
         </p>
       ) : null}
+
+      {canQuickCreate && (
+        <CustomerQuickCreateDialog
+          open={quickCreateOpen}
+          onClose={() => setQuickCreateOpen(false)}
+          onCreated={handleQuickCreated}
+          variant="minimal"
+          contextLabel={quickCreateContextLabel}
+        />
+      )}
     </div>
   );
 }

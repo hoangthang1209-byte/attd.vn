@@ -39,6 +39,7 @@ export async function GET() {
       canManageProducts: can(session, "products.manage"),
       canManageCms: can(session, "cms.manage"),
       canViewCrm: can(session, "crm.view"),
+      canCreateCustomers: can(session, "customers.create"),
       canViewDashboard: can(session, "dashboard.view"),
       canViewWarehouse: can(session, "warehouse.view"),
       canViewReports: can(session, "reports.view"),
