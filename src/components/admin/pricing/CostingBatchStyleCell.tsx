@@ -18,6 +18,7 @@ type Props = {
   }) => void;
   onCommit?: () => void;
   onKeyNav?: (key: "enter" | "tab" | "shiftTab" | "escape") => void;
+  onRegisterFocus?: (focus: () => void) => void;
 };
 
 export default function CostingBatchStyleCell({
@@ -30,6 +31,7 @@ export default function CostingBatchStyleCell({
   onChange,
   onCommit,
   onKeyNav,
+  onRegisterFocus,
 }: Props) {
   const internalRef = useRef<HTMLInputElement>(null);
   const inputRef = externalRef ?? internalRef;
@@ -61,6 +63,12 @@ export default function CostingBatchStyleCell({
     const timer = setTimeout(() => void searchProducts(value), 250);
     return () => clearTimeout(timer);
   }, [open, value, searchProducts]);
+
+  useEffect(() => {
+    if (onRegisterFocus) {
+      onRegisterFocus(() => inputRef.current?.focus());
+    }
+  }, [onRegisterFocus, inputRef]);
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();

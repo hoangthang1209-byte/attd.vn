@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import CostingBatchStyleCell from "@/components/admin/pricing/CostingBatchStyleCell";
+import CostingQuickPanel from "@/components/admin/pricing/CostingQuickPanel";
 import {
   formatPricingCurrency,
   formatPricingPercent,
@@ -76,7 +77,9 @@ export default function CostingBatchSpreadsheetTable({
   const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [quickCostRow, setQuickCostRow] = useState<CostingBatchRowView | null>(null);
   const focusStyleRef = useRef<HTMLInputElement>(null);
+  const styleFocusByKey = useRef<Record<string, () => void>>({});
 
   useEffect(() => {
     const next: Record<string, ReturnType<typeof rowToEditState>> = {};
@@ -135,6 +138,30 @@ export default function CostingBatchSpreadsheetTable({
   }, [batch.rows, drafts, rowEdits]);
 
   const previewTotals = useMemo(() => computeSpreadsheetTotals(liveRows), [liveRows]);
+
+  const rowKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const [, rows] of groupedPersisted) {
+      for (const row of rows) keys.push(row.itemId);
+    }
+    for (const draft of drafts) keys.push(draft.draftId);
+    return keys;
+  }, [groupedPersisted, drafts]);
+
+  const focusNextRowStyle = useCallback(
+    (currentKey: string) => {
+      const index = rowKeys.indexOf(currentKey);
+      if (index >= 0 && index < rowKeys.length - 1) {
+        const nextKey = rowKeys[index + 1];
+        styleFocusByKey.current[nextKey]?.();
+      }
+    },
+    [rowKeys],
+  );
+
+  const registerStyleFocus = useCallback((key: string, focus: () => void) => {
+    styleFocusByKey.current[key] = focus;
+  }, []);
 
   const markSaving = (key: string, saving: boolean) => {
     setSavingKeys((prev) => {
@@ -370,6 +397,7 @@ export default function CostingBatchSpreadsheetTable({
         }) => void;
         autoFocus?: boolean;
         inputRef?: React.RefObject<HTMLInputElement | null>;
+        onRegisterFocus?: (focus: () => void) => void;
       };
     },
   ) {
@@ -384,6 +412,7 @@ export default function CostingBatchSpreadsheetTable({
           onChange={options.styleProps.onStyleChange}
           onCommit={options.onCommit}
           onKeyNav={options.onKeyNav}
+          onRegisterFocus={options.styleProps.onRegisterFocus}
         />
       );
     }
@@ -446,17 +475,18 @@ export default function CostingBatchSpreadsheetTable({
         <td>
           {renderEditableCell(draft.draftId, "style", draft.customProductName, () => {}, {
             styleCell: true,
-            styleProps: {
-              productId: draft.productId,
-              autoFocus: isFirstDraft && drafts.length === 1,
-              inputRef: isFirstDraft ? focusStyleRef : undefined,
-              onStyleChange: (next) =>
-                updateDraft(draft.draftId, {
-                  customProductName: next.customProductName,
-                  productId: next.productId,
-                  variantId: next.variantId,
-                }),
-            },
+              styleProps: {
+                productId: draft.productId,
+                autoFocus: isFirstDraft && drafts.length === 1,
+                inputRef: isFirstDraft ? focusStyleRef : undefined,
+                onStyleChange: (next) =>
+                  updateDraft(draft.draftId, {
+                    customProductName: next.customProductName,
+                    productId: next.productId,
+                    variantId: next.variantId,
+                  }),
+                onRegisterFocus: (focus) => registerStyleFocus(draft.draftId, focus),
+              },
             onCommit: () => {
               if (canPersistSpreadsheetRow(draft)) void persistDraft(draft);
             },
@@ -611,8 +641,12 @@ export default function CostingBatchSpreadsheetTable({
                     productId: next.productId,
                     variantId: next.variantId,
                   }),
+                onRegisterFocus: (focus) => registerStyleFocus(row.itemId, focus),
               },
               onCommit: () => void commitRowEdit(row),
+              onKeyNav: keyNavHandler("style", () => {}, () => {
+                void commitRowEdit(row);
+              }),
             })
           )}
           {row.calculationCode && (
@@ -631,6 +665,7 @@ export default function CostingBatchSpreadsheetTable({
               {
                 numeric: true,
                 onCommit: () => void commitRowEdit(row),
+                onKeyNav: keyNavHandler("quantity", () => {}, () => void commitRowEdit(row)),
               },
             )
           )}
@@ -646,12 +681,23 @@ export default function CostingBatchSpreadsheetTable({
               (v) => setEdit({ groupLabel: v }),
               {
                 onCommit: () => void commitRowEdit(row),
+                onKeyNav: keyNavHandler("group", () => {}, () => void commitRowEdit(row)),
               },
             )
           )}
         </td>
         <td className="costing-batch-table__num">
-          {row.costPerUnit != null ? formatPricingCurrency(row.costPerUnit) : "—"}
+          {row.calculationId ? (
+            <button
+              type="button"
+              className="costing-batch-table__cost-trigger"
+              onClick={() => setQuickCostRow(row)}
+            >
+              {row.costPerUnit != null ? formatPricingCurrency(row.costPerUnit) : "Sửa nhanh"}
+            </button>
+          ) : (
+            row.costPerUnit != null ? formatPricingCurrency(row.costPerUnit) : "—"
+          )}
         </td>
         <td className="costing-batch-table__num">
           {row.totalCost != null ? formatPricingCurrency(row.totalCost) : "—"}
@@ -665,6 +711,19 @@ export default function CostingBatchSpreadsheetTable({
             {
               numeric: true,
               onCommit: () => void commitRowEdit(row),
+              onKeyNav: (key) => {
+                if (key === "tab") {
+                  void commitRowEdit(row);
+                  focusNextRowStyle(row.itemId);
+                  return;
+                }
+                if (key === "enter") {
+                  void commitRowEdit(row);
+                  focusNextRowStyle(row.itemId);
+                  return;
+                }
+                keyNavHandler("sellingPrice", () => {}, () => void commitRowEdit(row))(key);
+              },
             },
           )}
         </td>
@@ -691,6 +750,15 @@ export default function CostingBatchSpreadsheetTable({
             >
               {row.calculationId ? "Sửa costing" : "Tính giá"}
             </Link>
+            {row.calculationId && (
+              <button
+                type="button"
+                className="admin-btn admin-btn--xs admin-btn--secondary"
+                onClick={() => setQuickCostRow(row)}
+              >
+                Sửa nhanh
+              </button>
+            )}
             {row.calculationId && !row.isFinal && (
               <button
                 type="button"
@@ -850,6 +918,15 @@ export default function CostingBatchSpreadsheetTable({
           </div>
         </div>
       )}
+
+      <CostingQuickPanel
+        open={quickCostRow != null}
+        batchId={batchId}
+        row={quickCostRow}
+        onClose={() => setQuickCostRow(null)}
+        onSaved={onBatchUpdate}
+        onError={onError}
+      />
     </>
   );
 }

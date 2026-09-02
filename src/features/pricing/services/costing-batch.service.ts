@@ -14,8 +14,10 @@ import { finalizePricingCalculation } from "@/features/pricing/services/pricing-
 import {
   calculateCosting,
   saveCostingCalculation,
+  updateCostingCalculation,
 } from "@/features/pricing/services/costing-calculator.service";
 import type { CostingCalculatorInput } from "@/features/pricing/costing-types";
+import type { CostingWorkspaceClone } from "@/features/pricing/costing-calculation-clone";
 import { createQuoteFromPricingCalculations } from "@/features/quotes/quote.service";
 
 export class CostingBatchValidationError extends Error {
@@ -912,5 +914,44 @@ export async function removeCostingBatchItem(batchId: string, itemId: string) {
   }
 
   await prisma.pricingCostingBatchItem.delete({ where: { id: itemId } });
+  return getCostingBatchDetail(batchId);
+}
+
+export async function quickCostSaveBatchRow(
+  batchId: string,
+  itemId: string,
+  workspace: CostingWorkspaceClone,
+) {
+  const item = await prisma.pricingCostingBatchItem.findFirst({
+    where: { id: itemId, batchId },
+    include: {
+      batch: true,
+      pricingCalculation: {
+        include: { items: { orderBy: { createdAt: "asc" }, take: 1 } },
+      },
+    },
+  });
+  if (!item) throw new CostingBatchValidationError("Không tìm thấy dòng batch.");
+
+  const input = costingWorkspaceToCalculatorInput(workspace, {
+    leadId: item.batch.leadId ?? undefined,
+    customerId: item.batch.customerId ?? undefined,
+    contactId: item.batch.contactId ?? undefined,
+    internalNote: workspace.internalNote || undefined,
+  });
+
+  if (!item.pricingCalculationId || !item.pricingCalculation) {
+    await saveCostingCalculation(input, { batchItemId: itemId });
+    return getCostingBatchDetail(batchId);
+  }
+
+  const calc = item.pricingCalculation;
+  if (calc.isFinal) {
+    const saved = await saveCostingCalculation(input);
+    await linkBatchItemToCalculation(itemId, saved.calculationId);
+    return getCostingBatchDetail(batchId);
+  }
+
+  await updateCostingCalculation(calc.id, input);
   return getCostingBatchDetail(batchId);
 }

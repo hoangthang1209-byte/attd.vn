@@ -108,6 +108,18 @@ export async function POST(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ batch });
     }
 
+    if (raw.action === "quickCost" && raw.workspace && typeof raw.workspace === "object") {
+      const { quickCostSaveBatchRow } = await import(
+        "@/features/pricing/services/costing-batch.service"
+      );
+      const batch = await quickCostSaveBatchRow(
+        id,
+        itemId,
+        raw.workspace as import("@/features/pricing/costing-calculation-clone").CostingWorkspaceClone,
+      );
+      return NextResponse.json({ batch });
+    }
+
     if (raw.action === "clone") {
       const targets = Array.isArray(raw.targets)
         ? raw.targets

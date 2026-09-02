@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generatePricingCalculationCode } from "@/features/pricing/pricing-code";
+import { computeSellingPriceCommercials } from "@/features/pricing/costing-batch-selling-price";
 import { createQuoteFromPricingCalculation } from "@/features/quotes/quote.service";
 import type {
   CostingCalculatorInput,
@@ -356,4 +357,101 @@ export async function saveCostingCalculation(
     quoteId: quote?.id,
     quoteNo: quote?.quoteNo,
   };
+}
+
+export class CostingCalculatorValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CostingCalculatorValidationError";
+  }
+}
+
+export async function updateCostingCalculation(
+  calculationId: string,
+  input: CostingCalculatorInput,
+): Promise<CostingSaveResult> {
+  const calc = await prisma.pricingCalculation.findUnique({
+    where: { id: calculationId },
+    include: { items: { orderBy: { createdAt: "asc" }, take: 1 } },
+  });
+  if (!calc) throw new CostingCalculatorValidationError("Không tìm thấy bản tính giá.");
+  if (calc.isFinal) {
+    throw new CostingCalculatorValidationError(
+      "Bản tính giá FINAL không thể sửa trực tiếp. Tạo phiên bản mới.",
+    );
+  }
+
+  const calcItem = calc.items[0];
+  if (!calcItem) throw new CostingCalculatorValidationError("Bản tính giá không có dòng sản phẩm.");
+
+  const result = await calculateCosting(input);
+  const quantityBreaks = (input.quantityBreaks ?? [])
+    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
+    .map((item) => ({
+      quantity: Math.round(item.quantity),
+      totalCostPerUnit: roundMoney(positive(item.totalCostPerUnit)),
+      suggestedSellingPricePerUnit: roundMoney(positive(item.suggestedSellingPricePerUnit)),
+      revenueBeforeVat: roundMoney(positive(item.revenueBeforeVat)),
+      grossProfit: roundMoney(positive(item.grossProfit)),
+      actualMarginRate: roundMoney(positive(item.actualMarginRate)),
+      finalQuotePrice: roundMoney(positive(item.finalQuotePrice)),
+    }));
+  const costingSnapshot = { ...result, quantityBreaks };
+
+  const useManualSell = calcItem.manualOverride && calcItem.manualUnitPrice != null;
+  let unitPrice = result.suggestedSellingPricePerUnit;
+  let revenue = result.revenueBeforeVat;
+  let profit = result.grossProfit;
+  let marginRate = result.actualMarginRate;
+
+  if (useManualSell) {
+    const commercials = computeSellingPriceCommercials({
+      quantity: result.quantity,
+      costEstimate: result.totalCost,
+      sellingPricePerUnit: calcItem.manualUnitPrice!.toNumber(),
+    });
+    unitPrice = commercials.sellingPricePerUnit;
+    revenue = commercials.revenue;
+    profit = commercials.profit;
+    marginRate = commercials.marginRate;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.pricingCalculationItem.update({
+      where: { id: calcItem.id },
+      data: {
+        productId: result.productId,
+        variantId: result.variantId,
+        productNameSnapshot: result.productName,
+        variantNameSnapshot: result.variantName,
+        quantity: result.quantity,
+        unit: result.unit,
+        baseUnitPrice: unitPrice,
+        unitPrice,
+        lineSubtotal: revenue,
+        lineTotal: revenue,
+        costEstimate: result.totalCost,
+        marginAmount: profit,
+        marginRate,
+        pricingSnapshot: costingSnapshot as unknown as Prisma.InputJsonValue,
+        manualOverride: calcItem.manualOverride,
+        manualUnitPrice: calcItem.manualUnitPrice,
+        manualOverrideReason: calcItem.manualOverrideReason,
+      },
+    });
+
+    await tx.pricingCalculation.update({
+      where: { id: calculationId },
+      data: {
+        subtotal: revenue,
+        totalAmount: result.finalQuotePrice,
+        manualOverride: calc.manualOverride,
+        manualTotalAmount: calc.manualTotalAmount,
+        inputSnapshot: { calculator: "costing", ...input } as Prisma.InputJsonValue,
+        resultSnapshot: { calculator: "costing", ...costingSnapshot } as unknown as Prisma.InputJsonValue,
+      },
+    });
+  });
+
+  return { calculationId, calculationCode: calc.code };
 }
