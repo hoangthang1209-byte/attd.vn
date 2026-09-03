@@ -22,6 +22,7 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedCustomer, setSelectedCustomer] = useState<CrmCustomerRecord | null>(null);
+  const [customerEditorOpen, setCustomerEditorOpen] = useState(false);
   const pendingCustomerPickRef = useRef<CrmCustomerRecord | null>(null);
   const [cloneSourceId, setCloneSourceId] = useState<string | null>(null);
   const [cloneLabel, setCloneLabel] = useState("");
@@ -173,6 +174,7 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
       const data = await res.json() as { batch?: CostingBatchDetail; message?: string };
       if (!res.ok) throw new Error(data.message ?? "Không thể cập nhật khách hàng");
       setBatch(data.batch ?? null);
+      setCustomerEditorOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi cập nhật");
     } finally {
@@ -191,111 +193,145 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
   }
   if (!batch) return null;
 
+  const styleCount = batch.rows.filter((r) => !r.isIncomplete).length;
+  const quoteCount =
+    selected.size > 0 ? selected.size : batch.rows.filter((r) => r.calculationId).length;
+  const hasCost = batch.totals.hasCostTotals;
+
   return (
     <div className="costing-batch-workspace">
-      <div className="costing-batch-workspace__header admin-panel">
-        <div className="admin-section-header">
-          <div>
-            <h3 className="admin-subtitle" style={{ margin: 0 }}>
-              {batch.title?.trim() || batch.code}
-            </h3>
-            <p className="admin-field-hint">
-              {batch.code} · {batch.status}
-              {batch.quoteNo && (
-                <> · Báo giá <Link href={`/admin/quotes`}>{batch.quoteNo}</Link></>
-              )}
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/admin/pricing/costing/batch" className="admin-btn admin-btn--secondary">
-              ← Danh sách batch
+      <header className="costing-batch-ops-header">
+        <div className="costing-batch-ops-header__top">
+          <div className="costing-batch-ops-header__identity">
+            <Link href="/admin/pricing/costing/batch" className="costing-batch-ops-header__back">
+              ← Batch
             </Link>
-            {!batch.quoteId && (
+            <span className="costing-batch-ops-header__code">{batch.code}</span>
+            {batch.title?.trim() && (
+              <span className="costing-batch-ops-header__title">{batch.title.trim()}</span>
+            )}
+            <span className="costing-batch-ops-header__status">{batch.status}</span>
+            {batch.quoteNo && (
+              <span className="admin-field-hint">· Báo giá {batch.quoteNo}</span>
+            )}
+          </div>
+        </div>
+
+        <div className="costing-batch-ops-header__customer">
+          {customerEditorOpen ? (
+            <div className="costing-batch-ops-header__customer-editor">
+              <CustomerSearchField
+                value={selectedCustomer}
+                onSelect={(customer) => {
+                  if (!customer) {
+                    pendingCustomerPickRef.current = null;
+                    void updateCustomerSelection(null, null);
+                    return;
+                  }
+                  pendingCustomerPickRef.current = customer;
+                  setSelectedCustomer(customer);
+                }}
+                onContactSelect={(contact) => {
+                  const customer = pendingCustomerPickRef.current;
+                  if (!customer) return;
+                  pendingCustomerPickRef.current = null;
+                  void updateCustomerSelection(customer, contact);
+                }}
+                disabled={busy}
+                label="Khách hàng"
+                hideHint
+                allowQuickCreate
+                quickCreateContextLabel="batch costing này"
+              />
               <button
                 type="button"
-                className="admin-btn admin-btn--primary"
-                disabled={busy}
-                onClick={() => void createQuote()}
+                className="admin-btn admin-btn--xs admin-btn--secondary"
+                onClick={() => setCustomerEditorOpen(false)}
               >
-                Tạo báo giá ({selected.size > 0 ? selected.size : batch.rows.filter((r) => r.calculationId).length})
+                Đóng
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <>
+              <span className="costing-batch-ops-header__customer-line">
+                {batch.customer ? (
+                  <>
+                    {batch.customer.name}
+                    <span className="admin-field-hint"> · {batch.customer.code}</span>
+                    {batch.contact && (
+                      <span className="admin-field-hint"> · {batch.contact.fullName}</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="admin-field-hint">Chưa chọn khách hàng</span>
+                )}
+              </span>
+              <button
+                type="button"
+                className="admin-btn admin-btn--xs admin-btn--secondary"
+                disabled={busy}
+                onClick={() => setCustomerEditorOpen(true)}
+              >
+                Đổi khách hàng
+              </button>
+            </>
+          )}
         </div>
 
-        <div className="admin-seo-brief-form-grid" style={{ marginTop: 12 }}>
-          <div className="admin-field">
-            <CustomerSearchField
-              value={selectedCustomer}
-              onSelect={(customer) => {
-                if (!customer) {
-                  pendingCustomerPickRef.current = null;
-                  void updateCustomerSelection(null, null);
-                  return;
-                }
-                pendingCustomerPickRef.current = customer;
-                setSelectedCustomer(customer);
-              }}
-              onContactSelect={(contact) => {
-                const customer = pendingCustomerPickRef.current;
-                if (!customer) return;
-                pendingCustomerPickRef.current = null;
-                void updateCustomerSelection(customer, contact);
-              }}
+        <div className="costing-batch-kpi-strip" aria-label="Tổng hợp batch">
+          <span>
+            <em>{styleCount}</em> style
+          </span>
+          <span>
+            <em>{batch.totals.totalQuantity.toLocaleString("vi-VN")}</em> SL
+          </span>
+          <span>
+            Doanh thu <em>{formatPricingCurrency(batch.totals.totalRevenue)}</em>
+          </span>
+          <span>
+            Cost{" "}
+            <em>{hasCost ? formatPricingCurrency(batch.totals.totalCost) : "—"}</em>
+          </span>
+          <span>
+            LN{" "}
+            <em>{hasCost ? formatPricingCurrency(batch.totals.totalProfit) : "—"}</em>
+          </span>
+          <span>
+            Margin{" "}
+            <em>{hasCost ? formatPricingPercent(batch.totals.averageMarginRate) : "—"}</em>
+          </span>
+        </div>
+      </header>
+
+      {error && <p className="admin-error costing-batch-workspace__error">{error}</p>}
+
+      <CostingBatchSpreadsheetTable
+        batchId={batchId}
+        batch={batch}
+        selected={selected}
+        onBatchUpdate={setBatch}
+        onError={setError}
+        onToggleRow={toggleRow}
+        onToggleAllCosted={toggleAllCosted}
+        onCloneStart={(itemId) => {
+          setCloneSourceId(itemId);
+          setCloneLabel("");
+          setCloneTargets("");
+        }}
+        onFinalizeRow={(itemId) => void finalizeRow(itemId)}
+        quoteAction={
+          !batch.quoteId ? (
+            <button
+              type="button"
+              className="admin-btn admin-btn--primary admin-btn--xs"
               disabled={busy}
-              label="Khách hàng"
-              hideHint
-              allowQuickCreate
-              quickCreateContextLabel="batch costing này"
-            />
-            {batch.contact && (
-              <p className="admin-field-hint" style={{ marginTop: 6 }}>
-                Liên hệ: {batch.contact.fullName}
-              </p>
-            )}
-          </div>
-          <div>
-            <span className="admin-field-hint">Tổng SL</span>
-            <br /><strong>{batch.totals.totalQuantity.toLocaleString("vi-VN")}</strong>
-          </div>
-          <div>
-            <span className="admin-field-hint">Doanh thu</span>
-            <br /><strong>{formatPricingCurrency(batch.totals.totalRevenue)}</strong>
-          </div>
-          <div>
-            <span className="admin-field-hint">Tổng cost ước tính</span>
-            <br /><strong>{formatPricingCurrency(batch.totals.totalCost)}</strong>
-          </div>
-          <div>
-            <span className="admin-field-hint">Lợi nhuận ước tính</span>
-            <br /><strong>{formatPricingCurrency(batch.totals.totalProfit)}</strong>
-          </div>
-          <div>
-            <span className="admin-field-hint">Margin TB</span>
-            <br /><strong>{formatPricingPercent(batch.totals.averageMarginRate)}</strong>
-          </div>
-        </div>
-      </div>
-
-      {error && <p className="admin-error" style={{ marginTop: 12 }}>{error}</p>}
-
-      <div style={{ marginTop: 16 }}>
-        <CostingBatchSpreadsheetTable
-          batchId={batchId}
-          batch={batch}
-          selected={selected}
-          onBatchUpdate={setBatch}
-          onError={setError}
-          onToggleRow={toggleRow}
-          onToggleAllCosted={toggleAllCosted}
-          onCloneStart={(itemId) => {
-            setCloneSourceId(itemId);
-            setCloneLabel("");
-            setCloneTargets("");
-          }}
-          onFinalizeRow={(itemId) => void finalizeRow(itemId)}
-        />
-      </div>
+              onClick={() => void createQuote()}
+            >
+              Tạo báo giá ({quoteCount})
+            </button>
+          ) : null
+        }
+      />
 
       {cloneSourceId && (
         <div className="costing-picker-backdrop" role="presentation" onClick={() => setCloneSourceId(null)}>

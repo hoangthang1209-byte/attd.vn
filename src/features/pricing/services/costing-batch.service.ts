@@ -73,6 +73,8 @@ export type CostingBatchDetail = {
     totalCost: number;
     totalProfit: number;
     averageMarginRate: number | null;
+    /** True when at least one row has positive estimated cost evidence. */
+    hasCostTotals: boolean;
   };
 };
 
@@ -185,27 +187,29 @@ function computeBatchTotals(rows: CostingBatchRowView[]) {
   let totalQuantity = 0;
   let totalRevenue = 0;
   let totalCost = 0;
-  let hasCostRows = false;
+  let hasCostTotals = false;
 
   for (const row of rows) {
     if (row.quantity != null) totalQuantity += row.quantity;
     if (row.revenue != null) totalRevenue += row.revenue;
-    if (row.totalCost != null) {
+    // Zero costEstimate from an empty calculator is display-"unknown", not known COGS.
+    if (row.totalCost != null && row.totalCost > 0) {
       totalCost += row.totalCost;
-      hasCostRows = true;
+      hasCostTotals = true;
     }
   }
 
-  const totalProfit = hasCostRows ? roundMoney(totalRevenue - totalCost) : 0;
+  const totalProfit = hasCostTotals ? roundMoney(totalRevenue - totalCost) : 0;
   const averageMarginRate =
-    hasCostRows && totalRevenue > 0 ? roundMoney((totalProfit / totalRevenue) * 100) : null;
+    hasCostTotals && totalRevenue > 0 ? roundMoney((totalProfit / totalRevenue) * 100) : null;
 
   return {
     totalQuantity,
     totalRevenue: roundMoney(totalRevenue),
-    totalCost: hasCostRows ? roundMoney(totalCost) : 0,
-    totalProfit: hasCostRows ? totalProfit : 0,
+    totalCost: hasCostTotals ? roundMoney(totalCost) : 0,
+    totalProfit: hasCostTotals ? totalProfit : 0,
     averageMarginRate,
+    hasCostTotals,
   };
 }
 

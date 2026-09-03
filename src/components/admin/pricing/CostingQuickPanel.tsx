@@ -275,11 +275,17 @@ export default function CostingQuickPanel({
             <div className="costing-quick-panel__summary">
               <div>
                 <span className="admin-field-hint">Giá vốn / SP</span>
-                <strong>{formatPricingCurrency(preview.totalCostPerUnit)}</strong>
+                <strong>
+                  {preview.totalCostPerUnit > 0
+                    ? formatPricingCurrency(preview.totalCostPerUnit)
+                    : "—"}
+                </strong>
               </div>
               <div>
                 <span className="admin-field-hint">Tổng giá vốn</span>
-                <strong>{formatPricingCurrency(preview.totalCost)}</strong>
+                <strong>
+                  {preview.totalCost > 0 ? formatPricingCurrency(preview.totalCost) : "—"}
+                </strong>
               </div>
               <div>
                 <span className="admin-field-hint">Giá bán / SP</span>
@@ -294,7 +300,7 @@ export default function CostingQuickPanel({
               <div>
                 <span className="admin-field-hint">LN / SP</span>
                 <strong>
-                  {commercial
+                  {commercial && preview.totalCost > 0
                     ? formatPricingCurrency(commercial.profit / commercial.quantity)
                     : "—"}
                 </strong>
@@ -302,7 +308,9 @@ export default function CostingQuickPanel({
               <div>
                 <span className="admin-field-hint">Margin</span>
                 <strong>
-                  {commercial ? formatPricingPercent(commercial.marginRate) : "—"}
+                  {commercial && preview.totalCost > 0
+                    ? formatPricingPercent(commercial.marginRate)
+                    : "—"}
                 </strong>
               </div>
             </div>

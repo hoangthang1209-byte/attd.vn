@@ -175,7 +175,7 @@ export function computeSpreadsheetTotals(rows: SpreadsheetLiveRow[]) {
   for (const row of rows) {
     if (row.quantity != null) totalQuantity += row.quantity;
     if (row.revenue != null) totalRevenue += row.revenue;
-    if (row.totalCost != null) {
+    if (row.totalCost != null && row.totalCost > 0) {
       totalCost += row.totalCost;
       hasCost = true;
     }
@@ -230,10 +230,14 @@ export function liveRowFromPersisted(params: {
   sellingPricePerUnit: number | null;
   totalCost: number | null;
 }): SpreadsheetLiveRow {
-  if (params.sellingPricePerUnit != null && params.quantity != null && params.totalCost != null) {
+  // Treat zero/empty costEstimate as unknown (not costed yet) for display math.
+  const knownCost =
+    params.totalCost != null && params.totalCost > 0 ? params.totalCost : null;
+
+  if (params.sellingPricePerUnit != null && params.quantity != null && knownCost != null) {
     const commercials = computeSellingPriceCommercials({
       quantity: params.quantity,
-      costEstimate: params.totalCost,
+      costEstimate: knownCost,
       sellingPricePerUnit: params.sellingPricePerUnit,
     });
     return computeSpreadsheetLiveRow({
@@ -243,7 +247,16 @@ export function liveRowFromPersisted(params: {
     });
   }
 
-  return computeSpreadsheetLiveRow(params);
+  return computeSpreadsheetLiveRow({
+    quantity: params.quantity,
+    sellingPricePerUnit: params.sellingPricePerUnit,
+    totalCost: knownCost,
+  });
+}
+
+/** Display: known zero stays 0; uncosted / missing stays "—". */
+export function hasKnownCostEstimate(totalCost: number | null | undefined): boolean {
+  return totalCost != null && totalCost > 0;
 }
 
 /** Acceptance dataset for Big Bang regression tests — not used in production UI. */

@@ -7,7 +7,7 @@ export default async function CostingBatchDetailPage({ params }: PageProps) {
   const { id } = await params;
   return (
     <>
-      <AdminPageTitle title="Costing batch workspace" />
+      <AdminPageTitle title="Costing batch" />
       <CostingBatchWorkspace batchId={id} />
     </>
   );

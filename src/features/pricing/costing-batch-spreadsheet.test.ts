@@ -7,6 +7,7 @@ import {
   computeSpreadsheetLiveRow,
   computeSpreadsheetTotals,
   createEmptyDraftRow,
+  hasKnownCostEstimate,
   nextEditableColumn,
   parseIntegerQuantity,
   parseSellingPrice,
@@ -71,6 +72,21 @@ describe("costing batch spreadsheet helpers", () => {
     assert.equal(BIG_BANG_ACCEPTANCE_ROWS.length, 13);
     assert.equal(totals.totalQuantity, 6460);
     assert.equal(totals.totalRevenue, 1163640000);
+  });
+
+  it("unknown-vs-zero: zero costEstimate displays as unknown for cost totals", () => {
+    const totals = computeSpreadsheetTotals([
+      computeSpreadsheetLiveRow({
+        quantity: 100,
+        sellingPricePerUnit: 1000,
+        totalCost: 0,
+      }),
+    ]);
+    assert.equal(totals.hasCostTotals, false);
+    assert.equal(totals.totalRevenue, 100000);
+    assert.equal(hasKnownCostEstimate(0), false);
+    assert.equal(hasKnownCostEstimate(null), false);
+    assert.equal(hasKnownCostEstimate(50000), true);
   });
 
   it("paste to draft preserves invalid rows for review", () => {
