@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import CostingBatchStyleCell from "@/components/admin/pricing/CostingBatchStyleCell";
 import CostingQuickPanel from "@/components/admin/pricing/CostingQuickPanel";
+import AdminPortalMenu from "@/components/admin/AdminPortalMenu";
 import {
   formatPricingCurrency,
   formatPricingPercent,
@@ -81,18 +82,8 @@ export default function CostingBatchSpreadsheetTable({
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [quickCostRow, setQuickCostRow] = useState<CostingBatchRowView | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const focusStyleRef = useRef<HTMLInputElement>(null);
   const styleFocusByKey = useRef<Record<string, () => void>>({});
-
-  useEffect(() => {
-    if (!openMenuId) return;
-    function onDocClick() {
-      setOpenMenuId(null);
-    }
-    document.addEventListener("click", onDocClick);
-    return () => document.removeEventListener("click", onDocClick);
-  }, [openMenuId]);
 
   useEffect(() => {
     const next: Record<string, ReturnType<typeof rowToEditState>> = {};
@@ -763,7 +754,7 @@ export default function CostingBatchSpreadsheetTable({
             {row.calculationId ? (
               <button
                 type="button"
-                className="admin-btn admin-btn--xs admin-btn--secondary"
+                className="admin-btn admin-btn--xs admin-btn--secondary costing-batch-table__quick-btn"
                 onClick={() => setQuickCostRow(row)}
               >
                 Sửa nhanh
@@ -771,36 +762,24 @@ export default function CostingBatchSpreadsheetTable({
             ) : (
               <Link
                 href={costingHref(row)}
-                className="admin-btn admin-btn--xs admin-btn--secondary"
+                className="admin-btn admin-btn--xs admin-btn--secondary costing-batch-table__quick-btn"
               >
                 Tính giá
               </Link>
             )}
-            <div className="costing-batch-table__menu">
-              <button
-                type="button"
-                className="admin-btn admin-btn--xs admin-btn--secondary costing-batch-table__menu-trigger"
-                aria-label="Thêm thao tác"
-                aria-expanded={openMenuId === row.itemId}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpenMenuId((prev) => (prev === row.itemId ? null : row.itemId));
-                }}
-              >
-                ···
-              </button>
-              {openMenuId === row.itemId && (
-                <div
-                  className="costing-batch-table__menu-panel"
-                  role="menu"
-                  onClick={(e) => e.stopPropagation()}
-                >
+            <AdminPortalMenu
+              triggerClassName="admin-btn admin-btn--xs admin-btn--secondary costing-batch-table__menu-trigger"
+              menuClassName="admin-portal-menu costing-batch-table__menu-panel"
+              disabled={saving}
+            >
+              {(close) => (
+                <>
                   {row.calculationId && (
                     <Link
                       href={costingHref(row)}
-                      className="costing-batch-table__menu-item"
+                      className="admin-portal-menu__item"
                       role="menuitem"
-                      onClick={() => setOpenMenuId(null)}
+                      onClick={close}
                     >
                       Mở costing đầy đủ
                     </Link>
@@ -808,11 +787,11 @@ export default function CostingBatchSpreadsheetTable({
                   {row.calculationId && !row.isFinal && (
                     <button
                       type="button"
-                      className="costing-batch-table__menu-item"
+                      className="admin-portal-menu__item"
                       role="menuitem"
                       disabled={saving}
                       onClick={() => {
-                        setOpenMenuId(null);
+                        close();
                         onFinalizeRow(row.itemId);
                       }}
                     >
@@ -820,46 +799,52 @@ export default function CostingBatchSpreadsheetTable({
                     </button>
                   )}
                   {row.calculationId && !row.isFinal && (
-                    <button
-                      type="button"
-                      className="costing-batch-table__menu-item"
-                      role="menuitem"
-                      disabled={saving}
-                      onClick={() => {
-                        setOpenMenuId(null);
-                        onCloneStart(row.itemId);
-                      }}
-                    >
-                      Nhân bản
-                    </button>
+                    <>
+                      <div className="admin-portal-menu__separator" role="separator" />
+                      <button
+                        type="button"
+                        className="admin-portal-menu__item"
+                        role="menuitem"
+                        disabled={saving}
+                        onClick={() => {
+                          close();
+                          onCloneStart(row.itemId);
+                        }}
+                      >
+                        Nhân bản
+                      </button>
+                    </>
                   )}
                   {row.calculationId && (
                     <Link
                       href={`/admin/pricing/history/${row.calculationId}`}
-                      className="costing-batch-table__menu-item"
+                      className="admin-portal-menu__item"
                       role="menuitem"
-                      onClick={() => setOpenMenuId(null)}
+                      onClick={close}
                     >
                       Chi tiết / lịch sử
                     </Link>
                   )}
                   {!row.isFinal && (
-                    <button
-                      type="button"
-                      className="costing-batch-table__menu-item costing-batch-table__menu-item--danger"
-                      role="menuitem"
-                      disabled={saving}
-                      onClick={() => {
-                        setOpenMenuId(null);
-                        void removePersistedRow(row.itemId);
-                      }}
-                    >
-                      Xóa khỏi batch
-                    </button>
+                    <>
+                      <div className="admin-portal-menu__separator" role="separator" />
+                      <button
+                        type="button"
+                        className="admin-portal-menu__item admin-portal-menu__item--danger"
+                        role="menuitem"
+                        disabled={saving}
+                        onClick={() => {
+                          close();
+                          void removePersistedRow(row.itemId);
+                        }}
+                      >
+                        Xóa khỏi batch
+                      </button>
+                    </>
                   )}
-                </div>
+                </>
               )}
-            </div>
+            </AdminPortalMenu>
           </div>
         </td>
       </tr>
