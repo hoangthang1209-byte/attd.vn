@@ -41,7 +41,15 @@ export default function QuoteDocumentManufacturingEvidence({
         {safeItems.map((item) => (
           <article key={item.id} className="quote-manufacturing-card">
             <div className="quote-manufacturing-media">
-              <img src={item.imageUrl} alt={item.alt || item.title} />
+              {/* eslint-disable-next-line @next/next/no-img-element -- quote/PDF document uses plain img for print fidelity */}
+              <img
+                src={item.imageUrl}
+                alt={item.alt || item.title}
+                className="quote-manufacturing-media__img"
+                width={320}
+                height={200}
+                loading="eager"
+              />
             </div>
             <div className="quote-manufacturing-card__body">
               <p className="quote-manufacturing-category">

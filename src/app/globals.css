@@ -14789,6 +14789,162 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 .quote-doc__actions, .quote-document-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 16px; }
 .quote-document-actions__group { display: flex; gap: 12px; flex-wrap: wrap; }
 .quote-document-actions__hint { margin: 0; font-size: 12px; color: #6b7280; }
+
+/* Admin quote manufacturing evidence picker — bounded thumbs (never viewport-sized) */
+.quote-manufacturing-picker { margin-top: 16px; display: flex; flex-direction: column; gap: 16px; }
+.quote-manufacturing-picker__selected { display: flex; flex-direction: column; gap: 10px; }
+.quote-manufacturing-picker__row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 10px;
+  background: #fafafa;
+}
+.quote-manufacturing-picker__thumb {
+  position: relative;
+  width: 56px;
+  height: 64px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  background: #f3f4f6;
+}
+.quote-manufacturing-picker__img {
+  display: block;
+  width: 56px !important;
+  height: 64px !important;
+  max-width: 56px;
+  max-height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.quote-manufacturing-picker__title { margin: 0; font-size: 13px; font-weight: 600; color: #111827; }
+.quote-manufacturing-picker__actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.quote-manufacturing-picker__suggestions { display: flex; flex-direction: column; gap: 8px; }
+.quote-manufacturing-picker__label { margin: 0; font-size: 12px; font-weight: 600; color: #6b7280; }
+.quote-manufacturing-picker__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.quote-manufacturing-picker__filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)) auto;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 900px) {
+  .quote-manufacturing-picker__filters { grid-template-columns: 1fr; }
+  .quote-manufacturing-picker__row { grid-template-columns: 56px minmax(0, 1fr); }
+  .quote-manufacturing-picker__actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+.quote-manufacturing-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.quote-manufacturing-picker__card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.quote-manufacturing-picker__card-media {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  overflow: hidden;
+  background: #f3f4f6;
+}
+.quote-manufacturing-picker__card-img {
+  display: block;
+  width: 100% !important;
+  height: 120px !important;
+  max-height: 120px;
+  object-fit: cover;
+}
+.quote-manufacturing-picker__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 12px;
+}
+
+/* Public / PDF manufacturing evidence — bounded media, not page background */
+.quote-manufacturing-section { margin: 24px 0 8px; }
+.quote-manufacturing-section__head h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+.quote-manufacturing-section__head p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.45;
+}
+.quote-manufacturing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .quote-manufacturing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.quote-manufacturing-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.quote-manufacturing-media {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  overflow: hidden;
+  background: #f3f4f6;
+}
+.quote-manufacturing-media__img {
+  display: block;
+  width: 100%;
+  height: 120px;
+  max-height: 120px;
+  object-fit: cover;
+}
+.quote-manufacturing-card__body { padding: 8px 10px 10px; }
+.quote-manufacturing-category {
+  margin: 0 0 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #6b7280;
+}
+.quote-manufacturing-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.35;
+}
+.quote-manufacturing-description {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+.quote-doc--pdf .quote-manufacturing-media,
+.quote-document-root[data-mode="pdf"] .quote-manufacturing-media {
+  height: 88px;
+}
+.quote-doc--pdf .quote-manufacturing-media__img,
+.quote-document-root[data-mode="pdf"] .quote-manufacturing-media__img {
+  height: 88px;
+  max-height: 88px;
+}
 .quote-public-page { max-width: 1200px; margin: 40px auto; padding: 16px; }
 .quote-public-loading {
   min-height: min(70vh, 560px);

@@ -186,7 +186,14 @@ export default function QuoteManufacturingEvidencePicker({ quoteId }: Props) {
               selected.map((item, index) => (
                 <article key={item.id} className="quote-manufacturing-picker__row">
                   <div className="quote-manufacturing-picker__thumb">
-                    <Image src={item.imageUrl} alt={item.alt} fill sizes="72px" />
+                    <Image
+                      src={item.imageUrl}
+                      alt={item.alt}
+                      width={56}
+                      height={64}
+                      className="quote-manufacturing-picker__img"
+                      sizes="56px"
+                    />
                   </div>
                   <div>
                     <p className="quote-manufacturing-picker__title">{item.title}</p>
@@ -285,7 +292,14 @@ export default function QuoteManufacturingEvidencePicker({ quoteId }: Props) {
             {filteredAvailable.slice(0, 24).map((item) => (
               <article key={item.id} className="quote-manufacturing-picker__card">
                 <div className="quote-manufacturing-picker__card-media">
-                  <Image src={item.imageUrl} alt={item.alt} fill sizes="160px" />
+                  <Image
+                    src={item.imageUrl}
+                    alt={item.alt}
+                    width={160}
+                    height={120}
+                    className="quote-manufacturing-picker__card-img"
+                    sizes="160px"
+                  />
                 </div>
                 <div className="quote-manufacturing-picker__card-body">
                   <p className="quote-manufacturing-picker__title">{item.title}</p>

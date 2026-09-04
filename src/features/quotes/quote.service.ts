@@ -21,6 +21,10 @@ import {
 } from "@/features/sales/services/sales-representative.service";
 import type { CreateQuoteInput, QuoteItemInput, QuoteListRecord } from "@/features/quotes/types";
 import {
+  collectQuoteItemsFromPricingCalculations,
+  mapPricingCalculationItemToQuoteItem,
+} from "@/features/quotes/quote-from-pricing-map";
+import {
   assertQuoteFinancialFieldsImmutable,
   QuoteFinancialLockError,
 } from "@/features/orders/order-quoted-cost";
@@ -419,64 +423,6 @@ export async function createQuote(input: CreateQuoteInput) {
   return getQuoteDetail(quote.id);
 }
 
-type PricingCalcDetail = NonNullable<Awaited<ReturnType<typeof getPricingCalculationDetail>>>;
-type PricingCalcItem = PricingCalcDetail["items"][number];
-
-function buildCostingQuoteItemDescription(item: PricingCalcItem): string {
-  return [
-    (() => {
-      const materialName = (item.pricingSnapshot as { materialName?: unknown } | null)?.materialName;
-      return typeof materialName === "string" && materialName.trim()
-        ? `VL: ${materialName.trim()}`
-        : null;
-    })(),
-    (() => {
-      const gsm = (item.pricingSnapshot as { gsm?: unknown } | null)?.gsm;
-      return typeof gsm === "number" && Number.isFinite(gsm) ? `GSM: ${gsm}` : null;
-    })(),
-    `SL: ${item.quantity.toLocaleString("vi-VN")} ${item.unit}`,
-    (() => {
-      const targetMarginRate = (item.pricingSnapshot as { targetMarginRate?: unknown } | null)?.targetMarginRate;
-      return typeof targetMarginRate === "number" && Number.isFinite(targetMarginRate)
-        ? `Target margin: ${targetMarginRate}%`
-        : null;
-    })(),
-    "Giá từ Costing Calculator",
-  ].filter(Boolean).join(" | ");
-}
-
-function mapPricingCalculationItemToQuoteItem(
-  item: PricingCalcItem,
-  calcQuantityBreaks: unknown[],
-  sortOrder: number,
-): QuoteItemInput {
-  return {
-    pricingSnapshot: item.pricingSnapshot as Record<string, unknown> | null,
-    pricingCalculationItemId: item.id,
-    productId: item.productId,
-    variantId: item.variantId,
-    productNameSnapshot: item.productNameSnapshot,
-    variantNameSnapshot: item.variantNameSnapshot,
-    description: buildCostingQuoteItemDescription(item),
-    itemNote: calcQuantityBreaks.length > 0
-      ? "Có bảng giá theo số lượng trong costing snapshot."
-      : null,
-    quantity: item.quantity,
-    unit: item.unit,
-    baseUnitPrice: item.baseUnitPrice,
-    serviceFee: item.serviceFee,
-    setupFee: item.setupFee,
-    unitPrice: item.unitPrice,
-    discountAmount: item.discountAmount,
-    manualUnitPrice: item.manualUnitPrice,
-    manualOverrideReason: item.manualOverrideReason,
-    costEstimate: item.costEstimate,
-    marginAmount: item.marginAmount,
-    marginRate: item.marginRate,
-    sortOrder,
-  };
-}
-
 export async function createQuoteFromPricingCalculations(
   pricingCalculationIds: string[],
   overrides?: Partial<CreateQuoteInput>,
@@ -495,25 +441,11 @@ export async function createQuoteFromPricingCalculations(
     );
   }
 
-  const pricingCalculationItemIds: string[] = [];
-  let sortOrder = 0;
-  const items: QuoteItemInput[] = [];
-
-  for (const calc of calcs) {
-    if (!calc) continue;
-    const calcResult =
-      calc.resultSnapshot && typeof calc.resultSnapshot === "object"
-        ? (calc.resultSnapshot as Record<string, unknown>)
-        : null;
-    const calcQuantityBreaks = Array.isArray(calcResult?.quantityBreaks)
-      ? calcResult.quantityBreaks
-      : [];
-    for (const item of calc.items) {
-      pricingCalculationItemIds.push(item.id);
-      items.push(mapPricingCalculationItemToQuoteItem(item, calcQuantityBreaks, sortOrder));
-      sortOrder += 1;
-    }
-  }
+  const presentCalcs = calcs.filter((calc): calc is NonNullable<typeof calc> => Boolean(calc));
+  const items = collectQuoteItemsFromPricingCalculations(presentCalcs);
+  const pricingCalculationItemIds = items
+    .map((item) => item.pricingCalculationItemId)
+    .filter((id): id is string => Boolean(id));
 
   const existingQuoteItems = await prisma.quoteItem.findMany({
     where: { pricingCalculationItemId: { in: pricingCalculationItemIds } },
