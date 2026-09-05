@@ -390,6 +390,7 @@ export async function createQuote(input: CreateQuoteInput) {
         sampleFee: input.sampleFee ?? null,
         sampleLeadTime: input.sampleLeadTime?.trim() || null,
         sampleRefundCondition: input.sampleRefundCondition?.trim() || null,
+        pricingCostingBatchId: input.pricingCostingBatchId ?? null,
         inputSnapshot: input as unknown as Prisma.InputJsonValue,
         resultSnapshot: { items, totals } as unknown as Prisma.InputJsonValue,
       },
@@ -447,12 +448,14 @@ export async function createQuoteFromPricingCalculations(
     .map((item) => item.pricingCalculationItemId)
     .filter((id): id is string => Boolean(id));
 
-  const existingQuoteItems = await prisma.quoteItem.findMany({
-    where: { pricingCalculationItemId: { in: pricingCalculationItemIds } },
-    select: { pricingCalculationItemId: true },
-  });
-  if (existingQuoteItems.length > 0) {
-    throw new QuoteValidationError("Một hoặc nhiều dòng đã được dùng trong báo giá khác.");
+  if (!overrides?.allowReusePricingCalculationItems && pricingCalculationItemIds.length > 0) {
+    const existingQuoteItems = await prisma.quoteItem.findMany({
+      where: { pricingCalculationItemId: { in: pricingCalculationItemIds } },
+      select: { pricingCalculationItemId: true },
+    });
+    if (existingQuoteItems.length > 0) {
+      throw new QuoteValidationError("Một hoặc nhiều dòng đã được dùng trong báo giá khác.");
+    }
   }
 
   const firstCalc = calcs[0]!;
@@ -464,6 +467,8 @@ export async function createQuoteFromPricingCalculations(
     sourceType: "PRICING_CALCULATION",
     pricingCalculationId: pricingCalculationIds.length === 1 ? pricingCalculationIds[0] : null,
     pricingCalculationIds,
+    pricingCostingBatchId: overrides?.pricingCostingBatchId ?? null,
+    allowReusePricingCalculationItems: overrides?.allowReusePricingCalculationItems,
     leadId: overrides?.leadId ?? firstCalc.lead?.id ?? null,
     customerId: overrides?.customerId ?? firstCalc.customer?.id ?? null,
     contactId: overrides?.contactId ?? firstCalc.contact?.id ?? null,
@@ -479,6 +484,13 @@ export async function createQuoteFromPricingCalculations(
     internalNote: overrides?.internalNote ?? firstCalc.internalNote,
     terms: overrides?.terms,
     status: overrides?.status ?? "DRAFT",
+    customerCompanySnapshot: overrides?.customerCompanySnapshot,
+    customerTaxCodeSnapshot: overrides?.customerTaxCodeSnapshot,
+    customerAddressSnapshot: overrides?.customerAddressSnapshot,
+    customerContactNameSnapshot: overrides?.customerContactNameSnapshot,
+    customerContactTitleSnapshot: overrides?.customerContactTitleSnapshot,
+    customerPhoneSnapshot: overrides?.customerPhoneSnapshot,
+    customerEmailSnapshot: overrides?.customerEmailSnapshot,
     items: overrides?.items ?? items,
   });
 }

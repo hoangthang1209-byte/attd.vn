@@ -31992,6 +31992,65 @@ body:has(.blog-article-page) .floating-contact {
   padding: 1px 8px;
 }
 
+.costing-batch-quote-lifecycle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.35;
+}
+
+.costing-batch-quote-lifecycle__dirty {
+  color: #b45309;
+  font-weight: 600;
+}
+
+.costing-batch-quote-lifecycle__clean {
+  color: #047857;
+  font-weight: 500;
+}
+
+.costing-batch-quote-history {
+  font-size: 12px;
+}
+
+.costing-batch-quote-history summary {
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.costing-batch-quote-history ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+
+.costing-batch-quote-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.costing-batch-cell-input--money-display {
+  cursor: text;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  width: 100%;
+  min-width: 0;
+}
+
+.costing-batch-cell-input--money-display:hover {
+  border-color: var(--admin-border, #e5e7eb);
+  background: #fff;
+}
+
 .costing-batch-ops-header__customer {
   display: flex;
   flex-wrap: wrap;

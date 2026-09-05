@@ -75,6 +75,13 @@ export type CreateQuoteInput = {
   sampleRefundCondition?: string | null;
   items: QuoteItemInput[];
   pricingCalculationIds?: string[];
+  /** When set, quote is linked into costing-batch history. */
+  pricingCostingBatchId?: string | null;
+  /**
+   * Allow the same PricingCalculationItem to appear on multiple quotes
+   * (batch revision snapshots). Default false for single-calc quote flows.
+   */
+  allowReusePricingCalculationItems?: boolean;
 };
 
 export type QuoteTotals = {

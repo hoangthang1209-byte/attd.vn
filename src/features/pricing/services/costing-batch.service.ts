@@ -1,4 +1,4 @@
-import type { PricingCostingBatchStatus } from "@prisma/client";
+import type { PricingCostingBatchStatus, QuoteStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
@@ -9,6 +9,10 @@ import {
 } from "@/features/pricing/costing-calculation-clone";
 import { generateCostingBatchCode } from "@/features/pricing/costing-batch-code";
 import { computeSellingPriceCommercials } from "@/features/pricing/costing-batch-selling-price";
+import {
+  computeBatchQuoteFingerprint,
+  isBatchChangedSinceQuote,
+} from "@/features/pricing/costing-batch-quote-fingerprint";
 import { formatRevisionDisplayLabel } from "@/features/pricing/pricing-calculation-revision";
 import { finalizePricingCalculation } from "@/features/pricing/services/pricing-calculation.service";
 import {
@@ -19,6 +23,10 @@ import {
 import type { CostingCalculatorInput } from "@/features/pricing/costing-types";
 import type { CostingWorkspaceClone } from "@/features/pricing/costing-calculation-clone";
 import { createQuoteFromPricingCalculations } from "@/features/quotes/quote.service";
+import {
+  contactToQuoteSnapshots,
+  customerToQuoteSnapshots,
+} from "@/features/quotes/quote-party-utils";
 
 export class CostingBatchValidationError extends Error {
   constructor(message: string) {
@@ -26,6 +34,31 @@ export class CostingBatchValidationError extends Error {
     this.name = "CostingBatchValidationError";
   }
 }
+
+export class CostingBatchAcceptedQuoteWarningError extends CostingBatchValidationError {
+  readonly code = "ACCEPTED_QUOTE_EXISTS" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "CostingBatchAcceptedQuoteWarningError";
+  }
+}
+
+export class CostingBatchNoChangeError extends CostingBatchValidationError {
+  readonly code = "NO_CHANGE_SINCE_QUOTE" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "CostingBatchNoChangeError";
+  }
+}
+
+export type CostingBatchQuoteHistoryItem = {
+  id: string;
+  quoteNo: string;
+  status: QuoteStatus;
+  createdAt: string;
+  isLatest: boolean;
+  hasOrder: boolean;
+};
 
 export type CostingBatchRowView = {
   itemId: string;
@@ -61,6 +94,10 @@ export type CostingBatchDetail = {
   internalNote: string | null;
   quoteId: string | null;
   quoteNo: string | null;
+  lastQuotedAt: string | null;
+  changedSinceQuote: boolean;
+  quotes: CostingBatchQuoteHistoryItem[];
+  hasAcceptedQuoteWithOrder: boolean;
   createdAt: string;
   updatedAt: string;
   lead: { id: string; fullName: string; code: string | null } | null;
@@ -217,6 +254,28 @@ function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function fingerprintFromBatchDetailParts(input: {
+  customerId: string | null;
+  contactId: string | null;
+  rows: CostingBatchRowView[];
+}): string {
+  return computeBatchQuoteFingerprint({
+    customerId: input.customerId,
+    contactId: input.contactId,
+    rows: input.rows.map((row) => ({
+      itemId: row.itemId,
+      calculationId: row.calculationId,
+      productId: row.productId,
+      customProductName: row.customProductName ?? (row.productId ? null : row.productName),
+      quantity: row.quantity,
+      sellingPricePerUnit: row.sellingPricePerUnit,
+      costEstimate: row.totalCost,
+      revisionLabel: row.revisionLabel,
+      isFinal: row.isFinal,
+    })),
+  });
+}
+
 export async function listCostingBatches(limit = 50) {
   const rows = await prisma.pricingCostingBatch.findMany({
     orderBy: { createdAt: "desc" },
@@ -250,6 +309,16 @@ export async function getCostingBatchDetail(id: string): Promise<CostingBatchDet
       customer: { select: { id: true, name: true, code: true } },
       contact: { select: { id: true, fullName: true } },
       quote: { select: { id: true, quoteNo: true } },
+      quotes: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          quoteNo: true,
+          status: true,
+          createdAt: true,
+          order: { select: { id: true } },
+        },
+      },
       items: {
         orderBy: { sortOrder: "asc" },
         include: {
@@ -266,6 +335,56 @@ export async function getCostingBatchDetail(id: string): Promise<CostingBatchDet
   if (!row) return null;
 
   const rows = row.items.map(mapRowView);
+  const currentFingerprint = fingerprintFromBatchDetailParts({
+    customerId: row.customerId,
+    contactId: row.contactId,
+    rows,
+  });
+
+  // Lazily backfill fingerprint for pre-C3.6 quoted batches using current commercial state.
+  let lastQuotedFingerprint = row.lastQuotedFingerprint;
+  let lastQuotedAt = row.lastQuotedAt;
+  if (row.quoteId && !lastQuotedFingerprint) {
+    const stampedAt = lastQuotedAt ?? new Date();
+    await prisma.pricingCostingBatch.update({
+      where: { id: row.id },
+      data: {
+        lastQuotedFingerprint: currentFingerprint,
+        lastQuotedAt: stampedAt,
+      },
+    });
+    lastQuotedFingerprint = currentFingerprint;
+    lastQuotedAt = stampedAt;
+  }
+
+  const changedSinceQuote = Boolean(row.quoteId)
+    && isBatchChangedSinceQuote(currentFingerprint, lastQuotedFingerprint);
+
+  const quotes: CostingBatchQuoteHistoryItem[] = row.quotes.map((q) => ({
+    id: q.id,
+    quoteNo: q.quoteNo,
+    status: q.status,
+    createdAt: q.createdAt.toISOString(),
+    isLatest: q.id === row.quoteId,
+    hasOrder: Boolean(q.order),
+  }));
+
+  // Include latest pointer if history FK missing (pre-backfill edge).
+  if (row.quote && !quotes.some((q) => q.id === row.quote!.id)) {
+    quotes.unshift({
+      id: row.quote.id,
+      quoteNo: row.quote.quoteNo,
+      status: "DRAFT",
+      createdAt: row.createdAt.toISOString(),
+      isLatest: true,
+      hasOrder: false,
+    });
+  }
+
+  const hasAcceptedQuoteWithOrder = quotes.some(
+    (q) => q.status === "ACCEPTED" && q.hasOrder,
+  );
+
   return {
     id: row.id,
     code: row.code,
@@ -274,6 +393,10 @@ export async function getCostingBatchDetail(id: string): Promise<CostingBatchDet
     internalNote: row.internalNote,
     quoteId: row.quoteId,
     quoteNo: row.quote?.quoteNo ?? null,
+    lastQuotedAt: lastQuotedAt?.toISOString() ?? null,
+    changedSinceQuote,
+    quotes,
+    hasAcceptedQuoteWithOrder,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     lead: row.lead,
@@ -574,17 +697,32 @@ export async function finalizeCostingBatchRow(batchId: string, itemId: string) {
 export async function createQuoteFromCostingBatch(
   batchId: string,
   itemIds?: string[],
+  options?: { confirmAcceptedRisk?: boolean },
 ) {
+  const detail = await getCostingBatchDetail(batchId);
+  if (!detail) throw new CostingBatchValidationError("Không tìm thấy batch costing.");
+
+  if (detail.quoteId && !detail.changedSinceQuote) {
+    throw new CostingBatchNoChangeError(
+      "Batch chưa có thay đổi sau báo giá gần nhất. Không tạo báo giá trùng.",
+    );
+  }
+
+  if (detail.hasAcceptedQuoteWithOrder && !options?.confirmAcceptedRisk) {
+    throw new CostingBatchAcceptedQuoteWarningError(
+      "Batch đã có báo giá ACCEPTED kèm đơn hàng. Xác nhận nếu vẫn muốn tạo báo giá mới từ batch này.",
+    );
+  }
+
   const batch = await prisma.pricingCostingBatch.findUnique({
     where: { id: batchId },
     include: {
       items: { orderBy: { sortOrder: "asc" } },
+      customer: true,
+      contact: true,
     },
   });
   if (!batch) throw new CostingBatchValidationError("Không tìm thấy batch costing.");
-  if (batch.quoteId) {
-    throw new CostingBatchValidationError("Batch đã có báo giá. Tạo báo giá mới từ batch đã quoted không được phép.");
-  }
 
   const selected =
     itemIds?.length
@@ -599,21 +737,45 @@ export async function createQuoteFromCostingBatch(
     throw new CostingBatchValidationError("Không có dòng đã tính giá để tạo báo giá.");
   }
 
+  const customerSnapshots = batch.customer
+    ? customerToQuoteSnapshots(batch.customer)
+    : {};
+  const contactSnapshots = batch.contact
+    ? contactToQuoteSnapshots(batch.contact, {
+        phone: batch.customer?.phone,
+        email: batch.customer?.email,
+      })
+    : {};
+
+  const isRevision = Boolean(batch.quoteId);
   const quote = await createQuoteFromPricingCalculations(calculationIds, {
     leadId: batch.leadId,
     customerId: batch.customerId,
     contactId: batch.contactId,
     title: batch.title?.trim() || `Báo giá ${batch.code}`,
     internalNote: batch.internalNote,
+    pricingCostingBatchId: batch.id,
+    allowReusePricingCalculationItems: isRevision,
+    ...customerSnapshots,
+    ...contactSnapshots,
   });
 
   if (!quote) throw new CostingBatchValidationError("Không thể tạo báo giá.");
+
+  // Fingerprint from current detail rows (full batch commercial state), not only selected.
+  const fingerprint = fingerprintFromBatchDetailParts({
+    customerId: batch.customerId,
+    contactId: batch.contactId,
+    rows: detail.rows,
+  });
 
   await prisma.pricingCostingBatch.update({
     where: { id: batchId },
     data: {
       quoteId: quote.id,
       status: "QUOTED",
+      lastQuotedFingerprint: fingerprint,
+      lastQuotedAt: new Date(),
     },
   });
 

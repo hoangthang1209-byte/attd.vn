@@ -78,6 +78,7 @@ export default function CostingBatchSpreadsheetTable({
 }: Props) {
   const [drafts, setDrafts] = useState<SpreadsheetRowDraft[]>([]);
   const [rowEdits, setRowEdits] = useState<Record<string, ReturnType<typeof rowToEditState>>>({});
+  const [focusedMoneyCell, setFocusedMoneyCell] = useState<string | null>(null);
   const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
@@ -389,6 +390,7 @@ export default function CostingBatchSpreadsheetTable({
     options?: {
       disabled?: boolean;
       numeric?: boolean;
+      moneyDisplay?: boolean;
       onCommit?: () => void;
       onKeyNav?: (key: "enter" | "tab" | "shiftTab" | "escape") => void;
       styleCell?: boolean;
@@ -421,15 +423,37 @@ export default function CostingBatchSpreadsheetTable({
       );
     }
 
+    const moneyKey = `${rowKey}:${column}`;
+    const moneyFocused = focusedMoneyCell === moneyKey;
+    const inputValue =
+      options?.moneyDisplay && !moneyFocused
+        ? (() => {
+            const parsed = parseSellingPrice(value);
+            return parsed != null ? formatPricingCurrency(parsed) : value;
+          })()
+        : value;
+
     return (
       <input
         className="costing-batch-cell-input"
-        type={options?.numeric ? "text" : "text"}
-        inputMode={options?.numeric ? "numeric" : "text"}
-        value={value}
+        type="text"
+        inputMode={options?.numeric || options?.moneyDisplay ? "numeric" : "text"}
+        value={inputValue}
         disabled={options?.disabled}
-        onChange={(e) => onValueChange(e.target.value)}
-        onBlur={() => options?.onCommit?.()}
+        onChange={(e) => {
+          if (options?.moneyDisplay && !moneyFocused) {
+            setFocusedMoneyCell(moneyKey);
+            return;
+          }
+          onValueChange(e.target.value);
+        }}
+        onFocus={() => {
+          if (options?.moneyDisplay) setFocusedMoneyCell(moneyKey);
+        }}
+        onBlur={() => {
+          if (options?.moneyDisplay) setFocusedMoneyCell(null);
+          options?.onCommit?.();
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
@@ -544,6 +568,7 @@ export default function CostingBatchSpreadsheetTable({
             draft.sellingPrice,
             (v) => updateDraft(draft.draftId, { sellingPrice: v }),
             {
+              moneyDisplay: true,
               numeric: true,
               onCommit: () => {
                 if (canPersistSpreadsheetRow(draft)) void persistDraft(draft);
@@ -716,6 +741,7 @@ export default function CostingBatchSpreadsheetTable({
             edit.sellingPrice,
             (v) => setEdit({ sellingPrice: v }),
             {
+              moneyDisplay: true,
               numeric: true,
               onCommit: () => void commitRowEdit(row),
               onKeyNav: (key) => {

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  CostingBatchAcceptedQuoteWarningError,
+  CostingBatchNoChangeError,
   CostingBatchValidationError,
   createQuoteFromCostingBatch,
 } from "@/features/pricing/services/costing-batch.service";
@@ -30,9 +32,19 @@ export async function POST(req: NextRequest, context: RouteContext) {
     : undefined;
 
   try {
-    const result = await createQuoteFromCostingBatch(id, itemIds);
+    const confirmAcceptedRisk = raw.confirmAcceptedRisk === true;
+    const result = await createQuoteFromCostingBatch(id, itemIds, { confirmAcceptedRisk });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
+    if (
+      err instanceof CostingBatchAcceptedQuoteWarningError ||
+      err instanceof CostingBatchNoChangeError
+    ) {
+      return NextResponse.json(
+        { message: err.message, code: err.code },
+        { status: err instanceof CostingBatchNoChangeError ? 400 : 409 },
+      );
+    }
     if (err instanceof CostingBatchValidationError || err instanceof QuoteValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });
     }

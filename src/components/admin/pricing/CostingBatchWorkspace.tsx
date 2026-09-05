@@ -134,20 +134,36 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
     }
   }
 
-  async function createQuote() {
+  async function createQuote(confirmAcceptedRisk = false) {
     setBusy(true);
     setError(null);
     try {
-      const itemIds = selected.size > 0 ? [...selected] : undefined;
-      const res = await fetch(`/api/pricing/costing-batches/${batchId}/create-quote`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemIds }),
-      });
-      const data = await res.json() as { quote?: { id: string }; message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Không thể tạo báo giá");
-      if (data.quote?.id) router.push(`/admin/quotes/${data.quote.id}`);
-      else await load();
+      let confirmed = confirmAcceptedRisk;
+      for (;;) {
+        const itemIds = selected.size > 0 ? [...selected] : undefined;
+        const res = await fetch(`/api/pricing/costing-batches/${batchId}/create-quote`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemIds, confirmAcceptedRisk: confirmed }),
+        });
+        const data = await res.json() as {
+          quote?: { id: string };
+          message?: string;
+          code?: string;
+        };
+        if (res.status === 409 && data.code === "ACCEPTED_QUOTE_EXISTS" && !confirmed) {
+          const ok = window.confirm(
+            `${data.message ?? "Batch đã có báo giá ACCEPTED kèm đơn hàng."}\n\nVẫn tạo báo giá mới?`,
+          );
+          if (!ok) return;
+          confirmed = true;
+          continue;
+        }
+        if (!res.ok) throw new Error(data.message ?? "Không thể tạo báo giá");
+        if (data.quote?.id) router.push(`/admin/quotes/${data.quote.id}`);
+        else await load();
+        return;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể tạo báo giá");
     } finally {
@@ -193,10 +209,52 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
   }
   if (!batch) return null;
 
-  const styleCount = batch.rows.filter((r) => !r.isIncomplete).length;
+  const current = batch;
+  const styleCount = current.rows.filter((r) => !r.isIncomplete).length;
   const quoteCount =
-    selected.size > 0 ? selected.size : batch.rows.filter((r) => r.calculationId).length;
-  const hasCost = batch.totals.hasCostTotals;
+    selected.size > 0 ? selected.size : current.rows.filter((r) => r.calculationId).length;
+  const hasCost = current.totals.hasCostTotals;
+  const quoteHistory = current.quotes;
+
+  function renderQuoteAction() {
+    if (!current.quoteId) {
+      return (
+        <button
+          type="button"
+          className="admin-btn admin-btn--primary admin-btn--xs"
+          disabled={busy || quoteCount === 0}
+          onClick={() => void createQuote()}
+        >
+          Tạo báo giá ({quoteCount})
+        </button>
+      );
+    }
+
+    if (!current.changedSinceQuote) {
+      return (
+        <div className="costing-batch-quote-actions">
+          <Link
+            href={`/admin/quotes/${current.quoteId}`}
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+          >
+            Xem {current.quoteNo ?? "báo giá"}
+          </Link>
+          <span className="admin-field-hint">Không có thay đổi mới</span>
+        </div>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        className="admin-btn admin-btn--primary admin-btn--xs"
+        disabled={busy || quoteCount === 0}
+        onClick={() => void createQuote()}
+      >
+        Tạo báo giá mới ({quoteCount})
+      </button>
+    );
+  }
 
   return (
     <div className="costing-batch-workspace">
@@ -206,16 +264,50 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
             <Link href="/admin/pricing/costing/batch" className="costing-batch-ops-header__back">
               ← Batch
             </Link>
-            <span className="costing-batch-ops-header__code">{batch.code}</span>
-            {batch.title?.trim() && (
-              <span className="costing-batch-ops-header__title">{batch.title.trim()}</span>
+            <span className="costing-batch-ops-header__code">{current.code}</span>
+            {current.title?.trim() && (
+              <span className="costing-batch-ops-header__title">{current.title.trim()}</span>
             )}
-            <span className="costing-batch-ops-header__status">{batch.status}</span>
-            {batch.quoteNo && (
-              <span className="admin-field-hint">· Báo giá {batch.quoteNo}</span>
-            )}
+            <span className="costing-batch-ops-header__status">{current.status}</span>
           </div>
         </div>
+
+        {current.quoteId ? (
+          <div className="costing-batch-quote-lifecycle">
+            <span>
+              Báo giá gần nhất:{" "}
+              <Link href={`/admin/quotes/${current.quoteId}`} className="admin-link">
+                {current.quoteNo ?? "—"}
+              </Link>
+              {" · "}
+              {current.changedSinceQuote ? (
+                <span className="costing-batch-quote-lifecycle__dirty">
+                  ● Có thay đổi sau báo giá
+                </span>
+              ) : (
+                <span className="costing-batch-quote-lifecycle__clean">
+                  Không có thay đổi
+                </span>
+              )}
+            </span>
+            {quoteHistory.length > 0 ? (
+              <details className="costing-batch-quote-history">
+                <summary>Lịch sử báo giá ({quoteHistory.length})</summary>
+                <ul>
+                  {quoteHistory.map((q) => (
+                    <li key={q.id}>
+                      <Link href={`/admin/quotes/${q.id}`} className="admin-link">
+                        {q.quoteNo}
+                      </Link>
+                      {q.isLatest ? " · mới nhất" : ""}
+                      {q.status === "ACCEPTED" ? " · ACCEPTED" : ""}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="costing-batch-ops-header__customer">
           {customerEditorOpen ? (
@@ -319,18 +411,7 @@ export default function CostingBatchWorkspace({ batchId }: { batchId: string }) 
           setCloneTargets("");
         }}
         onFinalizeRow={(itemId) => void finalizeRow(itemId)}
-        quoteAction={
-          !batch.quoteId ? (
-            <button
-              type="button"
-              className="admin-btn admin-btn--primary admin-btn--xs"
-              disabled={busy}
-              onClick={() => void createQuote()}
-            >
-              Tạo báo giá ({quoteCount})
-            </button>
-          ) : null
-        }
+        quoteAction={renderQuoteAction()}
       />
 
       {cloneSourceId && (

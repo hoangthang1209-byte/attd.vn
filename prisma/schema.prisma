@@ -3754,22 +3754,27 @@ model PricingCalculationItem {
 }
 
 model PricingCostingBatch {
-  id           String                    @id @default(cuid())
-  code         String                    @unique
-  title        String?
-  status       PricingCostingBatchStatus @default(WORKING)
-  leadId       String?
-  customerId   String?
-  contactId    String?
-  quoteId      String?                   @unique
-  internalNote String?                   @db.Text
-  createdAt    DateTime                  @default(now())
-  updatedAt    DateTime                  @updatedAt
-  lead         Lead?                     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  customer     Customer?                 @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  contact      Contact?                  @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  quote        Quote?                    @relation(fields: [quoteId], references: [id], onDelete: SetNull)
-  items        PricingCostingBatchItem[]
+  id                     String                    @id @default(cuid())
+  code                   String                    @unique
+  title                  String?
+  status                 PricingCostingBatchStatus @default(WORKING)
+  leadId                 String?
+  customerId             String?
+  contactId              String?
+  /// Latest quote created from this batch (compatibility pointer).
+  quoteId                String?                   @unique
+  /// Commercial fingerprint captured when the latest quote was created.
+  lastQuotedFingerprint  String?
+  lastQuotedAt           DateTime?
+  internalNote           String?                   @db.Text
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  lead                   Lead?                     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer               Customer?                 @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contact                Contact?                  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  quote                  Quote?                    @relation("CostingBatchLatestQuote", fields: [quoteId], references: [id], onDelete: SetNull)
+  quotes                 Quote[]                   @relation("CostingBatchQuoteHistory")
+  items                  PricingCostingBatchItem[]
 
   @@index([code])
   @@index([customerId])
@@ -3919,6 +3924,8 @@ model Quote {
   sampleRefundCondition        String?              @db.Text
   inputSnapshot                Json?
   resultSnapshot               Json?
+  /// Costing batch this quote was created from (history; many quotes per batch).
+  pricingCostingBatchId        String?
   createdAt                    DateTime             @default(now())
   updatedAt                    DateTime             @updatedAt
   pricingCalculation           PricingCalculation?  @relation(fields: [pricingCalculationId], references: [id], onDelete: SetNull)
@@ -3931,13 +3938,15 @@ model Quote {
   order                        Order?
   dealerRfq                    DealerRFQ?
   salesOpportunities           SalesOpportunity[]
-  costingBatch                 PricingCostingBatch?
+  costingBatch                 PricingCostingBatch? @relation("CostingBatchLatestQuote")
+  pricingCostingBatch          PricingCostingBatch? @relation("CostingBatchQuoteHistory", fields: [pricingCostingBatchId], references: [id], onDelete: SetNull)
 
   @@index([quoteNo])
   @@index([salesRepresentativeId])
   @@index([publicToken])
   @@index([status])
   @@index([pricingCalculationId])
+  @@index([pricingCostingBatchId])
   @@index([leadId])
   @@index([customerId])
   @@index([contactId])
