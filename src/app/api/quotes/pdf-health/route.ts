@@ -21,7 +21,9 @@ export async function GET() {
       doc.on("end", () => resolve());
       doc.on("error", reject);
       doc.font(fonts.boldName, 14).text("ATTD PDF health check");
-      doc.font(fonts.regularName, 10).text(`Font: ${fonts.usedDejaVu ? "DejaVu" : "Helvetica"}`);
+      doc.font(fonts.regularName, 10).text(
+        `Font: ${fonts.usedUnicodeFont ? "DejaVu" : "Helvetica"}`,
+      );
       doc.end();
     });
 

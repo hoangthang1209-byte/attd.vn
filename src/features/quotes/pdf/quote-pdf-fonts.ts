@@ -1,25 +1,31 @@
-import "server-only";
-
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 export type PdfFontNames = {
   regularName: string;
   boldName: string;
-  usedDejaVu: boolean;
+  usedUnicodeFont: boolean;
+  fontFamily: "dejavu" | "helvetica";
+  regularPath: string | null;
+  boldPath: string | null;
 };
 
-// Runtime-only font paths — resolved against cwd at execution, not traced at build.
 function fontPath(...segments: string[]): string {
   return join(/* turbopackIgnore: true */ process.cwd(), ...segments);
 }
 
+/**
+ * Prefer packaged application fonts (always traced into PDF serverless functions),
+ * then fall back to the dejavu-fonts-ttf npm package for local/dev installs.
+ */
 const FONT_CANDIDATES = {
   regular: [
+    fontPath("assets/fonts/quote-pdf/DejaVuSans.ttf"),
     fontPath("node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf"),
     fontPath("node_modules/dejavu-fonts-ttf/DejaVuSans.ttf"),
   ],
   bold: [
+    fontPath("assets/fonts/quote-pdf/DejaVuSans-Bold.ttf"),
     fontPath("node_modules/dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf"),
     fontPath("node_modules/dejavu-fonts-ttf/DejaVuSans-Bold.ttf"),
   ],
@@ -34,17 +40,31 @@ function resolveExistingPath(candidates: string[]): string | null {
   return null;
 }
 
-function logFontStatus(usedDejaVu: boolean, regularPath: string | null): void {
+function logFontStatus(result: PdfFontNames): void {
   if (fontStatusLogged) return;
   fontStatusLogged = true;
-  if (usedDejaVu) {
-    console.info("[quote-pdf] Using DejaVu fonts:", regularPath);
+  if (result.usedUnicodeFont) {
+    console.info("[quote-pdf] Using Unicode PDF fonts:", {
+      family: result.fontFamily,
+      regularPath: result.regularPath,
+      boldPath: result.boldPath,
+    });
   } else {
-    console.warn(
-      "[quote-pdf] DejaVu fonts not found — using Helvetica fallback (Vietnamese diacritics may be missing).",
-      { regularPath },
-    );
+    console.error("[quote-pdf] Unicode PDF fonts missing — Helvetica cannot render Vietnamese.", {
+      regularCandidates: FONT_CANDIDATES.regular,
+      boldCandidates: FONT_CANDIDATES.bold,
+    });
   }
+}
+
+export function resolveQuotePdfFontPaths(): {
+  regularPath: string | null;
+  boldPath: string | null;
+} {
+  return {
+    regularPath: resolveExistingPath(FONT_CANDIDATES.regular),
+    boldPath: resolveExistingPath(FONT_CANDIDATES.bold),
+  };
 }
 
 export function registerQuotePdfFonts(
@@ -53,26 +73,49 @@ export function registerQuotePdfFonts(
     font: (name: string, size?: number) => unknown;
   },
 ): PdfFontNames {
-  const regularPath = resolveExistingPath(FONT_CANDIDATES.regular);
-  const boldPath = resolveExistingPath(FONT_CANDIDATES.bold);
+  const { regularPath, boldPath } = resolveQuotePdfFontPaths();
 
   if (!regularPath || !boldPath) {
-    logFontStatus(false, regularPath);
-    return { regularName: "Helvetica", boldName: "Helvetica-Bold", usedDejaVu: false };
+    const result: PdfFontNames = {
+      regularName: "Helvetica",
+      boldName: "Helvetica-Bold",
+      usedUnicodeFont: false,
+      fontFamily: "helvetica",
+      regularPath,
+      boldPath,
+    };
+    logFontStatus(result);
+    return result;
   }
 
   try {
     doc.registerFont("QuotePdfRegular", regularPath);
     doc.registerFont("QuotePdfBold", boldPath);
     doc.font("QuotePdfRegular", 8);
-    logFontStatus(true, regularPath);
-    return { regularName: "QuotePdfRegular", boldName: "QuotePdfBold", usedDejaVu: true };
+    const result: PdfFontNames = {
+      regularName: "QuotePdfRegular",
+      boldName: "QuotePdfBold",
+      usedUnicodeFont: true,
+      fontFamily: "dejavu",
+      regularPath,
+      boldPath,
+    };
+    logFontStatus(result);
+    return result;
   } catch (err) {
-    console.warn(
-      "[quote-pdf] DejaVu font registration failed — using Helvetica.",
+    console.error(
+      "[quote-pdf] Unicode font registration failed — Helvetica cannot render Vietnamese.",
       err instanceof Error ? err.message : err,
     );
-    logFontStatus(false, regularPath);
-    return { regularName: "Helvetica", boldName: "Helvetica-Bold", usedDejaVu: false };
+    const result: PdfFontNames = {
+      regularName: "Helvetica",
+      boldName: "Helvetica-Bold",
+      usedUnicodeFont: false,
+      fontFamily: "helvetica",
+      regularPath,
+      boldPath,
+    };
+    logFontStatus(result);
+    return result;
   }
 }

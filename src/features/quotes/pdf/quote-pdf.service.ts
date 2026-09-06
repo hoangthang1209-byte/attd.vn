@@ -191,6 +191,11 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
   const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 28 });
   const bufferPromise = renderPdfToBuffer(doc);
   const fonts = registerQuotePdfFonts(doc);
+  if (!fonts.usedUnicodeFont) {
+    throw new Error(
+      "PDFKit Unicode fonts missing (DejaVu). Cannot generate Vietnamese-safe quote PDF.",
+    );
+  }
   const company = data.company;
   const pageW = safeDim(doc.page.width - 56, 500);
   const colW = safeDim(pageW / 3, 120);

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { existsSync } from "node:fs";
 import puppeteer, { type Browser, type PDFOptions } from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 import { QuotePdfChromiumError } from "@/features/quotes/pdf/quote-pdf-chromium-error";
@@ -45,6 +46,24 @@ export function isValidQuotePdfBuffer(buffer: Buffer, minBytes = QUOTE_MIN_PDF_B
   );
 }
 
+function assertSparticuzBinPresent(traceId: string): void {
+  const binDir = `${process.cwd()}/node_modules/@sparticuz/chromium/bin`;
+  const chromiumBr = `${binDir}/chromium.br`;
+  const binExists = existsSync(binDir);
+  const brExists = existsSync(chromiumBr);
+  logChromiumStage(traceId, "sparticuz-bin-check", {
+    binDir,
+    binExists,
+    chromiumBrExists: brExists,
+  });
+  if (!binExists || !brExists) {
+    throw new QuotePdfChromiumError(
+      traceId,
+      `Chromium binary pack missing at ${binDir}. Ensure @sparticuz/chromium is externalized and included in outputFileTracingIncludes.`,
+    );
+  }
+}
+
 /** Resolve Chrome/Chromium executable — Vercel uses @sparticuz/chromium only. */
 export async function resolveChromiumExecutablePath(
   traceId: string,
@@ -52,6 +71,7 @@ export async function resolveChromiumExecutablePath(
   logChromiumStage(traceId, "resolve-executable-path:start");
 
   if (isVercelRuntime()) {
+    assertSparticuzBinPresent(traceId);
     const executablePath = await chromium.executablePath();
     if (!executablePath) {
       throw new QuotePdfChromiumError(
@@ -59,7 +79,11 @@ export async function resolveChromiumExecutablePath(
         "Không tìm thấy Chrome/Chromium để tạo PDF. (Vercel path missing)",
       );
     }
-    logChromiumStage(traceId, "resolve-executable-path:success", { executablePath });
+    logChromiumStage(traceId, "resolve-executable-path:success", {
+      executablePath,
+      executableExists: existsSync(executablePath),
+      source: "sparticuz-vercel",
+    });
     return executablePath;
   }
 
@@ -69,6 +93,7 @@ export async function resolveChromiumExecutablePath(
   if (envPath) {
     logChromiumStage(traceId, "resolve-executable-path:success", {
       executablePath: envPath,
+      executableExists: existsSync(envPath),
       source: "env",
     });
     return envPath;
@@ -79,6 +104,7 @@ export async function resolveChromiumExecutablePath(
       "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
     logChromiumStage(traceId, "resolve-executable-path:success", {
       executablePath: macChrome,
+      executableExists: existsSync(macChrome),
       source: "macos-chrome",
     });
     return macChrome;
@@ -91,8 +117,10 @@ export async function resolveChromiumExecutablePath(
     "/usr/bin/chromium-browser",
   ];
   for (const candidate of linuxCandidates) {
+    if (!existsSync(candidate)) continue;
     logChromiumStage(traceId, "resolve-executable-path:success", {
       executablePath: candidate,
+      executableExists: true,
       source: "linux-path",
     });
     return candidate;
@@ -103,6 +131,7 @@ export async function resolveChromiumExecutablePath(
     if (sparticuzPath) {
       logChromiumStage(traceId, "resolve-executable-path:success", {
         executablePath: sparticuzPath,
+        executableExists: existsSync(sparticuzPath),
         source: "sparticuz-local",
       });
       return sparticuzPath;
@@ -117,24 +146,6 @@ export async function resolveChromiumExecutablePath(
   );
 }
 
-function getLaunchArgs(): string[] {
-  if (isVercelRuntime()) {
-    return [
-      ...chromium.args,
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-    ];
-  }
-
-  return [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu",
-  ];
-}
-
 export async function launchChromiumBrowser(
   traceId: string,
   executablePath: string,
@@ -143,37 +154,60 @@ export async function launchChromiumBrowser(
   logChromiumStage(traceId, "launch-browser:start", { executablePath });
 
   // @sparticuz/chromium ships chrome-headless-shell which only supports headless:"shell".
-  // Using headless:true (new headless) fails immediately on Vercel.
   if (isVercelRuntime()) {
     chromium.setGraphicsMode = false;
   }
 
   const headlessMode: boolean | "shell" = isVercelRuntime() ? "shell" : true;
-  // Prefer package args directly — they already include --headless='shell'.
-  // Avoid puppeteer.defaultArgs double-injecting conflicting --headless flags.
+
+  // Official @sparticuz/chromium + puppeteer-core@25 pattern:
+  // await puppeteer.defaultArgs({ args: chromium.args, headless: "shell" })
   const args = isVercelRuntime()
-    ? [
-        ...chromium.args,
+    ? await puppeteer.defaultArgs({
+        args: [
+          ...chromium.args,
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--font-render-hinting=none",
+        ],
+        headless: "shell",
+      })
+    : [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--font-render-hinting=none",
-      ]
-    : getLaunchArgs();
+        "--disable-gpu",
+      ];
 
-  const browser = await puppeteer.launch({
-    args,
-    executablePath,
-    headless: headlessMode,
-    defaultViewport: viewport,
-    acceptInsecureCerts: false,
-  });
+  try {
+    const browser = await puppeteer.launch({
+      args,
+      executablePath,
+      headless: headlessMode,
+      defaultViewport: viewport,
+      acceptInsecureCerts: false,
+    });
 
-  logChromiumStage(traceId, "launch-browser:success", {
-    headless: headlessMode,
-    argCount: args.length,
-  });
-  return browser;
+    logChromiumStage(traceId, "launch-browser:success", {
+      headless: headlessMode,
+      argCount: args.length,
+    });
+    return browser;
+  } catch (error) {
+    console.error("[quote-pdf] chromium launch failed", {
+      traceId,
+      executablePath,
+      executableExists: existsSync(executablePath),
+      headless: headlessMode,
+      argCount: args.length,
+      argsSample: args.slice(0, 12),
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
+    });
+    throw wrapChromiumPdfError(traceId, error);
+  }
 }
 
 export function logChromiumBrowserDiagnostics(
@@ -189,6 +223,7 @@ export function logChromiumBrowserDiagnostics(
     vercelEnv: process.env.VERCEL_ENV ?? null,
     nodeEnv: process.env.NODE_ENV,
     executablePath,
+    executableExists: existsSync(executablePath),
   });
 }
 

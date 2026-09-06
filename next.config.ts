@@ -4,8 +4,29 @@ const BLOB_HOSTNAME =
   process.env.BLOB_STORE_HOSTNAME ??
   "0iitstjrwqim8udr.public.blob.vercel-storage.com";
 
+/** Chromium binary + PDFKit Unicode fonts must be present in serverless traces. */
+const PDF_RUNTIME_TRACE_INCLUDES = [
+  "./node_modules/@sparticuz/chromium/**/*",
+  "./assets/fonts/quote-pdf/**/*",
+];
+
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["pdfkit", "puppeteer-core", "@sparticuz/chromium"],
+  serverExternalPackages: [
+    "pdfkit",
+    "puppeteer-core",
+    "@sparticuz/chromium",
+    "dejavu-fonts-ttf",
+  ],
+  outputFileTracingIncludes: {
+    "/api/quotes/[id]/pdf": PDF_RUNTIME_TRACE_INCLUDES,
+    "/api/quotes/public/[token]/pdf": PDF_RUNTIME_TRACE_INCLUDES,
+    "/api/quotes/pdf-renderer-health": PDF_RUNTIME_TRACE_INCLUDES,
+    "/api/quotes/pdf-health": PDF_RUNTIME_TRACE_INCLUDES,
+    "/api/tech-packs/[id]/pdf": PDF_RUNTIME_TRACE_INCLUDES,
+    "/api/orders/[id]/documents/[docType]/pdf": PDF_RUNTIME_TRACE_INCLUDES,
+    "/api/orders/[id]/documents/production-sheet/pdf": PDF_RUNTIME_TRACE_INCLUDES,
+    "/api/orders/[id]/documents/delivery-note/pdf": PDF_RUNTIME_TRACE_INCLUDES,
+  },
   images: {
     remotePatterns: [
       {

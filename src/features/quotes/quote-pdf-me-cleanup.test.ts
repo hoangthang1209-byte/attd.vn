@@ -49,7 +49,8 @@ describe("Quote-PDF-1 chromium / download reliability", () => {
     assert.match(chromium, /headless:\s*headlessMode/);
     assert.match(chromium, /"shell"/);
     assert.match(chromium, /setGraphicsMode\s*=\s*false/);
-    assert.doesNotMatch(chromium, /puppeteer\.defaultArgs\(/);
+    assert.match(chromium, /puppeteer\.defaultArgs\(/);
+    assert.match(chromium, /outputFileTracingIncludes|sparticuz-bin-check/);
 
     const adminRoute = read("src/app/api/quotes/[id]/pdf/route.ts");
     const publicRoute = read("src/app/api/quotes/public/[token]/pdf/route.ts");
@@ -57,6 +58,10 @@ describe("Quote-PDF-1 chromium / download reliability", () => {
     assert.match(publicRoute, /maxDuration\s*=\s*60/);
     assert.match(adminRoute, /runtime\s*=\s*"nodejs"/);
     assert.match(publicRoute, /runtime\s*=\s*"nodejs"/);
+
+    const nextConfig = read("next.config.ts");
+    assert.match(nextConfig, /@sparticuz\/chromium\/\*\*\/\*/);
+    assert.match(nextConfig, /assets\/fonts\/quote-pdf/);
 
     const route = read("src/features/quotes/pdf/quote-pdf-route.ts");
     assert.match(route, /allowFallback = options\?\.allowFallback \?\? true/);
