@@ -50,7 +50,10 @@ describe("Quote-PDF-1 chromium / download reliability", () => {
     assert.match(chromium, /"shell"/);
     assert.match(chromium, /setGraphicsMode\s*=\s*false/);
     assert.match(chromium, /puppeteer\.defaultArgs\(/);
-    assert.match(chromium, /outputFileTracingIncludes|sparticuz-bin-check/);
+    assert.match(chromium, /sparticuz-bin-check/);
+    assert.match(chromium, /prepareVercelChromiumSharedLibs|extract-al2023|libnspr4/);
+    assert.match(chromium, /LD_LIBRARY_PATH/);
+    assert.match(chromium, /inflate\(/);
 
     const adminRoute = read("src/app/api/quotes/[id]/pdf/route.ts");
     const publicRoute = read("src/app/api/quotes/public/[token]/pdf/route.ts");

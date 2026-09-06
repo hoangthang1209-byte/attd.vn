@@ -1,8 +1,13 @@
 import "server-only";
 
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import puppeteer, { type Browser, type PDFOptions } from "puppeteer-core";
-import chromium from "@sparticuz/chromium";
+import chromium, {
+  inflate,
+  setupLambdaEnvironment,
+} from "@sparticuz/chromium";
 import { QuotePdfChromiumError } from "@/features/quotes/pdf/quote-pdf-chromium-error";
 
 export const QUOTE_PDF_VIEWPORT = {
@@ -46,20 +51,88 @@ export function isValidQuotePdfBuffer(buffer: Buffer, minBytes = QUOTE_MIN_PDF_B
   );
 }
 
+function sparticuzBinDir(): string {
+  return join(process.cwd(), "node_modules", "@sparticuz", "chromium", "bin");
+}
+
 function assertSparticuzBinPresent(traceId: string): void {
-  const binDir = `${process.cwd()}/node_modules/@sparticuz/chromium/bin`;
-  const chromiumBr = `${binDir}/chromium.br`;
+  const binDir = sparticuzBinDir();
+  const chromiumBr = join(binDir, "chromium.br");
+  const al2023Br = join(binDir, "al2023.tar.br");
   const binExists = existsSync(binDir);
   const brExists = existsSync(chromiumBr);
+  const alExists = existsSync(al2023Br);
   logChromiumStage(traceId, "sparticuz-bin-check", {
     binDir,
     binExists,
     chromiumBrExists: brExists,
+    al2023BrExists: alExists,
   });
   if (!binExists || !brExists) {
     throw new QuotePdfChromiumError(
       traceId,
       `Chromium binary pack missing at ${binDir}. Ensure @sparticuz/chromium is externalized and included in outputFileTracingIncludes.`,
+    );
+  }
+  if (!alExists) {
+    throw new QuotePdfChromiumError(
+      traceId,
+      `AL2023 shared-library pack missing at ${al2023Br}. Required for libnspr4.so on Vercel.`,
+    );
+  }
+}
+
+/**
+ * Vercel Fluid / serverless often leaves /tmp/chromium from a prior warm start
+ * while AL2023 libs were never extracted (or were wiped). Also re-apply
+ * LD_LIBRARY_PATH immediately before launch — module-load setup can be stale.
+ */
+async function prepareVercelChromiumSharedLibs(traceId: string): Promise<void> {
+  // Helps older detection paths; v149 also keys off VERCEL + Node >= 20.
+  if (!process.env.AWS_LAMBDA_JS_RUNTIME?.trim()) {
+    const major = process.versions.node.split(".")[0] ?? "22";
+    process.env.AWS_LAMBDA_JS_RUNTIME = `nodejs${major}.x`;
+  }
+
+  const alRoot = join(tmpdir(), "al2023");
+  const alLibDir = join(alRoot, "lib");
+  const nsprPath = join(alLibDir, "libnspr4.so");
+  const chromiumPath = join(tmpdir(), "chromium");
+
+  if (!existsSync(nsprPath)) {
+    logChromiumStage(traceId, "extract-al2023:start", {
+      chromiumExists: existsSync(chromiumPath),
+      alRootExists: existsSync(alRoot),
+    });
+    // inflate() short-circuits when /tmp/al2023 exists — remove incomplete trees.
+    if (existsSync(alRoot)) {
+      rmSync(alRoot, { recursive: true, force: true });
+    }
+    await inflate(join(sparticuzBinDir(), "al2023.tar.br"));
+  }
+
+  setupLambdaEnvironment(alLibDir);
+
+  const ldParts = [
+    alLibDir,
+    tmpdir(),
+    ...(process.env.LD_LIBRARY_PATH ?? "").split(":").filter(Boolean),
+  ];
+  process.env.LD_LIBRARY_PATH = [...new Set(ldParts)].join(":");
+
+  const libReady = existsSync(nsprPath);
+  logChromiumStage(traceId, "lambda-libs-ready", {
+    libnspr4Exists: libReady,
+    chromiumExists: existsSync(chromiumPath),
+    ldLibraryPath: process.env.LD_LIBRARY_PATH,
+    awsLambdaJsRuntime: process.env.AWS_LAMBDA_JS_RUNTIME ?? null,
+    nodeMajor: process.versions.node.split(".")[0] ?? null,
+  });
+
+  if (!libReady) {
+    throw new QuotePdfChromiumError(
+      traceId,
+      "AL2023 libnspr4.so missing after extract; Chromium cannot launch on Vercel.",
     );
   }
 }
@@ -72,6 +145,7 @@ export async function resolveChromiumExecutablePath(
 
   if (isVercelRuntime()) {
     assertSparticuzBinPresent(traceId);
+    await prepareVercelChromiumSharedLibs(traceId);
     const executablePath = await chromium.executablePath();
     if (!executablePath) {
       throw new QuotePdfChromiumError(
@@ -79,6 +153,8 @@ export async function resolveChromiumExecutablePath(
         "Không tìm thấy Chrome/Chromium để tạo PDF. (Vercel path missing)",
       );
     }
+    // Re-apply after extract — warm-start early-return skips package-side setup timing.
+    await prepareVercelChromiumSharedLibs(traceId);
     logChromiumStage(traceId, "resolve-executable-path:success", {
       executablePath,
       executableExists: existsSync(executablePath),
@@ -156,6 +232,7 @@ export async function launchChromiumBrowser(
   // @sparticuz/chromium ships chrome-headless-shell which only supports headless:"shell".
   if (isVercelRuntime()) {
     chromium.setGraphicsMode = false;
+    await prepareVercelChromiumSharedLibs(traceId);
   }
 
   const headlessMode: boolean | "shell" = isVercelRuntime() ? "shell" : true;
@@ -187,11 +264,20 @@ export async function launchChromiumBrowser(
       headless: headlessMode,
       defaultViewport: viewport,
       acceptInsecureCerts: false,
+      env: {
+        ...process.env,
+        // Child process must see AL2023 libs (libnspr4.so / libnss3.so).
+        LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH,
+        FONTCONFIG_PATH:
+          process.env.FONTCONFIG_PATH ?? join(tmpdir(), "fonts"),
+        HOME: process.env.HOME ?? tmpdir(),
+      },
     });
 
     logChromiumStage(traceId, "launch-browser:success", {
       headless: headlessMode,
       argCount: args.length,
+      ldLibraryPath: process.env.LD_LIBRARY_PATH ?? null,
     });
     return browser;
   } catch (error) {
@@ -199,6 +285,8 @@ export async function launchChromiumBrowser(
       traceId,
       executablePath,
       executableExists: existsSync(executablePath),
+      libnspr4Exists: existsSync(join(tmpdir(), "al2023", "lib", "libnspr4.so")),
+      ldLibraryPath: process.env.LD_LIBRARY_PATH ?? null,
       headless: headlessMode,
       argCount: args.length,
       argsSample: args.slice(0, 12),
