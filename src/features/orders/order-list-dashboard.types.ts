@@ -68,12 +68,20 @@ export type OrderListDashboardSummary = {
   quickFilters: OrderListQuickFilterChip[];
 };
 
+export type OrderListCustomerFilter = {
+  id: string;
+  name: string;
+  code: string;
+};
+
 export type OrderListDashboardResponse = {
   orders: OrderListDashboardRow[];
   total: number;
   page: number;
   pageSize: number;
   summary: OrderListDashboardSummary;
+  /** Present when the list is filtered by an exact customerId. */
+  customerFilter?: OrderListCustomerFilter | null;
   permissions: {
     canViewFinancials: boolean;
     canCreateOrders: boolean;
@@ -83,6 +91,8 @@ export type OrderListDashboardResponse = {
 
 export type OrderListDashboardParams = {
   search?: string;
+  /** Exact Order.customerId filter (cuid). */
+  customerId?: string;
   status?: OrderStatus;
   paymentState?: OrderPaymentStateFilter;
   quickFilter?: OrderListQuickFilter;

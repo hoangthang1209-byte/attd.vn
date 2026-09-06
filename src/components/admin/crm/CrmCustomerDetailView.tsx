@@ -18,8 +18,7 @@ import {
 } from "@/components/admin/crm/CustomerBadges";
 import { useCustomerTypeOptions } from "@/components/admin/crm/useCustomerTypeOptions";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
-import CrmRelatedQuotes from "@/components/admin/crm/CrmRelatedQuotes";
-import CrmRelatedOrders from "@/components/admin/crm/CrmRelatedOrders";
+import CustomerAccountWorkspace from "@/components/admin/crm/CustomerAccountWorkspace";
 import {
   CUSTOMER_STATUS_LABELS,
   REPRESENTATIVE_SALUTATION_LABELS,
@@ -36,6 +35,7 @@ import {
   type CrmContactRecord,
   type CrmCustomerRecord,
 } from "@/features/crm/types";
+import type { CustomerAccountOverview } from "@/features/crm/customer-account-overview.types";
 
 function toAddressValues(customer: CrmCustomerRecord): CrmAddressFieldValues {
   return {
@@ -53,8 +53,10 @@ function toAddressValues(customer: CrmCustomerRecord): CrmAddressFieldValues {
 
 export default function CrmCustomerDetailView({
   initialCustomer,
+  overview,
 }: {
   initialCustomer: CrmCustomerRecord;
+  overview: CustomerAccountOverview;
 }) {
   const mutate = useAdminMutation();
   const { types: customerTypes, loading: typesLoading } = useCustomerTypeOptions(true);
@@ -212,15 +214,72 @@ export default function CrmCustomerDetailView({
         </p>
       )}
 
-      <div className="admin-crm-placeholder-grid">
-        <CrmRelatedQuotes
-          customerId={customer.id}
-          createHref={`/admin/quotes/new?customerId=${customer.id}`}
-        />
-        <CrmRelatedOrders customerId={customer.id} />
-      </div>
+      <CustomerAccountWorkspace overview={overview} />
 
       <div className="admin-crm-detail-grid">
+        <section className="admin-section-card">
+          <div className="admin-section-header">
+            <h3>Người liên hệ</h3>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--small"
+              onClick={() => {
+                setEditingContact(null);
+                setContactDialogOpen(true);
+              }}
+            >
+              Thêm người liên hệ
+            </button>
+          </div>
+          <div className="admin-crm-contact-list">
+            {(customer.contacts ?? []).map((contact) => (
+              <article key={contact.id} className="admin-crm-contact-card">
+                <div>
+                  <strong>{contact.fullName}</strong>
+                  {contact.isPrimary && <span className="admin-badge admin-badge--primary">Chính</span>}
+                  <p className="admin-field-hint">
+                    {[contact.title, contact.department].filter(Boolean).join(" · ") || "—"}
+                  </p>
+                  <p className="admin-field-hint">
+                    {[contact.phone, contact.email, contact.zalo ? `Zalo: ${contact.zalo}` : null]
+                      .filter(Boolean)
+                      .join(" · ") || "—"}
+                  </p>
+                </div>
+                <div className="admin-crm-contact-card__actions">
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary admin-btn--small"
+                    onClick={() => {
+                      setEditingContact(contact);
+                      setContactDialogOpen(true);
+                    }}
+                  >
+                    Sửa
+                  </button>
+                  {!contact.isPrimary && (
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--secondary admin-btn--small"
+                      onClick={() => void handleSetPrimary(contact.id)}
+                    >
+                      Đặt chính
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--danger admin-btn--small"
+                    onClick={() => void handleDeleteContact(contact.id)}
+                  >
+                    Xóa
+                  </button>
+                </div>
+              </article>
+            ))}
+            {!customer.contacts?.length && <p className="admin-field-hint">Chưa có người liên hệ</p>}
+          </div>
+        </section>
+
         <section className="admin-section-card">
           <h3>A. Thông tin doanh nghiệp</h3>
           <div className="admin-form admin-form--compact admin-form-grid">
@@ -352,67 +411,6 @@ export default function CrmCustomerDetailView({
         </section>
 
         <section className="admin-section-card">
-          <div className="admin-section-header">
-            <h3>C. Người liên hệ</h3>
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary admin-btn--small"
-              onClick={() => {
-                setEditingContact(null);
-                setContactDialogOpen(true);
-              }}
-            >
-              Thêm người liên hệ
-            </button>
-          </div>
-          <div className="admin-crm-contact-list">
-            {(customer.contacts ?? []).map((contact) => (
-              <article key={contact.id} className="admin-crm-contact-card">
-                <div>
-                  <strong>{contact.fullName}</strong>
-                  {contact.isPrimary && <span className="admin-badge admin-badge--primary">Chính</span>}
-                  <p className="admin-field-hint">
-                    {[contact.title, contact.department].filter(Boolean).join(" · ") || "—"}
-                  </p>
-                  <p className="admin-field-hint">
-                    {[contact.phone, contact.email].filter(Boolean).join(" · ") || "—"}
-                  </p>
-                </div>
-                <div className="admin-crm-contact-card__actions">
-                  <button
-                    type="button"
-                    className="admin-btn admin-btn--secondary admin-btn--small"
-                    onClick={() => {
-                      setEditingContact(contact);
-                      setContactDialogOpen(true);
-                    }}
-                  >
-                    Sửa
-                  </button>
-                  {!contact.isPrimary && (
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn--secondary admin-btn--small"
-                      onClick={() => void handleSetPrimary(contact.id)}
-                    >
-                      Đặt chính
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="admin-btn admin-btn--danger admin-btn--small"
-                    onClick={() => void handleDeleteContact(contact.id)}
-                  >
-                    Xóa
-                  </button>
-                </div>
-              </article>
-            ))}
-            {!customer.contacts?.length && <p className="admin-field-hint">Chưa có người liên hệ</p>}
-          </div>
-        </section>
-
-        <section className="admin-section-card">
           <h3>D. Ghi chú</h3>
           <div className="admin-form admin-form--compact">
             <label>
@@ -448,15 +446,15 @@ export default function CrmCustomerDetailView({
         </section>
 
         <section className="admin-section-card">
-          <h3>Hoạt động</h3>
-          <CrmAddActivityForm customerId={customer.id} onCreated={() => void refreshCustomer()} />
-          <CrmActivityTimeline activities={customer.activities ?? []} />
-        </section>
-
-        <section className="admin-section-card">
           <h3>Nhu cầu sản phẩm</h3>
           <CrmProductInterestForm customerId={customer.id} onCreated={() => void refreshCustomer()} />
           <CrmProductInterestList interests={customer.productInterests ?? []} />
+        </section>
+
+        <section className="admin-section-card">
+          <h3>Hoạt động</h3>
+          <CrmAddActivityForm customerId={customer.id} onCreated={() => void refreshCustomer()} />
+          <CrmActivityTimeline activities={customer.activities ?? []} />
         </section>
       </div>
 

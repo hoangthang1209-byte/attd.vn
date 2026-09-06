@@ -84,6 +84,11 @@ function buildSearchWhere(search?: string): Prisma.OrderWhereInput {
   };
 }
 
+function buildCustomerIdWhere(customerId?: string): Prisma.OrderWhereInput {
+  if (!customerId) return {};
+  return { customerId };
+}
+
 function deliveryDeadlineRelative(expectedAt: Date | null, now: Date): {
   label: string;
   tone: OrderListDashboardRow["deliveryDeadlineTone"];
@@ -552,11 +557,14 @@ export async function listOrderDashboard(
   const employeeId = session.employeeId ?? null;
   const canViewFinancials = options?.canViewFinancials ?? false;
 
+  const customerIdWhere = buildCustomerIdWhere(params.customerId);
+
   const baseWhere: Prisma.OrderWhereInput = {
     AND: [
       scopeWhere,
       { status: { in: ACTIVE_STATUSES } },
       buildSearchWhere(params.search),
+      customerIdWhere,
       params.status ? { status: params.status } : {},
       params.mine && employeeId
         ? {
@@ -570,16 +578,26 @@ export async function listOrderDashboard(
     ],
   };
 
-  const [rows, scopeRows] = await Promise.all([
+  const summaryWhere: Prisma.OrderWhereInput = {
+    AND: [scopeWhere, { status: { in: ACTIVE_STATUSES } }, customerIdWhere],
+  };
+
+  const [rows, scopeRows, customerFilterRow] = await Promise.all([
     prisma.order.findMany({
       where: baseWhere,
       include: orderInclude,
       orderBy: [{ productionDueDate: "asc" }, { createdAt: "desc" }],
     }),
     prisma.order.findMany({
-      where: { AND: [scopeWhere, { status: { in: ACTIVE_STATUSES } }] },
+      where: summaryWhere,
       include: orderInclude,
     }),
+    params.customerId
+      ? prisma.customer.findUnique({
+          where: { id: params.customerId },
+          select: { id: true, name: true, code: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   let enrichedAll = await enrichOrders(rows, now);
@@ -615,6 +633,15 @@ export async function listOrderDashboard(
     page,
     pageSize,
     summary,
+    customerFilter: customerFilterRow
+      ? {
+          id: customerFilterRow.id,
+          name: customerFilterRow.name,
+          code: customerFilterRow.code,
+        }
+      : params.customerId
+        ? { id: params.customerId, name: "Khách hàng", code: params.customerId }
+        : null,
     permissions: {
       canViewFinancials,
       canCreateOrders: options?.canCreateOrders ?? false,

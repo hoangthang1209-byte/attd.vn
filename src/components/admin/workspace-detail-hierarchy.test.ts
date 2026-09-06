@@ -67,9 +67,11 @@ describe("IA-4D detail workspace hierarchy", () => {
     const page = read("src/app/(backend)/admin/crm/customers/[id]/page.tsx");
     const view = read("src/components/admin/crm/CrmCustomerDetailView.tsx");
     assert.match(page, /AdminPageTitle title="Khách hàng"/);
+    assert.match(page, /getCustomerAccountOverview/);
     assert.match(view, /<h2>\{customer\.name\}<\/h2>/);
     assert.match(view, /customer\.code/);
     assert.match(view, /CustomerStatusBadge/);
+    assert.match(view, /CustomerAccountWorkspace/);
     assert.doesNotMatch(view, /<h1\b/);
   });
 

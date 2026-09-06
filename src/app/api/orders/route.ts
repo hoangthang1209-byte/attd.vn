@@ -14,6 +14,7 @@ import {
   listOrders,
   OrderValidationError,
 } from "@/features/orders/order.service";
+import { parseOrderListCustomerId } from "@/features/orders/order-list-customer-id";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
@@ -24,6 +25,11 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const paymentState = searchParams.get("paymentState");
+  const customerIdRaw = searchParams.get("customerId");
+  const customerId = parseOrderListCustomerId(customerIdRaw);
+  if (customerIdRaw?.trim() && !customerId) {
+    return NextResponse.json({ message: "customerId không hợp lệ" }, { status: 400 });
+  }
   try {
     const result = await listOrders({
       search: searchParams.get("search") ?? undefined,
@@ -31,7 +37,7 @@ export async function GET(req: NextRequest) {
       paymentState: paymentState
         ? (paymentState as OrderPaymentStateFilter)
         : undefined,
-      customerId: searchParams.get("customerId") ?? undefined,
+      customerId,
       leadId: searchParams.get("leadId") ?? undefined,
       page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
       pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : 50,

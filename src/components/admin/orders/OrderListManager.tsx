@@ -51,6 +51,7 @@ function useListFilters() {
   const filters = useMemo(
     () => ({
       search: searchParams.get("search") ?? "",
+      customerId: searchParams.get("customerId") ?? "",
       status: (searchParams.get("status") as OrderStatus | null) ?? "",
       paymentState: (searchParams.get("paymentState") as OrderPaymentStateFilter | null) ?? "",
       quickFilter: (searchParams.get("quickFilter") as OrderListQuickFilter | null) ?? "all",
@@ -68,6 +69,11 @@ function useListFilters() {
       for (const [key, value] of Object.entries(merged)) {
         if (key === "page" && (!value || value === 1)) {
           params.delete("page");
+          continue;
+        }
+        if (key === "mine") {
+          if (value) params.set("mine", "1");
+          else params.delete("mine");
           continue;
         }
         if (!value || value === "all" || value === "") params.delete(key);
@@ -92,6 +98,7 @@ function useListFilters() {
 function buildQueryString(filters: ReturnType<typeof useListFilters>["filters"]) {
   const params = new URLSearchParams();
   if (filters.search.trim()) params.set("search", filters.search.trim());
+  if (filters.customerId.trim()) params.set("customerId", filters.customerId.trim());
   if (filters.status) params.set("status", filters.status);
   if (filters.paymentState) params.set("paymentState", filters.paymentState);
   if (filters.quickFilter && filters.quickFilter !== "all") {
@@ -157,6 +164,7 @@ export default function OrderListManager() {
   const canViewFinancials = data?.permissions.canViewFinancials ?? permissions.canViewFinancials;
   const canCreateOrders = data?.permissions.canCreateOrders ?? permissions.canCreateOrders;
   const canViewCrm = permissions.canViewCrm;
+  const customerFilter = data?.customerFilter ?? null;
 
   const activeQuick =
     filters.kpi ? null : filters.mine ? "mine" : filters.quickFilter || "all";
@@ -246,6 +254,36 @@ export default function OrderListManager() {
             </span>
           )}
         </div>
+
+        {filters.customerId && (
+          <div className="order-ops-customer-filter" role="status">
+            <span>
+              Đang lọc theo khách hàng:{" "}
+              <strong>
+                {customerFilter
+                  ? `${customerFilter.code} — ${customerFilter.name}`
+                  : filters.customerId}
+              </strong>
+            </span>
+            <div className="order-ops-customer-filter__actions">
+              {canViewCrm && (
+                <Link
+                  href={`/admin/crm/customers/${filters.customerId}`}
+                  className="admin-btn admin-btn--secondary admin-btn--xs"
+                >
+                  Mở khách hàng
+                </Link>
+              )}
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-btn--xs"
+                onClick={() => update({ customerId: "", page: 1 })}
+              >
+                Bỏ lọc khách hàng
+              </button>
+            </div>
+          </div>
+        )}
 
         {advancedOpen && (
           <p className="order-ops-controls__hint admin-field-hint">

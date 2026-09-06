@@ -4,6 +4,7 @@ import type { OrderPaymentStateFilter } from "@/features/orders/order-labels";
 import { can, canViewOrderFinancials } from "@/features/auth/admin-permissions";
 import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
+import { parseOrderListCustomerId } from "@/features/orders/order-list-customer-id";
 import { listOrderDashboard } from "@/features/orders/order-list-dashboard.service";
 import type {
   OrderListKpiKey,
@@ -41,12 +42,19 @@ export async function GET(req: NextRequest) {
   const quickRaw = searchParams.get("quickFilter");
   const statusRaw = searchParams.get("status");
   const paymentRaw = searchParams.get("paymentState");
+  const customerIdRaw = searchParams.get("customerId");
+  const customerId = parseOrderListCustomerId(customerIdRaw);
+
+  if (customerIdRaw?.trim() && !customerId) {
+    return NextResponse.json({ message: "customerId không hợp lệ" }, { status: 400 });
+  }
 
   try {
     const result = await listOrderDashboard(
       session,
       {
         search: searchParams.get("search") ?? undefined,
+        customerId,
         status: statusRaw ? (statusRaw as OrderStatus) : undefined,
         paymentState: paymentRaw ? (paymentRaw as OrderPaymentStateFilter) : undefined,
         quickFilter:

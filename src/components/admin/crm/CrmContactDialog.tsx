@@ -27,6 +27,7 @@ export default function CrmContactDialog({
   const [department, setDepartment] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [zalo, setZalo] = useState("");
   const [note, setNote] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +39,7 @@ export default function CrmContactDialog({
     setDepartment(contact?.department ?? "");
     setPhone(contact?.phone ?? "");
     setEmail(contact?.email ?? "");
+    setZalo(contact?.zalo ?? "");
     setNote(contact?.note ?? "");
     setIsPrimary(contact?.isPrimary ?? false);
     setError(null);
@@ -54,6 +56,7 @@ export default function CrmContactDialog({
       department: department || null,
       phone: phone || null,
       email: email || null,
+      zalo: zalo || null,
       note: note || null,
       isPrimary,
     };
@@ -109,6 +112,10 @@ export default function CrmContactDialog({
         <div className="admin-field">
           <label className="admin-label">Email</label>
           <input className="admin-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="admin-field">
+          <label className="admin-label">Zalo</label>
+          <input className="admin-input" value={zalo} onChange={(e) => setZalo(e.target.value)} />
         </div>
         <div className="admin-field">
           <label className="admin-label">Ghi chú</label>
