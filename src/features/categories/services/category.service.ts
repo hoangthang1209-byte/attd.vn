@@ -1,5 +1,9 @@
-import { unstable_noStore as noStore } from "next/cache";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CACHE_TAGS,
+} from "@/lib/public-cache-tags";
 import { sumDescendantProductCountsSafe } from "@/features/categories/category-product-count.utils";
 import {
   filterPubliclyActiveCategoryTree,
@@ -80,13 +84,12 @@ type CategoryRow = Awaited<
 >[number];
 
 /**
- * Fresh CMS parent/child category tree.
- * Used by mega menu, mobile nav, and `/san-pham` filter sidebar.
+ * CMS parent/child category tree (uncached DB read).
+ * Used to build the public tree; do not call from public routes directly —
+ * prefer getPublicCmsCategoryTree() which is tagged/cached.
  * Source: `/admin/products/categories` — parentId null = parent, parentId set = child.
  */
 export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
-  noStore();
-
   const categories = await prisma.category.findMany({
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     include: cmsCategoryInclude,
@@ -154,12 +157,20 @@ export async function getCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
   }));
 }
 
-export async function getPublicCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
+async function loadPublicCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
   const [tree, visibilityNodes] = await Promise.all([
     getCmsCategoryTree(),
     loadCategoryVisibilityNodes(),
   ]);
   return filterPubliclyActiveCategoryTree(tree, visibilityNodes);
+}
+
+/** Public category tree for mega menu, catalog filters, and homepage grids. */
+export async function getPublicCmsCategoryTree(): Promise<CmsCategoryTreeNode[]> {
+  return unstable_cache(loadPublicCmsCategoryTree, ["public-cms-category-tree"], {
+    tags: [PUBLIC_CACHE_TAGS.categories],
+    revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+  })();
 }
 
 export type CatalogCategoryFilterChild = {

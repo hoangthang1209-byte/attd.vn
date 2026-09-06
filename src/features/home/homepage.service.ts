@@ -1,15 +1,20 @@
+import { unstable_cache } from "next/cache";
 import { buildHomepageChildCategoryGrid } from "@/features/home/homepage-category.utils";
 import {
   getPublicCmsCategoryTree,
   type CmsCategoryTreeNode,
 } from "@/features/categories/services/category.service";
-import { getProductsForPublicListing } from "@/features/products/services/product.service";
+import { getHomepageLatestProducts } from "@/features/products/services/product.service";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import { mapProductCardAvailableColors } from "@/features/products/product-card-color-swatches";
 import { getPublishedBlogPosts } from "@/features/blog/services/blog-public.service";
 import { catalogCategoryHref } from "@/lib/marketplaceCategoryTree";
 import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
 import { isValidImageSrc } from "@/lib/imagePaths";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CACHE_TAGS,
+} from "@/lib/public-cache-tags";
 import type {
   HomepageBlogPostItem,
   HomepageCategoryItem,
@@ -61,9 +66,7 @@ const AVAILABILITY_LABELS = {
   OUT_OF_STOCK: "Hết hàng",
 } as const;
 
-type PublicListingProduct = Awaited<
-  ReturnType<typeof getProductsForPublicListing>
->["products"][number];
+type HomepageProductCard = Awaited<ReturnType<typeof getHomepageLatestProducts>>[number];
 
 function resolveMediaImageUrl(asset: {
   url: string;
@@ -397,7 +400,7 @@ function mapWorkshopGallery(row: {
 }
 
 /** Load full homepage CMS configuration with safe defaults (read-only). */
-export async function getHomepageCmsConfig(): Promise<HomepageCmsConfig> {
+async function loadHomepageCmsConfigFromDb(): Promise<HomepageCmsConfig> {
   try {
     const row = await prisma.homepageSettings.findUnique({
       where: { id: HOMEPAGE_ID },
@@ -477,6 +480,20 @@ export async function getHomepageCmsConfig(): Promise<HomepageCmsConfig> {
     return getDefaultHomepageCmsConfig();
   }
 }
+
+/** Uncached — used by Admin CMS editors and mutation read-your-writes. */
+export async function getHomepageCmsConfig(): Promise<HomepageCmsConfig> {
+  return loadHomepageCmsConfigFromDb();
+}
+
+const getCachedHomepageCmsConfig = unstable_cache(
+  loadHomepageCmsConfigFromDb,
+  ["public-homepage-cms"],
+  {
+    tags: [PUBLIC_CACHE_TAGS.homepage],
+    revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+  },
+);
 
 export async function getHomepageHeroConfig(): Promise<HomepageHeroConfig> {
   const cms = await getHomepageCmsConfig();
@@ -804,7 +821,7 @@ function mapParentCategory(parent: CmsCategoryTreeNode): HomepageCategoryItem | 
   };
 }
 
-function deriveAvailabilityLabel(variants: PublicListingProduct["variants"]): string | null {
+function deriveAvailabilityLabel(variants: HomepageProductCard["variants"]): string | null {
   if (variants.length === 0) return null;
   const statuses = variants.map((variant) => variant.stockStatus);
   if (statuses.includes("IN_STOCK")) return AVAILABILITY_LABELS.IN_STOCK;
@@ -813,7 +830,7 @@ function deriveAvailabilityLabel(variants: PublicListingProduct["variants"]): st
   return null;
 }
 
-function mapProduct(product: PublicListingProduct): HomepageProductItem {
+function mapProduct(product: HomepageProductCard): HomepageProductItem {
   const primaryImage = getPrimaryProductImageFromProduct(product);
   const hoverImage = getProductCardHoverImageFromProduct(product);
   const imageAlt = product.images[0]?.altText?.trim() || product.name;
@@ -859,14 +876,13 @@ function mapBlogPost(post: {
 }
 
 /** Single CMS-backed data loader for the public homepage. */
-export async function getHomepageData(): Promise<HomepageData> {
-  const [{ products }, categoryTree, { posts: blogPostsRaw }, cms] =
-    await Promise.all([
-      getProductsForPublicListing({ page: 1, perPage: 12 }),
-      getPublicCmsCategoryTree(),
-      getPublishedBlogPosts(1, 3),
-      getHomepageCmsConfig(),
-    ]);
+async function loadHomepageData(): Promise<HomepageData> {
+  const [products, categoryTree, { posts: blogPostsRaw }, cms] = await Promise.all([
+    getHomepageLatestProducts(12),
+    getPublicCmsCategoryTree(),
+    getPublishedBlogPosts(1, 3),
+    getCachedHomepageCmsConfig(),
+  ]);
 
   const categories = categoryTree
     .map(mapParentCategory)
@@ -884,6 +900,18 @@ export async function getHomepageData(): Promise<HomepageData> {
     latestProducts: products.map(mapProduct),
     blogPosts: blogPostsRaw.map(mapBlogPost),
   };
+}
+
+export async function getHomepageData(): Promise<HomepageData> {
+  return unstable_cache(loadHomepageData, ["public-homepage-data"], {
+    tags: [
+      PUBLIC_CACHE_TAGS.homepage,
+      PUBLIC_CACHE_TAGS.categories,
+      PUBLIC_CACHE_TAGS.products,
+      PUBLIC_CACHE_TAGS.blog,
+    ],
+    revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+  })();
 }
 
 export type EditorialSectionKey = "proof" | "pathways";

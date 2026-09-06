@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { revalidatePublicCategoryCache } from "@/features/categories/revalidate-public-category-cache";
 
 export async function createCategory(
   name: string,
@@ -15,6 +16,7 @@ export async function createCategory(
   });
 
   revalidatePath("/admin/danh-muc");
+  revalidatePublicCategoryCache();
 }
 
 export async function deleteCategory(
@@ -27,4 +29,5 @@ export async function deleteCategory(
   });
 
   revalidatePath("/admin/danh-muc");
+  revalidatePublicCategoryCache();
 }

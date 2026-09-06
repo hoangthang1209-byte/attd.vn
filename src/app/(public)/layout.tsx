@@ -8,8 +8,11 @@ import { getBrandingSettings } from "@/features/settings/services/settings.servi
 import { getMarketplaceCategoryTree } from "@/features/categories/marketplace-category-tree";
 import { getPublicSiteNavigation } from "@/features/site-navigation/site-navigation.service";
 
-/** Category tree in header must stay fresh — matches `/san-pham` CMS hierarchy. */
-export const dynamic = "force-dynamic";
+/**
+ * Public shell is visitor-shared (branding / nav / categories). Freshness comes from
+ * tagged data caches + mutation-time revalidation — not force-dynamic.
+ */
+export const revalidate = 3600;
 
 export default async function PublicLayout({
   children,

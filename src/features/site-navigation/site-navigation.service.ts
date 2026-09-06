@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import type { SiteNavCtaSlot, SiteNavPlacement } from "@prisma/client";
 import {
   DEFAULT_SITE_NAVIGATION_SETTINGS,
@@ -32,6 +33,10 @@ import {
 } from "@/lib/footer-config";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
 import { prisma } from "@/lib/prisma";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CACHE_TAGS,
+} from "@/lib/public-cache-tags";
 
 type NavItemRow = {
   id: string;
@@ -320,11 +325,18 @@ export function mapCmsConfigToPublicNavigation(
   };
 }
 
-export async function getPublicSiteNavigation(): Promise<PublicSiteNavigation> {
+async function loadPublicSiteNavigation(): Promise<PublicSiteNavigation> {
   const loaded = await loadSiteNavigationRows();
   const cms = mergeCmsConfig(loaded);
   const socialLinks = await resolvePublicSocialLinks(cms.socialLinks);
   return mapCmsConfigToPublicNavigation(cms, socialLinks);
+}
+
+export async function getPublicSiteNavigation(): Promise<PublicSiteNavigation> {
+  return unstable_cache(loadPublicSiteNavigation, ["public-site-navigation"], {
+    tags: [PUBLIC_CACHE_TAGS.navigation, PUBLIC_CACHE_TAGS.branding],
+    revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+  })();
 }
 
 async function replacePlacementItems(

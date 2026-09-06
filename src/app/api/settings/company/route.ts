@@ -5,6 +5,10 @@ import {
   upsertCompanySettings,
 } from "@/features/settings/services/settings.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
+import {
+  PUBLIC_CACHE_TAGS,
+  revalidatePublicCacheTags,
+} from "@/lib/public-cache-tags";
 
 export async function GET() {
   const settings = await getCompanySettings();
@@ -36,6 +40,7 @@ export async function PATCH(request: Request) {
       workingHours: String(body.workingHours ?? "").trim(),
     });
 
+    revalidatePublicCacheTags(PUBLIC_CACHE_TAGS.company);
     revalidatePath("/", "layout");
 
     const settings = await getCompanySettings();

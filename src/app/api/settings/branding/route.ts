@@ -7,6 +7,10 @@ import {
   getBrandingSettings,
 } from "@/features/settings/services/settings.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
+import {
+  PUBLIC_CACHE_TAGS,
+  revalidatePublicCacheTags,
+} from "@/lib/public-cache-tags";
 
 function isValidWebsiteUrl(value: string): boolean {
   const trimmed = value.trim();
@@ -129,6 +133,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: MIGRATION_MESSAGE }, { status: 503 });
     }
 
+    revalidatePublicCacheTags(PUBLIC_CACHE_TAGS.branding, PUBLIC_CACHE_TAGS.navigation);
     revalidatePath("/", "layout");
     revalidatePath("/");
 

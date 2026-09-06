@@ -1,5 +1,10 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { companyInfo as staticCompanyInfo } from "@/lib/companyInfo";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CACHE_TAGS,
+} from "@/lib/public-cache-tags";
 
 export type CompanyInfoData = {
   name: string;
@@ -50,7 +55,7 @@ function mapDbToCompanyInfo(row: {
   };
 }
 
-export async function getCompanySettings(): Promise<CompanyInfoData> {
+async function loadCompanySettings(): Promise<CompanyInfoData> {
   try {
     const row = await prisma.companySettings.findUnique({
       where: { id: "default" },
@@ -60,6 +65,19 @@ export async function getCompanySettings(): Promise<CompanyInfoData> {
     // DB unavailable — fall back to static config
   }
   return staticCompanyInfo as CompanyInfoData;
+}
+
+/** Uncached — Admin settings and mutation read-your-writes. */
+export async function getCompanySettings(): Promise<CompanyInfoData> {
+  return loadCompanySettings();
+}
+
+/** Tagged cache for public footer / JSON-LD (invalidated on company save). */
+export async function getCachedCompanySettings(): Promise<CompanyInfoData> {
+  return unstable_cache(loadCompanySettings, ["public-company-settings"], {
+    tags: [PUBLIC_CACHE_TAGS.company],
+    revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+  })();
 }
 
 export async function upsertCompanySettings(data: {
@@ -202,7 +220,7 @@ function mapDbToBranding(row: {
   };
 }
 
-export async function getBrandingSettings(): Promise<BrandingSettingsData> {
+async function loadBrandingSettings(): Promise<BrandingSettingsData> {
   try {
     const row = await prisma.brandingSettings.findUnique({
       where: { id: "default" },
@@ -212,6 +230,13 @@ export async function getBrandingSettings(): Promise<BrandingSettingsData> {
     // DB unavailable or table missing — fall back to static config
   }
   return staticBranding;
+}
+
+export async function getBrandingSettings(): Promise<BrandingSettingsData> {
+  return unstable_cache(loadBrandingSettings, ["public-branding-settings"], {
+    tags: [PUBLIC_CACHE_TAGS.branding],
+    revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+  })();
 }
 
 export async function isBrandingTableReady(): Promise<boolean> {

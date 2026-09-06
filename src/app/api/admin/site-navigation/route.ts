@@ -22,6 +22,10 @@ import {
   placementForPanel,
 } from "@/features/site-navigation/site-navigation-validation";
 import { getAdminSessionFromCookies } from "@/lib/admin-auth/get-admin-session";
+import {
+  PUBLIC_CACHE_TAGS,
+  revalidatePublicCacheTags,
+} from "@/lib/public-cache-tags";
 
 const MIGRATION_MESSAGE =
   "SiteNavigationSettings tables chưa tồn tại. Chạy prisma migrate deploy.";
@@ -42,6 +46,7 @@ async function requireCmsManagePermission() {
 }
 
 function revalidatePublicNavigation() {
+  revalidatePublicCacheTags(PUBLIC_CACHE_TAGS.navigation);
   revalidatePath("/", "layout");
   revalidatePath("/admin/site-navigation");
 }

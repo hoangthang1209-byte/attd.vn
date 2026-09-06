@@ -18,6 +18,16 @@ import type {
   HomepageSourcingPathwayConfig,
   HomepageWorkshopGalleryConfig,
 } from "@/features/home/homepage.types";
+import {
+  PUBLIC_CACHE_TAGS,
+  revalidatePublicCacheTags,
+} from "@/lib/public-cache-tags";
+
+function revalidateHomepageSurfaces() {
+  revalidatePublicCacheTags(PUBLIC_CACHE_TAGS.homepage);
+  revalidatePath("/");
+  revalidatePath("/admin/settings/homepage");
+}
 
 export async function GET() {
   const cms = await getHomepageCmsConfig();
@@ -58,8 +68,7 @@ export async function PATCH(request: Request) {
       if ("error" in result) {
         return NextResponse.json({ message: result.error }, { status: 400 });
       }
-      revalidatePath("/");
-      revalidatePath("/admin/settings/homepage");
+      revalidateHomepageSurfaces();
       return NextResponse.json({ hero: result.hero, panel: "hero" });
     }
 
@@ -74,8 +83,7 @@ export async function PATCH(request: Request) {
         secondaryCtaUrl: String(body.secondaryCtaUrl ?? "").trim(),
       });
       if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
-      revalidatePath("/");
-      revalidatePath("/admin/settings/homepage");
+      revalidateHomepageSurfaces();
       return NextResponse.json({ hero: result.hero, panel });
     }
 
@@ -86,8 +94,7 @@ export async function PATCH(request: Request) {
       }
       const result = await upsertHomepageProofConfig(items);
       if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
-      revalidatePath("/");
-      revalidatePath("/admin/settings/homepage");
+      revalidateHomepageSurfaces();
       return NextResponse.json({ proofStrip: result.proofStrip, panel });
     }
 
@@ -98,8 +105,7 @@ export async function PATCH(request: Request) {
       }
       const result = await upsertHomepagePathwaysConfig(items);
       if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
-      revalidatePath("/");
-      revalidatePath("/admin/settings/homepage");
+      revalidateHomepageSurfaces();
       return NextResponse.json({ sourcingPathways: result.sourcingPathways, panel });
     }
 
@@ -110,8 +116,7 @@ export async function PATCH(request: Request) {
       }
       const result = await upsertHomepageOemConfig(oem);
       if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
-      revalidatePath("/");
-      revalidatePath("/admin/settings/homepage");
+      revalidateHomepageSurfaces();
       return NextResponse.json({ oemBanner: result.oemBanner, panel });
     }
 
@@ -122,8 +127,7 @@ export async function PATCH(request: Request) {
       }
       const result = await upsertHomepageCompanyRealityConfig(companyReality);
       if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
-      revalidatePath("/");
-      revalidatePath("/admin/settings/homepage");
+      revalidateHomepageSurfaces();
       return NextResponse.json({ companyReality: result.companyReality, panel });
     }
 
@@ -134,8 +138,7 @@ export async function PATCH(request: Request) {
       }
       const result = await upsertHomepageWorkshopGalleryConfig(workshopGallery);
       if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
-      revalidatePath("/");
-      revalidatePath("/admin/settings/homepage");
+      revalidateHomepageSurfaces();
       return NextResponse.json({ workshopGallery: result.workshopGallery, panel });
     }
 
@@ -148,8 +151,7 @@ export async function PATCH(request: Request) {
         oemSectionOrder: Number(body.oemSectionOrder),
       });
       if ("error" in result) return NextResponse.json({ message: result.error }, { status: 400 });
-      revalidatePath("/");
-      revalidatePath("/admin/settings/homepage");
+      revalidateHomepageSurfaces();
       return NextResponse.json({ sections: result.sections, panel });
     }
 

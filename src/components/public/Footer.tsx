@@ -5,7 +5,7 @@ import FooterSocialLinks from "@/components/public/FooterSocialLinks";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import {
-  getCompanySettings,
+  getCachedCompanySettings,
   getBrandingSettings,
 } from "@/features/settings/services/settings.service";
 import { buildGoogleMapsSearchUrl, VERIFIED_EXPERIENCE_YEARS } from "@/lib/company-trust";
@@ -40,7 +40,7 @@ export default async function Footer({
   siteNavigation?: PublicSiteNavigation;
 }) {
   const [rawCompany, rawBranding] = await Promise.all([
-    getCompanySettings(),
+    getCachedCompanySettings(),
     getBrandingSettings(),
   ]);
   const company = normalizeFooterCompany(rawCompany);

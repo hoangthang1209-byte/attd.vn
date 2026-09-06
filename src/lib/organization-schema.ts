@@ -1,6 +1,6 @@
 import type { CompanyInfoData } from "@/features/settings/services/settings.service";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
-import { getCompanySettings } from "@/features/settings/services/settings.service";
+import { getCachedCompanySettings } from "@/features/settings/services/settings.service";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 import { buildGoogleMapsSearchUrl } from "@/lib/company-trust";
 import { hasCompanyField } from "@/lib/companyInfo";
@@ -59,7 +59,7 @@ export function buildOrganizationJsonLd(
 
 export async function getOrganizationJsonLd(): Promise<OrganizationJsonLd> {
   const [company, branding] = await Promise.all([
-    getCompanySettings(),
+    getCachedCompanySettings(),
     getBrandingSettings(),
   ]);
 

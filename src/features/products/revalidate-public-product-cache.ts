@@ -1,6 +1,11 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { isIndexableCategoryLanding } from "@/lib/seo/indexable-category-routes";
+import {
+  PUBLIC_CACHE_TAGS,
+  revalidatePublicCacheTags,
+  type PublicCacheTag,
+} from "@/lib/public-cache-tags";
 
 export type ProductCacheRevalidationInput = {
   productId?: string;
@@ -68,6 +73,15 @@ export function planProductCacheRevalidationPaths(input: {
 export async function revalidatePublicProductCache(
   input: ProductCacheRevalidationInput,
 ): Promise<void> {
+  const tags: PublicCacheTag[] = [
+    PUBLIC_CACHE_TAGS.products,
+    PUBLIC_CACHE_TAGS.categories,
+  ];
+  if (input.affectsHomepage) {
+    tags.push(PUBLIC_CACHE_TAGS.homepage);
+  }
+  revalidatePublicCacheTags(...tags);
+
   const categorySlugs = await resolveCategorySlugs(input);
   for (const path of planProductCacheRevalidationPaths({
     slug: input.slug,

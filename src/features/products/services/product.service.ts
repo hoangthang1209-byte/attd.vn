@@ -377,6 +377,21 @@ const PUBLIC_PRODUCT_CARD_SELECT = {
 
 export { PUBLIC_PRODUCT_CARD_SELECT, PUBLIC_PRODUCT_CARD_VARIANT_SELECT };
 
+/** Lightweight latest products for homepage discovery (no count / full category rows). */
+export async function getHomepageLatestProducts(limit = 12) {
+  const where = buildPublicProductVisibilityWhere();
+  const products = await prisma.product.findMany({
+    where,
+    select: PUBLIC_PRODUCT_CARD_SELECT,
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+
+  return products.filter(
+    (product) => !isDemoOrSampleProductMetadata(product.metadata),
+  );
+}
+
 /** Returns up to `limit` active products in the same category, excluding the given product. */
 export async function getRelatedProducts(
   categoryId: string,
