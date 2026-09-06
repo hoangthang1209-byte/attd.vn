@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { QuoteStatus } from "@prisma/client";
 import QuoteStatusBadge from "@/components/admin/quotes/QuoteStatusBadge";
-import QuoteManufacturingEvidencePicker from "@/components/admin/quotes/QuoteManufacturingEvidencePicker";
 import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
 import { QuotePartyColumns } from "@/components/quotes/QuoteDocumentSections";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
@@ -381,8 +380,6 @@ export default function QuoteDetailView({ id }: { id: string }) {
           </div>
         </fieldset>
       )}
-
-      <QuoteManufacturingEvidencePicker quoteId={id} />
 
       {quote.customerNote && <p className="admin-field-hint" style={{ marginTop: 12 }}><strong>Ghi chú gửi khách:</strong> {quote.customerNote}</p>}
       {quote.internalNote && <p className="admin-field-hint"><strong>Ghi chú nội bộ:</strong> {quote.internalNote}</p>}

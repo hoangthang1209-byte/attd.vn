@@ -1,15 +1,11 @@
 /**
  * Resolve absolute base URL for server-side Chromium to fetch the document route.
- * Priority: NEXT_PUBLIC_SITE_URL → forwarded headers → host → VERCEL_URL → local dev.
+ * Prefer the live request host (matches apex→www redirects) over a stale env value.
+ * Fallback: NEXT_PUBLIC_SITE_URL → VERCEL_URL → local dev.
  */
 export function resolveQuoteDocumentBaseUrl(
   requestHeaders?: { get(name: string): string | null },
 ): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (configured) {
-    return configured.replace(/\/$/, "");
-  }
-
   if (requestHeaders) {
     const host =
       requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim() ||
@@ -26,6 +22,11 @@ export function resolveQuoteDocumentBaseUrl(
         return `${proto}://${host}`.replace(/\/$/, "");
       }
     }
+  }
+
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, "");
   }
 
   if (process.env.VERCEL_URL?.trim()) {

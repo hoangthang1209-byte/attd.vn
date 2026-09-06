@@ -118,10 +118,6 @@ describe("batch → quote item mapping", () => {
 describe("admin quote manufacturing image bounds", () => {
   const root = process.cwd();
   const css = readFileSync(path.join(root, "src/app/globals.css"), "utf8");
-  const pickerSrc = readFileSync(
-    path.join(root, "src/components/admin/quotes/QuoteManufacturingEvidencePicker.tsx"),
-    "utf8",
-  );
   const detailSrc = readFileSync(
     path.join(root, "src/components/admin/quotes/QuoteDetailView.tsx"),
     "utf8",
@@ -134,15 +130,15 @@ describe("admin quote manufacturing image bounds", () => {
     path.join(root, "src/components/quotes/QuoteDesignThumb.tsx"),
     "utf8",
   );
+  const documentContent = readFileSync(
+    path.join(root, "src/components/quotes/QuoteDocumentContent.tsx"),
+    "utf8",
+  );
 
-  it("4. admin quote item / mfg image containers remain bounded", () => {
-    assert.match(css, /\.quote-manufacturing-picker__thumb\s*\{[\s\S]*?width:\s*56px/);
-    assert.match(css, /\.quote-manufacturing-picker__thumb\s*\{[\s\S]*?height:\s*64px/);
-    assert.match(css, /\.quote-manufacturing-picker__thumb\s*\{[\s\S]*?overflow:\s*hidden/);
-    assert.match(css, /\.quote-manufacturing-picker__img\s*\{[\s\S]*?object-fit:\s*cover/);
-    assert.match(css, /\.quote-manufacturing-picker__card-media\s*\{[\s\S]*?height:\s*120px/);
-    assert.match(css, /\.quote-manufacturing-media\s*\{[\s\S]*?height:\s*120px/);
-    assert.match(css, /\.quote-manufacturing-media__img\s*\{[\s\S]*?object-fit:\s*cover/);
+  it("4. quote detail no longer mounts manufacturing evidence picker", () => {
+    assert.doesNotMatch(detailSrc, /QuoteManufacturingEvidencePicker/);
+    assert.doesNotMatch(documentContent, /QuoteDocumentManufacturingEvidence/);
+    assert.match(publicMfgSrc, /return null/);
   });
 
   it("5. two quote items render as two rows (detail maps items)", () => {
@@ -151,25 +147,20 @@ describe("admin quote manufacturing image bounds", () => {
     assert.match(detailSrc, /Sản phẩm \/ dịch vụ/);
   });
 
-  it("6. no full-page Image fill positioning in manufacturing picker", () => {
-    assert.doesNotMatch(pickerSrc, /\bfill\b/);
-    assert.match(pickerSrc, /width=\{56\}/);
-    assert.match(pickerSrc, /height=\{64\}/);
-    assert.match(pickerSrc, /className="quote-manufacturing-picker__img"/);
-    const imgBlock = css.match(/\.quote-manufacturing-picker__img\s*\{[\s\S]*?\}/);
-    assert.ok(imgBlock);
-    assert.doesNotMatch(imgBlock[0], /100vw|100vh|position:\s*fixed|position:\s*absolute/);
-  });
-
-  it("8. public quote design thumb stays bounded; manufacturing uses media class", () => {
+  it("6. bounded design thumbs remain; no viewport image sizing", () => {
     assert.match(designThumbSrc, /quote-doc__design-thumb/);
     assert.match(designThumbSrc, /width=\{56\}/);
     assert.match(designThumbSrc, /height=\{64\}/);
-    assert.match(publicMfgSrc, /quote-manufacturing-media__img/);
+    assert.match(css, /\.quote-doc__design-thumb\s*\{[\s\S]*?width:\s*56px/);
+    assert.doesNotMatch(css, /\.quote-doc__design-thumb[^}]*100vw/);
+  });
+
+  it("8. public quote design thumb stays bounded", () => {
+    assert.match(designThumbSrc, /quote-doc__design-thumb/);
     assert.match(css, /\.quote-doc__design-thumb\s*\{[\s\S]*?width:\s*56px/);
   });
 
-  it("9. PDF/print manufacturing media remains height-capped", () => {
+  it("9. legacy manufacturing media CSS remains capped if ever re-enabled", () => {
     assert.match(
       css,
       /\.quote-doc--pdf\s+\.quote-manufacturing-media__img[\s\S]*?max-height:\s*88px/,

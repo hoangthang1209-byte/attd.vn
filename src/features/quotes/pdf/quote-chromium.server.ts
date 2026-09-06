@@ -142,14 +142,28 @@ export async function launchChromiumBrowser(
 ): Promise<Browser> {
   logChromiumStage(traceId, "launch-browser:start", { executablePath });
 
+  // @sparticuz/chromium ships chrome-headless-shell which only supports headless:"shell".
+  // Using headless:true (new headless) fails immediately on Vercel.
+  if (isVercelRuntime()) {
+    chromium.setGraphicsMode = false;
+  }
+
+  const headlessMode: boolean | "shell" = isVercelRuntime() ? "shell" : true;
+  const args = isVercelRuntime()
+    ? await puppeteer.defaultArgs({ args: chromium.args, headless: "shell" })
+    : getLaunchArgs();
+
   const browser = await puppeteer.launch({
-    args: getLaunchArgs(),
+    args,
     executablePath,
-    headless: true,
+    headless: headlessMode,
     defaultViewport: viewport,
   });
 
-  logChromiumStage(traceId, "launch-browser:success");
+  logChromiumStage(traceId, "launch-browser:success", {
+    headless: headlessMode,
+    argCount: args.length,
+  });
   return browser;
 }
 

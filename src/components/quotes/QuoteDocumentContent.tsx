@@ -8,7 +8,6 @@ import {
   QuotePartyColumns,
 } from "@/components/quotes/QuoteDocumentSections";
 import QuoteDocumentItemsTable from "@/components/quotes/QuoteDocumentItemsTable";
-import QuoteDocumentManufacturingEvidence from "@/components/quotes/QuoteDocumentManufacturingEvidence";
 import QuoteDocumentSummaryRow from "@/components/quotes/QuoteDocumentSummaryRow";
 import QuoteDocumentNotes from "@/components/quotes/QuoteDocumentNotes";
 
@@ -44,11 +43,6 @@ export default function QuoteDocumentContent({
       <QuotePartyColumns quote={quote} />
       <QuoteDocumentItemsTable
         quote={quote}
-        absoluteMedia={absoluteMedia}
-        mediaBaseUrl={mediaBaseUrl}
-      />
-      <QuoteDocumentManufacturingEvidence
-        items={quote.manufacturingEvidence}
         absoluteMedia={absoluteMedia}
         mediaBaseUrl={mediaBaseUrl}
       />

@@ -136,32 +136,15 @@ export async function getSelectedManufacturingAssetsForQuotePdf(
   return dedupeEvidenceItems(selectedItems).slice(0, QUOTE_MANUFACTURING_MAX_SELECTED);
 }
 
+/**
+ * Quotation documents no longer include Manufacturing Library evidence.
+ * Historical ManufacturingRelation rows are preserved; this loader is a no-op choke point
+ * so public/PDF serializers stay stable without destructive data migration.
+ */
 export async function getManufacturingAssetsForQuotePdf(
-  quoteId: string,
+  _quoteId: string,
 ): Promise<QuoteManufacturingEvidenceItem[]> {
-  const selectedItems = await getSelectedManufacturingAssetsForQuotePdf(quoteId);
-  if (selectedItems.length > 0) return selectedItems;
-
-  const fallbackRows = await prisma.manufacturingAssetDisplayLocation.findMany({
-    where: {
-      displayLocation: { key: "quote-pdf", active: true },
-      asset: {
-        status: "PUBLISHED",
-        visibility: { in: QUOTE_DOCUMENT_VISIBILITIES },
-      },
-    },
-    include: {
-      asset: { include: quoteManufacturingAssetInclude },
-    },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    take: QUOTE_MANUFACTURING_MAX_SELECTED,
-  });
-
-  return dedupeEvidenceItems(
-    fallbackRows
-      .map((row) => mapQuoteManufacturingAsset(row.asset, row.sortOrder))
-      .filter((item): item is QuoteManufacturingEvidenceItem => Boolean(item)),
-  ).slice(0, QUOTE_MANUFACTURING_MAX_SELECTED);
+  return [];
 }
 
 export async function listAvailableManufacturingAssetsForQuotePicker(): Promise<
