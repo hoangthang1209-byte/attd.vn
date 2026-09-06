@@ -60,6 +60,7 @@ describe("Quote-PDF-1 chromium / download reliability", () => {
 
     const route = read("src/features/quotes/pdf/quote-pdf-route.ts");
     assert.match(route, /allowFallback = options\?\.allowFallback \?\? true/);
+    assert.match(route, /Default ON so download works/);
     const client = read("src/features/quotes/pdf/download-quote-pdf.client.ts");
     assert.match(client, /renderer !== "pdfkit"/);
   });

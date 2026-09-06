@@ -217,8 +217,11 @@ export function quoteRouteErrorResponse(
   );
 }
 
+/** Default ON so download works when Chromium fails. Pass allowFallback=0 to disable. */
 export function parseAllowPdfFallback(
   value: string | null | undefined,
 ): boolean {
-  return value === "1";
+  if (value == null || value === "") return true;
+  if (value === "0" || value === "false") return false;
+  return value === "1" || value === "true";
 }
