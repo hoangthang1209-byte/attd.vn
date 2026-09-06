@@ -33,13 +33,19 @@ export async function downloadQuotePdfFromApi(
   }
 
   const renderer = res.headers.get("X-Quote-Pdf-Renderer");
-  if (renderer !== "chromium") {
-    console.error("[downloadQuotePdfFromApi] Non-visual PDF renderer", {
+  if (renderer !== "chromium" && renderer !== "pdfkit") {
+    console.error("[downloadQuotePdfFromApi] Unknown PDF renderer", {
       apiUrl,
       renderer,
       fallback: res.headers.get("X-Quote-Pdf-Fallback"),
     });
     throw new Error(VISUAL_PDF_ERROR);
+  }
+  if (renderer === "pdfkit") {
+    console.warn("[downloadQuotePdfFromApi] Using PDFKit fallback renderer", {
+      apiUrl,
+      fallback: res.headers.get("X-Quote-Pdf-Fallback"),
+    });
   }
 
   const contentType = res.headers.get("Content-Type") ?? "";

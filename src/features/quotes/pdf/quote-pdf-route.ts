@@ -105,7 +105,8 @@ export async function buildQuotePdfResponse(
   const itemCount = pdfData.items.length;
   const imageCount = countDesignImages(pdfData);
   const disposition = options?.disposition ?? "attachment";
-  const allowFallback = options?.allowFallback ?? false;
+  // Prefer Chromium visual PDF; if it fails, always fall back to PDFKit so download works.
+  const allowFallback = options?.allowFallback ?? true;
 
   console.info(`[quote-pdf] quoteNo=${pdfData.quoteNo}`);
   console.info(`[quote-pdf] fallback allowed=${allowFallback}`);

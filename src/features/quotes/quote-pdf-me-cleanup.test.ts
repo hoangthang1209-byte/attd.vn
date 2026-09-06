@@ -49,7 +49,7 @@ describe("Quote-PDF-1 chromium / download reliability", () => {
     assert.match(chromium, /headless:\s*headlessMode/);
     assert.match(chromium, /"shell"/);
     assert.match(chromium, /setGraphicsMode\s*=\s*false/);
-    assert.match(chromium, /puppeteer\.defaultArgs/);
+    assert.doesNotMatch(chromium, /puppeteer\.defaultArgs\(/);
 
     const adminRoute = read("src/app/api/quotes/[id]/pdf/route.ts");
     const publicRoute = read("src/app/api/quotes/public/[token]/pdf/route.ts");
@@ -57,6 +57,11 @@ describe("Quote-PDF-1 chromium / download reliability", () => {
     assert.match(publicRoute, /maxDuration\s*=\s*60/);
     assert.match(adminRoute, /runtime\s*=\s*"nodejs"/);
     assert.match(publicRoute, /runtime\s*=\s*"nodejs"/);
+
+    const route = read("src/features/quotes/pdf/quote-pdf-route.ts");
+    assert.match(route, /allowFallback = options\?\.allowFallback \?\? true/);
+    const client = read("src/features/quotes/pdf/download-quote-pdf.client.ts");
+    assert.match(client, /renderer !== "pdfkit"/);
   });
 
   it("8–9. custom style / multi-item quote mapping remains snapshot-based", () => {

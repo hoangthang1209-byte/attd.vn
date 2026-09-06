@@ -149,8 +149,16 @@ export async function launchChromiumBrowser(
   }
 
   const headlessMode: boolean | "shell" = isVercelRuntime() ? "shell" : true;
+  // Prefer package args directly — they already include --headless='shell'.
+  // Avoid puppeteer.defaultArgs double-injecting conflicting --headless flags.
   const args = isVercelRuntime()
-    ? await puppeteer.defaultArgs({ args: chromium.args, headless: "shell" })
+    ? [
+        ...chromium.args,
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--font-render-hinting=none",
+      ]
     : getLaunchArgs();
 
   const browser = await puppeteer.launch({
@@ -158,6 +166,7 @@ export async function launchChromiumBrowser(
     executablePath,
     headless: headlessMode,
     defaultViewport: viewport,
+    acceptInsecureCerts: false,
   });
 
   logChromiumStage(traceId, "launch-browser:success", {
