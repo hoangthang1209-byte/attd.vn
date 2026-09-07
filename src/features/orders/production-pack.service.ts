@@ -172,9 +172,10 @@ export async function createOrderProductionFile(
   const title = input.title?.trim() || media.filename;
   const setAsActive = input.setAsActive ?? true;
 
+  let archivedIds: string[] = [];
   const created = await prisma.$transaction(async (tx) => {
     if (setAsActive) {
-      await archiveOtherActiveVersions(tx, {
+      archivedIds = await archiveOtherActiveVersions(tx, {
         orderId: input.orderId ?? null,
         orderItemId: input.orderItemId ?? null,
         type: input.type,
@@ -204,6 +205,13 @@ export async function createOrderProductionFile(
     });
   });
 
+  if (archivedIds.length > 0) {
+    const { invalidateApprovalsForArchivedArtworkFiles } = await import(
+      "@/features/item-production-tracking/production-approval.service"
+    );
+    await invalidateApprovalsForArchivedArtworkFiles(archivedIds);
+  }
+
   return mapProductionFile(created);
 }
 
@@ -229,7 +237,7 @@ async function archiveOtherActiveVersions(
     title: string;
     excludeId: string | null;
   },
-) {
+): Promise<string[]> {
   const where: Prisma.OrderProductionFileWhereInput = {
     status: "ACTIVE",
     type: input.type,
@@ -237,10 +245,16 @@ async function archiveOtherActiveVersions(
     ...(input.orderId ? { orderId: input.orderId } : { orderItemId: input.orderItemId! }),
     ...(input.excludeId ? { id: { not: input.excludeId } } : {}),
   };
+  const toArchive = await tx.orderProductionFile.findMany({
+    where,
+    select: { id: true },
+  });
+  if (toArchive.length === 0) return [];
   await tx.orderProductionFile.updateMany({
     where,
     data: { status: "ARCHIVED" },
   });
+  return toArchive.map((f) => f.id);
 }
 
 export async function updateOrderProductionFile(
@@ -279,9 +293,10 @@ export async function updateOrderProductionFile(
   const title = input.title !== undefined ? (input.title?.trim() || existing.title) : existing.title;
   const type = input.type ?? existing.type;
 
+  let archivedIds: string[] = [];
   const updated = await prisma.$transaction(async (tx) => {
     if (input.setAsActive) {
-      await archiveOtherActiveVersions(tx, {
+      archivedIds = await archiveOtherActiveVersions(tx, {
         orderId: existing.orderId,
         orderItemId: existing.orderItemId,
         type,
@@ -311,6 +326,13 @@ export async function updateOrderProductionFile(
       },
     });
   });
+
+  if (archivedIds.length > 0) {
+    const { invalidateApprovalsForArchivedArtworkFiles } = await import(
+      "@/features/item-production-tracking/production-approval.service"
+    );
+    await invalidateApprovalsForArchivedArtworkFiles(archivedIds);
+  }
 
   return mapProductionFile(updated);
 }

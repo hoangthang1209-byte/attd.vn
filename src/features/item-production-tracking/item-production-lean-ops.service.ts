@@ -52,6 +52,8 @@ export async function applyQuickStageUpdate(input: QuickStageUpdateInput) {
       note: input.note,
       expectedRowVersion: input.expectedRowVersion,
       adminUserId: input.adminUserId,
+      adminUsername: input.adminUsername,
+      bypassReason: input.bypassReason,
     });
   }
 
@@ -61,6 +63,8 @@ export async function applyQuickStageUpdate(input: QuickStageUpdateInput) {
       action: "START",
       expectedRowVersion: input.expectedRowVersion,
       adminUserId: input.adminUserId,
+      adminUsername: input.adminUsername,
+      bypassReason: input.bypassReason,
     });
   } else if (stage.status === "BLOCKED") {
     await applyStageProgress({
@@ -68,6 +72,8 @@ export async function applyQuickStageUpdate(input: QuickStageUpdateInput) {
       action: "UNBLOCK",
       expectedRowVersion: input.expectedRowVersion,
       adminUserId: input.adminUserId,
+      adminUsername: input.adminUsername,
+      bypassReason: input.bypassReason,
     });
   }
 
@@ -85,6 +91,8 @@ export async function applyQuickStageUpdate(input: QuickStageUpdateInput) {
     note: input.note,
     expectedRowVersion: input.expectedRowVersion,
     adminUserId: input.adminUserId,
+    adminUsername: input.adminUsername,
+    bypassReason: input.bypassReason,
   });
 }
 

@@ -53,6 +53,8 @@ export type QuickStageUpdateInput = {
   note?: string;
   expectedRowVersion?: number;
   adminUserId?: string | null;
+  adminUsername?: string | null;
+  bypassReason?: string | null;
 };
 
 export type ReportIssueInput = {

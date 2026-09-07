@@ -65,6 +65,13 @@ export default function ItemProductionStageDrawer({ stageId, onClose, onUpdated 
   >([]);
   const [quantityDelta, setQuantityDelta] = useState(0);
   const [note, setNote] = useState("");
+  const [gate, setGate] = useState<{
+    message: string;
+    productionJobHref: string;
+    pendingAction: StageAction;
+  } | null>(null);
+  const [bypassReason, setBypassReason] = useState("");
+  const [showBypass, setShowBypass] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,7 +107,7 @@ export default function ItemProductionStageDrawer({ stageId, onClose, onUpdated 
   const readyQty = Number(item?.readyQuantity ?? 0);
   const plannedQty = Number(item?.plannedQuantity ?? item?.orderedQuantity ?? 0);
 
-  async function runAction(action: StageAction) {
+  async function runAction(action: StageAction, withBypass = false) {
     if (!item) return;
     setPending(true);
     setError(null);
@@ -113,9 +120,20 @@ export default function ItemProductionStageDrawer({ stageId, onClose, onUpdated 
           quantityDelta: action === "PROGRESS_UPDATE" || action === "COMPLETE" ? quantityDelta : 0,
           note: note || undefined,
           expectedRowVersion: item.rowVersion,
+          bypassReason: withBypass ? bypassReason.trim() : undefined,
         }),
       });
       const json = await res.json();
+      if (res.status === 409 && json.code === "APPROVAL_REQUIRED") {
+        setGate({
+          message: json.message ?? "Sản phẩm chưa được duyệt sản xuất.",
+          productionJobHref:
+            json.productionJobHref ?? `/admin/production/jobs/${item.orderItem.id}`,
+          pendingAction: action,
+        });
+        setShowBypass(false);
+        return;
+      }
       if (!res.ok) throw new Error(json.message ?? "Cập nhật thất bại");
       onUpdated();
       onClose();
@@ -143,6 +161,57 @@ export default function ItemProductionStageDrawer({ stageId, onClose, onUpdated 
         ) : item && stage ? (
           <div style={{ display: "grid", gap: 12 }}>
             {error ? <p className="admin-error">{error}</p> : null}
+            {gate ? (
+              <div
+                role="alert"
+                style={{
+                  padding: 10,
+                  borderRadius: 8,
+                  background: "#fffbeb",
+                  border: "1px solid #fcd34d",
+                }}
+              >
+                <p style={{ margin: "0 0 8px", fontWeight: 600 }}>{gate.message}</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <a
+                    href={`${gate.productionJobHref}#production-approval`}
+                    className="admin-btn admin-btn--primary admin-btn--xs"
+                  >
+                    Mở duyệt sản xuất
+                  </a>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary admin-btn--xs"
+                    onClick={() => setShowBypass((v) => !v)}
+                  >
+                    Tiếp tục dù chưa duyệt
+                  </button>
+                </div>
+                {showBypass ? (
+                  <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                    <label className="admin-label">
+                      Lý do bypass (bắt buộc)
+                      <textarea
+                        className="admin-input"
+                        rows={2}
+                        value={bypassReason}
+                        onChange={(e) => setBypassReason(e.target.value)}
+                      />
+                    </label>
+                    <AdminLoadingButton
+                      type="button"
+                      variant="danger"
+                      size="small"
+                      pending={pending}
+                      disabled={bypassReason.trim().length < 5}
+                      onClick={() => void runAction(gate.pendingAction, true)}
+                    >
+                      Xác nhận tiếp tục
+                    </AdminLoadingButton>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <p className="admin-field-hint" style={{ margin: 0 }}>
               Đơn {item.orderItem.order.orderNo} · Item {item.orderItem.id.slice(0, 8)}…
             </p>

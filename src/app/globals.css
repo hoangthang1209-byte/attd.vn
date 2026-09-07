@@ -25851,6 +25851,87 @@ body:has(.mp-header--v271) {
 .prod-job__dl dt { font-size: 11px; color: #94a3b8; margin-bottom: 2px; }
 .prod-job__dl dd { margin: 0; font-weight: 500; }
 
+/* Lean Production Approval Truth */
+.prod-approval-card {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+.prod-approval-card--released { border-color: #86efac; background: #f0fdf4; }
+.prod-approval-card--pending { border-color: #fcd34d; background: #fffbeb; }
+.prod-approval-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.prod-approval-card__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.prod-approval-card__banner {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.prod-approval-card__banner--ok { color: #166534; }
+.prod-approval-card__banner--warn { color: #b45309; }
+.prod-approval-card__stale {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+}
+.prod-approval-card__dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 14px;
+  margin: 0;
+}
+.prod-approval-card__dl dt {
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+.prod-approval-card__dl dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+}
+.prod-approval-card__form {
+  display: grid;
+  gap: 10px;
+}
+.prod-approval-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.prod-approval-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.prod-approval-badge--ok { color: #166534; background: #dcfce7; }
+.prod-approval-badge--warn { color: #92400e; background: #fef3c7; }
+.prod-approval-badge--stale { color: #991b1b; background: #fee2e2; }
+
 /* Production job workspace (26.3.20.2) */
 .prod-job-header {
   display: flex;

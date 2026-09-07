@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { can } from "@/features/auth/admin-permissions";
 import { applyQuickStageUpdate } from "@/features/item-production-tracking/item-production-lean-ops.service";
+import { ProductionApprovalGateError } from "@/features/item-production-tracking/production-approval.service";
 import { requireProductionUpdate } from "@/lib/admin-auth/require-production-api";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       markComplete?: boolean;
       note?: string;
       expectedRowVersion?: number;
+      bypassReason?: string;
     };
     if (body.completedQuantity === undefined) {
       return NextResponse.json({ message: "Thiếu số lượng hoàn thành" }, { status: 400 });
@@ -35,9 +37,22 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       note: body.note,
       expectedRowVersion: body.expectedRowVersion,
       adminUserId: auth.session.userId ?? null,
+      adminUsername: auth.session.username ?? null,
+      bypassReason: body.bypassReason,
     });
     return NextResponse.json({ item, message: "Đã cập nhật tiến độ" });
   } catch (err) {
+    if (err instanceof ProductionApprovalGateError) {
+      return NextResponse.json(
+        {
+          message: err.message,
+          code: err.code,
+          orderItemId: err.orderItemId,
+          productionJobHref: err.productionJobHref,
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { message: err instanceof Error ? err.message : "Cập nhật thất bại" },
       { status: 400 },

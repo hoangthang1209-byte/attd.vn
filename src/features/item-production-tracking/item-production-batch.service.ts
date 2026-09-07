@@ -516,7 +516,46 @@ export async function applyBatchStageProgress(input: {
   note?: string;
   expectedEnd?: string;
   adminUserId?: string | null;
+  adminUsername?: string | null;
+  bypassReason?: string | null;
 }) {
+  const stageProbe = await prisma.itemProductionBatchStage.findUnique({
+    where: { id: input.batchStageId },
+    select: {
+      id: true,
+      stageKey: true,
+      batch: {
+        select: {
+          itemProductionTrackingId: true,
+          itemProductionTracking: { select: { orderItemId: true } },
+        },
+      },
+    },
+  });
+  if (!stageProbe) throw new Error("Không tìm thấy công đoạn");
+
+  const progressingActions: BatchStageAction[] = [
+    "START",
+    "PROGRESS_UPDATE",
+    "COMPLETE",
+    "REOPEN",
+    "UNBLOCK",
+  ];
+  if (progressingActions.includes(input.action)) {
+    const { enforceProductionApprovalGate } = await import(
+      "@/features/item-production-tracking/production-approval.service"
+    );
+    await enforceProductionApprovalGate({
+      orderItemId: stageProbe.batch.itemProductionTracking.orderItemId,
+      stageKey: stageProbe.stageKey,
+      bypassReason: input.bypassReason,
+      productionItemId: stageProbe.batch.itemProductionTrackingId,
+      stageId: stageProbe.id,
+      adminUserId: input.adminUserId,
+      adminUsername: input.adminUsername,
+    });
+  }
+
   return prisma.$transaction(async (tx) => {
     const stage = await tx.itemProductionBatchStage.findUnique({
       where: { id: input.batchStageId },

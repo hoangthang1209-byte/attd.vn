@@ -5,6 +5,7 @@ import {
   applyBatchStageProgress,
   type BatchStageAction,
 } from "@/features/item-production-tracking/item-production-batch.service";
+import { ProductionApprovalGateError } from "@/features/item-production-tracking/production-approval.service";
 import { requireProductionUpdate } from "@/lib/admin-auth/require-production-api";
 
 type Ctx = { params: Promise<{ batchId: string; stageId: string }> };
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       wasteQuantityDelta?: number;
       note?: string;
       expectedEnd?: string;
+      bypassReason?: string;
     };
     if (!body.action) {
       return NextResponse.json({ message: "Thiếu action" }, { status: 400 });
@@ -44,9 +46,22 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       note: body.note,
       expectedEnd: body.expectedEnd,
       adminUserId: auth.session.userId ?? null,
+      adminUsername: auth.session.username ?? null,
+      bypassReason: body.bypassReason,
     });
     return NextResponse.json({ batch, message: "Đã cập nhật tiến độ lô" });
   } catch (err) {
+    if (err instanceof ProductionApprovalGateError) {
+      return NextResponse.json(
+        {
+          message: err.message,
+          code: err.code,
+          orderItemId: err.orderItemId,
+          productionJobHref: err.productionJobHref,
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { message: err instanceof Error ? err.message : "Cập nhật thất bại" },
       { status: 400 },

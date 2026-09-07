@@ -435,6 +435,7 @@ model Contact {
   quotes              Quote[]
   orders              Order[]
   salesOpportunities  SalesOpportunity[]
+  productionApprovals OrderItemProductionApproval[]
 
   @@index([customerId])
 }
@@ -1593,6 +1594,7 @@ model MediaAsset {
   orderQcEvidence          OrderQcEvidence[]
   orderDeliveryProofs      OrderDeliveryProof[]
   manufacturingMedia       ManufacturingMedia[]
+  productionApprovalEvidence OrderItemProductionApproval[] @relation("ProductionApprovalEvidence")
   homepageSourcingPathways HomepageSourcingPathway[] @relation("HomepagePathwayImage")
   homepageOemSettings      HomepageSettings[]        @relation("HomepageOemImage")
   homepageWorkshopMedia    HomepageWorkshopMedia[]   @relation("HomepageWorkshopImage")
@@ -4377,6 +4379,8 @@ model OrderItem {
   techPacks                   TechPack[]
   productionPlan              ProductionPlan?
   itemProductionTracking      ItemProductionTracking?
+  productionApproval          OrderItemProductionApproval?
+  productionApprovalBypasses  OrderItemProductionApprovalBypass[]
 
   @@index([orderId])
   @@index([productId])
@@ -4499,11 +4503,72 @@ model OrderProductionFile {
   orderItem          OrderItem?           @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   mediaAsset         MediaAsset           @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
   appliesToColor     Color?               @relation(fields: [appliesToColorId], references: [id], onDelete: SetNull)
+  approvalsAsArtwork OrderItemProductionApproval[] @relation("ApprovalArtworkFile")
+  approvalsAsSample  OrderItemProductionApproval[] @relation("ApprovalSampleFile")
 
   @@index([orderId])
   @@index([orderItemId])
   @@index([mediaAssetId])
   @@index([status])
+}
+
+enum OrderItemProductionApprovalStatus {
+  PENDING
+  NEEDS_REVISION
+  RELEASED
+}
+
+/// Lean Production Approval Truth — current-state snapshot per OrderItem.
+/// ACTIVE file lifecycle ≠ customer-approved; RELEASED is the manufacture gate.
+model OrderItemProductionApproval {
+  id                    String                             @id @default(cuid())
+  orderItemId           String                             @unique
+  status                OrderItemProductionApprovalStatus  @default(PENDING)
+  sampleRequired        Boolean                            @default(true)
+  artworkFileId         String?
+  sampleFileId          String?
+  evidenceMediaAssetId  String?
+  techPackId            String?
+  approvedByContactId   String?
+  approvedByName        String?
+  approvedAt            DateTime?
+  note                  String?                            @db.Text
+  releasedByAdminUserId String?
+  createdAt             DateTime                           @default(now())
+  updatedAt             DateTime                           @updatedAt
+
+  orderItem           OrderItem            @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  artworkFile         OrderProductionFile? @relation("ApprovalArtworkFile", fields: [artworkFileId], references: [id], onDelete: SetNull)
+  sampleFile          OrderProductionFile? @relation("ApprovalSampleFile", fields: [sampleFileId], references: [id], onDelete: SetNull)
+  evidenceMediaAsset  MediaAsset?          @relation("ProductionApprovalEvidence", fields: [evidenceMediaAssetId], references: [id], onDelete: SetNull)
+  techPack            TechPack?            @relation(fields: [techPackId], references: [id], onDelete: SetNull)
+  approvedByContact   Contact?             @relation(fields: [approvedByContactId], references: [id], onDelete: SetNull)
+  releasedByAdminUser AdminUser?           @relation("ProductionApprovalReleasedBy", fields: [releasedByAdminUserId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([artworkFileId])
+  @@index([sampleFileId])
+  @@index([techPackId])
+  @@index([approvedByContactId])
+}
+
+/// Audited bypass when progressing production without RELEASED approval.
+model OrderItemProductionApprovalBypass {
+  id                    String   @id @default(cuid())
+  orderItemId           String
+  productionItemId      String?
+  stageId               String?
+  stageKey              String?
+  reason                String   @db.Text
+  actorAdminUserId      String?
+  actorUsernameSnapshot String?
+  createdAt             DateTime @default(now())
+
+  orderItem      OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  actorAdminUser AdminUser? @relation("ProductionApprovalBypassActor", fields: [actorAdminUserId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId, createdAt])
+  @@index([actorAdminUserId])
 }
 
 model ProductMaterialRequirement {
@@ -5087,6 +5152,8 @@ model AdminUser {
   itemProductionBatchesUpdated      ItemProductionBatch[]           @relation("BatchUpdatedBy")
   itemProductionIssuesCreated       ItemProductionIssue[]           @relation("IssueCreatedBy")
   itemProductionIssuesResolved      ItemProductionIssue[]            @relation("IssueResolvedBy")
+  productionApprovalsReleased       OrderItemProductionApproval[]    @relation("ProductionApprovalReleasedBy")
+  productionApprovalBypasses        OrderItemProductionApprovalBypass[] @relation("ProductionApprovalBypassActor")
 
   @@index([username])
   @@index([roleId])
@@ -5341,6 +5408,7 @@ model TechPack {
   bomItems          TechPackBomItem[]
   artworkPlacements TechPackArtworkPlacement[]
   releaseHistory    TechPackReleaseHistory[]
+  productionApprovals OrderItemProductionApproval[]
 
   @@index([orderItemId])
   @@index([quoteItemId])

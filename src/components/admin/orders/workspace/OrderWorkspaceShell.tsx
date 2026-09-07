@@ -215,6 +215,7 @@ export default function OrderWorkspaceShell(props: OrderWorkspaceShellProps) {
               loading={workspaceData.loading}
               canViewProduction={canViewProduction}
               canEditOrder={canEditOrder}
+              productionApprovals={workspaceData.productionApprovals}
             />
             <OrderProductionSummaryPanel
               orderNo={order.orderNo}

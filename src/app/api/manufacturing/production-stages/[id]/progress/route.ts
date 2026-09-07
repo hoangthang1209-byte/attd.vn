@@ -5,6 +5,7 @@ import {
   applyStageProgress,
   type StageAction,
 } from "@/features/item-production-tracking/item-production.service";
+import { ProductionApprovalGateError } from "@/features/item-production-tracking/production-approval.service";
 import { requireProductionUpdate } from "@/lib/admin-auth/require-production-api";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       note?: string;
       expectedEnd?: string;
       expectedRowVersion?: number;
+      bypassReason?: string;
     };
     if (!body.action) {
       return NextResponse.json({ message: "Thiếu action" }, { status: 400 });
@@ -46,9 +48,22 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       expectedEnd: body.expectedEnd,
       expectedRowVersion: body.expectedRowVersion,
       adminUserId: auth.session.userId ?? null,
+      adminUsername: auth.session.username ?? null,
+      bypassReason: body.bypassReason,
     });
     return NextResponse.json({ item, message: "Đã cập nhật tiến độ" });
   } catch (err) {
+    if (err instanceof ProductionApprovalGateError) {
+      return NextResponse.json(
+        {
+          message: err.message,
+          code: err.code,
+          orderItemId: err.orderItemId,
+          productionJobHref: err.productionJobHref,
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { message: err instanceof Error ? err.message : "Cập nhật thất bại" },
       { status: 400 },

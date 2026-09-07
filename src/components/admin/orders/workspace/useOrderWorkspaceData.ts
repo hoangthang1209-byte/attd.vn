@@ -17,6 +17,10 @@ export type OrderWorkspaceData = {
   materialRows: MaterialAvailabilityRow[];
   itemMaterials: MaterialsItemRow[];
   productionFileCount: number;
+  productionApprovals: Record<
+    string,
+    { status: "PENDING" | "NEEDS_REVISION" | "RELEASED"; artworkStale: boolean }
+  >;
   loading: boolean;
   refresh: () => void;
 };
@@ -26,6 +30,9 @@ export function useOrderWorkspaceData(orderId: string): OrderWorkspaceData {
   const [materialRows, setMaterialRows] = useState<MaterialAvailabilityRow[]>([]);
   const [itemMaterials, setItemMaterials] = useState<MaterialsItemRow[]>([]);
   const [productionFileCount, setProductionFileCount] = useState(0);
+  const [productionApprovals, setProductionApprovals] = useState<
+    Record<string, { status: "PENDING" | "NEEDS_REVISION" | "RELEASED"; artworkStale: boolean }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
 
@@ -42,14 +49,20 @@ export function useOrderWorkspaceData(orderId: string): OrderWorkspaceData {
       fetch(`/api/orders/${orderId}/material-availability`).then((r) => r.json()),
       fetch(`/api/orders/${orderId}/materials`).then((r) => r.json()),
       fetch(`/api/orders/${orderId}/production-files`).then((r) => r.json()),
+      fetch(`/api/orders/${orderId}/production-approvals`).then((r) => r.json()),
     ])
-      .then(([execData, availData, materialsData, filesData]) => {
+      .then(([execData, availData, materialsData, filesData, approvalData]) => {
         if (cancelled) return;
         setBundle((execData.bundle as ProductionExecutionBundle | undefined) ?? null);
         setMaterialRows((availData.rows as MaterialAvailabilityRow[] | undefined) ?? []);
         setItemMaterials((materialsData.items as MaterialsItemRow[] | undefined) ?? []);
         const files = (filesData.files as unknown[] | undefined) ?? [];
         setProductionFileCount(files.length);
+        setProductionApprovals(
+          (approvalData.statuses as
+            | Record<string, { status: "PENDING" | "NEEDS_REVISION" | "RELEASED"; artworkStale: boolean }>
+            | undefined) ?? {},
+        );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -60,5 +73,13 @@ export function useOrderWorkspaceData(orderId: string): OrderWorkspaceData {
     };
   }, [orderId, refreshToken]);
 
-  return { bundle, materialRows, itemMaterials, productionFileCount, loading, refresh };
+  return {
+    bundle,
+    materialRows,
+    itemMaterials,
+    productionFileCount,
+    productionApprovals,
+    loading,
+    refresh,
+  };
 }

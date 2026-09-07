@@ -370,7 +370,22 @@ export async function listProductionItems(filters: ProductionListFilters) {
     };
   });
 
-  return { items: itemsWithBatchSummary, total, page, pageSize, kpis };
+  const { getProductionApprovalStatusesForOrderItems } = await import(
+    "@/features/item-production-tracking/production-approval.service"
+  );
+  const approvalMap = await getProductionApprovalStatusesForOrderItems(
+    itemsWithBatchSummary.map((item) => item.orderItemId),
+  );
+  const itemsWithApproval = itemsWithBatchSummary.map((item) => {
+    const approval = approvalMap.get(item.orderItemId);
+    return {
+      ...item,
+      productionApprovalStatus: approval?.status ?? "PENDING",
+      productionApprovalArtworkStale: approval?.artworkStale ?? false,
+    };
+  });
+
+  return { items: itemsWithApproval, total, page, pageSize, kpis };
 }
 
 export async function getProductionItem(id: string) {
@@ -640,8 +655,43 @@ export async function applyStageProgress(input: {
   note?: string;
   expectedEnd?: string;
   adminUserId?: string | null;
+  adminUsername?: string | null;
+  bypassReason?: string | null;
   expectedRowVersion?: number;
 }) {
+  const stageProbe = await prisma.itemProductionStage.findUnique({
+    where: { id: input.stageId },
+    select: {
+      id: true,
+      stageKey: true,
+      productionItemId: true,
+      productionItem: { select: { orderItemId: true } },
+    },
+  });
+  if (!stageProbe) throw new Error("Không tìm thấy công đoạn");
+
+  const progressingActions: StageAction[] = [
+    "START",
+    "PROGRESS_UPDATE",
+    "COMPLETE",
+    "REOPEN",
+    "UNBLOCK",
+  ];
+  if (progressingActions.includes(input.action)) {
+    const { enforceProductionApprovalGate } = await import(
+      "@/features/item-production-tracking/production-approval.service"
+    );
+    await enforceProductionApprovalGate({
+      orderItemId: stageProbe.productionItem.orderItemId,
+      stageKey: stageProbe.stageKey,
+      bypassReason: input.bypassReason,
+      productionItemId: stageProbe.productionItemId,
+      stageId: stageProbe.id,
+      adminUserId: input.adminUserId,
+      adminUsername: input.adminUsername,
+    });
+  }
+
   return prisma.$transaction(async (tx) => {
     const stage = await tx.itemProductionStage.findUnique({
       where: { id: input.stageId },

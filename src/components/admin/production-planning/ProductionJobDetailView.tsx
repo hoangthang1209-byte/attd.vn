@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import OrderItemExecutionCard from "@/components/admin/orders/OrderItemExecutionCard";
 import OrderProductionPackSection from "@/components/admin/orders/OrderProductionPackSection";
+import ProductionApprovalCard from "@/components/admin/production-planning/ProductionApprovalCard";
 import ProductionPlanEditor from "@/components/admin/production-planning/ProductionPlanEditor";
 import ProductionJobHeader from "@/components/admin/production-planning/ProductionJobHeader";
 import ProductionJobOperationalStrip from "@/components/admin/production-planning/ProductionJobOperationalStrip";
@@ -144,6 +145,8 @@ export default function ProductionJobDetailView({ orderItemId }: Props) {
         itemBundle={itemBundle}
         onNavigate={openTab}
       />
+
+      <ProductionApprovalCard orderItemId={orderItemId} />
 
       <div className="prod-job__tabs prod-job-tabs" role="tablist" aria-label="Công việc sản xuất">
         {PRODUCTION_JOB_TABS.map((t) => (

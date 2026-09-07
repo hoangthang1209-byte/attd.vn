@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { ITEM_PRODUCTION_STAGE_LABELS } from "@/features/item-production-tracking/config";
 import type { ItemProductionStageKey } from "@prisma/client";
@@ -18,6 +19,7 @@ type StageInfo = {
 
 type Props = {
   productionItemId: string;
+  orderItemId?: string;
   stage: StageInfo;
   rowVersion: number;
   orderedQuantity: number;
@@ -26,7 +28,8 @@ type Props = {
 };
 
 export default function ItemProductionQuickUpdateModal({
-  productionItemId,
+  productionItemId: _productionItemId,
+  orderItemId,
   stage,
   rowVersion,
   orderedQuantity,
@@ -40,13 +43,20 @@ export default function ItemProductionQuickUpdateModal({
   const [advanced, setAdvanced] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gate, setGate] = useState<{
+    message: string;
+    productionJobHref: string;
+    orderItemId: string;
+  } | null>(null);
+  const [bypassReason, setBypassReason] = useState("");
+  const [showBypass, setShowBypass] = useState(false);
 
   useEffect(() => {
     setCompleted(stage.completedQuantity);
     setRework(stage.rejectedQuantity + stage.reworkQuantity);
   }, [stage]);
 
-  async function save() {
+  async function save(withBypass?: boolean) {
     setPending(true);
     setError(null);
     try {
@@ -59,9 +69,21 @@ export default function ItemProductionQuickUpdateModal({
           markComplete,
           note: note || undefined,
           expectedRowVersion: rowVersion,
+          bypassReason: withBypass ? bypassReason.trim() : undefined,
         }),
       });
       const json = await res.json();
+      if (res.status === 409 && json.code === "APPROVAL_REQUIRED") {
+        setGate({
+          message: json.message ?? "Sản phẩm chưa được duyệt sản xuất.",
+          productionJobHref:
+            json.productionJobHref ??
+            `/admin/production/jobs/${json.orderItemId ?? orderItemId ?? ""}`,
+          orderItemId: json.orderItemId ?? orderItemId ?? "",
+        });
+        setShowBypass(false);
+        return;
+      }
       if (!res.ok) throw new Error(json.message ?? "Cập nhật thất bại");
       onSaved();
       onClose();
@@ -93,6 +115,56 @@ export default function ItemProductionQuickUpdateModal({
         <p className="admin-field-hint" style={{ margin: "0 0 12px" }}>
           Công đoạn: <strong>{stageLabel}</strong>
         </p>
+        {gate ? (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 12,
+              padding: 10,
+              borderRadius: 8,
+              background: "#fffbeb",
+              border: "1px solid #fcd34d",
+            }}
+          >
+            <p style={{ margin: "0 0 8px", fontWeight: 600 }}>{gate.message}</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <Link href={`${gate.productionJobHref}#production-approval`} className="admin-btn admin-btn--primary admin-btn--xs">
+                Mở duyệt sản xuất
+              </Link>
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-btn--xs"
+                onClick={() => setShowBypass((v) => !v)}
+              >
+                Tiếp tục dù chưa duyệt
+              </button>
+            </div>
+            {showBypass ? (
+              <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                <label className="admin-label">
+                  Lý do bypass (bắt buộc)
+                  <textarea
+                    className="admin-input"
+                    rows={2}
+                    value={bypassReason}
+                    onChange={(e) => setBypassReason(e.target.value)}
+                    placeholder="VD: Khách xác nhận miệng, chờ file Zalo"
+                  />
+                </label>
+                <AdminLoadingButton
+                  type="button"
+                  variant="danger"
+                  size="small"
+                  pending={pending}
+                  disabled={bypassReason.trim().length < 5}
+                  onClick={() => void save(true)}
+                >
+                  Xác nhận tiếp tục
+                </AdminLoadingButton>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {error ? <p className="admin-error">{error}</p> : null}
         <div style={{ display: "grid", gap: 10 }}>
           <label className="admin-label">
@@ -101,46 +173,44 @@ export default function ItemProductionQuickUpdateModal({
               className="admin-input"
               type="number"
               min={0}
+              max={orderedQuantity || undefined}
               value={completed}
-              onChange={(e) => setCompleted(Number(e.target.value) || 0)}
-              autoFocus
-            />
-            <span className="admin-field-hint">Có thể vượt SL đặt (hao hụt / dư sản xuất). Tiến độ % tối đa 100%.</span>
-          </label>
-          <label className="admin-label">
-            Lỗi / làm lại <span className="admin-field-hint">(tùy chọn)</span>
-            <input
-              className="admin-input"
-              type="number"
-              min={0}
-              value={rework}
-              onChange={(e) => setRework(Number(e.target.value) || 0)}
+              onChange={(e) => setCompleted(Number(e.target.value))}
             />
           </label>
-          <label className="admin-field-hint" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <label className="admin-label" style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input type="checkbox" checked={markComplete} onChange={(e) => setMarkComplete(e.target.checked)} />
-            Hoàn thành công đoạn
-          </label>
-          <label className="admin-label">
-            Ghi chú
-            <textarea className="admin-input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+            Đánh dấu hoàn thành công đoạn
           </label>
           <button type="button" className="admin-link" onClick={() => setAdvanced((v) => !v)}>
             {advanced ? "Ẩn nâng cao" : "Nâng cao"}
           </button>
           {advanced ? (
-            <p className="admin-field-hint" style={{ margin: 0 }}>
-              Kế hoạch công đoạn: {stage.plannedQuantity} · Đặt hàng: {orderedQuantity}
-            </p>
+            <>
+              <label className="admin-label">
+                Lỗi / làm lại
+                <input
+                  className="admin-input"
+                  type="number"
+                  min={0}
+                  value={rework}
+                  onChange={(e) => setRework(Number(e.target.value))}
+                />
+              </label>
+              <label className="admin-label">
+                Ghi chú
+                <input className="admin-input" value={note} onChange={(e) => setNote(e.target.value)} />
+              </label>
+            </>
           ) : null}
-        </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
-          <button type="button" className="admin-btn admin-btn--secondary" onClick={onClose}>
-            Hủy
-          </button>
-          <AdminLoadingButton pending={pending} variant="primary" onClick={() => void save()}>
-            Lưu
-          </AdminLoadingButton>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button type="button" className="admin-btn admin-btn--secondary" onClick={onClose} disabled={pending}>
+              Huỷ
+            </button>
+            <AdminLoadingButton type="button" variant="primary" pending={pending} onClick={() => void save(false)}>
+              Lưu
+            </AdminLoadingButton>
+          </div>
         </div>
       </div>
     </div>

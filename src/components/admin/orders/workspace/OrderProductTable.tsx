@@ -34,6 +34,10 @@ type Props = {
   loading: boolean;
   canViewProduction: boolean;
   canEditOrder: boolean;
+  productionApprovals?: Record<
+    string,
+    { status: "PENDING" | "NEEDS_REVISION" | "RELEASED"; artworkStale: boolean }
+  >;
 };
 
 function compactSizeSummary(item: OrderItemRecord): string {
@@ -63,6 +67,10 @@ function productionItemHref(orderNo: string, orderItemId: string) {
   return `/admin/production?search=${encodeURIComponent(orderNo)}&highlightItem=${orderItemId}`;
 }
 
+function productionJobApprovalHref(orderItemId: string) {
+  return `/admin/production/jobs/${orderItemId}#production-approval`;
+}
+
 export default function OrderProductTable({
   order,
   bundle,
@@ -71,6 +79,7 @@ export default function OrderProductTable({
   loading,
   canViewProduction,
   canEditOrder,
+  productionApprovals = {},
 }: Props) {
   const [expandedSizes, setExpandedSizes] = useState<Record<string, boolean>>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -161,6 +170,33 @@ export default function OrderProductTable({
                           <span className="order-workspace-progress__label">{progressPct}%</span>
                         </div>
                       )}
+                      {canViewProduction ? (
+                        <div style={{ marginTop: 4 }}>
+                          {(() => {
+                            const approval = productionApprovals[item.id];
+                            const released =
+                              approval?.status === "RELEASED" && !approval.artworkStale;
+                            return (
+                              <Link
+                                href={productionJobApprovalHref(item.id)}
+                                className={`prod-approval-badge ${
+                                  approval?.artworkStale
+                                    ? "prod-approval-badge--stale"
+                                    : released
+                                      ? "prod-approval-badge--ok"
+                                      : "prod-approval-badge--warn"
+                                }`}
+                              >
+                                {released
+                                  ? "✓ Đã duyệt SX"
+                                  : approval?.artworkStale
+                                    ? "⚠ Artwork lệch duyệt"
+                                    : "⚠ Chưa duyệt SX"}
+                              </Link>
+                            );
+                          })()}
+                        </div>
+                      ) : null}
                     </td>
                     <td>
                       <span className={`order-workspace-status-pill order-workspace-status-pill--${docStatus === "Đủ" ? "ok" : "warn"}`}>

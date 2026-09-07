@@ -59,6 +59,8 @@ type ListItem = {
   promisedDeliveryDate: string | null;
   lastProgressAt: string | null;
   rowVersion: number;
+  productionApprovalStatus?: "PENDING" | "NEEDS_REVISION" | "RELEASED";
+  productionApprovalArtworkStale?: boolean;
   supplier: { id: string; name: string; code: string } | null;
   assignedEmployee: { id: string; fullName: string; employeeCode: string } | null;
   stages: StageCell[];
@@ -153,6 +155,7 @@ function isExceptionRow(item: ListItem) {
 
 type QuickUpdateTarget = {
   productionItemId: string;
+  orderItemId: string;
   rowVersion: number;
   orderedQuantity: number;
   stage: StageCell;
@@ -662,6 +665,24 @@ export default function ItemProductionTimelineManager() {
                               {sampleStatus === "NEEDS_REVISION" ? "Cần chỉnh mẫu" : "Chưa duyệt mẫu"}
                             </div>
                           ) : null}
+                          <div style={{ marginTop: 4 }}>
+                            <Link
+                              href={`/admin/production/jobs/${item.orderItem.id}#production-approval`}
+                              className={`prod-approval-badge ${
+                                item.productionApprovalArtworkStale
+                                  ? "prod-approval-badge--stale"
+                                  : item.productionApprovalStatus === "RELEASED"
+                                    ? "prod-approval-badge--ok"
+                                    : "prod-approval-badge--warn"
+                              }`}
+                            >
+                              {item.productionApprovalArtworkStale
+                                ? "⚠ Artwork lệch"
+                                : item.productionApprovalStatus === "RELEASED"
+                                  ? "✓ Đã duyệt SX"
+                                  : "⚠ Chưa duyệt SX"}
+                            </Link>
+                          </div>
                         </td>
                         <td style={{ position: "sticky", left: orderFilterActive ? 220 : stickyOffsets.stage, background: "inherit", zIndex: 2 }}>
                           {item.batchSummary?.usesBatchExecution ? (
@@ -675,6 +696,7 @@ export default function ItemProductionTimelineManager() {
                               onClick={() =>
                                 setQuickUpdate({
                                   productionItemId: item.id,
+                                  orderItemId: item.orderItem.id,
                                   rowVersion: item.rowVersion,
                                   orderedQuantity: item.orderedQuantity,
                                   stage: currentStage,
@@ -781,6 +803,7 @@ export default function ItemProductionTimelineManager() {
                                 onClick={() =>
                                   setQuickUpdate({
                                     productionItemId: item.id,
+                                    orderItemId: item.orderItem.id,
                                     rowVersion: item.rowVersion,
                                     orderedQuantity: item.orderedQuantity,
                                     stage: currentStage,
@@ -910,6 +933,7 @@ export default function ItemProductionTimelineManager() {
       {quickUpdate ? (
         <ItemProductionQuickUpdateModal
           productionItemId={quickUpdate.productionItemId}
+          orderItemId={quickUpdate.orderItemId}
           stage={quickUpdate.stage}
           rowVersion={quickUpdate.rowVersion}
           orderedQuantity={quickUpdate.orderedQuantity}
