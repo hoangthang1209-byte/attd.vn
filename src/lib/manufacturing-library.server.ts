@@ -11,6 +11,7 @@ import type {
   ManufacturingEvidenceItem,
   ManufacturingEvidenceSurface,
 } from "@/lib/manufacturing-library.types";
+import { withPrismaPoolRetry } from "@/lib/prisma-pool-retry";
 import {
   PUBLIC_CACHE_REVALIDATE_SECONDS,
   PUBLIC_CACHE_TAGS,
@@ -53,7 +54,14 @@ export async function getManufacturingEvidenceForProduct(input: {
 }): Promise<readonly ManufacturingEvidenceItem[]> {
   const limit = input.limit ?? 2;
   return unstable_cache(
-    async () => loadManufacturingEvidenceForProductUncached(input.productId, input.categoryId ?? null, limit),
+    async () =>
+      withPrismaPoolRetry(() =>
+        loadManufacturingEvidenceForProductUncached(
+          input.productId,
+          input.categoryId ?? null,
+          limit,
+        ),
+      ),
     ["public-pdp-manufacturing-evidence", input.productId, input.categoryId ?? "", String(limit)],
     {
       tags: [PUBLIC_CACHE_TAGS.products],

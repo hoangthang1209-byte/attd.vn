@@ -8,6 +8,6 @@ export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient();
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+// Always reuse one client across Next.js workers/chunks. Multiple clients on Neon
+// (connection_limit≈3) exhaust the pool during catalog SSG.
+globalForPrisma.prisma = prisma;

@@ -91,12 +91,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const displayShortDescription = catalog?.shortDescription ?? product.shortDescription;
   const displayContent = catalog?.content ?? product.description;
 
-  const [relatedProductsRaw, recommendedProductsRaw] = product.category?.id
-    ? await Promise.all([
-        getRelatedProducts(product.category.id, product.id, 4),
-        getCrossSellProducts(product.id, product.category.id, 8),
-      ])
-    : [[], []];
+  // Sequential public reads keep Neon pool pressure low during SSG (limit ≈3).
+  const relatedProductsRaw = product.category?.id
+    ? await getRelatedProducts(product.category.id, product.id, 4)
+    : [];
+  const recommendedProductsRaw = product.category?.id
+    ? await getCrossSellProducts(product.id, product.category.id, 8)
+    : [];
   const relatedProducts = dedupeProductRailSlugs(relatedProductsRaw, [product.slug]).slice(0, 4);
   const recommendedProducts = dedupeProductRailSlugs(
     recommendedProductsRaw,

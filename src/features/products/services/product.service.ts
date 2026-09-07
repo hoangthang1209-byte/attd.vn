@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { withPrismaPoolRetry } from "@/lib/prisma-pool-retry";
 import { getCategoryFilterIdsBySlug } from "@/features/categories/services/category.service";
 import {
   buildDefaultCustomizationsFromFlags,
@@ -128,51 +129,62 @@ export async function getProductDetailBySlug(slug: string): Promise<PublicProduc
 }
 
 async function loadProductDetailBySlugUncached(slug: string): Promise<PublicProductDetail | null> {
-  try {
-    const product = await prisma.product.findFirst({
-      where: buildPublicProductVisibilityWhere({ slug }),
-      include: PRODUCT_DETAIL_INCLUDE,
-    });
-    // Demo/sample exclusion is post-query: Prisma JSON NOT(path=true) falsely 404s
-    // real ACTIVE products that only have non-demo metadata (e.g. curatedSalesBadges).
-    // Readiness/image-health must never gate public PDP visibility.
-    if (!product || isDemoOrSampleProductMetadata(product.metadata)) return null;
-    return await mapFetchedProductToPublicDetail(product);
-  } catch (error) {
-    if (!isPartialCatalogSchemaError(error)) {
-      // Defensive fallback: never let optional relation/query shape crash an ACTIVE PDP.
-      console.error("[pdp] getProductDetailBySlug primary query failed; trying legacy select", {
-        slug,
-        errorName: error instanceof Error ? error.name : typeof error,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
-    }
-
+  return withPrismaPoolRetry(async () => {
     try {
-      const legacy = await prisma.product.findFirst({
+      const product = await prisma.product.findFirst({
         where: buildPublicProductVisibilityWhere({ slug }),
-        select: PRODUCT_DETAIL_LEGACY_SELECT,
+        include: PRODUCT_DETAIL_INCLUDE,
       });
-      if (!legacy || isDemoOrSampleProductMetadata(legacy.metadata)) return null;
-      return await mapFetchedProductToPublicDetail(normalizeLegacyProductRow(legacy));
-    } catch (legacyError) {
-      console.error("[pdp] getProductDetailBySlug legacy fallback failed", {
-        slug,
-        errorName: legacyError instanceof Error ? legacyError.name : typeof legacyError,
-        errorMessage: legacyError instanceof Error ? legacyError.message : String(legacyError),
-      });
-      throw legacyError;
+      // Demo/sample exclusion is post-query: Prisma JSON NOT(path=true) falsely 404s
+      // real ACTIVE products that only have non-demo metadata (e.g. curatedSalesBadges).
+      // Readiness/image-health must never gate public PDP visibility.
+      if (!product || isDemoOrSampleProductMetadata(product.metadata)) return null;
+      return await mapFetchedProductToPublicDetail(product);
+    } catch (error) {
+      const isPoolTimeout =
+        !!error &&
+        typeof error === "object" &&
+        "code" in error &&
+        String((error as { code?: unknown }).code ?? "") === "P2024";
+      if (isPoolTimeout) throw error;
+
+      if (!isPartialCatalogSchemaError(error)) {
+        // Defensive fallback: never let optional relation/query shape crash an ACTIVE PDP.
+        console.error("[pdp] getProductDetailBySlug primary query failed; trying legacy select", {
+          slug,
+          errorName: error instanceof Error ? error.name : typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        const legacy = await prisma.product.findFirst({
+          where: buildPublicProductVisibilityWhere({ slug }),
+          select: PRODUCT_DETAIL_LEGACY_SELECT,
+        });
+        if (!legacy || isDemoOrSampleProductMetadata(legacy.metadata)) return null;
+        return await mapFetchedProductToPublicDetail(normalizeLegacyProductRow(legacy));
+      } catch (legacyError) {
+        console.error("[pdp] getProductDetailBySlug legacy fallback failed", {
+          slug,
+          errorName: legacyError instanceof Error ? legacyError.name : typeof legacyError,
+          errorMessage: legacyError instanceof Error ? legacyError.message : String(legacyError),
+        });
+        throw legacyError;
+      }
     }
-  }
+  });
 }
 
 /** Slugs for ISR prebuild — public-visible products only (no demo/sample). */
 export async function listPublicProductSlugsForStaticParams(): Promise<string[]> {
-  const products = await prisma.product.findMany({
-    where: buildPublicProductVisibilityWhere(),
-    select: { slug: true, metadata: true },
-    orderBy: { updatedAt: "desc" },
-  });
+  const products = await withPrismaPoolRetry(() =>
+    prisma.product.findMany({
+      where: buildPublicProductVisibilityWhere(),
+      select: { slug: true, metadata: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+  );
   return products
     .filter((product) => !isDemoOrSampleProductMetadata(product.metadata))
     .map((product) => product.slug)
@@ -370,17 +382,19 @@ export async function getProductsForPublicListing(params: {
 
   return unstable_cache(
     async () =>
-      loadProductsForPublicListingUncached({
-        categorySlug: categorySlug?.trim() || undefined,
-        search: search?.trim() || undefined,
-        page: safePage,
-        perPage: safePerPage,
-        inStock,
-        supportsPrinting,
-        supportsEmbroidery,
-        supportsOem,
-        material: material?.trim() || undefined,
-      }),
+      withPrismaPoolRetry(() =>
+        loadProductsForPublicListingUncached({
+          categorySlug: categorySlug?.trim() || undefined,
+          search: search?.trim() || undefined,
+          page: safePage,
+          perPage: safePerPage,
+          inStock,
+          supportsPrinting,
+          supportsEmbroidery,
+          supportsOem,
+          material: material?.trim() || undefined,
+        }),
+      ),
     cacheKey,
     {
       tags: [PUBLIC_CACHE_TAGS.products, PUBLIC_CACHE_TAGS.categories],
@@ -484,18 +498,19 @@ export async function getRelatedProducts(
 ) {
   const safeLimit = Math.min(12, Math.max(1, limit));
   return unstable_cache(
-    async () => {
-      const products = await prisma.product.findMany({
-        where: buildPublicProductVisibilityWhere({
-          categoryId,
-          id: { not: excludeProductId },
-        }),
-        select: PUBLIC_PRODUCT_CARD_SELECT,
-        orderBy: { createdAt: "desc" },
-        take: safeLimit,
-      });
-      return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
-    },
+    async () =>
+      withPrismaPoolRetry(async () => {
+        const products = await prisma.product.findMany({
+          where: buildPublicProductVisibilityWhere({
+            categoryId,
+            id: { not: excludeProductId },
+          }),
+          select: PUBLIC_PRODUCT_CARD_SELECT,
+          orderBy: { createdAt: "desc" },
+          take: safeLimit,
+        });
+        return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
+      }),
     ["public-related-products", categoryId, excludeProductId, String(safeLimit)],
     {
       tags: [PUBLIC_CACHE_TAGS.products],
@@ -512,18 +527,19 @@ export async function getCrossSellProducts(
 ) {
   const safeLimit = Math.min(12, Math.max(1, limit));
   return unstable_cache(
-    async () => {
-      const products = await prisma.product.findMany({
-        where: buildPublicProductVisibilityWhere({
-          id: { not: excludeProductId },
-          categoryId: { not: excludeCategoryId },
-        }),
-        select: PUBLIC_PRODUCT_CARD_SELECT,
-        orderBy: { createdAt: "desc" },
-        take: safeLimit,
-      });
-      return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
-    },
+    async () =>
+      withPrismaPoolRetry(async () => {
+        const products = await prisma.product.findMany({
+          where: buildPublicProductVisibilityWhere({
+            id: { not: excludeProductId },
+            categoryId: { not: excludeCategoryId },
+          }),
+          select: PUBLIC_PRODUCT_CARD_SELECT,
+          orderBy: { createdAt: "desc" },
+          take: safeLimit,
+        });
+        return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
+      }),
     ["public-cross-sell-products", excludeProductId, excludeCategoryId, String(safeLimit)],
     {
       tags: [PUBLIC_CACHE_TAGS.products],
