@@ -12,6 +12,8 @@ import {
 import { buildContactMetadata } from "@/lib/seo/indexation-policy";
 import { getCompanySettings } from "@/features/settings/services/settings.service";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = buildContactMetadata({
   title: "Liên hệ báo giá | ATTD",
   description:

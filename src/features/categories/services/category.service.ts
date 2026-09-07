@@ -7,9 +7,11 @@ import {
 import { sumDescendantProductCountsSafe } from "@/features/categories/category-product-count.utils";
 import {
   filterPubliclyActiveCategoryTree,
+  isCategoryBranchActive,
   isCategoryPubliclyAccessibleBySlug,
   loadCategoryVisibilityNodes,
 } from "@/features/categories/category-public-visibility";
+import { isReservedStaticPublicSlug } from "@/lib/seo/indexable-category-routes";
 import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
 import { buildPublicProductVisibilityWhere, isDemoOrSampleProductMetadata } from "@/features/products/product-public-visibility";
 import {
@@ -224,6 +226,20 @@ export async function getCategoryTreeForCatalogFilter(): Promise<
 
 /** Collect category id + all descendant ids for catalog filtering. */
 export async function getCategoryFilterIdsBySlug(slug: string): Promise<string[]> {
+  const normalized = slug.trim();
+  if (!normalized) return [];
+
+  return unstable_cache(
+    async () => loadCategoryFilterIdsBySlugUncached(normalized),
+    ["public-category-filter-ids", normalized],
+    {
+      tags: [PUBLIC_CACHE_TAGS.categories],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+}
+
+async function loadCategoryFilterIdsBySlugUncached(slug: string): Promise<string[]> {
   const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
   if (!accessible) return [];
 
@@ -266,6 +282,22 @@ export async function getCategoryFilterIdsBySlug(slug: string): Promise<string[]
 
 /** Resolve heading/breadcrumb context for selected catalog category slug. */
 export async function resolveCatalogCategoryContext(
+  slug: string,
+): Promise<CatalogCategoryContext | null> {
+  const normalized = slug.trim();
+  if (!normalized) return null;
+
+  return unstable_cache(
+    async () => loadCatalogCategoryContextUncached(normalized),
+    ["public-catalog-category-context", normalized],
+    {
+      tags: [PUBLIC_CACHE_TAGS.categories],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+}
+
+async function loadCatalogCategoryContextUncached(
   slug: string,
 ): Promise<CatalogCategoryContext | null> {
   const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
@@ -315,6 +347,20 @@ export async function resolveCatalogCategoryContext(
 }
 
 export async function getCategoryBySlug(slug: string) {
+  const normalized = slug.trim();
+  if (!normalized) return null;
+
+  return unstable_cache(
+    async () => loadCategoryBySlugUncached(normalized),
+    ["public-category-by-slug", normalized],
+    {
+      tags: [PUBLIC_CACHE_TAGS.categories, PUBLIC_CACHE_TAGS.products],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+}
+
+async function loadCategoryBySlugUncached(slug: string) {
   const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
   if (!accessible) return null;
 
@@ -357,4 +403,15 @@ export async function getCategoryBySlug(slug: string) {
       (product) => !isDemoOrSampleProductMetadata(product.metadata),
     ),
   };
+}
+
+/** Public category slugs for ISR prebuild (excludes reserved static public routes). */
+export async function listPublicCategorySlugsForStaticParams(): Promise<string[]> {
+  const nodes = await loadCategoryVisibilityNodes();
+  return nodes
+    .filter(
+      (node) =>
+        isCategoryBranchActive(node.id, nodes) && !isReservedStaticPublicSlug(node.slug),
+    )
+    .map((node) => node.slug);
 }

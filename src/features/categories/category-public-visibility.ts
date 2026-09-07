@@ -1,4 +1,9 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CACHE_TAGS,
+} from "@/lib/public-cache-tags";
 
 export type CategoryVisibilityNode = {
   id: string;
@@ -34,10 +39,17 @@ export function isCategoryBranchActive(
   return true;
 }
 
-export async function loadCategoryVisibilityNodes(): Promise<CategoryVisibilityNode[]> {
+async function loadCategoryVisibilityNodesUncached(): Promise<CategoryVisibilityNode[]> {
   return prisma.category.findMany({
     select: { id: true, parentId: true, isActive: true, slug: true },
   });
+}
+
+export async function loadCategoryVisibilityNodes(): Promise<CategoryVisibilityNode[]> {
+  return unstable_cache(loadCategoryVisibilityNodesUncached, ["public-category-visibility-nodes"], {
+    tags: [PUBLIC_CACHE_TAGS.categories],
+    revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+  })();
 }
 
 export async function isCategoryPubliclyAccessibleBySlug(slug: string): Promise<boolean> {
@@ -52,10 +64,9 @@ export async function isCategoryPubliclyAccessibleById(categoryId: string): Prom
   return isCategoryBranchActive(categoryId, nodes);
 }
 
-export function filterPubliclyActiveCategoryTree<T extends { id: string; isActive: boolean; children: Array<{ id: string; isActive: boolean }> }>(
-  tree: T[],
-  nodes: CategoryVisibilityNode[],
-): T[] {
+export function filterPubliclyActiveCategoryTree<
+  T extends { id: string; isActive: boolean; children: Array<{ id: string; isActive: boolean }> },
+>(tree: T[], nodes: CategoryVisibilityNode[]): T[] {
   return tree
     .filter((parent) => parent.isActive !== false && isCategoryBranchActive(parent.id, nodes))
     .map((parent) => ({

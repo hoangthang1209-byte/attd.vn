@@ -4,6 +4,8 @@ import KnowledgeLandingPage from "@/components/seo/KnowledgeLandingPage";
 import { getKnowledgeContent } from "@/lib/knowledgeContent";
 import { canonicalUrl } from "@/lib/seo";
 
+export const revalidate = 3600;
+
 const SLUG = "vai-tc-la-gi";
 
 export function generateMetadata(): Metadata {

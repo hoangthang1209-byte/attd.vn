@@ -9,6 +9,7 @@ export const PUBLIC_CACHE_TAGS = {
   products: "public-products",
   blog: "public-blog",
   homepage: "public-homepage",
+  landing: "public-landing",
 } as const;
 
 export type PublicCacheTag =

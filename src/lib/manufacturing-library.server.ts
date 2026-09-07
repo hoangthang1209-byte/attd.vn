@@ -1,5 +1,6 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
 import { MANUFACTURING_SURFACE_DISPLAY_LOCATION } from "@/lib/manufacturing/manufacturing.constants";
 import {
   getManufacturingAssetsForDisplayLocation,
@@ -10,6 +11,10 @@ import type {
   ManufacturingEvidenceItem,
   ManufacturingEvidenceSurface,
 } from "@/lib/manufacturing-library.types";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CACHE_TAGS,
+} from "@/lib/public-cache-tags";
 
 export async function getManufacturingEvidenceForSurfaceAsync(
   surface: ManufacturingEvidenceSurface,
@@ -47,20 +52,35 @@ export async function getManufacturingEvidenceForProduct(input: {
   limit?: number;
 }): Promise<readonly ManufacturingEvidenceItem[]> {
   const limit = input.limit ?? 2;
+  return unstable_cache(
+    async () => loadManufacturingEvidenceForProductUncached(input.productId, input.categoryId ?? null, limit),
+    ["public-pdp-manufacturing-evidence", input.productId, input.categoryId ?? "", String(limit)],
+    {
+      tags: [PUBLIC_CACHE_TAGS.products],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+}
+
+async function loadManufacturingEvidenceForProductUncached(
+  productId: string,
+  categoryId: string | null,
+  limit: number,
+): Promise<readonly ManufacturingEvidenceItem[]> {
   const locationKey = MANUFACTURING_SURFACE_DISPLAY_LOCATION.pdp;
   const productItems = await getManufacturingAssetsForTarget({
     targetType: "PRODUCT",
-    targetId: input.productId,
+    targetId: productId,
     locationKey,
     visibility: "PUBLIC",
     requireMedia: true,
     limit,
   });
 
-  const categoryItems = input.categoryId
+  const categoryItems = categoryId
     ? await getManufacturingAssetsForTarget({
         targetType: "PRODUCT_CATEGORY",
-        targetId: input.categoryId,
+        targetId: categoryId,
         locationKey,
         visibility: "PUBLIC",
         requireMedia: true,

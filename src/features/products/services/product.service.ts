@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCategoryFilterIdsBySlug } from "@/features/categories/services/category.service";
 import {
@@ -24,6 +25,10 @@ import {
   parseProductDescriptionBlocks,
   type ProductDescriptionBlock,
 } from "@/features/products/product-description-blocks";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CACHE_TAGS,
+} from "@/lib/public-cache-tags";
 
 const PRODUCT_DETAIL_INCLUDE = {
   category: { select: { id: true, name: true, slug: true } },
@@ -109,6 +114,20 @@ async function mapFetchedProductToPublicDetail(
 }
 
 export async function getProductDetailBySlug(slug: string): Promise<PublicProductDetail | null> {
+  const normalized = slug.trim();
+  if (!normalized) return null;
+
+  return unstable_cache(
+    async () => loadProductDetailBySlugUncached(normalized),
+    ["public-product-detail", normalized],
+    {
+      tags: [PUBLIC_CACHE_TAGS.products, PUBLIC_CACHE_TAGS.categories],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+}
+
+async function loadProductDetailBySlugUncached(slug: string): Promise<PublicProductDetail | null> {
   try {
     const product = await prisma.product.findFirst({
       where: buildPublicProductVisibilityWhere({ slug }),
@@ -145,6 +164,19 @@ export async function getProductDetailBySlug(slug: string): Promise<PublicProduc
       throw legacyError;
     }
   }
+}
+
+/** Slugs for ISR prebuild — public-visible products only (no demo/sample). */
+export async function listPublicProductSlugsForStaticParams(): Promise<string[]> {
+  const products = await prisma.product.findMany({
+    where: buildPublicProductVisibilityWhere(),
+    select: { slug: true, metadata: true },
+    orderBy: { updatedAt: "desc" },
+  });
+  return products
+    .filter((product) => !isDemoOrSampleProductMetadata(product.metadata))
+    .map((product) => product.slug)
+    .filter(Boolean);
 }
 
 export async function getProducts() {
@@ -227,6 +259,32 @@ export async function getProductById(id: string) {
 
 const PUBLIC_PRODUCT_CARD_VARIANT_SELECT = PRODUCT_CARD_COLOR_VARIANT_SELECT;
 
+const PUBLIC_PRODUCT_CARD_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  productCode: true,
+  featuredImage: true,
+  gallery: true,
+  defaultMoq: true,
+  leadTime: true,
+  supportsPrinting: true,
+  supportsEmbroidery: true,
+  supportsOem: true,
+  metadata: true,
+  category: { select: { name: true, slug: true } },
+  variants: {
+    where: { variantStatus: "ACTIVE" as const },
+    select: PUBLIC_PRODUCT_CARD_VARIANT_SELECT,
+  },
+  images: {
+    select: { imageUrl: true, altText: true, sortOrder: true },
+    orderBy: { sortOrder: "asc" as const },
+  },
+} as const;
+
+export { PUBLIC_PRODUCT_CARD_SELECT, PUBLIC_PRODUCT_CARD_VARIANT_SELECT };
+
 /** Search OR clauses for public catalog listing — name, code, slug, tags. */
 export function buildPublicProductListingSearchOr(
   search: string,
@@ -292,6 +350,68 @@ export async function getProductsForPublicListing(params: {
     material,
   } = params;
 
+  const normalizedSearch = search?.trim().toLowerCase() || "";
+  const normalizedMaterial = material?.trim().toLowerCase() || "";
+  const safePage = Math.max(1, page);
+  const safePerPage = Math.min(48, Math.max(1, perPage));
+
+  const cacheKey = [
+    "public-product-listing",
+    categorySlug?.trim() || "",
+    normalizedSearch,
+    String(safePage),
+    String(safePerPage),
+    inStock ? "1" : "0",
+    supportsPrinting ? "1" : "0",
+    supportsEmbroidery ? "1" : "0",
+    supportsOem ? "1" : "0",
+    normalizedMaterial,
+  ];
+
+  return unstable_cache(
+    async () =>
+      loadProductsForPublicListingUncached({
+        categorySlug: categorySlug?.trim() || undefined,
+        search: search?.trim() || undefined,
+        page: safePage,
+        perPage: safePerPage,
+        inStock,
+        supportsPrinting,
+        supportsEmbroidery,
+        supportsOem,
+        material: material?.trim() || undefined,
+      }),
+    cacheKey,
+    {
+      tags: [PUBLIC_CACHE_TAGS.products, PUBLIC_CACHE_TAGS.categories],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+}
+
+async function loadProductsForPublicListingUncached(params: {
+  categorySlug?: string;
+  search?: string;
+  page: number;
+  perPage: number;
+  inStock?: boolean;
+  supportsPrinting?: boolean;
+  supportsEmbroidery?: boolean;
+  supportsOem?: boolean;
+  material?: string;
+}) {
+  const {
+    categorySlug,
+    search,
+    page,
+    perPage,
+    inStock,
+    supportsPrinting,
+    supportsEmbroidery,
+    supportsOem,
+    material,
+  } = params;
+
   let categoryIds: string[] | undefined;
   if (categorySlug) {
     categoryIds = await getCategoryFilterIdsBySlug(categorySlug);
@@ -313,17 +433,7 @@ export async function getProductsForPublicListing(params: {
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
-      include: {
-        category: true,
-        images: {
-          select: { imageUrl: true, altText: true, sortOrder: true },
-          orderBy: { sortOrder: "asc" },
-        },
-        variants: {
-          where: { variantStatus: "ACTIVE" as const },
-          select: PUBLIC_PRODUCT_CARD_VARIANT_SELECT,
-        },
-      },
+      select: PUBLIC_PRODUCT_CARD_SELECT,
       orderBy: { createdAt: "desc" },
       take: perPage,
       skip: (page - 1) * perPage,
@@ -351,32 +461,6 @@ export async function getPublicCatalogStats() {
   return { productCount, variantCount, categoryCount };
 }
 
-const PUBLIC_PRODUCT_CARD_SELECT = {
-  id: true,
-  name: true,
-  slug: true,
-  productCode: true,
-  featuredImage: true,
-  gallery: true,
-  defaultMoq: true,
-  leadTime: true,
-  supportsPrinting: true,
-  supportsEmbroidery: true,
-  supportsOem: true,
-  metadata: true,
-  category: { select: { name: true, slug: true } },
-  variants: {
-    where: { variantStatus: "ACTIVE" as const },
-    select: PUBLIC_PRODUCT_CARD_VARIANT_SELECT,
-  },
-  images: {
-    select: { imageUrl: true, altText: true, sortOrder: true },
-    orderBy: { sortOrder: "asc" as const },
-  },
-} as const;
-
-export { PUBLIC_PRODUCT_CARD_SELECT, PUBLIC_PRODUCT_CARD_VARIANT_SELECT };
-
 /** Lightweight latest products for homepage discovery (no count / full category rows). */
 export async function getHomepageLatestProducts(limit = 12) {
   const where = buildPublicProductVisibilityWhere();
@@ -396,36 +480,56 @@ export async function getHomepageLatestProducts(limit = 12) {
 export async function getRelatedProducts(
   categoryId: string,
   excludeProductId: string,
-  limit = 4
+  limit = 4,
 ) {
-  const products = await prisma.product.findMany({
-    where: buildPublicProductVisibilityWhere({
-      categoryId,
-      id: { not: excludeProductId },
-    }),
-    select: PUBLIC_PRODUCT_CARD_SELECT,
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
-  return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
+  const safeLimit = Math.min(12, Math.max(1, limit));
+  return unstable_cache(
+    async () => {
+      const products = await prisma.product.findMany({
+        where: buildPublicProductVisibilityWhere({
+          categoryId,
+          id: { not: excludeProductId },
+        }),
+        select: PUBLIC_PRODUCT_CARD_SELECT,
+        orderBy: { createdAt: "desc" },
+        take: safeLimit,
+      });
+      return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
+    },
+    ["public-related-products", categoryId, excludeProductId, String(safeLimit)],
+    {
+      tags: [PUBLIC_CACHE_TAGS.products],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
 }
 
 /** Cross-sell products from other categories for product detail recommendations. */
 export async function getCrossSellProducts(
   excludeProductId: string,
   excludeCategoryId: string,
-  limit = 4
+  limit = 4,
 ) {
-  const products = await prisma.product.findMany({
-    where: buildPublicProductVisibilityWhere({
-      id: { not: excludeProductId },
-      categoryId: { not: excludeCategoryId },
-    }),
-    select: PUBLIC_PRODUCT_CARD_SELECT,
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
-  return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
+  const safeLimit = Math.min(12, Math.max(1, limit));
+  return unstable_cache(
+    async () => {
+      const products = await prisma.product.findMany({
+        where: buildPublicProductVisibilityWhere({
+          id: { not: excludeProductId },
+          categoryId: { not: excludeCategoryId },
+        }),
+        select: PUBLIC_PRODUCT_CARD_SELECT,
+        orderBy: { createdAt: "desc" },
+        take: safeLimit,
+      });
+      return products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata));
+    },
+    ["public-cross-sell-products", excludeProductId, excludeCategoryId, String(safeLimit)],
+    {
+      tags: [PUBLIC_CACHE_TAGS.products],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
 }
 
 export async function getPublicProductsBySlugs(slugs: string[], limit = 12) {

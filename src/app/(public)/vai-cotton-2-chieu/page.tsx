@@ -4,6 +4,8 @@ import KnowledgeLandingPage from "@/components/seo/KnowledgeLandingPage";
 import { getKnowledgeContent } from "@/lib/knowledgeContent";
 import { canonicalUrl } from "@/lib/seo";
 
+export const revalidate = 3600;
+
 const SLUG = "vai-cotton-2-chieu";
 
 export function generateMetadata(): Metadata {

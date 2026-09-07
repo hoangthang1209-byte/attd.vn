@@ -5,6 +5,8 @@ import TrackedLink from "@/components/analytics/TrackedLink";
 import { CTA } from "@/lib/ctaConfig";
 import { getZaloUrl } from "@/lib/companyInfo";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: `Chính sách đại lý | ${SITE_NAME}`,
   description:

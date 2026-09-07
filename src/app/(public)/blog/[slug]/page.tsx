@@ -16,15 +16,23 @@ import { calculateReadingTime, formatReadingTime } from "@/features/blog/reading
 import {
   getPublishedBlogPostBySlug,
   getRelatedBlogPosts,
+  listPublishedBlogSlugsForStaticParams,
   resolveBlogOgImage,
 } from "@/features/blog/services/blog-public.service";
 import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
+
+export const revalidate = 3600;
 
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
-function formatDate(date: Date): string {
+export async function generateStaticParams() {
+  const slugs = await listPublishedBlogSlugsForStaticParams();
+  return slugs.map((slug) => ({ slug }));
+}
+
+function formatDate(date: Date | string): string {
   return new Intl.DateTimeFormat("vi-VN", {
     day: "2-digit",
     month: "2-digit",

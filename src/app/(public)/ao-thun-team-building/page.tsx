@@ -4,6 +4,8 @@ import IndustryLandingPage from "@/components/seo/IndustryLandingPage";
 import { getIndustryContent } from "@/lib/industryContent";
 import { canonicalUrl } from "@/lib/seo";
 
+export const revalidate = 3600;
+
 const SLUG = "ao-thun-team-building";
 
 export function generateMetadata(): Metadata {

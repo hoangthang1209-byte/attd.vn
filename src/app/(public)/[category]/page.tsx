@@ -12,7 +12,10 @@ import FaqSchema from "@/components/seo/FaqSchema";
 import CollectionSchema from "@/components/seo/CollectionSchema";
 import CollectionSEOContent from "@/components/seo/CollectionSEOContent";
 import ItemListSchema from "@/components/seo/ItemListSchema";
-import { getCategoryBySlug } from "@/features/categories/services/category.service";
+import {
+  getCategoryBySlug,
+  listPublicCategorySlugsForStaticParams,
+} from "@/features/categories/services/category.service";
 import { loadCollectionContent } from "@/features/landing-pages/load-collection-cms";
 import {
   SITE_NAME,
@@ -29,9 +32,16 @@ import {
 import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
 import { isValidImageSrc } from "@/lib/imagePaths";
 
+export const revalidate = 3600;
+
 type PageProps = {
   params: Promise<{ category: string }>;
 };
+
+export async function generateStaticParams() {
+  const slugs = await listPublicCategorySlugsForStaticParams();
+  return slugs.map((category) => ({ category }));
+}
 
 const STOCK_LABELS: Record<string, string> = {
   IN_STOCK: "Còn hàng",

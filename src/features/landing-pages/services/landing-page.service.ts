@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCollectionContent } from "@/lib/collectionContent";
 import { getWholesaleContent } from "@/lib/wholesaleContent";
@@ -11,6 +12,10 @@ import {
   type LandingPageRecord,
   type LandingPageSlug,
 } from "@/features/landing-pages/types";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CACHE_TAGS,
+} from "@/lib/public-cache-tags";
 
 function toPrismaFaqJson(faq: LandingPageInput["faqJson"] | undefined): Prisma.InputJsonValue {
   return (faq ?? []) as unknown as Prisma.InputJsonValue;
@@ -97,9 +102,21 @@ export async function getLandingPageBySlug(
 export async function getPublishedLandingPage(
   slug: string
 ): Promise<LandingPageRecord | null> {
-  const row = await getLandingPageBySlug(slug);
-  if (!row?.isPublished) return null;
-  return row;
+  const normalized = slug.trim();
+  if (!normalized) return null;
+
+  return unstable_cache(
+    async () => {
+      const row = await getLandingPageBySlug(normalized);
+      if (!row?.isPublished) return null;
+      return row;
+    },
+    ["public-landing-page", normalized],
+    {
+      tags: [PUBLIC_CACHE_TAGS.landing, PUBLIC_CACHE_TAGS.homepage],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
 }
 
 export async function upsertLandingPage(

@@ -6,6 +6,8 @@ import PublicBlogCard from "@/components/blog/PublicBlogCard";
 import { SITE_NAME } from "@/lib/seo";
 import { buildBlogIndexMetadata } from "@/lib/seo/indexation-policy";
 
+export const revalidate = 3600;
+
 const PER_PAGE = 9;
 
 export async function generateMetadata({

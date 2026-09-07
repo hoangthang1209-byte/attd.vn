@@ -4,6 +4,8 @@ import KnowledgeLandingPage from "@/components/seo/KnowledgeLandingPage";
 import { getKnowledgeContent } from "@/lib/knowledgeContent";
 import { canonicalUrl } from "@/lib/seo";
 
+export const revalidate = 3600;
+
 const SLUG = "size-ao-thun-tron";
 
 export function generateMetadata(): Metadata {

@@ -7,6 +7,8 @@ import {
   loadWholesalePage,
 } from "@/features/landing-pages/load-wholesale-page";
 
+export const revalidate = 3600;
+
 const SLUG = "kho-ao-polo-tron";
 
 export async function generateMetadata(): Promise<Metadata> {

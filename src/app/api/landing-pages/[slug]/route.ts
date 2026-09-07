@@ -112,6 +112,10 @@ export async function PATCH(
     }
 
     revalidatePath(landingPageRoute(slug));
+    const { revalidatePublicCacheTags, PUBLIC_CACHE_TAGS } = await import(
+      "@/lib/public-cache-tags"
+    );
+    revalidatePublicCacheTags(PUBLIC_CACHE_TAGS.landing, PUBLIC_CACHE_TAGS.homepage);
 
     return NextResponse.json(page);
   } catch (err) {

@@ -5,6 +5,7 @@ import {
   getCrossSellProducts,
   getProductDetailBySlug,
   getRelatedProducts,
+  listPublicProductSlugsForStaticParams,
 } from "@/features/products/services/product.service";
 import ProductDetailInteractive from "@/components/marketplace/ProductDetailInteractive";
 import ProductDiscoveryRail from "@/components/marketplace/ProductDiscoveryRail";
@@ -26,9 +27,16 @@ import {
   mapProductToDiscoveryCard,
 } from "@/features/products/product-discovery";
 
+export const revalidate = 3600;
+
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
+
+export async function generateStaticParams() {
+  const slugs = await listPublicProductSlugsForStaticParams();
+  return slugs.map((slug) => ({ slug }));
+}
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;

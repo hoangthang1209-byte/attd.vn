@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { INDEXABLE_CATEGORY_LANDING_SLUGS } from "@/lib/seo/indexable-category-routes";
 import {
   PUBLIC_CACHE_TAGS,
   revalidatePublicCacheTags,
@@ -12,4 +13,9 @@ export function revalidatePublicCategoryCache(): void {
   revalidatePath("/danh-muc-san-pham");
   revalidatePath("/admin/danh-muc");
   revalidatePath("/admin/products/categories");
+
+  for (const slug of INDEXABLE_CATEGORY_LANDING_SLUGS) {
+    revalidatePath(`/${slug}`);
+    revalidatePath(`/san-pham?category=${slug}`);
+  }
 }

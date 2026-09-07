@@ -6,6 +6,8 @@ import { getPublishedPostsByCategorySlug } from "@/features/blog/services/blog-p
 import { SITE_NAME } from "@/lib/seo";
 import { buildBlogCategoryMetadata } from "@/lib/seo/indexation-policy";
 
+export const revalidate = 3600;
+
 type PageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ page?: string }>;

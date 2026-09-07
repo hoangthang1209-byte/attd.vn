@@ -1,6 +1,12 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
 import { tagMatchesFilter } from "@/features/blog/content-processor";
+import { asCachedDate, asCachedDateRequired } from "@/lib/public-cache-dates";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CACHE_TAGS,
+} from "@/lib/public-cache-tags";
 
 const LIST_SELECT = {
   id: true,
@@ -34,7 +40,40 @@ const RELATED_SELECT = {
   },
 } as const;
 
+function reviveBlogListPost<T extends {
+  publishedAt: Date | string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}>(post: T) {
+  return {
+    ...post,
+    publishedAt: asCachedDate(post.publishedAt),
+    createdAt: asCachedDateRequired(post.createdAt),
+    updatedAt: asCachedDateRequired(post.updatedAt),
+  };
+}
+
 export async function getPublishedBlogPosts(page: number, perPage = 9, tag?: string) {
+  const safePage = Math.max(1, page);
+  const safePerPage = Math.min(24, Math.max(1, perPage));
+  const normalizedTag = tag?.trim() || "";
+
+  const result = await unstable_cache(
+    async () => loadPublishedBlogPostsUncached(safePage, safePerPage, normalizedTag || undefined),
+    ["public-blog-list", String(safePage), String(safePerPage), normalizedTag],
+    {
+      tags: [PUBLIC_CACHE_TAGS.blog],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+
+  return {
+    ...result,
+    posts: result.posts.map(reviveBlogListPost),
+  };
+}
+
+async function loadPublishedBlogPostsUncached(page: number, perPage: number, tag?: string) {
   const where = { status: "PUBLISHED" as const, slug: { not: "" } };
 
   if (tag?.trim()) {
@@ -124,6 +163,28 @@ export async function getPublishedBlogPosts(page: number, perPage = 9, tag?: str
 }
 
 export async function getPublishedBlogPostBySlug(slug: string) {
+  const normalized = slug.trim();
+  if (!normalized) return null;
+
+  const post = await unstable_cache(
+    async () => loadPublishedBlogPostBySlugUncached(normalized),
+    ["public-blog-post", normalized],
+    {
+      tags: [PUBLIC_CACHE_TAGS.blog],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+
+  if (!post) return null;
+  return {
+    ...post,
+    publishedAt: asCachedDate(post.publishedAt),
+    createdAt: asCachedDateRequired(post.createdAt),
+    updatedAt: asCachedDateRequired(post.updatedAt),
+  };
+}
+
+async function loadPublishedBlogPostBySlugUncached(slug: string) {
   const post = await prisma.blogPost.findUnique({
     where: { slug },
     include: {
@@ -173,6 +234,25 @@ export async function getPublishedBlogPostBySlug(slug: string) {
 }
 
 export async function getRelatedBlogPosts(currentSlug: string, categoryIds: string[] = []) {
+  const normalized = currentSlug.trim();
+  const idsKey = [...categoryIds].sort().join(",");
+  const posts = await unstable_cache(
+    async () => loadRelatedBlogPostsUncached(normalized, categoryIds),
+    ["public-related-blog-posts", normalized, idsKey],
+    {
+      tags: [PUBLIC_CACHE_TAGS.blog],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+  return posts.map((post) => ({
+    ...post,
+    publishedAt: asCachedDate(post.publishedAt),
+    createdAt: asCachedDateRequired(post.createdAt),
+    updatedAt: asCachedDateRequired(post.updatedAt),
+  }));
+}
+
+async function loadRelatedBlogPostsUncached(currentSlug: string, categoryIds: string[]) {
   const baseWhere = {
     status: "PUBLISHED" as const,
     slug: { not: currentSlug },
@@ -277,8 +357,29 @@ function mapRelatedPost(post: {
 export async function getPublishedPostsByCategorySlug(
   categorySlug: string,
   page: number,
-  perPage = 9
+  perPage = 9,
 ) {
+  const normalized = categorySlug.trim();
+  const safePage = Math.max(1, page);
+  const safePerPage = Math.min(24, Math.max(1, perPage));
+  if (!normalized) return null;
+
+  const result = await unstable_cache(
+    async () => loadPublishedPostsByCategorySlugUncached(normalized, safePage, safePerPage),
+    ["public-blog-category-list", normalized, String(safePage), String(safePerPage)],
+    {
+      tags: [PUBLIC_CACHE_TAGS.blog],
+      revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+    },
+  )();
+  if (!result) return null;
+  return {
+    ...result,
+    posts: result.posts.map(reviveBlogListPost),
+  };
+}
+
+async function loadPublishedPostsByCategorySlugUncached(categorySlug: string, page: number, perPage: number) {
   const category = await prisma.blogCategory.findFirst({
     where: { slug: categorySlug, isVisible: true },
   });
@@ -330,6 +431,23 @@ export async function resolveBlogOgImage(post: {
   if (post.featuredImageUrl) return post.featuredImageUrl;
   const branding = await getBrandingSettings();
   return branding.defaultOgImageUrl ?? process.env.NEXT_PUBLIC_DEFAULT_OG_IMAGE ?? null;
+}
+
+/** Published blog slugs for ISR prebuild. */
+export async function listPublishedBlogSlugsForStaticParams(): Promise<string[]> {
+  const posts = await prisma.blogPost.findMany({
+    where: { status: "PUBLISHED", slug: { not: "" } },
+    select: { slug: true },
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+  });
+  if (posts.length > 0) return posts.map((post) => post.slug).filter(Boolean);
+
+  const legacy = await prisma.post.findMany({
+    where: { status: "PUBLISHED", slug: { not: "" } },
+    select: { slug: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return legacy.map((post) => post.slug).filter(Boolean);
 }
 
 export type PublicBlogPost = Awaited<ReturnType<typeof getPublishedBlogPostBySlug>>;

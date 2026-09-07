@@ -8,6 +8,8 @@ import LandingHeroVisual from "@/components/public/LandingHeroVisual";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
 import { getLandingDemoImage } from "@/features/demo/demo-image-map";
 
+export const revalidate = 3600;
+
 export async function generateMetadata(): Promise<Metadata> {
   const landing = await resolveBespokeLanding("nguon-hang");
   return {
