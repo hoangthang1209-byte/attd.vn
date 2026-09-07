@@ -26,7 +26,9 @@ export default async function CrmCustomerDetailPage({ params }: PageProps) {
       includeProduction:
         can(session, "production.view") ||
         can(session, "manufacturing.production.view"),
+      includeCosting: can(session, "pricing.manage"),
       canCreateQuote: can(session, "quotes.create"),
+      canCreateCosting: can(session, "pricing.manage"),
     }),
   ]);
 

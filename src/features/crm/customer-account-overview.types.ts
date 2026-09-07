@@ -30,13 +30,16 @@ export const CUSTOMER_360_ORDER_LIST_LIMIT = 20;
 export const CUSTOMER_360_OPEN_QUOTE_LIMIT = 20;
 export const CUSTOMER_360_PRODUCTION_LIMIT = 10;
 export const CUSTOMER_360_PURCHASED_PRODUCT_LIMIT = 50;
+export { CUSTOMER_360_COSTING_LIMIT } from "@/features/crm/customer-costing-bridge";
 
 export type CustomerAccountOverviewCapabilities = {
   includeQuotes: boolean;
   includeOrders: boolean;
   includeFinancials: boolean;
   includeProduction: boolean;
+  includeCosting: boolean;
   canCreateQuote: boolean;
+  canCreateCosting: boolean;
 };
 
 export type CustomerAccountKpis = {
@@ -103,12 +106,27 @@ export type CustomerPurchasedProductRow = {
   lastSupplierName: string | null;
 };
 
+export type CustomerCostingRow = {
+  id: string;
+  code: string;
+  status: string;
+  isFinal: boolean;
+  revisionLabel: string | null;
+  updatedAt: string;
+  productCount: number;
+  productLabel: string | null;
+  sellingTotal: number | null;
+  estimatedCost: number | null;
+  marginRate: number | null;
+};
+
 export type CustomerAccountOverview = {
   customerId: string;
   customerName: string;
   customerCode: string;
   capabilities: CustomerAccountOverviewCapabilities;
   kpis: CustomerAccountKpis;
+  recentCostings: CustomerCostingRow[];
   openQuotes: CustomerOpenQuoteRow[];
   orders: CustomerOrderRow[];
   ordersTotalCount: number;

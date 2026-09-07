@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   ACTIVE_ORDER_STATUSES,
+  CUSTOMER_360_COSTING_LIMIT,
   OPEN_QUOTE_STATUSES,
 } from "@/features/crm/customer-account-overview.types";
 import {
@@ -10,6 +11,10 @@ import {
 } from "@/features/crm/services/customer-account-overview.service";
 
 describe("Customer 360 Phase 1 overview helpers", () => {
+  it("bounds recent costings for Customer 360", () => {
+    assert.equal(CUSTOMER_360_COSTING_LIMIT, 5);
+  });
+
   it("defines open quotes as DRAFT/SENT/VIEWED only", () => {
     assert.deepEqual([...OPEN_QUOTE_STATUSES], ["DRAFT", "SENT", "VIEWED"]);
   });

@@ -37,6 +37,7 @@ import type {
   CostingComponentInput,
   CostingQuantityBreakResult,
 } from "@/features/pricing/costing-types";
+import { parseCostingCustomerIdParam } from "@/features/crm/customer-costing-bridge";
 
 type ProductOption = { id: string; name: string; productCode: string | null };
 type VariantOption = { id: string; sku: string; colorName: string | null; sizeName: string | null };
@@ -118,6 +119,7 @@ export default function CostingCalculator() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromCalculationId = searchParams.get("fromCalculation");
+  const customerIdFromUrl = parseCostingCustomerIdParam(searchParams.get("customerId"));
   const batchId = searchParams.get("batchId");
   const batchItemId = searchParams.get("batchItemId");
   const { permissions } = useAdminPermissions();
@@ -145,6 +147,9 @@ export default function CostingCalculator() {
   const [vatRate, setVatRate] = useState("0");
   const [leadId, setLeadId] = useState("");
   const [customerId, setCustomerId] = useState("");
+  const [customerPrefillLabel, setCustomerPrefillLabel] = useState<string | null>(null);
+  const [customerPrefillError, setCustomerPrefillError] = useState<string | null>(null);
+  const [customerPrefillDone, setCustomerPrefillDone] = useState(false);
   const [contactId, setContactId] = useState("");
   const [priceGroupId, setPriceGroupId] = useState("");
   const [internalNote, setInternalNote] = useState("");
@@ -337,6 +342,49 @@ export default function CostingCalculator() {
       cancelled = true;
     };
   }, [fromCalculationId]);
+
+  useEffect(() => {
+    // fromCalculation clone owns customer selection; do not fight it with URL prefill.
+    if (fromCalculationId || !customerIdFromUrl || customerPrefillDone) return;
+
+    let cancelled = false;
+    void fetch(`/api/crm/customers/${encodeURIComponent(customerIdFromUrl)}`)
+      .then(async (res) => {
+        const data = (await res.json()) as {
+          customer?: { id: string; name: string; code: string; contacts?: ContactOption[] };
+          message?: string;
+        };
+        if (!res.ok || !data.customer?.id) {
+          throw new Error(data.message ?? "Không tìm thấy khách hàng.");
+        }
+        if (cancelled) return;
+        const option: CustomerOption = {
+          id: data.customer.id,
+          name: data.customer.name,
+          code: data.customer.code,
+        };
+        setCustomers((prev) =>
+          prev.some((row) => row.id === option.id) ? prev : [option, ...prev],
+        );
+        setCustomerId(option.id);
+        setCustomerPrefillLabel(`${option.name} (${option.code})`);
+        setCustomerPrefillError(null);
+        setContacts(data.customer.contacts ?? []);
+        setCustomerPrefillDone(true);
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setCustomerPrefillError(
+          err.message || "Không thể chọn khách hàng từ liên kết. Vui lòng chọn lại.",
+        );
+        setCustomerPrefillLabel(null);
+        setCustomerPrefillDone(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customerIdFromUrl, fromCalculationId, customerPrefillDone]);
 
   useEffect(() => {
     if (!customerId) {
@@ -633,6 +681,19 @@ export default function CostingCalculator() {
             Đang tạo phiên bản mới từ {revisionCloneSource.code} · {revisionCloneSource.revisionDisplay}
           </p>
         )}
+        {customerPrefillLabel && !fromCalculationId && (
+          <p
+            className="admin-kb-badge admin-kb-badge--medium"
+            style={{ display: "block", marginBottom: 16, padding: "10px 12px" }}
+          >
+            Khách hàng: <strong>{customerPrefillLabel}</strong>
+          </p>
+        )}
+        {customerPrefillError && !fromCalculationId && (
+          <p className="admin-error" role="alert">
+            {customerPrefillError}
+          </p>
+        )}
         {batchId && (
           <p
             className="admin-kb-badge admin-kb-badge--medium"
@@ -737,7 +798,19 @@ export default function CostingCalculator() {
                 <select
                   className="admin-input"
                   value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setCustomerId(nextId);
+                    setCustomerPrefillError(null);
+                    if (!nextId) {
+                      setCustomerPrefillLabel(null);
+                      return;
+                    }
+                    const selected = customers.find((row) => row.id === nextId);
+                    setCustomerPrefillLabel(
+                      selected ? `${selected.name} (${selected.code})` : null,
+                    );
+                  }}
                 >
                   <option value="">— Không chọn —</option>
                   {customers.map((customer) => (

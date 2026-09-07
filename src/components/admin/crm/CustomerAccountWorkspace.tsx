@@ -7,6 +7,11 @@ import { formatOrderCurrency, formatOrderDate } from "@/features/orders/order-fo
 import { formatQuoteCurrency, formatQuoteDate } from "@/features/quotes/format";
 import { ITEM_PRODUCTION_RISK_LABELS } from "@/features/item-production-tracking/labels";
 import type { CustomerAccountOverview } from "@/features/crm/customer-account-overview.types";
+import {
+  buildCostingOpenHref,
+  buildCustomerCostingHref,
+  costingStatusDisplay,
+} from "@/features/crm/customer-costing-bridge";
 
 function formatMarginRate(rate: number | null): string {
   if (rate == null || !Number.isFinite(rate)) return "—";
@@ -24,6 +29,7 @@ export default function CustomerAccountWorkspace({
   overview: CustomerAccountOverview;
 }) {
   const { capabilities, kpis } = overview;
+  const costingHref = buildCustomerCostingHref(overview.customerId);
 
   return (
     <div className="admin-customer-360">
@@ -61,6 +67,79 @@ export default function CustomerAccountWorkspace({
           )}
         </div>
       )}
+
+      {capabilities.includeCosting ? (
+        <section className="admin-section-card" style={{ marginBottom: 16 }}>
+          <div className="admin-section-header">
+            <h3>Tính giá gần đây</h3>
+            {capabilities.canCreateCosting && overview.recentCostings.length > 0 ? (
+              <Link href={costingHref} className="admin-btn admin-btn--primary admin-btn--xs">
+                Tính giá
+              </Link>
+            ) : null}
+          </div>
+          {overview.recentCostings.length === 0 ? (
+            <p className="admin-empty-hint">
+              Chưa có lần tính giá.
+              {capabilities.canCreateCosting ? (
+                <>
+                  {" "}
+                  <Link href={costingHref}>Tính giá</Link>
+                </>
+              ) : null}
+            </p>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Mã</th>
+                    <th>Ngày</th>
+                    <th>Sản phẩm</th>
+                    <th>Trạng thái</th>
+                    {capabilities.includeFinancials && <th>Giá bán</th>}
+                    {capabilities.includeFinancials && <th>Chi phí</th>}
+                    {capabilities.includeFinancials && <th>Margin</th>}
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {overview.recentCostings.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <Link href={buildCostingOpenHref(row.id)}>{row.code}</Link>
+                      </td>
+                      <td>{formatOrderDate(row.updatedAt)}</td>
+                      <td>
+                        {row.productLabel ?? "—"}
+                        {row.productCount > 1 ? ` (+${row.productCount - 1})` : ""}
+                      </td>
+                      <td>{costingStatusDisplay(row)}</td>
+                      {capabilities.includeFinancials && (
+                        <td>{formatOrderCurrency(row.sellingTotal)}</td>
+                      )}
+                      {capabilities.includeFinancials && (
+                        <td>{formatOrderCurrency(row.estimatedCost)}</td>
+                      )}
+                      {capabilities.includeFinancials && (
+                        <td>{formatMarginRate(row.marginRate)}</td>
+                      )}
+                      <td>
+                        <Link
+                          href={buildCostingOpenHref(row.id)}
+                          className="admin-btn admin-btn--secondary admin-btn--xs"
+                        >
+                          Mở tính giá
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <div className="admin-crm-placeholder-grid">
         {capabilities.includeQuotes ? (

@@ -15,6 +15,10 @@ import {
   type CustomerOrderRow,
   type CustomerPurchasedProductRow,
 } from "@/features/crm/customer-account-overview.types";
+import {
+  CUSTOMER_360_COSTING_LIMIT,
+  mapCustomerCostingRows,
+} from "@/features/crm/customer-costing-bridge";
 import { resolveQuoteDisplayAmount } from "@/features/quotes/quote-amount";
 import { prisma } from "@/lib/prisma";
 
@@ -174,13 +178,14 @@ export async function getCustomerAccountOverview(
     lastOrderDate: null,
   };
 
-  if (!capabilities.includeOrders && !capabilities.includeQuotes) {
+  if (!capabilities.includeOrders && !capabilities.includeQuotes && !capabilities.includeCosting) {
     return {
       customerId,
       customerName: customer.name,
       customerCode: customer.code,
       capabilities,
       kpis: emptyKpis,
+      recentCostings: [],
       openQuotes: [],
       orders: [],
       ordersTotalCount: 0,
@@ -200,6 +205,7 @@ export async function getCustomerAccountOverview(
     ordersTotalCount,
     productionTrackings,
     purchasedItemRows,
+    costingRows,
   ] = await Promise.all([
     capabilities.includeOrders
       ? prisma.order.count({ where: nonCancelledOrderWhere })
@@ -351,6 +357,32 @@ export async function getCustomerAccountOverview(
           },
         })
       : Promise.resolve([]),
+    capabilities.includeCosting
+      ? prisma.pricingCalculation.findMany({
+          where: {
+            customerId,
+            status: { not: "ARCHIVED" },
+          },
+          orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+          take: CUSTOMER_360_COSTING_LIMIT,
+          select: {
+            id: true,
+            code: true,
+            status: true,
+            isFinal: true,
+            revisionLabel: true,
+            updatedAt: true,
+            totalAmount: true,
+            items: {
+              select: {
+                productNameSnapshot: true,
+                costEstimate: true,
+                marginRate: true,
+              },
+            },
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
   const kpis: CustomerAccountKpis = {
@@ -444,12 +476,17 @@ export async function getCustomerAccountOverview(
     { includeFinancials: capabilities.includeFinancials },
   );
 
+  const recentCostings = mapCustomerCostingRows(costingRows, {
+    includeFinancials: capabilities.includeFinancials,
+  });
+
   return {
     customerId,
     customerName: customer.name,
     customerCode: customer.code,
     capabilities,
     kpis,
+    recentCostings,
     openQuotes,
     orders,
     ordersTotalCount,
