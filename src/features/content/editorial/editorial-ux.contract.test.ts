@@ -18,21 +18,17 @@ function read(path: string) {
 }
 
 describe("Sprint 13.1 content editorial IA", () => {
-  it("places editorial content routes under NỘI DUNG with editor-facing labels", () => {
-    const content = adminNavigationSections.find((s) => s.label === "NỘI DUNG");
+  it("places editorial content shortlist under CONTENT & SEO", () => {
+    const content = adminNavigationSections.find((s) => s.label === "CONTENT & SEO");
     assert.ok(content);
     const labels = content.platforms[0].items.map((i) => i.label);
-    assert.ok(labels.includes("Dashboard"));
-    assert.ok(labels.includes("Trung tâm vận hành"));
-    assert.ok(labels.includes("Chủ đề"));
-    assert.ok(labels.includes("Lịch biên tập"));
-    assert.ok(labels.includes("Hướng dẫn biên tập"));
-    assert.ok(labels.includes("Kiểm duyệt"));
-    assert.ok(labels.includes("Xuất bản"));
     assert.ok(labels.includes("Blog"));
+    assert.ok(labels.includes("Landing Page"));
+    assert.ok(labels.includes("SEO"));
+    assert.ok(labels.includes("Case Study"));
     assert.equal(
       content.platforms[0].items.find((i) => i.href === "/admin/content/seo")?.label,
-      "Dashboard",
+      "SEO",
     );
   });
 
@@ -43,21 +39,21 @@ describe("Sprint 13.1 content editorial IA", () => {
     );
   });
 
-  it("maps content dashboard breadcrumbs to NỘI DUNG / Dashboard", () => {
+  it("maps content dashboard breadcrumbs to CONTENT & SEO", () => {
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/seo").breadcrumbs, [
-      "NỘI DUNG",
-      "Dashboard",
+      "CONTENT & SEO",
+      "SEO",
     ]);
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/launch").breadcrumbs, [
-      "NỘI DUNG",
+      "CONTENT & SEO",
       "Hướng dẫn biên tập",
     ]);
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/reviews").breadcrumbs, [
-      "NỘI DUNG",
+      "CONTENT & SEO",
       "Kiểm duyệt",
     ]);
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/topics/abc").breadcrumbs, [
-      "NỘI DUNG",
+      "CONTENT & SEO",
       "Workspace",
     ]);
   });

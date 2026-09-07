@@ -38,19 +38,19 @@ function emptyEngagement(status: ContentPerformanceSummary["engagement"]["source
 }
 
 describe("Sprint 13.4 content performance", () => {
-  it("registers Hiệu quả nội dung in nav and breadcrumbs", () => {
-    const content = adminNavigationSections.find((s) => s.label === "NỘI DUNG");
+  it("keeps Hiệu quả nội dung routes/breadcrumbs without primary nav promotion", () => {
+    const content = adminNavigationSections.find((s) => s.label === "CONTENT & SEO");
     assert.ok(content);
     assert.equal(
-      content.platforms[0].items.find((i) => i.href === "/admin/content/performance")?.label,
-      "Hiệu quả nội dung",
+      content.platforms[0].items.find((i) => i.href === "/admin/content/performance"),
+      undefined,
     );
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/performance").breadcrumbs, [
-      "NỘI DUNG",
+      "CONTENT & SEO",
       "Hiệu quả nội dung",
     ]);
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/performance/settings").breadcrumbs, [
-      "NỘI DUNG",
+      "CONTENT & SEO",
       "Hiệu quả nội dung",
       "Cài đặt nguồn",
     ]);

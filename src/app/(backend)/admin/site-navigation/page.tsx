@@ -2,6 +2,9 @@ import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import SiteNavigationAdminManager from "@/components/admin/site-navigation/SiteNavigationAdminManager";
 import { getSiteNavigationCmsConfig, isSiteNavigationTableReady } from "@/features/site-navigation/site-navigation.service";
 import { requireAdminPermissionPage } from "@/lib/admin-auth/require-admin-permission";
+import { adminPageMetadata } from "@/lib/admin/admin-metadata";
+
+export const metadata = adminPageMetadata("Điều hướng & Footer");
 
 export default async function SiteNavigationAdminPage() {
   await requireAdminPermissionPage("cms.manage");

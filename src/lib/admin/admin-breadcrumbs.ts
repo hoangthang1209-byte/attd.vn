@@ -19,16 +19,16 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/dashboard",
     meta: {
-      breadcrumbs: ["Dashboard"],
-      title: "Dashboard",
+      breadcrumbs: ["Tổng quan"],
+      title: "Tổng quan",
       description: "Theo dõi nhanh tình hình vận hành, thương mại và hệ thống CMS.",
     },
   },
   {
     path: "/admin",
     meta: {
-      breadcrumbs: ["Dashboard"],
-      title: "Dashboard",
+      breadcrumbs: ["Tổng quan"],
+      title: "Tổng quan",
       description: "Theo dõi nhanh tình hình vận hành, thương mại và hệ thống CMS.",
     },
   },
@@ -37,15 +37,15 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/crm/leads",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Lead"],
-      title: "Quản lý lead",
+      breadcrumbs: ["BÁN HÀNG", "Lead"],
+      title: "Lead",
       description: "Tiếp nhận, phân loại và theo dõi cơ hội bán hàng mới.",
     },
   },
   {
     path: "/admin/crm/customers/import",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Khách hàng", "Import Excel"],
+      breadcrumbs: ["BÁN HÀNG", "Khách hàng", "Import Excel"],
       title: "Import khách hàng",
       description: "Nhập danh sách khách hàng từ file Excel và kiểm tra trước khi import.",
     },
@@ -53,7 +53,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/crm/customers/new",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Khách hàng", "Tạo mới"],
+      breadcrumbs: ["BÁN HÀNG", "Khách hàng", "Tạo mới"],
       title: "Tạo khách hàng",
       description: "Thêm hồ sơ khách hàng mới vào CRM.",
     },
@@ -61,7 +61,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/crm/customers/:id",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Khách hàng", "Chi tiết"],
+      breadcrumbs: ["BÁN HÀNG", "Khách hàng", "Chi tiết"],
       title: "Chi tiết khách hàng",
       description: "Xem và cập nhật hồ sơ khách hàng, liên hệ và lịch sử chăm sóc.",
     },
@@ -69,7 +69,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/crm/customers",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Khách hàng"],
+      breadcrumbs: ["BÁN HÀNG", "Khách hàng"],
       title: "Khách hàng",
       description: "Quản lý hồ sơ công ty, người liên hệ và lịch sử chăm sóc.",
     },
@@ -77,7 +77,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/crm/whatsapp-assistant",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "AI Assistant"],
+      breadcrumbs: ["BÁN HÀNG", "AI Assistant"],
       title: "AI Assistant",
       description: "Hỗ trợ phân tích hội thoại và tạo dữ liệu bán hàng từ trao đổi khách hàng.",
     },
@@ -85,7 +85,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/crm",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "CRM"],
+      breadcrumbs: ["BÁN HÀNG", "CRM"],
       title: "CRM Pipeline",
       description: "Theo dõi pipeline bán hàng và trạng thái xử lý khách hàng.",
     },
@@ -93,7 +93,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/sales/follow-up",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Follow-up"],
+      breadcrumbs: ["BÁN HÀNG", "Follow-up"],
       title: "Follow-up",
       description: "Theo dõi các việc cần chăm sóc tiếp theo trong quy trình bán hàng.",
     },
@@ -101,7 +101,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/sales/pipeline",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Pipeline bán hàng"],
+      breadcrumbs: ["BÁN HÀNG", "Pipeline bán hàng"],
       title: "Pipeline bán hàng",
       description: "Quản lý các cơ hội thương mại theo giai đoạn bán hàng.",
     },
@@ -109,7 +109,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/quotes/new",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Báo giá", "Tạo mới"],
+      breadcrumbs: ["BÁN HÀNG", "Báo giá", "Tạo mới"],
       title: "Tạo báo giá",
       description: "Tạo báo giá mới cho khách hàng.",
     },
@@ -117,7 +117,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/quotes/:id/edit",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Báo giá", "Chỉnh sửa"],
+      breadcrumbs: ["BÁN HÀNG", "Báo giá", "Chỉnh sửa"],
       title: "Chỉnh sửa báo giá",
       description: "Cập nhật nội dung và điều khoản báo giá.",
     },
@@ -125,7 +125,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/quotes/:id",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Báo giá", "Chi tiết"],
+      breadcrumbs: ["BÁN HÀNG", "Báo giá", "Chi tiết"],
       title: "Chi tiết báo giá",
       description: "Xem chi tiết báo giá và trạng thái xử lý.",
     },
@@ -133,7 +133,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/quotes",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Báo giá"],
+      breadcrumbs: ["BÁN HÀNG", "Báo giá"],
       title: "Quản lý báo giá",
       description: "Tạo, gửi và theo dõi báo giá khách hàng.",
     },
@@ -141,7 +141,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/orders/new",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Đơn hàng", "Tạo mới"],
+      breadcrumbs: ["BÁN HÀNG", "Đơn hàng", "Tạo mới"],
       title: "Tạo đơn hàng",
       description: "Tạo đơn hàng mới từ báo giá hoặc nhập trực tiếp.",
     },
@@ -149,7 +149,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/orders/:id/edit",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Đơn hàng", "Chỉnh sửa"],
+      breadcrumbs: ["BÁN HÀNG", "Đơn hàng", "Chỉnh sửa"],
       title: "Chỉnh sửa đơn hàng",
       description: "Cập nhật thông tin và trạng thái đơn hàng.",
     },
@@ -157,7 +157,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/orders/:id",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Đơn hàng", "Chi tiết"],
+      breadcrumbs: ["BÁN HÀNG", "Đơn hàng", "Chi tiết"],
       title: "Chi tiết đơn hàng",
       description: "Xem chi tiết đơn hàng và các bước xử lý liên quan.",
     },
@@ -165,7 +165,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/orders",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Đơn hàng"],
+      breadcrumbs: ["BÁN HÀNG", "Đơn hàng"],
       title: "Đơn hàng",
       description: "Theo dõi đơn hàng đã chốt và trạng thái xử lý liên quan.",
     },
@@ -179,11 +179,19 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/pricing/costing",
+    meta: {
+      breadcrumbs: ["BÁN HÀNG", "Tính giá"],
+      title: "Tính giá",
+      description: "Tính giá vốn và chuẩn bị đầu vào cho báo giá.",
+    },
+  },
+  {
     path: "/admin/pricing",
     meta: {
-      breadcrumbs: ["THƯƠNG MẠI", "Bảng giá"],
-      title: "Pricing Engine",
-      description: "Tính giá, kiểm tra biên lợi nhuận và chuẩn hóa báo giá.",
+      breadcrumbs: ["CẤU HÌNH", "Cấu hình giá"],
+      title: "Cấu hình giá",
+      description: "Tổng quan công cụ giá, lịch sử tính giá và nhóm giá.",
     },
   },
 
@@ -223,8 +231,8 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/danh-muc",
     meta: {
-      breadcrumbs: ["SẢN PHẨM", "Danh mục"],
-      title: "Danh mục",
+      breadcrumbs: ["CẤU HÌNH", "Danh mục sản phẩm"],
+      title: "Danh mục sản phẩm",
       description: "Quản lý cấu trúc danh mục sản phẩm trên website và CMS.",
     },
   },
@@ -249,7 +257,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/tech-pack",
     meta: {
-      breadcrumbs: ["KỸ THUẬT SẢN PHẨM", "Tech Pack"],
+      breadcrumbs: ["KỸ THUẬT", "Tech Pack"],
       title: "Tech Pack",
       description: "Quản lý tài liệu kỹ thuật phục vụ phát triển mẫu và sản xuất.",
     },
@@ -257,7 +265,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/pattern",
     meta: {
-      breadcrumbs: ["KỸ THUẬT SẢN PHẨM", "Pattern"],
+      breadcrumbs: ["KỸ THUẬT", "Pattern"],
       title: "Pattern",
       description: "Quản lý rập, thông số và dữ liệu kỹ thuật theo sản phẩm.",
     },
@@ -265,7 +273,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/measurement-template",
     meta: {
-      breadcrumbs: ["KỸ THUẬT SẢN PHẨM", "Mẫu thông số"],
+      breadcrumbs: ["KỸ THUẬT", "Mẫu thông số"],
       title: "Mẫu thông số",
       description: "Chuẩn hóa bộ thông số đo dùng cho tech pack và pattern.",
     },
@@ -273,7 +281,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/production-materials",
     meta: {
-      breadcrumbs: ["KỸ THUẬT SẢN PHẨM", "Nguyên vật liệu"],
+      breadcrumbs: ["KỸ THUẬT", "Nguyên vật liệu"],
       title: "Nguyên vật liệu",
       description: "Quản lý thư viện nguyên vật liệu phục vụ BOM và sản xuất.",
     },
@@ -281,7 +289,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/trims",
     meta: {
-      breadcrumbs: ["KỸ THUẬT SẢN PHẨM", "Phụ liệu"],
+      breadcrumbs: ["KỸ THUẬT", "Phụ liệu"],
       title: "Phụ liệu",
       description: "Quản lý phụ liệu, nhãn, bo, dây kéo và chi tiết hoàn thiện sản phẩm.",
     },
@@ -339,8 +347,8 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/production-suppliers",
     meta: {
-      breadcrumbs: ["SẢN XUẤT", "Nhà cung cấp sản xuất"],
-      title: "Nhà cung cấp sản xuất",
+      breadcrumbs: ["SẢN XUẤT", "Nhà cung cấp"],
+      title: "Nhà cung cấp",
       description: "Quản lý nhà cung cấp phục vụ sản xuất, gia công và nguyên liệu.",
     },
   },
@@ -355,9 +363,9 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/production",
     meta: {
-      breadcrumbs: ["SẢN XUẤT", "Lệnh sản xuất"],
-      title: "Lệnh sản xuất",
-      description: "Theo dõi lệnh sản xuất và các trạng thái vận hành liên quan.",
+      breadcrumbs: ["SẢN XUẤT", "Tổng quan sản xuất"],
+      title: "Tổng quan sản xuất",
+      description: "Tổng quan lệnh/kế hoạch sản xuất và trạng thái vận hành liên quan.",
     },
   },
   {
@@ -399,7 +407,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/blog",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Blog"],
+      breadcrumbs: ["CONTENT & SEO", "Blog"],
       title: "Blog",
       description: "Quản lý bài viết, nội dung SEO và truyền thông thương hiệu.",
     },
@@ -407,7 +415,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/landing-pages",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Landing Page"],
+      breadcrumbs: ["CONTENT & SEO", "Landing Page"],
       title: "Landing Page",
       description: "Quản lý các trang landing phục vụ SEO, chiến dịch và chuyển đổi.",
     },
@@ -415,7 +423,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/case-studies",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Case Study"],
+      breadcrumbs: ["CONTENT & SEO", "Case Study"],
       title: "Case Study",
       description: "Quản lý dự án tiêu biểu và bằng chứng năng lực trên website.",
     },
@@ -423,7 +431,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/operations",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Trung tâm vận hành"],
+      breadcrumbs: ["CONTENT & SEO", "Trung tâm vận hành"],
       title: "Trung tâm vận hành nội dung",
       description: "Cockpit vận hành: pipeline, sức khỏe nội dung, hàng đợi kiểm duyệt và xuất bản — chỉ xem, không đổi trạng thái.",
     },
@@ -431,7 +439,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/reviews/:id",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Kiểm duyệt", "Chi tiết"],
+      breadcrumbs: ["CONTENT & SEO", "Kiểm duyệt", "Chi tiết"],
       title: "Chi tiết kiểm duyệt",
       description: "Xem và xử lý một bài đang chờ kiểm duyệt biên tập.",
     },
@@ -439,7 +447,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/reviews",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Kiểm duyệt"],
+      breadcrumbs: ["CONTENT & SEO", "Kiểm duyệt"],
       title: "Kiểm duyệt",
       description: "Hàng đợi kiểm duyệt biên tập trước khi xuất bản.",
     },
@@ -447,7 +455,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/generation/:id",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "AI vận hành", "Chi tiết đề xuất"],
+      breadcrumbs: ["CONTENT & SEO", "AI vận hành", "Chi tiết đề xuất"],
       title: "Chi tiết đề xuất AI",
       description: "Xem đề xuất AI: nội dung gốc/đề xuất, ngữ cảnh, chi phí, và lịch sử trạng thái.",
     },
@@ -455,7 +463,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/ai/smoke",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "AI vận hành", "Smoke Workspace"],
+      breadcrumbs: ["CONTENT & SEO", "AI vận hành", "Smoke Workspace"],
       title: "AI Smoke Workspace",
       description: "Kiểm tra tiền điều kiện AI (PASS/WARNING/FAIL) và mô phỏng lỗi an toàn bằng provider TEST.",
     },
@@ -463,7 +471,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/ai",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "AI vận hành"],
+      breadcrumbs: ["CONTENT & SEO", "AI vận hành"],
       title: "AI vận hành",
       description: "Cấu hình provider, giai đoạn triển khai, hạn mức, sức khỏe provider và usage ledger AI.",
     },
@@ -471,7 +479,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/publishing",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Xuất bản"],
+      breadcrumbs: ["CONTENT & SEO", "Xuất bản"],
       title: "Xuất bản",
       description: "Theo dõi bản nháp, lịch xuất bản và bài đã đăng.",
     },
@@ -481,7 +489,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/seo-planning",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "SEO Planning"],
+      breadcrumbs: ["CONTENT & SEO", "SEO Planning"],
       title: "SEO Planning",
       description: "Kế hoạch SEO chiến dịch (workspace kế thừa).",
     },
@@ -489,7 +497,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/topics/:id",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Workspace"],
+      breadcrumbs: ["CONTENT & SEO", "Workspace"],
       title: "Editorial Workspace",
       description: "Workspace biên tập cho một chủ đề: Brief, Context, Viết bài và QA.",
     },
@@ -497,7 +505,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/seo-topics/:id",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Chủ đề", "Chi tiết"],
+      breadcrumbs: ["CONTENT & SEO", "Chủ đề", "Chi tiết"],
       title: "Chi tiết chủ đề",
       description: "Workspace biên tập cho một chủ đề: Brief, Context, Viết bài và QA.",
     },
@@ -505,7 +513,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/seo-topics",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Chủ đề"],
+      breadcrumbs: ["CONTENT & SEO", "Chủ đề"],
       title: "Chủ đề",
       description: "Danh sách chủ đề nội dung — chọn bài cần làm tiếp theo.",
     },
@@ -513,7 +521,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/launch",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Hướng dẫn biên tập"],
+      breadcrumbs: ["CONTENT & SEO", "Hướng dẫn biên tập"],
       title: "Hướng dẫn biên tập",
       description: "Quy trình viết bài từ Brief đến xuất bản — dành cho biên tập viên.",
     },
@@ -521,7 +529,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/seo-strategies/:id",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Chiến lược", "Chi tiết"],
+      breadcrumbs: ["CONTENT & SEO", "Chiến lược", "Chi tiết"],
       title: "Chi tiết chiến lược",
       description: "Chiến lược nội dung và cụm chủ đề liên quan.",
     },
@@ -529,7 +537,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/calendar",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Lịch biên tập"],
+      breadcrumbs: ["CONTENT & SEO", "Lịch biên tập"],
       title: "Lịch biên tập",
       description: "Lập kế hoạch xuất bản theo pipeline, tuần, tháng và agenda.",
     },
@@ -537,7 +545,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/performance/settings",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Hiệu quả nội dung", "Cài đặt nguồn"],
+      breadcrumbs: ["CONTENT & SEO", "Hiệu quả nội dung", "Cài đặt nguồn"],
       title: "Cài đặt nguồn đo lường",
       description: "Trạng thái kết nối Search Console, Analytics và attribution — không hiển thị credential.",
     },
@@ -545,7 +553,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/performance/:id",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Hiệu quả nội dung", "Chi tiết"],
+      breadcrumbs: ["CONTENT & SEO", "Hiệu quả nội dung", "Chi tiết"],
       title: "Chi tiết hiệu quả bài",
       description: "Search, engagement, conversion và khuyến nghị cập nhật cho một bài đã xuất bản.",
     },
@@ -553,7 +561,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/performance",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Hiệu quả nội dung"],
+      breadcrumbs: ["CONTENT & SEO", "Hiệu quả nội dung"],
       title: "Hiệu quả nội dung",
       description: "Theo dõi hiệu quả bài đã xuất bản và xác định nội dung cần tối ưu tiếp theo.",
     },
@@ -561,7 +569,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/seo-strategies",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Chiến lược"],
+      breadcrumbs: ["CONTENT & SEO", "Chiến lược"],
       title: "Chiến lược",
       description: "Quản lý chiến lược nội dung và tiến độ theo cụm chủ đề.",
     },
@@ -569,8 +577,8 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/content/seo",
     meta: {
-      breadcrumbs: ["NỘI DUNG", "Dashboard"],
-      title: "Content Dashboard",
+      breadcrumbs: ["CONTENT & SEO", "SEO"],
+      title: "SEO",
       description: "Bảng điều khiển biên tập — việc hôm nay, tiến độ và hành động tiếp theo.",
     },
   },
@@ -579,8 +587,8 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/media",
     meta: {
-      breadcrumbs: ["MEDIA", "Thư viện tài sản"],
-      title: "Thư viện tài sản",
+      breadcrumbs: ["CẤU HÌNH", "Media"],
+      title: "Media",
       description: "Quản lý tài sản media dùng chung cho sản phẩm, nội dung và website.",
     },
   },
@@ -753,7 +761,7 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/delivery",
     meta: {
-      breadcrumbs: ["VẬN HÀNH", "Giao hàng"],
+      breadcrumbs: ["SẢN XUẤT", "Giao hàng"],
       title: "Giao hàng",
       description: "Theo dõi giao hàng, vận chuyển và trạng thái bàn giao.",
     },
@@ -805,23 +813,23 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
   {
     path: "/admin/settings/users",
     meta: {
-      breadcrumbs: ["HỆ THỐNG", "Users"],
-      title: "Users",
-      description: "Quản lý tài khoản người dùng có quyền truy cập CMS.",
+      breadcrumbs: ["CẤU HÌNH", "Người dùng"],
+      title: "Người dùng",
+      description: "Quản lý tài khoản người dùng có quyền truy cập Admin.",
     },
   },
   {
     path: "/admin/settings/roles",
     meta: {
-      breadcrumbs: ["HỆ THỐNG", "Roles"],
-      title: "Roles",
+      breadcrumbs: ["CẤU HÌNH", "Vai trò & quyền"],
+      title: "Vai trò & quyền",
       description: "Quản lý vai trò và quyền truy cập theo phân quyền nội bộ.",
     },
   },
   {
     path: "/admin/settings/company",
     meta: {
-      breadcrumbs: ["HỆ THỐNG", "Thông tin công ty"],
+      breadcrumbs: ["CẤU HÌNH", "Thông tin công ty"],
       title: "Thông tin công ty",
       description: "Quản lý thông tin công ty dùng trong tài liệu và cấu hình CMS.",
     },
@@ -883,8 +891,8 @@ export function getAdminBreadcrumbMeta(pathname: string): AdminBreadcrumbMeta {
   if (matchedRule) return matchedRule.meta;
 
   return {
-    breadcrumbs: ["CMS"],
-    title: "ATTD CMS",
+    breadcrumbs: ["Admin"],
+    title: "ATTD Admin",
     description: "Quản trị dữ liệu, nội dung và vận hành nội bộ của ATTD.",
   };
 }

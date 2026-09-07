@@ -7,6 +7,9 @@ import HomepageCompanyRealitySettingsForm from "@/components/admin/HomepageCompa
 import HomepageWorkshopGallerySettingsForm from "@/components/admin/HomepageWorkshopGallerySettingsForm";
 import HomepageSectionsSettingsForm from "@/components/admin/HomepageSectionsSettingsForm";
 import { getHomepageCmsConfig } from "@/features/home/homepage.service";
+import { adminPageMetadata } from "@/lib/admin/admin-metadata";
+
+export const metadata = adminPageMetadata("Trang chủ");
 
 export default async function HomepageSettingsPage() {
   const cms = await getHomepageCmsConfig();

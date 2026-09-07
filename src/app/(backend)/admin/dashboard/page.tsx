@@ -6,6 +6,9 @@ import { countCaseStudies } from "@/features/case-studies/services/case-study.se
 import { getCmsHealth } from "@/features/admin/services/cms-health.service";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CmsHealthCard from "@/components/admin/CmsHealthCard";
+import { adminPageMetadata } from "@/lib/admin/admin-metadata";
+
+export const metadata = adminPageMetadata("Tổng quan");
 
 export default async function DashboardPage() {
   const [
@@ -57,7 +60,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <AdminPageTitle title={"Dashboard"} />
+      <AdminPageTitle title={"Tổng quan"} />
       <div className="admin-dashboard-grid">
         <CmsHealthCard health={health} />
         {cmsCards.map((card) => (

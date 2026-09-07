@@ -80,7 +80,8 @@ describe("IA-4A workspace toolbar foundation", () => {
   it("does not alter navigation, breadcrumbs, AdminShell, or globals.css in this sprint", () => {
     // Contract: these authority files must remain outside the IA-4A edit set.
     // Verified by presence of stable markers rather than git (runs in isolation).
-    assert.match(read("src/lib/admin/admin-navigation.ts"), /KNOWLEDGE & AI/);
+    assert.match(read("src/lib/admin/admin-navigation.ts"), /CONTENT & SEO/);
+    assert.match(read("src/lib/admin/admin-breadcrumbs.ts"), /CONTENT & SEO/);
     assert.match(read("src/lib/admin/admin-breadcrumbs.ts"), /KNOWLEDGE & AI/);
     assert.match(read("src/components/admin/AdminShell.tsx"), /pageTitle/);
     assert.match(read("src/components/admin/AdminUi.tsx"), /WorkspaceToolbarEnd/);

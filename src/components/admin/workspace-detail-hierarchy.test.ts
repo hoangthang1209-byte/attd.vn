@@ -103,7 +103,8 @@ describe("IA-4D detail workspace hierarchy", () => {
       read("src/components/admin/products/ProductCatalogDashboard.tsx"),
       /marginBottom:\s*0/,
     );
-    assert.match(read("src/lib/admin/admin-navigation.ts"), /KNOWLEDGE & AI/);
+    assert.match(read("src/lib/admin/admin-navigation.ts"), /CONTENT & SEO/);
+    assert.match(read("src/lib/admin/admin-breadcrumbs.ts"), /CONTENT & SEO/);
     assert.match(read("src/lib/admin/admin-breadcrumbs.ts"), /KNOWLEDGE & AI/);
     assert.match(read("src/components/admin/AdminShell.tsx"), /pageTitle/);
     assert.doesNotMatch(

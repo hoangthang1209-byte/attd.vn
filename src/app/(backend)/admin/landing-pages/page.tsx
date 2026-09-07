@@ -4,6 +4,9 @@ import {
   ensureLandingPagesSeeded,
   isLandingPageTableReady,
 } from "@/features/landing-pages/services/landing-page.service";
+import { adminPageMetadata } from "@/lib/admin/admin-metadata";
+
+export const metadata = adminPageMetadata("Landing Page");
 
 export default async function LandingPagesAdminPage() {
   const tableReady = await isLandingPageTableReady();

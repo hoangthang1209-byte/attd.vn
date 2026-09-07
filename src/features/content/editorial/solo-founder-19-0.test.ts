@@ -62,32 +62,27 @@ describe("Sprint 19.0 Solo Founder Experience", () => {
     }
   });
 
-  it("Solo nav filter hides the Content operations href", () => {
+  it("Solo nav filter hides enterprise Content ops hrefs when present", () => {
     const filtered = filterNavigationForWorkspaceMode(adminNavigationSections, true);
-    const content = filtered.find((s) => s.label === "NỘI DUNG");
+    const content = filtered.find((s) => s.label === "CONTENT & SEO");
     assert.ok(content);
     const hrefs = content.platforms.flatMap((p) => p.items.map((i) => i.href));
     assert.ok(!hrefs.includes("/admin/content/operations"));
     assert.ok(!hrefs.includes("/admin/content/ai"));
     assert.ok(!hrefs.includes("/admin/content/calendar"));
     assert.ok(!hrefs.includes("/admin/content/performance"));
-    // Solo shortlist stays reachable.
+    // Lean primary Content & SEO shortlist stays reachable.
     assert.ok(hrefs.includes("/admin/content/seo"));
-    assert.ok(hrefs.includes("/admin/content/seo-topics"));
-    assert.ok(hrefs.includes("/admin/content/reviews"));
-    assert.ok(hrefs.includes("/admin/content/publishing"));
     assert.ok(hrefs.includes("/admin/blog"));
+    assert.ok(hrefs.includes("/admin/landing-pages"));
+    assert.ok(hrefs.includes("/admin/case-studies"));
   });
 
-  it("Team nav keeps the Content operations href", () => {
+  it("Team nav keeps Content & SEO primary shortlist unchanged", () => {
     const filtered = filterNavigationForWorkspaceMode(adminNavigationSections, false);
-    const content = filtered.find((s) => s.label === "NỘI DUNG");
+    const content = filtered.find((s) => s.label === "CONTENT & SEO");
     assert.ok(content);
-    const hrefs = content.platforms.flatMap((p) => p.items.map((i) => i.href));
-    assert.ok(hrefs.includes("/admin/content/operations"));
-    assert.ok(hrefs.includes("/admin/content/ai"));
-    // Filter never mutates the static registry — Team output equals unfiltered items.
-    const rawContent = adminNavigationSections.find((s) => s.label === "NỘI DUNG");
+    const rawContent = adminNavigationSections.find((s) => s.label === "CONTENT & SEO");
     assert.ok(rawContent);
     assert.deepEqual(
       content.platforms.flatMap((p) => p.items.map((i) => i.href)),

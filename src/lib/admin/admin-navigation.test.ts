@@ -5,7 +5,14 @@ import { describe, it } from "node:test";
 import {
   adminDashboardNavItem,
   adminNavigationSections,
+  filterNavigationForWorkspaceMode,
+  SOLO_HIDDEN_CONTENT_HREFS,
 } from "@/lib/admin/admin-navigation";
+import {
+  ADMIN_DOCUMENT_TITLE,
+  ADMIN_TITLE_TEMPLATE,
+  adminPageMetadata,
+} from "@/lib/admin/admin-metadata";
 
 function allNavItems() {
   return adminNavigationSections.flatMap((section) =>
@@ -16,17 +23,95 @@ function allNavItems() {
 function hrefToPageCandidates(href: string): string[] {
   const relative = href.replace(/^\/admin\//, "");
   const base = path.join("src/app/(backend)/admin", relative);
-  return [
-    path.join(base, "page.tsx"),
-    `${base}.tsx`,
-  ];
+  return [path.join(base, "page.tsx"), `${base}.tsx`];
 }
 
-describe("admin navigation CMS IA v2", () => {
+describe("lean admin navigation", () => {
   it("uses domain → items only (no visible third-level platform labels)", () => {
     for (const section of adminNavigationSections) {
       assert.equal(section.platforms.length, 1, `${section.label} should have one internal platform`);
       assert.equal(section.platforms[0].label, "", `${section.label} platform label must be empty`);
+    }
+  });
+
+  it("keeps primary section order for the operating spine", () => {
+    assert.deepEqual(
+      adminNavigationSections.map((section) => section.label),
+      [
+        "BÁN HÀNG",
+        "SẢN PHẨM",
+        "SẢN XUẤT",
+        "KỸ THUẬT",
+        "CONTENT & SEO",
+        "WEBSITE",
+        "CẤU HÌNH",
+      ],
+    );
+    assert.equal(adminDashboardNavItem.label, "Tổng quan");
+    assert.equal(adminDashboardNavItem.href, "/admin/dashboard");
+  });
+
+  it("keeps commercial spine primary with costing promoted", () => {
+    const sales = adminNavigationSections.find((s) => s.label === "BÁN HÀNG");
+    assert.ok(sales);
+    assert.deepEqual(
+      sales.platforms[0].items.map((item) => [item.label, item.href]),
+      [
+        ["Khách hàng", "/admin/crm/customers"],
+        ["Lead", "/admin/crm/leads"],
+        ["Tính giá", "/admin/pricing/costing"],
+        ["Báo giá", "/admin/quotes"],
+        ["Đơn hàng", "/admin/orders"],
+      ],
+    );
+  });
+
+  it("keeps products lean and demotes product configuration", () => {
+    const products = adminNavigationSections.find((s) => s.label === "SẢN PHẨM");
+    assert.ok(products);
+    assert.deepEqual(
+      products.platforms[0].items.map((item) => item.href),
+      ["/admin/products"],
+    );
+    const hrefs = allNavItems().map((item) => item.href);
+    assert.ok(!hrefs.includes("/admin/variant"));
+    assert.ok(!hrefs.includes("/admin/attributes"));
+    assert.ok(!hrefs.includes("/admin/pricing/product-tiers"));
+    assert.ok(hrefs.includes("/admin/danh-muc"));
+  });
+
+  it("keeps Content & SEO and Website as primary business domains", () => {
+    const content = adminNavigationSections.find((s) => s.label === "CONTENT & SEO");
+    assert.ok(content);
+    assert.deepEqual(
+      content.platforms[0].items.map((item) => item.href),
+      [
+        "/admin/blog",
+        "/admin/landing-pages",
+        "/admin/content/seo",
+        "/admin/case-studies",
+      ],
+    );
+    const website = adminNavigationSections.find((s) => s.label === "WEBSITE");
+    assert.ok(website);
+    assert.ok(website.platforms[0].items.some((i) => i.href === "/admin/settings/homepage"));
+    assert.ok(website.platforms[0].items.some((i) => i.href === "/admin/site-navigation"));
+  });
+
+  it("hides experimental/enterprise surfaces from primary nav", () => {
+    const hrefs = new Set(allNavItems().map((item) => item.href));
+    for (const href of [
+      "/admin/knowledge-graph",
+      "/admin/knowledge-base",
+      "/admin/content/ai",
+      "/admin/content/operations",
+      "/admin/dealer",
+      "/admin/crm/whatsapp-assistant",
+      "/admin/sales/pipeline",
+      "/admin/media/dashboard",
+      "/admin/manufacturing-library",
+    ]) {
+      assert.equal(hrefs.has(href), false, `${href} must not be primary`);
     }
   });
 
@@ -43,32 +128,6 @@ describe("admin navigation CMS IA v2", () => {
     assert.equal(new Set(hrefs).size, hrefs.length, "duplicate hrefs in navigation");
   });
 
-  it("does not place /admin/media under SẢN PHẨM", () => {
-    const products = adminNavigationSections.find((s) => s.label === "SẢN PHẨM");
-    assert.ok(products);
-    const mediaInProducts = products.platforms[0].items.some((i) => i.href === "/admin/media");
-    assert.equal(mediaInProducts, false);
-    const media = allNavItems().find((i) => i.href === "/admin/media");
-    assert.ok(media);
-    assert.equal(media.label, "Thư viện tài sản");
-  });
-
-  it("uses KNOWLEDGE & AI naming without Tri thức", () => {
-    const knowledge = adminNavigationSections.find((s) => s.label === "KNOWLEDGE & AI");
-    assert.ok(knowledge);
-    const raw = JSON.stringify(adminNavigationSections);
-    assert.doesNotMatch(raw, /Tri thức/);
-    assert.match(raw, /Knowledge Base/);
-    assert.match(raw, /Knowledge Graph/);
-  });
-
-  it("gates Manufacturing Library with canManageManufacturingLibrary", () => {
-    const item = allNavItems().find((i) => i.href === "/admin/manufacturing-library");
-    assert.ok(item, "Manufacturing Library route present");
-    assert.equal(item.label, "Thư viện sản xuất");
-    assert.deepEqual(item.requiredPermissions, ["canManageManufacturingLibrary"]);
-  });
-
   it("resolves every sidebar href to an existing admin page", () => {
     for (const item of allNavItems()) {
       if (!item.href || item.status !== "active") continue;
@@ -80,58 +139,32 @@ describe("admin navigation CMS IA v2", () => {
     }
   });
 
-  it("hides domains that would have zero permitted items (filter contract)", () => {
-    // Empty-permission simulation: only canViewDashboard true → only dashboard + system company/branding/trust
-    const permissions = {
-      canViewDashboard: true,
-      canViewCrm: false,
-      canAccessQuotes: false,
-      canAccessPricing: false,
-      canViewOrders: false,
-      canManageProducts: false,
-      canViewProduction: false,
-      canManageManufacturingLibrary: false,
-      canManageCms: false,
-      canViewDelivery: false,
-      canViewWarehouse: false,
-      canManageEmployees: false,
-      canViewFinancials: false,
-      canViewReports: false,
-      canManageUsers: false,
-      canManageRoles: false,
-    } as const;
-
-    function allowed(required?: readonly string[]) {
-      if (!required?.length) return true;
-      return required.every((key) => (permissions as Record<string, boolean>)[key]);
+  it("Solo filter still drops enterprise content ops when present", () => {
+    const filtered = filterNavigationForWorkspaceMode(adminNavigationSections, true);
+    const content = filtered.find((s) => s.label === "CONTENT & SEO");
+    assert.ok(content);
+    const hrefs = content.platforms.flatMap((p) => p.items.map((i) => i.href));
+    for (const hidden of SOLO_HIDDEN_CONTENT_HREFS) {
+      assert.ok(!hrefs.includes(hidden));
     }
-
-    const visibleSections = adminNavigationSections
-      .map((section) => ({
-        ...section,
-        platforms: section.platforms
-          .map((platform) => ({
-            ...platform,
-            items: platform.items.filter(
-              (item) => item.status === "active" && item.href && allowed(item.requiredPermissions),
-            ),
-          }))
-          .filter((platform) => platform.items.length > 0),
-      }))
-      .filter((section) => section.platforms.length > 0);
-
-    assert.ok(visibleSections.every((s) => s.platforms.some((p) => p.items.length > 0)));
-    assert.ok(!visibleSections.some((s) => s.label === "THƯƠNG MẠI"));
-    assert.ok(visibleSections.some((s) => s.label === "HỆ THỐNG"));
-    assert.ok(allowed(adminDashboardNavItem.requiredPermissions));
+    assert.ok(hrefs.includes("/admin/blog"));
+    assert.ok(hrefs.includes("/admin/content/seo"));
   });
 
-  it("keeps site navigation under WEBSITE with updated label", () => {
-    const website = adminNavigationSections.find((s) => s.label === "WEBSITE");
-    assert.ok(website);
-    const siteNav = website.platforms[0].items.find((i) => i.href === "/admin/site-navigation");
-    assert.ok(siteNav);
-    assert.equal(siteNav.label, "Điều hướng & Footer");
-    assert.equal(siteNav.requiredPermissions?.[0], "canManageCms");
+  it("keeps primary visible destination count lean", () => {
+    const count =
+      (adminDashboardNavItem.href ? 1 : 0) +
+      allNavItems().filter((item) => item.status === "active" && item.href).length;
+    assert.ok(count <= 30, `expected lean primary count, got ${count}`);
+    assert.ok(count >= 20, `expected core domains retained, got ${count}`);
+  });
+});
+
+describe("admin document titles", () => {
+  it("uses ATTD Admin title template without duplication", () => {
+    assert.equal(ADMIN_DOCUMENT_TITLE, "ATTD Admin");
+    assert.equal(ADMIN_TITLE_TEMPLATE, "%s | ATTD Admin");
+    assert.deepEqual(adminPageMetadata("Khách hàng"), { title: "Khách hàng" });
+    assert.doesNotMatch(ADMIN_TITLE_TEMPLATE, /ATTD Admin \| ATTD Admin/);
   });
 });

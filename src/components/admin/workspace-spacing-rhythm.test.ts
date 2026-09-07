@@ -110,7 +110,8 @@ describe("IA-4B workspace spacing rhythm", () => {
       read("src/components/admin/content/ContentPublishingDashboardClient.tsx"),
       /<h1[^>]*>\s*Xuất bản nội dung\s*<\/h1>/,
     );
-    assert.match(read("src/lib/admin/admin-navigation.ts"), /KNOWLEDGE & AI/);
+    assert.match(read("src/lib/admin/admin-navigation.ts"), /CONTENT & SEO/);
+    assert.match(read("src/lib/admin/admin-breadcrumbs.ts"), /CONTENT & SEO/);
     assert.match(read("src/lib/admin/admin-breadcrumbs.ts"), /KNOWLEDGE & AI/);
     assert.match(read("src/components/admin/AdminShell.tsx"), /pageTitle/);
     assert.match(read("src/components/admin/AdminUi.tsx"), /WorkspaceToolbarEnd/);

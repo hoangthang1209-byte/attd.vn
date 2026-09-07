@@ -54,7 +54,8 @@ describe("IA-3B page identity consistency", () => {
   it("does not alter navigation or breadcrumb authority registries", () => {
     const nav = read("src/lib/admin/admin-navigation.ts");
     const crumbs = read("src/lib/admin/admin-breadcrumbs.ts");
-    assert.match(nav, /KNOWLEDGE & AI/);
+    assert.match(nav, /CONTENT & SEO/);
+    assert.match(crumbs, /CONTENT & SEO/);
     assert.match(crumbs, /KNOWLEDGE & AI/);
     assert.doesNotMatch(nav, /Tri thức/);
     assert.doesNotMatch(crumbs, /Tri thức/);

@@ -4,6 +4,9 @@ import MediaLibraryClient from "@/components/admin/MediaLibraryClient";
 import CmsDiagnosticsPanel from "@/components/admin/CmsDiagnosticsPanel";
 import { getCmsHealth } from "@/features/admin/services/cms-health.service";
 import { InlineLoading } from "@/components/ui/loading/ContextLoading";
+import { adminPageMetadata } from "@/lib/admin/admin-metadata";
+
+export const metadata = adminPageMetadata("Media");
 
 export default async function MediaPage() {
   const health = await getCmsHealth();

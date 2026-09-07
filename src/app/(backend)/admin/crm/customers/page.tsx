@@ -2,6 +2,9 @@ import { Suspense } from "react";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CrmCustomersList from "@/components/admin/crm/CrmCustomersList";
 import { SectionLoading } from "@/components/ui/loading/ContextLoading";
+import { adminPageMetadata } from "@/lib/admin/admin-metadata";
+
+export const metadata = adminPageMetadata("Khách hàng");
 
 export default function CrmCustomersPage() {
   return (

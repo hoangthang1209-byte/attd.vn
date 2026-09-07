@@ -273,16 +273,16 @@ describe("Sprint 17.0 Content Operations Command Center", () => {
     assert.doesNotMatch(source, /fetch\(/);
   });
 
-  it("registers the page, nav item, and a GET-only API route", () => {
+  it("registers the page and a GET-only API route (ops nav is lean-hidden)", () => {
     const page = readFileSync("src/app/(backend)/admin/content/operations/page.tsx", "utf8");
     assert.match(page, /ContentOperationsClient/);
 
-    const content = adminNavigationSections.find((s) => s.label === "NỘI DUNG");
+    const content = adminNavigationSections.find((s) => s.label === "CONTENT & SEO");
     assert.ok(content);
     const item = content.platforms[0].items.find((i) => i.href === "/admin/content/operations");
-    assert.equal(item?.label, "Trung tâm vận hành");
+    assert.equal(item, undefined);
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/operations").breadcrumbs, [
-      "NỘI DUNG",
+      "CONTENT & SEO",
       "Trung tâm vận hành",
     ]);
 

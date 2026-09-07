@@ -37,13 +37,13 @@ function sampleTopic(
 }
 
 describe("Sprint editorial calendar planning", () => {
-  it("registers Lịch biên tập under NỘI DUNG", () => {
-    const content = adminNavigationSections.find((s) => s.label === "NỘI DUNG");
+  it("registers Lịch biên tập breadcrumbs without primary nav promotion", () => {
+    const content = adminNavigationSections.find((s) => s.label === "CONTENT & SEO");
     assert.ok(content);
     const item = content.platforms[0].items.find((i) => i.href === "/admin/content/calendar");
-    assert.equal(item?.label, "Lịch biên tập");
+    assert.equal(item, undefined);
     assert.deepEqual(getAdminBreadcrumbMeta("/admin/content/calendar").breadcrumbs, [
-      "NỘI DUNG",
+      "CONTENT & SEO",
       "Lịch biên tập",
     ]);
   });

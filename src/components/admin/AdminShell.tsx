@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import AdminScrollRestoration from "@/components/admin/AdminScrollRestoration";
@@ -17,6 +17,7 @@ import {
   type AdminNavigationItem,
 } from "@/lib/admin/admin-navigation";
 import { getAdminBreadcrumbMeta } from "@/lib/admin/admin-breadcrumbs";
+import { ADMIN_DOCUMENT_TITLE } from "@/lib/admin/admin-metadata";
 import styles from "./AdminShell.module.css";
 
 function hasRequiredPermissions(
@@ -27,7 +28,7 @@ function hasRequiredPermissions(
   return requiredPermissions.every((permission) => permissions[permission]);
 }
 
-function isNavItemActive(
+function navPathMatches(
   href: string,
   pathname: string,
   searchParams: URLSearchParams,
@@ -39,10 +40,7 @@ function isNavItemActive(
 
   if (!pathMatches) return false;
 
-  if (!queryString) {
-    if (pathname === path) return true;
-    return pathname.startsWith(`${path}/`);
-  }
+  if (!queryString) return true;
 
   if (pathname !== path) return false;
   const expected = new URLSearchParams(queryString);
@@ -50,6 +48,20 @@ function isNavItemActive(
     if (searchParams.get(key) !== value) return false;
   }
   return true;
+}
+
+/** Longest matching href wins so `/admin/pricing/costing` does not activate `/admin/pricing`. */
+function resolveActiveHref(
+  hrefs: string[],
+  pathname: string,
+  searchParams: URLSearchParams,
+): string | null {
+  let best: string | null = null;
+  for (const href of hrefs) {
+    if (!navPathMatches(href, pathname, searchParams)) continue;
+    if (!best || href.length > best.length) best = href;
+  }
+  return best;
 }
 
 function AdminShellNav() {
@@ -91,11 +103,24 @@ function AdminShellNav() {
     return { dashboard, sections };
   }, [permissions, loading, isSolo]);
 
+  const activeHref = useMemo(() => {
+    const hrefs: string[] = [];
+    if (visibleNavigation.dashboard?.href) hrefs.push(visibleNavigation.dashboard.href);
+    for (const section of visibleNavigation.sections) {
+      for (const platform of section.platforms) {
+        for (const item of platform.items) {
+          if (item.href) hrefs.push(item.href);
+        }
+      }
+    }
+    return resolveActiveHref(hrefs, pathname, searchParams);
+  }, [visibleNavigation, pathname, searchParams]);
+
   return (
     <nav className={styles.nav}>
       {visibleNavigation.dashboard ? (
         <div className={styles.navGroup}>
-          <AdminNavItem item={visibleNavigation.dashboard} pathname={pathname} searchParams={searchParams} />
+          <AdminNavItem item={visibleNavigation.dashboard} activeHref={activeHref} />
         </div>
       ) : null}
       {visibleNavigation.sections.map((section) => (
@@ -111,8 +136,7 @@ function AdminShellNav() {
                 <AdminNavItem
                   key={item.href ?? `${section.label}:${item.label}`}
                   item={item}
-                  pathname={pathname}
-                  searchParams={searchParams}
+                  activeHref={activeHref}
                 />
               ))}
             </div>
@@ -125,12 +149,10 @@ function AdminShellNav() {
 
 function AdminNavItem({
   item,
-  pathname,
-  searchParams,
+  activeHref,
 }: {
   item: AdminNavigationItem;
-  pathname: string;
-  searchParams: URLSearchParams;
+  activeHref: string | null;
 }) {
   if (item.status === "coming-soon" || !item.href) {
     return (
@@ -145,7 +167,7 @@ function AdminNavItem({
     );
   }
 
-  const active = isNavItemActive(item.href, pathname, searchParams);
+  const active = activeHref === item.href;
   return (
     <Link
       href={item.href}
@@ -217,6 +239,15 @@ function AdminShellMain({
   const pageMeta = getAdminBreadcrumbMeta(pathname);
   const pageTitle = title || pageMeta.title;
 
+  useEffect(() => {
+    const nextTitle = pageTitle?.trim()
+      ? `${pageTitle.trim()} | ${ADMIN_DOCUMENT_TITLE}`
+      : ADMIN_DOCUMENT_TITLE;
+    if (document.title !== nextTitle) {
+      document.title = nextTitle;
+    }
+  }, [pageTitle]);
+
   return (
     <main id="admin-content-scroll" className={`${styles.main} admin-content-scroll`}>
       <Suspense fallback={null}>
@@ -243,10 +274,6 @@ function AdminShellMain({
         </div>
         <div className={styles.headerActions}>
           <WorkspaceModeToggle />
-          <span className={styles.statusPill}>
-            <span className={styles.statusDot} aria-hidden="true" />
-            IA v2.0
-          </span>
         </div>
       </header>
       <div className={`${styles.content} admin-main-content`}>{children}</div>

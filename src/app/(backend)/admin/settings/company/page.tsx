@@ -2,6 +2,9 @@ import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import CompanySettingsForm from "@/components/admin/CompanySettingsForm";
 import { prisma } from "@/lib/prisma";
 import { seedDefaultSettings } from "@/features/settings/services/settings.service";
+import { adminPageMetadata } from "@/lib/admin/admin-metadata";
+
+export const metadata = adminPageMetadata("Thông tin công ty");
 
 export default async function CompanySettingsPage() {
   let row = await prisma.companySettings.findUnique({ where: { id: "default" } });
