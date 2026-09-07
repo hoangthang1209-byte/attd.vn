@@ -28,6 +28,11 @@ import {
 import { copyProductBomToOrderItems } from "@/features/orders/production-pack.service";
 import { aggregateOrderQuotedCommercialSummary } from "@/features/orders/order-quoted-cost";
 import {
+  assertOrderItemsMutableForActualCost,
+  getOrderActualCostSummary,
+  OrderActualCostValidationError,
+} from "@/features/orders/order-actual-cost.service";
+import {
   sanitizeOrderColorSnapshot,
   validateStockBackedOrderItem,
 } from "@/features/orders/quick-order/quick-order-stock-validation";
@@ -264,6 +269,7 @@ function mapOrderDetail(row: NonNullable<Awaited<ReturnType<typeof fetchOrderRow
     quote: row.quote,
     items,
     quotedCommercial,
+    actualCost: null,
     payments,
     activities: row.activities.map((activity) => ({
       id: activity.id,
@@ -302,7 +308,13 @@ async function fetchOrderRow(id: string) {
 export async function getOrderDetail(id: string): Promise<OrderDetailRecord | null> {
   const row = await fetchOrderRow(id);
   if (!row) return null;
-  return mapOrderDetail(row);
+  const detail = mapOrderDetail(row);
+  try {
+    detail.actualCost = await getOrderActualCostSummary(id);
+  } catch {
+    detail.actualCost = null;
+  }
+  return detail;
 }
 
 export async function getOrderDetailByOrderNo(
@@ -326,7 +338,13 @@ export async function getOrderDetailByOrderNo(
     },
   });
   if (!row) return null;
-  return mapOrderDetail(row);
+  const detail = mapOrderDetail(row);
+  try {
+    detail.actualCost = await getOrderActualCostSummary(row.id);
+  } catch {
+    detail.actualCost = null;
+  }
+  return detail;
 }
 
 export async function listOrders(
@@ -1153,6 +1171,15 @@ export async function updateOrderDetails(id: string, input: UpdateOrderInput) {
   if (!order) throw new OrderValidationError("Không tìm thấy đơn hàng.");
   if (!isOrderEditable(order.status)) {
     throw new OrderValidationError("Không thể chỉnh sửa đơn hàng đã hoàn tất hoặc đã hủy.");
+  }
+
+  try {
+    await assertOrderItemsMutableForActualCost(id);
+  } catch (err) {
+    if (err instanceof OrderActualCostValidationError) {
+      throw new OrderValidationError(err.message);
+    }
+    throw err;
   }
 
   validateOrderItemsInput(input);

@@ -186,6 +186,7 @@ export default function OrderWorkspaceShell(props: OrderWorkspaceShellProps) {
         order={order}
         bundle={workspaceData.bundle}
         canViewFinancials={canViewFinancials}
+        canEditOrder={canEditOrder}
         onNavigateTab={navigateTab}
       />
 

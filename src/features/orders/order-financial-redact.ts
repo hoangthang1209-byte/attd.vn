@@ -24,6 +24,7 @@ export type OrderDetailOperationalView = Omit<
   | "financials"
   | "priceVatType"
   | "quotedCommercial"
+  | "actualCost"
   | "items"
 > & {
   items: Array<
@@ -62,11 +63,13 @@ export function omitOrderDetailFinancialFields(order: OrderDetailRecord): OrderD
     financials: _financials,
     priceVatType: _priceVatType,
     quotedCommercial: _quotedCommercial,
+    actualCost: _actualCost,
     items,
     activities,
     ...rest
   } = order;
 
+  void _actualCost;
   return {
     ...rest,
     items: items.map(

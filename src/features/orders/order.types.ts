@@ -10,6 +10,7 @@ import type {
   QuotePriceVatType,
 } from "@prisma/client";
 import type { OrderPaymentStateFilter } from "@/features/orders/order-labels";
+import type { OrderActualCostSummary } from "@/features/orders/order-actual-cost.types";
 
 export type OrderFinancialSummary = {
   totalAmount: number;
@@ -190,6 +191,7 @@ export type OrderDetailRecord = {
   quote: { id: string; quoteNo: string } | null;
   items: OrderItemRecord[];
   quotedCommercial: OrderQuotedCommercialSummary | null;
+  actualCost: OrderActualCostSummary | null;
   payments: OrderPaymentRecord[];
   activities: OrderActivityRecord[];
   financials: OrderFinancialSummary;

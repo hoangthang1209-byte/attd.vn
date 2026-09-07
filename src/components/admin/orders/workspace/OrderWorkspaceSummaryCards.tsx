@@ -14,6 +14,7 @@ type Props = {
   order: OrderDetailRecord;
   bundle: ProductionExecutionBundle | null;
   canViewFinancials: boolean;
+  canEditOrder: boolean;
   onNavigateTab: (tab: OrderWorkspaceTab) => void;
 };
 
@@ -28,6 +29,7 @@ export default function OrderWorkspaceSummaryCards({
   order,
   bundle,
   canViewFinancials,
+  canEditOrder,
   onNavigateTab,
 }: Props) {
   const milestones = deriveOrderMilestones(order, bundle);
@@ -51,7 +53,7 @@ export default function OrderWorkspaceSummaryCards({
 
       {canViewFinancials && order.financials && (
         <article className="order-workspace-summary-card">
-          <h3 className="order-workspace-summary-card__title">Giá trị đơn hàng</h3>
+          <h3 className="order-workspace-summary-card__title">Thanh toán</h3>
           <p className="order-workspace-summary-card__line">
             Tổng tiền hàng: <strong>{formatOrderCurrency(order.subtotal, order.currency)}</strong>
           </p>
@@ -72,7 +74,9 @@ export default function OrderWorkspaceSummaryCards({
         </article>
       )}
 
-      {canViewFinancials && <OrderCommercialCostStrip order={order} />}
+      {canViewFinancials && (
+        <OrderCommercialCostStrip order={order} canEditOrder={canEditOrder} />
+      )}
 
       <article className="order-workspace-summary-card">
         <h3 className="order-workspace-summary-card__title">Tiến độ đơn hàng</h3>

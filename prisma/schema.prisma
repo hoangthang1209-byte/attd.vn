@@ -4117,6 +4117,20 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum OrderActualCostCloseStatus {
+  DRAFT
+  CLOSED
+}
+
+enum OrderActualCostCategory {
+  PRODUCTION
+  PRINT_EMBROIDERY
+  MATERIAL
+  PACKAGING
+  SHIPPING
+  OTHER
+}
+
 enum OrderPaymentType {
   DEPOSIT
   PAYMENT
@@ -4242,6 +4256,8 @@ model Order {
   qcEvidence                   OrderQcEvidence[]
   deliveryExecutions           OrderDeliveryExecution[]
   deliveryProofs               OrderDeliveryProof[]
+  actualCostClose              OrderActualCostClose?
+  actualCostEntries            OrderActualCostEntry[]
 
   @@index([orderNo])
   @@index([quoteId])
@@ -4254,6 +4270,59 @@ model Order {
   @@index([deliveryMethodId])
   @@index([deliveryCarrierId])
   @@index([salesEmployeeId])
+}
+
+/// Operational Actual Cost / Margin Close — frozen estimate + confirmed actual COGS.
+model OrderActualCostClose {
+  id                         String                      @id @default(cuid())
+  orderId                    String                      @unique
+  status                     OrderActualCostCloseStatus  @default(DRAFT)
+  estimatedCommercialValue   Decimal                     @db.Decimal(12, 2)
+  estimatedCost              Decimal?                    @db.Decimal(12, 2)
+  estimatedGrossMargin       Decimal?                    @db.Decimal(12, 2)
+  estimatedGrossMarginRate   Decimal?                    @db.Decimal(8, 4)
+  actualCostTotal            Decimal                     @default(0) @db.Decimal(12, 2)
+  actualGrossMargin          Decimal                     @default(0) @db.Decimal(12, 2)
+  actualGrossMarginRate      Decimal?                    @db.Decimal(8, 4)
+  costVariance               Decimal?                    @db.Decimal(12, 2)
+  closedAt                   DateTime?
+  closedByUserId             String?
+  reopenedAt                 DateTime?
+  reopenedByUserId           String?
+  note                       String?                     @db.Text
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+
+  order          Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  closedByUser   AdminUser? @relation("OrderActualCostClosedBy", fields: [closedByUserId], references: [id], onDelete: SetNull)
+  reopenedByUser AdminUser? @relation("OrderActualCostReopenedBy", fields: [reopenedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([closedByUserId])
+  @@index([reopenedByUserId])
+}
+
+model OrderActualCostEntry {
+  id              String                   @id @default(cuid())
+  orderId         String
+  orderItemId     String?
+  category        OrderActualCostCategory
+  label           String?
+  description     String?                  @db.Text
+  amount          Decimal                  @db.Decimal(12, 2)
+  currency        String
+  createdByUserId String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  order         Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem     OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  createdByUser AdminUser? @relation("OrderActualCostEntryCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@index([orderItemId])
+  @@index([category])
+  @@index([createdByUserId])
 }
 
 model Employee {
@@ -4381,6 +4450,7 @@ model OrderItem {
   itemProductionTracking      ItemProductionTracking?
   productionApproval          OrderItemProductionApproval?
   productionApprovalBypasses  OrderItemProductionApprovalBypass[]
+  actualCostEntries           OrderActualCostEntry[]
 
   @@index([orderId])
   @@index([productId])
@@ -5154,6 +5224,9 @@ model AdminUser {
   itemProductionIssuesResolved      ItemProductionIssue[]            @relation("IssueResolvedBy")
   productionApprovalsReleased       OrderItemProductionApproval[]    @relation("ProductionApprovalReleasedBy")
   productionApprovalBypasses        OrderItemProductionApprovalBypass[] @relation("ProductionApprovalBypassActor")
+  orderActualCostClosesClosed       OrderActualCostClose[]           @relation("OrderActualCostClosedBy")
+  orderActualCostClosesReopened     OrderActualCostClose[]           @relation("OrderActualCostReopenedBy")
+  orderActualCostEntriesCreated     OrderActualCostEntry[]           @relation("OrderActualCostEntryCreatedBy")
 
   @@index([username])
   @@index([roleId])
