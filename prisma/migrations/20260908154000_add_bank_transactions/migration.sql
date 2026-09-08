@@ -1,6 +1,9 @@
 -- Bank transaction ledger for webhook-driven payment reconciliation.
 -- Intentionally stores the provider payload separately from OrderPayment so
 -- unmatched/needs-review transfers remain auditable without creating payments.
+-- matchedOrderId/orderPaymentId are application-level references in phase 1;
+-- no database FK is declared so the banking model can remain isolated in its
+-- own Prisma schema file without adding back-relations to the large core schema.
 
 CREATE TABLE "BankTransaction" (
   "id" TEXT NOT NULL,
@@ -43,13 +46,3 @@ CREATE INDEX "BankTransaction_matchStatus_idx"
 
 CREATE INDEX "BankTransaction_matchedOrderId_idx"
   ON "BankTransaction"("matchedOrderId");
-
-ALTER TABLE "BankTransaction"
-  ADD CONSTRAINT "BankTransaction_matchedOrderId_fkey"
-  FOREIGN KEY ("matchedOrderId") REFERENCES "Order"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
-
-ALTER TABLE "BankTransaction"
-  ADD CONSTRAINT "BankTransaction_orderPaymentId_fkey"
-  FOREIGN KEY ("orderPaymentId") REFERENCES "OrderPayment"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
