@@ -80,6 +80,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
   }
 
+  const allowedAccounts = allowedAccountNumbers();
+  if (!allowedAccounts) {
+    console.error("[SePay webhook] Receiving-account allowlist is not configured");
+    return NextResponse.json(
+      { success: false, message: "Webhook receiving-account allowlist is not configured" },
+      { status: 503 },
+    );
+  }
+
   let body: unknown;
   try {
     body = JSON.parse(rawBody);
@@ -89,8 +98,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const payload = parseSePayWebhookPayload(body);
-    const allowedAccounts = allowedAccountNumbers();
-    if (allowedAccounts && !allowedAccounts.has(payload.accountNumber.trim())) {
+    if (!allowedAccounts.has(payload.accountNumber.trim())) {
       // Acknowledge authenticated SePay events for other linked accounts so they
       // are not retried, but never let them reach ATTD payment reconciliation.
       console.warn("[SePay webhook] Ignored transaction for non-allowlisted account", {
