@@ -8,6 +8,7 @@ Phase 1 synchronizes bank transactions into ATTD and automatically reconciles **
 - Source of truth for order receivables: existing `OrderPayment` records.
 - Incoming transfers with a valid order reference are auto-recorded only when the amount does not exceed the outstanding balance.
 - Ambiguous, overpaid, completed/cancelled-order, and non-VND cases are stored for manual review and do **not** create an `OrderPayment`.
+- Financial users can manually match unresolved incoming transfers to a valid order, or mark them ignored.
 - Outgoing transfers are stored as `IGNORED` in Phase 1.
 
 ## 1. Database migration
@@ -21,6 +22,12 @@ npx prisma migrate deploy
 Migration:
 
 `prisma/migrations/20260908154000_add_bank_transactions/migration.sql`
+
+Prisma model:
+
+`prisma/banking.prisma`
+
+The repository uses Prisma multi-file schema loading (`prisma.schema = "./prisma"`) so the banking table remains part of the managed Prisma data model without modifying the large core `schema.prisma` file.
 
 ## 2. Authentication configuration
 
@@ -118,6 +125,21 @@ The transaction is saved with `NEEDS_REVIEW` and linked to the detected order wh
 
 If no valid `DH-xxxxxx` order number is found, or the referenced order does not exist, the transaction remains `UNMATCHED`.
 
+### Manual reconciliation
+
+Users with order-update + financial access can resolve `UNMATCHED` or `NEEDS_REVIEW` incoming transfers from the Admin banking screen.
+
+**Khớp thủ công**:
+
+1. Enter a valid order number such as `DH-000523`.
+2. ATTD locks the bank transaction row to prevent concurrent double-posting.
+3. The same safety rules used by automatic matching are checked again.
+4. If valid, one confirmed `OrderPayment` is created and the transaction becomes `MATCHED`.
+
+Manual matching still refuses completed/cancelled orders, non-VND orders, orders with no receivable, and transfers larger than the remaining receivable.
+
+**Bỏ qua** marks an unresolved transaction `IGNORED` without creating a payment. Phase 1 does not provide an “unignore” action.
+
 ## 6. Duplicate protection
 
 SePay transaction `id` is stored as `externalId` and protected by the unique key:
@@ -127,6 +149,8 @@ SePay transaction `id` is stored as `externalId` and protected by the unique key
 ```
 
 Webhook retries/replays return success without creating another bank transaction or another `OrderPayment`.
+
+Manual reconciliation also locks the transaction row before creating a payment, preventing concurrent actions from posting the same transfer twice.
 
 ## 7. Admin screen
 
@@ -144,7 +168,7 @@ The screen refreshes every 15 seconds and supports:
 - Matched
 - Ignored
 
-Matched rows link directly to the existing ATTD order detail screen.
+Matched/detected rows link directly to the existing ATTD order detail screen. Users with update permission can manually match unresolved incoming transfers or ignore them.
 
 ## 8. Production activation checklist
 
@@ -155,4 +179,5 @@ Matched rows link directly to the existing ATTD order detail screen.
 5. Send a low-value controlled transfer using a real test order and content `ATTD DHxxxxxx`.
 6. Verify one `BankTransaction`, one `OrderPayment`, the order payment state, and the Order Activity timeline.
 7. Replay/test the same webhook and verify no duplicate payment is created.
-8. Only after the controlled test succeeds, enable the webhook for the production receiving account(s).
+8. Test one unmatched transaction and manually reconcile it from `/admin/bank-transactions`.
+9. Only after the controlled tests succeed, enable the webhook for the production receiving account(s).
