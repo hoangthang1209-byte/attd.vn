@@ -87,9 +87,12 @@ export default function BankTransactionManager() {
 
   useEffect(() => {
     if (permissionsLoading || !permissions.canViewFinancials) return;
-    void load();
+    const initial = window.setTimeout(() => void load(), 0);
     const interval = window.setInterval(() => void load(), 15_000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(interval);
+    };
   }, [load, permissions.canViewFinancials, permissionsLoading]);
 
   const totals = useMemo(() => {
