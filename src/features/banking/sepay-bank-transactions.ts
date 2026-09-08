@@ -144,6 +144,19 @@ function duplicateResult(existing: Awaited<ReturnType<typeof findExistingTransac
   };
 }
 
+async function lockOrderByOrderNo(
+  tx: Prisma.TransactionClient,
+  orderNo: string,
+): Promise<boolean> {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT "id"
+    FROM "Order"
+    WHERE "orderNo" = ${orderNo}
+    FOR UPDATE
+  `);
+  return rows.length > 0;
+}
+
 export function parseSePayWebhookPayload(input: unknown): SePayWebhookPayload {
   return sePayWebhookSchema.parse(input);
 }
@@ -210,12 +223,8 @@ export async function processSePayWebhook(
         };
       }
 
-      const order = await tx.order.findUnique({
-        where: { orderNo },
-        include: { payments: true },
-      });
-
-      if (!order) {
+      const orderExists = await lockOrderByOrderNo(tx, orderNo);
+      if (!orderExists) {
         await tx.$executeRaw(Prisma.sql`
           UPDATE "BankTransaction"
           SET "matchReason" = ${`Có mã ${orderNo} nhưng không tìm thấy đơn hàng.`},
@@ -229,6 +238,14 @@ export async function processSePayWebhook(
           orderPaymentId: null,
           duplicate: false,
         };
+      }
+
+      const order = await tx.order.findUnique({
+        where: { orderNo },
+        include: { payments: true },
+      });
+      if (!order) {
+        throw new Error(`Đơn hàng ${orderNo} biến mất trong lúc đối soát.`);
       }
 
       const paymentInputs = order.payments.map((payment) => ({
@@ -385,7 +402,6 @@ export async function reconcileBankTransaction(
         UPDATE "BankTransaction"
         SET "matchStatus" = 'IGNORED',
             "matchReason" = ${note ? `Bỏ qua thủ công · ${note}` : "Bỏ qua thủ công."},
-            "matchedAt" = CURRENT_TIMESTAMP,
             "updatedAt" = CURRENT_TIMESTAMP
         WHERE "id" = ${transaction.id}
       `);
@@ -402,6 +418,11 @@ export async function reconcileBankTransaction(
     const orderNo = normalizeOrderNo(input.orderNo?.trim() || "");
     if (!orderNo) {
       throw new BankTransactionValidationError("Mã đơn hàng phải có dạng DH-000523 hoặc DH000523.");
+    }
+
+    const orderExists = await lockOrderByOrderNo(tx, orderNo);
+    if (!orderExists) {
+      throw new BankTransactionValidationError(`Không tìm thấy đơn hàng ${orderNo}.`);
     }
 
     const order = await tx.order.findUnique({
