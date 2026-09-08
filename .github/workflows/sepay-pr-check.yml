@@ -27,14 +27,22 @@ jobs:
       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Build current main schema baseline
+        run: |
+          git fetch origin main:refs/remotes/origin/main --depth=1
+          git show origin/main:prisma/schema.prisma > /tmp/main-schema.prisma
+          npx prisma db push --schema /tmp/main-schema.prisma --force-reset --accept-data-loss --skip-generate
+      - name: Apply SePay migration on main baseline
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/migrations/20260908154000_add_bank_transactions/migration.sql
       - run: npx prisma validate
       - run: npx prisma generate
-      - run: npx prisma migrate deploy
       - run: npx tsc --noEmit
       - run: >-
           npx eslint
