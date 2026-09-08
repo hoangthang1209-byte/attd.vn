@@ -74,6 +74,12 @@ export const adminNavigationSections: AdminNavigationSection[] = [
         status: "active",
         requiredPermissions: ["canViewOrders"],
       },
+      {
+        label: "Giao dịch ngân hàng",
+        href: "/admin/bank-transactions",
+        status: "active",
+        requiredPermissions: ["canViewFinancials"],
+      },
     ]),
   },
   {
