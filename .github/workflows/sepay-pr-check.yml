@@ -1,0 +1,24 @@
+name: SePay PR Check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma validate
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npx eslint src/features/banking/sepay-bank-transactions.ts src/app/api/webhooks/sepay/route.ts src/app/api/bank-transactions/route.ts src/components/admin/banking/BankTransactionManager.tsx src/app/\(backend\)/admin/bank-transactions/page.tsx
