@@ -29,6 +29,8 @@ Prisma model:
 
 The repository uses Prisma multi-file schema loading (`prisma.schema = "./prisma"`) so the banking table remains part of the managed Prisma data model without modifying the large core `schema.prisma` file.
 
+`matchedOrderId` and `orderPaymentId` are intentionally application-level audit references rather than database foreign keys. The bank ledger therefore remains independent of Order/Payment lifecycle changes while the service layer validates all reconciliation writes.
+
 ## 2. Authentication configuration
 
 Use HMAC in production when available.
@@ -60,9 +62,9 @@ If both variables exist, ATTD prefers HMAC and does not fall back to the API key
 
 Never commit either secret to GitHub.
 
-### Receiving-account allowlist
+### Required receiving-account allowlist
 
-Strongly recommended in Production:
+ATTD fails closed unless the receiving bank account allowlist is configured:
 
 ```text
 SEPAY_ALLOWED_ACCOUNT_NUMBERS=1017588888,0123456789
@@ -70,9 +72,11 @@ SEPAY_ALLOWED_ACCOUNT_NUMBERS=1017588888,0123456789
 
 Use the exact bank account numbers sent by SePay in `accountNumber`, separated by commas when ATTD has multiple receiving accounts.
 
-When the allowlist is configured, an authenticated webhook for another linked SePay account is acknowledged with `{"success":true}` but is **not** written into ATTD or reconciled to an Order. This prevents transfers on unrelated linked accounts from creating customer payments.
+If this variable is missing or empty, the webhook returns HTTP 503 and does **not** process any payment. This prevents a partially configured production deployment from accepting transactions from arbitrary linked accounts.
 
-If the variable is omitted, ATTD accepts transactions from every account covered by the configured SePay webhook. For Production, configure both the SePay webhook to the intended bank account(s) and this allowlist.
+For an authenticated SePay event whose `accountNumber` is not in the allowlist, ATTD acknowledges the event with `{"success":true}` so SePay does not retry it, but the event is **not** written into ATTD or reconciled to an Order.
+
+For Production, configure both the SePay webhook itself to the intended bank account(s) and this ATTD allowlist.
 
 ## 3. Webhook URL
 
@@ -82,7 +86,7 @@ Configure the SePay webhook endpoint as:
 https://attd.vn/api/webhooks/sepay
 ```
 
-The endpoint accepts SePay transaction webhooks only. It is not an admin/session-authenticated endpoint; webhook authentication is mandatory.
+The endpoint accepts SePay transaction webhooks only. It is not an admin/session-authenticated endpoint; webhook authentication and the receiving-account allowlist are mandatory.
 
 On successful processing (including duplicate/replayed deliveries), ATTD responds with HTTP 200 and exactly:
 
@@ -200,10 +204,10 @@ The Order → Thanh toán tab shows a copyable payment memo such as `ATTD DH0005
 
 ## 8. Production activation checklist
 
-1. Merge and deploy this implementation.
+1. Merge and deploy this implementation only after the database/environment prerequisites are ready.
 2. Apply the database migration.
 3. Configure `SEPAY_WEBHOOK_SECRET` (preferred) or `SEPAY_WEBHOOK_API_KEY` in Vercel.
-4. Configure `SEPAY_ALLOWED_ACCOUNT_NUMBERS` with the ATTD receiving account number(s).
+4. Configure the required `SEPAY_ALLOWED_ACCOUNT_NUMBERS` with the ATTD receiving account number(s).
 5. Add `https://attd.vn/api/webhooks/sepay` in SePay and bind it only to the intended receiving account(s).
 6. Keep event type as incoming-only for Phase 1 when possible.
 7. Send a low-value controlled transfer using a real test order and content `ATTD DHxxxxxx`.
