@@ -1,0 +1,29 @@
+model BankTransaction {
+  id             String   @id
+  provider       String   @default("SEPAY")
+  externalId     String
+  gateway        String
+  transactionAt  DateTime
+  accountNumber  String
+  subAccount     String?
+  code           String?
+  content        String
+  transferType   String
+  amount         Decimal  @db.Decimal(14, 2)
+  accumulated    Decimal? @db.Decimal(14, 2)
+  referenceCode  String?
+  description    String?
+  rawPayload     Json
+  matchStatus    String   @default("UNMATCHED")
+  matchReason    String?
+  matchedOrderId String?
+  orderPaymentId String?  @unique
+  matchedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([provider, externalId])
+  @@index([transactionAt])
+  @@index([matchStatus])
+  @@index([matchedOrderId])
+}
