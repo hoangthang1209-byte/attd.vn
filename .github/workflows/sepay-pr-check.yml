@@ -8,7 +8,7 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
     steps:
@@ -29,3 +29,4 @@ jobs:
           "src/app/api/bank-transactions/[id]/reconcile/route.ts"
           "src/components/admin/banking/BankTransactionManager.tsx"
           "src/app/(backend)/admin/bank-transactions/page.tsx"
+      - run: npm run build
