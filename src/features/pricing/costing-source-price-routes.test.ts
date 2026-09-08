@@ -124,11 +124,25 @@ describe("CostingSourcePrice routes and permissions", () => {
     assert.match(helpers, /activeSuppliersOnly/);
   });
 
-  it("does not add Costing V2 row-table UI", () => {
+  it("Costing V2 picker uses bounded search, empty-library UX, and no cheapest auto-select", () => {
     const calculator = read("src/components/admin/pricing/CostingCalculator.tsx");
-    const nav = read("src/lib/admin/admin-navigation.ts");
-    assert.doesNotMatch(calculator, /CostingSourcePricePanel/);
-    assert.doesNotMatch(calculator, /costing-source-search/);
-    assert.doesNotMatch(nav, /cost-library/);
+    const picker = read("src/components/admin/pricing/costing/CostingSourcePickerDialog.tsx");
+    const search = read("src/features/pricing/services/costing-source-search.service.ts");
+    const searchRoute = read("src/app/api/pricing/costing-source-search/route.ts");
+    assert.match(calculator, /CostingStructuredSection/);
+    assert.match(calculator, /Thông tin tính giá/);
+    assert.match(picker, /costing-source-search/);
+    assert.match(picker, /300/);
+    assert.match(picker, /Chưa có nguyên vật liệu trong thư viện/);
+    assert.match(picker, /\/admin\/production-materials/);
+    assert.match(picker, /Vui lòng chọn nhà cung cấp/);
+    assert.match(picker, /initialPickerSourcePriceId/);
+    assert.match(picker, /sourceType=\$\{encodeURIComponent\(selectedSource\.type\)\}/);
+    assert.match(read("src/features/pricing/costing-v2-identity.ts"), /Định mức cũ \(SP\/đơn vị\)/);
+    assert.match(read("src/components/admin/pricing/costing/CostingStructuredSection.tsx"), /Thay bằng nguồn V2/);
+    assert.doesNotMatch(picker, /Sửa nguyên/);
+    assert.match(search, /MATERIALS/);
+    assert.match(search, /COSTING_SOURCE_SEARCH_LIMIT/);
+    assert.match(searchRoute, /take: COSTING_SOURCE_SEARCH_LIMIT/);
   });
 });

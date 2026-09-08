@@ -4,6 +4,8 @@ import {
   cheapestUnitPrice,
   COSTING_SOURCE_SEARCH_LIMIT,
   costingSourceCheckAllows,
+  initialPickerSourcePriceId,
+  mergeMaterialAndTrimSearchHits,
   normalizeCostingPurchaseUnit,
   parseCostingSourceCalculationType,
   parseCostingUnitPrice,
@@ -129,6 +131,35 @@ describe("CostingSourcePrice model helpers", () => {
     assert.equal(picker[0]?.unitPrice, 98000);
     assert.equal(cheapestUnitPrice(rows), 91000);
     assert.notEqual(picker[0]?.id, rows.find((row) => row.unitPrice === cheapestUnitPrice(rows))?.id);
+  });
+
+  it("does not auto-select among Thiện Tâm 95,000 and Tân Phát 91,000", () => {
+    const rows = [
+      price({ id: "thien-tam", supplierId: "thien-tam", supplierName: "Thiện Tâm", unitPrice: 95000 }),
+      price({ id: "tan-phat", supplierId: "tan-phat", supplierName: "Tân Phát", unitPrice: 91000 }),
+    ];
+    const picker = selectPickerSourcePrices(rows);
+    assert.equal(picker.length, 2);
+    assert.equal(initialPickerSourcePriceId(picker), null);
+    assert.equal(cheapestUnitPrice(picker), 91000);
+    assert.notEqual(picker.find((row) => row.supplierName === "Thiện Tâm")?.unitPrice, cheapestUnitPrice(picker));
+  });
+
+  it("preselects only when exactly one active source price exists", () => {
+    assert.equal(initialPickerSourcePriceId([]), null);
+    assert.equal(initialPickerSourcePriceId([{ id: "only" }]), "only");
+    assert.equal(initialPickerSourcePriceId([{ id: "a" }, { id: "b" }]), null);
+  });
+
+  it("MATERIALS merge preserves explicit source types", () => {
+    const merged = mergeMaterialAndTrimSearchHits(
+      [{ id: "mat-1", type: "PRODUCTION_MATERIAL", name: "Cotton", code: "CTN" }],
+      [{ id: "trim-1", type: "PRODUCTION_TRIM", name: "Cotton rib", code: "RIB" }],
+      20,
+    );
+    assert.equal(merged.find((hit) => hit.id === "mat-1")?.type, "PRODUCTION_MATERIAL");
+    assert.equal(merged.find((hit) => hit.id === "trim-1")?.type, "PRODUCTION_TRIM");
+    assert.equal(merged.length, 2);
   });
 
   it("enforces exactly one source FK", () => {

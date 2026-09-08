@@ -77,6 +77,34 @@ describe("Costing → Quote customer description confidentiality", () => {
     assert.equal((item.pricingSnapshot as { targetMarginRate?: number }).targetMarginRate, 35);
   });
 
+  it("keeps V2 costLines internal while copying costEstimate and pricingSnapshot", () => {
+    const item = mapPricingCalculationItemToQuoteItem(
+      sampleItem({
+        pricingSnapshot: {
+          workspaceVersion: 2,
+          targetMarginRate: 30,
+          costLines: [
+            {
+              label: "Cotton 100%",
+              supplierName: "Thiện Tâm",
+              unitPrice: 95000,
+              consumption: 0.22,
+            },
+          ],
+        },
+        costEstimate: 25495000,
+        marginRate: 30,
+      }),
+      [],
+      0,
+    );
+    assert.equal(item.description, "Áo thun oversize · Đen / L");
+    assert.equal(item.costEstimate, 25495000);
+    assert.equal((item.pricingSnapshot as { targetMarginRate?: number }).targetMarginRate, 30);
+    assert.equal(((item.pricingSnapshot as { costLines?: unknown[] }).costLines ?? []).length, 1);
+    assert.doesNotMatch(item.description ?? "", /Thiện Tâm|95000|0\.22|Cotton 100%/);
+  });
+
   it("batch mapping stays description-safe", () => {
     const items = collectQuoteItemsFromPricingCalculations([
       { resultSnapshot: { quantityBreaks: [{ quantity: 100 }] }, items: [sampleItem()] },

@@ -237,6 +237,27 @@ export function cheapestUnitPrice(prices: StoredSourcePrice[]): number | null {
   return Math.min(...active.map((row) => row.unitPrice));
 }
 
+/** Preselect only when exactly one active price exists. Never pick cheapest among many. */
+export function initialPickerSourcePriceId(prices: Array<{ id: string }>): string | null {
+  return prices.length === 1 ? prices[0]!.id : null;
+}
+
+export function mergeMaterialAndTrimSearchHits(
+  materials: CostingSourceSearchHit[],
+  trims: CostingSourceSearchHit[],
+  take: number,
+): CostingSourceSearchHit[] {
+  const limit = Math.min(Math.max(take, 1), COSTING_SOURCE_SEARCH_LIMIT);
+  return [...materials, ...trims]
+    .filter((hit) => hit.type === "PRODUCTION_MATERIAL" || hit.type === "PRODUCTION_TRIM")
+    .sort((a, b) => {
+      const byName = a.name.localeCompare(b.name, "vi");
+      if (byName !== 0) return byName;
+      return (a.code ?? "").localeCompare(b.code ?? "", "vi");
+    })
+    .slice(0, limit);
+}
+
 const CALCULATION_TYPES: PricingCalculationType[] = ["PER_ITEM", "PER_ORDER", "PER_POSITION", "MANUAL"];
 
 export function parseCostingSourceCalculationType(

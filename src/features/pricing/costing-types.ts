@@ -1,3 +1,5 @@
+import type { CostingSourceType, PricingCalculationType } from "@prisma/client";
+
 export type CostingComponentType =
   | "MATERIAL"
   | "RIB"
@@ -31,6 +33,43 @@ export type CostingQuantityBreakResult = {
   finalQuotePrice: number;
 };
 
+export type CostingLineSection = "MATERIAL" | "PROCESS" | "OTHER";
+export type CostingLineOrigin = "LIBRARY" | "CUSTOM" | "LEGACY";
+export type CostingPricingBasis =
+  | "LEGACY_YIELD"
+  | "UNIT_TIMES_CONSUMPTION"
+  | "PER_ITEM"
+  | "PER_POSITION"
+  | "PER_ORDER"
+  | "MANUAL";
+
+export type CostingStructuredLine = {
+  key: string;
+  section: CostingLineSection;
+  componentType: CostingComponentType;
+  origin: CostingLineOrigin;
+  pricingBasis: CostingPricingBasis;
+  label: string;
+  sourceType?: CostingSourceType | "CUSTOM" | "LEGACY" | null;
+  sourceId?: string | null;
+  sourceCode?: string | null;
+  sourceComposition?: string | null;
+  sourceGsm?: string | null;
+  supplierId?: string | null;
+  supplierName?: string | null;
+  sourcePriceId?: string | null;
+  unitPrice: number;
+  referenceUnitPrice?: number | null;
+  unit: string;
+  calculationType?: PricingCalculationType | null;
+  consumption?: number | null;
+  quantityFactor?: number | null;
+  costPerUnit: number;
+  totalCost: number;
+  isOverride?: boolean;
+  note?: string | null;
+};
+
 export type CostingCalculatorInput = {
   productId?: string;
   variantId?: string;
@@ -44,6 +83,9 @@ export type CostingCalculatorInput = {
   fabricCostPerUnit?: number;
   ribCostPerUnit?: number;
   components?: CostingComponentInput[];
+  /** V2 structured rows. When present (or workspaceVersion=2), these replace singleton fabric/rib math. */
+  workspaceVersion?: 2;
+  costLines?: CostingStructuredLine[];
   overheadRate?: number;
   targetMarginRate?: number;
   vatRate?: number;
@@ -81,6 +123,7 @@ export type CostingCalculatorResult = {
   ribCostPerUnit: number;
   materialCostPerUnit: number;
   processCostPerUnit: number;
+  otherCostPerUnit?: number;
   componentCostPerUnit: number;
   overheadRate: number;
   overheadCostPerUnit: number;
@@ -95,6 +138,8 @@ export type CostingCalculatorResult = {
   grossProfit: number;
   actualMarginRate: number;
   components: CostingComponentBreakdown[];
+  costLines?: CostingStructuredLine[];
+  workspaceVersion?: 2;
   warnings: string[];
 };
 
@@ -103,4 +148,9 @@ export type CostingSaveResult = {
   calculationCode: string;
   quoteId?: string;
   quoteNo?: string;
+};
+
+export type CostingPreviewContext = {
+  productName?: string | null;
+  variantName?: string | null;
 };

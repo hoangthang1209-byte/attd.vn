@@ -31978,6 +31978,63 @@ body:has(.blog-article-page) .floating-contact {
   font-size: 13px;
 }
 
+.costing-picker__row--button {
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  cursor: pointer;
+}
+
+.costing-picker__row--choice {
+  cursor: pointer;
+}
+
+.costing-picker__row--choice input {
+  margin-right: 8px;
+}
+
+.costing-picker__selected-source {
+  margin: 10px 0;
+  font-weight: 600;
+}
+
+.costing-picker__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.costing-line-section__subtotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.costing-line-override {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.costing-line-row--custom td:first-child input,
+.costing-line-row--custom .costing-component-card__head strong {
+  font-style: italic;
+}
+
+.costing-manual-escape {
+  margin: 0 0 16px;
+}
+
 .costing-picker__row-main {
   display: flex;
   flex-direction: column;

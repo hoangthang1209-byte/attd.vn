@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   calculateCosting,
   calculateCostingQuantityBreaks,
+  CostingCalculatorValidationError,
   saveCostingCalculation,
 } from "@/features/pricing/services/costing-calculator.service";
 import type {
@@ -10,6 +11,7 @@ import type {
   CostingComponentType,
   CostingQuantityBreakResult,
 } from "@/features/pricing/costing-types";
+import { parseStructuredCostingLines } from "@/features/pricing/costing-v2";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 const COMPONENT_TYPES: CostingComponentType[] = [
@@ -79,6 +81,8 @@ function parseCostingBody(raw: Record<string, unknown>): CostingCalculatorInput 
     fabricCostPerUnit: asNumber(raw.fabricCostPerUnit),
     ribCostPerUnit: asNumber(raw.ribCostPerUnit),
     components: parseComponents(raw.components),
+    workspaceVersion: raw.workspaceVersion === 2 ? 2 : undefined,
+    costLines: parseStructuredCostingLines(raw.costLines),
     overheadRate: asNumber(raw.overheadRate),
     targetMarginRate: asNumber(raw.targetMarginRate),
     vatRate: asNumber(raw.vatRate),
@@ -181,6 +185,9 @@ export async function POST(req: NextRequest) {
     const result = await calculateCosting(input);
     return NextResponse.json({ result });
   } catch (err) {
+    if (err instanceof CostingCalculatorValidationError) {
+      return NextResponse.json({ message: err.message }, { status: 400 });
+    }
     console.error("[POST /api/pricing/costing]", err);
     return NextResponse.json({ message: "Không thể tính giá costing" }, { status: 500 });
   }

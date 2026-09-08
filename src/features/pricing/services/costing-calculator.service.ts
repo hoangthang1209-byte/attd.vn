@@ -12,6 +12,8 @@ import type {
   CostingQuantityBreakResult,
   CostingSaveResult,
 } from "@/features/pricing/costing-types";
+import { previewCostingCalculation } from "@/features/pricing/costing-preview";
+import { usesV2CostLines, validateCostingLinesForSave } from "@/features/pricing/costing-v2";
 
 const PROCESS_COMPONENT_TYPES: CostingComponentType[] = [
   "CUTTING",
@@ -138,9 +140,16 @@ async function resolveProduct(input: CostingCalculatorInput) {
 }
 
 export async function calculateCosting(input: CostingCalculatorInput): Promise<CostingCalculatorResult> {
+  const { product, variant } = await resolveProduct(input);
+  const context = {
+    productName: input.customProductName?.trim() || product?.name || "Sản phẩm tùy chỉnh",
+    variantName: variantLabel(variant),
+  };
+  if (usesV2CostLines(input)) {
+    return previewCostingCalculation(input, context);
+  }
   const quantity = Math.max(1, Math.round(positive(input.quantity, 1)));
   const warnings: string[] = [];
-  const { product, variant } = await resolveProduct(input);
   const productName = input.customProductName?.trim() || product?.name || "Sản phẩm tùy chỉnh";
   const fabricPrice = positive(input.fabricPrice);
   const fabricConsumption = positive(input.fabricConsumption);
@@ -214,6 +223,7 @@ export async function calculateCosting(input: CostingCalculatorInput): Promise<C
     ribCostPerUnit,
     materialCostPerUnit,
     processCostPerUnit,
+    otherCostPerUnit: 0,
     componentCostPerUnit,
     overheadRate,
     overheadCostPerUnit,
@@ -264,6 +274,10 @@ export async function saveCostingCalculation(
   input: CostingCalculatorInput,
   options?: { batchItemId?: string },
 ): Promise<CostingSaveResult> {
+  if (usesV2CostLines(input)) {
+    const lineError = validateCostingLinesForSave(input.costLines ?? [], input.quantity);
+    if (lineError) throw new CostingCalculatorValidationError(lineError);
+  }
   const result = await calculateCosting(input);
   const quantityBreaks = (input.quantityBreaks ?? [])
     .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
@@ -383,6 +397,11 @@ export async function updateCostingCalculation(
 
   const calcItem = calc.items[0];
   if (!calcItem) throw new CostingCalculatorValidationError("Bản tính giá không có dòng sản phẩm.");
+
+  if (usesV2CostLines(input)) {
+    const lineError = validateCostingLinesForSave(input.costLines ?? [], input.quantity);
+    if (lineError) throw new CostingCalculatorValidationError(lineError);
+  }
 
   const result = await calculateCosting(input);
   const quantityBreaks = (input.quantityBreaks ?? [])

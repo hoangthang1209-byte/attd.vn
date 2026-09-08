@@ -28,7 +28,7 @@ export type PricingCalcForQuoteItems = {
 };
 
 function isUnsafeCustomerDescription(value: string): boolean {
-  return /VL:|GSM:|target margin|Giá từ Costing Calculator|costing snapshot|supplierUnitPrice|cost breakdown/i.test(
+  return /VL:|GSM:|target margin|Giá từ Costing Calculator|costing snapshot|supplierUnitPrice|cost breakdown|supplierName|sourcePriceId|Định mức|PER_ITEM|PER_ORDER|PER_POSITION/i.test(
     value,
   );
 }

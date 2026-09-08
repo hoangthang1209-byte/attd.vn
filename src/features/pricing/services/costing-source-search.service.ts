@@ -9,16 +9,28 @@ import {
 import {
   COSTING_SOURCE_SEARCH_LIMIT,
   CostingSourcePriceValidationError,
+  mergeMaterialAndTrimSearchHits,
   tokenizeSearchQuery,
   type CostingSourceSearchHit,
 } from "@/features/pricing/costing-source-price";
 
+export type CostingSourceSearchKind = CostingSourceType | "MATERIALS";
+
 export async function searchCostingSources(input: {
-  kind: CostingSourceType;
+  kind: CostingSourceSearchKind;
   query?: string;
   take?: number;
 }): Promise<CostingSourceSearchHit[]> {
   const take = Math.min(Math.max(input.take ?? COSTING_SOURCE_SEARCH_LIMIT, 1), COSTING_SOURCE_SEARCH_LIMIT);
+
+  if (input.kind === "MATERIALS") {
+    const [materials, trims] = await Promise.all([
+      searchCostingSources({ kind: "PRODUCTION_MATERIAL", query: input.query, take }),
+      searchCostingSources({ kind: "PRODUCTION_TRIM", query: input.query, take }),
+    ]);
+    return mergeMaterialAndTrimSearchHits(materials, trims, take);
+  }
+
   const tokens = tokenizeSearchQuery(input.query ?? "");
 
   if (input.kind === "PRODUCTION_MATERIAL") {
@@ -122,8 +134,13 @@ export async function searchCostingSources(input: {
   }));
 }
 
-export function parseCostingSourceSearchKind(value: string | null): CostingSourceType {
-  if (value === "PRODUCTION_MATERIAL" || value === "PRODUCTION_TRIM" || value === "COST_LIBRARY") {
+export function parseCostingSourceSearchKind(value: string | null): CostingSourceSearchKind {
+  if (
+    value === "PRODUCTION_MATERIAL" ||
+    value === "PRODUCTION_TRIM" ||
+    value === "COST_LIBRARY" ||
+    value === "MATERIALS"
+  ) {
     return value;
   }
   throw new CostingSourcePriceValidationError("Loại nguồn tìm kiếm không hợp lệ.", "INVALID_SEARCH_KIND");

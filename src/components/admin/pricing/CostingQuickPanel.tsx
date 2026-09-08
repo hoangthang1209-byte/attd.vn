@@ -22,6 +22,7 @@ import { costingComponentTypeLabel } from "@/features/pricing/costing-component-
 import { previewCostingCalculation } from "@/features/pricing/costing-preview";
 import {
   applyQuickCostLineUnitCost,
+  appendQuickCostComponent,
   customValuesToComponentRow,
   flattenWorkspaceToQuickCostLines,
   libraryItemToComponentRow,
@@ -146,10 +147,7 @@ export default function CostingQuickPanel({
 
   function appendComponent(row: import("@/components/admin/pricing/costing/CostingComponentTable").CostingComponentRow) {
     if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      components: [...workspace.components, row],
-    });
+    setWorkspace(appendQuickCostComponent(workspace, row));
     const nextIndex = quickLines.length;
     setTimeout(() => focusLine(nextIndex), 0);
   }
