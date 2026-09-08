@@ -62,9 +62,8 @@ export default function BankTransactionManager() {
   const [manualOrderNo, setManualOrderNo] = useState("");
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
 
-  const load = useCallback(async (showLoading = false) => {
+  const load = useCallback(async () => {
     if (!permissions.canViewFinancials) return;
-    if (showLoading) setLoading(true);
     try {
       const params = new URLSearchParams({ limit: "150" });
       if (filter !== "ALL") params.set("status", filter);
@@ -88,8 +87,8 @@ export default function BankTransactionManager() {
 
   useEffect(() => {
     if (permissionsLoading || !permissions.canViewFinancials) return;
-    void load(true);
-    const interval = window.setInterval(() => void load(false), 15_000);
+    void load();
+    const interval = window.setInterval(() => void load(), 15_000);
     return () => window.clearInterval(interval);
   }, [load, permissions.canViewFinancials, permissionsLoading]);
 
@@ -127,7 +126,7 @@ export default function BankTransactionManager() {
       if (!response.ok) throw new Error(body.message ?? "Không thể đối soát giao dịch");
       setMatchingId(null);
       setManualOrderNo("");
-      await load(false);
+      await load();
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Không thể đối soát giao dịch");
     } finally {
@@ -167,7 +166,10 @@ export default function BankTransactionManager() {
         </div>
         <button
           type="button"
-          onClick={() => void load(true)}
+          onClick={() => {
+            setLoading(true);
+            void load();
+          }}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           disabled={loading}
         >
