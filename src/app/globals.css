@@ -20978,6 +20978,12 @@ body:has(.mp-pdp--b2b) .product-quote-dialog__product-variant {
   --admin-focus: rgba(220, 38, 38, 0.18);
   --admin-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   --admin-overlay-z: 4800;
+  --admin-header-height: 9rem;
+}
+
+/* Mobile Admin: window is the scroller (`.main` overflow is visible). */
+html.admin-cms {
+  scroll-padding-top: var(--admin-header-height);
 }
 
 .admin-shell {
@@ -31821,7 +31827,7 @@ body:has(.blog-article-page) .floating-contact {
 
 .costing-summary-panel {
   position: sticky;
-  top: 16px;
+  top: calc(var(--admin-header-height, 9rem) + 16px);
 }
 
 .costing-summary-panel__inner {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 import AdminScrollRestoration from "@/components/admin/AdminScrollRestoration";
@@ -227,6 +227,13 @@ function WorkspaceModeToggle() {
   );
 }
 
+function applyAdminHeaderHeight(header: HTMLElement, scroller: HTMLElement) {
+  const height = Math.ceil(header.getBoundingClientRect().height);
+  const value = `${Math.max(0, height)}px`;
+  scroller.style.setProperty("--admin-header-height", value);
+  document.documentElement.style.setProperty("--admin-header-height", value);
+}
+
 function AdminShellMain({
   children,
   onOpenNav,
@@ -238,6 +245,8 @@ function AdminShellMain({
   const { title } = useAdminTitle();
   const pageMeta = getAdminBreadcrumbMeta(pathname);
   const pageTitle = title || pageMeta.title;
+  const mainRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const nextTitle = pageTitle?.trim()
@@ -248,12 +257,27 @@ function AdminShellMain({
     }
   }, [pageTitle]);
 
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    const scroller = mainRef.current;
+    if (!header || !scroller) return;
+
+    applyAdminHeaderHeight(header, scroller);
+    const observer = new ResizeObserver(() => applyAdminHeaderHeight(header, scroller));
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [pageTitle, pageMeta.description]);
+
   return (
-    <main id="admin-content-scroll" className={`${styles.main} admin-content-scroll`}>
+    <main
+      ref={mainRef}
+      id="admin-content-scroll"
+      className={`${styles.main} admin-content-scroll`}
+    >
       <Suspense fallback={null}>
         <AdminScrollRestoration />
       </Suspense>
-      <header className={styles.header}>
+      <header ref={headerRef} className={styles.header}>
         <button
           type="button"
           className={styles.mobileHeaderToggle}
@@ -286,6 +310,16 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isLogin = pathname === "/admin/login";
+
+  useEffect(() => {
+    if (isLogin) return;
+    const root = document.documentElement;
+    root.classList.add("admin-cms");
+    return () => {
+      root.classList.remove("admin-cms");
+      root.style.removeProperty("--admin-header-height");
+    };
+  }, [isLogin]);
 
   if (isLogin) {
     return children;
