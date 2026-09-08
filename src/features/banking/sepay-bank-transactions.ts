@@ -13,6 +13,14 @@ export const BANK_TRANSACTION_STATUSES = [
 ] as const;
 
 export type BankTransactionStatus = (typeof BANK_TRANSACTION_STATUSES)[number];
+export type BankTransactionReconcileAction = "MATCH" | "IGNORE";
+
+export class BankTransactionValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BankTransactionValidationError";
+  }
+}
 
 const sePayWebhookSchema = z.object({
   id: z.union([z.number(), z.string()]).transform((value) => String(value)),
@@ -59,8 +67,6 @@ export type SePayProcessingResult = {
 };
 
 function parseVietnamBankDate(value: string): Date {
-  // SePay sends local Vietnam time as YYYY-MM-DD HH:mm:ss. Store the same
-  // wall-clock value in the existing timestamp-without-time-zone schema style.
   const normalized = value.trim().replace(" ", "T");
   const parsed = new Date(`${normalized}+07:00`);
   if (Number.isNaN(parsed.getTime())) {
@@ -88,6 +94,28 @@ function paymentTypeForIncomingTransfer(input: {
 }): "DEPOSIT" | "PAYMENT" {
   if (input.confirmedPaid <= 0 && input.amount < input.totalAmount) return "DEPOSIT";
   return "PAYMENT";
+}
+
+function reconciliationBlockReason(input: {
+  orderNo: string;
+  currency: string;
+  orderStatus: import("@prisma/client").OrderStatus;
+  outstandingAmount: number;
+  amount: number;
+}): string | null {
+  if (input.currency !== "VND") {
+    return `Đơn ${input.orderNo} dùng tiền tệ ${input.currency}; Phase 1 chỉ đối soát chuyển khoản VND.`;
+  }
+  if (isOrderPaymentLocked(input.orderStatus)) {
+    return `Đơn ${input.orderNo} đã ${input.orderStatus === "COMPLETED" ? "hoàn tất" : "hủy"}; không thể cập nhật thanh toán.`;
+  }
+  if (input.outstandingAmount <= 0) {
+    return `Đơn ${input.orderNo} không còn công nợ phải thu.`;
+  }
+  if (input.amount > input.outstandingAmount) {
+    return `Số tiền ${input.amount.toLocaleString("vi-VN")} đ vượt công nợ ${input.outstandingAmount.toLocaleString("vi-VN")} đ của ${input.orderNo}.`;
+  }
+  return null;
 }
 
 async function findExistingTransaction(externalId: string) {
@@ -211,17 +239,13 @@ export async function processSePayWebhook(
       const totalAmount = order.totalAmount.toNumber();
       const financials = computeOrderFinancials(totalAmount, paymentInputs);
       const confirmedPaid = financials.paidAmount;
-
-      let reviewReason: string | null = null;
-      if (order.currency !== "VND") {
-        reviewReason = `Đơn ${orderNo} dùng tiền tệ ${order.currency}; không tự ghi nhận chuyển khoản VND.`;
-      } else if (isOrderPaymentLocked(order.status)) {
-        reviewReason = `Đơn ${orderNo} đã ${order.status === "COMPLETED" ? "hoàn tất" : "hủy"}; cần kiểm tra thủ công.`;
-      } else if (financials.outstandingAmount <= 0) {
-        reviewReason = `Đơn ${orderNo} không còn công nợ phải thu.`;
-      } else if (payload.transferAmount > financials.outstandingAmount) {
-        reviewReason = `Số tiền ${payload.transferAmount.toLocaleString("vi-VN")} đ vượt công nợ ${financials.outstandingAmount.toLocaleString("vi-VN")} đ của ${orderNo}.`;
-      }
+      const reviewReason = reconciliationBlockReason({
+        orderNo,
+        currency: order.currency,
+        orderStatus: order.status,
+        outstandingAmount: financials.outstandingAmount,
+        amount: payload.transferAmount,
+      });
 
       if (reviewReason) {
         await tx.$executeRaw(Prisma.sql`
@@ -300,11 +324,165 @@ export async function processSePayWebhook(
       };
     });
   } catch (error) {
-    // Race-safe idempotency: the provider can retry/replay the same transaction.
     const duplicate = await findExistingTransaction(payload.id);
     if (duplicate) return duplicateResult(duplicate);
     throw error;
   }
+}
+
+type LockedBankTransaction = {
+  id: string;
+  provider: string;
+  externalId: string;
+  gateway: string;
+  transactionAt: Date;
+  content: string;
+  transferType: string;
+  amount: Prisma.Decimal;
+  referenceCode: string | null;
+  matchStatus: BankTransactionStatus;
+  matchedOrderId: string | null;
+  orderPaymentId: string | null;
+};
+
+async function lockBankTransaction(
+  tx: Prisma.TransactionClient,
+  transactionId: string,
+): Promise<LockedBankTransaction | null> {
+  const rows = await tx.$queryRaw<LockedBankTransaction[]>(Prisma.sql`
+    SELECT
+      "id", "provider", "externalId", "gateway", "transactionAt", "content",
+      "transferType", "amount", "referenceCode", "matchStatus",
+      "matchedOrderId", "orderPaymentId"
+    FROM "BankTransaction"
+    WHERE "id" = ${transactionId}
+    FOR UPDATE
+  `);
+  return rows[0] ?? null;
+}
+
+export async function reconcileBankTransaction(
+  transactionId: string,
+  input: {
+    action: BankTransactionReconcileAction;
+    orderNo?: string | null;
+    note?: string | null;
+  },
+) {
+  const note = input.note?.trim() || null;
+
+  return prisma.$transaction(async (tx) => {
+    const transaction = await lockBankTransaction(tx, transactionId);
+    if (!transaction) {
+      throw new BankTransactionValidationError("Không tìm thấy giao dịch ngân hàng.");
+    }
+    if (transaction.orderPaymentId || transaction.matchStatus === "MATCHED") {
+      throw new BankTransactionValidationError("Giao dịch này đã được đối soát.");
+    }
+
+    if (input.action === "IGNORE") {
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE "BankTransaction"
+        SET "matchStatus" = 'IGNORED',
+            "matchReason" = ${note ? `Bỏ qua thủ công · ${note}` : "Bỏ qua thủ công."},
+            "matchedAt" = CURRENT_TIMESTAMP,
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${transaction.id}
+      `);
+      return { matchStatus: "IGNORED" as const, matchedOrderId: transaction.matchedOrderId };
+    }
+
+    if (transaction.transferType !== "in") {
+      throw new BankTransactionValidationError("Phase 1 chỉ khớp thủ công giao dịch tiền vào.");
+    }
+    if (transaction.matchStatus === "IGNORED") {
+      throw new BankTransactionValidationError("Giao dịch đã được bỏ qua; chưa hỗ trợ mở lại trong Phase 1.");
+    }
+
+    const orderNo = normalizeOrderNo(input.orderNo?.trim() || "");
+    if (!orderNo) {
+      throw new BankTransactionValidationError("Mã đơn hàng phải có dạng DH-000523 hoặc DH000523.");
+    }
+
+    const order = await tx.order.findUnique({
+      where: { orderNo },
+      include: { payments: true },
+    });
+    if (!order) {
+      throw new BankTransactionValidationError(`Không tìm thấy đơn hàng ${orderNo}.`);
+    }
+
+    const paymentInputs = order.payments.map((payment) => ({
+      type: payment.type,
+      status: payment.status,
+      amount: payment.amount.toNumber(),
+    }));
+    const totalAmount = order.totalAmount.toNumber();
+    const financials = computeOrderFinancials(totalAmount, paymentInputs);
+    const amount = transaction.amount.toNumber();
+    const blocked = reconciliationBlockReason({
+      orderNo,
+      currency: order.currency,
+      orderStatus: order.status,
+      outstandingAmount: financials.outstandingAmount,
+      amount,
+    });
+    if (blocked) throw new BankTransactionValidationError(blocked);
+
+    const paymentType = paymentTypeForIncomingTransfer({
+      confirmedPaid: financials.paidAmount,
+      amount,
+      totalAmount,
+    });
+    const bankReference = transaction.referenceCode?.trim() || `SEPAY-${transaction.externalId}`;
+    const payment = await tx.orderPayment.create({
+      data: {
+        orderId: order.id,
+        type: paymentType,
+        method: "BANK_TRANSFER",
+        amount,
+        paidAt: transaction.transactionAt,
+        referenceCode: bankReference,
+        note: ["Đối soát thủ công từ SePay", transaction.gateway, transaction.content.trim(), note]
+          .filter(Boolean)
+          .join(" · "),
+      },
+      select: { id: true },
+    });
+
+    await tx.orderActivity.create({
+      data: {
+        orderId: order.id,
+        type: "PAYMENT_RECORDED",
+        title: `Đối soát thủ công ${paymentType === "DEPOSIT" ? "tiền cọc" : "thanh toán"}: ${amount.toLocaleString("vi-VN")} đ`,
+        detail: `Chuyển khoản · SePay · ${bankReference}`,
+        metadata: {
+          source: "SEPAY_MANUAL",
+          bankTransactionId: transaction.id,
+          sepayTransactionId: transaction.externalId,
+          note,
+        },
+      },
+    });
+
+    await tx.$executeRaw(Prisma.sql`
+      UPDATE "BankTransaction"
+      SET "matchStatus" = 'MATCHED',
+          "matchReason" = ${note ? `Khớp thủ công với ${orderNo} · ${note}` : `Khớp thủ công với ${orderNo}.`},
+          "matchedOrderId" = ${order.id},
+          "orderPaymentId" = ${payment.id},
+          "matchedAt" = CURRENT_TIMESTAMP,
+          "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${transaction.id}
+    `);
+
+    return {
+      matchStatus: "MATCHED" as const,
+      matchedOrderId: order.id,
+      matchedOrderNo: order.orderNo,
+      orderPaymentId: payment.id,
+    };
+  });
 }
 
 export async function listBankTransactions(input?: {
