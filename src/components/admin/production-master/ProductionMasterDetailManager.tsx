@@ -14,6 +14,7 @@ import AdminPageTitle from "@/components/admin/AdminPageTitle";
 import AdminInlineLoader from "@/components/admin/feedback/AdminInlineLoader";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import ProductionMasterSearchSelect from "@/components/admin/production-master/ProductionMasterSearchSelect";
+import CostingSourcePricePanel from "@/components/admin/pricing/CostingSourcePricePanel";
 import type { MasterAdminConfig } from "@/components/admin/production-master/production-master-admin-config";
 
 type Props = {
@@ -332,6 +333,14 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
           })}
         </div>
       </SectionCard>
+
+      {(config.kind === "material" || config.kind === "trim") && (
+        <CostingSourcePricePanel
+          pricesApiPath={`${config.apiPath}/${itemId}/source-prices`}
+          defaultUnit={config.kind === "material" ? "kg" : "cái"}
+          suggestedUnits={config.kind === "material" ? ["kg", "m", "yard", "mét"] : ["cái", "bộ", "mét", "kg"]}
+        />
+      )}
 
       {mergeOpen && config.kind === "supplier" && (
         <div className="admin-modal-backdrop" role="presentation" onClick={() => setMergeOpen(false)}>

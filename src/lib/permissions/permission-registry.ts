@@ -46,6 +46,9 @@ export const PUBLIC_TOKEN_FORBIDDEN_FIELDS = [
   "assignedToAdminUserId",
   "staffOnlyIdentifiers",
   "privateCustomerDetails",
+  "costingSourcePrice",
+  "costingSourcePrices",
+  "supplierUnitPrice",
 ] as const;
 
 export type PublicTokenForbiddenField =

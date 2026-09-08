@@ -19,6 +19,8 @@ export type CostLibraryItem = {
   defaultUnitCost: number;
   defaultQuantityFactor?: number;
   defaultNote?: string;
+  /** Present on materialized DB rows that correspond to an in-code builtin. */
+  legacyBuiltinId?: string | null;
 };
 
 export const COST_LIBRARY_CATEGORY_LABELS: Record<CostLibraryCategory, string> = {
@@ -122,4 +124,43 @@ export function isCostLibraryCategory(value: string): value is CostLibraryCatego
     value === "ACCESSORY" ||
     value === "OTHER"
   );
+}
+
+export function costLibraryDedupeKey(category: string, name: string): string {
+  return `${category}:${normalizeCostLibraryName(name)}`;
+}
+
+export function findBuiltinCostLibraryById(id: string): CostLibraryItem | null {
+  return BUILTIN_COST_LIBRARY.find((item) => item.id === id) ?? null;
+}
+
+/** DB rows hide equivalent builtins by name+category and by stamped legacyBuiltinId. */
+export function mergeCostLibraryCatalog(
+  dbItems: CostLibraryItem[],
+  builtins: CostLibraryItem[] = BUILTIN_COST_LIBRARY,
+): CostLibraryItem[] {
+  const seenKeys = new Set(dbItems.map((item) => costLibraryDedupeKey(item.category, item.name)));
+  const seenBuiltinIds = new Set(
+    dbItems.map((item) => item.legacyBuiltinId).filter((id): id is string => Boolean(id)),
+  );
+  const leftover = builtins.filter(
+    (item) => !seenKeys.has(costLibraryDedupeKey(item.category, item.name)) && !seenBuiltinIds.has(item.id),
+  );
+  return [...leftover, ...dbItems];
+}
+
+export function costLibraryItemMatchesTokens(
+  item: Pick<CostLibraryItem, "name" | "category" | "defaultNote">,
+  tokens: string[],
+): boolean {
+  if (tokens.length === 0) return true;
+  const haystack = [
+    item.name,
+    item.category,
+    COST_LIBRARY_CATEGORY_LABELS[item.category],
+    item.defaultNote ?? "",
+  ]
+    .join(" ")
+    .toLocaleLowerCase("vi-VN");
+  return tokens.every((token) => haystack.includes(token.toLocaleLowerCase("vi-VN")));
 }

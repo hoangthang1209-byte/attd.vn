@@ -85,6 +85,9 @@ export default function PricingOverviewDashboard() {
         <Link href="/admin/pricing/product-tiers" className="admin-btn admin-btn--secondary">
           Bảng giá sản phẩm
         </Link>
+        <Link href="/admin/pricing/cost-library" className="admin-btn admin-btn--secondary">
+          Thư viện chi phí
+        </Link>
         <Link href="/admin/pricing/service-rules" className="admin-btn admin-btn--secondary">
           Phí dịch vụ
         </Link>
