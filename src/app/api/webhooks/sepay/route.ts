@@ -50,13 +50,31 @@ function authenticate(req: NextRequest, rawBody: string): "ok" | "invalid" | "un
   return "unconfigured";
 }
 
+function allowedAccountNumbers(): Set<string> | null {
+  const raw = process.env.SEPAY_ALLOWED_ACCOUNT_NUMBERS?.trim();
+  if (!raw) return null;
+  const values = raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return values.length > 0 ? new Set(values) : null;
+}
+
+function successResponse() {
+  // SePay requires this exact JSON body for a successful delivery.
+  return NextResponse.json({ success: true });
+}
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const auth = authenticate(req, rawBody);
 
   if (auth === "unconfigured") {
     console.error("[SePay webhook] Authentication is not configured");
-    return NextResponse.json({ success: false, message: "Webhook authentication is not configured" }, { status: 503 });
+    return NextResponse.json(
+      { success: false, message: "Webhook authentication is not configured" },
+      { status: 503 },
+    );
   }
   if (auth === "invalid") {
     return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
@@ -71,12 +89,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const payload = parseSePayWebhookPayload(body);
-    const result = await processSePayWebhook(payload);
-    return NextResponse.json({
-      success: true,
-      duplicate: result.duplicate,
-      matchStatus: result.matchStatus,
-    });
+    const allowedAccounts = allowedAccountNumbers();
+    if (allowedAccounts && !allowedAccounts.has(payload.accountNumber.trim())) {
+      // Acknowledge authenticated SePay events for other linked accounts so they
+      // are not retried, but never let them reach ATTD payment reconciliation.
+      console.warn("[SePay webhook] Ignored transaction for non-allowlisted account", {
+        transactionId: payload.id,
+        gateway: payload.gateway,
+        accountNumberSuffix: payload.accountNumber.slice(-4),
+      });
+      return successResponse();
+    }
+
+    await processSePayWebhook(payload);
+    return successResponse();
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json(
