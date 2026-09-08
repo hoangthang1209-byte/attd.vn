@@ -210,7 +210,7 @@ export async function processSePayWebhook(
       }));
       const totalAmount = order.totalAmount.toNumber();
       const financials = computeOrderFinancials(totalAmount, paymentInputs);
-      const confirmedPaid = financials.paidAmount - financials.overpaidAmount;
+      const confirmedPaid = financials.paidAmount;
 
       let reviewReason: string | null = null;
       if (order.currency !== "VND") {
