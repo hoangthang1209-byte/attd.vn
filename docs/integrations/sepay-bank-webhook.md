@@ -60,6 +60,20 @@ If both variables exist, ATTD prefers HMAC and does not fall back to the API key
 
 Never commit either secret to GitHub.
 
+### Receiving-account allowlist
+
+Strongly recommended in Production:
+
+```text
+SEPAY_ALLOWED_ACCOUNT_NUMBERS=1017588888,0123456789
+```
+
+Use the exact bank account numbers sent by SePay in `accountNumber`, separated by commas when ATTD has multiple receiving accounts.
+
+When the allowlist is configured, an authenticated webhook for another linked SePay account is acknowledged with `{"success":true}` but is **not** written into ATTD or reconciled to an Order. This prevents transfers on unrelated linked accounts from creating customer payments.
+
+If the variable is omitted, ATTD accepts transactions from every account covered by the configured SePay webhook. For Production, configure both the SePay webhook to the intended bank account(s) and this allowlist.
+
 ## 3. Webhook URL
 
 Configure the SePay webhook endpoint as:
@@ -69,6 +83,14 @@ https://attd.vn/api/webhooks/sepay
 ```
 
 The endpoint accepts SePay transaction webhooks only. It is not an admin/session-authenticated endpoint; webhook authentication is mandatory.
+
+On successful processing (including duplicate/replayed deliveries), ATTD responds with HTTP 200 and exactly:
+
+```json
+{"success":true}
+```
+
+This is the success response required by SePay; do not add diagnostic fields to the response body.
 
 ## 4. Transfer content convention
 
@@ -87,6 +109,8 @@ DH_000523
 ```
 
 The canonical ATTD order remains `DH-000523`.
+
+The Order payment tab displays the canonical transfer memo with a copy action for sales/finance users.
 
 For the highest automatic match rate, future quotation/order QR generation should pre-fill the transfer content using this convention.
 
@@ -140,7 +164,7 @@ Manual matching still refuses completed/cancelled orders, non-VND orders, orders
 
 **Bỏ qua** marks an unresolved transaction `IGNORED` without creating a payment. Phase 1 does not provide an “unignore” action.
 
-## 6. Duplicate protection
+## 6. Duplicate and concurrency protection
 
 SePay transaction `id` is stored as `externalId` and protected by the unique key:
 
@@ -150,7 +174,9 @@ SePay transaction `id` is stored as `externalId` and protected by the unique key
 
 Webhook retries/replays return success without creating another bank transaction or another `OrderPayment`.
 
-Manual reconciliation also locks the transaction row before creating a payment, preventing concurrent actions from posting the same transfer twice.
+ATTD also serializes payment posting per Order before calculating outstanding balance, preventing two different incoming transfers arriving at nearly the same time from both using a stale receivable balance.
+
+Manual reconciliation locks the transaction row before creating a payment, preventing concurrent actions from posting the same transfer twice.
 
 ## 7. Admin screen
 
@@ -170,14 +196,19 @@ The screen refreshes every 15 seconds and supports:
 
 Matched/detected rows link directly to the existing ATTD order detail screen. Users with update permission can manually match unresolved incoming transfers or ignore them.
 
+The Order → Thanh toán tab shows a copyable payment memo such as `ATTD DH000523` and the current outstanding amount.
+
 ## 8. Production activation checklist
 
 1. Merge and deploy this implementation.
 2. Apply the database migration.
 3. Configure `SEPAY_WEBHOOK_SECRET` (preferred) or `SEPAY_WEBHOOK_API_KEY` in Vercel.
-4. Add `https://attd.vn/api/webhooks/sepay` in SePay.
-5. Send a low-value controlled transfer using a real test order and content `ATTD DHxxxxxx`.
-6. Verify one `BankTransaction`, one `OrderPayment`, the order payment state, and the Order Activity timeline.
-7. Replay/test the same webhook and verify no duplicate payment is created.
-8. Test one unmatched transaction and manually reconcile it from `/admin/bank-transactions`.
-9. Only after the controlled tests succeed, enable the webhook for the production receiving account(s).
+4. Configure `SEPAY_ALLOWED_ACCOUNT_NUMBERS` with the ATTD receiving account number(s).
+5. Add `https://attd.vn/api/webhooks/sepay` in SePay and bind it only to the intended receiving account(s).
+6. Keep event type as incoming-only for Phase 1 when possible.
+7. Send a low-value controlled transfer using a real test order and content `ATTD DHxxxxxx`.
+8. Verify one `BankTransaction`, one `OrderPayment`, the order payment state, and the Order Activity timeline.
+9. Replay/test the same webhook and verify no duplicate payment is created.
+10. Test one unmatched transaction and manually reconcile it from `/admin/bank-transactions`.
+11. Verify a non-allowlisted account cannot create a payment if multiple accounts are linked in SePay.
+12. Only after the controlled tests succeed, rely on automatic reconciliation for normal customer payments.
