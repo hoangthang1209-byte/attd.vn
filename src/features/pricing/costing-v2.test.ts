@@ -8,6 +8,8 @@ import {
 import {
   COSTING_WORKSPACE_VERSION,
   computeStructuredLineCost,
+  computeV2Costing,
+  defaultV2ProcessLines,
   finalizeStructuredLine,
   newCostingLineKey,
   projectLegacyInputToCostLines,
@@ -155,6 +157,24 @@ function hoodieLines(): CostingStructuredLine[] {
 }
 
 describe("Costing V2 structured lines", () => {
+  it("new V2 Costing starts with zero default process rows and Cost/SP = 0", () => {
+    const seeded = defaultV2ProcessLines();
+    assert.equal(seeded.length, 0);
+    const result = computeV2Costing({
+      workspaceVersion: COSTING_WORKSPACE_VERSION,
+      customProductName: "New V2",
+      quantity: 500,
+      targetMarginRate: 30,
+      costLines: seeded,
+    });
+    assert.equal(result.workspaceVersion, 2);
+    assert.equal(result.costLines?.length, 0);
+    assert.equal(result.materialCostPerUnit, 0);
+    assert.equal(result.processCostPerUnit, 0);
+    assert.equal(result.otherCostPerUnit, 0);
+    assert.equal(result.totalCostPerUnit, 0);
+  });
+
   it("multiplies N material/trim rows: unitPrice × consumption", () => {
     const cotton = computeStructuredLineCost(
       line({

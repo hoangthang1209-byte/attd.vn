@@ -292,32 +292,9 @@ export function projectLegacyInputToCostLines(input: CostingCalculatorInput): Co
   return lines;
 }
 
+/** Brand-new V2 Costing starts with zero rows. Operators add library or manual lines explicitly. */
 export function defaultV2ProcessLines(): CostingStructuredLine[] {
-  const quantity = 100;
-  const seeds: Array<{ label: string; type: CostingComponentType; unitPrice: number }> = [
-    { label: "Cắt", type: "CUTTING", unitPrice: 1000 },
-    { label: "May", type: "SEWING", unitPrice: 20000 },
-    { label: "In", type: "PRINTING", unitPrice: 9000 },
-    { label: "Đóng gói + bao bì, thùng", type: "PACKAGING", unitPrice: 1000 },
-  ];
-  return seeds.map((seed) =>
-    finalizeStructuredLine(
-      {
-        key: newCostingLineKey(),
-        section: "PROCESS",
-        componentType: seed.type,
-        origin: "CUSTOM",
-        pricingBasis: "PER_ITEM",
-        label: seed.label,
-        sourceType: "CUSTOM",
-        unitPrice: seed.unitPrice,
-        unit: "cái",
-        calculationType: "PER_ITEM",
-        quantityFactor: 1,
-      },
-      quantity,
-    ),
-  );
+  return [];
 }
 
 export function computeV2Costing(

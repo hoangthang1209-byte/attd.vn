@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminLoadingState } from "@/components/admin/AdminUi";
+import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import {
   buildCostingWorkspaceClone,
   type CostingCalculationCloneRecord,
@@ -17,6 +18,7 @@ import CostingSourcePickerDialog, {
 import CostingStructuredSection from "@/components/admin/pricing/costing/CostingStructuredSection";
 import CostingSummaryPanel from "@/components/admin/pricing/costing/CostingSummaryPanel";
 import { formatPricingCurrency } from "@/features/pricing/format";
+import { formatBomMergeToast, mergeBomCostLines } from "@/features/pricing/costing-bom-merge";
 import { COSTING_BOM_PRESETS } from "@/features/pricing/costing-bom-presets";
 import { COSTING_TEMPLATES } from "@/features/pricing/costing-templates";
 import { previewCostingCalculation } from "@/features/pricing/costing-preview";
@@ -72,6 +74,7 @@ function variantLabel(variant: VariantOption | undefined): string | null {
 
 export default function CostingCalculator() {
   const router = useRouter();
+  const toast = useAdminToast();
   const searchParams = useSearchParams();
   const fromCalculationId = searchParams.get("fromCalculation");
   const customerIdFromUrl = parseCostingCustomerIdParam(searchParams.get("customerId"));
@@ -459,7 +462,11 @@ export default function CostingCalculator() {
       fabricConsumption: selectedBomPreset.defaultFabricConsumption,
       ribCostPerUnit: selectedBomPreset.defaultRibCostPerUnit,
     });
-    setCostLines((prev) => [...prev, ...mapped]);
+    const merged = mergeBomCostLines(costLines, mapped);
+    setCostLines(merged.lines);
+    if (merged.added > 0 || merged.skipped > 0) {
+      toast.info(formatBomMergeToast(merged.added, merged.skipped));
+    }
   }
 
   function applyTemplate(templateKey: string) {
@@ -726,6 +733,7 @@ export default function CostingCalculator() {
           section="PROCESS"
           title="Gia công & dịch vụ"
           addLabel="+ Thêm gia công"
+          emptyHint="Chưa có chi phí gia công"
           lines={finalizedCostLines.filter((line) => line.section === "PROCESS")}
           quantity={parsedQuantity}
           subtotal={livePreview.processCostPerUnit}

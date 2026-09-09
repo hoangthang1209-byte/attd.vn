@@ -13,6 +13,7 @@ type Props = {
   section: CostingLineSection;
   title: string;
   addLabel: string;
+  emptyHint?: string;
   lines: CostingStructuredLine[];
   quantity: number;
   subtotal: number;
@@ -31,6 +32,7 @@ export default function CostingStructuredSection({
   section,
   title,
   addLabel,
+  emptyHint,
   lines,
   quantity,
   subtotal,
@@ -49,7 +51,7 @@ export default function CostingStructuredSection({
       </div>
 
       {lines.length === 0 ? (
-        <p className="admin-field-hint">Chưa có dòng. Dùng “{addLabel}”.</p>
+        <p className="admin-field-hint">{emptyHint ?? `Chưa có dòng. Dùng “${addLabel}”.`}</p>
       ) : (
         <>
           <div className="admin-table-wrap costing-component-table-wrap costing-line-table-wrap">
