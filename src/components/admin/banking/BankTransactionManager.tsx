@@ -24,6 +24,14 @@ const STATUS_LABELS: Record<BankTransactionStatus, string> = {
   IGNORED: "Bỏ qua",
 };
 
+type SePayConfigurationStatus = {
+  authConfigured: boolean;
+  authMode: "HMAC" | "API_KEY" | null;
+  accountAllowlistConfigured: boolean;
+  allowedAccountCount: number;
+  ready: boolean;
+};
+
 function formatMoney(value: number) {
   return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(value);
 }
@@ -55,6 +63,7 @@ export default function BankTransactionManager() {
   const { permissions, loading: permissionsLoading } = useAdminPermissions();
   const [filter, setFilter] = useState<"ALL" | BankTransactionStatus>("ALL");
   const [transactions, setTransactions] = useState<BankTransactionRecord[]>([]);
+  const [configuration, setConfiguration] = useState<SePayConfigurationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
@@ -72,8 +81,10 @@ export default function BankTransactionManager() {
       });
       const body = await response.json() as {
         transactions?: BankTransactionRecord[];
+        configuration?: SePayConfigurationStatus;
         message?: string;
       };
+      if (body.configuration) setConfiguration(body.configuration);
       if (!response.ok) throw new Error(body.message ?? "Không thể tải giao dịch ngân hàng");
       setTransactions(body.transactions ?? []);
       setLastUpdatedAt(new Date());
@@ -180,6 +191,22 @@ export default function BankTransactionManager() {
           Làm mới
         </button>
       </div>
+
+      {configuration ? (
+        configuration.ready ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            <span className="font-semibold">SePay sẵn sàng nhận webhook.</span>{" "}
+            Xác thực {configuration.authMode === "HMAC" ? "HMAC-SHA256" : "API key"}; allowlist có {configuration.allowedAccountCount} tài khoản nhận.
+          </div>
+        ) : (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <span className="font-semibold">SePay chưa sẵn sàng.</span>{" "}
+            Webhook đang fail-closed và sẽ không ghi nhận thanh toán.
+            {!configuration.authConfigured ? " Thiếu SEPAY_WEBHOOK_SECRET hoặc SEPAY_WEBHOOK_API_KEY." : ""}
+            {!configuration.accountAllowlistConfigured ? " Thiếu SEPAY_ALLOWED_ACCOUNT_NUMBERS." : ""}
+          </div>
+        )
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Giao dịch đang xem" value={String(totals.count)} />
