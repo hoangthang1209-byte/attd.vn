@@ -290,8 +290,9 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     path: "/admin/production-materials",
     meta: {
       breadcrumbs: ["KỸ THUẬT", "Nguyên vật liệu"],
-      title: "Nguyên vật liệu",
-      description: "Quản lý thư viện nguyên vật liệu phục vụ BOM và sản xuất.",
+      title: "Thư viện nguyên phụ liệu",
+      description:
+        "Quản lý vải, bo, nhãn, bao bì và nguyên phụ liệu dùng cho tính giá, Tech Pack, BOM và sản xuất.",
     },
   },
   {
@@ -299,7 +300,8 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     meta: {
       breadcrumbs: ["KỸ THUẬT", "Phụ liệu"],
       title: "Phụ liệu",
-      description: "Quản lý phụ liệu, nhãn, bo, dây kéo và chi tiết hoàn thiện sản phẩm.",
+      description:
+        "Quản lý phụ liệu, nhãn, bo, dây kéo và chi tiết hoàn thiện sản phẩm. Cũng có trong Thư viện nguyên phụ liệu.",
     },
   },
 

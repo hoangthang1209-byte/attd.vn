@@ -228,6 +228,11 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
             </>
           )}
         </dl>
+        {(config.kind === "material" || config.kind === "trim") && (
+          <p className="admin-field-hint" style={{ marginTop: 8 }}>
+            Giá nhà cung cấp dùng cho Costing. Thay đổi giá hiện tại không làm đổi các bản tính giá đã lưu.
+          </p>
+        )}
         {isReferenced && (
           <p className="admin-muted" style={{ marginTop: 8, fontSize: 13 }}>
             Mục này đang được tham chiếu. Chỉ có thể lưu trữ, không thể xóa cứng.
@@ -235,7 +240,7 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
         )}
       </SectionCard>
 
-      <SectionCard title="Thông tin">
+      <SectionCard title="Thông tin nguyên phụ liệu">
         <div className="admin-form-grid">
           {config.fields.map((field) => {
             if (field.type === "checkbox") {
@@ -336,6 +341,7 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
 
       {(config.kind === "material" || config.kind === "trim") && (
         <CostingSourcePricePanel
+          title="Nhà cung cấp & giá"
           pricesApiPath={`${config.apiPath}/${itemId}/source-prices`}
           defaultUnit={config.kind === "material" ? "kg" : "cái"}
           suggestedUnits={config.kind === "material" ? ["kg", "m", "yard", "mét"] : ["cái", "bộ", "mét", "kg"]}
