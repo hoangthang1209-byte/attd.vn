@@ -9,6 +9,27 @@ import {
 import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { assertFinancialApiAccess } from "@/lib/admin-auth/financial-access";
 
+function getSePayConfigurationStatus() {
+  const hasHmacSecret = Boolean(process.env.SEPAY_WEBHOOK_SECRET?.trim());
+  const hasApiKey = Boolean(process.env.SEPAY_WEBHOOK_API_KEY?.trim());
+  const allowedAccounts = (process.env.SEPAY_ALLOWED_ACCOUNT_NUMBERS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const authMode = hasHmacSecret ? "HMAC" : hasApiKey ? "API_KEY" : null;
+  const authConfigured = Boolean(authMode);
+  const accountAllowlistConfigured = allowedAccounts.length > 0;
+
+  return {
+    authConfigured,
+    authMode,
+    accountAllowlistConfigured,
+    allowedAccountCount: allowedAccounts.length,
+    ready: authConfigured && accountAllowlistConfigured,
+  };
+}
+
 export async function GET(req: NextRequest) {
   const session = getAdminSessionFromRequest(req);
   if (!can(session, "orders.view")) {
@@ -33,11 +54,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: "limit không hợp lệ" }, { status: 400 });
   }
 
+  const configuration = getSePayConfigurationStatus();
+
   try {
     const transactions = await listBankTransactions({ status, limit });
-    return NextResponse.json({ transactions });
+    return NextResponse.json({ transactions, configuration });
   } catch (error) {
     console.error("[GET /api/bank-transactions]", error);
-    return NextResponse.json({ message: "Không thể tải giao dịch ngân hàng" }, { status: 500 });
+    return NextResponse.json(
+      { message: "Không thể tải giao dịch ngân hàng", configuration },
+      { status: 500 },
+    );
   }
 }
