@@ -53,13 +53,13 @@ function usageBadge(row: Record<string, unknown>): string {
 
 export const PRODUCTION_MATERIAL_ADMIN: MasterAdminConfig = {
   kind: "material",
-  title: "Vật liệu sản xuất",
+  title: "Nguyên phụ liệu · Vải",
   listPath: "/admin/production-materials",
   apiPath: "/api/production-materials",
-  createLabel: "Tên vật liệu",
+  createLabel: "Tên nguyên phụ liệu",
   columns: [
     { key: "code", label: "Mã" },
-    { key: "name", label: "Tên" },
+    { key: "name", label: "Nguyên phụ liệu" },
     {
       key: "category",
       label: "Danh mục",
@@ -68,7 +68,7 @@ export const PRODUCTION_MATERIAL_ADMIN: MasterAdminConfig = {
     { key: "composition", label: "Thành phần", render: (row) => String(row.composition ?? "—") },
     {
       key: "supplier",
-      label: "NCC",
+      label: "NCC mặc định",
       render: (row) => {
         const s = row.supplier as { name?: string } | null | undefined;
         return s?.name ?? "—";
@@ -76,7 +76,7 @@ export const PRODUCTION_MATERIAL_ADMIN: MasterAdminConfig = {
     },
     {
       key: "statusBadge",
-      label: "Sử dụng",
+      label: "Trạng thái",
       render: (row) => usageBadge(row),
     },
     {
@@ -102,7 +102,7 @@ export const PRODUCTION_MATERIAL_ADMIN: MasterAdminConfig = {
     { key: "composition", label: "Thành phần", type: "text" },
     { key: "gsm", label: "GSM", type: "text" },
     { key: "width", label: "Khổ rộng", type: "text" },
-    { key: "supplierId", label: "Nhà cung cấp", type: "supplier-select" },
+    { key: "supplierId", label: "Nhà cung cấp mặc định", type: "supplier-select" },
     { key: "defaultColor", label: "Màu mặc định", type: "text" },
     { key: "notes", label: "Ghi chú", type: "textarea", fullWidth: true },
     { key: "isActive", label: "Đang sử dụng", type: "checkbox" },
@@ -111,13 +111,13 @@ export const PRODUCTION_MATERIAL_ADMIN: MasterAdminConfig = {
 
 export const PRODUCTION_TRIM_ADMIN: MasterAdminConfig = {
   kind: "trim",
-  title: "Phụ liệu sản xuất",
+  title: "Nguyên phụ liệu · Phụ liệu",
   listPath: "/admin/trims",
   apiPath: "/api/production-trims",
   createLabel: "Tên phụ liệu",
   columns: [
     { key: "code", label: "Mã" },
-    { key: "name", label: "Tên" },
+    { key: "name", label: "Phụ liệu" },
     {
       key: "category",
       label: "Danh mục",
@@ -125,7 +125,7 @@ export const PRODUCTION_TRIM_ADMIN: MasterAdminConfig = {
     },
     {
       key: "supplier",
-      label: "NCC",
+      label: "NCC mặc định",
       render: (row) => {
         const s = row.supplier as { name?: string } | null | undefined;
         return s?.name ?? "—";
@@ -133,7 +133,7 @@ export const PRODUCTION_TRIM_ADMIN: MasterAdminConfig = {
     },
     {
       key: "statusBadge",
-      label: "Sử dụng",
+      label: "Trạng thái",
       render: (row) => usageBadge(row),
     },
     {
@@ -156,7 +156,7 @@ export const PRODUCTION_TRIM_ADMIN: MasterAdminConfig = {
         label: PRODUCTION_TRIM_CATEGORY_LABELS[v],
       })),
     },
-    { key: "supplierId", label: "Nhà cung cấp", type: "supplier-select" },
+    { key: "supplierId", label: "Nhà cung cấp mặc định", type: "supplier-select" },
     { key: "notes", label: "Ghi chú", type: "textarea", fullWidth: true },
     { key: "isActive", label: "Đang sử dụng", type: "checkbox" },
   ],

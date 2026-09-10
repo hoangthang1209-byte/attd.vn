@@ -169,7 +169,7 @@ export default function CostingSourcePickerDialog({
             {searchError && <p className="admin-error">{searchError}</p>}
             {emptyLibrary && kind === "MATERIALS" && (
               <div className="costing-picker__empty">
-                <p>Chưa có nguyên vật liệu trong thư viện.</p>
+                <p>Chưa có nguyên phụ liệu trong thư viện.</p>
                 <Link href="/admin/production-materials" className="admin-btn admin-btn--secondary admin-btn--small">
                   KỸ THUẬT → Nguyên vật liệu
                 </Link>

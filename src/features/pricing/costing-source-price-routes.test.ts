@@ -133,7 +133,7 @@ describe("CostingSourcePrice routes and permissions", () => {
     assert.match(calculator, /Thông tin tính giá/);
     assert.match(picker, /costing-source-search/);
     assert.match(picker, /300/);
-    assert.match(picker, /Chưa có nguyên vật liệu trong thư viện/);
+    assert.match(picker, /Chưa có nguyên phụ liệu trong thư viện/);
     assert.match(picker, /\/admin\/production-materials/);
     assert.match(picker, /Vui lòng chọn nhà cung cấp/);
     assert.match(picker, /initialPickerSourcePriceId/);

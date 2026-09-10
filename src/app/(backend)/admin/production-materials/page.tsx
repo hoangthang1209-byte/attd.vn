@@ -1,14 +1,14 @@
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
-import { ProductionMasterListClient } from "@/components/admin/production-master/ProductionMasterClientManagers";
+import MaterialLibraryListManager from "@/components/admin/production-master/MaterialLibraryListManager";
 import { adminPageMetadata } from "@/lib/admin/admin-metadata";
 
-export const metadata = adminPageMetadata("Nguyên vật liệu");
+export const metadata = adminPageMetadata("Thư viện nguyên phụ liệu");
 
 export default function ProductionMaterialsPage() {
   return (
     <>
-      <AdminPageTitle title="Vật liệu sản xuất" />
-      <ProductionMasterListClient kind="material" />
+      <AdminPageTitle title="Thư viện nguyên phụ liệu" />
+      <MaterialLibraryListManager />
     </>
   );
 }

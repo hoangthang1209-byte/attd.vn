@@ -145,26 +145,47 @@ export default function CostingSourcePricePanel({
   return (
     <SectionCard title={title}>
       <p className="admin-muted" style={{ marginTop: 0, fontSize: 13 }}>
-        Giá tham chiếu hiện tại theo nhà cung cấp / xưởng. Không tự chọn giá rẻ nhất.
+        Giá tham chiếu hiện tại theo nhà cung cấp. Không tự chọn giá rẻ nhất. Đơn vị giá phải khớp định mức khi dùng trong Costing.
+      </p>
+      <p className="admin-field-hint" style={{ marginTop: 4 }}>
+        Chưa có nhà cung cấp?{" "}
+        <a href="/admin/production-suppliers" className="admin-link">
+          Quản lý nhà cung cấp
+        </a>
       </p>
       {error && <p className="admin-error">{error}</p>}
 
       {loading ? (
         <p className="admin-muted">Đang tải giá nhà cung cấp…</p>
       ) : items.length === 0 ? (
-        <p className="admin-muted">Chưa có giá nhà cung cấp.</p>
+        <div className="admin-empty-inline">
+          <p className="admin-muted" style={{ marginBottom: 8 }}>
+            Chưa có giá nhà cung cấp
+          </p>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--xs"
+            onClick={() => {
+              resetForm();
+              document.getElementById("costing-source-price-form")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }}
+          >
+            + Thêm giá nhà cung cấp
+          </button>
+        </div>
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
                 <th>{showCalculationType ? "NCC / Xưởng" : "Nhà cung cấp"}</th>
-                <th>Giá</th>
+                <th className="material-library-price-col">Đơn giá</th>
                 <th>Đơn vị</th>
                 {showCalculationType && <th>Cách tính</th>}
                 <th>Trạng thái</th>
+                <th>Cập nhật</th>
                 <th>Ghi chú</th>
-                <th>Actions</th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -176,7 +197,7 @@ export default function CostingSourcePricePanel({
                       {row.supplierCode}
                     </div>
                   </td>
-                  <td>{formatPricingCurrency(row.unitPrice)}</td>
+                  <td className="material-library-price-col">{formatPricingCurrency(row.unitPrice)}</td>
                   <td>{row.unit}</td>
                   {showCalculationType && (
                     <td>
@@ -189,6 +210,13 @@ export default function CostingSourcePricePanel({
                     <StatusBadge tone={row.isActive ? "success" : "danger"}>
                       {row.isActive ? "Đang dùng" : "Đã vô hiệu hóa"}
                     </StatusBadge>
+                  </td>
+                  <td>
+                    {new Date(row.updatedAt).toLocaleDateString("vi-VN", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })}
                   </td>
                   <td>{row.note ?? "—"}</td>
                   <td>
@@ -222,7 +250,7 @@ export default function CostingSourcePricePanel({
         </div>
       )}
 
-      <div className="admin-form-grid" style={{ marginTop: 16 }}>
+      <div id="costing-source-price-form" className="admin-form-grid" style={{ marginTop: 16 }}>
         <label className="admin-field">
           <span>{showCalculationType ? "NCC / Xưởng" : "Nhà cung cấp"}</span>
           <ProductionMasterSearchSelect
@@ -237,7 +265,7 @@ export default function CostingSourcePricePanel({
           />
         </label>
         <label className="admin-field">
-          <span>Giá</span>
+          <span>Đơn giá</span>
           <input
             className="admin-input"
             inputMode="decimal"
@@ -281,16 +309,16 @@ export default function CostingSourcePricePanel({
           <input className="admin-input" value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
       </div>
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         <AdminLoadingButton
           type="button"
           variant="primary"
           pending={saving}
           pendingLabel="Đang lưu…"
-          disabled={saving || !supplierId || !unitPrice.trim()}
+          disabled={saving || !supplierId || !unitPrice.trim() || !unit.trim()}
           onClick={() => void handleSave()}
         >
-          {editingId ? "Cập nhật giá" : "Thêm giá"}
+          {editingId ? "Cập nhật giá" : "+ Thêm giá nhà cung cấp"}
         </AdminLoadingButton>
         {editingId && (
           <button type="button" className="admin-btn" onClick={resetForm}>
