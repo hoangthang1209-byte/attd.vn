@@ -110,7 +110,7 @@ describe("batch → quote item mapping", () => {
     assert.equal(item.marginAmount, 27200000);
     assert.equal(item.marginRate, 82.93);
     assert.equal(item.unitPrice, 164000);
-    assert.equal(item.itemNote, "Có bảng giá theo số lượng trong costing snapshot.");
+    assert.equal(item.itemNote, null);
     assert.deepEqual(item.pricingSnapshot, { fabricPrice: 135000, targetMarginRate: 35 });
   });
 });

@@ -187,6 +187,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/pricing/cost-library",
+    meta: {
+      breadcrumbs: ["CẤU HÌNH", "Cấu hình giá", "Thư viện chi phí"],
+      title: "Thư viện chi phí",
+      description: "Giá tham chiếu theo nhà cung cấp / xưởng cho cost library.",
+    },
+  },
+  {
     path: "/admin/pricing",
     meta: {
       breadcrumbs: ["CẤU HÌNH", "Cấu hình giá"],

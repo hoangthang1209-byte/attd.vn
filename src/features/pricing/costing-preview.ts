@@ -4,7 +4,9 @@ import type {
   CostingComponentBreakdown,
   CostingComponentInput,
   CostingComponentType,
+  CostingPreviewContext,
 } from "@/features/pricing/costing-types";
+import { computeV2Costing, usesV2CostLines } from "@/features/pricing/costing-v2";
 
 const PROCESS_COMPONENT_TYPES: CostingComponentType[] = [
   "CUTTING",
@@ -105,16 +107,16 @@ function buildComponentBreakdown(
   };
 }
 
-export type CostingPreviewContext = {
-  productName?: string | null;
-  variantName?: string | null;
-};
+export type { CostingPreviewContext } from "@/features/pricing/costing-types";
 
 /** Client-side preview — mirrors server calculateCosting formulas without DB lookups. */
 export function previewCostingCalculation(
   input: CostingCalculatorInput,
   context?: CostingPreviewContext,
 ): CostingCalculatorResult {
+  if (usesV2CostLines(input)) {
+    return computeV2Costing(input, context);
+  }
   const quantity = Math.max(1, Math.round(positive(input.quantity, 1)));
   const warnings: string[] = [];
   const productName =
@@ -214,6 +216,7 @@ export function previewCostingCalculation(
     ribCostPerUnit,
     materialCostPerUnit,
     processCostPerUnit,
+    otherCostPerUnit: 0,
     componentCostPerUnit,
     overheadRate,
     overheadCostPerUnit,

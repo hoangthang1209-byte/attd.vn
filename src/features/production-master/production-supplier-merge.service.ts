@@ -1,3 +1,4 @@
+import { mergeCostingSourcePricesForSupplier } from "@/features/pricing/services/costing-source-price.service";
 import { prisma } from "@/lib/prisma";
 import { ProductionMasterValidationError } from "@/features/production-master/production-master.errors";
 
@@ -29,6 +30,8 @@ export async function mergeProductionSuppliers(sourceId: string, targetSupplierI
     data: { supplierId: targetSupplierId },
   });
 
+  const sourcePrices = await mergeCostingSourcePricesForSupplier(sourceId, targetSupplierId);
+
   const mergeNote = `Đã gộp vào ${target.code} - ${target.name}.`;
   const notes = source.notes?.trim()
     ? `${source.notes.trim()}\n${mergeNote}`
@@ -43,6 +46,8 @@ export async function mergeProductionSuppliers(sourceId: string, targetSupplierI
     bomUpdated: bomUpdated.count,
     materialUpdated: materialUpdated.count,
     trimUpdated: trimUpdated.count,
+    sourcePricesMoved: sourcePrices.moved,
+    sourcePricesKeptOnSource: sourcePrices.keptOnSource,
     target,
   };
 }

@@ -258,46 +258,46 @@ model ProductCustomizationCapability {
 }
 
 model Lead {
-  id                  String               @id @default(cuid())
-  code                String?              @unique
-  fullName            String
-  phone               String
-  email               String?
-  company             String?
-  contactName         String?
-  companyName         String?
-  zalo                String?
-  source              LeadSource           @default(WEBSITE)
-  sourceDetail        String?
-  demand              String?              @db.Text
-  status              LeadStatus           @default(NEW)
-  priority            LeadPriority         @default(NORMAL)
-  message             String?              @db.Text
-  note                String?              @db.Text
-  followUpAt          DateTime?
-  nextFollowUpAt      DateTime?
-  estimatedValue      Decimal?             @db.Decimal(12, 2)
-  assignedTo          String?
-  customerId          String?
-  contactId           String?
-  convertedAt         DateTime?
-  landingPage         String?
-  utmSource           String?
-  utmMedium           String?
-  utmCampaign         String?
-  referrer            String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  customer            Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  contact             Contact?             @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  notes               LeadNote[]
-  activities          CRMActivity[]
-  productInterests    CRMProductInterest[]
-  pricingCalculations PricingCalculation[]
+  id                    String                @id @default(cuid())
+  code                  String?               @unique
+  fullName              String
+  phone                 String
+  email                 String?
+  company               String?
+  contactName           String?
+  companyName           String?
+  zalo                  String?
+  source                LeadSource            @default(WEBSITE)
+  sourceDetail          String?
+  demand                String?               @db.Text
+  status                LeadStatus            @default(NEW)
+  priority              LeadPriority          @default(NORMAL)
+  message               String?               @db.Text
+  note                  String?               @db.Text
+  followUpAt            DateTime?
+  nextFollowUpAt        DateTime?
+  estimatedValue        Decimal?              @db.Decimal(12, 2)
+  assignedTo            String?
+  customerId            String?
+  contactId             String?
+  convertedAt           DateTime?
+  landingPage           String?
+  utmSource             String?
+  utmMedium             String?
+  utmCampaign           String?
+  referrer              String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  customer              Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contact               Contact?              @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  notes                 LeadNote[]
+  activities            CRMActivity[]
+  productInterests      CRMProductInterest[]
+  pricingCalculations   PricingCalculation[]
   pricingCostingBatches PricingCostingBatch[]
-  quotes              Quote[]
-  salesOpportunities  SalesOpportunity[]
-  dealerRfq           DealerRFQ?
+  quotes                Quote[]
+  salesOpportunities    SalesOpportunity[]
+  dealerRfq             DealerRFQ?
 
   @@index([code])
   @@index([status])
@@ -415,27 +415,27 @@ model CustomerType {
 }
 
 model Contact {
-  id                  String               @id @default(cuid())
-  customerId          String
-  fullName            String
-  title               String?
-  department          String?
-  phone               String?
-  email               String?
-  zalo                String?
-  isPrimary           Boolean              @default(false)
-  note                String?              @db.Text
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  customer            Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  leads               Lead[]
-  activities          CRMActivity[]
-  pricingCalculations PricingCalculation[]
+  id                    String                        @id @default(cuid())
+  customerId            String
+  fullName              String
+  title                 String?
+  department            String?
+  phone                 String?
+  email                 String?
+  zalo                  String?
+  isPrimary             Boolean                       @default(false)
+  note                  String?                       @db.Text
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  customer              Customer                      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  leads                 Lead[]
+  activities            CRMActivity[]
+  pricingCalculations   PricingCalculation[]
   pricingCostingBatches PricingCostingBatch[]
-  quotes              Quote[]
-  orders              Order[]
-  salesOpportunities  SalesOpportunity[]
-  productionApprovals OrderItemProductionApproval[]
+  quotes                Quote[]
+  orders                Order[]
+  salesOpportunities    SalesOpportunity[]
+  productionApprovals   OrderItemProductionApproval[]
 
   @@index([customerId])
 }
@@ -1503,103 +1503,103 @@ model MediaBundleSlotAsset {
 }
 
 model MediaAsset {
-  id                       String                    @id @default(cuid())
-  filename                 String
-  originalName             String?
-  url                      String
-  thumbnailUrl             String?
-  storageKey               String
-  storageProvider          MediaStorageProvider      @default(CLOUDINARY)
-  publicId                 String?
-  mimeType                 String
-  format                   String?
-  sizeBytes                Int
-  width                    Int?
-  height                   Int?
+  id                         String                        @id @default(cuid())
+  filename                   String
+  originalName               String?
+  url                        String
+  thumbnailUrl               String?
+  storageKey                 String
+  storageProvider            MediaStorageProvider          @default(CLOUDINARY)
+  publicId                   String?
+  mimeType                   String
+  format                     String?
+  sizeBytes                  Int
+  width                      Int?
+  height                     Int?
   /// Legacy compatibility metadata. Prefer libraryId for new Media Library code.
-  folder                   MediaFolder
+  folder                     MediaFolder
   /// Legacy compatibility metadata. Prefer roleId for new Media Library code.
-  usageType                MediaUsageType            @default(GENERAL)
-  libraryId                String?
-  roleId                   String?
-  visibility               MediaVisibility           @default(PUBLIC)
-  altText                  String?
-  title                    String?
-  caption                  String?
-  description              String?                   @db.Text
-  tags                     String[]                  @default([])
-  keywords                 String[]                  @default([])
-  aiTags                   String[]                  @default([])
-  dominantColor            String?
-  orientation              MediaOrientation          @default(UNKNOWN)
-  contentLanguage          String?
-  contentHash              String?
-  perceptualHash           String?
-  duplicateOfId            String?
-  duplicateStatus          MediaDuplicateStatus      @default(UNIQUE)
-  assetType                MediaAssetType            @default(PHOTO)
-  subjectTerms             String[]                  @default([])
-  materialTerms            String[]                  @default([])
-  colorTerms               String[]                  @default([])
-  techniqueTerms           String[]                  @default([])
-  industryTerms            String[]                  @default([])
-  audienceTerms            String[]                  @default([])
-  useCaseTerms             String[]                  @default([])
-  contentSuitabilities     MediaContentSuitability[] @default([])
-  seoScore                 Int                       @default(0)
-  metadataCompleteness     Int                       @default(0)
-  seoReadinessStatus       MediaSeoReadinessStatus   @default(INCOMPLETE)
-  aiProcessingStatus       MediaAiProcessingStatus   @default(NOT_PROCESSED)
-  aiProcessedAt            DateTime?
-  aiProcessingError        String?                   @db.Text
-  aiMetadataVersion        String?
-  uploadedBy               String?
-  metadata                 Json?
+  usageType                  MediaUsageType                @default(GENERAL)
+  libraryId                  String?
+  roleId                     String?
+  visibility                 MediaVisibility               @default(PUBLIC)
+  altText                    String?
+  title                      String?
+  caption                    String?
+  description                String?                       @db.Text
+  tags                       String[]                      @default([])
+  keywords                   String[]                      @default([])
+  aiTags                     String[]                      @default([])
+  dominantColor              String?
+  orientation                MediaOrientation              @default(UNKNOWN)
+  contentLanguage            String?
+  contentHash                String?
+  perceptualHash             String?
+  duplicateOfId              String?
+  duplicateStatus            MediaDuplicateStatus          @default(UNIQUE)
+  assetType                  MediaAssetType                @default(PHOTO)
+  subjectTerms               String[]                      @default([])
+  materialTerms              String[]                      @default([])
+  colorTerms                 String[]                      @default([])
+  techniqueTerms             String[]                      @default([])
+  industryTerms              String[]                      @default([])
+  audienceTerms              String[]                      @default([])
+  useCaseTerms               String[]                      @default([])
+  contentSuitabilities       MediaContentSuitability[]     @default([])
+  seoScore                   Int                           @default(0)
+  metadataCompleteness       Int                           @default(0)
+  seoReadinessStatus         MediaSeoReadinessStatus       @default(INCOMPLETE)
+  aiProcessingStatus         MediaAiProcessingStatus       @default(NOT_PROCESSED)
+  aiProcessedAt              DateTime?
+  aiProcessingError          String?                       @db.Text
+  aiMetadataVersion          String?
+  uploadedBy                 String?
+  metadata                   Json?
   /// Sprint 14.5 — enterprise asset lifecycle (orthogonal to visibility).
-  lifecycleStatus          MediaLifecycleStatus      @default(ACTIVE)
-  deprecatedAt             DateTime?
-  deprecatedBy             String?
-  archivedAt               DateTime?
-  archivedBy               String?
-  retiredAt                DateTime?
-  retiredBy                String?
-  lifecycleReason          String?                   @db.Text
-  replacementAssetId       String?
-  supersedesAssetId        String?
-  rightsStatus             MediaRightsStatus         @default(UNKNOWN)
-  rightsExpiresAt          DateTime?
-  rightsOwner              String?
-  rightsNotes              String?                   @db.Text
-  usageRestriction         String?                   @db.Text
-  lastLifecycleReviewAt    DateTime?
-  nextLifecycleReviewAt    DateTime?
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
-  library                  MediaLibrary?             @relation(fields: [libraryId], references: [id], onDelete: SetNull)
-  role                     MediaRole?                @relation(fields: [roleId], references: [id], onDelete: SetNull)
-  duplicateOf              MediaAsset?               @relation("MediaAssetDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
-  duplicates               MediaAsset[]              @relation("MediaAssetDuplicates")
-  replacementAsset         MediaAsset?               @relation("MediaAssetReplacement", fields: [replacementAssetId], references: [id], onDelete: SetNull)
-  replacedAssets           MediaAsset[]              @relation("MediaAssetReplacement")
-  supersedesAsset          MediaAsset?               @relation("MediaAssetSupersession", fields: [supersedesAssetId], references: [id], onDelete: SetNull)
-  supersededBy             MediaAsset[]              @relation("MediaAssetSupersession")
-  lifecycleEvents          MediaAssetLifecycleEvent[]
-  collections              MediaAssetCollection[]
-  bundleSlotAssets         MediaBundleSlotAsset[]
-  contentMediaAssignments  ContentMediaAssignment[]
-  quoteItems               QuoteItem[]
-  orderItems               OrderItem[]
-  salesRepresentatives     SalesRepresentative[]
-  orderProductionFiles     OrderProductionFile[]
-  orderQcEvidence          OrderQcEvidence[]
-  orderDeliveryProofs      OrderDeliveryProof[]
-  manufacturingMedia       ManufacturingMedia[]
+  lifecycleStatus            MediaLifecycleStatus          @default(ACTIVE)
+  deprecatedAt               DateTime?
+  deprecatedBy               String?
+  archivedAt                 DateTime?
+  archivedBy                 String?
+  retiredAt                  DateTime?
+  retiredBy                  String?
+  lifecycleReason            String?                       @db.Text
+  replacementAssetId         String?
+  supersedesAssetId          String?
+  rightsStatus               MediaRightsStatus             @default(UNKNOWN)
+  rightsExpiresAt            DateTime?
+  rightsOwner                String?
+  rightsNotes                String?                       @db.Text
+  usageRestriction           String?                       @db.Text
+  lastLifecycleReviewAt      DateTime?
+  nextLifecycleReviewAt      DateTime?
+  createdAt                  DateTime                      @default(now())
+  updatedAt                  DateTime                      @updatedAt
+  library                    MediaLibrary?                 @relation(fields: [libraryId], references: [id], onDelete: SetNull)
+  role                       MediaRole?                    @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  duplicateOf                MediaAsset?                   @relation("MediaAssetDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates                 MediaAsset[]                  @relation("MediaAssetDuplicates")
+  replacementAsset           MediaAsset?                   @relation("MediaAssetReplacement", fields: [replacementAssetId], references: [id], onDelete: SetNull)
+  replacedAssets             MediaAsset[]                  @relation("MediaAssetReplacement")
+  supersedesAsset            MediaAsset?                   @relation("MediaAssetSupersession", fields: [supersedesAssetId], references: [id], onDelete: SetNull)
+  supersededBy               MediaAsset[]                  @relation("MediaAssetSupersession")
+  lifecycleEvents            MediaAssetLifecycleEvent[]
+  collections                MediaAssetCollection[]
+  bundleSlotAssets           MediaBundleSlotAsset[]
+  contentMediaAssignments    ContentMediaAssignment[]
+  quoteItems                 QuoteItem[]
+  orderItems                 OrderItem[]
+  salesRepresentatives       SalesRepresentative[]
+  orderProductionFiles       OrderProductionFile[]
+  orderQcEvidence            OrderQcEvidence[]
+  orderDeliveryProofs        OrderDeliveryProof[]
+  manufacturingMedia         ManufacturingMedia[]
   productionApprovalEvidence OrderItemProductionApproval[] @relation("ProductionApprovalEvidence")
-  homepageSourcingPathways HomepageSourcingPathway[] @relation("HomepagePathwayImage")
-  homepageOemSettings      HomepageSettings[]        @relation("HomepageOemImage")
-  homepageWorkshopMedia    HomepageWorkshopMedia[]   @relation("HomepageWorkshopImage")
-  categoryImages           Category[]                @relation("CategoryImage")
-  caseStudyImages          CaseStudyRecord[]         @relation("CaseStudyImage")
+  homepageSourcingPathways   HomepageSourcingPathway[]     @relation("HomepagePathwayImage")
+  homepageOemSettings        HomepageSettings[]            @relation("HomepageOemImage")
+  homepageWorkshopMedia      HomepageWorkshopMedia[]       @relation("HomepageWorkshopImage")
+  categoryImages             Category[]                    @relation("CategoryImage")
+  caseStudyImages            CaseStudyRecord[]             @relation("CaseStudyImage")
 
   @@index([folder])
   @@index([filename])
@@ -1626,17 +1626,17 @@ model MediaAsset {
 
 /// Append-only lifecycle audit trail (Sprint 14.5). Never stores file bytes or secrets.
 model MediaAssetLifecycleEvent {
-  id                 String               @id @default(cuid())
+  id                 String                @id @default(cuid())
   mediaAssetId       String
   action             MediaLifecycleAction
   fromStatus         MediaLifecycleStatus?
   toStatus           MediaLifecycleStatus?
   actorId            String?
-  reason             String?              @db.Text
+  reason             String?               @db.Text
   replacementAssetId String?
   metadata           Json?
-  createdAt          DateTime             @default(now())
-  mediaAsset         MediaAsset           @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+  createdAt          DateTime              @default(now())
+  mediaAsset         MediaAsset            @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
 
   @@index([mediaAssetId, createdAt])
   @@index([action, createdAt])
@@ -2801,19 +2801,19 @@ model AiGenerationRun {
   updatedAt          DateTime           @updatedAt
 
   // Sprint 16.0 — governed content generation proposal fields (additive/nullable).
-  proposalStatus     AiProposalStatus?
-  appliedAt          DateTime?
-  appliedBy          String?
-  rejectedAt         DateTime?
-  rejectedBy         String?
-  sectionId          String?
-  writingDraftId     String?
-  writingPlanId      String?
-  contextBuildId     String?
-  templateId         String?
-  templateVersion    String?
-  factIdsUsed        Json?
-  mediaIdsUsed       Json?
+  proposalStatus  AiProposalStatus?
+  appliedAt       DateTime?
+  appliedBy       String?
+  rejectedAt      DateTime?
+  rejectedBy      String?
+  sectionId       String?
+  writingDraftId  String?
+  writingPlanId   String?
+  contextBuildId  String?
+  templateId      String?
+  templateVersion String?
+  factIdsUsed     Json?
+  mediaIdsUsed    Json?
 
   @@index([type, entityType, entityId, createdAt])
   @@index([status, createdAt])
@@ -3589,6 +3589,12 @@ enum PricingCalculationType {
   MANUAL
 }
 
+enum CostingSourceType {
+  PRODUCTION_MATERIAL
+  PRODUCTION_TRIM
+  COST_LIBRARY
+}
+
 model PriceGroup {
   id                  String               @id @default(cuid())
   code                String               @unique
@@ -3711,12 +3717,46 @@ model PricingCostLibraryItem {
   defaultQuantityFactor Decimal  @default(1) @db.Decimal(8, 4)
   defaultNote           String?  @db.Text
   description           String?  @db.Text
+  /// Stable in-code builtin id (e.g. sew-basic) after canonical materialization.
+  legacyBuiltinId       String?  @unique
   createdByUserId       String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
+  costingSourcePrices CostingSourcePrice[]
+
   @@unique([nameNormalized, category])
   @@index([category])
+}
+
+/// Current supplier/provider reference price for a Costing source.
+/// Exactly one of productionMaterialId / productionTrimId / costLibraryItemId is set
+/// (enforced in application validation + DB CHECK). One current row per source+supplier.
+model CostingSourcePrice {
+  id                   String                  @id @default(cuid())
+  supplierId           String
+  sourceType           CostingSourceType
+  productionMaterialId String?
+  productionTrimId     String?
+  costLibraryItemId    String?
+  unitPrice            Decimal                 @db.Decimal(12, 2)
+  unit                 String
+  calculationType      PricingCalculationType?
+  isActive             Boolean                 @default(true)
+  note                 String?                 @db.Text
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  supplier           ProductionSupplier      @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  productionMaterial ProductionMaterial?     @relation(fields: [productionMaterialId], references: [id], onDelete: Restrict)
+  productionTrim     ProductionTrim?         @relation(fields: [productionTrimId], references: [id], onDelete: Restrict)
+  costLibraryItem    PricingCostLibraryItem? @relation(fields: [costLibraryItemId], references: [id], onDelete: Restrict)
+
+  @@index([supplierId])
+  @@index([sourceType, isActive])
+  @@index([productionMaterialId])
+  @@index([productionTrimId])
+  @@index([costLibraryItemId])
 }
 
 model PricingCalculationItem {
@@ -3756,27 +3796,27 @@ model PricingCalculationItem {
 }
 
 model PricingCostingBatch {
-  id                     String                    @id @default(cuid())
-  code                   String                    @unique
-  title                  String?
-  status                 PricingCostingBatchStatus @default(WORKING)
-  leadId                 String?
-  customerId             String?
-  contactId              String?
+  id                    String                    @id @default(cuid())
+  code                  String                    @unique
+  title                 String?
+  status                PricingCostingBatchStatus @default(WORKING)
+  leadId                String?
+  customerId            String?
+  contactId             String?
   /// Latest quote created from this batch (compatibility pointer).
-  quoteId                String?                   @unique
+  quoteId               String?                   @unique
   /// Commercial fingerprint captured when the latest quote was created.
-  lastQuotedFingerprint  String?
-  lastQuotedAt           DateTime?
-  internalNote           String?                   @db.Text
-  createdAt              DateTime                  @default(now())
-  updatedAt              DateTime                  @updatedAt
-  lead                   Lead?                     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  customer               Customer?                 @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  contact                Contact?                  @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  quote                  Quote?                    @relation("CostingBatchLatestQuote", fields: [quoteId], references: [id], onDelete: SetNull)
-  quotes                 Quote[]                   @relation("CostingBatchQuoteHistory")
-  items                  PricingCostingBatchItem[]
+  lastQuotedFingerprint String?
+  lastQuotedAt          DateTime?
+  internalNote          String?                   @db.Text
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  lead                  Lead?                     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer              Customer?                 @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  contact               Contact?                  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  quote                 Quote?                    @relation("CostingBatchLatestQuote", fields: [quoteId], references: [id], onDelete: SetNull)
+  quotes                Quote[]                   @relation("CostingBatchQuoteHistory")
+  items                 PricingCostingBatchItem[]
 
   @@index([code])
   @@index([customerId])
@@ -4274,24 +4314,24 @@ model Order {
 
 /// Operational Actual Cost / Margin Close — frozen estimate + confirmed actual COGS.
 model OrderActualCostClose {
-  id                         String                      @id @default(cuid())
-  orderId                    String                      @unique
-  status                     OrderActualCostCloseStatus  @default(DRAFT)
-  estimatedCommercialValue   Decimal                     @db.Decimal(12, 2)
-  estimatedCost              Decimal?                    @db.Decimal(12, 2)
-  estimatedGrossMargin       Decimal?                    @db.Decimal(12, 2)
-  estimatedGrossMarginRate   Decimal?                    @db.Decimal(8, 4)
-  actualCostTotal            Decimal                     @default(0) @db.Decimal(12, 2)
-  actualGrossMargin          Decimal                     @default(0) @db.Decimal(12, 2)
-  actualGrossMarginRate      Decimal?                    @db.Decimal(8, 4)
-  costVariance               Decimal?                    @db.Decimal(12, 2)
-  closedAt                   DateTime?
-  closedByUserId             String?
-  reopenedAt                 DateTime?
-  reopenedByUserId           String?
-  note                       String?                     @db.Text
-  createdAt                  DateTime                    @default(now())
-  updatedAt                  DateTime                    @updatedAt
+  id                       String                     @id @default(cuid())
+  orderId                  String                     @unique
+  status                   OrderActualCostCloseStatus @default(DRAFT)
+  estimatedCommercialValue Decimal                    @db.Decimal(12, 2)
+  estimatedCost            Decimal?                   @db.Decimal(12, 2)
+  estimatedGrossMargin     Decimal?                   @db.Decimal(12, 2)
+  estimatedGrossMarginRate Decimal?                   @db.Decimal(8, 4)
+  actualCostTotal          Decimal                    @default(0) @db.Decimal(12, 2)
+  actualGrossMargin        Decimal                    @default(0) @db.Decimal(12, 2)
+  actualGrossMarginRate    Decimal?                   @db.Decimal(8, 4)
+  costVariance             Decimal?                   @db.Decimal(12, 2)
+  closedAt                 DateTime?
+  closedByUserId           String?
+  reopenedAt               DateTime?
+  reopenedByUserId         String?
+  note                     String?                    @db.Text
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
 
   order          Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   closedByUser   AdminUser? @relation("OrderActualCostClosedBy", fields: [closedByUserId], references: [id], onDelete: SetNull)
@@ -4303,17 +4343,17 @@ model OrderActualCostClose {
 }
 
 model OrderActualCostEntry {
-  id              String                   @id @default(cuid())
+  id              String                  @id @default(cuid())
   orderId         String
   orderItemId     String?
   category        OrderActualCostCategory
   label           String?
-  description     String?                  @db.Text
-  amount          Decimal                  @db.Decimal(12, 2)
+  description     String?                 @db.Text
+  amount          Decimal                 @db.Decimal(12, 2)
   currency        String
   createdByUserId String?
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 
   order         Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderItem     OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
@@ -4326,31 +4366,31 @@ model OrderActualCostEntry {
 }
 
 model Employee {
-  id                         String                    @id @default(cuid())
-  employeeCode               String                    @unique
-  fullName                   String
-  jobTitle                   String?
-  department                 String?
-  role                       EmployeeRole?
-  phone                      String?
-  email                      String?
-  isActive                   Boolean                   @default(true)
-  createdAt                  DateTime                  @default(now())
-  updatedAt                  DateTime                  @updatedAt
-  productionOrders           Order[]                   @relation("OrderProductionOwner")
-  deliveryOrders             Order[]                   @relation("OrderDeliveryOwner")
-  salesOrders                Order[]                   @relation("OrderSalesEmployee")
-  salesRepresentative        SalesRepresentative?
-  materialStockAdjustments   MaterialStockAdjustment[]
-  purchaseRequests           PurchaseRequest[]
-  assignedProductionStages   OrderProductionStage[]    @relation("ProductionStageAssignee")
-  qcInspections              OrderQcInspection[]       @relation("QcInspector")
-  assignedDeliveryExecutions OrderDeliveryExecution[]  @relation("DeliveryExecutionAssignee")
-  deliveryAttempts           OrderDeliveryAttempt[]    @relation("DeliveryAttemptBy")
-  adminUser                  AdminUser?
-  productionPlans            ProductionPlan[]          @relation("ProductionPlanOwner")
-  itemProductionAssignments  ItemProductionTracking[]  @relation("ItemProductionAssignee")
-  itemProductionBatchAssignments ItemProductionBatch[]   @relation("ItemProductionBatchPic")
+  id                             String                    @id @default(cuid())
+  employeeCode                   String                    @unique
+  fullName                       String
+  jobTitle                       String?
+  department                     String?
+  role                           EmployeeRole?
+  phone                          String?
+  email                          String?
+  isActive                       Boolean                   @default(true)
+  createdAt                      DateTime                  @default(now())
+  updatedAt                      DateTime                  @updatedAt
+  productionOrders               Order[]                   @relation("OrderProductionOwner")
+  deliveryOrders                 Order[]                   @relation("OrderDeliveryOwner")
+  salesOrders                    Order[]                   @relation("OrderSalesEmployee")
+  salesRepresentative            SalesRepresentative?
+  materialStockAdjustments       MaterialStockAdjustment[]
+  purchaseRequests               PurchaseRequest[]
+  assignedProductionStages       OrderProductionStage[]    @relation("ProductionStageAssignee")
+  qcInspections                  OrderQcInspection[]       @relation("QcInspector")
+  assignedDeliveryExecutions     OrderDeliveryExecution[]  @relation("DeliveryExecutionAssignee")
+  deliveryAttempts               OrderDeliveryAttempt[]    @relation("DeliveryAttemptBy")
+  adminUser                      AdminUser?
+  productionPlans                ProductionPlan[]          @relation("ProductionPlanOwner")
+  itemProductionAssignments      ItemProductionTracking[]  @relation("ItemProductionAssignee")
+  itemProductionBatchAssignments ItemProductionBatch[]     @relation("ItemProductionBatchPic")
 
   @@index([employeeCode])
   @@index([isActive])
@@ -4395,7 +4435,7 @@ model DeliveryCarrier {
 }
 
 model OrderItem {
-  id                          String                         @id @default(cuid())
+  id                          String                              @id @default(cuid())
   orderId                     String
   productId                   String?
   variantId                   String?
@@ -4412,33 +4452,33 @@ model OrderItem {
   categorySnapshot            String?
   genderSnapshot              String?
   moqSnapshot                 Int?
-  itemNote                    String?                        @db.Text
+  itemNote                    String?                             @db.Text
   productionLeadTime          String?
   quantity                    Int
-  unit                        String                         @default("cái")
-  unitPrice                   Decimal                        @default(0) @db.Decimal(12, 2)
-  lineTotal                   Decimal                        @default(0) @db.Decimal(12, 2)
-  quotedUnitCost              Decimal?                       @db.Decimal(12, 2)
-  quotedTotalCost             Decimal?                       @db.Decimal(12, 2)
-  quotedMarginAmount          Decimal?                       @db.Decimal(12, 2)
-  quotedMarginRate            Decimal?                       @db.Decimal(8, 4)
+  unit                        String                              @default("cái")
+  unitPrice                   Decimal                             @default(0) @db.Decimal(12, 2)
+  lineTotal                   Decimal                             @default(0) @db.Decimal(12, 2)
+  quotedUnitCost              Decimal?                            @db.Decimal(12, 2)
+  quotedTotalCost             Decimal?                            @db.Decimal(12, 2)
+  quotedMarginAmount          Decimal?                            @db.Decimal(12, 2)
+  quotedMarginRate            Decimal?                            @db.Decimal(8, 4)
   pricingCalculationItemId    String?
-  sortOrder                   Int                            @default(0)
+  sortOrder                   Int                                 @default(0)
   supplySource                OrderItemSupplySource?
   processingMethod            OrderItemProcessingMethod?
   revenueCategoryId           String?
   revenueCategoryNameSnapshot String?
   revenueCategoryCodeSnapshot String?
-  createdAt                   DateTime                       @default(now())
-  updatedAt                   DateTime                       @updatedAt
-  order                       Order                          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product                     Product?                       @relation(fields: [productId], references: [id], onDelete: SetNull)
-  variant                     ProductVariant?                @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  color                       Color?                         @relation(fields: [colorId], references: [id], onDelete: SetNull)
-  category                    Category?                      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  designMediaAsset            MediaAsset?                    @relation(fields: [designMediaAssetId], references: [id], onDelete: SetNull)
-  revenueCategory             RevenueCategory?               @relation(fields: [revenueCategoryId], references: [id], onDelete: SetNull)
-  pricingCalculationItem      PricingCalculationItem?        @relation(fields: [pricingCalculationItemId], references: [id], onDelete: SetNull)
+  createdAt                   DateTime                            @default(now())
+  updatedAt                   DateTime                            @updatedAt
+  order                       Order                               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product                     Product?                            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant                     ProductVariant?                     @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  color                       Color?                              @relation(fields: [colorId], references: [id], onDelete: SetNull)
+  category                    Category?                           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  designMediaAsset            MediaAsset?                         @relation(fields: [designMediaAssetId], references: [id], onDelete: SetNull)
+  revenueCategory             RevenueCategory?                    @relation(fields: [revenueCategoryId], references: [id], onDelete: SetNull)
+  pricingCalculationItem      PricingCalculationItem?             @relation(fields: [pricingCalculationItemId], references: [id], onDelete: SetNull)
   variants                    OrderItemVariant[]
   productionFiles             OrderProductionFile[]
   productionStages            OrderProductionStage[]
@@ -4554,25 +4594,25 @@ enum MaterialType {
 }
 
 model OrderProductionFile {
-  id                 String               @id @default(cuid())
+  id                 String                        @id @default(cuid())
   orderId            String?
   orderItemId        String?
   mediaAssetId       String
   type               ProductionFileType
-  status             ProductionFileStatus @default(ACTIVE)
-  version            Int                  @default(1)
+  status             ProductionFileStatus          @default(ACTIVE)
+  version            Int                           @default(1)
   title              String?
-  note               String?              @db.Text
+  note               String?                       @db.Text
   appliesToColorId   String?
   appliesToColorName String?
   appliesToSize      String?
-  sortOrder          Int                  @default(0)
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  order              Order?               @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderItem          OrderItem?           @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  mediaAsset         MediaAsset           @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
-  appliesToColor     Color?               @relation(fields: [appliesToColorId], references: [id], onDelete: SetNull)
+  sortOrder          Int                           @default(0)
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+  order              Order?                        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem          OrderItem?                    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  mediaAsset         MediaAsset                    @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict)
+  appliesToColor     Color?                        @relation(fields: [appliesToColorId], references: [id], onDelete: SetNull)
   approvalsAsArtwork OrderItemProductionApproval[] @relation("ApprovalArtworkFile")
   approvalsAsSample  OrderItemProductionApproval[] @relation("ApprovalSampleFile")
 
@@ -4591,10 +4631,10 @@ enum OrderItemProductionApprovalStatus {
 /// Lean Production Approval Truth — current-state snapshot per OrderItem.
 /// ACTIVE file lifecycle ≠ customer-approved; RELEASED is the manufacture gate.
 model OrderItemProductionApproval {
-  id                    String                             @id @default(cuid())
-  orderItemId           String                             @unique
-  status                OrderItemProductionApprovalStatus  @default(PENDING)
-  sampleRequired        Boolean                            @default(true)
+  id                    String                            @id @default(cuid())
+  orderItemId           String                            @unique
+  status                OrderItemProductionApprovalStatus @default(PENDING)
+  sampleRequired        Boolean                           @default(true)
   artworkFileId         String?
   sampleFileId          String?
   evidenceMediaAssetId  String?
@@ -4602,10 +4642,10 @@ model OrderItemProductionApproval {
   approvedByContactId   String?
   approvedByName        String?
   approvedAt            DateTime?
-  note                  String?                            @db.Text
+  note                  String?                           @db.Text
   releasedByAdminUserId String?
-  createdAt             DateTime                           @default(now())
-  updatedAt             DateTime                           @updatedAt
+  createdAt             DateTime                          @default(now())
+  updatedAt             DateTime                          @updatedAt
 
   orderItem           OrderItem            @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   artworkFile         OrderProductionFile? @relation("ApprovalArtworkFile", fields: [artworkFileId], references: [id], onDelete: SetNull)
@@ -5212,21 +5252,21 @@ model AdminUser {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  employee                      Employee?                     @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  role                          AdminRole?                    @relation(fields: [roleId], references: [id], onDelete: SetNull)
-  assignedDealerRfqs            DealerRFQ[]
-  itemProductionProgressEntries ItemProductionProgressEntry[]
+  employee                           Employee?                           @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  role                               AdminRole?                          @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  assignedDealerRfqs                 DealerRFQ[]
+  itemProductionProgressEntries      ItemProductionProgressEntry[]
   itemProductionBatchProgressEntries ItemProductionBatchProgressEntry[]
-  itemProductionBatchAuditEntries   ItemProductionBatchAuditEntry[] @relation("BatchAuditActor")
-  itemProductionBatchesCreated      ItemProductionBatch[]           @relation("BatchCreatedBy")
-  itemProductionBatchesUpdated      ItemProductionBatch[]           @relation("BatchUpdatedBy")
-  itemProductionIssuesCreated       ItemProductionIssue[]           @relation("IssueCreatedBy")
-  itemProductionIssuesResolved      ItemProductionIssue[]            @relation("IssueResolvedBy")
-  productionApprovalsReleased       OrderItemProductionApproval[]    @relation("ProductionApprovalReleasedBy")
-  productionApprovalBypasses        OrderItemProductionApprovalBypass[] @relation("ProductionApprovalBypassActor")
-  orderActualCostClosesClosed       OrderActualCostClose[]           @relation("OrderActualCostClosedBy")
-  orderActualCostClosesReopened     OrderActualCostClose[]           @relation("OrderActualCostReopenedBy")
-  orderActualCostEntriesCreated     OrderActualCostEntry[]           @relation("OrderActualCostEntryCreatedBy")
+  itemProductionBatchAuditEntries    ItemProductionBatchAuditEntry[]     @relation("BatchAuditActor")
+  itemProductionBatchesCreated       ItemProductionBatch[]               @relation("BatchCreatedBy")
+  itemProductionBatchesUpdated       ItemProductionBatch[]               @relation("BatchUpdatedBy")
+  itemProductionIssuesCreated        ItemProductionIssue[]               @relation("IssueCreatedBy")
+  itemProductionIssuesResolved       ItemProductionIssue[]               @relation("IssueResolvedBy")
+  productionApprovalsReleased        OrderItemProductionApproval[]       @relation("ProductionApprovalReleasedBy")
+  productionApprovalBypasses         OrderItemProductionApprovalBypass[] @relation("ProductionApprovalBypassActor")
+  orderActualCostClosesClosed        OrderActualCostClose[]              @relation("OrderActualCostClosedBy")
+  orderActualCostClosesReopened      OrderActualCostClose[]              @relation("OrderActualCostReopenedBy")
+  orderActualCostEntriesCreated      OrderActualCostEntry[]              @relation("OrderActualCostEntryCreatedBy")
 
   @@index([username])
   @@index([roleId])
@@ -5467,20 +5507,20 @@ model TechPack {
   createdAt                   DateTime       @default(now())
   updatedAt                   DateTime       @updatedAt
 
-  orderItem         OrderItem?                 @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
-  quoteItem         QuoteItem?                 @relation(fields: [quoteItemId], references: [id], onDelete: SetNull)
-  customer          Customer?                  @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  product           Product?                   @relation(fields: [productId], references: [id], onDelete: SetNull)
-  productVariant    ProductVariant?            @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
-  pattern           Pattern?                   @relation(fields: [patternId], references: [id], onDelete: SetNull)
-  productionPlan    ProductionPlan?            @relation(fields: [productionPlanId], references: [id], onDelete: SetNull)
-  supersededBy      TechPack?                  @relation("TechPackSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
-  supersedes        TechPack[]                 @relation("TechPackSupersession")
-  assets            TechPackAsset[]
-  measurements      TechPackMeasurement[]
-  bomItems          TechPackBomItem[]
-  artworkPlacements TechPackArtworkPlacement[]
-  releaseHistory    TechPackReleaseHistory[]
+  orderItem           OrderItem?                    @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  quoteItem           QuoteItem?                    @relation(fields: [quoteItemId], references: [id], onDelete: SetNull)
+  customer            Customer?                     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  product             Product?                      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productVariant      ProductVariant?               @relation(fields: [productVariantId], references: [id], onDelete: SetNull)
+  pattern             Pattern?                      @relation(fields: [patternId], references: [id], onDelete: SetNull)
+  productionPlan      ProductionPlan?               @relation(fields: [productionPlanId], references: [id], onDelete: SetNull)
+  supersededBy        TechPack?                     @relation("TechPackSupersession", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes          TechPack[]                    @relation("TechPackSupersession")
+  assets              TechPackAsset[]
+  measurements        TechPackMeasurement[]
+  bomItems            TechPackBomItem[]
+  artworkPlacements   TechPackArtworkPlacement[]
+  releaseHistory      TechPackReleaseHistory[]
   productionApprovals OrderItemProductionApproval[]
 
   @@index([orderItemId])
@@ -5781,13 +5821,14 @@ model ProductionSupplier {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  materials               ProductionMaterial[]
-  trims                   ProductionTrim[]
-  bomItems                TechPackBomItem[]
-  patterns                Pattern[]
-  itemProductionTrackings ItemProductionTracking[]
-  itemProductionStages    ItemProductionStage[]
-  itemProductionBatches   ItemProductionBatch[]
+  materials                 ProductionMaterial[]
+  trims                     ProductionTrim[]
+  costingSourcePrices       CostingSourcePrice[]
+  bomItems                  TechPackBomItem[]
+  patterns                  Pattern[]
+  itemProductionTrackings   ItemProductionTracking[]
+  itemProductionStages      ItemProductionStage[]
+  itemProductionBatches     ItemProductionBatch[]
   itemProductionBatchStages ItemProductionBatchStage[]
 
   @@index([code])
@@ -5810,8 +5851,9 @@ model ProductionMaterial {
   createdAt    DateTime                   @default(now())
   updatedAt    DateTime                   @updatedAt
 
-  supplier ProductionSupplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  bomItems TechPackBomItem[]
+  supplier            ProductionSupplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  bomItems            TechPackBomItem[]
+  costingSourcePrices CostingSourcePrice[]
 
   @@index([code])
   @@index([isActive])
@@ -5830,8 +5872,9 @@ model ProductionTrim {
   createdAt  DateTime               @default(now())
   updatedAt  DateTime               @updatedAt
 
-  supplier ProductionSupplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  bomItems TechPackBomItem[]
+  supplier            ProductionSupplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  bomItems            TechPackBomItem[]
+  costingSourcePrices CostingSourcePrice[]
 
   @@index([code])
   @@index([isActive])
@@ -6081,36 +6124,36 @@ enum ItemProductionBatchAuditAction {
 }
 
 model ItemProductionBatch {
-  id                     String                    @id @default(cuid())
-  code                   String
+  id                       String                    @id @default(cuid())
+  code                     String
   itemProductionTrackingId String
-  sequence               Int
-  name                   String?
-  plannedQuantity        Int
-  supplierId             String?
-  picEmployeeId          String?
-  status                 ItemProductionBatchStatus @default(DRAFT)
-  progressPercent        Decimal                   @default(0) @db.Decimal(5, 2)
-  readyQuantity          Int                       @default(0)
-  riskStatus             ItemProductionRiskStatus  @default(ON_TRACK)
-  currentStageKey        ItemProductionStageKey?
-  plannedStartAt         DateTime?
-  plannedEndAt           DateTime?
-  actualStartAt          DateTime?
-  actualEndAt            DateTime?
-  lastProgressAt         DateTime?
-  notes                  String?                   @db.Text
-  metadata               Json?
-  createdByAdminUserId   String?
-  updatedByAdminUserId   String?
-  createdAt              DateTime                  @default(now())
-  updatedAt              DateTime                  @updatedAt
+  sequence                 Int
+  name                     String?
+  plannedQuantity          Int
+  supplierId               String?
+  picEmployeeId            String?
+  status                   ItemProductionBatchStatus @default(DRAFT)
+  progressPercent          Decimal                   @default(0) @db.Decimal(5, 2)
+  readyQuantity            Int                       @default(0)
+  riskStatus               ItemProductionRiskStatus  @default(ON_TRACK)
+  currentStageKey          ItemProductionStageKey?
+  plannedStartAt           DateTime?
+  plannedEndAt             DateTime?
+  actualStartAt            DateTime?
+  actualEndAt              DateTime?
+  lastProgressAt           DateTime?
+  notes                    String?                   @db.Text
+  metadata                 Json?
+  createdByAdminUserId     String?
+  updatedByAdminUserId     String?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
 
-  itemProductionTracking ItemProductionTracking @relation(fields: [itemProductionTrackingId], references: [id], onDelete: Cascade)
-  supplier               ProductionSupplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  picEmployee            Employee?                @relation("ItemProductionBatchPic", fields: [picEmployeeId], references: [id], onDelete: SetNull)
-  createdByAdminUser     AdminUser?               @relation("BatchCreatedBy", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
-  updatedByAdminUser     AdminUser?               @relation("BatchUpdatedBy", fields: [updatedByAdminUserId], references: [id], onDelete: SetNull)
+  itemProductionTracking ItemProductionTracking          @relation(fields: [itemProductionTrackingId], references: [id], onDelete: Cascade)
+  supplier               ProductionSupplier?             @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  picEmployee            Employee?                       @relation("ItemProductionBatchPic", fields: [picEmployeeId], references: [id], onDelete: SetNull)
+  createdByAdminUser     AdminUser?                      @relation("BatchCreatedBy", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
+  updatedByAdminUser     AdminUser?                      @relation("BatchUpdatedBy", fields: [updatedByAdminUserId], references: [id], onDelete: SetNull)
   stages                 ItemProductionBatchStage[]
   auditEntries           ItemProductionBatchAuditEntry[]
 
@@ -6149,8 +6192,8 @@ model ItemProductionBatchStage {
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
 
-  batch    ItemProductionBatch                 @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  supplier ProductionSupplier?                 @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  batch    ItemProductionBatch                @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  supplier ProductionSupplier?                @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   history  ItemProductionBatchProgressEntry[]
 
   @@unique([batchId, stageKey])
@@ -6224,17 +6267,17 @@ enum ItemProductionIssueType {
 }
 
 model ItemProductionIssue {
-  id                    String                    @id @default(cuid())
+  id                    String                  @id @default(cuid())
   productionItemId      String
   issueType             ItemProductionIssueType
-  note                  String?                   @db.Text
-  isResolved            Boolean                   @default(false)
-  resolvedNote          String?                   @db.Text
+  note                  String?                 @db.Text
+  isResolved            Boolean                 @default(false)
+  resolvedNote          String?                 @db.Text
   resolvedAt            DateTime?
   createdByAdminUserId  String?
   resolvedByAdminUserId String?
-  createdAt             DateTime                  @default(now())
-  updatedAt             DateTime                  @updatedAt
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
 
   productionItem      ItemProductionTracking @relation(fields: [productionItemId], references: [id], onDelete: Cascade)
   createdByAdminUser  AdminUser?             @relation("IssueCreatedBy", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)

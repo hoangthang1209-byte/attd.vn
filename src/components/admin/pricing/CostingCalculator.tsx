@@ -4,39 +4,40 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminLoadingState } from "@/components/admin/AdminUi";
+import { useAdminToast } from "@/components/admin/AdminToastProvider";
 import {
   buildCostingWorkspaceClone,
   type CostingCalculationCloneRecord,
   type CostingWorkspaceClone,
 } from "@/features/pricing/costing-calculation-clone";
-import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import CostingBomQuickStart from "@/components/admin/pricing/costing/CostingBomQuickStart";
-import CostingComponentTable, {
-  type CostingComponentRow,
-} from "@/components/admin/pricing/costing/CostingComponentTable";
-import CostingCostPicker from "@/components/admin/pricing/costing/CostingCostPicker";
-import CostingCustomCostForm, {
-  type CustomCostFormValues,
-} from "@/components/admin/pricing/costing/CostingCustomCostForm";
+import CostingSourcePickerDialog, {
+  type CostingSourcePickerSelection,
+} from "@/components/admin/pricing/costing/CostingSourcePickerDialog";
+import CostingStructuredSection from "@/components/admin/pricing/costing/CostingStructuredSection";
 import CostingSummaryPanel from "@/components/admin/pricing/costing/CostingSummaryPanel";
 import { formatPricingCurrency } from "@/features/pricing/format";
-import {
-  BUILTIN_COST_LIBRARY,
-  costLibraryCategoryToComponentType,
-  type CostLibraryItem,
-} from "@/features/pricing/cost-library";
-import {
-  COSTING_BOM_PRESETS,
-  type CostingBomPresetItem,
-} from "@/features/pricing/costing-bom-presets";
+import { formatBomMergeToast, mergeBomCostLines } from "@/features/pricing/costing-bom-merge";
+import { COSTING_BOM_PRESETS } from "@/features/pricing/costing-bom-presets";
 import { COSTING_TEMPLATES } from "@/features/pricing/costing-templates";
 import { previewCostingCalculation } from "@/features/pricing/costing-preview";
 import type {
   CostingCalculatorResult,
-  CostingComponentInput,
   CostingQuantityBreakResult,
+  CostingStructuredLine,
 } from "@/features/pricing/costing-types";
+import {
+  COSTING_WORKSPACE_VERSION,
+  costLinesFromBomItems,
+  defaultV2ProcessLines,
+  emptyCustomMaterialLine,
+  emptyCustomProcessLine,
+  emptyManualOtherLine,
+  finalizeStructuredLine,
+  projectLegacyInputToCostLines,
+  structuredLineFromSourcePick,
+} from "@/features/pricing/costing-v2";
 import { parseCostingCustomerIdParam } from "@/features/crm/customer-costing-bridge";
 
 type ProductOption = { id: string; name: string; productCode: string | null };
@@ -46,19 +47,8 @@ type CustomerOption = { id: string; name: string; code: string };
 type ContactOption = { id: string; fullName: string };
 type PriceGroupOption = { id: string; name: string; isDefault: boolean; isActive: boolean };
 
-const defaultComponents: CostingComponentRow[] = [
-  { label: "Cắt", type: "CUTTING", unitCost: "1000", totalCost: "", quantityFactor: "1", note: "" },
-  { label: "May", type: "SEWING", unitCost: "20000", totalCost: "", quantityFactor: "1", note: "" },
-  { label: "In", type: "PRINTING", unitCost: "9000", totalCost: "", quantityFactor: "1", note: "" },
-  { label: "Đóng gói + bao bì, thùng", type: "PACKAGING", unitCost: "1000", totalCost: "", quantityFactor: "1", note: "" },
-];
-
 const INITIAL_FIELD_DEFAULTS = {
   unit: "cái",
-  materialName: "65/35",
-  fabricPrice: "135000",
-  fabricConsumption: "3.7",
-  ribCostPerUnit: "4600",
   overheadRate: "0",
   targetMarginRate: "35",
   vatRate: "0",
@@ -70,44 +60,11 @@ function isUnsetOrDefault(current: string, defaultValue: string): boolean {
   return trimmed === defaultValue;
 }
 
-function bomItemToComponentRow(item: CostingBomPresetItem): CostingComponentRow {
-  return {
-    label: item.label,
-    type: item.type,
-    unitCost: String(item.unitCost),
-    totalCost: "",
-    quantityFactor: String(item.quantityFactor ?? 1),
-    note: item.note ?? "",
-  };
-}
-
 function toNumber(value: string): number | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function libraryItemToComponentRow(item: CostLibraryItem): CostingComponentRow {
-  return {
-    label: item.name,
-    type: costLibraryCategoryToComponentType(item.category, item.name),
-    unitCost: String(item.defaultUnitCost),
-    totalCost: "",
-    quantityFactor: String(item.defaultQuantityFactor ?? 1),
-    note: item.defaultNote ?? item.description ?? "",
-  };
-}
-
-function customValuesToComponentRow(values: CustomCostFormValues): CostingComponentRow {
-  return {
-    label: values.name.trim(),
-    type: costLibraryCategoryToComponentType(values.category, values.name),
-    unitCost: values.defaultUnitCost.trim(),
-    totalCost: "",
-    quantityFactor: "1",
-    note: values.note.trim(),
-  };
 }
 
 function variantLabel(variant: VariantOption | undefined): string | null {
@@ -117,12 +74,12 @@ function variantLabel(variant: VariantOption | undefined): string | null {
 
 export default function CostingCalculator() {
   const router = useRouter();
+  const toast = useAdminToast();
   const searchParams = useSearchParams();
   const fromCalculationId = searchParams.get("fromCalculation");
   const customerIdFromUrl = parseCostingCustomerIdParam(searchParams.get("customerId"));
   const batchId = searchParams.get("batchId");
   const batchItemId = searchParams.get("batchItemId");
-  const { permissions } = useAdminPermissions();
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [variantsMap, setVariantsMap] = useState<Record<string, VariantOption[]>>({});
   const [leads, setLeads] = useState<LeadOption[]>([]);
@@ -135,13 +92,7 @@ export default function CostingCalculator() {
   const [customProductName, setCustomProductName] = useState("");
   const [quantity, setQuantity] = useState("100");
   const [unit, setUnit] = useState("cái");
-  const [materialName, setMaterialName] = useState("65/35");
-  const [gsm, setGsm] = useState("");
-  const [fabricPrice, setFabricPrice] = useState("135000");
-  const [fabricConsumption, setFabricConsumption] = useState("3.7");
-  const [fabricCostPerUnit, setFabricCostPerUnit] = useState("");
-  const [ribCostPerUnit, setRibCostPerUnit] = useState("4600");
-  const [components, setComponents] = useState<CostingComponentRow[]>(defaultComponents);
+  const [costLines, setCostLines] = useState<CostingStructuredLine[]>(() => defaultV2ProcessLines());
   const [overheadRate, setOverheadRate] = useState("0");
   const [targetMarginRate, setTargetMarginRate] = useState("35");
   const [vatRate, setVatRate] = useState("0");
@@ -161,13 +112,10 @@ export default function CostingCalculator() {
   const [saving, setSaving] = useState(false);
   const [loadingBreaks, setLoadingBreaks] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [costPickerOpen, setCostPickerOpen] = useState(false);
+  const [materialPickerOpen, setMaterialPickerOpen] = useState(false);
+  const [servicePickerOpen, setServicePickerOpen] = useState(false);
+  const [replaceLineKey, setReplaceLineKey] = useState<string | null>(null);
   const [quickStartOpen, setQuickStartOpen] = useState(false);
-  const [customCostOpen, setCustomCostOpen] = useState(false);
-  const [customCostBusy, setCustomCostBusy] = useState(false);
-  const [customCostError, setCustomCostError] = useState<string | null>(null);
-  const [libraryItems, setLibraryItems] = useState<CostLibraryItem[]>(BUILTIN_COST_LIBRARY);
-  const [canManageLibrary, setCanManageLibrary] = useState(permissions.canAccessPricing);
   const [revisionCloneSource, setRevisionCloneSource] = useState<{
     code: string;
     revisionDisplay: string;
@@ -180,13 +128,32 @@ export default function CostingCalculator() {
     setCustomProductName(workspace.customProductName);
     setQuantity(workspace.quantity);
     setUnit(workspace.unit);
-    setMaterialName(workspace.materialName);
-    setGsm(workspace.gsm);
-    setFabricPrice(workspace.fabricPrice);
-    setFabricConsumption(workspace.fabricConsumption);
-    setFabricCostPerUnit(workspace.fabricCostPerUnit);
-    setRibCostPerUnit(workspace.ribCostPerUnit);
-    setComponents(workspace.components.length ? workspace.components : defaultComponents);
+    setCostLines(
+      workspace.costLines?.length
+        ? workspace.costLines
+        : projectLegacyInputToCostLines({
+            customProductName: workspace.customProductName,
+            quantity: toNumber(workspace.quantity) ?? 1,
+            unit: workspace.unit,
+            materialName: workspace.materialName,
+            gsm: toNumber(workspace.gsm),
+            fabricPrice: toNumber(workspace.fabricPrice),
+            fabricConsumption: toNumber(workspace.fabricConsumption),
+            fabricCostPerUnit: toNumber(workspace.fabricCostPerUnit),
+            ribCostPerUnit: toNumber(workspace.ribCostPerUnit),
+            components: workspace.components.map((row) => ({
+              label: row.label,
+              type: row.type,
+              unitCost: toNumber(row.unitCost),
+              totalCost: toNumber(row.totalCost),
+              quantityFactor: toNumber(row.quantityFactor),
+              note: row.note,
+            })),
+            overheadRate: toNumber(workspace.overheadRate),
+            targetMarginRate: toNumber(workspace.targetMarginRate),
+            vatRate: toNumber(workspace.vatRate),
+          }),
+    );
     setOverheadRate(workspace.overheadRate);
     setTargetMarginRate(workspace.targetMarginRate);
     setVatRate(workspace.vatRate);
@@ -198,78 +165,39 @@ export default function CostingCalculator() {
     setQuantityTiers(workspace.quantityTiers);
   }
 
-  async function loadCostLibrary() {
-    try {
-      const res = await fetch("/api/pricing/cost-library");
-      const data = await res.json() as {
-        items?: CostLibraryItem[];
-        canManageLibrary?: boolean;
-        message?: string;
-      };
-      if (!res.ok) throw new Error(data.message ?? "Không thể tải thư viện chi phí");
-      setLibraryItems(data.items ?? BUILTIN_COST_LIBRARY);
-      if (data.canManageLibrary != null) setCanManageLibrary(data.canManageLibrary);
-    } catch {
-      setLibraryItems(BUILTIN_COST_LIBRARY);
-    }
-  }
-
-  const derivedFabricCost = useMemo(() => {
-    const price = toNumber(fabricPrice) ?? 0;
-    const consumption = toNumber(fabricConsumption) ?? 0;
-    if (price <= 0 || consumption <= 0) return null;
-    return price / consumption;
-  }, [fabricPrice, fabricConsumption]);
-
   const selectedProduct = products.find((p) => p.id === productId);
   const selectedVariant = (variantsMap[productId] ?? []).find((v) => v.id === variantId);
+  const parsedQuantity = Math.max(1, toNumber(quantity) ?? 1);
+  const finalizedCostLines = useMemo(
+    () => costLines.map((line) => finalizeStructuredLine(line, parsedQuantity)),
+    [costLines, parsedQuantity],
+  );
 
-  const previewInput = useMemo(() => {
-    const cleanComponents: CostingComponentInput[] = components
-      .filter((row) => row.label.trim() || row.unitCost.trim() || row.totalCost.trim())
-      .map((row) => ({
-        label: row.label.trim() || "Chi phí khác",
-        type: row.type,
-        unitCost: toNumber(row.unitCost),
-        totalCost: toNumber(row.totalCost),
-        quantityFactor: toNumber(row.quantityFactor),
-        note: row.note.trim() || undefined,
-      }));
-
-    return {
+  const previewInput = useMemo(
+    () => ({
       productId: productId || undefined,
       variantId: variantId || undefined,
       customProductName: customProductName.trim() || undefined,
-      quantity: toNumber(quantity) ?? 1,
+      quantity: parsedQuantity,
       unit: unit.trim() || "cái",
-      materialName: materialName.trim() || undefined,
-      gsm: toNumber(gsm),
-      fabricPrice: toNumber(fabricPrice),
-      fabricConsumption: toNumber(fabricConsumption),
-      fabricCostPerUnit: toNumber(fabricCostPerUnit),
-      ribCostPerUnit: toNumber(ribCostPerUnit),
-      components: cleanComponents,
+      workspaceVersion: COSTING_WORKSPACE_VERSION,
+      costLines: finalizedCostLines,
       overheadRate: toNumber(overheadRate),
       targetMarginRate: toNumber(targetMarginRate),
       vatRate: toNumber(vatRate),
-    };
-  }, [
-    components,
-    customProductName,
-    fabricConsumption,
-    fabricCostPerUnit,
-    fabricPrice,
-    gsm,
-    materialName,
-    overheadRate,
-    productId,
-    quantity,
-    ribCostPerUnit,
-    targetMarginRate,
-    unit,
-    variantId,
-    vatRate,
-  ]);
+    }),
+    [
+      customProductName,
+      finalizedCostLines,
+      overheadRate,
+      parsedQuantity,
+      productId,
+      targetMarginRate,
+      unit,
+      variantId,
+      vatRate,
+    ],
+  );
 
   const livePreview = useMemo(
     () =>
@@ -281,7 +209,6 @@ export default function CostingCalculator() {
   );
 
   useEffect(() => {
-    void loadCostLibrary();
     void Promise.all([
       fetch("/api/admin/products?pageSize=200").then((r) => r.json()),
       fetch("/api/crm/leads?limit=100").then((r) => r.json()),
@@ -408,31 +335,15 @@ export default function CostingCalculator() {
   }
 
   function buildPayload(mode = "calculate") {
-    const cleanComponents: CostingComponentInput[] = components
-      .filter((row) => row.label.trim() || row.unitCost.trim() || row.totalCost.trim())
-      .map((row) => ({
-        label: row.label.trim() || "Chi phí khác",
-        type: row.type,
-        unitCost: toNumber(row.unitCost),
-        totalCost: toNumber(row.totalCost),
-        quantityFactor: toNumber(row.quantityFactor),
-        note: row.note.trim() || undefined,
-      }));
-
     return {
       mode,
       productId: productId || undefined,
       variantId: variantId || undefined,
       customProductName: customProductName.trim() || undefined,
-      quantity: toNumber(quantity) ?? 1,
+      quantity: parsedQuantity,
       unit: unit.trim() || "cái",
-      materialName: materialName.trim() || undefined,
-      gsm: toNumber(gsm),
-      fabricPrice: toNumber(fabricPrice),
-      fabricConsumption: toNumber(fabricConsumption),
-      fabricCostPerUnit: toNumber(fabricCostPerUnit),
-      ribCostPerUnit: toNumber(ribCostPerUnit),
-      components: cleanComponents,
+      workspaceVersion: COSTING_WORKSPACE_VERSION,
+      costLines: finalizedCostLines,
       overheadRate: toNumber(overheadRate),
       targetMarginRate: toNumber(targetMarginRate),
       vatRate: toNumber(vatRate),
@@ -487,86 +398,35 @@ export default function CostingCalculator() {
     }
   }
 
-  function updateComponent(index: number, patch: Partial<CostingComponentRow>) {
-    setComponents((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  function updateCostLine(key: string, patch: Partial<CostingStructuredLine>) {
+    setCostLines((prev) =>
+      prev.map((line) => (line.key === key ? finalizeStructuredLine({ ...line, ...patch }, parsedQuantity) : line)),
+    );
   }
 
-  function appendCostLibraryItem(itemId: string) {
-    const item = libraryItems.find((entry) => entry.id === itemId);
-    if (!item) return;
-    setComponents((prev) => [...prev, libraryItemToComponentRow(item)]);
+  function removeCostLine(key: string) {
+    setCostLines((prev) => prev.filter((line) => line.key !== key));
   }
 
-  async function handleCustomCostSubmit(values: CustomCostFormValues) {
-    setCustomCostBusy(true);
-    setCustomCostError(null);
-    const unitCost = toNumber(values.defaultUnitCost);
-    if (unitCost == null || unitCost < 0) {
-      setCustomCostError("Cost mặc định phải >= 0.");
-      setCustomCostBusy(false);
-      return;
-    }
-    if (!values.name.trim()) {
-      setCustomCostError("Tên chi phí là bắt buộc.");
-      setCustomCostBusy(false);
-      return;
-    }
-
-    try {
-      if (values.saveToLibrary && canManageLibrary) {
-        const res = await fetch("/api/pricing/cost-library", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: values.name.trim(),
-            category: values.category,
-            defaultUnitCost: unitCost,
-            defaultNote: values.note.trim() || null,
-            defaultQuantityFactor: 1,
-          }),
-        });
-        const data = await res.json() as {
-          item?: CostLibraryItem;
-          existingItem?: CostLibraryItem | null;
-          message?: string;
-        };
-
-        if (res.status === 409 && data.existingItem) {
-          setComponents((prev) => [...prev, libraryItemToComponentRow(data.existingItem!)]);
-          await loadCostLibrary();
-          setCustomCostOpen(false);
-          setCostPickerOpen(false);
-          return;
-        }
-
-        if (!res.ok) {
-          const code = (data as { code?: string }).code;
-          if (code === "DUPLICATE_BUILTIN" && data.existingItem) {
-            setComponents((prev) => [...prev, libraryItemToComponentRow(data.existingItem!)]);
-            setCustomCostOpen(false);
-            setCostPickerOpen(false);
-            return;
-          }
-          throw new Error(data.message ?? "Không thể lưu vào thư viện chi phí");
-        }
-
-        if (data.item) {
-          setComponents((prev) => [...prev, libraryItemToComponentRow(data.item!)]);
-          await loadCostLibrary();
-        } else {
-          setComponents((prev) => [...prev, customValuesToComponentRow(values)]);
-        }
-      } else {
-        setComponents((prev) => [...prev, customValuesToComponentRow(values)]);
-      }
-
-      setCustomCostOpen(false);
-      setCostPickerOpen(false);
-    } catch (err) {
-      setCustomCostError(err instanceof Error ? err.message : "Không thể thêm chi phí");
-    } finally {
-      setCustomCostBusy(false);
-    }
+  function handleSourcePick(section: "MATERIAL" | "PROCESS", selection: CostingSourcePickerSelection) {
+    const nextLine = structuredLineFromSourcePick({
+      section,
+      source: selection.source,
+      price: selection.price,
+      manual: selection.manual,
+      quantity: parsedQuantity,
+    });
+    setCostLines((prev) => {
+      if (!replaceLineKey) return [...prev, nextLine];
+      return prev.map((line) =>
+        line.key === replaceLineKey
+          ? { ...nextLine, key: replaceLineKey, consumption: null }
+          : line,
+      );
+    });
+    setReplaceLineKey(null);
+    setMaterialPickerOpen(false);
+    setServicePickerOpen(false);
   }
 
   function applyBomPreset(presetKey: string) {
@@ -575,30 +435,6 @@ export default function CostingCalculator() {
 
     if (selectedBomPreset.defaultUnit && isUnsetOrDefault(unit, INITIAL_FIELD_DEFAULTS.unit)) {
       setUnit(selectedBomPreset.defaultUnit);
-    }
-    if (
-      selectedBomPreset.defaultMaterialName &&
-      isUnsetOrDefault(materialName, INITIAL_FIELD_DEFAULTS.materialName)
-    ) {
-      setMaterialName(selectedBomPreset.defaultMaterialName);
-    }
-    if (
-      selectedBomPreset.defaultFabricPrice != null &&
-      isUnsetOrDefault(fabricPrice, INITIAL_FIELD_DEFAULTS.fabricPrice)
-    ) {
-      setFabricPrice(String(selectedBomPreset.defaultFabricPrice));
-    }
-    if (
-      selectedBomPreset.defaultFabricConsumption != null &&
-      isUnsetOrDefault(fabricConsumption, INITIAL_FIELD_DEFAULTS.fabricConsumption)
-    ) {
-      setFabricConsumption(String(selectedBomPreset.defaultFabricConsumption));
-    }
-    if (
-      selectedBomPreset.defaultRibCostPerUnit != null &&
-      isUnsetOrDefault(ribCostPerUnit, INITIAL_FIELD_DEFAULTS.ribCostPerUnit)
-    ) {
-      setRibCostPerUnit(String(selectedBomPreset.defaultRibCostPerUnit));
     }
     if (
       selectedBomPreset.defaultOverheadRate != null &&
@@ -619,29 +455,41 @@ export default function CostingCalculator() {
       setVatRate(String(selectedBomPreset.defaultVatRate));
     }
 
-    setComponents((prev) => [...prev, ...selectedBomPreset.items.map(bomItemToComponentRow)]);
+    const mapped = costLinesFromBomItems(selectedBomPreset.items, {
+      quantity: parsedQuantity,
+      materialName: selectedBomPreset.defaultMaterialName,
+      fabricPrice: selectedBomPreset.defaultFabricPrice,
+      fabricConsumption: selectedBomPreset.defaultFabricConsumption,
+      ribCostPerUnit: selectedBomPreset.defaultRibCostPerUnit,
+    });
+    const merged = mergeBomCostLines(costLines, mapped);
+    setCostLines(merged.lines);
+    if (merged.added > 0 || merged.skipped > 0) {
+      toast.info(formatBomMergeToast(merged.added, merged.skipped));
+    }
   }
 
   function applyTemplate(templateKey: string) {
     const selectedTemplate = COSTING_TEMPLATES.find((template) => template.key === templateKey);
     if (!selectedTemplate) return;
     setUnit(selectedTemplate.defaultUnit);
-    setMaterialName(selectedTemplate.defaultMaterialName);
-    setFabricPrice(String(selectedTemplate.defaultFabricPrice));
-    setFabricConsumption(String(selectedTemplate.defaultFabricConsumption));
-    setRibCostPerUnit(String(selectedTemplate.defaultRibCostPerUnit));
     setOverheadRate(String(selectedTemplate.defaultOverheadRate));
     setTargetMarginRate(String(selectedTemplate.defaultTargetMarginRate));
     setVatRate(String(selectedTemplate.defaultVatRate));
-    setComponents(
-      selectedTemplate.defaultComponents.map((component) => ({
+    setCostLines(
+      costLinesFromBomItems(selectedTemplate.defaultComponents.map((component) => ({
         label: component.label,
         type: component.type,
-        unitCost: component.unitCost != null ? String(component.unitCost) : "",
-        totalCost: component.totalCost != null ? String(component.totalCost) : "",
-        quantityFactor: component.quantityFactor != null ? String(component.quantityFactor) : "1",
-        note: component.note ?? "",
-      })),
+        unitCost: component.unitCost ?? 0,
+        quantityFactor: component.quantityFactor,
+        note: component.note,
+      })), {
+        quantity: parsedQuantity,
+        materialName: selectedTemplate.defaultMaterialName,
+        fabricPrice: selectedTemplate.defaultFabricPrice,
+        fabricConsumption: selectedTemplate.defaultFabricConsumption,
+        ribCostPerUnit: selectedTemplate.defaultRibCostPerUnit,
+      }),
     );
   }
 
@@ -663,8 +511,6 @@ export default function CostingCalculator() {
       setLoadingBreaks(false);
     }
   }
-
-  const parsedQuantity = Math.max(1, toNumber(quantity) ?? 1);
 
   if (loadingClone && fromCalculationId) {
     return <AdminLoadingState label="Đang tải bản tính giá nguồn…" />;
@@ -708,10 +554,46 @@ export default function CostingCalculator() {
         {error && <p className="admin-error">{error}</p>}
 
         <section className="costing-section">
-          <h2 className="costing-section__title">Thông tin costing</h2>
+          <div className="costing-section__head">
+            <h2 className="costing-section__title">Thông tin tính giá</h2>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--small"
+              onClick={() => setQuickStartOpen(true)}
+            >
+              Bắt đầu nhanh từ mẫu
+            </button>
+          </div>
           <div className="admin-seo-brief-form-grid">
             <div className="admin-field">
-              <label className="admin-label">Sản phẩm có sẵn</label>
+              <label className="admin-label">Khách hàng</label>
+              <select
+                className="admin-input"
+                value={customerId}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setCustomerId(nextId);
+                  setCustomerPrefillError(null);
+                  if (!nextId) {
+                    setCustomerPrefillLabel(null);
+                    return;
+                  }
+                  const selected = customers.find((row) => row.id === nextId);
+                  setCustomerPrefillLabel(
+                    selected ? `${selected.name} (${selected.code})` : null,
+                  );
+                }}
+              >
+                <option value="">— Không chọn —</option>
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name} ({customer.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Sản phẩm</label>
               <select
                 className="admin-input"
                 value={productId}
@@ -777,10 +659,27 @@ export default function CostingCalculator() {
                 onChange={(e) => setTargetMarginRate(e.target.value)}
               />
             </div>
+            <div className="admin-field">
+              <label className="admin-label">Nhóm giá</label>
+              <select
+                className="admin-input"
+                value={priceGroupId}
+                onChange={(e) => setPriceGroupId(e.target.value)}
+              >
+                <option value="">— Không chọn —</option>
+                {groups
+                  .filter((group) => group.isActive)
+                  .map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name} {group.isDefault ? "(mặc định)" : ""}
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
 
           <details className="costing-details">
-            <summary>Thông tin bổ sung (lead, khách hàng, nhóm giá)</summary>
+            <summary>Thông tin bổ sung (lead, liên hệ)</summary>
             <div className="admin-seo-brief-form-grid" style={{ marginTop: 12 }}>
               <div className="admin-field">
                 <label className="admin-label">Lead</label>
@@ -789,33 +688,6 @@ export default function CostingCalculator() {
                   {leads.map((lead) => (
                     <option key={lead.id} value={lead.id}>
                       {lead.fullName} {lead.companyName ?? lead.company ?? ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Khách hàng</label>
-                <select
-                  className="admin-input"
-                  value={customerId}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    setCustomerId(nextId);
-                    setCustomerPrefillError(null);
-                    if (!nextId) {
-                      setCustomerPrefillLabel(null);
-                      return;
-                    }
-                    const selected = customers.find((row) => row.id === nextId);
-                    setCustomerPrefillLabel(
-                      selected ? `${selected.name} (${selected.code})` : null,
-                    );
-                  }}
-                >
-                  <option value="">— Không chọn —</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name} ({customer.code})
                     </option>
                   ))}
                 </select>
@@ -834,135 +706,57 @@ export default function CostingCalculator() {
                   ))}
                 </select>
               </div>
-              <div className="admin-field">
-                <label className="admin-label">Nhóm giá</label>
-                <select
-                  className="admin-input"
-                  value={priceGroupId}
-                  onChange={(e) => setPriceGroupId(e.target.value)}
-                >
-                  <option value="">— Không chọn —</option>
-                  {groups
-                    .filter((group) => group.isActive)
-                    .map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name} {group.isDefault ? "(mặc định)" : ""}
-                      </option>
-                    ))}
-                </select>
-              </div>
             </div>
           </details>
         </section>
 
-        <section className="costing-section">
-          <div className="costing-section__head">
-            <h2 className="costing-section__title">Chi phí</h2>
-            <div className="costing-section__actions">
-              <button
-                type="button"
-                className="admin-btn admin-btn--secondary admin-btn--small"
-                onClick={() => setQuickStartOpen(true)}
-              >
-                Bắt đầu nhanh từ mẫu
-              </button>
-              <button
-                type="button"
-                className="admin-btn admin-btn--primary admin-btn--small"
-                onClick={() => setCostPickerOpen(true)}
-              >
-                + Thêm chi phí
-              </button>
-            </div>
-          </div>
+        <CostingStructuredSection
+          section="MATERIAL"
+          title="Nguyên vật liệu & phụ liệu"
+          addLabel="+ Thêm nguyên phụ liệu"
+          lines={finalizedCostLines.filter((line) => line.section === "MATERIAL")}
+          quantity={parsedQuantity}
+          subtotal={livePreview.materialCostPerUnit}
+          onAdd={() => {
+            setReplaceLineKey(null);
+            setMaterialPickerOpen(true);
+          }}
+          onChange={updateCostLine}
+          onRemove={removeCostLine}
+          onReplaceSource={(key) => {
+            setReplaceLineKey(key);
+            setMaterialPickerOpen(true);
+          }}
+        />
 
-          <details className="costing-details costing-details--fabric">
-            <summary>Vải & phụ liệu chính</summary>
-            <div className="admin-seo-brief-form-grid" style={{ marginTop: 12 }}>
-              <div className="admin-field">
-                <label className="admin-label">Tên vải / vật liệu</label>
-                <input className="admin-input" value={materialName} onChange={(e) => setMaterialName(e.target.value)} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">GSM</label>
-                <input className="admin-input" type="number" min="0" value={gsm} onChange={(e) => setGsm(e.target.value)} />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Giá vải / vật liệu</label>
-                <input
-                  className="admin-input"
-                  type="number"
-                  min="0"
-                  value={fabricPrice}
-                  onChange={(e) => setFabricPrice(e.target.value)}
-                />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Định mức</label>
-                <input
-                  className="admin-input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={fabricConsumption}
-                  onChange={(e) => setFabricConsumption(e.target.value)}
-                />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Cost vải / SP (override)</label>
-                <input
-                  className="admin-input"
-                  type="number"
-                  min="0"
-                  value={fabricCostPerUnit}
-                  onChange={(e) => setFabricCostPerUnit(e.target.value)}
-                  placeholder={
-                    derivedFabricCost ? formatPricingCurrency(derivedFabricCost) : "Tự tính từ giá / định mức"
-                  }
-                />
-              </div>
-              <div className="admin-field">
-                <label className="admin-label">Bo / phụ liệu chính / SP</label>
-                <input
-                  className="admin-input"
-                  type="number"
-                  min="0"
-                  value={ribCostPerUnit}
-                  onChange={(e) => setRibCostPerUnit(e.target.value)}
-                />
-              </div>
-            </div>
-          </details>
+        <CostingStructuredSection
+          section="PROCESS"
+          title="Gia công & dịch vụ"
+          addLabel="+ Thêm gia công"
+          emptyHint="Chưa có chi phí gia công"
+          lines={finalizedCostLines.filter((line) => line.section === "PROCESS")}
+          quantity={parsedQuantity}
+          subtotal={livePreview.processCostPerUnit}
+          onAdd={() => setServicePickerOpen(true)}
+          onChange={updateCostLine}
+          onRemove={removeCostLine}
+        />
 
-          <div className="costing-breakdown">
-            <p className="costing-breakdown__title">Cấu trúc giá vốn / SP</p>
-            <ul className="costing-breakdown__list">
-              {livePreview.components.map((component) => (
-                <li key={component.key}>
-                  <span>{component.label}</span>
-                  <span>{formatPricingCurrency(component.unitCost)}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="costing-breakdown__total">
-              <span>GIÁ VỐN / SP</span>
-              <strong>{formatPricingCurrency(livePreview.totalCostPerUnit)}</strong>
-            </div>
-            {livePreview.overheadRate > 0 && (
-              <p className="admin-field-hint">
-                Overhead {livePreview.overheadRate}% ·{" "}
-                {formatPricingCurrency(livePreview.overheadCostPerUnit)}/SP
-              </p>
-            )}
-          </div>
+        <CostingStructuredSection
+          section="OTHER"
+          title="Chi phí khác"
+          addLabel="+ Chi phí khác"
+          lines={finalizedCostLines.filter((line) => line.section === "OTHER")}
+          quantity={parsedQuantity}
+          subtotal={livePreview.otherCostPerUnit ?? 0}
+          onAdd={() => setCostLines((prev) => [...prev, emptyManualOtherLine(parsedQuantity)])}
+          onChange={updateCostLine}
+          onRemove={removeCostLine}
+        />
 
-          <CostingComponentTable
-            rows={components}
-            quantity={parsedQuantity}
-            onUpdate={updateComponent}
-            onRemove={(index) => setComponents(components.filter((_, i) => i !== index))}
-          />
-        </section>
+        <p className="admin-field-hint costing-manual-escape">
+          Không tìm thấy trong thư viện? Thêm dòng thủ công từ picker hoặc dùng Chi phí khác.
+        </p>
 
         <section className="costing-section costing-section--actions">
           <div className="costing-actions">
@@ -1133,24 +927,39 @@ export default function CostingCalculator() {
 
       <CostingSummaryPanel preview={livePreview} officialResult={result} />
 
-      <CostingCostPicker
-        open={costPickerOpen}
-        items={libraryItems}
-        onClose={() => setCostPickerOpen(false)}
-        onPickLibraryItem={appendCostLibraryItem}
-        onOpenCustomForm={() => {
-          setCustomCostError(null);
-          setCustomCostOpen(true);
+      <CostingSourcePickerDialog
+        open={materialPickerOpen}
+        kind="MATERIALS"
+        title="Thêm nguyên phụ liệu"
+        onClose={() => {
+          setMaterialPickerOpen(false);
+          setReplaceLineKey(null);
+        }}
+        onSelect={(selection) => handleSourcePick("MATERIAL", selection)}
+        onManualWithoutSource={() => {
+          if (replaceLineKey) {
+            setCostLines((prev) =>
+              prev.map((line) =>
+                line.key === replaceLineKey ? { ...emptyCustomMaterialLine(parsedQuantity), key: replaceLineKey } : line,
+              ),
+            );
+            setReplaceLineKey(null);
+          } else {
+            setCostLines((prev) => [...prev, emptyCustomMaterialLine(parsedQuantity)]);
+          }
+          setMaterialPickerOpen(false);
         }}
       />
-
-      <CostingCustomCostForm
-        open={customCostOpen}
-        busy={customCostBusy}
-        error={customCostError}
-        canSaveToLibrary={canManageLibrary}
-        onClose={() => setCustomCostOpen(false)}
-        onSubmit={(values) => void handleCustomCostSubmit(values)}
+      <CostingSourcePickerDialog
+        open={servicePickerOpen}
+        kind="COST_LIBRARY"
+        title="Thêm gia công / dịch vụ"
+        onClose={() => setServicePickerOpen(false)}
+        onSelect={(selection) => handleSourcePick("PROCESS", selection)}
+        onManualWithoutSource={() => {
+          setCostLines((prev) => [...prev, emptyCustomProcessLine(parsedQuantity)]);
+          setServicePickerOpen(false);
+        }}
       />
 
       <CostingBomQuickStart

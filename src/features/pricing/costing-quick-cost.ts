@@ -7,6 +7,7 @@ import {
 import type { CostingWorkspaceClone } from "@/features/pricing/costing-calculation-clone";
 import { costingWorkspaceToCalculatorInput } from "@/features/pricing/costing-calculation-clone";
 import type { CostingComponentType } from "@/features/pricing/costing-types";
+import { finalizeStructuredLine, newCostingLineKey } from "@/features/pricing/costing-v2";
 
 export function libraryItemToComponentRow(item: CostLibraryItem): CostingComponentRow {
   return {
@@ -38,11 +39,23 @@ export type QuickCostLine = {
   label: string;
   detail: string;
   unitCost: string;
-  source: "fabric" | "rib" | "component";
+  source: "fabric" | "rib" | "component" | "costLine";
   componentIndex?: number;
+  costLineKey?: string;
 };
 
 export function flattenWorkspaceToQuickCostLines(workspace: CostingWorkspaceClone): QuickCostLine[] {
+  if (workspace.costLines?.length) {
+    return workspace.costLines.map((line) => ({
+      key: line.key,
+      type: line.componentType,
+      label: line.label.trim() || "Chi phí",
+      detail: [line.supplierName, line.unit, line.note].filter(Boolean).join(" · "),
+      unitCost: String(line.costPerUnit),
+      source: "costLine" as const,
+      costLineKey: line.key,
+    }));
+  }
   const lines: QuickCostLine[] = [];
   const fabricCost = workspace.fabricCostPerUnit.trim();
   if (fabricCost && Number(fabricCost) > 0) {
@@ -91,7 +104,26 @@ export function applyQuickCostLineUnitCost(
   const next = {
     ...workspace,
     components: workspace.components.map((row) => ({ ...row })),
+    costLines: workspace.costLines?.map((row) => ({ ...row })),
   };
+  if (line.source === "costLine" && next.costLines && line.costLineKey) {
+    const parsed = Number(unitCost);
+    next.costLines = next.costLines.map((row) =>
+      row.key === line.costLineKey
+        ? finalizeStructuredLine(
+            {
+              ...row,
+              unitPrice: Number.isFinite(parsed) ? parsed : 0,
+              pricingBasis: "MANUAL",
+              calculationType: "MANUAL",
+              isOverride: true,
+            },
+            Math.max(1, Number(workspace.quantity) || 1),
+          )
+        : row,
+    );
+    return next;
+  }
   if (line.source === "fabric") {
     next.fabricCostPerUnit = unitCost;
     return next;
@@ -117,7 +149,12 @@ export function removeQuickCostLine(
   const next = {
     ...workspace,
     components: workspace.components.map((row) => ({ ...row })),
+    costLines: workspace.costLines?.map((row) => ({ ...row })),
   };
+  if (line.source === "costLine" && next.costLines && line.costLineKey) {
+    next.costLines = next.costLines.filter((row) => row.key !== line.costLineKey);
+    return next;
+  }
   if (line.source === "fabric") {
     next.fabricCostPerUnit = "";
     return next;
@@ -130,6 +167,37 @@ export function removeQuickCostLine(
     next.components = next.components.filter((_, i) => i !== line.componentIndex);
   }
   return next;
+}
+
+export function appendQuickCostComponent(
+  workspace: CostingWorkspaceClone,
+  row: CostingComponentRow,
+): CostingWorkspaceClone {
+  const quantity = Math.max(1, Number(workspace.quantity) || 1);
+  const unitCost = Number(row.unitCost);
+  const nextLine = finalizeStructuredLine(
+    {
+      key: newCostingLineKey(),
+      section: row.type === "MATERIAL" || row.type === "RIB" ? "MATERIAL" : row.type === "OTHER" ? "OTHER" : "PROCESS",
+      componentType: row.type,
+      origin: "CUSTOM",
+      pricingBasis: "PER_ITEM",
+      label: row.label.trim() || "Chi phí khác",
+      sourceType: "CUSTOM",
+      unitPrice: Number.isFinite(unitCost) ? unitCost : 0,
+      unit: "cái",
+      calculationType: "PER_ITEM",
+      quantityFactor: Number(row.quantityFactor) || 1,
+      note: row.note.trim() || null,
+    },
+    quantity,
+  );
+  return {
+    ...workspace,
+    workspaceVersion: 2,
+    components: [...workspace.components, row],
+    costLines: [...(workspace.costLines ?? []), nextLine],
+  };
 }
 
 export function workspaceToCalculatorInput(

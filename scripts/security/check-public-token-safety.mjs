@@ -15,6 +15,9 @@ const PUBLIC_TOKEN_FORBIDDEN_FIELDS = [
   "assignedToAdminUserId",
   "staffOnlyIdentifiers",
   "privateCustomerDetails",
+  "costingSourcePrice",
+  "costingSourcePrices",
+  "supplierUnitPrice",
 ];
 
 const forbiddenFieldSet = new Set(
@@ -237,6 +240,16 @@ expectUnsafe(
   },
   ["metadata"],
   "tech-pack metadata field",
+);
+
+expectUnsafe(
+  {
+    quoteNo: "BG-006",
+    costingSourcePrices: [{ supplierName: "Noi bo", unitPrice: 95000 }],
+    supplierUnitPrice: 91000,
+  },
+  ["costingSourcePrices", "supplierUnitPrice"],
+  "costing source prices are internal",
 );
 
 console.log("Public token safety checks passed.");

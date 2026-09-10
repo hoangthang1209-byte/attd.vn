@@ -27,30 +27,35 @@ export type PricingCalcForQuoteItems = {
   resultSnapshot: unknown;
 };
 
-function buildCostingQuoteItemDescription(item: PricingCalcItemForQuote): string {
-  return [
-    (() => {
-      const materialName = (item.pricingSnapshot as { materialName?: unknown } | null)?.materialName;
-      return typeof materialName === "string" && materialName.trim()
-        ? `VL: ${materialName.trim()}`
-        : null;
-    })(),
-    (() => {
-      const gsm = (item.pricingSnapshot as { gsm?: unknown } | null)?.gsm;
-      return typeof gsm === "number" && Number.isFinite(gsm) ? `GSM: ${gsm}` : null;
-    })(),
-    `SL: ${item.quantity.toLocaleString("vi-VN")} ${item.unit}`,
-    (() => {
-      const targetMarginRate = (item.pricingSnapshot as { targetMarginRate?: unknown } | null)
-        ?.targetMarginRate;
-      return typeof targetMarginRate === "number" && Number.isFinite(targetMarginRate)
-        ? `Target margin: ${targetMarginRate}%`
-        : null;
-    })(),
-    "Giá từ Costing Calculator",
-  ]
-    .filter(Boolean)
-    .join(" | ");
+function isUnsafeCustomerDescription(value: string): boolean {
+  return /VL:|GSM:|target margin|Giá từ Costing Calculator|costing snapshot|supplierUnitPrice|cost breakdown|supplierName|sourcePriceId|Định mức|PER_ITEM|PER_ORDER|PER_POSITION/i.test(
+    value,
+  );
+}
+
+function existingCustomerFacingDescription(item: PricingCalcItemForQuote): string | null {
+  const snapshot =
+    item.pricingSnapshot && typeof item.pricingSnapshot === "object"
+      ? (item.pricingSnapshot as Record<string, unknown>)
+      : null;
+  const candidates = [snapshot?.customerFacingDescription, snapshot?.publicDescription];
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") continue;
+    const trimmed = candidate.trim();
+    if (!trimmed || isUnsafeCustomerDescription(trimmed)) continue;
+    return trimmed;
+  }
+  return null;
+}
+
+function buildCostingQuoteItemDescription(item: PricingCalcItemForQuote): string | null {
+  const existing = existingCustomerFacingDescription(item);
+  if (existing) return existing;
+  const name = item.productNameSnapshot?.trim() || "";
+  const variant = item.variantNameSnapshot?.trim() || "";
+  const parts = [name, variant].filter(Boolean);
+  if (parts.length === 0) return null;
+  return parts.join(" · ");
 }
 
 export function mapPricingCalculationItemToQuoteItem(
@@ -58,6 +63,7 @@ export function mapPricingCalculationItemToQuoteItem(
   calcQuantityBreaks: unknown[],
   sortOrder: number,
 ): QuoteItemInput {
+  void calcQuantityBreaks;
   return {
     pricingSnapshot: item.pricingSnapshot as Record<string, unknown> | null,
     pricingCalculationItemId: item.id,
@@ -66,10 +72,7 @@ export function mapPricingCalculationItemToQuoteItem(
     productNameSnapshot: item.productNameSnapshot,
     variantNameSnapshot: item.variantNameSnapshot,
     description: buildCostingQuoteItemDescription(item),
-    itemNote:
-      calcQuantityBreaks.length > 0
-        ? "Có bảng giá theo số lượng trong costing snapshot."
-        : null,
+    itemNote: null,
     quantity: item.quantity,
     unit: item.unit,
     baseUnitPrice: item.baseUnitPrice,

@@ -11,6 +11,7 @@ type Props = {
 export default function CostingSummaryPanel({ preview, officialResult }: Props) {
   const display = officialResult ?? preview;
   const isLive = !officialResult;
+  const otherCost = display.otherCostPerUnit ?? 0;
 
   return (
     <aside className="costing-summary-panel">
@@ -21,6 +22,18 @@ export default function CostingSummaryPanel({ preview, officialResult }: Props) 
         </div>
 
         <dl className="costing-summary-panel__metrics">
+          <div className="costing-summary-panel__metric">
+            <dt>Nguyên phụ liệu / SP</dt>
+            <dd>{formatPricingCurrency(display.materialCostPerUnit)}</dd>
+          </div>
+          <div className="costing-summary-panel__metric">
+            <dt>Gia công / SP</dt>
+            <dd>{formatPricingCurrency(display.processCostPerUnit)}</dd>
+          </div>
+          <div className="costing-summary-panel__metric">
+            <dt>Chi phí khác / SP</dt>
+            <dd>{formatPricingCurrency(otherCost)}</dd>
+          </div>
           <div className="costing-summary-panel__metric costing-summary-panel__metric--cost">
             <dt>Giá vốn / SP</dt>
             <dd>{formatPricingCurrency(display.totalCostPerUnit)}</dd>
@@ -30,19 +43,19 @@ export default function CostingSummaryPanel({ preview, officialResult }: Props) 
             <dd>{formatPricingCurrency(display.totalCost)}</dd>
           </div>
           <div className="costing-summary-panel__metric costing-summary-panel__metric--sell">
-            <dt>Giá bán dự kiến / SP</dt>
+            <dt>Giá bán đề xuất / SP</dt>
             <dd>{formatPricingCurrency(display.suggestedSellingPricePerUnit)}</dd>
           </div>
-          <div className="costing-summary-panel__metric costing-summary-panel__metric--margin">
-            <dt>Lợi nhuận / SP</dt>
-            <dd>
-              {formatPricingCurrency(
-                display.quantity > 0 ? display.grossProfit / display.quantity : 0,
-              )}
-            </dd>
+          <div className="costing-summary-panel__metric costing-summary-panel__metric--sell">
+            <dt>Doanh thu dự kiến</dt>
+            <dd>{formatPricingCurrency(display.revenueBeforeVat)}</dd>
           </div>
           <div className="costing-summary-panel__metric costing-summary-panel__metric--margin">
-            <dt>Biên lợi nhuận</dt>
+            <dt>Lợi nhuận gộp</dt>
+            <dd>{formatPricingCurrency(display.grossProfit)}</dd>
+          </div>
+          <div className="costing-summary-panel__metric costing-summary-panel__metric--margin">
+            <dt>Margin %</dt>
             <dd>{formatPricingPercent(display.actualMarginRate)}</dd>
           </div>
         </dl>

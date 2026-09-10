@@ -4,7 +4,12 @@ import type {
   CostingComponentInput,
   CostingComponentType,
   CostingQuantityBreakResult,
+  CostingStructuredLine,
 } from "@/features/pricing/costing-types";
+import {
+  parseStructuredCostingLines,
+  resolveCostLinesForWorkspace,
+} from "@/features/pricing/costing-v2";
 import { formatRevisionDisplayLabel } from "@/features/pricing/pricing-calculation-revision";
 
 const PROCESS_TYPES: CostingComponentType[] = [
@@ -55,6 +60,8 @@ export type CostingWorkspaceClone = {
   fabricCostPerUnit: string;
   ribCostPerUnit: string;
   components: CostingComponentRow[];
+  costLines?: CostingStructuredLine[];
+  workspaceVersion?: 2;
   overheadRate: string;
   targetMarginRate: string;
   vatRate: string;
@@ -148,6 +155,8 @@ export function parseCostingCalculatorInputSnapshot(snapshot: unknown): CostingC
     fabricCostPerUnit: asNumber(raw.fabricCostPerUnit),
     ribCostPerUnit: asNumber(raw.ribCostPerUnit),
     components,
+    workspaceVersion: raw.workspaceVersion === 2 ? 2 : undefined,
+    costLines: parseStructuredCostingLines(raw.costLines),
     overheadRate: asNumber(raw.overheadRate),
     targetMarginRate: asNumber(raw.targetMarginRate),
     vatRate: asNumber(raw.vatRate),
@@ -245,6 +254,22 @@ export function buildCostingWorkspaceClone(record: CostingCalculationCloneRecord
       ? input.components.map(componentInputToRow)
       : componentsFromResultBreakdown(result);
 
+  const resultCostLines = parseStructuredCostingLines(result.costLines);
+  const costLines =
+    input.costLines?.length
+      ? input.costLines
+      : resultCostLines?.length
+        ? resultCostLines
+        : resolveCostLinesForWorkspace({
+            ...input,
+            quantity,
+            fabricPrice,
+            fabricConsumption,
+            fabricCostPerUnit: fabricCostPerUnit ?? undefined,
+            ribCostPerUnit,
+            components: input.components,
+          });
+
   const revisionDisplay = formatRevisionDisplayLabel(
     record.revisionLabel,
     1,
@@ -267,6 +292,8 @@ export function buildCostingWorkspaceClone(record: CostingCalculationCloneRecord
     fabricCostPerUnit: numToField(fabricCostPerUnit),
     ribCostPerUnit: numToField(ribCostPerUnit),
     components: components.length ? components : [],
+    costLines,
+    workspaceVersion: 2,
     overheadRate: numToField(input.overheadRate ?? asNumber(result.overheadRate)) || "0",
     targetMarginRate:
       numToField(input.targetMarginRate ?? asNumber(result.targetMarginRate)) || "35",
@@ -328,6 +355,8 @@ export function costingWorkspaceToCalculatorInput(
     fabricCostPerUnit: asNumber(workspace.fabricCostPerUnit),
     ribCostPerUnit: asNumber(workspace.ribCostPerUnit),
     components,
+    workspaceVersion: workspace.workspaceVersion === 2 || workspace.costLines ? 2 : undefined,
+    costLines: workspace.costLines,
     overheadRate: asNumber(workspace.overheadRate),
     targetMarginRate: asNumber(workspace.targetMarginRate),
     vatRate: asNumber(workspace.vatRate),
