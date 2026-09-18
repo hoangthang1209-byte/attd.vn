@@ -6,7 +6,15 @@ set -euo pipefail
 
 PG_BIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1 || true)"
 if [ -z "${PG_BIN}" ]; then
-  echo "PostgreSQL server binaries not found under /usr/lib/postgresql. Install postgresql first." >&2
+  # The snapshot/base image normally already contains PostgreSQL. Self-heal for
+  # bases that do not, so the environment still comes up.
+  echo "PostgreSQL server binaries not found; installing postgresql via apt"
+  sudo DEBIAN_FRONTEND=noninteractive apt-get update -y
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql postgresql-contrib
+  PG_BIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1 || true)"
+fi
+if [ -z "${PG_BIN}" ]; then
+  echo "Failed to locate PostgreSQL server binaries under /usr/lib/postgresql." >&2
   exit 1
 fi
 export PATH="${PG_BIN}:${PATH}"
