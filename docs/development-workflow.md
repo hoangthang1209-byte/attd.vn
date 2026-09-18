@@ -15,7 +15,7 @@ Business requirement → specification → branch → implementation → CI → 
 - Do not use production credentials or production database access.
 
 ## Required verification
-Run:
+For local work, run:
 ```bash
 npm run lint
 npm run typecheck
@@ -23,6 +23,16 @@ npm run security:public-token
 npm test --if-present
 npm run build
 ```
+
+## CI baseline policy
+The repository currently contains legacy lint debt that predates the Safe Software Factory rollout. During the transition:
+- Pull requests must pass ESLint on every changed JavaScript/TypeScript file.
+- Existing untouched lint debt does not block unrelated PRs.
+- Typecheck, security checks and production build still run across the repository.
+- Do not introduce new lint errors.
+- Legacy lint debt should be reduced in dedicated cleanup tasks, not mixed into unrelated feature PRs.
+
+When the legacy lint backlog reaches zero, CI should be tightened to run full-repository lint as a required check.
 
 ## Pull request gate
 A PR is ready for human approval only when:
