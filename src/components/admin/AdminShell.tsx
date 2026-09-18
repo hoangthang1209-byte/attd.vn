@@ -5,6 +5,7 @@ import { Menu, X } from "lucide-react";
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
+import AdminEnvironmentBadge from "@/components/admin/AdminEnvironmentBadge";
 import AdminScrollRestoration from "@/components/admin/AdminScrollRestoration";
 import AdminCommandPalette from "@/components/admin/AdminCommandPalette";
 import { AdminTitleProvider, useAdminTitle } from "@/components/admin/AdminTitleContext";
@@ -347,10 +348,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             }}
           >
             <div className={styles.sidebarTop}>
-              <Link href="/admin/dashboard" scroll={false} className={styles.brand}>
-                <span className={styles.brandMark}>ATTD CMS</span>
-                <span className={styles.brandSub}>Design Authority</span>
-              </Link>
+              <div className={styles.brandRow}>
+                <Link href="/admin/dashboard" scroll={false} className={styles.brand}>
+                  <span className={styles.brandMark}>ATTD CMS</span>
+                  <span className={styles.brandSub}>Design Authority</span>
+                </Link>
+                <AdminEnvironmentBadge />
+              </div>
               <div className={styles.sidebarActions}>
                 <AdminLogoutButton />
                 <button
