@@ -17,8 +17,14 @@ ensure_var() {
   fi
 }
 
+random_alnum() {
+  local length="$1"
+  openssl rand -base64 96 | tr -dc 'A-Za-z0-9' | head -c "${length}"
+}
+
 ensure_var "DATABASE_URL" "postgresql://postgres@127.0.0.1:5432/attd?schema=public"
-# Dev-only admin gate so the /admin backoffice is reachable locally.
-ensure_var "ADMIN_PASSWORD" "attd-dev-admin"
-ensure_var "ADMIN_SESSION_SECRET" "attd-dev-session-secret-change-me"
+# Generate per-environment dev-only admin credentials instead of committing
+# predictable defaults. Values are written only to the gitignored local .env.
+ensure_var "ADMIN_PASSWORD" "$(random_alnum 24)"
+ensure_var "ADMIN_SESSION_SECRET" "$(random_alnum 64)"
 ensure_var "NEXT_PUBLIC_SITE_URL" "http://localhost:3000"
