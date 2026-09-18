@@ -8,6 +8,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}/.."
 
 bash "${SCRIPT_DIR}/write-env.sh"
+
+# Export local dev vars (DATABASE_URL, etc.) for downstream Prisma commands.
+set -a
+# shellcheck disable=SC1091
+. ./.env
+set +a
+
 bash "${SCRIPT_DIR}/postgres.sh"
 
 if [ -d node_modules ]; then

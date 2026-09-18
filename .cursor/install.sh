@@ -13,6 +13,14 @@ npm ci
 echo "==> Writing local development .env"
 bash "${SCRIPT_DIR}/write-env.sh"
 
+# Export the local dev vars so every downstream command sees DATABASE_URL.
+# The Prisma CLI auto-loads .env, but the seed runs Prisma Client via tsx which
+# does not, so we source it explicitly here.
+set -a
+# shellcheck disable=SC1091
+. ./.env
+set +a
+
 echo "==> Ensuring local PostgreSQL is running"
 bash "${SCRIPT_DIR}/postgres.sh"
 
