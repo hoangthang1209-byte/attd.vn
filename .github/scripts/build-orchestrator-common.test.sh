@@ -98,6 +98,27 @@ marker_run1="$(orchestrator_idempotency_marker "review" "33" "abc123")"
 marker_run2="$(orchestrator_idempotency_marker "review" "33" "abc123")"
 assert_eq "duplicate events share stable marker" "$marker_run1" "$marker_run2"
 
+assert_eq "reviewed SHA wins over PR head" \
+  "reviewed-commit-aaa" \
+  "$(resolve_reviewed_sha "reviewed-commit-aaa" "newer-head-bbb")"
+
+assert_eq "reviewed SHA falls back to PR head when empty" \
+  "newer-head-bbb" \
+  "$(resolve_reviewed_sha "" "newer-head-bbb")"
+
+assert_eq "reviewed SHA falls back to PR head when whitespace" \
+  "newer-head-bbb" \
+  "$(resolve_reviewed_sha "   " "newer-head-bbb")"
+
+review_marker="$(orchestrator_idempotency_marker "review" "43" "reviewed-commit-aaa")"
+head_marker="$(orchestrator_idempotency_marker "review" "43" "newer-head-bbb")"
+if [ "$review_marker" != "$head_marker" ]; then
+  echo "PASS: reviewed SHA and PR head SHA produce distinct idempotency keys"
+else
+  echo "FAIL: reviewed SHA and PR head SHA produce distinct idempotency keys"
+  failures=$((failures + 1))
+fi
+
 query="$(active_builder_tasks_search_query)"
 if printf '%s' "$query" | grep -q 'status:pr-open'; then
   echo "FAIL: active builder query must not count status:pr-open"

@@ -9,6 +9,10 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: orchestrator-review-pr-${{ github.event.pull_request.number }}-sha-${{ github.event.review.commit_id || github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
 jobs:
   react-to-reviewer:
     name: React to ATTD PR Reviewer
@@ -24,7 +28,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
           PULL_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEWED_SHA: ${{ github.event.review.commit_id || github.event.pull_request.head.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REVIEW_STATE: ${{ github.event.review.state }}
           RUN_ID: ${{ github.run_id }}
         run: |
@@ -36,4 +41,6 @@ jobs:
           review_body="$(jq -r '.review.body // ""' "$GITHUB_EVENT_PATH")"
 
           source .github/scripts/build-orchestrator-common.sh
-          handle_reviewer_outcome "$PULL_NUMBER" "$HEAD_SHA" "$review_body" "$RUN_ID"
+          reviewed_sha="$(resolve_reviewed_sha "$REVIEWED_SHA" "$PR_HEAD_SHA")"
+          echo "Using reviewed SHA ${reviewed_sha} (PR head: ${PR_HEAD_SHA})."
+          handle_reviewer_outcome "$PULL_NUMBER" "$reviewed_sha" "$review_body" "$RUN_ID"

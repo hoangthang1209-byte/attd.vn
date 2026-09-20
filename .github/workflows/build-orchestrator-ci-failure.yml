@@ -10,6 +10,10 @@ permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: orchestrator-ci-pr-${{ github.event.workflow_run.pull_requests[0].number }}-sha-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
 jobs:
   react-to-ci-failure:
     name: React to failed CI on low-risk PR

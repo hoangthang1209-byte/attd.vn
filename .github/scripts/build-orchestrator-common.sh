@@ -37,6 +37,19 @@ normalize_whitespace() {
   printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 
+resolve_reviewed_sha() {
+  local review_commit_id="$1"
+  local pull_head_sha="$2"
+
+  review_commit_id="$(normalize_whitespace "$review_commit_id")"
+  if [ -n "$review_commit_id" ]; then
+    printf '%s' "$review_commit_id"
+    return 0
+  fi
+
+  printf '%s' "$pull_head_sha"
+}
+
 is_orchestrator_build_approved_author() {
   local author="$1"
   local issue_number="$2"
@@ -117,13 +130,33 @@ orchestrator_idempotency_marker() {
   printf '%s %s-pr-%s-sha-%s' "$ORCHESTRATOR_MARKER_PREFIX" "$kind" "$pull_number" "$head_sha"
 }
 
+orchestrator_repair_label_for_kind() {
+  local kind="$1"
+
+  case "$kind" in
+    review) printf '%s' "$ORCHESTRATOR_REVIEW_REPAIR_LABEL" ;;
+    ci) printf '%s' "$ORCHESTRATOR_CI_REPAIR_LABEL" ;;
+    *) return 1 ;;
+  esac
+}
+
 repository_has_idempotency_for_pr_sha() {
   local kind="$1"
   local pull_number="$2"
   local head_sha="$3"
-  local marker count
+  local marker repair_issue count
 
   marker="$(orchestrator_idempotency_marker "$kind" "$pull_number" "$head_sha")"
+
+  if pull_request_has_idempotency_marker "$pull_number" "$marker"; then
+    return 0
+  fi
+
+  repair_issue="$(find_open_repair_issue_for_pr "$pull_number" "$head_sha" "$kind")"
+  if [ -n "$repair_issue" ]; then
+    return 0
+  fi
+
   count="$(gh search issues \
     --repo "$GITHUB_REPOSITORY" \
     --match title,body,comments \
@@ -271,24 +304,28 @@ find_open_repair_issue_for_pr() {
   local pull_number="$1"
   local head_sha="$2"
   local kind="$3"
-  local marker
+  local marker repair_label
 
   marker="$(orchestrator_idempotency_marker "$kind" "$pull_number" "$head_sha")"
+  repair_label="$(orchestrator_repair_label_for_kind "$kind")"
 
-  gh search issues \
+  gh issue list \
     --repo "$GITHUB_REPOSITORY" \
-    --match title,body \
-    --json number,body,state \
+    --state open \
+    --label "$repair_label" \
+    --json number,body \
     --jq \
       --arg marker "$marker" \
-      --arg pr "$pull_number" \
-      --arg sha "$head_sha" '
-      [.[]
-        | select(.state == "OPEN")
-        | select(.body | contains($marker))
-      ] | .[0].number // empty
-    ' \
-    "Repair PR #${pull_number}" "$head_sha" 2>/dev/null || true
+      '[.[] | select(.body | contains($marker)) | .number] | first // empty' \
+    2>/dev/null || true
+}
+
+claim_pr_idempotency_marker() {
+  local pull_number="$1"
+  local marker="$2"
+  local message="$3"
+
+  post_unique_pr_comment "$pull_number" "$marker" "$message"
 }
 
 issue_has_orchestrator_build_approved() {
@@ -433,6 +470,9 @@ handle_reviewer_outcome() {
       parent_issue="${linked_issues[0]}"
     fi
 
+    claim_pr_idempotency_marker "$pull_number" "$marker" \
+      "ORCHESTRATOR_REPAIR_CLAIM: Reserving idempotency for P2 repair at \`${head_sha:0:7}\`."
+
     repair_issue="$(find_open_repair_issue_for_pr "$pull_number" "$head_sha" "review")"
     if [ -z "$repair_issue" ]; then
       repair_issue="$(create_repair_issue "$pull_number" "$head_sha" "$marker" \
@@ -443,6 +483,7 @@ handle_reviewer_outcome() {
     fi
 
     if should_defer_for_active_builder_queue; then
+      claim_pr_idempotency_marker "$pull_number" "$marker" "$ORCHESTRATOR_QUEUE_DEFERRED_COMMENT"
       if ! issue_is_deferred_repair "$repair_issue"; then
         gh issue comment "$repair_issue" --body "${ORCHESTRATOR_QUEUE_DEFERRED_COMMENT}
 
@@ -497,6 +538,9 @@ handle_ci_failure_outcome() {
     parent_issue="${linked_issues[0]}"
   fi
 
+  claim_pr_idempotency_marker "$pull_number" "$marker" \
+    "ORCHESTRATOR_REPAIR_CLAIM: Reserving idempotency for CI repair at \`${head_sha:0:7}\`."
+
   repair_issue="$(find_open_repair_issue_for_pr "$pull_number" "$head_sha" "ci")"
   if [ -z "$repair_issue" ]; then
     repair_issue="$(create_repair_issue "$pull_number" "$head_sha" "$marker" \
@@ -505,6 +549,7 @@ handle_ci_failure_outcome() {
   fi
 
   if should_defer_for_active_builder_queue; then
+    claim_pr_idempotency_marker "$pull_number" "$marker" "$ORCHESTRATOR_QUEUE_DEFERRED_COMMENT"
     if ! issue_is_deferred_repair "$repair_issue"; then
       gh issue comment "$repair_issue" --body "${ORCHESTRATOR_QUEUE_DEFERRED_COMMENT}
 
