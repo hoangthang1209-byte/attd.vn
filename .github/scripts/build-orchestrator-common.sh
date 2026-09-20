@@ -196,17 +196,6 @@ issue_has_idempotency_marker() {
     ' | grep -qx 'true'
 }
 
-pull_request_has_idempotency_marker() {
-  local pull_number="$1"
-  local marker="$2"
-
-  gh pr view "$pull_number" --json body,comments --jq \
-    --arg marker "$marker" '
-      (.body | contains($marker))
-      or ([.comments[].body | select(contains($marker))] | length > 0)
-    ' | grep -qx 'true'
-}
-
 linked_issue_numbers_array() {
   local pull_number="$1"
   mapfile -t _linked_issues < <(linked_issue_numbers_from_pr "$pull_number")
@@ -518,8 +507,8 @@ post_unique_pr_comment() {
   local marker="$2"
   local body="$3"
 
-  if pull_request_has_idempotency_marker "$pull_number" "$marker"; then
-    echo "PR #${pull_number} already has marker ${marker}; skipping comment."
+  if pull_request_has_terminal_idempotency_for_marker "$pull_number" "$marker"; then
+    echo "PR #${pull_number} already has terminal marker ${marker}; skipping comment."
     return 0
   fi
 
@@ -645,6 +634,53 @@ handle_ci_failure_outcome() {
     "${ORCHESTRATOR_CI_REPAIR_TRIGGERED_PREFIX} Created/reused repair issue #${repair_issue} for CI failure at \`${head_sha:0:7}\`."
 }
 
+collect_deferred_repair_issues() {
+  local -n deferred_issues_ref="$1"
+  local -A seen=()
+  local issue_number repair_label
+
+  while IFS= read -r issue_number; do
+    [ -z "$issue_number" ] && continue
+    if [ -n "${seen[$issue_number]:-}" ]; then
+      continue
+    fi
+    seen[$issue_number]=1
+    deferred_issues_ref+=("$issue_number")
+  done < <(
+    gh issue list \
+      --repo "$GITHUB_REPOSITORY" \
+      --state open \
+      --label "status:queued" \
+      --json number \
+      --jq '.[].number' 2>/dev/null || true
+  )
+
+  for repair_label in "$ORCHESTRATOR_REVIEW_REPAIR_LABEL" "$ORCHESTRATOR_CI_REPAIR_LABEL"; do
+    while IFS= read -r issue_number; do
+      [ -z "$issue_number" ] && continue
+      if ! issue_is_deferred_repair "$issue_number"; then
+        continue
+      fi
+      if ! issue_has_label "$issue_number" "status:queued"; then
+        echo "Restoring missing status:queued on deferred repair issue #${issue_number}."
+        set_issue_status_label "$issue_number" "status:queued"
+      fi
+      if [ -n "${seen[$issue_number]:-}" ]; then
+        continue
+      fi
+      seen[$issue_number]=1
+      deferred_issues_ref+=("$issue_number")
+    done < <(
+      gh issue list \
+        --repo "$GITHUB_REPOSITORY" \
+        --state open \
+        --label "$repair_label" \
+        --json number \
+        --jq '.[].number' 2>/dev/null || true
+    )
+  done
+}
+
 process_deferred_queue() {
   ensure_orchestrator_labels
 
@@ -653,14 +689,8 @@ process_deferred_queue() {
     return 0
   fi
 
-  mapfile -t deferred_issues < <(
-    gh issue list \
-      --repo "$GITHUB_REPOSITORY" \
-      --state open \
-      --label "status:queued" \
-      --json number \
-      --jq '.[].number' 2>/dev/null || true
-  )
+  local deferred_issues=()
+  collect_deferred_repair_issues deferred_issues
 
   for issue_number in "${deferred_issues[@]}"; do
     if issue_has_label "$issue_number" "status:ready-to-merge" \

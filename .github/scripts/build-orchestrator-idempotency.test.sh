@@ -43,12 +43,6 @@ issue_has_label() { return 1; }
 set_issue_status_label() { :; }
 gh() { :; }
 
-pull_request_has_idempotency_marker() {
-  local pull_number="$1"
-  local marker="$2"
-  [[ "$MOCK_PR_COMMENTS" == *"$marker"* ]]
-}
-
 pull_request_has_terminal_idempotency_for_marker() {
   local pull_number="$1"
   local marker="$2"
