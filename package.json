@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "test": "tsx --test src/features/quotes/quote-number-clipboard.test.ts",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "security:public-token": "node scripts/security/check-public-token-safety.mjs",
@@ -72,6 +73,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }
