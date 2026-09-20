@@ -16,6 +16,7 @@ MOCK_DEFERRED_HAS_BUILD_APPROVED=0
 MOCK_REPAIR_DEFERRED_ISSUE=""
 MOCK_REPAIR_DEFERRED_HAS_QUEUED_LABEL=0
 MOCK_RESTORED_QUEUED_LABELS=0
+MOCK_BUILDING_PROMOTIONS=0
 
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; failures=$((failures + 1)); }
@@ -73,6 +74,9 @@ set_issue_status_label() {
   if [ "$issue_number" = "${MOCK_REPAIR_DEFERRED_ISSUE:-}" ] && [ "$label" = "status:queued" ]; then
     MOCK_REPAIR_DEFERRED_HAS_QUEUED_LABEL=1
     MOCK_RESTORED_QUEUED_LABELS=$((MOCK_RESTORED_QUEUED_LABELS + 1))
+  fi
+  if [ "$issue_number" = "${MOCK_DEFERRED_ISSUE:-}" ] && [ "$label" = "status:building" ]; then
+    MOCK_BUILDING_PROMOTIONS=$((MOCK_BUILDING_PROMOTIONS + 1))
   fi
 }
 
@@ -151,13 +155,6 @@ else
   fail "deferred/tracking-only issues do not inflate active Builder count"
 fi
 
-query="$(active_builder_tasks_search_query)"
-if printf '%s' "$query" | grep -q 'status:pr-open'; then
-  fail "parent status:pr-open must not block Builder queue"
-else
-  pass "parent status:pr-open does not block Builder queue"
-fi
-
 MOCK_ACTIVE_BUILDER_COUNT=1
 if should_defer_for_active_builder_queue; then
   pass "new repair defers while another Builder task is active"
@@ -185,11 +182,17 @@ fi
 
 MOCK_DEFERRED_HAS_BUILD_APPROVED=1
 MOCK_BUILD_APPROVED_POSTS=0
+MOCK_BUILDING_PROMOTIONS=0
 process_deferred_queue
 if [ "$MOCK_BUILD_APPROVED_POSTS" -eq 0 ]; then
   pass "already-triggered deferred repair does not emit duplicate BUILD_APPROVED"
 else
   fail "already-triggered deferred repair does not emit duplicate BUILD_APPROVED"
+fi
+if [ "$MOCK_BUILDING_PROMOTIONS" -eq 1 ]; then
+  pass "queued deferred repair with BUILD_APPROVED is promoted to status:building"
+else
+  fail "queued deferred repair with BUILD_APPROVED is promoted to status:building (got ${MOCK_BUILDING_PROMOTIONS})"
 fi
 
 # Issue #50 P2.2: defer comment without status:queued label is reconciled and resumed.

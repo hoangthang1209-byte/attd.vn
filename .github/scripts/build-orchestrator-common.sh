@@ -273,11 +273,6 @@ is_low_risk_pull_request() {
   return 0
 }
 
-active_builder_tasks_search_query() {
-  printf '%s' \
-    'is:issue is:open (label:"status:approved" OR label:"status:building") -label:"status:ready-to-merge" -label:"status:merged" -label:"status:blocked" -label:"status:stalled" -label:"status:queued"'
-}
-
 issue_excluded_from_active_builder_count() {
   local issue_number="$1"
 
@@ -701,6 +696,11 @@ process_deferred_queue() {
     fi
 
     if issue_has_orchestrator_build_approved "$issue_number"; then
+      if issue_has_label "$issue_number" "status:queued"; then
+        echo "Deferred repair issue #${issue_number} has BUILD_APPROVED but status:queued; promoting to status:building."
+        set_issue_status_label "$issue_number" "status:building"
+        return 0
+      fi
       echo "Deferred repair issue #${issue_number} already has BUILD_APPROVED; skipping duplicate trigger."
       continue
     fi

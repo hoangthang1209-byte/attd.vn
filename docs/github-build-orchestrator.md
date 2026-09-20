@@ -77,7 +77,20 @@ Every orchestrator action embeds an auditable marker keyed on stable PR + head S
 
 `ORCHESTRATOR_IDEMPOTENCY: <kind>-pr-<number>-sha-<sha>`
 
-Duplicate reviewer events or CI failures for the same PR head SHA do **not** create duplicate repair issues or duplicate `BUILD_APPROVED` comments when the marker already exists (run IDs are not part of dedup identity).
+Duplicate reviewer events or CI failures for the same PR head SHA do **not** create duplicate repair issues or duplicate `BUILD_APPROVED` comments when a **terminal** PR comment already carries that marker (run IDs are not part of dedup identity).
+
+### Terminal vs claim-only markers
+
+PR-level dedup requires a **terminal** comment body that includes the marker **and** at least one terminal token:
+
+- `ORCHESTRATOR_REPAIR_TRIGGERED:` or `ORCHESTRATOR_CI_REPAIR_TRIGGERED:`
+- `ORCHESTRATOR_BLOCKED:`
+- `READY TO MERGE`
+- `ORCHESTRATOR_QUEUE_DEFERRED:`
+
+A **claim-only** comment (`ORCHESTRATOR_REPAIR_CLAIM:` with the marker but none of the terminal tokens above) does **not** block later triggered or deferred comments. This prevents orphan claim comments from leaving repairs stuck without a resumable terminal state.
+
+Issue-level markers and `BUILD_APPROVED` authorization remain separate guards against duplicate Builder triggers.
 
 ## BUILD_APPROVED authorization (orchestrator path)
 
@@ -129,10 +142,13 @@ Orchestration stops without triggering Builder when:
 ## Local tests
 
 ```bash
-bash .github/scripts/build-orchestrator-common.test.sh
-bash .github/scripts/build-orchestrator-queue.test.sh
 bash -n .github/scripts/build-orchestrator-common.sh
 bash -n .github/scripts/task-status-common.sh
+bash .github/scripts/build-orchestrator-common.test.sh
+bash .github/scripts/build-orchestrator-terminal-predicate.test.sh
+bash .github/scripts/build-orchestrator-idempotency.test.sh
+bash .github/scripts/build-orchestrator-queue.test.sh
+bash .github/scripts/build-orchestrator-handler.test.sh
 ```
 
 Live GitHub Actions behavior requires merge and workflow runs on real PR/review events.

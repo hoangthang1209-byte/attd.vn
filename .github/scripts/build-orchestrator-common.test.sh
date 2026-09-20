@@ -119,21 +119,6 @@ else
   failures=$((failures + 1))
 fi
 
-query="$(active_builder_tasks_search_query)"
-if printf '%s' "$query" | grep -q 'status:pr-open'; then
-  echo "FAIL: active builder query must not count status:pr-open"
-  failures=$((failures + 1))
-else
-  echo "PASS: active builder query excludes status:pr-open"
-fi
-
-if printf '%s' "$query" | grep -q 'status:queued'; then
-  echo "PASS: active builder query excludes status:queued"
-else
-  echo "FAIL: active builder query must exclude status:queued"
-  failures=$((failures + 1))
-fi
-
 if [ "$failures" -ne 0 ]; then
   echo "${failures} test(s) failed."
   exit 1
