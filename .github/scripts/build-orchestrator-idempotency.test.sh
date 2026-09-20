@@ -17,6 +17,7 @@ MOCK_ACTIVE_BUILDER_COUNT=0
 MOCK_LOW_RISK=1
 MOCK_LINKED_ISSUES="44"
 MOCK_CREATE_REPAIR_FAILS=0
+MOCK_ISSUE_HAS_BUILD_APPROVED=0
 
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; failures=$((failures + 1)); }
@@ -31,8 +32,16 @@ set_issue_status_label() { :; }
 is_low_risk_pull_request() { [ "${MOCK_LOW_RISK:-0}" -eq 1 ]; }
 should_defer_for_active_builder_queue() { [ "${MOCK_ACTIVE_BUILDER_COUNT:-0}" -gt 0 ]; }
 issue_is_deferred_repair() { return 1; }
-issue_has_orchestrator_build_approved() { return 1; }
-post_orchestrator_build_approved() { MOCK_BUILD_APPROVED_POSTS=$((MOCK_BUILD_APPROVED_POSTS + 1)); }
+issue_has_orchestrator_build_approved() { [ "${MOCK_ISSUE_HAS_BUILD_APPROVED:-0}" -eq 1 ]; }
+post_orchestrator_build_approved() {
+  MOCK_BUILD_APPROVED_POSTS=$((MOCK_BUILD_APPROVED_POSTS + 1))
+  MOCK_ISSUE_HAS_BUILD_APPROVED=1
+}
+issue_is_deferred_repair() { return 1; }
+issue_has_idempotency_marker() { return 1; }
+issue_has_label() { return 1; }
+set_issue_status_label() { :; }
+gh() { :; }
 
 pull_request_has_idempotency_marker() {
   local pull_number="$1"
@@ -86,25 +95,6 @@ create_repair_issue() {
   printf '9999'
 }
 
-repository_has_idempotency_for_pr_sha() {
-  local kind="$1"
-  local pull_number="$2"
-  local head_sha="$3"
-  local marker repair_issue
-  marker="$(orchestrator_idempotency_marker "$kind" "$pull_number" "$head_sha")"
-
-  repair_issue="$(find_open_repair_issue_for_pr "$pull_number" "$head_sha" "$kind")"
-  if [ -n "$repair_issue" ]; then
-    return 0
-  fi
-
-  if pull_request_has_terminal_idempotency_for_marker "$pull_number" "$marker"; then
-    return 0
-  fi
-
-  return 1
-}
-
 sample_review_p2() {
   cat <<'EOF'
 <!-- CURSOR_AUTOMATION_ID: test -->
@@ -129,6 +119,7 @@ reset_mocks() {
   MOCK_BUILD_APPROVED_POSTS=0
   MOCK_ACTIVE_BUILDER_COUNT=0
   MOCK_CREATE_REPAIR_FAILS=0
+  MOCK_ISSUE_HAS_BUILD_APPROVED=0
 }
 
 # Issue #46: orphan claim-only marker must not permanently block retry.
@@ -181,9 +172,9 @@ fi
 first_create_count="$MOCK_REPAIR_ISSUE_CREATE_COUNT"
 
 if repository_has_idempotency_for_pr_sha "review" "43" "deadbeef"; then
-  pass "duplicate reviewer event detects repair issue or terminal PR marker"
+  pass "duplicate reviewer event detects terminal PR marker"
 else
-  fail "duplicate reviewer event detects repair issue or terminal PR marker"
+  fail "duplicate reviewer event detects terminal PR marker"
 fi
 
 if ! repository_has_idempotency_for_pr_sha "review" "43" "deadbeef"; then
@@ -209,9 +200,9 @@ if ! repository_has_idempotency_for_pr_sha "ci" "43" "cafebabe"; then
 fi
 
 if repository_has_idempotency_for_pr_sha "ci" "43" "cafebabe"; then
-  pass "duplicate CI failure detects repair issue or terminal PR marker"
+  pass "duplicate CI failure detects terminal PR marker"
 else
-  fail "duplicate CI failure detects repair issue or terminal PR marker"
+  fail "duplicate CI failure detects terminal PR marker"
 fi
 
 ci_create_count="$MOCK_REPAIR_ISSUE_CREATE_COUNT"
@@ -230,15 +221,75 @@ fi
 reset_mocks
 MOCK_ACTIVE_BUILDER_COUNT=1
 defer_marker="$(orchestrator_idempotency_marker "review" "43" "defer-sha")"
-ensure_repair_issue_for_pr_sha "43" "defer-sha" "review" "$defer_marker" \
-  "orchestrator:review-repair" "P2" "44" >/dev/null
-post_unique_pr_comment "43" "$defer_marker" "$ORCHESTRATOR_QUEUE_DEFERRED_COMMENT"
+repair_issue="$(ensure_repair_issue_for_pr_sha "43" "defer-sha" "review" "$defer_marker" \
+  "orchestrator:review-repair" "P2" "44")"
+complete_repair_orchestration_trigger "43" "$repair_issue" "$defer_marker" \
+  "${ORCHESTRATOR_REPAIR_TRIGGERED_PREFIX} deferred test"
 
 if [[ "$MOCK_PR_COMMENTS" == *"$ORCHESTRATOR_QUEUE_DEFERRED_COMMENT"* ]] \
   && [[ "$MOCK_PR_TERMINAL_MARKERS" == *"|${defer_marker}|"* ]]; then
   pass "deferred path writes terminal PR-level marker after repair issue exists"
 else
   fail "deferred path writes terminal PR-level marker after repair issue exists"
+fi
+
+# Issue #48 P2.1: open repair issue alone is not terminal idempotency.
+reset_mocks
+partial_marker="$(orchestrator_idempotency_marker "review" "48" "partial-sha")"
+MOCK_REPAIR_ISSUES="|${partial_marker}|"
+if orchestration_is_terminal_complete "review" "48" "partial-sha"; then
+  fail "open repair issue without terminal PR marker is not terminal idempotency"
+else
+  pass "open repair issue without terminal PR marker is not terminal idempotency"
+fi
+
+# Issue #48 P2.1/P2.2: partial failure after repair issue creation resumes with one BUILD_APPROVED.
+reset_mocks
+partial_marker="$(orchestrator_idempotency_marker "review" "48" "resume-sha")"
+MOCK_REPAIR_ISSUES="|${partial_marker}|"
+resume_incomplete_repair_orchestration "48" "resume-sha" "review" "$partial_marker" \
+  "${ORCHESTRATOR_REPAIR_TRIGGERED_PREFIX} Created/reused repair issue #8888 for P2 findings."
+if [ "$MOCK_BUILD_APPROVED_POSTS" -eq 1 ]; then
+  pass "partial failure resumes and posts exactly one BUILD_APPROVED"
+else
+  fail "partial failure resumes and posts exactly one BUILD_APPROVED (got ${MOCK_BUILD_APPROVED_POSTS})"
+fi
+if [[ "$MOCK_PR_TERMINAL_MARKERS" == *"|${partial_marker}|"* ]]; then
+  pass "partial failure resume finishes missing terminal PR marker"
+else
+  fail "partial failure resume finishes missing terminal PR marker"
+fi
+
+# Issue #48: duplicate event after completed orchestration remains a no-op.
+reset_mocks
+partial_marker="$(orchestrator_idempotency_marker "review" "48" "done-sha")"
+MOCK_REPAIR_ISSUES="|${partial_marker}|"
+MOCK_ISSUE_HAS_BUILD_APPROVED=1
+post_unique_pr_comment "48" "$partial_marker" \
+  "${ORCHESTRATOR_REPAIR_TRIGGERED_PREFIX} Created/reused repair issue #8888 for P2 findings."
+MOCK_BUILD_APPROVED_POSTS=0
+if orchestration_is_terminal_complete "review" "48" "done-sha"; then
+  pass "duplicate event after completed orchestration remains a no-op"
+else
+  fail "completed orchestration is detected as terminal"
+fi
+
+# Issue #48: BUILD_APPROVED posted but PR marker missing resumes marker only.
+reset_mocks
+partial_marker="$(orchestrator_idempotency_marker "ci" "48" "marker-gap-sha")"
+MOCK_REPAIR_ISSUES="|${partial_marker}|"
+MOCK_ISSUE_HAS_BUILD_APPROVED=1
+resume_incomplete_repair_orchestration "48" "marker-gap-sha" "ci" "$partial_marker" \
+  "${ORCHESTRATOR_CI_REPAIR_TRIGGERED_PREFIX} Created/reused repair issue #8888 for CI failure."
+if [ "$MOCK_BUILD_APPROVED_POSTS" -eq 0 ]; then
+  pass "resume with existing BUILD_APPROVED does not emit duplicate BUILD_APPROVED"
+else
+  fail "resume with existing BUILD_APPROVED must not emit duplicate BUILD_APPROVED"
+fi
+if [[ "$MOCK_PR_TERMINAL_MARKERS" == *"|${partial_marker}|"* ]]; then
+  pass "resume with existing BUILD_APPROVED finishes missing PR terminal marker"
+else
+  fail "resume with existing BUILD_APPROVED must finish missing PR terminal marker"
 fi
 
 # Workflow concurrency groups are keyed by PR + event kind + SHA.
