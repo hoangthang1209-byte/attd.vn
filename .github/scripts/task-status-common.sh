@@ -25,10 +25,24 @@ ensure_task_status_labels() {
   done
 }
 
-list_issue_status_labels() {
+clear_issue_status_labels() {
   local issue_number="$1"
-  gh issue view "$issue_number" --json labels --jq \
-    --arg prefix "$STATUS_LABEL_PREFIX" '[.labels[].name | select(startswith($prefix))]'
+
+  mapfile -t current_status_labels < <(
+    gh issue view "$issue_number" --json labels --jq \
+      --arg prefix "$STATUS_LABEL_PREFIX" '.labels[].name | select(startswith($prefix))'
+  )
+
+  if [ "${#current_status_labels[@]}" -eq 0 ]; then
+    return 0
+  fi
+
+  local remove_args=()
+  for label in "${current_status_labels[@]}"; do
+    remove_args+=(--remove-label "$label")
+  done
+
+  gh issue edit "$issue_number" "${remove_args[@]}"
 }
 
 set_issue_status_label() {
@@ -94,7 +108,8 @@ reconcile_issue_without_open_pr() {
 
   approved_at="$(latest_authorized_build_approved_timestamp "$issue_number")"
   if [ -z "$approved_at" ]; then
-    echo "Issue #${issue_number} has no open linked PR and no authorized BUILD_APPROVED; leaving status unchanged."
+    echo "Issue #${issue_number} has no open linked PR and no authorized BUILD_APPROVED; clearing stale status labels."
+    clear_issue_status_labels "$issue_number"
     return 0
   fi
 
@@ -135,6 +150,7 @@ reconcile_stale_pr_open_issues() {
 list_stall_watchdog_candidate_issues() {
   gh search issues \
     --repo "$GITHUB_REPOSITORY" \
+    --limit 500 \
     'is:issue is:open (label:"status:approved" OR label:"status:pr-open")' \
     --json number \
     --jq '.[].number'

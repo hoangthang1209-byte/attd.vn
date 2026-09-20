@@ -37,6 +37,7 @@ jobs:
           for issue_number in "${candidate_issues[@]}"; do
             approved_at="$(latest_authorized_build_approved_timestamp "$issue_number")"
             if [ -z "$approved_at" ]; then
+              reconcile_issue_without_open_pr "$issue_number"
               continue
             fi
 
