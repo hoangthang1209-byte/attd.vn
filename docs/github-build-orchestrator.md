@@ -69,6 +69,8 @@ When a repair would start but another task is active:
 - Set the repair issue to `status:queued`
 - The queue workflow retries deferred issues when no active Builder work remains
 
+A historical `ORCHESTRATOR_QUEUE_DEFERRED` comment alone does **not** keep an issue deferred after authorized `BUILD_APPROVED` was posted and the repair was promoted (`status:building`). Only `status:queued` or a defer comment **without** authorized `BUILD_APPROVED` remains eligible for queue reconciliation.
+
 Do not start unrelated feature work while a repair task is active.
 
 ## Idempotency
@@ -149,6 +151,9 @@ bash .github/scripts/build-orchestrator-terminal-predicate.test.sh
 bash .github/scripts/build-orchestrator-idempotency.test.sh
 bash .github/scripts/build-orchestrator-queue.test.sh
 bash .github/scripts/build-orchestrator-handler.test.sh
+bash .github/scripts/build-orchestrator-deferred-repair.test.sh
 ```
+
+The CI `Verify` job runs `bash -n` on orchestrator scripts and all `build-orchestrator-*.test.sh` files (no GitHub API credentials required).
 
 Live GitHub Actions behavior requires merge and workflow runs on real PR/review events.
