@@ -242,6 +242,12 @@ export const adminNavigationSections: AdminNavigationSection[] = [
         status: "active",
         requiredPermissions: ["canViewDashboard"],
       },
+      {
+        label: "Tự động hóa",
+        href: "/admin/automation",
+        status: "active",
+        requiredPermissions: ["canViewDashboard"],
+      },
     ]),
   },
 ];
