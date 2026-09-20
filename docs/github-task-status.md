@@ -25,11 +25,13 @@ Only one `status:*` label is active on an issue at a time. Non-status labels are
 
 Workflow: `.github/workflows/task-status-build-approved.yml`
 
-When a new issue comment body equals `BUILD_APPROVED` (after trimming leading/trailing whitespace):
+When a new **task issue** comment (not a pull-request thread) body equals `BUILD_APPROVED` (after trimming leading/trailing whitespace) **and** the comment author is the repository owner (`github.repository_owner`, matching the Builder trigger policy):
 
 1. Ensure standard labels exist.
 2. Add `status:approved`.
 3. Remove any other `status:*` labels.
+
+Comments on pull-request threads are ignored. Unauthorized `BUILD_APPROVED` comments are ignored.
 
 This does **not** change Builder authorization behavior.
 
@@ -51,17 +53,21 @@ Same workflow on `pull_request` `closed` when `merged == true`:
 1. Set linked issues to `status:merged`.
 2. GitHub's normal close-on-merge behavior applies when the PR uses closing keywords.
 
+When a linked PR is **closed without merge**, linked issues are reconciled: if no **open** linked PR remains, the issue reverts to `status:approved` or becomes `status:stalled` when the authorized `BUILD_APPROVED` is older than the watchdog threshold.
+
+When a PR body is **edited** and no longer reports closing references, open issues labeled `status:pr-open` with no **open** linked PR are reconciled the same way.
+
 No production deployment or auto-merge is performed.
 
 ### Stalled watchdog → `status:stalled`
 
 Workflow: `.github/workflows/task-status-stalled-watchdog.yml`
 
-Runs every 15 minutes (and on manual dispatch). For each **open** issue that has:
+Runs every 15 minutes (and on manual dispatch). Candidate issues are pre-filtered to open issues labeled `status:approved` or `status:pr-open`. For each candidate that has:
 
-- at least one exact `BUILD_APPROVED` comment (trimmed),
-- no linked pull request,
-- most recent `BUILD_APPROVED` older than **45 minutes**,
+- at least one authorized exact `BUILD_APPROVED` comment (trimmed, from the repository owner),
+- no **open** linked pull request,
+- most recent authorized `BUILD_APPROVED` older than **45 minutes**,
 
 the workflow:
 
@@ -87,10 +93,14 @@ If a PR is linked later, the PR workflow transitions the issue to `status:pr-ope
 
 ## Verification checklist
 
-- [ ] Exact `BUILD_APPROVED` sets `status:approved`
+- [ ] Authorized exact `BUILD_APPROVED` on a task issue sets `status:approved`
+- [ ] Unauthorized or PR-thread `BUILD_APPROVED` comments are ignored
 - [ ] Only one `status:*` label remains after each transition
-- [ ] Linked PR sets `status:pr-open`
+- [ ] Linked open PR sets `status:pr-open`
 - [ ] Merged linked PR sets `status:merged`
-- [ ] No-PR issue past threshold becomes `status:stalled`
+- [ ] Closed-unmerged linked PR does not leave `status:pr-open`
+- [ ] PR body edit that removes linkage reconciles stale `status:pr-open`
+- [ ] No open linked PR issue past threshold becomes `status:stalled`
+- [ ] Watchdog counts only **open** linked PRs for stall prevention
 - [ ] Watchdog does not duplicate `TASK_STALLED` comments
 - [ ] No auto-merge behavior exists

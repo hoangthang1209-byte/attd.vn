@@ -23,30 +23,24 @@ jobs:
       - name: Scan open issues for stalled approvals
         env:
           GH_TOKEN: ${{ github.token }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
           STALL_THRESHOLD_MINUTES: "45"
         run: |
           source .github/scripts/task-status-common.sh
           ensure_task_status_labels
 
-          mapfile -t open_issues < <(
-            gh issue list \
-              --repo "$GITHUB_REPOSITORY" \
-              --state open \
-              --limit 500 \
-              --json number \
-              --jq '.[].number'
-          )
+          mapfile -t candidate_issues < <(list_stall_watchdog_candidate_issues)
 
           now_epoch="$(date -u +%s)"
           threshold_seconds=$((STALL_THRESHOLD_MINUTES * 60))
 
-          for issue_number in "${open_issues[@]}"; do
-            approved_at="$(latest_build_approved_timestamp "$issue_number")"
+          for issue_number in "${candidate_issues[@]}"; do
+            approved_at="$(latest_authorized_build_approved_timestamp "$issue_number")"
             if [ -z "$approved_at" ]; then
               continue
             fi
 
-            if [ "$(linked_pull_request_count "$issue_number")" -gt 0 ]; then
+            if [ "$(open_linked_pull_request_count "$issue_number")" -gt 0 ]; then
               continue
             fi
 
@@ -56,7 +50,7 @@ jobs:
               continue
             fi
 
-            echo "Issue #${issue_number} is stalled (${age_seconds}s since BUILD_APPROVED, no linked PR)."
+            echo "Issue #${issue_number} is stalled (${age_seconds}s since BUILD_APPROVED, no open linked PR)."
             set_issue_status_label "$issue_number" "status:stalled"
 
             if [ "$(issue_has_stalled_comment "$issue_number")" = "true" ]; then
@@ -65,3 +59,4 @@ jobs:
             fi
 
             gh issue comment "$issue_number" --body "$STALLED_COMMENT"
+          done

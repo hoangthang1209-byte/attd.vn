@@ -4,6 +4,8 @@ set -euo pipefail
 
 readonly STATUS_LABEL_PREFIX="status:"
 readonly STALLED_COMMENT='TASK_STALLED: No linked PR was created within 45 minutes after BUILD_APPROVED.'
+readonly BUILD_APPROVED_AUTHOR="${BUILD_APPROVED_AUTHOR:-${GITHUB_REPOSITORY_OWNER:-}}"
+readonly STALL_THRESHOLD_MINUTES="${STALL_THRESHOLD_MINUTES:-45}"
 
 ensure_task_status_labels() {
   local labels=(
@@ -23,13 +25,6 @@ ensure_task_status_labels() {
   done
 }
 
-issue_has_label_prefix() {
-  local issue_number="$1"
-  local prefix="$2"
-  gh issue view "$issue_number" --json labels --jq \
-    --arg prefix "$prefix" '[.labels[].name | select(startswith($prefix))] | length > 0'
-}
-
 list_issue_status_labels() {
   local issue_number="$1"
   gh issue view "$issue_number" --json labels --jq \
@@ -39,8 +34,6 @@ list_issue_status_labels() {
 set_issue_status_label() {
   local issue_number="$1"
   local target_status="$2"
-
-  ensure_task_status_labels
 
   mapfile -t current_status_labels < <(
     gh issue view "$issue_number" --json labels --jq \
@@ -57,20 +50,26 @@ set_issue_status_label() {
   gh issue edit "$issue_number" --add-label "$target_status" "${remove_args[@]}"
 }
 
-linked_pull_request_count() {
+open_linked_pull_request_count() {
   local issue_number="$1"
   gh pr list \
     --repo "$GITHUB_REPOSITORY" \
     --search "linked:issue-${issue_number}" \
-    --state all \
+    --state open \
     --json number \
     --jq 'length'
 }
 
-latest_build_approved_timestamp() {
+latest_authorized_build_approved_timestamp() {
   local issue_number="$1"
   gh issue view "$issue_number" --json comments --jq \
-    '[.comments[] | select(.body | gsub("^\\s+|\\s+$"; "") == "BUILD_APPROVED") | .createdAt] | max // empty'
+    --arg author "$BUILD_APPROVED_AUTHOR" \
+    '[.comments[]
+      | select(
+          (.body | gsub("^\\s+|\\s+$"; "") == "BUILD_APPROVED")
+          and (.author.login == $author)
+        )
+      | .createdAt] | max // empty'
 }
 
 issue_has_stalled_comment() {
@@ -83,4 +82,60 @@ linked_issue_numbers_from_pr() {
   local pull_number="$1"
   gh pr view "$pull_number" --json closingIssuesReferences --jq \
     '[.closingIssuesReferences[] | select(.number != null) | .number] | unique | .[]'
+}
+
+reconcile_issue_without_open_pr() {
+  local issue_number="$1"
+  local approved_at now_epoch threshold_seconds approved_epoch age_seconds
+
+  if [ "$(open_linked_pull_request_count "$issue_number")" -gt 0 ]; then
+    return 0
+  fi
+
+  approved_at="$(latest_authorized_build_approved_timestamp "$issue_number")"
+  if [ -z "$approved_at" ]; then
+    echo "Issue #${issue_number} has no open linked PR and no authorized BUILD_APPROVED; leaving status unchanged."
+    return 0
+  fi
+
+  now_epoch="$(date -u +%s)"
+  threshold_seconds=$((STALL_THRESHOLD_MINUTES * 60))
+  approved_epoch="$(date -u -d "$approved_at" +%s)"
+  age_seconds=$((now_epoch - approved_epoch))
+
+  if [ "$age_seconds" -ge "$threshold_seconds" ]; then
+    echo "Issue #${issue_number} has no open linked PR and is past stall threshold; setting status:stalled."
+    set_issue_status_label "$issue_number" "status:stalled"
+
+    if [ "$(issue_has_stalled_comment "$issue_number")" != "true" ]; then
+      gh issue comment "$issue_number" --body "$STALLED_COMMENT"
+    fi
+    return 0
+  fi
+
+  echo "Issue #${issue_number} has no open linked PR; reverting to status:approved."
+  set_issue_status_label "$issue_number" "status:approved"
+}
+
+reconcile_stale_pr_open_issues() {
+  mapfile -t stale_candidates < <(
+    gh issue list \
+      --repo "$GITHUB_REPOSITORY" \
+      --state open \
+      --label "status:pr-open" \
+      --json number \
+      --jq '.[].number'
+  )
+
+  for issue_number in "${stale_candidates[@]}"; do
+    reconcile_issue_without_open_pr "$issue_number"
+  done
+}
+
+list_stall_watchdog_candidate_issues() {
+  gh search issues \
+    --repo "$GITHUB_REPOSITORY" \
+    'is:issue is:open (label:"status:approved" OR label:"status:pr-open")' \
+    --json number \
+    --jq '.[].number'
 }
