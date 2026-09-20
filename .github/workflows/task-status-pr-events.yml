@@ -1,0 +1,46 @@
+name: Task Status — Pull Request Events
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, closed]
+
+permissions:
+  issues: write
+  pull-requests: read
+  contents: read
+
+jobs:
+  update-linked-issues:
+    name: Update linked issue status labels
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Transition linked issues
+        env:
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          source .github/scripts/task-status-common.sh
+
+          mapfile -t linked_issues < <(linked_issue_numbers_from_pr "$PULL_NUMBER")
+
+          if [ "${#linked_issues[@]}" -eq 0 ]; then
+            echo "No linked issues found for PR #${PULL_NUMBER}."
+            exit 0
+          fi
+
+          if [ "${{ github.event.action }}" = "closed" ] && [ "$PR_MERGED" = "true" ]; then
+            target_status="status:merged"
+          else
+            target_status="status:pr-open"
+          fi
+
+          for issue_number in "${linked_issues[@]}"; do
+            echo "Setting issue #${issue_number} to ${target_status} (PR #${PULL_NUMBER})."
+            set_issue_status_label "$issue_number" "$target_status"
+          done
