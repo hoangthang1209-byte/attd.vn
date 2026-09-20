@@ -29,7 +29,7 @@ describe("quote number clipboard", () => {
     );
   });
 
-  it("connects temporary Vietnamese feedback to the quote detail control", () => {
+  it("connects temporary Vietnamese feedback and resets it after two seconds", () => {
     const source = readFileSync(
       "src/components/admin/quotes/QuoteDetailView.tsx",
       "utf8",
@@ -38,7 +38,10 @@ describe("quote number clipboard", () => {
     assert.match(source, /copyQuoteNumber\(quote\.quoteNo\)/);
     assert.match(source, /Đã sao chép/);
     assert.match(source, /Không thể sao chép/);
-    assert.match(source, /setTimeout\(\(\) => \{/);
+    assert.match(
+      source,
+      /if \(quoteNumberCopyStatus === "idle"\) return;\s+const timer = window\.setTimeout\(\(\) => \{\s+setQuoteNumberCopyStatus\("idle"\);\s+\}, 2000\);\s+return \(\) => window\.clearTimeout\(timer\);\s+\}, \[quoteNumberCopyStatus\]\);/,
+    );
     assert.match(source, /aria-live="polite"/);
   });
 });
