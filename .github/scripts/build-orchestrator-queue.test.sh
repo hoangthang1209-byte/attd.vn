@@ -57,7 +57,14 @@ issue_has_label() {
 
 issue_is_deferred_repair() {
   local issue_number="$1"
-  [ "$issue_number" = "${MOCK_REPAIR_DEFERRED_ISSUE:-}" ]
+  if [ "$issue_number" = "${MOCK_REPAIR_DEFERRED_ISSUE:-}" ]; then
+    if [ "${MOCK_DEFERRED_HAS_BUILD_APPROVED:-0}" -eq 1 ] \
+      && [ "${MOCK_REPAIR_DEFERRED_HAS_QUEUED_LABEL:-0}" -eq 0 ]; then
+      return 1
+    fi
+    return 0
+  fi
+  return 1
 }
 
 issue_has_orchestrator_build_approved() {
@@ -212,6 +219,26 @@ if [ "$MOCK_BUILD_APPROVED_POSTS" -eq 1 ]; then
   pass "deferred repair without status:queued resumes with exactly one BUILD_APPROVED"
 else
   fail "deferred repair without status:queued resumes with exactly one BUILD_APPROVED (got ${MOCK_BUILD_APPROVED_POSTS})"
+fi
+
+# Issue #54 P2.2: stale defer comment must not re-queue promoted repairs with BUILD_APPROVED.
+MOCK_DEFERRED_ISSUE=""
+MOCK_REPAIR_DEFERRED_ISSUE="8888"
+MOCK_REPAIR_DEFERRED_HAS_QUEUED_LABEL=0
+MOCK_DEFERRED_HAS_BUILD_APPROVED=1
+MOCK_BUILD_APPROVED_POSTS=0
+MOCK_RESTORED_QUEUED_LABELS=0
+MOCK_BUILDING_PROMOTIONS=0
+process_deferred_queue
+if [ "$MOCK_RESTORED_QUEUED_LABELS" -eq 0 ]; then
+  pass "promoted repair with BUILD_APPROVED is not re-queued from stale defer comment"
+else
+  fail "promoted repair with BUILD_APPROVED is not re-queued from stale defer comment (got ${MOCK_RESTORED_QUEUED_LABELS})"
+fi
+if [ "$MOCK_BUILD_APPROVED_POSTS" -eq 0 ]; then
+  pass "promoted repair with BUILD_APPROVED does not emit duplicate BUILD_APPROVED"
+else
+  fail "promoted repair with BUILD_APPROVED does not emit duplicate BUILD_APPROVED (got ${MOCK_BUILD_APPROVED_POSTS})"
 fi
 
 if [ "$failures" -ne 0 ]; then

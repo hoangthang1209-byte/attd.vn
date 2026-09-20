@@ -392,6 +392,12 @@ issue_is_deferred_repair() {
     return 0
   fi
 
+  # A historical ORCHESTRATOR_QUEUE_DEFERRED comment must not keep an issue deferred
+  # after authorized BUILD_APPROVED was posted and the repair was promoted.
+  if issue_has_orchestrator_build_approved "$issue_number"; then
+    return 1
+  fi
+
   gh issue view "$issue_number" --json comments --jq \
     '[.comments[].body | select(contains("ORCHESTRATOR_QUEUE_DEFERRED"))] | length > 0' \
     | grep -qx 'true'
