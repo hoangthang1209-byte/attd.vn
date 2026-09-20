@@ -89,5 +89,12 @@ jobs:
       - name: Tests
         run: npm test --if-present
 
+      - name: Task status shell contract tests
+        if: hashFiles('.github/scripts/task-status-common.sh') != ''
+        run: |
+          bash -n .github/scripts/task-status-common.sh
+          bash -n .github/scripts/test-task-status-contract.sh
+          bash .github/scripts/test-task-status-contract.sh
+
       - name: Production build
         run: npm run build

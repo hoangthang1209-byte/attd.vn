@@ -25,6 +25,27 @@ ensure_task_status_labels() {
   done
 }
 
+is_authorized_build_approved_comment() {
+  local body="$1"
+  local author="$2"
+  local normalized
+
+  normalized="$(printf '%s' "$body" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  [ "$normalized" = "BUILD_APPROVED" ] && [ "$author" = "$BUILD_APPROVED_AUTHOR" ]
+}
+
+closing_issue_numbers_from_pr_body_text() {
+  local body_text="$1"
+
+  if [ -z "$body_text" ]; then
+    return 0
+  fi
+
+  printf '%s' "$body_text" | grep -ioE '(close[ds]?|fixe[ds]?|resolve[ds]?)[[:space:]]+([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+#|#)[0-9]+' \
+    | grep -ioE '[0-9]+$' \
+    | sort -nu
+}
+
 clear_issue_status_labels() {
   local issue_number="$1"
 
@@ -76,20 +97,23 @@ open_linked_pull_request_count() {
 
 latest_authorized_build_approved_timestamp() {
   local issue_number="$1"
-  gh issue view "$issue_number" --json comments --jq \
+  gh api "repos/${GITHUB_REPOSITORY}/issues/${issue_number}/comments" --paginate \
+    --jq \
     --arg author "$BUILD_APPROVED_AUTHOR" \
-    '[.comments[]
+    '[.[]
       | select(
           (.body | gsub("^\\s+|\\s+$"; "") == "BUILD_APPROVED")
-          and (.author.login == $author)
+          and (.user.login == $author)
         )
-      | .createdAt] | max // empty'
+      | .created_at] | max // empty'
 }
 
 issue_has_stalled_comment() {
   local issue_number="$1"
-  gh issue view "$issue_number" --json comments --jq \
-    --arg body "$STALLED_COMMENT" '[.comments[] | select(.body == $body)] | length > 0'
+  gh api "repos/${GITHUB_REPOSITORY}/issues/${issue_number}/comments" --paginate \
+    --jq \
+    --arg body "$STALLED_COMMENT" \
+    '([.[] | select(.body == $body)] | length) > 0'
 }
 
 linked_issue_numbers_from_pr() {
@@ -132,12 +156,30 @@ reconcile_issue_without_open_pr() {
   set_issue_status_label "$issue_number" "status:approved"
 }
 
+reconcile_previously_linked_issues_from_pr_body() {
+  local previous_body="$1"
+  local issue_number
+
+  mapfile -t previously_linked < <(closing_issue_numbers_from_pr_body_text "$previous_body")
+
+  if [ "${#previously_linked[@]}" -eq 0 ]; then
+    echo "No closing issue references in previous PR body; skipping stale reconciliation."
+    return 0
+  fi
+
+  for issue_number in "${previously_linked[@]}"; do
+    echo "Reconciling previously linked issue #${issue_number} after PR body removed closing references."
+    reconcile_issue_without_open_pr "$issue_number"
+  done
+}
+
 reconcile_stale_pr_open_issues() {
   mapfile -t stale_candidates < <(
     gh issue list \
       --repo "$GITHUB_REPOSITORY" \
       --state open \
       --label "status:pr-open" \
+      --limit 500 \
       --json number \
       --jq '.[].number'
   )

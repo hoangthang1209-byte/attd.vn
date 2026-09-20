@@ -55,7 +55,7 @@ Same workflow on `pull_request` `closed` when `merged == true`:
 
 When a linked PR is **closed without merge**, linked issues are reconciled: if no **open** linked PR remains, the issue reverts to `status:approved` or becomes `status:stalled` when the authorized `BUILD_APPROVED` is older than the watchdog threshold. If no authorized `BUILD_APPROVED` exists, all `status:*` labels are removed (neutral fallback); the issue is not marked approved or stalled without evidence.
 
-When a PR body is **edited** and no longer reports closing references, open issues labeled `status:pr-open` with no **open** linked PR are reconciled the same way.
+When a PR body is **edited** and no longer reports closing references, only issues that appeared in the **previous** PR body closing keywords are reconciled (no global stale scan on unrelated PR edits). Title-only or non-body edits skip reconciliation; the 15-minute watchdog still covers broader stale cases.
 
 No production deployment or auto-merge is performed.
 
@@ -80,7 +80,15 @@ If a PR is linked later, the PR workflow transitions the issue to `status:pr-ope
 
 ## Shared scripts
 
-- `.github/scripts/task-status-common.sh` — label bootstrap, status label replacement, linkage helpers.
+- `.github/scripts/task-status-common.sh` — label bootstrap, status label replacement, linkage helpers, paginated comment lookup.
+- `.github/scripts/test-task-status-contract.sh` — scoped regression harness for authorization, closing-keyword parsing, and stale `status:pr-open` reconciliation paths.
+
+Run locally:
+
+```bash
+bash -n .github/scripts/task-status-common.sh
+bash .github/scripts/test-task-status-contract.sh
+```
 
 ## Out of scope (deferred)
 

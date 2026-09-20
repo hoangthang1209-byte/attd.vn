@@ -24,6 +24,7 @@ jobs:
           PULL_NUMBER: ${{ github.event.pull_request.number }}
           PR_ACTION: ${{ github.event.action }}
           PR_MERGED: ${{ github.event.pull_request.merged }}
+          PREVIOUS_PR_BODY: ${{ github.event.changes.body && github.event.changes.body.from || '' }}
           GH_TOKEN: ${{ github.token }}
           BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
           STALL_THRESHOLD_MINUTES: "45"
@@ -34,8 +35,12 @@ jobs:
           mapfile -t linked_issues < <(linked_issue_numbers_from_pr "$PULL_NUMBER")
 
           if [ "$PR_ACTION" = "edited" ] && [ "${#linked_issues[@]}" -eq 0 ]; then
-            echo "PR #${PULL_NUMBER} edited with no closing references; reconciling stale status:pr-open issues."
-            reconcile_stale_pr_open_issues
+            if [ -n "$PREVIOUS_PR_BODY" ]; then
+              echo "PR #${PULL_NUMBER} body edited with no closing references; reconciling previously linked issues."
+              reconcile_previously_linked_issues_from_pr_body "$PREVIOUS_PR_BODY"
+            else
+              echo "PR #${PULL_NUMBER} edited without body change; skipping stale reconciliation."
+            fi
             exit 0
           fi
 

@@ -26,8 +26,8 @@ jobs:
           COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
           BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
         run: |
-          normalized="$(printf '%s' "$COMMENT_BODY" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-          if [ "$normalized" = "BUILD_APPROVED" ] && [ "$COMMENT_AUTHOR" = "$BUILD_APPROVED_AUTHOR" ]; then
+          source .github/scripts/task-status-common.sh
+          if is_authorized_build_approved_comment "$COMMENT_BODY" "$COMMENT_AUTHOR"; then
             echo "authorized=true" >> "$GITHUB_OUTPUT"
           else
             echo "authorized=false" >> "$GITHUB_OUTPUT"
