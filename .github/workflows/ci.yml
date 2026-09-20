@@ -86,6 +86,14 @@ jobs:
       - name: Public token safety check
         run: npm run security:public-token
 
+      - name: Orchestrator shell contract tests
+        run: |
+          bash -n .github/scripts/build-orchestrator-common.sh
+          bash -n .github/scripts/task-status-common.sh
+          for test_script in .github/scripts/build-orchestrator-*.test.sh; do
+            bash "$test_script"
+          done
+
       - name: Tests
         run: npm test --if-present
 

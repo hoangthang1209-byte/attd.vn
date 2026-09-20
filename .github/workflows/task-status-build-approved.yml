@@ -1,0 +1,58 @@
+name: Task Status — BUILD_APPROVED
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  set-approved:
+    name: Set status:approved
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ !github.event.issue.pull_request }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate authorized BUILD_APPROVED comment
+        id: validate
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ github.token }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
+        run: |
+          source .github/scripts/task-status-common.sh
+          source .github/scripts/build-orchestrator-common.sh
+
+          normalized="$(normalize_build_approved_comment "$COMMENT_BODY")"
+          if [ "$normalized" = "BUILD_APPROVED" ] \
+            && is_orchestrator_build_approved_author "$COMMENT_AUTHOR" "$ISSUE_NUMBER"; then
+            echo "authorized=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "authorized=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Apply status label for BUILD_APPROVED
+        if: steps.validate.outputs.authorized == 'true'
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ github.token }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
+        run: |
+          source .github/scripts/task-status-common.sh
+          source .github/scripts/build-orchestrator-common.sh
+          ensure_orchestrator_labels
+
+          if issue_has_label "$ISSUE_NUMBER" "orchestrator:review-repair" \
+            || issue_has_label "$ISSUE_NUMBER" "orchestrator:ci-repair"; then
+            set_issue_status_label "$ISSUE_NUMBER" "status:building"
+          else
+            set_issue_status_label "$ISSUE_NUMBER" "status:approved"
+          fi

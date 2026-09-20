@@ -1,0 +1,33 @@
+name: Build Orchestrator — Queue
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: orchestrator-deferred-queue
+  cancel-in-progress: false
+
+jobs:
+  process-queue:
+    name: Process deferred Builder queue
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resume deferred repair tasks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
+        run: |
+          source .github/scripts/build-orchestrator-common.sh
+          process_deferred_queue
