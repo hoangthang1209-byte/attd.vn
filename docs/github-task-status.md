@@ -2,7 +2,7 @@
 
 Minimal GitHub issue status labels and automation for ATTD Builder task tracking.
 
-Full PR/CI/reviewer lifecycle automation from Phase F1 (#29) is **deferred** to a later phase. This document covers only the F1a foundation.
+Phase F1b adds reviewer/CI repair orchestration on top of this foundation — see `docs/github-build-orchestrator.md`. This document covers the F1a label and watchdog contract.
 
 ## Labels
 
@@ -13,7 +13,10 @@ Full PR/CI/reviewer lifecycle automation from Phase F1 (#29) is **deferred** to 
 | `status:stalled` | Approved task with no linked PR after watchdog threshold |
 | `status:pr-open` | Linked pull request exists and is not merged |
 | `status:merged` | Linked pull request was merged |
-| `risk:low` | Manual or future automation for low-risk tasks |
+| `status:ready-to-merge` | Independent review clean; human merge still required (F1b) |
+| `status:blocked` | Blocked for human attention (F1b) |
+| `status:ci-failed` | Required CI failed on linked PR (F1b) |
+| `risk:low` | Required for F1b auto-orchestration on linked PRs |
 | `risk:medium` | Manual or future automation for medium-risk tasks |
 | `risk:high` | Manual or future automation for high-risk tasks |
 
@@ -82,11 +85,12 @@ If a PR is linked later, the PR workflow transitions the issue to `status:pr-ope
 
 - `.github/scripts/task-status-common.sh` — label bootstrap, status label replacement, linkage helpers.
 
-## Out of scope (deferred)
+## F1b extensions
 
-- CI gate integration
-- Automated PR reviewer assignment
-- Ready-to-merge lifecycle
+Orchestrator workflows may set `status:building` on `orchestrator:*` repair issues when posting automated `BUILD_APPROVED`, and may set `status:ready-to-merge`, `status:blocked`, or `status:ci-failed` per `docs/github-build-orchestrator.md`.
+
+## Out of scope
+
 - Auto-merge
 - Production deployment triggers
 - Cursor or PAT credentials in the repository

@@ -1,0 +1,39 @@
+name: Build Orchestrator — PR Review
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  react-to-reviewer:
+    name: React to ATTD PR Reviewer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Process reviewer summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          if [ "$REVIEW_STATE" != "COMMENTED" ] && [ "$REVIEW_STATE" != "CHANGES_REQUESTED" ]; then
+            echo "Review state ${REVIEW_STATE} is not a final structured review; skipping."
+            exit 0
+          fi
+
+          review_body="$(jq -r '.review.body // ""' "$GITHUB_EVENT_PATH")"
+
+          source .github/scripts/build-orchestrator-common.sh
+          handle_reviewer_outcome "$PULL_NUMBER" "$HEAD_SHA" "$review_body" "$RUN_ID"

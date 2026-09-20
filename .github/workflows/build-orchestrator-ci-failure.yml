@@ -1,0 +1,36 @@
+name: Build Orchestrator — CI Failure
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  react-to-ci-failure:
+    name: React to failed CI on low-risk PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'failure'
+          && github.event.workflow_run.event == 'pull_request'
+          && github.event.workflow_run.pull_requests[0] != null }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Process CI failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
+          PULL_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          source .github/scripts/build-orchestrator-common.sh
+          handle_ci_failure_outcome "$PULL_NUMBER" "$HEAD_SHA" "$RUN_ID"

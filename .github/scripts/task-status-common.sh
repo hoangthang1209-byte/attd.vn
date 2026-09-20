@@ -60,14 +60,28 @@ open_linked_pull_request_count() {
     --jq 'length'
 }
 
+comment_is_build_approved() {
+  local body="$1"
+  [ "$(normalize_build_approved_comment "$body")" = "BUILD_APPROVED" ]
+}
+
+normalize_build_approved_comment() {
+  printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
 latest_authorized_build_approved_timestamp() {
   local issue_number="$1"
-  gh issue view "$issue_number" --json comments --jq \
+  gh issue view "$issue_number" --json comments,labels --jq \
     --arg author "$BUILD_APPROVED_AUTHOR" \
-    '[.comments[]
+    --arg bot "github-actions[bot]" \
+    '([.labels[].name | select(startswith("orchestrator:"))] | length > 0) as $orchestrator_issue |
+    [.comments[]
       | select(
           (.body | gsub("^\\s+|\\s+$"; "") == "BUILD_APPROVED")
-          and (.author.login == $author)
+          and (
+            (.author.login == $author)
+            or ((.author.login == $bot) and $orchestrator_issue)
+          )
         )
       | .createdAt] | max // empty'
 }
