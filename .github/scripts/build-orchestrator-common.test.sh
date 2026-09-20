@@ -89,10 +89,29 @@ read -r p0 p1 p2 p3 <<< "$(parse_review_severity_counts "$(sample_review_ready)"
 assert_eq "ready review P2" "0" "$p2"
 assert_eq "ready review P3" "1" "$p3"
 
-marker="$(orchestrator_idempotency_marker "review" "33" "abc123" "run1")"
-assert_eq "idempotency marker prefix" \
-  "${ORCHESTRATOR_MARKER_PREFIX} review-pr-33-sha-abc123-run-run1" \
+marker="$(orchestrator_idempotency_marker "review" "33" "abc123")"
+assert_eq "idempotency marker is PR+SHA keyed" \
+  "${ORCHESTRATOR_MARKER_PREFIX} review-pr-33-sha-abc123" \
   "$marker"
+
+marker_run1="$(orchestrator_idempotency_marker "review" "33" "abc123")"
+marker_run2="$(orchestrator_idempotency_marker "review" "33" "abc123")"
+assert_eq "duplicate events share stable marker" "$marker_run1" "$marker_run2"
+
+query="$(active_builder_tasks_search_query)"
+if printf '%s' "$query" | grep -q 'status:pr-open'; then
+  echo "FAIL: active builder query must not count status:pr-open"
+  failures=$((failures + 1))
+else
+  echo "PASS: active builder query excludes status:pr-open"
+fi
+
+if printf '%s' "$query" | grep -q 'status:queued'; then
+  echo "PASS: active builder query excludes status:queued"
+else
+  echo "FAIL: active builder query must exclude status:queued"
+  failures=$((failures + 1))
+fi
 
 if [ "$failures" -ne 0 ]; then
   echo "${failures} test(s) failed."

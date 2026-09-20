@@ -59,22 +59,25 @@ At most **one** CI repair trigger per PR head SHA (idempotency marker).
 
 ## Continuous queue
 
-Only **one** active Builder task is allowed at a time (open issues labeled `status:approved`, `status:building`, `status:pr-open`, or `status:ci-failed`, excluding terminal blocked/ready/merged/stalled states).
+Only **one** active Builder task is allowed at a time (open issues labeled `status:approved` or `status:building`, excluding terminal blocked/ready/merged/stalled states and deferred `status:queued` repairs).
+
+Parent tracking labels such as `status:pr-open` and `status:ci-failed` do **not** count as active Builder work.
 
 When a repair would start but another task is active:
 
 - Post `ORCHESTRATOR_QUEUE_DEFERRED` on the repair issue
-- The queue workflow retries deferred issues when the active task finishes
+- Set the repair issue to `status:queued`
+- The queue workflow retries deferred issues when no active Builder work remains
 
 Do not start unrelated feature work while a repair task is active.
 
 ## Idempotency
 
-Every orchestrator action embeds an auditable marker:
+Every orchestrator action embeds an auditable marker keyed on stable PR + head SHA identifiers:
 
-`ORCHESTRATOR_IDEMPOTENCY: <kind>-pr-<number>-sha-<sha>-run-<id>`
+`ORCHESTRATOR_IDEMPOTENCY: <kind>-pr-<number>-sha-<sha>`
 
-Duplicate reviewer events or CI failures for the same PR head SHA do **not** create duplicate repair issues or duplicate `BUILD_APPROVED` comments when the marker already exists.
+Duplicate reviewer events or CI failures for the same PR head SHA do **not** create duplicate repair issues or duplicate `BUILD_APPROVED` comments when the marker already exists (run IDs are not part of dedup identity).
 
 ## BUILD_APPROVED authorization (orchestrator path)
 
@@ -99,6 +102,7 @@ No auto-merge. No production deployment. No paid Cursor on-demand escalation.
 | `status:ready-to-merge` | Review clean (P0/P1/P2 = 0); human merge still required |
 | `status:blocked` | P0/P1 or high-risk gate blocked automation |
 | `status:ci-failed` | Required CI failed on linked PR |
+| `status:queued` | Deferred repair waiting for Builder queue |
 | `orchestrator:review-repair` | Repair issue created from reviewer P2 findings |
 | `orchestrator:ci-repair` | Repair issue created from CI failure |
 
@@ -126,6 +130,7 @@ Orchestration stops without triggering Builder when:
 
 ```bash
 bash .github/scripts/build-orchestrator-common.test.sh
+bash .github/scripts/build-orchestrator-queue.test.sh
 bash -n .github/scripts/build-orchestrator-common.sh
 bash -n .github/scripts/task-status-common.sh
 ```
