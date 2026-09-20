@@ -10,6 +10,10 @@ permissions:
   issues: write
   pull-requests: read
 
+concurrency:
+  group: orchestrator-deferred-queue
+  cancel-in-progress: false
+
 jobs:
   process-queue:
     name: Process deferred Builder queue

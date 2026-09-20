@@ -27,6 +27,10 @@ count_active_builder_tasks() {
   printf '%s' "${MOCK_ACTIVE_BUILDER_COUNT:-0}"
 }
 
+issue_excluded_from_active_builder_count() {
+  return 1
+}
+
 repository_has_idempotency_for_pr_sha() {
   [ "${MOCK_IDEMPOTENCY_HITS:-0}" -gt 0 ]
 }

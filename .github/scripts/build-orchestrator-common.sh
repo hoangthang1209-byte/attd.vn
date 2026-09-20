@@ -7,6 +7,9 @@ ORCHESTRATOR_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${ORCHESTRATOR_SCRIPT_DIR}/task-status-common.sh"
 
 readonly ORCHESTRATOR_MARKER_PREFIX="ORCHESTRATOR_IDEMPOTENCY:"
+readonly ORCHESTRATOR_REPAIR_CLAIM_PREFIX="ORCHESTRATOR_REPAIR_CLAIM:"
+readonly ORCHESTRATOR_REPAIR_TRIGGERED_PREFIX="ORCHESTRATOR_REPAIR_TRIGGERED:"
+readonly ORCHESTRATOR_CI_REPAIR_TRIGGERED_PREFIX="ORCHESTRATOR_CI_REPAIR_TRIGGERED:"
 readonly ORCHESTRATOR_BLOCKED_COMMENT='ORCHESTRATOR_BLOCKED: P0/P1 findings require human attention before auto-repair.'
 readonly ORCHESTRATOR_READY_COMMENT='READY TO MERGE'
 readonly ORCHESTRATOR_QUEUE_DEFERRED_COMMENT='ORCHESTRATOR_QUEUE_DEFERRED: Another Builder task is active; repair trigger deferred.'
@@ -140,31 +143,52 @@ orchestrator_repair_label_for_kind() {
   esac
 }
 
+pull_request_has_terminal_idempotency_for_marker() {
+  local pull_number="$1"
+  local marker="$2"
+
+  gh pr view "$pull_number" --json body,comments --jq \
+    --arg marker "$marker" '
+      def terminal_comment($body):
+        ($body | contains($marker))
+        and (
+          ($body | contains("ORCHESTRATOR_REPAIR_TRIGGERED:"))
+          or ($body | contains("ORCHESTRATOR_CI_REPAIR_TRIGGERED:"))
+          or ($body | contains("ORCHESTRATOR_BLOCKED:"))
+          or ($body | contains("READY TO MERGE"))
+          or ($body | contains("ORCHESTRATOR_QUEUE_DEFERRED:"))
+        )
+        and (
+          ($body | contains("ORCHESTRATOR_REPAIR_CLAIM:") | not)
+          or ($body | contains("ORCHESTRATOR_REPAIR_TRIGGERED:"))
+          or ($body | contains("ORCHESTRATOR_CI_REPAIR_TRIGGERED:"))
+          or ($body | contains("ORCHESTRATOR_BLOCKED:"))
+          or ($body | contains("READY TO MERGE"))
+          or ($body | contains("ORCHESTRATOR_QUEUE_DEFERRED:"))
+        );
+      (.body | terminal_comment(.))
+      or ([.comments[].body | select(terminal_comment(.))] | length > 0)
+    ' | grep -qx 'true'
+}
+
 repository_has_idempotency_for_pr_sha() {
   local kind="$1"
   local pull_number="$2"
   local head_sha="$3"
-  local marker repair_issue count
+  local marker repair_issue
 
   marker="$(orchestrator_idempotency_marker "$kind" "$pull_number" "$head_sha")"
-
-  if pull_request_has_idempotency_marker "$pull_number" "$marker"; then
-    return 0
-  fi
 
   repair_issue="$(find_open_repair_issue_for_pr "$pull_number" "$head_sha" "$kind")"
   if [ -n "$repair_issue" ]; then
     return 0
   fi
 
-  count="$(gh search issues \
-    --repo "$GITHUB_REPOSITORY" \
-    --match title,body,comments \
-    --json number \
-    --jq 'length' \
-    "$marker" 2>/dev/null || printf '0')"
+  if pull_request_has_terminal_idempotency_for_marker "$pull_number" "$marker"; then
+    return 0
+  fi
 
-  [ "${count:-0}" -gt 0 ]
+  return 1
 }
 
 repository_has_idempotency_marker() {
@@ -285,12 +309,42 @@ active_builder_tasks_search_query() {
     'is:issue is:open (label:"status:approved" OR label:"status:building") -label:"status:ready-to-merge" -label:"status:merged" -label:"status:blocked" -label:"status:stalled" -label:"status:queued"'
 }
 
+issue_excluded_from_active_builder_count() {
+  local issue_number="$1"
+
+  issue_has_label "$issue_number" "status:ready-to-merge" \
+    || issue_has_label "$issue_number" "status:merged" \
+    || issue_has_label "$issue_number" "status:blocked" \
+    || issue_has_label "$issue_number" "status:stalled" \
+    || issue_has_label "$issue_number" "status:queued"
+}
+
 count_active_builder_tasks() {
-  gh search issues \
-    --repo "$GITHUB_REPOSITORY" \
-    "$(active_builder_tasks_search_query)" \
-    --json number \
-    --jq 'length'
+  local -A seen=()
+  local active_count=0 issue_number
+
+  for label in "status:approved" "status:building"; do
+    while IFS= read -r issue_number; do
+      [ -z "$issue_number" ] && continue
+      if [ -n "${seen[$issue_number]:-}" ]; then
+        continue
+      fi
+      if issue_excluded_from_active_builder_count "$issue_number"; then
+        continue
+      fi
+      seen[$issue_number]=1
+      active_count=$((active_count + 1))
+    done < <(
+      gh issue list \
+        --repo "$GITHUB_REPOSITORY" \
+        --state open \
+        --label "$label" \
+        --json number \
+        --jq '.[].number' 2>/dev/null || true
+    )
+  done
+
+  printf '%s' "$active_count"
 }
 
 should_defer_for_active_builder_queue() {
@@ -304,28 +358,62 @@ find_open_repair_issue_for_pr() {
   local pull_number="$1"
   local head_sha="$2"
   local kind="$3"
-  local marker repair_label
+  local marker repair_label title_pattern
 
   marker="$(orchestrator_idempotency_marker "$kind" "$pull_number" "$head_sha")"
   repair_label="$(orchestrator_repair_label_for_kind "$kind")"
+  title_pattern="Repair PR #${pull_number} "
 
   gh issue list \
     --repo "$GITHUB_REPOSITORY" \
     --state open \
     --label "$repair_label" \
-    --json number,body \
+    --json number,body,title \
     --jq \
       --arg marker "$marker" \
-      '[.[] | select(.body | contains($marker)) | .number] | first // empty' \
+      --arg title_pattern "$title_pattern" \
+      --arg head_sha "$head_sha" \
+      '[.[] | select(
+          (.body | contains($marker))
+          or (
+            (.title | startswith($title_pattern))
+            and (.body | contains($head_sha))
+          )
+        ) | .number] | first // empty' \
     2>/dev/null || true
 }
 
-claim_pr_idempotency_marker() {
+ensure_repair_issue_for_pr_sha() {
   local pull_number="$1"
-  local marker="$2"
-  local message="$3"
+  local head_sha="$2"
+  local kind="$3"
+  local marker="$4"
+  local repair_label="$5"
+  local source_kind="$6"
+  local parent_issue="${7:-}"
+  local repair_issue=""
 
-  post_unique_pr_comment "$pull_number" "$marker" "$message"
+  repair_issue="$(find_open_repair_issue_for_pr "$pull_number" "$head_sha" "$kind")"
+  if [ -n "$repair_issue" ]; then
+    printf '%s' "$repair_issue"
+    return 0
+  fi
+
+  repair_issue=""
+  if repair_issue="$(create_repair_issue "$pull_number" "$head_sha" "$marker" \
+    "$repair_label" "$source_kind" "$parent_issue")" && [ -n "$repair_issue" ]; then
+    printf '%s' "$repair_issue"
+    return 0
+  fi
+
+  repair_issue="$(find_open_repair_issue_for_pr "$pull_number" "$head_sha" "$kind")"
+  if [ -n "$repair_issue" ]; then
+    printf '%s' "$repair_issue"
+    return 0
+  fi
+
+  echo "Repair issue creation failed for PR #${pull_number} @ ${head_sha}; retry allowed on next event." >&2
+  return 1
 }
 
 issue_has_orchestrator_build_approved() {
@@ -470,26 +558,18 @@ handle_reviewer_outcome() {
       parent_issue="${linked_issues[0]}"
     fi
 
-    claim_pr_idempotency_marker "$pull_number" "$marker" \
-      "ORCHESTRATOR_REPAIR_CLAIM: Reserving idempotency for P2 repair at \`${head_sha:0:7}\`."
-
-    repair_issue="$(find_open_repair_issue_for_pr "$pull_number" "$head_sha" "review")"
-    if [ -z "$repair_issue" ]; then
-      repair_issue="$(create_repair_issue "$pull_number" "$head_sha" "$marker" \
-        "$ORCHESTRATOR_REVIEW_REPAIR_LABEL" "P2" "$parent_issue")"
-      echo "Created repair issue #${repair_issue}."
-    else
-      echo "Reusing repair issue #${repair_issue}."
-    fi
+    repair_issue="$(ensure_repair_issue_for_pr_sha "$pull_number" "$head_sha" "review" \
+      "$marker" "$ORCHESTRATOR_REVIEW_REPAIR_LABEL" "P2" "$parent_issue")"
+    echo "Created/reused repair issue #${repair_issue}."
 
     if should_defer_for_active_builder_queue; then
-      claim_pr_idempotency_marker "$pull_number" "$marker" "$ORCHESTRATOR_QUEUE_DEFERRED_COMMENT"
       if ! issue_is_deferred_repair "$repair_issue"; then
         gh issue comment "$repair_issue" --body "${ORCHESTRATOR_QUEUE_DEFERRED_COMMENT}
 
 ${marker}"
       fi
       set_issue_status_label "$repair_issue" "status:queued"
+      post_unique_pr_comment "$pull_number" "$marker" "$ORCHESTRATOR_QUEUE_DEFERRED_COMMENT"
       return 0
     fi
 
@@ -502,7 +582,7 @@ ${marker}"
     fi
     set_issue_status_label "$repair_issue" "status:building"
     post_unique_pr_comment "$pull_number" "$marker" \
-      "ORCHESTRATOR_REPAIR_TRIGGERED: Created/reused repair issue #${repair_issue} for P2 findings."
+      "${ORCHESTRATOR_REPAIR_TRIGGERED_PREFIX} Created/reused repair issue #${repair_issue} for P2 findings."
     return 0
   fi
 
@@ -538,24 +618,18 @@ handle_ci_failure_outcome() {
     parent_issue="${linked_issues[0]}"
   fi
 
-  claim_pr_idempotency_marker "$pull_number" "$marker" \
-    "ORCHESTRATOR_REPAIR_CLAIM: Reserving idempotency for CI repair at \`${head_sha:0:7}\`."
-
-  repair_issue="$(find_open_repair_issue_for_pr "$pull_number" "$head_sha" "ci")"
-  if [ -z "$repair_issue" ]; then
-    repair_issue="$(create_repair_issue "$pull_number" "$head_sha" "$marker" \
-      "$ORCHESTRATOR_CI_REPAIR_LABEL" "CI" "$parent_issue")"
-    echo "Created CI repair issue #${repair_issue}."
-  fi
+  repair_issue="$(ensure_repair_issue_for_pr_sha "$pull_number" "$head_sha" "ci" \
+    "$marker" "$ORCHESTRATOR_CI_REPAIR_LABEL" "CI" "$parent_issue")"
+  echo "Created/reused CI repair issue #${repair_issue}."
 
   if should_defer_for_active_builder_queue; then
-    claim_pr_idempotency_marker "$pull_number" "$marker" "$ORCHESTRATOR_QUEUE_DEFERRED_COMMENT"
     if ! issue_is_deferred_repair "$repair_issue"; then
       gh issue comment "$repair_issue" --body "${ORCHESTRATOR_QUEUE_DEFERRED_COMMENT}
 
 ${marker}"
     fi
     set_issue_status_label "$repair_issue" "status:queued"
+    post_unique_pr_comment "$pull_number" "$marker" "$ORCHESTRATOR_QUEUE_DEFERRED_COMMENT"
     return 0
   fi
 
@@ -568,7 +642,7 @@ ${marker}"
   fi
   set_issue_status_label "$repair_issue" "status:building"
   post_unique_pr_comment "$pull_number" "$marker" \
-    "ORCHESTRATOR_CI_REPAIR_TRIGGERED: Created/reused repair issue #${repair_issue} for CI failure at \`${head_sha:0:7}\`."
+    "${ORCHESTRATOR_CI_REPAIR_TRIGGERED_PREFIX} Created/reused repair issue #${repair_issue} for CI failure at \`${head_sha:0:7}\`."
 }
 
 process_deferred_queue() {
