@@ -6,7 +6,14 @@ export {
   type GitHubIssuePayload,
   type GitHubPullRequestPayload,
 } from "@/features/automation/automation-github.types";
-export { buildAutomationSearchQueries, HISTORICAL_MERGED_LOOKBACK_DAYS, HISTORICAL_AUTOMATION_STATUS_LABELS } from "@/features/automation/automation-github.queries";
+export {
+  buildAutomationSearchQueries,
+  countGitHubSearchBooleanOperators,
+  findUncoveredAutomationStatusLabels,
+  GITHUB_SEARCH_MAX_BOOLEAN_OPERATORS,
+  HISTORICAL_MERGED_LOOKBACK_DAYS,
+  HISTORICAL_AUTOMATION_STATUS_LABELS,
+} from "@/features/automation/automation-github.queries";
 export {
   fetchAutomationIssues,
   fetchLinkedPullRequestSafe,
