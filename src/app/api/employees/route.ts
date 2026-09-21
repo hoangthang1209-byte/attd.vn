@@ -5,10 +5,7 @@ import {
   listEmployees,
   parseEmployeeRoleInput,
 } from "@/features/employees/employee.service";
-import {
-  isEmployeeRole,
-  SALES_CAPABLE_EMPLOYEE_ROLES,
-} from "@/features/employees/employee-role";
+import { isEmployeeRole } from "@/features/employees/employee-role";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
@@ -23,7 +20,7 @@ export async function GET(req: NextRequest) {
         roleParam && isEmployeeRole(roleParam)
           ? roleParam
           : undefined,
-      roles: salesCapableOnly ? SALES_CAPABLE_EMPLOYEE_ROLES : undefined,
+      salesCapableOnly,
       limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : 100,
     });
     return NextResponse.json(result);

@@ -13,7 +13,10 @@ import {
   LEAD_DETAIL_INCLUDE,
   mapLeadRow,
 } from "@/features/crm/mappers";
-import { buildOwnerChangeAuditContent } from "@/features/crm/lead-intake.utils";
+import {
+  buildOwnerChangeAuditContent,
+  shouldCreateOwnerChangeAudit,
+} from "@/features/crm/lead-intake.utils";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
 import { validateLeadOwnerId, LeadIntakeValidationError } from "@/features/crm/services/lead-intake.service";
 import { getEmployeeById } from "@/features/employees/employee.service";
@@ -633,13 +636,7 @@ export async function updateCrmLead(
     if (data.assignedTo !== undefined) {
       nextAssignedTo = data.assignedTo?.trim() || null;
       if (nextAssignedTo) {
-        const validated = await validateLeadOwnerId(nextAssignedTo);
-        if (!validated) {
-          throw new LeadIntakeValidationError(
-            "Sales owner không hợp lệ hoặc đã ngưng hoạt động."
-          );
-        }
-        nextAssignedTo = validated;
+        nextAssignedTo = await validateLeadOwnerId(nextAssignedTo);
       }
     }
 
@@ -684,7 +681,7 @@ export async function updateCrmLead(
         },
       });
 
-      if (nextAssignedTo !== undefined && nextAssignedTo !== (existing.assignedTo ?? null)) {
+      if (shouldCreateOwnerChangeAudit(existing.assignedTo, nextAssignedTo)) {
         const [prevEmployee, nextEmployee] = await Promise.all([
           existing.assignedTo ? getEmployeeById(existing.assignedTo) : Promise.resolve(null),
           nextAssignedTo ? getEmployeeById(nextAssignedTo) : Promise.resolve(null),
@@ -696,7 +693,7 @@ export async function updateCrmLead(
             title: "Thay đổi phụ trách sales",
             content: buildOwnerChangeAuditContent(
               existing.assignedTo,
-              nextAssignedTo,
+              nextAssignedTo ?? null,
               prevEmployee?.fullName,
               nextEmployee?.fullName
             ),
@@ -719,7 +716,10 @@ export async function updateCrmLead(
     });
 
     return getCrmLeadById(row.id);
-  } catch {
+  } catch (err) {
+    if (err instanceof LeadIntakeValidationError) {
+      throw err;
+    }
     return null;
   }
 }
