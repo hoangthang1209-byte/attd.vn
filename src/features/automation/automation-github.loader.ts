@@ -147,6 +147,7 @@ export type FetchAutomationIssuesResult = {
   openTasksTruncated: boolean;
   openTasksTotalCount: number | null;
   openTasksLoadedCount: number | null;
+  closedHistoryUnavailable: boolean;
 };
 
 function searchItemToIssuePayload(
@@ -239,11 +240,32 @@ export async function fetchAutomationIssues(
   }
 
   const queries = buildAutomationSearchQueries(config.owner, config.repo, statusLabels);
-  const searchResults = await Promise.all(queries.map((query) => searchIssuesPaginated(query)));
-  const openSearchResult = searchResults[0];
+  const [openQuery, closedHistoryQuery] = queries;
+
+  const openSearchResult = await searchIssuesPaginated(openQuery);
+  let closedHistoryUnavailable = false;
+  let closedHistoryResult: SearchIssuesPaginatedResult = {
+    items: [],
+    totalCount: 0,
+    truncated: false,
+  };
+
+  try {
+    closedHistoryResult = await searchIssuesPaginated(closedHistoryQuery);
+  } catch (error) {
+    if (error instanceof AutomationGitHubRequestError) {
+      console.warn(
+        "[fetchAutomationIssues] closed history search failed; continuing with open operational data only",
+        error.status,
+      );
+      closedHistoryUnavailable = true;
+    } else {
+      throw error;
+    }
+  }
 
   const issueMap = new Map<number, GitHubSearchIssuesResponse["items"][number]>();
-  for (const result of searchResults) {
+  for (const result of [openSearchResult, closedHistoryResult]) {
     for (const item of result.items) {
       issueMap.set(item.number, item);
     }
@@ -261,9 +283,10 @@ export async function fetchAutomationIssues(
 
   return {
     issues,
-    openTasksTruncated: openSearchResult?.truncated ?? false,
-    openTasksTotalCount: openSearchResult?.totalCount ?? null,
-    openTasksLoadedCount: openSearchResult?.items.length ?? null,
+    openTasksTruncated: openSearchResult.truncated,
+    openTasksTotalCount: openSearchResult.totalCount,
+    openTasksLoadedCount: openSearchResult.items.length,
+    closedHistoryUnavailable,
   };
 }
 

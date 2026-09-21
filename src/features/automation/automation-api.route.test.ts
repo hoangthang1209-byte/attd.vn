@@ -76,12 +76,12 @@ describe("automation dashboard API GET authorization contract", () => {
     const body = (await response.json()) as {
       configured: boolean;
       summary: {
-        totalOpen: number;
-        building: number;
-        stalledOrFailed: number;
-        needsFix: number;
-        readyToMerge: number;
-        mergedToday: number;
+        totalOpen: { value: number; isPartial: boolean };
+        building: { value: number; isPartial: boolean };
+        stalledOrFailed: { value: number; isPartial: boolean };
+        needsFix: { value: number; isPartial: boolean };
+        readyToMerge: { value: number; isPartial: boolean };
+        mergedToday: { value: number; isPartial: boolean };
       };
       tasks: unknown[];
       fetchedAt: string;
@@ -90,12 +90,12 @@ describe("automation dashboard API GET authorization contract", () => {
     assert.equal(body.configured, false);
     assert.equal(typeof body.fetchedAt, "string");
     assert.deepEqual(body.summary, {
-      totalOpen: 0,
-      building: 0,
-      stalledOrFailed: 0,
-      needsFix: 0,
-      readyToMerge: 0,
-      mergedToday: 0,
+      totalOpen: { value: 0, isPartial: false },
+      building: { value: 0, isPartial: false },
+      stalledOrFailed: { value: 0, isPartial: false },
+      needsFix: { value: 0, isPartial: false },
+      readyToMerge: { value: 0, isPartial: false },
+      mergedToday: { value: 0, isPartial: false },
     });
     assert.deepEqual(body.tasks, []);
   });

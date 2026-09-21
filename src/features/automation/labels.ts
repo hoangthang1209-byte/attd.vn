@@ -84,3 +84,9 @@ export const AUTOMATION_OPEN_FILTER_OPTIONS = [
   { value: "open" as const, label: "Đang mở" },
   { value: "closed" as const, label: "Đã đóng" },
 ];
+
+export const AUTOMATION_PR_STATE_SUFFIX: Record<"merged" | "open" | "closed", string> = {
+  merged: " (đã merge)",
+  open: " (đang mở)",
+  closed: " (đã đóng)",
+};

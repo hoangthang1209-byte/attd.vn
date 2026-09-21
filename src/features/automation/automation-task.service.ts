@@ -72,8 +72,13 @@ async function enrichTaskWithLinkedPullRequest(task: AutomationTask): Promise<Au
 }
 
 async function loadAutomationTasksUncached(): Promise<CachedAutomationPayload> {
-  const { issues, openTasksTruncated, openTasksTotalCount, openTasksLoadedCount } =
-    await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+  const {
+    issues,
+    openTasksTruncated,
+    openTasksTotalCount,
+    openTasksLoadedCount,
+    closedHistoryUnavailable,
+  } = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
 
   const baseTasks = issues
     .map(mapIssueToTask)
@@ -91,6 +96,7 @@ async function loadAutomationTasksUncached(): Promise<CachedAutomationPayload> {
       openTasksTruncated,
       openTasksTotalCount,
       openTasksLoadedCount,
+      closedHistoryUnavailable,
     },
   };
 }
@@ -101,18 +107,20 @@ function getCachedAutomationTasks(repoSlug: string) {
   });
 }
 
+const EMPTY_SUMMARY = {
+  totalOpen: { value: 0, isPartial: false },
+  building: { value: 0, isPartial: false },
+  stalledOrFailed: { value: 0, isPartial: false },
+  needsFix: { value: 0, isPartial: false },
+  readyToMerge: { value: 0, isPartial: false },
+  mergedToday: { value: 0, isPartial: false },
+} as const;
+
 function emptyDashboard(configMessage: string | null): AutomationDashboardResponse {
   return {
     configured: false,
     configMessage,
-    summary: {
-      totalOpen: 0,
-      building: 0,
-      stalledOrFailed: 0,
-      needsFix: 0,
-      readyToMerge: 0,
-      mergedToday: 0,
-    },
+    summary: EMPTY_SUMMARY,
     tasks: [],
     fetchedAt: new Date().toISOString(),
   };
@@ -129,7 +137,7 @@ export async function getAutomationDashboard(): Promise<AutomationDashboardRespo
     return {
       configured: true,
       configMessage: null,
-      summary: buildSummary(tasks),
+      summary: buildSummary(tasks, dataCompleteness),
       tasks,
       fetchedAt: new Date().toISOString(),
       dataCompleteness,
@@ -151,14 +159,7 @@ export async function getAutomationDashboard(): Promise<AutomationDashboardRespo
     return {
       configured: true,
       configMessage: loadError,
-      summary: {
-        totalOpen: 0,
-        building: 0,
-        stalledOrFailed: 0,
-        needsFix: 0,
-        readyToMerge: 0,
-        mergedToday: 0,
-      },
+      summary: EMPTY_SUMMARY,
       tasks: [],
       fetchedAt: new Date().toISOString(),
     };

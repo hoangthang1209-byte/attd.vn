@@ -19,10 +19,12 @@ import {
 } from "@/features/automation/labels";
 import type {
   AutomationDashboardResponse,
+  AutomationSummaryMetric,
   AutomationTask,
   AutomationTaskRisk,
   NormalizedTaskStatus,
 } from "@/features/automation/automation-task.types";
+import { AUTOMATION_PR_STATE_SUFFIX } from "@/features/automation/labels";
 import { formatQuoteDateTime } from "@/features/quotes/format";
 
 type StatusFilter = NormalizedTaskStatus | "all";
@@ -118,7 +120,7 @@ export default function AutomationDashboardClient() {
     <AdminPageShell>
       <PageHeader
         title="Tự động hóa"
-        description="Theo dõi task Builder, trạng thái PR/CI và blocker trực tiếp từ GitHub."
+        description="Theo dõi task tự động hóa, trạng thái PR/CI và blocker trực tiếp từ GitHub."
         actions={
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => void load()}>
             Làm mới
@@ -148,23 +150,27 @@ export default function AutomationDashboardClient() {
           {data.dataCompleteness.openTasksLoadedCount ?? data.tasks.filter((task) => task.isOpen).length}
           {" / "}
           {data.dataCompleteness.openTasksTotalCount ?? "?"} task theo GitHub Search API (giới hạn 1000 kết
-          quả). Các task còn lại không hiển thị.
+          quả). Các task còn lại không hiển thị. Số liệu theo trạng thái (trừ tổng mở) chỉ phản ánh phần
+          đã tải.
+        </p>
+      ) : null}
+
+      {data?.configured && data.dataCompleteness?.closedHistoryUnavailable ? (
+        <p className="admin-error" role="status">
+          Không thể tải lịch sử task đã đóng (merged/superseded 30 ngày). Dữ liệu task đang mở vẫn hiển thị;
+          số liệu &quot;Đã merge hôm nay&quot; có thể thiếu.
         </p>
       ) : null}
 
       {data?.configured ? (
         <>
           <div className="sales-follow-up__stats">
-            <StatCard label="Task đang mở" value={data.summary.totalOpen} />
-            <StatCard label="Đang build" value={data.summary.building} tone="info" />
-            <StatCard
-              label="Stalled / Thất bại"
-              value={data.summary.stalledOrFailed}
-              tone="danger"
-            />
-            <StatCard label="Cần sửa" value={data.summary.needsFix} tone="warning" />
-            <StatCard label="Sẵn sàng merge" value={data.summary.readyToMerge} tone="success" />
-            <StatCard label="Merged hôm nay" value={data.summary.mergedToday} />
+            <StatCard label="Task đang mở" metric={data.summary.totalOpen} />
+            <StatCard label="Đang build" metric={data.summary.building} tone="info" />
+            <StatCard label="Tạm dừng / Thất bại" metric={data.summary.stalledOrFailed} tone="danger" />
+            <StatCard label="Cần sửa" metric={data.summary.needsFix} tone="warning" />
+            <StatCard label="Sẵn sàng merge" metric={data.summary.readyToMerge} tone="success" />
+            <StatCard label="Đã merge hôm nay" metric={data.summary.mergedToday} />
           </div>
 
           <div className="admin-data-toolbar">
@@ -226,11 +232,11 @@ export default function AutomationDashboardClient() {
               <table className="admin-table admin-table--compact sales-follow-up__table">
                 <thead>
                   <tr>
-                    <th>Issue</th>
+                    <th>Vấn đề</th>
                     <th>Tiêu đề</th>
                     <th>Trạng thái</th>
                     <th>Rủi ro</th>
-                    <th>PR</th>
+                    <th>PR liên kết</th>
                     <th>Cập nhật</th>
                     <th>Blocker</th>
                     <th />
@@ -255,7 +261,7 @@ export default function AutomationDashboardClient() {
           )}
 
           <p className="admin-muted">
-            Cập nhật lúc {data.fetchedAt ? formatQuoteDateTime(data.fetchedAt) : "—"} · cache 60 giây
+            Cập nhật lúc {data.fetchedAt ? formatQuoteDateTime(data.fetchedAt) : "—"} · bộ nhớ đệm 60 giây
           </p>
         </>
       ) : null}
@@ -263,19 +269,32 @@ export default function AutomationDashboardClient() {
   );
 }
 
+function formatSummaryMetric(metric: AutomationSummaryMetric): string {
+  if (!metric.isPartial) return String(metric.value);
+  return `${metric.value}+`;
+}
+
 function StatCard({
   label,
-  value,
+  metric,
   tone,
 }: {
   label: string;
-  value: number;
+  metric: AutomationSummaryMetric;
   tone?: "danger" | "warning" | "info" | "success";
 }) {
+  const displayValue = formatSummaryMetric(metric);
+  const partialHint = metric.isPartial ? " (một phần)" : "";
+
   return (
     <article className={`sales-follow-up__stat-card${tone ? ` sales-follow-up__stat-card--${tone}` : ""}`}>
-      <span className="sales-follow-up__stat-label">{label}</span>
-      <strong className="sales-follow-up__stat-value">{value}</strong>
+      <span className="sales-follow-up__stat-label">
+        {label}
+        {partialHint}
+      </span>
+      <strong className="sales-follow-up__stat-value" title={metric.isPartial ? "Số liệu chưa đầy đủ" : undefined}>
+        {displayValue}
+      </strong>
     </article>
   );
 }
@@ -320,10 +339,10 @@ function AutomationTaskRow({
             >
               PR #{task.linkedPullRequest.number}
               {task.linkedPullRequest.merged
-                ? " (merged)"
+                ? AUTOMATION_PR_STATE_SUFFIX.merged
                 : task.linkedPullRequest.state === "open"
-                  ? " (open)"
-                  : " (closed)"}
+                  ? AUTOMATION_PR_STATE_SUFFIX.open
+                  : AUTOMATION_PR_STATE_SUFFIX.closed}
             </Link>
           ) : (
             "—"
@@ -342,7 +361,7 @@ function AutomationTaskRow({
           <td colSpan={8}>
             <div className="admin-panel">
               <p>
-                <strong>GitHub issue:</strong>{" "}
+                <strong>Vấn đề GitHub:</strong>{" "}
                 <Link href={task.githubIssueUrl} target="_blank" rel="noreferrer">
                   #{task.issueNumber}
                 </Link>
@@ -356,16 +375,16 @@ function AutomationTaskRow({
                 </p>
               ) : (
                 <p>
-                  <strong>PR liên kết:</strong> chưa có PR open/linked
+                  <strong>PR liên kết:</strong> chưa có PR liên kết hoặc đang mở
                 </p>
               )}
               <p>
-                <strong>Trạng thái CI/Reviewer:</strong>{" "}
+                <strong>Trạng thái CI / Review:</strong>{" "}
                 {task.statusLabel ?? "—"}
-                {task.status === "ready_to_merge" ? " · READY TO MERGE" : ""}
+                {task.status === "ready_to_merge" ? " · Sẵn sàng merge" : ""}
               </p>
               <p>
-                <strong>Blocker:</strong> {task.blockerReason ?? "Không có"}
+                <strong>Điểm chặn:</strong> {task.blockerReason ?? "Không có"}
               </p>
               <p>
                 <strong>Cập nhật gần nhất:</strong> {formatQuoteDateTime(task.latestUpdateAt)}

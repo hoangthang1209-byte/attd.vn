@@ -33,7 +33,8 @@ Do not grant write, admin, or workflow permissions for this dashboard.
 ## Security
 
 - Route is protected by existing admin authentication middleware.
-- `/api/admin/automation` requires the `dashboard.view` permission, matching the nav entry’s `canViewDashboard` intent.
+- **Page guard:** `/admin/automation` calls `requireAdminPermissionPage("dashboard.view", "/admin/dashboard")` so direct navigation matches nav and API authorization. Authenticated admins without `dashboard.view` are redirected to the dashboard with a forbidden message; unauthenticated access is handled by existing admin middleware.
+- **API guard:** `/api/admin/automation` requires the `dashboard.view` permission via `requireAutomationDashboardPermission()`, matching the nav entry’s `canViewDashboard` intent (401 unauthenticated, 403 without permission).
 - Token is used only in server modules (`server-only`) and the `/api/admin/automation` route.
 - API responses never include the token or other secrets.
 - No GitHub write/merge actions are performed.
@@ -46,7 +47,9 @@ GitHub responses are cached for 60 seconds via Next.js `unstable_cache` to reduc
 
 - Status discovery uses **two consolidated Search API queries** per cache miss (open operational labels + date-bounded closed merged/superseded history), not one query per status label.
 - Search results paginate until complete (100 items per page, up to 10 pages per query). When GitHub Search returns more than 1000 open operational matches, the API surfaces explicit truncation metadata instead of implying completeness.
-- Secondary REST lookups (issue comments, linked PR timeline/detail) use bounded concurrency and tolerate isolated 403/5xx failures with partial data.
+- Secondary REST lookups (issue comments, linked PR timeline/detail) use bounded concurrency and tolerate isolated 403/429/5xx failures with partial data.
+- If the closed merged/superseded history Search query fails but the open operational query succeeds, the dashboard returns open task data with an explicit partial-data warning instead of collapsing entirely. A failure of the primary open-task Search query remains fatal.
+- When open operational tasks exceed the Search API page cap, summary cards use authoritative `openTasksTotalCount` for the total-open metric and mark per-status open buckets as partial (`+` suffix) because exact status totals are unavailable without loading every task.
 - Linked PR resolution uses REST timeline/pull endpoints and runs only for open, non-terminal tasks.
 - Issue comments are fetched via REST; search payloads supply issue metadata directly.
 

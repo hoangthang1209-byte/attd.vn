@@ -3,8 +3,10 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { AUTOMATION_STATUS_GITHUB_LABELS } from "@/features/automation/automation-status.parser";
 import {
   AUTOMATION_COMMENT_FETCH_CONCURRENCY,
+  isRecoverableGitHubLookupError,
   mapWithConcurrency,
 } from "@/features/automation/automation-async-utils";
+import { AutomationGitHubRequestError } from "@/features/automation/automation-github.types";
 import { fetchAutomationIssues } from "@/features/automation/automation-github.loader";
 
 const originalFetch = globalThis.fetch;
@@ -17,6 +19,13 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("automation async utilities", () => {
+  it("treats 403, 429, and 5xx as recoverable lookup errors", () => {
+    assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("forbidden", 403)), true);
+    assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("rate limit", 429)), true);
+    assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("server", 503)), true);
+    assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("not found", 404)), false);
+  });
+
   it("limits concurrent workers", async () => {
     let active = 0;
     let maxActive = 0;

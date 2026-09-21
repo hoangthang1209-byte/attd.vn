@@ -99,4 +99,32 @@ describe("automation GitHub request-count regression", () => {
     assert.equal(result.openTasksTotalCount, 1205);
     assert.equal(result.openTasksLoadedCount, 1000);
   });
+
+  it("continues with open operational data when closed history search fails", async () => {
+    globalThis.fetch = async (input) => {
+      const url = decodeURIComponent(String(input));
+
+      if (url.includes("/search/issues") && url.includes("is:open")) {
+        return jsonResponse({
+          total_count: 2,
+          items: buildSearchItems(2),
+        });
+      }
+
+      if (url.includes("/search/issues") && url.includes("is:closed")) {
+        return jsonResponse({ message: "secondary search failed" }, 503);
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.equal(result.issues.length, 2);
+    assert.equal(result.closedHistoryUnavailable, true);
+    assert.equal(result.openTasksTruncated, false);
+  });
 });

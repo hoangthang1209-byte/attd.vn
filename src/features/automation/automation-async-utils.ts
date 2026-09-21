@@ -27,5 +27,9 @@ export async function mapWithConcurrency<T, R>(
 export function isRecoverableGitHubLookupError(error: unknown): boolean {
   if (!error || typeof error !== "object" || !("status" in error)) return false;
   const status = (error as { status: unknown }).status;
-  return status === 403 || (typeof status === "number" && status >= 500);
+  return (
+    status === 403 ||
+    status === 429 ||
+    (typeof status === "number" && status >= 500)
+  );
 }

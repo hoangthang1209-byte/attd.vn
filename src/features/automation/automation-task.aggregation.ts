@@ -8,6 +8,8 @@ import {
   resolveMergeTimestamp,
 } from "@/features/automation/automation-status.parser";
 import type {
+  AutomationDataCompleteness,
+  AutomationSummaryMetric,
   AutomationTask,
   AutomationTaskSummary,
 } from "@/features/automation/automation-task.types";
@@ -18,7 +20,7 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
   const { status, statusLabel } = parseNormalizedStatus(labelNames);
   const { risk, riskLabel } = parseAutomationRisk(labelNames);
   const comments = issue.comments.map((comment) => ({
-    author: comment.author?.login ?? "unknown",
+    author: comment.author?.login ?? "không xác định",
     body: comment.body,
     createdAt: comment.createdAt,
   }));
@@ -46,19 +48,50 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
   };
 }
 
-export function buildSummary(tasks: AutomationTask[]): AutomationTaskSummary {
+function partialMetric(value: number, isPartial: boolean): AutomationSummaryMetric {
+  return { value, isPartial };
+}
+
+export function buildSummary(
+  tasks: AutomationTask[],
+  dataCompleteness?: AutomationDataCompleteness,
+): AutomationTaskSummary {
+  const openTasksTruncated = dataCompleteness?.openTasksTruncated ?? false;
+  const loadedOpenCount = tasks.filter((task) =>
+    isOpenAutomationTask(task.status, task.isOpen),
+  ).length;
+  const authoritativeOpenTotal =
+    openTasksTruncated && dataCompleteness?.openTasksTotalCount != null
+      ? dataCompleteness.openTasksTotalCount
+      : loadedOpenCount;
+
   return {
-    totalOpen: tasks.filter((task) => isOpenAutomationTask(task.status, task.isOpen)).length,
-    building: tasks.filter((task) => task.isOpen && task.status === "building").length,
-    stalledOrFailed: tasks.filter(
-      (task) =>
-        task.isOpen &&
-        (task.status === "stalled" || task.status === "failed" || task.status === "blocked"),
-    ).length,
-    needsFix: tasks.filter((task) => task.isOpen && task.status === "needs_fix").length,
-    readyToMerge: tasks.filter((task) => task.isOpen && task.status === "ready_to_merge").length,
-    mergedToday: tasks.filter(
-      (task) => task.status === "merged" && task.mergedAt && isMergedToday(task.mergedAt),
-    ).length,
+    totalOpen: partialMetric(authoritativeOpenTotal, openTasksTruncated),
+    building: partialMetric(
+      tasks.filter((task) => task.isOpen && task.status === "building").length,
+      openTasksTruncated,
+    ),
+    stalledOrFailed: partialMetric(
+      tasks.filter(
+        (task) =>
+          task.isOpen &&
+          (task.status === "stalled" || task.status === "failed" || task.status === "blocked"),
+      ).length,
+      openTasksTruncated,
+    ),
+    needsFix: partialMetric(
+      tasks.filter((task) => task.isOpen && task.status === "needs_fix").length,
+      openTasksTruncated,
+    ),
+    readyToMerge: partialMetric(
+      tasks.filter((task) => task.isOpen && task.status === "ready_to_merge").length,
+      openTasksTruncated,
+    ),
+    mergedToday: partialMetric(
+      tasks.filter(
+        (task) => task.status === "merged" && task.mergedAt && isMergedToday(task.mergedAt),
+      ).length,
+      dataCompleteness?.closedHistoryUnavailable ?? false,
+    ),
   };
 }

@@ -50,19 +50,27 @@ export type AutomationTask = {
   recentStatusComments: AutomationStatusComment[];
 };
 
+export type AutomationSummaryMetric = {
+  value: number;
+  /** True when the displayed count is from a loaded subset, not an authoritative total. */
+  isPartial: boolean;
+};
+
 export type AutomationTaskSummary = {
-  totalOpen: number;
-  building: number;
-  stalledOrFailed: number;
-  needsFix: number;
-  readyToMerge: number;
-  mergedToday: number;
+  totalOpen: AutomationSummaryMetric;
+  building: AutomationSummaryMetric;
+  stalledOrFailed: AutomationSummaryMetric;
+  needsFix: AutomationSummaryMetric;
+  readyToMerge: AutomationSummaryMetric;
+  mergedToday: AutomationSummaryMetric;
 };
 
 export type AutomationDataCompleteness = {
   openTasksTruncated: boolean;
   openTasksTotalCount: number | null;
   openTasksLoadedCount: number | null;
+  /** Closed merged/superseded history search failed; open operational data may still be present. */
+  closedHistoryUnavailable?: boolean;
 };
 
 export type AutomationDashboardResponse = {

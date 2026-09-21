@@ -38,7 +38,8 @@ describe("automation task service", () => {
     );
 
     const summary = buildSummary([mergedYesterdayUpdatedToday, mergedTodayTask]);
-    assert.equal(summary.mergedToday, 1);
+    assert.equal(summary.mergedToday.value, 1);
+    assert.equal(summary.mergedToday.isPartial, false);
   });
 
   it("uses linked PR mergedAt when available for mergedToday", () => {
@@ -55,7 +56,7 @@ describe("automation task service", () => {
     task.mergedAt = today.toISOString();
 
     const summary = buildSummary([task]);
-    assert.equal(summary.mergedToday, 1);
+    assert.equal(summary.mergedToday.value, 1);
   });
 
   it("does not count queued tasks in stalledOrFailed", () => {
@@ -76,6 +77,41 @@ describe("automation task service", () => {
     );
 
     const summary = buildSummary([queuedTask, blockedTask]);
-    assert.equal(summary.stalledOrFailed, 1);
+    assert.equal(summary.stalledOrFailed.value, 1);
+  });
+
+  it("uses authoritative openTasksTotalCount for totalOpen when truncated", () => {
+    const openTasks = Array.from({ length: 50 }, (_, index) =>
+      mapIssueToTask(
+        issueFixture({
+          number: index + 1,
+          state: "OPEN",
+          closedAt: null,
+          labels: [{ name: "status:building" }],
+        }),
+      ),
+    );
+
+    const summary = buildSummary(openTasks, {
+      openTasksTruncated: true,
+      openTasksTotalCount: 1205,
+      openTasksLoadedCount: 50,
+    });
+
+    assert.equal(summary.totalOpen.value, 1205);
+    assert.equal(summary.totalOpen.isPartial, true);
+    assert.equal(summary.building.value, 50);
+    assert.equal(summary.building.isPartial, true);
+  });
+
+  it("marks mergedToday partial when closed history is unavailable", () => {
+    const summary = buildSummary([], {
+      openTasksTruncated: false,
+      openTasksTotalCount: 0,
+      openTasksLoadedCount: 0,
+      closedHistoryUnavailable: true,
+    });
+
+    assert.equal(summary.mergedToday.isPartial, true);
   });
 });
