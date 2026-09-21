@@ -8,6 +8,8 @@ import LeadPriorityBadge from "@/components/admin/LeadPriorityBadge";
 import LeadSourceDisplay from "@/components/admin/LeadSourceDisplay";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
 import CrmAddActivityForm from "@/components/admin/crm/CrmAddActivityForm";
+import CrmLeadOwnerSelect from "@/components/admin/crm/CrmLeadOwnerSelect";
+import { isLeadFollowUpOverdue } from "@/features/crm/lead-intake.utils";
 import CrmConvertLeadPanel from "@/components/admin/crm/CrmConvertLeadPanel";
 import CrmLeadTimeline from "@/components/admin/crm/CrmLeadTimeline";
 import CrmProductInterestForm, {
@@ -51,6 +53,7 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
   );
   const [note, setNote] = useState(initialLead.note ?? "");
   const [demand, setDemand] = useState(initialLead.demand ?? "");
+  const [assignedTo, setAssignedTo] = useState(initialLead.assignedTo);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -83,6 +86,7 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
             nextFollowUpAt: nextFollowUpAt ? new Date(nextFollowUpAt).toISOString() : null,
             note,
             demand,
+            assignedTo,
           }),
         });
         return parseAdminJsonResponse(res, (data) => data.lead as CrmLeadRecord);
@@ -174,6 +178,18 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
                 <LeadSourceDisplay lead={lead} />
               </dd>
             </div>
+            {lead.sourceRef && (
+              <div>
+                <dt>Mã nguồn</dt>
+                <dd>{lead.sourceRef}</dd>
+              </div>
+            )}
+            {lead.receivedAt && (
+              <div>
+                <dt>Thời điểm nhận</dt>
+                <dd>{formatCrmDateTime(lead.receivedAt)}</dd>
+              </div>
+            )}
             <div>
               <dt>Giá trị ước tính</dt>
               <dd>{formatCrmCurrency(lead.estimatedValue)}</dd>
@@ -221,7 +237,11 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
                 value={nextFollowUpAt}
                 onChange={(e) => setNextFollowUpAt(e.target.value)}
               />
+              {isLeadFollowUpOverdue(lead.nextFollowUpAt, lead.followUpAt) && (
+                <span className="admin-badge admin-badge--danger">Quá hạn follow-up</span>
+              )}
             </label>
+            <CrmLeadOwnerSelect value={assignedTo} onChange={setAssignedTo} disabled={saving} />
             <label>
               Nhu cầu
               <textarea className="admin-input" rows={3} value={demand} onChange={(e) => setDemand(e.target.value)} />
