@@ -10,6 +10,7 @@ import {
 } from "@/features/automation/automation-status.parser";
 import { createInitialProductionStatus } from "@/features/automation/automation-production";
 import type {
+  AutomationDashboardView,
   AutomationDataCompleteness,
   AutomationSummaryMetric,
   AutomationTask,
@@ -60,7 +61,24 @@ function partialMetric(value: number, isPartial: boolean): AutomationSummaryMetr
 export function buildSummary(
   tasks: AutomationTask[],
   dataCompleteness?: AutomationDataCompleteness,
+  view: AutomationDashboardView = "active",
 ): AutomationTaskSummary {
+  if (view !== "active") {
+    return {
+      totalOpen: partialMetric(0, false),
+      building: partialMetric(0, false),
+      stalledOrFailed: partialMetric(0, false),
+      needsFix: partialMetric(0, false),
+      readyToMerge: partialMetric(0, false),
+      mergedToday: partialMetric(
+        tasks.filter(
+          (task) => task.status === "merged" && task.mergedAt && isMergedToday(task.mergedAt),
+        ).length,
+        dataCompleteness?.historyTruncated ?? false,
+      ),
+    };
+  }
+
   const openTasksTruncated = dataCompleteness?.openTasksTruncated ?? false;
   const loadedOpenCount = tasks.filter((task) =>
     isOpenAutomationTask(task.status, task.isOpen),

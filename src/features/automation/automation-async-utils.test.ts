@@ -103,6 +103,8 @@ describe("automation async utilities", () => {
       assert.ok(maxConcurrentCommentRequests <= AUTOMATION_COMMENT_FETCH_CONCURRENCY);
       assert.equal(result.issues.find((issue) => issue.number === 12)?.comments.length, 0);
       assert.equal(result.issues.find((issue) => issue.number === 11)?.comments.length, 1);
+      assert.equal(result.commentLookupFailedCount, 1);
+      assert.equal(result.recognitionDegraded, true);
     });
 
     it("continues loading when a secondary comment lookup fails with 404", async () => {
@@ -144,6 +146,8 @@ describe("automation async utilities", () => {
       assert.equal(result.issues.length, 2);
       assert.equal(result.issues.find((issue) => issue.number === 22)?.comments.length, 0);
       assert.equal(result.issues.find((issue) => issue.number === 21)?.comments.length, 1);
+      assert.equal(result.commentLookupFailedCount, 1);
+      assert.equal(result.recognitionDegraded, true);
     });
   });
 });

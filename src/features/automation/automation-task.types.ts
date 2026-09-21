@@ -84,7 +84,21 @@ export type AutomationDataCompleteness = {
   openTasksLoadedCount: number | null;
   /** Closed merged/superseded history search failed; open operational data may still be present. */
   closedHistoryUnavailable?: boolean;
+  /** Full-history REST listing hit the configured page cap. */
+  historyTruncated?: boolean;
+  historyLoadedCount?: number | null;
+  historyTotalCount?: number | null;
+  /** TASK_AREA-only recognition stopped before all unlabeled issues were checked. */
+  taskAreaRecognitionTruncated?: boolean;
+  unlabeledCommentChecksSkipped?: number | null;
+  unlabeledCommentChecksPerformed?: number | null;
+  /** Recoverable GitHub comment lookup failures during task recognition. */
+  commentLookupFailedCount?: number;
+  /** Recognition may be incomplete due to truncation and/or comment lookup failures. */
+  recognitionDegraded?: boolean;
 };
+
+export type AutomationDashboardView = "active" | "all" | "completed";
 
 export type AutomationDashboardResponse = {
   configured: boolean;
@@ -92,6 +106,7 @@ export type AutomationDashboardResponse = {
   summary: AutomationTaskSummary;
   tasks: AutomationTask[];
   fetchedAt: string;
+  view: AutomationDashboardView;
   dataCompleteness?: AutomationDataCompleteness;
   productionCommitSha: string | null;
   productionCheckedAt: string | null;
