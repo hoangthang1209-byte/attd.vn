@@ -98,7 +98,7 @@ jobs:
         run: npm test --if-present
 
       - name: Automation platform tests
-        run: node --experimental-test-module-mocks --import tsx --test src/features/automation/*.test.ts
+        run: npx tsx --experimental-test-module-mocks --test src/features/automation/*.test.ts
 
       - name: Production build
         run: npm run build

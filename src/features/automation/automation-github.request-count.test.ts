@@ -314,28 +314,39 @@ describe("automation GitHub request-count regression", () => {
   it("bounds historical TASK_AREA comment lookups on all-tasks view", async () => {
     let commentRequestCount = 0;
     const unlabeledCount = MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS + 25;
+    const prioritizedTaskAreaIssue = unlabeledCount;
 
     globalThis.fetch = async (input) => {
       const url = String(input);
 
       if (url.includes("/repos/") && url.includes("/issues?")) {
+        const page = Number(new URL(url).searchParams.get("page") ?? "1");
+        if (page !== 1) {
+          return jsonResponse([]);
+        }
         return jsonResponse(
-          Array.from({ length: unlabeledCount }, (_, index) => ({
-            number: index + 1,
-            title: `Unlabeled issue ${index + 1}`,
-            state: "open",
-            html_url: `https://github.com/hoangthang1209-byte/attd.vn/issues/${index + 1}`,
-            updated_at: `2026-01-${String((index % 28) + 1).padStart(2, "0")}T12:00:00.000Z`,
-            closed_at: null,
-            labels: [{ name: "bug" }],
-          })),
+          Array.from({ length: unlabeledCount }, (_, index) => {
+            const issueNumber = index + 1;
+            return {
+              number: issueNumber,
+              title: `Unlabeled issue ${issueNumber}`,
+              state: "open",
+              html_url: `https://github.com/hoangthang1209-byte/attd.vn/issues/${issueNumber}`,
+              updated_at:
+                issueNumber === prioritizedTaskAreaIssue
+                  ? "2026-09-21T12:00:00.000Z"
+                  : `2026-01-${String((index % 28) + 1).padStart(2, "0")}T12:00:00.000Z`,
+              closed_at: null,
+              labels: [{ name: "bug" }],
+            };
+          }),
         );
       }
 
       if (url.includes("/comments")) {
         commentRequestCount += 1;
         const issueNumber = Number(url.match(/\/issues\/(\d+)\/comments/)?.[1]);
-        if (issueNumber === 1) {
+        if (issueNumber === prioritizedTaskAreaIssue) {
           return jsonResponse([
             { user: { login: "owner" }, body: "TASK_AREA: Automation Platform", created_at: "2026-01-01T00:00:00Z" },
           ]);
@@ -349,7 +360,7 @@ describe("automation GitHub request-count regression", () => {
     const result = await fetchAutomationIssuesForView("all", AUTOMATION_STATUS_GITHUB_LABELS);
     assert.equal(commentRequestCount, MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS);
     assert.equal(result.issues.length, 1);
-    assert.equal(result.issues[0]?.number, 1);
+    assert.equal(result.issues[0]?.number, prioritizedTaskAreaIssue);
     assert.equal(result.taskAreaRecognitionTruncated, true);
     assert.equal(result.unlabeledCommentChecksSkipped, 25);
     assert.equal(result.unlabeledCommentChecksPerformed, MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS);

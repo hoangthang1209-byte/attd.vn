@@ -330,16 +330,6 @@ function mergeRecognitionCompleteness(
   };
 }
 
-function emptyRecognitionCompleteness(): TaskRecognitionCompleteness {
-  return {
-    taskAreaRecognitionTruncated: false,
-    unlabeledCommentChecksSkipped: 0,
-    unlabeledCommentChecksPerformed: 0,
-    commentLookupFailedCount: 0,
-    recognitionDegraded: false,
-  };
-}
-
 function recognitionFieldsFromCompleteness(
   completeness: TaskRecognitionCompleteness,
 ): Pick<
