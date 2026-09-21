@@ -80,7 +80,7 @@ describe("automation task service", () => {
     assert.equal(summary.stalledOrFailed.value, 1);
   });
 
-  it("uses authoritative openTasksTotalCount for totalOpen when truncated", () => {
+  it("marks totalOpen partial when open search pagination is truncated", () => {
     const openTasks = Array.from({ length: 50 }, (_, index) =>
       mapIssueToTask(
         issueFixture({
@@ -95,11 +95,11 @@ describe("automation task service", () => {
     const summary = buildSummary(openTasks, {
       openTasksTruncated: true,
       openTasksTotalCount: 1205,
-      openTasksLoadedCount: 50,
+      openTasksLoadedCount: 1000,
     });
 
-    assert.equal(summary.totalOpen.value, 1205);
-    assert.equal(summary.totalOpen.isPartial, false);
+    assert.equal(summary.totalOpen.value, 50);
+    assert.equal(summary.totalOpen.isPartial, true);
     assert.equal(summary.building.value, 50);
     assert.equal(summary.building.isPartial, true);
   });

@@ -60,12 +60,8 @@ export function buildSummary(
   const loadedOpenCount = tasks.filter((task) =>
     isOpenAutomationTask(task.status, task.isOpen),
   ).length;
-  const authoritativeOpenTotal =
-    openTasksTruncated && dataCompleteness?.openTasksTotalCount != null
-      ? dataCompleteness.openTasksTotalCount
-      : loadedOpenCount;
-  const totalOpenIsPartial =
-    openTasksTruncated && dataCompleteness?.openTasksTotalCount == null;
+  const authoritativeOpenTotal = loadedOpenCount;
+  const totalOpenIsPartial = openTasksTruncated;
 
   return {
     totalOpen: partialMetric(authoritativeOpenTotal, totalOpenIsPartial),
