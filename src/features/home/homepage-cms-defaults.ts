@@ -23,11 +23,11 @@ export const DEFAULT_PROOF_ITEMS: HomepageProofItemConfig[] = [
 export const DEFAULT_SOURCING_PATHWAYS: HomepageSourcingPathwayConfig[] = [
   {
     slot: "STOCK",
-    microLabel: "Sẵn sàng triển khai",
-    title: "Hàng sẵn kho",
+    microLabel: "Đồng phục & hàng trơn",
+    title: "Đồng phục doanh nghiệp",
     description:
-      "Khám phá các nhóm sản phẩm có sẵn để triển khai đơn hàng nhanh và chủ động hơn.",
-    ctaLabel: "Xem nguồn hàng",
+      "Nguồn hàng áo thun trơn, đồng phục và hàng may mặc cho sự kiện, nhân sự và chương trình thương hiệu.",
+    ctaLabel: "Xem sản phẩm",
     ctaUrl: "/san-pham",
     mediaAssetId: null,
     imageUrl: null,
@@ -38,11 +38,11 @@ export const DEFAULT_SOURCING_PATHWAYS: HomepageSourcingPathwayConfig[] = [
   },
   {
     slot: "OEM",
-    microLabel: "Phát triển theo yêu cầu",
-    title: "Đặt hàng OEM",
+    microLabel: "Phát triển riêng",
+    title: "OEM / phát triển sản phẩm riêng",
     description:
-      "Phát triển sản phẩm theo chất liệu, màu sắc, nhận diện và yêu cầu riêng của thương hiệu.",
-    ctaLabel: "Tìm hiểu OEM",
+      "Phát triển sản phẩm theo chất liệu, màu sắc, nhãn hiệu và yêu cầu riêng của thương hiệu.",
+    ctaLabel: "Tư vấn OEM",
     ctaUrl: "/oem",
     mediaAssetId: null,
     imageUrl: null,
@@ -53,12 +53,12 @@ export const DEFAULT_SOURCING_PATHWAYS: HomepageSourcingPathwayConfig[] = [
   },
   {
     slot: "DEALER",
-    microLabel: "Kết nối nguồn hàng",
-    title: "Nguồn hàng cho đại lý",
+    microLabel: "Quà tặng & merchandise",
+    title: "Quà tặng & hàng sự kiện",
     description:
-      "Tiếp cận danh mục và chính sách phù hợp cho đơn vị kinh doanh, agency và đối tác phân phối.",
-    ctaLabel: "Dành cho đại lý",
-    ctaUrl: "/dai-ly",
+      "Nguồn hàng quà tặng doanh nghiệp, merchandise và hàng tri ân cho sự kiện, khách hàng và nhân viên.",
+    ctaLabel: "Xem nguồn hàng",
+    ctaUrl: "/qua-tang-doanh-nghiep",
     mediaAssetId: null,
     imageUrl: null,
     imageAlt: null,

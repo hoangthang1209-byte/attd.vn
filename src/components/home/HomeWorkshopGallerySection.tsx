@@ -7,6 +7,7 @@ import type {
 
 type Props = {
   gallery: HomepageWorkshopGalleryConfig;
+  embedded?: boolean;
 };
 
 function getVisibleItems(gallery: HomepageWorkshopGalleryConfig): HomepageWorkshopMediaConfig[] {
@@ -61,18 +62,21 @@ function WorkshopCard({
   return <figure className="home-workshop-gallery__card">{content}</figure>;
 }
 
-export default function HomeWorkshopGallerySection({ gallery }: Props) {
+export default function HomeWorkshopGallerySection({ gallery, embedded = false }: Props) {
   const items = getVisibleItems(gallery);
   if (!gallery.enabled || items.length === 0) return null;
 
   const layoutClass = getLayoutClass(gallery, items.length);
 
-  return (
-    <section
-      className={`mp-section mp-section--tight home-workshop-gallery ${layoutClass}`}
-      aria-labelledby="home-workshop-gallery-title"
-    >
-      <div className="container">
+  const className = [
+    embedded ? "home-workshop-gallery--embedded" : "mp-section mp-section--tight",
+    "home-workshop-gallery",
+    layoutClass,
+  ].join(" ");
+
+  const inner = (
+    <div className="container">
+      {!embedded ? (
         <div className="home-workshop-gallery__header">
           <p className="home-workshop-gallery__eyebrow">{gallery.eyebrow}</p>
           <h2 id="home-workshop-gallery-title" className="home-workshop-gallery__title">
@@ -82,13 +86,23 @@ export default function HomeWorkshopGallerySection({ gallery }: Props) {
             <p className="home-workshop-gallery__description">{gallery.description}</p>
           ) : null}
         </div>
+      ) : null}
 
-        <div className="home-workshop-gallery__grid">
-          {items.map((item, index) => (
-            <WorkshopCard key={item.id || item.mediaAssetId} item={item} priority={index === 0} />
-          ))}
-        </div>
+      <div className="home-workshop-gallery__grid">
+        {items.map((item, index) => (
+          <WorkshopCard key={item.id || item.mediaAssetId} item={item} priority={index === 0} />
+        ))}
       </div>
+    </div>
+  );
+
+  if (embedded) {
+    return <div className={className}>{inner}</div>;
+  }
+
+  return (
+    <section className={className} aria-labelledby="home-workshop-gallery-title">
+      {inner}
     </section>
   );
 }

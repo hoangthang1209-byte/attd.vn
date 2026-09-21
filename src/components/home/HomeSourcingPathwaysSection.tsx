@@ -137,13 +137,13 @@ export default function HomeSourcingPathwaysSection({ pathways }: Props) {
     <section className="home-sourcing-pathways" aria-labelledby="home-sourcing-pathways-title">
       <div className="container">
         <header className="home-sourcing-pathways__header">
-          <p className="home-sourcing-pathways__eyebrow">Theo nhu cầu triển khai</p>
+          <p className="home-sourcing-pathways__eyebrow">Giải pháp nguồn hàng</p>
           <h2 id="home-sourcing-pathways-title" className="home-sourcing-pathways__title">
-            Chọn hướng nguồn hàng phù hợp
+            Bạn đang cần gì?
           </h2>
           <p className="home-sourcing-pathways__description">
-            Từ sản phẩm sẵn kho đến phương án phát triển riêng, chọn hướng phù hợp với cách bạn
-            triển khai đơn hàng.
+            Chọn hướng phù hợp với nhu cầu triển khai — từ đồng phục, merchandise đến quà tặng
+            doanh nghiệp và OEM riêng.
           </p>
         </header>
 

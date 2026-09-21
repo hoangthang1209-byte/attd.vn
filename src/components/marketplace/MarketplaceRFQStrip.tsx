@@ -4,10 +4,9 @@ export default function MarketplaceRFQStrip() {
       <div className="container">
         <div className="mp-rfq-inner">
           <div className="mp-rfq-copy">
-            <h2 className="mp-rfq-title">Không thấy sản phẩm phù hợp?</h2>
+            <h2 className="mp-rfq-title">Gửi yêu cầu sourcing</h2>
             <p className="mp-rfq-desc">
-              Gửi yêu cầu nhanh để ATTD tư vấn nhóm sản phẩm, số lượng tối thiểu
-              và lộ trình triển khai phù hợp.
+              Mô tả nhu cầu để nhận tư vấn sản phẩm, MOQ, lead time và báo giá sơ bộ từ ATTD.
             </p>
           </div>
 
