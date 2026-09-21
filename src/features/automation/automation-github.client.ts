@@ -13,7 +13,12 @@ export {
   HISTORICAL_AUTOMATION_STATUS_LABELS,
 } from "@/features/automation/automation-github.queries";
 export {
+  compareCommitsSafe,
   fetchAutomationIssues,
+  fetchAutomationIssuesForView,
   fetchLinkedPullRequestSafe,
+  fetchPullRequestCheckRunsSafe,
+  fetchPullRequestReviewsSafe,
   getAutomationGitHubConfig,
+  listRepoIssuesPaginated,
 } from "@/features/automation/automation-github.loader";

@@ -7,7 +7,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const { getAutomationDashboard } = await import("@/features/automation/automation-task.service");
-    const dashboard = await getAutomationDashboard();
+    const { parseAutomationDashboardView } = await import(
+      "@/features/automation/automation-dashboard-view-parser"
+    );
+    const view = parseAutomationDashboardView(request.nextUrl.searchParams.get("view"));
+    const dashboard = await getAutomationDashboard(view);
     return NextResponse.json(dashboard);
   } catch (error) {
     console.error("[GET /api/admin/automation]", error);

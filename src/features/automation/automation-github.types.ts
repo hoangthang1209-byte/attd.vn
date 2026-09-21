@@ -27,6 +27,7 @@ export type GitHubPullRequestPayload = {
   merged: boolean;
   mergedAt: string | null;
   updatedAt: string;
+  mergeCommitSha: string | null;
 };
 
 export class AutomationGitHubConfigError extends Error {

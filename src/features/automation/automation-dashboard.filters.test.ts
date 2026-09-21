@@ -4,34 +4,12 @@ import {
   collectTaskAreaFilterOptions,
   matchesAutomationTaskFilters,
 } from "@/features/automation/automation-dashboard.filters";
-import type { AutomationTask } from "@/features/automation/automation-task.types";
-
-function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
-  return {
-    issueNumber: 83,
-    title: "Automation dashboard task area",
-    taskArea: "Automation Platform",
-    status: "building",
-    statusLabel: "status:building",
-    risk: "low",
-    riskLabel: "risk:low",
-    linkedPullRequest: null,
-    latestUpdateAt: "2026-09-21T00:00:00.000Z",
-    closedAt: null,
-    mergedAt: null,
-    blockerReason: null,
-    isOpen: true,
-    githubIssueUrl: "https://github.com/hoangthang1209-byte/attd.vn/issues/83",
-    labels: ["status:building", "risk:low"],
-    recentStatusComments: [],
-    ...overrides,
-  };
-}
+import { automationTaskFixture } from "@/features/automation/automation-task.test-fixtures";
 
 describe("automation dashboard filters", () => {
   it("filters tasks by task area", () => {
-    const leadTask = taskFixture({ issueNumber: 71, taskArea: "Lead & Sales" });
-    const uiTask = taskFixture({ issueNumber: 74, taskArea: "Public Website UI" });
+    const leadTask = automationTaskFixture({ issueNumber: 71, taskArea: "Lead & Sales" });
+    const uiTask = automationTaskFixture({ issueNumber: 74, taskArea: "Public Website UI" });
 
     assert.equal(
       matchesAutomationTaskFilters(leadTask, {
@@ -57,7 +35,7 @@ describe("automation dashboard filters", () => {
 
   it("includes task area in search matching", () => {
     assert.equal(
-      matchesAutomationTaskFilters(taskFixture(), {
+      matchesAutomationTaskFilters(automationTaskFixture(), {
         statusFilter: "all",
         riskFilter: "all",
         openFilter: "all",
@@ -70,10 +48,10 @@ describe("automation dashboard filters", () => {
 
   it("collects sorted unique task area filter options", () => {
     const options = collectTaskAreaFilterOptions([
-      taskFixture({ taskArea: "Automation Platform" }),
-      taskFixture({ issueNumber: 71, taskArea: "Lead & Sales" }),
-      taskFixture({ issueNumber: 74, taskArea: "Public Website UI" }),
-      taskFixture({ issueNumber: 75, taskArea: "Lead & Sales" }),
+      automationTaskFixture({ taskArea: "Automation Platform" }),
+      automationTaskFixture({ issueNumber: 71, taskArea: "Lead & Sales" }),
+      automationTaskFixture({ issueNumber: 74, taskArea: "Public Website UI" }),
+      automationTaskFixture({ issueNumber: 75, taskArea: "Lead & Sales" }),
     ]);
 
     assert.deepEqual(options, [

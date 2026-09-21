@@ -27469,6 +27469,7 @@ html.admin-product-edit-dense .admin-catalog-form--onescreen {
 .sales-follow-up__filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .sales-follow-up__title-cell, .sales-follow-up__contact-cell { display: flex; flex-direction: column; gap: 2px; min-width: 140px; }
 .sales-follow-up__area-cell { max-width: 160px; white-space: normal; word-break: break-word; vertical-align: top; }
+.sales-follow-up__production-cell { max-width: 140px; white-space: normal; word-break: break-word; vertical-align: top; }
 .sales-follow-up__channels { font-size: 12px; max-width: 180px; word-break: break-word; }
 .sales-follow-up__reason { font-size: 12px; color: #4b5563; max-width: 200px; }
 
@@ -32774,4 +32775,38 @@ body:has(.blog-article-page) .floating-contact {
     margin-top: 8px;
     font-size: 13px;
   }
+}
+
+/* Automation Task Control Center */
+.automation-task-cards { display: none; }
+.automation-task-table-wrap { margin-top: 8px; }
+
+@media (max-width: 768px) {
+  .automation-task-table-wrap { display: none; }
+  .automation-task-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .automation-task-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .automation-task-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .automation-task-card__title { margin: 0; word-break: break-word; }
+  .automation-task-card__area { margin: 0; }
+  .automation-task-card__meta { margin: 0; font-size: 12px; color: #6b7280; }
+  .automation-task-card__details { margin-top: 4px; }
 }
