@@ -142,6 +142,16 @@ export default function AutomationDashboardClient() {
         <p className="admin-error">{data.configMessage}</p>
       ) : null}
 
+      {data?.configured && data.dataCompleteness?.openTasksTruncated ? (
+        <p className="admin-error" role="status">
+          Dữ liệu task đang mở chưa đầy đủ: đã tải{" "}
+          {data.dataCompleteness.openTasksLoadedCount ?? data.tasks.filter((task) => task.isOpen).length}
+          {" / "}
+          {data.dataCompleteness.openTasksTotalCount ?? "?"} task theo GitHub Search API (giới hạn 1000 kết
+          quả). Các task còn lại không hiển thị.
+        </p>
+      ) : null}
+
       {data?.configured ? (
         <>
           <div className="sales-follow-up__stats">

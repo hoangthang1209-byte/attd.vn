@@ -45,7 +45,8 @@ GitHub responses are cached for 60 seconds via Next.js `unstable_cache` to reduc
 ## GitHub API strategy
 
 - Status discovery uses **two consolidated Search API queries** per cache miss (open operational labels + date-bounded closed merged/superseded history), not one query per status label.
-- Search results paginate until complete (100 items per page, up to 10 pages per query).
+- Search results paginate until complete (100 items per page, up to 10 pages per query). When GitHub Search returns more than 1000 open operational matches, the API surfaces explicit truncation metadata instead of implying completeness.
+- Secondary REST lookups (issue comments, linked PR timeline/detail) use bounded concurrency and tolerate isolated 403/5xx failures with partial data.
 - Linked PR resolution uses REST timeline/pull endpoints and runs only for open, non-terminal tasks.
 - Issue comments are fetched via REST; search payloads supply issue metadata directly.
 

@@ -1,7 +1,7 @@
 import type { AutomationTaskRisk, NormalizedTaskStatus } from "@/features/automation/automation-task.types";
 
 export const AUTOMATION_STATUS_LABELS: Record<NormalizedTaskStatus, string> = {
-  backlog: "Backlog",
+  backlog: "Chưa xử lý",
   approved: "Đã duyệt",
   building: "Đang build",
   pr_open: "PR mở",
@@ -12,7 +12,7 @@ export const AUTOMATION_STATUS_LABELS: Record<NormalizedTaskStatus, string> = {
   failed: "Thất bại",
   blocked: "Bị chặn",
   queued: "Đang chờ",
-  stalled: "Stalled",
+  stalled: "Tạm dừng",
   superseded: "Đã thay thế",
   unknown: "Không xác định",
 };

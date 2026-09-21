@@ -61,9 +61,42 @@ describe("automation GitHub request-count regression", () => {
       return jsonResponse({}, 404);
     };
 
-    const issues = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
-    assert.equal(issues.length, 120);
+    const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.equal(result.issues.length, 120);
     assert.equal(searchCallCount, 3, "expected 2 open-query pages + 1 closed history query");
-    assert.ok(searchCallCount < issues.length);
+    assert.ok(searchCallCount < result.issues.length);
+    assert.equal(result.openTasksTruncated, false);
+    assert.equal(result.openTasksTotalCount, 120);
+    assert.equal(result.openTasksLoadedCount, 120);
+  });
+
+  it("surfaces truncation when open tasks exceed GitHub Search page limit", async () => {
+    globalThis.fetch = async (input) => {
+      const url = decodeURIComponent(String(input));
+
+      if (url.includes("/search/issues") && url.includes("is:open")) {
+        const page = Number(new URL(String(input)).searchParams.get("page") ?? "1");
+        return jsonResponse({
+          total_count: 1205,
+          items: buildSearchItems(100, (page - 1) * 100 + 1),
+        });
+      }
+
+      if (url.includes("/search/issues")) {
+        return jsonResponse({ total_count: 0, items: [] });
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.equal(result.issues.length, 1000);
+    assert.equal(result.openTasksTruncated, true);
+    assert.equal(result.openTasksTotalCount, 1205);
+    assert.equal(result.openTasksLoadedCount, 1000);
   });
 });

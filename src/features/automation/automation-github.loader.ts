@@ -1,5 +1,10 @@
 import { buildAutomationSearchQueries } from "@/features/automation/automation-github.queries";
 import {
+  AUTOMATION_COMMENT_FETCH_CONCURRENCY,
+  isRecoverableGitHubLookupError,
+  mapWithConcurrency,
+} from "@/features/automation/automation-async-utils";
+import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,
   type AutomationGitHubConfig,
@@ -8,6 +13,8 @@ import {
 } from "@/features/automation/automation-github.types";
 
 const DEFAULT_REPO = "hoangthang1209-byte/attd.vn";
+const SEARCH_PAGE_SIZE = 100;
+const MAX_SEARCH_PAGES = 10;
 
 function getAutomationRepo(): string {
   return process.env.GITHUB_AUTOMATION_REPO?.trim() || DEFAULT_REPO;
@@ -129,6 +136,19 @@ type GitHubPullDetailResponse = {
   updated_at: string;
 };
 
+export type SearchIssuesPaginatedResult = {
+  items: GitHubSearchIssuesResponse["items"];
+  totalCount: number;
+  truncated: boolean;
+};
+
+export type FetchAutomationIssuesResult = {
+  issues: GitHubIssuePayload[];
+  openTasksTruncated: boolean;
+  openTasksTotalCount: number | null;
+  openTasksLoadedCount: number | null;
+};
+
 function searchItemToIssuePayload(
   item: GitHubSearchIssuesResponse["items"][number],
   comments: GitHubIssueCommentsResponse,
@@ -149,7 +169,7 @@ function searchItemToIssuePayload(
   };
 }
 
-async function searchIssuesPaginated(query: string): Promise<GitHubSearchIssuesResponse["items"]> {
+export async function searchIssuesPaginated(query: string): Promise<SearchIssuesPaginatedResult> {
   const config = getAutomationGitHubConfig();
   if (!config.configured || !config.owner || !config.repo) {
     throw new AutomationGitHubConfigError(
@@ -158,19 +178,27 @@ async function searchIssuesPaginated(query: string): Promise<GitHubSearchIssuesR
   }
 
   const collected: GitHubSearchIssuesResponse["items"] = [];
+  let totalCount = 0;
   let page = 1;
 
-  while (page <= 10) {
+  while (page <= MAX_SEARCH_PAGES) {
     const encodedQuery = encodeURIComponent(query);
     const search = await githubRequest<GitHubSearchIssuesResponse>(
-      `/search/issues?q=${encodedQuery}&sort=updated&order=desc&per_page=100&page=${page}`,
+      `/search/issues?q=${encodedQuery}&sort=updated&order=desc&per_page=${SEARCH_PAGE_SIZE}&page=${page}`,
     );
+    totalCount = search.total_count;
     collected.push(...search.items.filter((item) => !item.pull_request));
-    if (search.items.length < 100) break;
+    if (search.items.length < SEARCH_PAGE_SIZE) break;
     page += 1;
   }
 
-  return collected;
+  const truncated = totalCount > collected.length;
+
+  return {
+    items: collected,
+    totalCount,
+    truncated,
+  };
 }
 
 async function fetchIssueComments(issueNumber: number): Promise<GitHubIssueCommentsResponse> {
@@ -186,9 +214,23 @@ async function fetchIssueComments(issueNumber: number): Promise<GitHubIssueComme
   );
 }
 
+async function fetchIssueCommentsSafe(issueNumber: number): Promise<GitHubIssueCommentsResponse> {
+  try {
+    return await fetchIssueComments(issueNumber);
+  } catch (error) {
+    if (isRecoverableGitHubLookupError(error)) {
+      console.warn(
+        `[fetchAutomationIssues] comment lookup failed for issue #${issueNumber}; continuing with partial data`,
+      );
+      return [];
+    }
+    throw error;
+  }
+}
+
 export async function fetchAutomationIssues(
   statusLabels: readonly string[],
-): Promise<GitHubIssuePayload[]> {
+): Promise<FetchAutomationIssuesResult> {
   const config = getAutomationGitHubConfig();
   if (!config.configured || !config.owner || !config.repo) {
     throw new AutomationGitHubConfigError(
@@ -198,20 +240,31 @@ export async function fetchAutomationIssues(
 
   const queries = buildAutomationSearchQueries(config.owner, config.repo, statusLabels);
   const searchResults = await Promise.all(queries.map((query) => searchIssuesPaginated(query)));
+  const openSearchResult = searchResults[0];
 
   const issueMap = new Map<number, GitHubSearchIssuesResponse["items"][number]>();
-  for (const items of searchResults) {
-    for (const item of items) {
+  for (const result of searchResults) {
+    for (const item of result.items) {
       issueMap.set(item.number, item);
     }
   }
 
-  return Promise.all(
-    [...issueMap.values()].map(async (item) => {
-      const comments = await fetchIssueComments(item.number);
+  const issueItems = [...issueMap.values()];
+  const issues = await mapWithConcurrency(
+    issueItems,
+    AUTOMATION_COMMENT_FETCH_CONCURRENCY,
+    async (item) => {
+      const comments = await fetchIssueCommentsSafe(item.number);
       return searchItemToIssuePayload(item, comments);
-    }),
+    },
   );
+
+  return {
+    issues,
+    openTasksTruncated: openSearchResult?.truncated ?? false,
+    openTasksTotalCount: openSearchResult?.totalCount ?? null,
+    openTasksLoadedCount: openSearchResult?.items.length ?? null,
+  };
 }
 
 function timelineEventToPullCandidate(event: GitHubTimelineEvent): GitHubPullRequestPayload | null {

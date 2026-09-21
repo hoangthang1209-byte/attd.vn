@@ -59,10 +59,17 @@ export type AutomationTaskSummary = {
   mergedToday: number;
 };
 
+export type AutomationDataCompleteness = {
+  openTasksTruncated: boolean;
+  openTasksTotalCount: number | null;
+  openTasksLoadedCount: number | null;
+};
+
 export type AutomationDashboardResponse = {
   configured: boolean;
   configMessage: string | null;
   summary: AutomationTaskSummary;
   tasks: AutomationTask[];
   fetchedAt: string;
+  dataCompleteness?: AutomationDataCompleteness;
 };
