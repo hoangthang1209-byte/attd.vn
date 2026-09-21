@@ -7,8 +7,10 @@ import {
   isOpenAutomationTask,
   parseAutomationRisk,
   parseNormalizedStatus,
+  parseTaskArea,
   resolveMergeTimestamp,
   shouldFetchLinkedPullRequest,
+  TASK_AREA_UNCLASSIFIED,
 } from "@/features/automation/automation-status.parser";
 
 describe("automation status parser", () => {
@@ -126,5 +128,40 @@ describe("automation status parser", () => {
     assert.equal(isOpenAutomationTask("building", true), true);
     assert.equal(isOpenAutomationTask("queued", true), true);
     assert.equal(isOpenAutomationTask("building", false), false);
+  });
+
+  it("parses TASK_AREA from the latest matching comment", () => {
+    assert.equal(
+      parseTaskArea([
+        { author: "owner", body: "TASK_AREA: Lead & Sales", createdAt: "2026-01-01T00:00:00Z" },
+        { author: "owner", body: "BUILD_APPROVED", createdAt: "2026-01-01T01:00:00Z" },
+        {
+          author: "owner",
+          body: "TASK_AREA: Public Website UI",
+          createdAt: "2026-01-01T02:00:00Z",
+        },
+      ]),
+      "Public Website UI",
+    );
+  });
+
+  it("returns Chưa phân loại when no TASK_AREA marker exists", () => {
+    assert.equal(
+      parseTaskArea([
+        { author: "owner", body: "BUILD_APPROVED", createdAt: "2026-01-01T00:00:00Z" },
+      ]),
+      TASK_AREA_UNCLASSIFIED,
+    );
+    assert.equal(parseTaskArea([]), TASK_AREA_UNCLASSIFIED);
+  });
+
+  it("ignores empty TASK_AREA values", () => {
+    assert.equal(
+      parseTaskArea([
+        { author: "owner", body: "TASK_AREA:", createdAt: "2026-01-01T00:00:00Z" },
+        { author: "owner", body: "TASK_AREA: Automation Platform", createdAt: "2026-01-01T01:00:00Z" },
+      ]),
+      "Automation Platform",
+    );
   });
 });

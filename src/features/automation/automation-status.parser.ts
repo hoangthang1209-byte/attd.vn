@@ -65,6 +65,11 @@ const STATUS_COMMENT_PREFIXES = [
   "BUILD_APPROVED",
 ] as const;
 
+export const TASK_AREA_COMMENT_PREFIX = "TASK_AREA:";
+export const TASK_AREA_UNCLASSIFIED = "Chưa phân loại";
+
+const TASK_AREA_COMMENT_PATTERN = /^TASK_AREA:\s*(.+)$/i;
+
 export function parseNormalizedStatus(labels: string[]): {
   status: NormalizedTaskStatus;
   statusLabel: string | null;
@@ -93,6 +98,22 @@ export function parseAutomationRisk(labels: string[]): {
     risk: RISK_LABEL_TO_NORMALIZED[riskLabel] ?? "unknown",
     riskLabel,
   };
+}
+
+/** Latest TASK_AREA comment wins; missing marker => Chưa phân loại. */
+export function parseTaskArea(comments: AutomationStatusComment[]): string {
+  for (let index = comments.length - 1; index >= 0; index -= 1) {
+    const body = comments[index]?.body.trim();
+    if (!body) continue;
+
+    const match = body.match(TASK_AREA_COMMENT_PATTERN);
+    if (match?.[1]) {
+      const area = match[1].trim();
+      if (area) return area;
+    }
+  }
+
+  return TASK_AREA_UNCLASSIFIED;
 }
 
 export function extractBlockerReason(comments: AutomationStatusComment[]): string | null {
