@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LeadIntakeValidationError } from "@/features/crm/lead-intake.types";
+import { authorizeLeadIntakeRequest } from "@/features/crm/lead-intake.utils";
 import { intakeLeadFromGmail } from "@/features/crm/services/lead-intake.service";
 
 /**
@@ -9,14 +10,12 @@ import { intakeLeadFromGmail } from "@/features/crm/services/lead-intake.service
  * No Gmail credentials in repo — caller supplies normalized payload only.
  */
 function authorizeLeadIntake(req: NextRequest): boolean {
-  const secret =
-    process.env.LEAD_INTAKE_CRON_SECRET?.trim() || process.env.CRON_SECRET?.trim();
-  if (!secret) return false;
-
-  const auth = req.headers.get("authorization") ?? "";
-  const headerSecret = req.headers.get("x-cron-secret") ?? "";
-  const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  return bearer === secret || headerSecret === secret;
+  return authorizeLeadIntakeRequest({
+    authorizationHeader: req.headers.get("authorization"),
+    cronSecretHeader: req.headers.get("x-cron-secret"),
+    configuredSecret:
+      process.env.LEAD_INTAKE_CRON_SECRET?.trim() || process.env.CRON_SECRET?.trim(),
+  });
 }
 
 export async function POST(req: NextRequest) {

@@ -20,6 +20,15 @@ export function isEmployeeRole(value: string): value is EmployeeRole {
   return EMPLOYEE_ROLES.includes(value as EmployeeRole);
 }
 
+/** Roles eligible for CRM lead ownership (matches resolveSalesEmployeeSnapshot). */
+export const SALES_CAPABLE_EMPLOYEE_ROLES: EmployeeRole[] = ["SALES", "ADMIN"];
+
+export function isSalesCapableEmployeeRole(
+  role: EmployeeRole | null | undefined
+): boolean {
+  return !role || SALES_CAPABLE_EMPLOYEE_ROLES.includes(role);
+}
+
 export function employeeRoleLabel(role: EmployeeRole | null | undefined): string {
   if (!role) return "—";
   return EMPLOYEE_ROLE_LABELS[role] ?? role;

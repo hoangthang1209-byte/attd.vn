@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { isSalesCapableEmployeeRole } from "@/features/employees/employee-role";
 import {
+  authorizeLeadIntakeRequest,
   buildIntakeAuditTitle,
   buildOwnerChangeAuditContent,
   isLeadFollowUpOverdue,
   mapIntakeChannelToDefaultSource,
   resolveLeadIntakeIdentity,
+  resolveValidatedSalesOwnerId,
   sanitizeIntakeMetadata,
   sanitizeSourceRef,
 } from "@/features/crm/lead-intake.utils";
@@ -89,5 +92,83 @@ describe("mapOperationalStatusLabel", () => {
     assert.equal(mapOperationalStatusLabel("CONTACTED"), "Đang liên hệ");
     assert.equal(mapOperationalStatusLabel("QUOTED"), "Đã báo giá");
     assert.equal(mapOperationalStatusLabel("WON"), "Chốt");
+  });
+});
+
+describe("resolveValidatedSalesOwnerId", () => {
+  it("accepts active SALES and ADMIN employees", () => {
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-1", isActive: true, role: "SALES" }),
+      "emp-1"
+    );
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-2", isActive: true, role: "ADMIN" }),
+      "emp-2"
+    );
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-3", isActive: true, role: null }),
+      "emp-3"
+    );
+  });
+
+  it("rejects inactive or non-sales-capable employees", () => {
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-4", isActive: false, role: "SALES" }),
+      null
+    );
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-5", isActive: true, role: "PRODUCTION" }),
+      null
+    );
+    assert.equal(resolveValidatedSalesOwnerId(null), null);
+  });
+});
+
+describe("isSalesCapableEmployeeRole", () => {
+  it("allows SALES, ADMIN, and unset role", () => {
+    assert.equal(isSalesCapableEmployeeRole("SALES"), true);
+    assert.equal(isSalesCapableEmployeeRole("ADMIN"), true);
+    assert.equal(isSalesCapableEmployeeRole(null), true);
+    assert.equal(isSalesCapableEmployeeRole("DELIVERY"), false);
+  });
+});
+
+describe("authorizeLeadIntakeRequest", () => {
+  it("accepts bearer or x-cron-secret when configured", () => {
+    assert.equal(
+      authorizeLeadIntakeRequest({
+        authorizationHeader: "Bearer secret-1",
+        cronSecretHeader: null,
+        configuredSecret: "secret-1",
+      }),
+      true
+    );
+    assert.equal(
+      authorizeLeadIntakeRequest({
+        authorizationHeader: null,
+        cronSecretHeader: "secret-1",
+        configuredSecret: "secret-1",
+      }),
+      true
+    );
+  });
+
+  it("rejects missing or mismatched secrets", () => {
+    assert.equal(
+      authorizeLeadIntakeRequest({
+        authorizationHeader: "Bearer wrong",
+        cronSecretHeader: null,
+        configuredSecret: "secret-1",
+      }),
+      false
+    );
+    assert.equal(
+      authorizeLeadIntakeRequest({
+        authorizationHeader: null,
+        cronSecretHeader: null,
+        configuredSecret: null,
+      }),
+      false
+    );
   });
 });

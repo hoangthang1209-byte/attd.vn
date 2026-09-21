@@ -1,6 +1,9 @@
 import type { EmployeeRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { isEmployeeRole } from "@/features/employees/employee-role";
+import {
+  isEmployeeRole,
+  isSalesCapableEmployeeRole,
+} from "@/features/employees/employee-role";
 
 export class EmployeeValidationError extends Error {
   constructor(message: string) {
@@ -207,7 +210,7 @@ export async function resolveSalesEmployeeSnapshot(employeeId: string | null | u
   });
   if (!employee) throw new EmployeeValidationError("Nhân viên tư vấn không hợp lệ.");
   if (!employee.isActive) throw new EmployeeValidationError("Nhân viên đã ngừng hoạt động.");
-  if (employee.role && employee.role !== "SALES" && employee.role !== "ADMIN") {
+  if (!isSalesCapableEmployeeRole(employee.role)) {
     throw new EmployeeValidationError("Nhân viên được chọn không thuộc vai trò kinh doanh.");
   }
 

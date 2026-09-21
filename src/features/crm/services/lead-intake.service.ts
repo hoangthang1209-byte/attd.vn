@@ -4,6 +4,7 @@ import { generateLeadCode } from "@/features/crm/crm-code";
 import {
   buildIntakeAuditTitle,
   resolveLeadIntakeIdentity,
+  resolveValidatedSalesOwnerId,
   sanitizeIntakeMetadata,
   sanitizeSourceRef,
 } from "@/features/crm/lead-intake.utils";
@@ -30,11 +31,45 @@ async function validateAssignedSalesId(
   }
 
   const employee = await getEmployeeById(id);
-  if (!employee || !employee.isActive) {
-    throw new LeadIntakeValidationError("Sales owner không hợp lệ hoặc đã ngưng hoạt động.");
+  const validated = resolveValidatedSalesOwnerId(
+    employee
+      ? { id: employee.id, isActive: employee.isActive, role: employee.role }
+      : null
+  );
+  if (!validated) {
+    if (options.required) {
+      throw new LeadIntakeValidationError(
+        "Sales owner không hợp lệ hoặc đã ngưng hoạt động."
+      );
+    }
+    return null;
   }
 
-  return employee.id;
+  return validated;
+}
+
+async function returnExistingLeadBySourceRef(
+  source: LeadSource,
+  sourceRef: string
+): Promise<LeadIntakeResult | null> {
+  const existing = await prisma.lead.findFirst({
+    where: { source, sourceRef },
+  });
+  if (!existing) return null;
+
+  await prisma.cRMActivity.create({
+    data: {
+      leadId: existing.id,
+      type: "NOTE",
+      title: buildIntakeAuditTitle(false, "source_ref"),
+      content: `Nguồn ${source}, sourceRef=${sourceRef}`,
+    },
+  });
+
+  const lead = await getCrmLeadById(existing.id);
+  if (!lead) return null;
+
+  return { lead, created: false, matchedBy: "source_ref" };
 }
 
 function collectProductInterests(input: NormalizedLeadIntakeInput): CreateProductInterestInput[] {
@@ -57,30 +92,16 @@ export async function intakeLead(
   const receivedAt = input.receivedAt ?? new Date();
 
   if (sourceRef) {
-    const existing = await prisma.lead.findFirst({
-      where: { source, sourceRef },
-    });
-    if (existing) {
-      await prisma.cRMActivity.create({
-        data: {
-          leadId: existing.id,
-          type: "NOTE",
-          title: buildIntakeAuditTitle(false, "source_ref"),
-          content: `Nguồn ${source}, sourceRef=${sourceRef}`,
-        },
-      });
-
-      const lead = await getCrmLeadById(existing.id);
-      if (!lead) return null;
-
-      return { lead, created: false, matchedBy: "source_ref" };
-    }
+    const existingResult = await returnExistingLeadBySourceRef(source, sourceRef);
+    if (existingResult) return existingResult;
   }
 
   const interests = collectProductInterests(input);
   const code = await generateLeadCode();
 
-  const row = await prisma.$transaction(async (tx) => {
+  let row;
+  try {
+    row = await prisma.$transaction(async (tx) => {
     const created = await tx.lead.create({
       data: {
         ...(input.leadId ? { id: input.leadId } : {}),
@@ -149,7 +170,18 @@ export async function intakeLead(
     });
 
     return created;
-  });
+    });
+  } catch (err) {
+    if (
+      sourceRef &&
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      const raced = await returnExistingLeadBySourceRef(source, sourceRef);
+      if (raced) return raced;
+    }
+    throw err;
+  }
 
   const lead = await getCrmLeadById(row.id);
   if (!lead) return null;

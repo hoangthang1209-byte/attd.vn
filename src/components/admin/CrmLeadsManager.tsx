@@ -92,16 +92,73 @@ export default function CrmLeadsManager() {
   }, [search, sourceFilter, statusFilter, priorityFilter, ownerFilter, overdueOnly]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (search.trim()) params.set("search", search.trim());
+        if (sourceFilter) params.set("source", sourceFilter);
+        if (statusFilter) params.set("status", statusFilter);
+        if (priorityFilter) params.set("priority", priorityFilter);
+        if (ownerFilter) params.set("assignedTo", ownerFilter);
+        if (overdueOnly) params.set("overdueOnly", "1");
+
+        const res = await fetch(`/api/crm/leads?${params.toString()}`);
+        const data = await res.json();
+        if (cancelled) return;
+
+        setTableReady(data.tableReady !== false);
+
+        if (!res.ok || data.error) {
+          const detail = data.error ?? data.message ?? `HTTP ${res.status}`;
+          setErrorMessage(detail);
+          setLeads([]);
+          setKpis(null);
+          setValueKpis(null);
+          setReminders(null);
+          setLoadState("error");
+          return;
+        }
+
+        const nextLeads = Array.isArray(data.leads) ? data.leads : [];
+        setLeads(nextLeads);
+        setTotal(typeof data.total === "number" ? data.total : nextLeads.length);
+        setKpis(data.kpis ?? null);
+        setValueKpis(data.valueKpis ?? null);
+        setReminders(data.reminders ?? null);
+        setLoadState(nextLeads.length === 0 ? "empty" : "ready");
+      } catch (err) {
+        if (cancelled) return;
+        const detail = err instanceof Error ? err.message : "Không thể tải dữ liệu CRM";
+        setErrorMessage(detail);
+        setLeads([]);
+        setKpis(null);
+        setValueKpis(null);
+        setReminders(null);
+        setLoadState("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [search, sourceFilter, statusFilter, priorityFilter, ownerFilter, overdueOnly]);
 
   useEffect(() => {
-    void fetch("/api/employees?active=1&limit=200")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data.employees)) setEmployees(data.employees);
-      })
-      .catch(() => undefined);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/employees?active=1&salesCapable=1&limit=200");
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.employees)) {
+          setEmployees(data.employees);
+        }
+      } catch {
+        // ignore employee list failures for lead table rendering
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function applyFilters(event: React.FormEvent) {
