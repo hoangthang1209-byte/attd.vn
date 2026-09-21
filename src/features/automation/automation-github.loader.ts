@@ -240,9 +240,27 @@ export async function fetchAutomationIssues(
   }
 
   const queries = buildAutomationSearchQueries(config.owner, config.repo, statusLabels);
-  const [openQuery, closedHistoryQuery] = queries;
+  const openQueries = queries.filter((query) => query.includes("is:open"));
+  const closedHistoryQuery = queries.find((query) => query.includes("is:closed"));
 
-  const openSearchResult = await searchIssuesPaginated(openQuery);
+  const openSearchResults = await Promise.all(
+    openQueries.map((query) => searchIssuesPaginated(query)),
+  );
+
+  let openTasksTruncated = false;
+  let openTasksTotalCount = 0;
+  const openIssueItems = new Map<number, GitHubSearchIssuesResponse["items"][number]>();
+
+  for (const result of openSearchResults) {
+    openTasksTruncated = openTasksTruncated || result.truncated;
+    openTasksTotalCount += result.totalCount;
+    for (const item of result.items) {
+      openIssueItems.set(item.number, item);
+    }
+  }
+
+  const openTasksLoadedCount = openIssueItems.size;
+
   let closedHistoryUnavailable = false;
   let closedHistoryResult: SearchIssuesPaginatedResult = {
     items: [],
@@ -250,25 +268,28 @@ export async function fetchAutomationIssues(
     truncated: false,
   };
 
-  try {
-    closedHistoryResult = await searchIssuesPaginated(closedHistoryQuery);
-  } catch (error) {
-    if (error instanceof AutomationGitHubRequestError) {
-      console.warn(
-        "[fetchAutomationIssues] closed history search failed; continuing with open operational data only",
-        error.status,
-      );
-      closedHistoryUnavailable = true;
-    } else {
-      throw error;
+  if (closedHistoryQuery) {
+    try {
+      closedHistoryResult = await searchIssuesPaginated(closedHistoryQuery);
+    } catch (error) {
+      if (error instanceof AutomationGitHubRequestError) {
+        console.warn(
+          "[fetchAutomationIssues] closed history search failed; continuing with open operational data only",
+          error.status,
+        );
+        closedHistoryUnavailable = true;
+      } else {
+        throw error;
+      }
     }
   }
 
   const issueMap = new Map<number, GitHubSearchIssuesResponse["items"][number]>();
-  for (const result of [openSearchResult, closedHistoryResult]) {
-    for (const item of result.items) {
-      issueMap.set(item.number, item);
-    }
+  for (const item of openIssueItems.values()) {
+    issueMap.set(item.number, item);
+  }
+  for (const item of closedHistoryResult.items) {
+    issueMap.set(item.number, item);
   }
 
   const issueItems = [...issueMap.values()];
@@ -283,9 +304,9 @@ export async function fetchAutomationIssues(
 
   return {
     issues,
-    openTasksTruncated: openSearchResult.truncated,
-    openTasksTotalCount: openSearchResult.totalCount,
-    openTasksLoadedCount: openSearchResult.items.length,
+    openTasksTruncated,
+    openTasksTotalCount,
+    openTasksLoadedCount,
     closedHistoryUnavailable,
   };
 }
