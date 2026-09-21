@@ -29,6 +29,7 @@ export function isRecoverableGitHubLookupError(error: unknown): boolean {
   const status = (error as { status: unknown }).status;
   return (
     status === 403 ||
+    status === 404 ||
     status === 429 ||
     (typeof status === "number" && status >= 500)
   );

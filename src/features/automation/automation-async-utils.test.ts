@@ -19,11 +19,12 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("automation async utilities", () => {
-  it("treats 403, 429, and 5xx as recoverable lookup errors", () => {
+  it("treats 403, 404, 429, and 5xx as recoverable lookup errors", () => {
     assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("forbidden", 403)), true);
+    assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("not found", 404)), true);
     assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("rate limit", 429)), true);
     assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("server", 503)), true);
-    assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("not found", 404)), false);
+    assert.equal(isRecoverableGitHubLookupError(new AutomationGitHubRequestError("bad request", 400)), false);
   });
 
   it("limits concurrent workers", async () => {
@@ -53,7 +54,7 @@ describe("automation async utilities", () => {
       delete process.env.GITHUB_AUTOMATION_REPO;
     });
 
-    it("continues loading when a secondary comment lookup fails", async () => {
+    it("continues loading when a secondary comment lookup fails with 403", async () => {
       let concurrentCommentRequests = 0;
       let maxConcurrentCommentRequests = 0;
 
@@ -102,6 +103,47 @@ describe("automation async utilities", () => {
       assert.ok(maxConcurrentCommentRequests <= AUTOMATION_COMMENT_FETCH_CONCURRENCY);
       assert.equal(result.issues.find((issue) => issue.number === 12)?.comments.length, 0);
       assert.equal(result.issues.find((issue) => issue.number === 11)?.comments.length, 1);
+    });
+
+    it("continues loading when a secondary comment lookup fails with 404", async () => {
+      globalThis.fetch = async (input) => {
+        const url = decodeURIComponent(String(input));
+
+        if (url.includes("/search/issues")) {
+          if (url.includes("is:open")) {
+            return jsonResponse({
+              total_count: 2,
+              items: [21, 22].map((number) => ({
+                number,
+                title: `Task ${number}`,
+                state: "open" as const,
+                html_url: `https://github.com/hoangthang1209-byte/attd.vn/issues/${number}`,
+                updated_at: "2026-09-20T12:00:00.000Z",
+                closed_at: null,
+                labels: [{ name: "status:building" }],
+              })),
+            });
+          }
+          return jsonResponse({ total_count: 0, items: [] });
+        }
+
+        if (url.includes("/issues/22/comments")) {
+          return jsonResponse({ message: "not found" }, 404);
+        }
+
+        if (url.includes("/comments")) {
+          return jsonResponse([
+            { user: { login: "owner" }, body: "ok", created_at: "2026-09-20T12:00:00.000Z" },
+          ]);
+        }
+
+        return jsonResponse({}, 404);
+      };
+
+      const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+      assert.equal(result.issues.length, 2);
+      assert.equal(result.issues.find((issue) => issue.number === 22)?.comments.length, 0);
+      assert.equal(result.issues.find((issue) => issue.number === 21)?.comments.length, 1);
     });
   });
 });

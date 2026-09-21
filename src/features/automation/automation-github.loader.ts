@@ -299,7 +299,7 @@ function timelineEventToPullCandidate(event: GitHubTimelineEvent): GitHubPullReq
     title: sourceIssue.title,
     url: sourceIssue.html_url,
     state: sourceIssue.state === "open" ? "OPEN" : "CLOSED",
-    merged: sourceIssue.state === "closed",
+    merged: false,
     mergedAt: null,
     updatedAt: sourceIssue.updated_at,
   };
@@ -335,7 +335,11 @@ async function enrichPullRequestWithMergeTimeOrCandidate(
     console.warn(
       `[fetchLinkedPullRequest] pull detail enrichment failed for PR #${candidate.number}; returning timeline candidate without merge metadata`,
     );
-    return candidate;
+    return {
+      ...candidate,
+      merged: false,
+      mergedAt: null,
+    };
   }
 }
 

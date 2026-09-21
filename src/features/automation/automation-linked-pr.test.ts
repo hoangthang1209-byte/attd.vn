@@ -93,7 +93,48 @@ describe("automation linked PR partial failure", () => {
         linkedPullRequest?.url,
         "https://github.com/hoangthang1209-byte/attd.vn/pull/99",
       );
+      assert.equal(linkedPullRequest?.merged, false);
       assert.equal(linkedPullRequest?.mergedAt, null);
     });
   }
+
+  it("does not infer merged from a closed timeline PR when pull detail fails", async () => {
+    const closedUnmergedTimeline = [
+      {
+        event: "cross-referenced",
+        source: {
+          issue: {
+            number: 100,
+            title: "Closed but unmerged PR",
+            html_url: "https://github.com/hoangthang1209-byte/attd.vn/pull/100",
+            state: "closed",
+            updated_at: "2026-09-21T00:00:00.000Z",
+            pull_request: {
+              url: "https://api.github.com/repos/hoangthang1209-byte/attd.vn/pulls/100",
+            },
+          },
+        },
+      },
+    ];
+
+    globalThis.fetch = async (input) => {
+      const url = decodeURIComponent(String(input));
+
+      if (url.includes("/issues/45/timeline")) {
+        return jsonResponse(closedUnmergedTimeline);
+      }
+
+      if (url.includes("/pulls/100")) {
+        return jsonResponse({ message: "pull detail unavailable" }, 404);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const linkedPullRequest = await fetchLinkedPullRequestSafe(45);
+    assert.notEqual(linkedPullRequest, null);
+    assert.equal(linkedPullRequest?.state, "CLOSED");
+    assert.equal(linkedPullRequest?.merged, false);
+    assert.equal(linkedPullRequest?.mergedAt, null);
+  });
 });
