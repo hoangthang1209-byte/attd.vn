@@ -5,6 +5,7 @@ import {
   isOpenAutomationTask,
   parseAutomationRisk,
   parseNormalizedStatus,
+  parseTaskArea,
   resolveMergeTimestamp,
 } from "@/features/automation/automation-status.parser";
 import type {
@@ -28,6 +29,7 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
   return {
     issueNumber: issue.number,
     title: issue.title,
+    taskArea: parseTaskArea(comments),
     status,
     statusLabel,
     risk,

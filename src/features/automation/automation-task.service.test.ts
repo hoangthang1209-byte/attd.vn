@@ -136,4 +136,25 @@ describe("automation task service", () => {
 
     assert.equal(summary.mergedToday.isPartial, true);
   });
+
+  it("maps taskArea from TASK_AREA comments into the task DTO", () => {
+    const task = mapIssueToTask(
+      issueFixture({
+        comments: [
+          {
+            author: { login: "owner" },
+            body: "TASK_AREA: Lead & Sales",
+            createdAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      }),
+    );
+
+    assert.equal(task.taskArea, "Lead & Sales");
+  });
+
+  it("defaults taskArea to Chưa phân loại when marker is missing", () => {
+    const task = mapIssueToTask(issueFixture());
+    assert.equal(task.taskArea, "Chưa phân loại");
+  });
 });

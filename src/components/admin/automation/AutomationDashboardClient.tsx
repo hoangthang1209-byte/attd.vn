@@ -9,6 +9,14 @@ import {
   PageHeader,
 } from "@/components/admin/AdminUi";
 import {
+  collectTaskAreaFilterOptions,
+  matchesAutomationTaskFilters,
+  type AutomationOpenFilter,
+  type AutomationRiskFilter,
+  type AutomationStatusFilter,
+  type AutomationTaskAreaFilter,
+} from "@/features/automation/automation-dashboard.filters";
+import {
   AUTOMATION_OPEN_FILTER_OPTIONS,
   AUTOMATION_RISK_BADGE_CLASS,
   AUTOMATION_RISK_FILTER_OPTIONS,
@@ -21,45 +29,18 @@ import type {
   AutomationDashboardResponse,
   AutomationSummaryMetric,
   AutomationTask,
-  AutomationTaskRisk,
-  NormalizedTaskStatus,
 } from "@/features/automation/automation-task.types";
 import { AUTOMATION_PR_STATE_SUFFIX } from "@/features/automation/labels";
 import { formatQuoteDateTime } from "@/features/quotes/format";
-
-type StatusFilter = NormalizedTaskStatus | "all";
-type RiskFilter = AutomationTaskRisk | "all";
-type OpenFilter = "all" | "open" | "closed";
-
-function matchesFilters(
-  task: AutomationTask,
-  statusFilter: StatusFilter,
-  riskFilter: RiskFilter,
-  openFilter: OpenFilter,
-  searchQuery: string,
-): boolean {
-  if (statusFilter !== "all" && task.status !== statusFilter) return false;
-  if (riskFilter !== "all" && task.risk !== riskFilter) return false;
-  if (openFilter === "open" && !task.isOpen) return false;
-  if (openFilter === "closed" && task.isOpen) return false;
-
-  const query = searchQuery.trim().toLowerCase();
-  if (!query) return true;
-
-  return (
-    task.title.toLowerCase().includes(query) ||
-    String(task.issueNumber).includes(query) ||
-    (task.blockerReason?.toLowerCase().includes(query) ?? false)
-  );
-}
 
 export default function AutomationDashboardClient() {
   const [data, setData] = useState<AutomationDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
-  const [openFilter, setOpenFilter] = useState<OpenFilter>("open");
+  const [statusFilter, setStatusFilter] = useState<AutomationStatusFilter>("all");
+  const [riskFilter, setRiskFilter] = useState<AutomationRiskFilter>("all");
+  const [openFilter, setOpenFilter] = useState<AutomationOpenFilter>("open");
+  const [taskAreaFilter, setTaskAreaFilter] = useState<AutomationTaskAreaFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
 
@@ -89,12 +70,23 @@ export default function AutomationDashboardClient() {
     };
   }, [load]);
 
+  const taskAreaFilterOptions = useMemo(
+    () => (data ? collectTaskAreaFilterOptions(data.tasks) : []),
+    [data],
+  );
+
   const filteredTasks = useMemo(() => {
     if (!data) return [];
     return data.tasks.filter((task) =>
-      matchesFilters(task, statusFilter, riskFilter, openFilter, searchQuery),
+      matchesAutomationTaskFilters(task, {
+        statusFilter,
+        riskFilter,
+        openFilter,
+        taskAreaFilter,
+        searchQuery,
+      }),
     );
-  }, [data, openFilter, riskFilter, searchQuery, statusFilter]);
+  }, [data, openFilter, riskFilter, searchQuery, statusFilter, taskAreaFilter]);
 
   if (loading) {
     return <AdminLoadingState label="Đang tải dashboard automation…" />;
@@ -185,7 +177,7 @@ export default function AutomationDashboardClient() {
             <select
               className="admin-select"
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              onChange={(event) => setStatusFilter(event.target.value as AutomationStatusFilter)}
               aria-label="Lọc theo trạng thái"
             >
               {AUTOMATION_STATUS_FILTER_OPTIONS.map((option) => (
@@ -197,10 +189,23 @@ export default function AutomationDashboardClient() {
             <select
               className="admin-select"
               value={riskFilter}
-              onChange={(event) => setRiskFilter(event.target.value as RiskFilter)}
+              onChange={(event) => setRiskFilter(event.target.value as AutomationRiskFilter)}
               aria-label="Lọc theo rủi ro"
             >
               {AUTOMATION_RISK_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="admin-select"
+              value={taskAreaFilter}
+              onChange={(event) => setTaskAreaFilter(event.target.value as AutomationTaskAreaFilter)}
+              aria-label="Lọc theo mảng"
+            >
+              <option value="all">Tất cả mảng</option>
+              {taskAreaFilterOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -233,6 +238,7 @@ export default function AutomationDashboardClient() {
                 <thead>
                   <tr>
                     <th>Vấn đề</th>
+                    <th>Mảng</th>
                     <th>Tiêu đề</th>
                     <th>Trạng thái</th>
                     <th>Rủi ro</th>
@@ -316,6 +322,9 @@ function AutomationTaskRow({
             #{task.issueNumber}
           </Link>
         </td>
+        <td className="sales-follow-up__area-cell" title={task.taskArea}>
+          <span className="admin-status-badge admin-status-badge--neutral">{task.taskArea}</span>
+        </td>
         <td className="sales-follow-up__title-cell">
           <strong>{task.title}</strong>
         </td>
@@ -358,8 +367,11 @@ function AutomationTaskRow({
       </tr>
       {expanded ? (
         <tr>
-          <td colSpan={8}>
+          <td colSpan={9}>
             <div className="admin-panel">
+              <p>
+                <strong>Mảng:</strong> {task.taskArea}
+              </p>
               <p>
                 <strong>Vấn đề GitHub:</strong>{" "}
                 <Link href={task.githubIssueUrl} target="_blank" rel="noreferrer">

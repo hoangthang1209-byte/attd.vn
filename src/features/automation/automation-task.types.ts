@@ -35,6 +35,8 @@ export type AutomationStatusComment = {
 export type AutomationTask = {
   issueNumber: number;
   title: string;
+  /** Parsed from latest TASK_AREA issue comment, or Chưa phân loại when absent. */
+  taskArea: string;
   status: NormalizedTaskStatus;
   statusLabel: string | null;
   risk: AutomationTaskRisk;
