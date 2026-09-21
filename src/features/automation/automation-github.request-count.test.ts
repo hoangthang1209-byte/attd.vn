@@ -12,7 +12,11 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function buildSearchItems(count: number, startNumber = 1) {
+function buildSearchItems(
+  count: number,
+  startNumber = 1,
+  label = "status:building",
+) {
   return Array.from({ length: count }, (_, index) => ({
     number: startNumber + index,
     title: `Task ${startNumber + index}`,
@@ -20,7 +24,7 @@ function buildSearchItems(count: number, startNumber = 1) {
     html_url: `https://github.com/hoangthang1209-byte/attd.vn/issues/${startNumber + index}`,
     updated_at: "2026-09-20T12:00:00.000Z",
     closed_at: null,
-    labels: [{ name: "status:building" }],
+    labels: [{ name: label }],
   }));
 }
 
@@ -63,15 +67,92 @@ describe("automation GitHub request-count regression", () => {
 
     const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
     assert.equal(result.issues.length, 120);
-    assert.ok(
-      searchCallCount >= 3,
-      "expected grouped open-query pagination plus one closed history query",
-    );
+    assert.equal(searchCallCount, 3, "expected 2 open-query pages + 1 closed history query");
     assert.ok(searchCallCount < result.issues.length);
     assert.equal(result.openTasksTruncated, false);
-    assert.notEqual(result.openTasksTotalCount, null);
-    assert.ok((result.openTasksTotalCount ?? 0) >= 120);
+    assert.equal(result.openTasksTotalCount, 120);
     assert.equal(result.openTasksLoadedCount, 120);
+  });
+
+  it("filters non-automation open issues after the label-free search", async () => {
+    globalThis.fetch = async (input) => {
+      const url = decodeURIComponent(String(input));
+
+      if (url.includes("/search/issues") && url.includes("is:open")) {
+        return jsonResponse({
+          total_count: 4,
+          items: [
+            ...buildSearchItems(2, 71, "status:pr-open"),
+            ...buildSearchItems(1, 100, "enhancement"),
+            ...buildSearchItems(1, 200, "bug"),
+          ],
+        });
+      }
+
+      if (url.includes("/search/issues")) {
+        return jsonResponse({ total_count: 0, items: [] });
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.deepEqual(
+      result.issues.map((issue) => issue.number).sort((left, right) => left - right),
+      [71, 72],
+    );
+    assert.equal(result.openTasksTotalCount, 4);
+    assert.equal(result.openTasksLoadedCount, 4);
+  });
+
+  it("retains recent closed merged issues and filters unrelated closed issues", async () => {
+    globalThis.fetch = async (input) => {
+      const url = decodeURIComponent(String(input));
+
+      if (url.includes("/search/issues") && url.includes("is:open")) {
+        return jsonResponse({ total_count: 0, items: [] });
+      }
+
+      if (url.includes("/search/issues") && url.includes("is:closed")) {
+        return jsonResponse({
+          total_count: 3,
+          items: [
+            {
+              number: 50,
+              title: "Merged automation task",
+              state: "closed" as const,
+              html_url: "https://github.com/hoangthang1209-byte/attd.vn/issues/50",
+              updated_at: "2026-09-20T12:00:00.000Z",
+              closed_at: "2026-09-19T12:00:00.000Z",
+              labels: [{ name: "status:merged" }],
+            },
+            {
+              number: 99,
+              title: "Closed bug",
+              state: "closed" as const,
+              html_url: "https://github.com/hoangthang1209-byte/attd.vn/issues/99",
+              updated_at: "2026-09-20T12:00:00.000Z",
+              closed_at: "2026-09-19T12:00:00.000Z",
+              labels: [{ name: "bug" }],
+            },
+          ],
+        });
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.equal(result.issues.length, 1);
+    assert.equal(result.issues[0]?.number, 50);
   });
 
   it("surfaces truncation when open tasks exceed GitHub Search page limit", async () => {
@@ -100,8 +181,7 @@ describe("automation GitHub request-count regression", () => {
     const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
     assert.equal(result.issues.length, 1000);
     assert.equal(result.openTasksTruncated, true);
-    assert.notEqual(result.openTasksTotalCount, null);
-    assert.ok((result.openTasksTotalCount ?? 0) >= 1205);
+    assert.equal(result.openTasksTotalCount, 1205);
     assert.equal(result.openTasksLoadedCount, 1000);
   });
 

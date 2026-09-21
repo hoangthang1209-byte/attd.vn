@@ -45,11 +45,12 @@ GitHub responses are cached for 60 seconds via Next.js `unstable_cache` to reduc
 
 ## GitHub API strategy
 
-- Status discovery uses a **small fixed set of grouped Search API queries** per cache miss (open operational labels split to stay within GitHub’s five boolean-operator limit + date-bounded closed merged/superseded history), not one query per status label.
-- Search results paginate until complete (100 items per page, up to 10 pages per query). When GitHub Search returns more than 1000 open operational matches, the API surfaces explicit truncation metadata instead of implying completeness.
+- Status discovery uses **two label-free Search API queries** per cache miss: all open issues, plus date-bounded recently closed issues. GitHub Search does not reliably support OR between `label:` qualifiers, so automation status labels are applied **client-side** after search.
+- Open results are filtered to issues carrying one of the configured operational `status:*` labels. Closed history results are filtered to `status:merged` and `status:superseded`.
+- Search results paginate until complete (100 items per page, up to 10 pages per query). When GitHub Search returns more than 1000 open repo issues, truncation metadata reflects the search page cap; summary cards mark open counts as partial because exact automation totals are unavailable without scanning every open issue.
 - Secondary REST lookups (issue comments, linked PR timeline/detail) use bounded concurrency and tolerate isolated 403/429/5xx failures with partial data.
 - If the closed merged/superseded history Search query fails but the open operational query succeeds, the dashboard returns open task data with an explicit partial-data warning instead of collapsing entirely. A failure of the primary open-task Search query remains fatal.
-- When open operational tasks exceed the Search API page cap, summary cards use authoritative `openTasksTotalCount` for the total-open metric and mark per-status open buckets as partial (`+` suffix) because exact status totals are unavailable without loading every task.
+- When open search pagination is truncated, summary cards use loaded automation task counts and mark open metrics as partial (`+` suffix) because additional automation tasks may exist beyond the loaded search pages.
 - Linked PR resolution uses REST timeline/pull endpoints and runs only for open, non-terminal tasks.
 - Issue comments are fetched via REST; search payloads supply issue metadata directly.
 

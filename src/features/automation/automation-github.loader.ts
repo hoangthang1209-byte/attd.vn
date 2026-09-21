@@ -1,4 +1,8 @@
-import { buildAutomationSearchQueries } from "@/features/automation/automation-github.queries";
+import {
+  buildAutomationSearchQueries,
+  hasAnyAutomationStatusLabel,
+  HISTORICAL_AUTOMATION_STATUS_LABELS,
+} from "@/features/automation/automation-github.queries";
 import {
   AUTOMATION_COMMENT_FETCH_CONCURRENCY,
   isRecoverableGitHubLookupError,
@@ -240,26 +244,18 @@ export async function fetchAutomationIssues(
   }
 
   const queries = buildAutomationSearchQueries(config.owner, config.repo, statusLabels);
-  const openQueries = queries.filter((query) => query.includes("is:open"));
-  const closedHistoryQuery = queries.find((query) => query.includes("is:closed"));
+  const [openQuery, closedHistoryQuery] = queries;
 
-  const openSearchResults = await Promise.all(
-    openQueries.map((query) => searchIssuesPaginated(query)),
-  );
+  const openSearchResult = await searchIssuesPaginated(openQuery);
+  const openTasksTruncated = openSearchResult.truncated;
+  const openTasksTotalCount = openSearchResult.totalCount;
+  const openTasksLoadedCount = openSearchResult.items.length;
 
-  let openTasksTruncated = false;
-  let openTasksTotalCount = 0;
   const openIssueItems = new Map<number, GitHubSearchIssuesResponse["items"][number]>();
-
-  for (const result of openSearchResults) {
-    openTasksTruncated = openTasksTruncated || result.truncated;
-    openTasksTotalCount += result.totalCount;
-    for (const item of result.items) {
-      openIssueItems.set(item.number, item);
-    }
+  for (const item of openSearchResult.items) {
+    if (!hasAnyAutomationStatusLabel(item, statusLabels)) continue;
+    openIssueItems.set(item.number, item);
   }
-
-  const openTasksLoadedCount = openIssueItems.size;
 
   let closedHistoryUnavailable = false;
   let closedHistoryResult: SearchIssuesPaginatedResult = {
@@ -268,19 +264,17 @@ export async function fetchAutomationIssues(
     truncated: false,
   };
 
-  if (closedHistoryQuery) {
-    try {
-      closedHistoryResult = await searchIssuesPaginated(closedHistoryQuery);
-    } catch (error) {
-      if (error instanceof AutomationGitHubRequestError) {
-        console.warn(
-          "[fetchAutomationIssues] closed history search failed; continuing with open operational data only",
-          error.status,
-        );
-        closedHistoryUnavailable = true;
-      } else {
-        throw error;
-      }
+  try {
+    closedHistoryResult = await searchIssuesPaginated(closedHistoryQuery);
+  } catch (error) {
+    if (error instanceof AutomationGitHubRequestError) {
+      console.warn(
+        "[fetchAutomationIssues] closed history search failed; continuing with open operational data only",
+        error.status,
+      );
+      closedHistoryUnavailable = true;
+    } else {
+      throw error;
     }
   }
 
@@ -289,6 +283,7 @@ export async function fetchAutomationIssues(
     issueMap.set(item.number, item);
   }
   for (const item of closedHistoryResult.items) {
+    if (!hasAnyAutomationStatusLabel(item, HISTORICAL_AUTOMATION_STATUS_LABELS)) continue;
     issueMap.set(item.number, item);
   }
 

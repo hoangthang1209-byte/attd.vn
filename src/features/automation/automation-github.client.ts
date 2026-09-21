@@ -8,9 +8,7 @@ export {
 } from "@/features/automation/automation-github.types";
 export {
   buildAutomationSearchQueries,
-  countGitHubSearchBooleanOperators,
-  findUncoveredAutomationStatusLabels,
-  GITHUB_SEARCH_MAX_BOOLEAN_OPERATORS,
+  hasAnyAutomationStatusLabel,
   HISTORICAL_MERGED_LOOKBACK_DAYS,
   HISTORICAL_AUTOMATION_STATUS_LABELS,
 } from "@/features/automation/automation-github.queries";
