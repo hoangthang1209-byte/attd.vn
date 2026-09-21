@@ -1,4 +1,4 @@
-import type { EmployeeRole } from "@prisma/client";
+import type { EmployeeRole, Prisma } from "@prisma/client";
 
 export const EMPLOYEE_ROLES: EmployeeRole[] = [
   "SALES",
@@ -27,6 +27,13 @@ export function isSalesCapableEmployeeRole(
   role: EmployeeRole | null | undefined
 ): boolean {
   return !role || SALES_CAPABLE_EMPLOYEE_ROLES.includes(role);
+}
+
+/** Prisma filter matching isSalesCapableEmployeeRole (SALES, ADMIN, legacy null). */
+export function buildSalesCapableEmployeeRoleFilter(): Prisma.EmployeeWhereInput {
+  return {
+    OR: [{ role: { in: SALES_CAPABLE_EMPLOYEE_ROLES } }, { role: null }],
+  };
 }
 
 export function employeeRoleLabel(role: EmployeeRole | null | undefined): string {

@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { generateLeadCode } from "@/features/crm/crm-code";
 import {
   buildIntakeAuditTitle,
+  isIntakeSourceRefUniqueViolation,
+  resolveExplicitSalesOwnerId,
   resolveLeadIntakeIdentity,
-  resolveValidatedSalesOwnerId,
   sanitizeIntakeMetadata,
   sanitizeSourceRef,
 } from "@/features/crm/lead-intake.utils";
@@ -31,21 +32,12 @@ async function validateAssignedSalesId(
   }
 
   const employee = await getEmployeeById(id);
-  const validated = resolveValidatedSalesOwnerId(
+  return resolveExplicitSalesOwnerId(
+    id,
     employee
       ? { id: employee.id, isActive: employee.isActive, role: employee.role }
       : null
   );
-  if (!validated) {
-    if (options.required) {
-      throw new LeadIntakeValidationError(
-        "Sales owner không hợp lệ hoặc đã ngưng hoạt động."
-      );
-    }
-    return null;
-  }
-
-  return validated;
 }
 
 async function returnExistingLeadBySourceRef(
@@ -172,11 +164,7 @@ export async function intakeLead(
     return created;
     });
   } catch (err) {
-    if (
-      sourceRef &&
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2002"
-    ) {
+    if (isIntakeSourceRefUniqueViolation(err, sourceRef)) {
       const raced = await returnExistingLeadBySourceRef(source, sourceRef);
       if (raced) return raced;
     }

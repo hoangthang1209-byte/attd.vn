@@ -130,27 +130,20 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   if (raw.note !== undefined) {
     patch.note = typeof raw.note === "string" ? raw.note : null;
   }
-  if (raw.assignedTo !== undefined) {
-    const ownerRaw = typeof raw.assignedTo === "string" ? raw.assignedTo.trim() : "";
-    if (ownerRaw) {
-      const validated = await validateLeadOwnerId(ownerRaw);
-      if (!validated) {
-        return NextResponse.json(
-          { message: "Sales owner không hợp lệ hoặc đã ngưng hoạt động." },
-          { status: 400 }
-        );
-      }
-      patch.assignedTo = validated;
-    } else {
-      patch.assignedTo = null;
-    }
-  }
-
-  if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });
-  }
-
   try {
+    if (raw.assignedTo !== undefined) {
+      const ownerRaw = typeof raw.assignedTo === "string" ? raw.assignedTo.trim() : "";
+      if (ownerRaw) {
+        patch.assignedTo = await validateLeadOwnerId(ownerRaw);
+      } else {
+        patch.assignedTo = null;
+      }
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });
+    }
+
     const lead = await updateCrmLead(id, patch);
     if (!lead) {
       return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });

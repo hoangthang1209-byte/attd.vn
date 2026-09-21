@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { isSalesCapableEmployeeRole } from "@/features/employees/employee-role";
+import { Prisma } from "@prisma/client";
+import { LeadIntakeValidationError } from "@/features/crm/lead-intake.types";
 import {
   authorizeLeadIntakeRequest,
   buildIntakeAuditTitle,
   buildOwnerChangeAuditContent,
+  isIntakeSourceRefUniqueViolation,
   isLeadFollowUpOverdue,
   mapIntakeChannelToDefaultSource,
+  resolveExplicitSalesOwnerId,
   resolveLeadIntakeIdentity,
   resolveValidatedSalesOwnerId,
   sanitizeIntakeMetadata,
   sanitizeSourceRef,
+  shouldCreateOwnerChangeAudit,
 } from "@/features/crm/lead-intake.utils";
 import { mapOperationalStatusLabel } from "@/features/crm/services/lead-intake.service";
 
@@ -96,6 +101,14 @@ describe("mapOperationalStatusLabel", () => {
 });
 
 describe("resolveValidatedSalesOwnerId", () => {
+  it("treats explicit empty owner as unassigned", () => {
+    assert.equal(resolveValidatedSalesOwnerId(null), null);
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "  ", isActive: true, role: "SALES" }),
+      null
+    );
+  });
+
   it("accepts active SALES and ADMIN employees", () => {
     assert.equal(
       resolveValidatedSalesOwnerId({ id: "emp-1", isActive: true, role: "SALES" }),
@@ -130,6 +143,63 @@ describe("isSalesCapableEmployeeRole", () => {
     assert.equal(isSalesCapableEmployeeRole("ADMIN"), true);
     assert.equal(isSalesCapableEmployeeRole(null), true);
     assert.equal(isSalesCapableEmployeeRole("DELIVERY"), false);
+  });
+});
+
+describe("resolveExplicitSalesOwnerId", () => {
+  it("allows omitted or empty owner assignment", () => {
+    assert.equal(resolveExplicitSalesOwnerId(null, null), null);
+    assert.equal(resolveExplicitSalesOwnerId("", null), null);
+    assert.equal(resolveExplicitSalesOwnerId("   ", null), null);
+  });
+
+  it("accepts explicit valid sales-capable owner", () => {
+    assert.equal(
+      resolveExplicitSalesOwnerId("emp-1", { id: "emp-1", isActive: true, role: "SALES" }),
+      "emp-1"
+    );
+    assert.equal(
+      resolveExplicitSalesOwnerId("emp-2", { id: "emp-2", isActive: true, role: null }),
+      "emp-2"
+    );
+  });
+
+  it("rejects explicit invalid owner instead of silently unassigning", () => {
+    assert.throws(
+      () => resolveExplicitSalesOwnerId("emp-bad", null),
+      (err: unknown) => err instanceof LeadIntakeValidationError
+    );
+    assert.throws(
+      () =>
+        resolveExplicitSalesOwnerId("emp-prod", {
+          id: "emp-prod",
+          isActive: true,
+          role: "PRODUCTION",
+        }),
+      (err: unknown) => err instanceof LeadIntakeValidationError
+    );
+  });
+});
+
+describe("isIntakeSourceRefUniqueViolation", () => {
+  it("detects Prisma P2002 unique constraint races for sourceRef intake", () => {
+    const err = new Prisma.PrismaClientKnownRequestError("Unique constraint", {
+      code: "P2002",
+      clientVersion: "6.9.0",
+    });
+    assert.equal(isIntakeSourceRefUniqueViolation(err, "msg-1"), true);
+    assert.equal(isIntakeSourceRefUniqueViolation(err, null), false);
+    assert.equal(isIntakeSourceRefUniqueViolation(new Error("other"), "msg-1"), false);
+  });
+});
+
+describe("shouldCreateOwnerChangeAudit", () => {
+  it("creates audit only when owner actually changes", () => {
+    assert.equal(shouldCreateOwnerChangeAudit("emp-1", "emp-2"), true);
+    assert.equal(shouldCreateOwnerChangeAudit(null, "emp-1"), true);
+    assert.equal(shouldCreateOwnerChangeAudit("emp-1", "emp-1"), false);
+    assert.equal(shouldCreateOwnerChangeAudit("emp-1", null), true);
+    assert.equal(shouldCreateOwnerChangeAudit("emp-1", undefined), false);
   });
 });
 

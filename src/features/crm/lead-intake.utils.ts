@@ -1,7 +1,12 @@
 import type { LeadSource } from "@prisma/client";
 import type { EmployeeRole } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { isSalesCapableEmployeeRole } from "@/features/employees/employee-role";
-import type { LeadIntakeChannel, NormalizedLeadIntakeInput } from "@/features/crm/lead-intake.types";
+import {
+  LeadIntakeValidationError,
+  type LeadIntakeChannel,
+  type NormalizedLeadIntakeInput,
+} from "@/features/crm/lead-intake.types";
 
 const METADATA_MAX_KEYS = 32;
 const METADATA_MAX_STRING_LEN = 500;
@@ -113,6 +118,44 @@ export function resolveValidatedSalesOwnerId(
   if (!employee?.id?.trim() || !employee.isActive) return null;
   if (!isSalesCapableEmployeeRole(employee.role)) return null;
   return employee.id;
+}
+
+const INVALID_SALES_OWNER_MESSAGE =
+  "Sales owner không hợp lệ hoặc đã ngưng hoạt động.";
+
+/** Rejects explicit non-empty owner ids that fail sales-capable validation. */
+export function resolveExplicitSalesOwnerId(
+  assignedSalesId: string | null | undefined,
+  employee: SalesOwnerCandidate | null | undefined
+): string | null {
+  const raw = assignedSalesId?.trim() || null;
+  if (!raw) return null;
+
+  const validated = resolveValidatedSalesOwnerId(
+    employee && employee.id === raw ? employee : null
+  );
+  if (!validated) {
+    throw new LeadIntakeValidationError(INVALID_SALES_OWNER_MESSAGE);
+  }
+  return validated;
+}
+
+export function isIntakeSourceRefUniqueViolation(
+  error: unknown,
+  sourceRef: string | null
+): sourceRef is string {
+  return !!(
+    sourceRef &&
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
+export function shouldCreateOwnerChangeAudit(
+  previousOwnerId: string | null,
+  nextOwnerId: string | null | undefined
+): boolean {
+  return nextOwnerId !== undefined && nextOwnerId !== (previousOwnerId ?? null);
 }
 
 export function authorizeLeadIntakeRequest(params: {
