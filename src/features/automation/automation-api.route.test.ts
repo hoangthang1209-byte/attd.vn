@@ -75,6 +75,7 @@ describe("automation dashboard API GET authorization contract", () => {
 
     const body = (await response.json()) as {
       configured: boolean;
+      view: string;
       summary: {
         totalOpen: { value: number; isPartial: boolean };
         building: { value: number; isPartial: boolean };
@@ -88,6 +89,7 @@ describe("automation dashboard API GET authorization contract", () => {
     };
 
     assert.equal(body.configured, false);
+    assert.equal(body.view, "active");
     assert.equal(typeof body.fetchedAt, "string");
     assert.deepEqual(body.summary, {
       totalOpen: { value: 0, isPartial: false },
@@ -98,5 +100,19 @@ describe("automation dashboard API GET authorization contract", () => {
       mergedToday: { value: 0, isPartial: false },
     });
     assert.deepEqual(body.tasks, []);
+  });
+
+  it("accepts view query parameter for all-tasks mode", async () => {
+    const token = createSessionToken([["dashboard.view", "ALL"]]);
+    const response = await GET(
+      new NextRequest("http://localhost/api/admin/automation?view=all", {
+        method: "GET",
+        headers: { cookie: `${ADMIN_STAFF_SESSION_COOKIE}=${encodeURIComponent(token)}` },
+      }),
+    );
+    assert.equal(response.status, 200);
+
+    const body = (await response.json()) as { view: string };
+    assert.equal(body.view, "all");
   });
 });

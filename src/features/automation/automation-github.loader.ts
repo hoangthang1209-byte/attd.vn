@@ -1,8 +1,13 @@
+import type { AutomationDashboardView } from "@/features/automation/automation-task.types";
 import {
   buildAutomationSearchQueries,
   hasAnyAutomationStatusLabel,
   HISTORICAL_AUTOMATION_STATUS_LABELS,
 } from "@/features/automation/automation-github.queries";
+import {
+  hasRecognizedAutomationStatusLabel,
+  isRecognizedDevelopmentTask,
+} from "@/features/automation/automation-task.recognition";
 import {
   AUTOMATION_COMMENT_FETCH_CONCURRENCY,
   isRecoverableGitHubLookupError,
@@ -19,6 +24,11 @@ import {
 const DEFAULT_REPO = "hoangthang1209-byte/attd.vn";
 const SEARCH_PAGE_SIZE = 100;
 const MAX_SEARCH_PAGES = 10;
+const ISSUES_PAGE_SIZE = 100;
+/** Hard cap for full-history REST listing (100 pages × 100 items). */
+const MAX_ISSUES_PAGES = 100;
+/** Bound TASK_AREA comment lookups on the active open-search path. */
+const MAX_UNLABELED_OPEN_COMMENT_CHECKS = 50;
 
 function getAutomationRepo(): string {
   return process.env.GITHUB_AUTOMATION_REPO?.trim() || DEFAULT_REPO;
@@ -152,7 +162,47 @@ export type FetchAutomationIssuesResult = {
   openTasksTotalCount: number | null;
   openTasksLoadedCount: number | null;
   closedHistoryUnavailable: boolean;
+  historyTruncated?: boolean;
+  historyLoadedCount?: number | null;
+  historyTotalCount?: number | null;
 };
+
+type GitHubRestIssueItem = {
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  html_url: string;
+  updated_at: string;
+  closed_at: string | null;
+  labels: Array<{ name: string }>;
+  pull_request?: { url: string };
+};
+
+export type ListRepoIssuesPaginatedResult = {
+  items: GitHubRestIssueItem[];
+  truncated: boolean;
+  loadedCount: number;
+};
+
+function restIssueToIssuePayload(
+  item: GitHubRestIssueItem,
+  comments: GitHubIssueCommentsResponse,
+): GitHubIssuePayload {
+  return {
+    number: item.number,
+    title: item.title,
+    state: item.state === "open" ? "OPEN" : "CLOSED",
+    url: item.html_url,
+    updatedAt: item.updated_at,
+    closedAt: item.closed_at,
+    labels: item.labels.map((label) => ({ name: label.name })),
+    comments: comments.map((comment) => ({
+      author: comment.user ? { login: comment.user.login } : null,
+      body: comment.body,
+      createdAt: comment.created_at,
+    })),
+  };
+}
 
 function searchItemToIssuePayload(
   item: GitHubSearchIssuesResponse["items"][number],
@@ -233,6 +283,113 @@ async function fetchIssueCommentsSafe(issueNumber: number): Promise<GitHubIssueC
   }
 }
 
+export async function listRepoIssuesPaginated(
+  state: "open" | "closed" | "all",
+): Promise<ListRepoIssuesPaginatedResult> {
+  const config = getAutomationGitHubConfig();
+  if (!config.configured || !config.owner || !config.repo) {
+    throw new AutomationGitHubConfigError(
+      config.configMessage ?? "GitHub automation chưa được cấu hình.",
+    );
+  }
+
+  const collected: GitHubRestIssueItem[] = [];
+  let page = 1;
+  let truncated = false;
+
+  while (page <= MAX_ISSUES_PAGES) {
+    const issues = await githubRequest<GitHubRestIssueItem[]>(
+      `/repos/${config.owner}/${config.repo}/issues?state=${state}&sort=updated&direction=desc&per_page=${ISSUES_PAGE_SIZE}&page=${page}`,
+    );
+    const issueOnly = issues.filter((item) => !item.pull_request);
+    collected.push(...issueOnly);
+    if (issues.length < ISSUES_PAGE_SIZE) break;
+    page += 1;
+  }
+
+  if (page > MAX_ISSUES_PAGES) {
+    truncated = true;
+  }
+
+  return {
+    items: collected,
+    truncated,
+    loadedCount: collected.length,
+  };
+}
+
+async function buildRecognizedIssuesFromItems(
+  items: Array<GitHubSearchIssuesResponse["items"][number] | GitHubRestIssueItem>,
+  toPayload: (
+    item: GitHubSearchIssuesResponse["items"][number] | GitHubRestIssueItem,
+    comments: GitHubIssueCommentsResponse,
+  ) => GitHubIssuePayload,
+  options?: { maxUnlabeledCommentChecks?: number },
+): Promise<GitHubIssuePayload[]> {
+  const labeledItems = items.filter((item) => hasRecognizedAutomationStatusLabel(item.labels));
+  const unlabeledItems = items
+    .filter((item) => !hasRecognizedAutomationStatusLabel(item.labels))
+    .slice(0, options?.maxUnlabeledCommentChecks ?? Number.POSITIVE_INFINITY);
+
+  const labeledIssues = await mapWithConcurrency(
+    labeledItems,
+    AUTOMATION_COMMENT_FETCH_CONCURRENCY,
+    async (item) => {
+      const comments = await fetchIssueCommentsSafe(item.number);
+      return toPayload(item, comments);
+    },
+  );
+
+  const unlabeledCandidates = await mapWithConcurrency(
+    unlabeledItems,
+    AUTOMATION_COMMENT_FETCH_CONCURRENCY,
+    async (item) => {
+      const comments = await fetchIssueCommentsSafe(item.number);
+      if (!isRecognizedDevelopmentTask({ labels: item.labels, comments })) return null;
+      return toPayload(item, comments);
+    },
+  );
+
+  const issueMap = new Map<number, GitHubIssuePayload>();
+  for (const issue of [...labeledIssues, ...unlabeledCandidates]) {
+    if (!issue) continue;
+    issueMap.set(issue.number, issue);
+  }
+
+  return [...issueMap.values()];
+}
+
+async function fetchAutomationIssuesFromRepoList(
+  state: "open" | "closed" | "all",
+): Promise<FetchAutomationIssuesResult> {
+  const listing = await listRepoIssuesPaginated(state);
+  const issues = await buildRecognizedIssuesFromItems(listing.items, restIssueToIssuePayload);
+
+  return {
+    issues,
+    openTasksTruncated: false,
+    openTasksTotalCount: null,
+    openTasksLoadedCount: null,
+    closedHistoryUnavailable: false,
+    historyTruncated: listing.truncated,
+    historyLoadedCount: listing.loadedCount,
+    historyTotalCount: listing.truncated ? null : listing.loadedCount,
+  };
+}
+
+export async function fetchAutomationIssuesForView(
+  view: AutomationDashboardView,
+  statusLabels: readonly string[],
+): Promise<FetchAutomationIssuesResult> {
+  if (view === "all") {
+    return fetchAutomationIssuesFromRepoList("all");
+  }
+  if (view === "completed") {
+    return fetchAutomationIssuesFromRepoList("closed");
+  }
+  return fetchAutomationIssues(statusLabels);
+}
+
 export async function fetchAutomationIssues(
   statusLabels: readonly string[],
 ): Promise<FetchAutomationIssuesResult> {
@@ -253,7 +410,6 @@ export async function fetchAutomationIssues(
 
   const openIssueItems = new Map<number, GitHubSearchIssuesResponse["items"][number]>();
   for (const item of openSearchResult.items) {
-    if (!hasAnyAutomationStatusLabel(item, statusLabels)) continue;
     openIssueItems.set(item.number, item);
   }
 
@@ -288,14 +444,21 @@ export async function fetchAutomationIssues(
   }
 
   const issueItems = [...issueMap.values()];
-  const issues = await mapWithConcurrency(
-    issueItems,
-    AUTOMATION_COMMENT_FETCH_CONCURRENCY,
-    async (item) => {
-      const comments = await fetchIssueCommentsSafe(item.number);
-      return searchItemToIssuePayload(item, comments);
-    },
-  );
+  const openItems = issueItems.filter((item) => item.state === "open");
+  const closedItems = issueItems.filter((item) => item.state === "closed");
+
+  const [openIssues, closedIssues] = await Promise.all([
+    buildRecognizedIssuesFromItems(openItems, searchItemToIssuePayload, {
+      maxUnlabeledCommentChecks: MAX_UNLABELED_OPEN_COMMENT_CHECKS,
+    }),
+    buildRecognizedIssuesFromItems(closedItems, searchItemToIssuePayload),
+  ]);
+
+  const issuesMap = new Map<number, GitHubIssuePayload>();
+  for (const issue of [...openIssues, ...closedIssues]) {
+    issuesMap.set(issue.number, issue);
+  }
+  const issues = [...issuesMap.values()];
 
   return {
     issues,

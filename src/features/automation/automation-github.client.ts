@@ -14,6 +14,8 @@ export {
 } from "@/features/automation/automation-github.queries";
 export {
   fetchAutomationIssues,
+  fetchAutomationIssuesForView,
   fetchLinkedPullRequestSafe,
   getAutomationGitHubConfig,
+  listRepoIssuesPaginated,
 } from "@/features/automation/automation-github.loader";

@@ -73,7 +73,13 @@ export type AutomationDataCompleteness = {
   openTasksLoadedCount: number | null;
   /** Closed merged/superseded history search failed; open operational data may still be present. */
   closedHistoryUnavailable?: boolean;
+  /** Full-history REST listing hit the configured page cap. */
+  historyTruncated?: boolean;
+  historyLoadedCount?: number | null;
+  historyTotalCount?: number | null;
 };
+
+export type AutomationDashboardView = "active" | "all" | "completed";
 
 export type AutomationDashboardResponse = {
   configured: boolean;
@@ -81,5 +87,6 @@ export type AutomationDashboardResponse = {
   summary: AutomationTaskSummary;
   tasks: AutomationTask[];
   fetchedAt: string;
+  view: AutomationDashboardView;
   dataCompleteness?: AutomationDataCompleteness;
 };

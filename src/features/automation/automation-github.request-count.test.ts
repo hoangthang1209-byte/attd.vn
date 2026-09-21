@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { AUTOMATION_STATUS_GITHUB_LABELS } from "@/features/automation/automation-status.parser";
-import { fetchAutomationIssues } from "@/features/automation/automation-github.loader";
+import {
+  fetchAutomationIssues,
+  fetchAutomationIssuesForView,
+  listRepoIssuesPaginated,
+} from "@/features/automation/automation-github.loader";
 
 const originalFetch = globalThis.fetch;
 
@@ -183,6 +187,125 @@ describe("automation GitHub request-count regression", () => {
     assert.equal(result.openTasksTruncated, true);
     assert.equal(result.openTasksTotalCount, 1205);
     assert.equal(result.openTasksLoadedCount, 1000);
+  });
+
+  it("discovers TASK_AREA-only open tasks outside status labels", async () => {
+    globalThis.fetch = async (input) => {
+      const url = decodeURIComponent(String(input));
+
+      if (url.includes("/search/issues") && url.includes("is:open")) {
+        return jsonResponse({
+          total_count: 2,
+          items: [
+            ...buildSearchItems(1, 300, "enhancement"),
+            {
+              number: 301,
+              title: "Task area only",
+              state: "open" as const,
+              html_url: "https://github.com/hoangthang1209-byte/attd.vn/issues/301",
+              updated_at: "2026-09-20T12:00:00.000Z",
+              closed_at: null,
+              labels: [{ name: "documentation" }],
+            },
+          ],
+        });
+      }
+
+      if (url.includes("/search/issues")) {
+        return jsonResponse({ total_count: 0, items: [] });
+      }
+
+      if (url.includes("/issues/301/comments")) {
+        return jsonResponse([{ user: { login: "owner" }, body: "TASK_AREA: Automation Platform", created_at: "2026-01-01T00:00:00Z" }]);
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.deepEqual(
+      result.issues.map((issue) => issue.number),
+      [301],
+    );
+  });
+
+  it("loads full repo history for the all-tasks view via REST pagination", async () => {
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+
+      if (url.includes("/repos/") && url.includes("/issues?")) {
+        const page = Number(new URL(url).searchParams.get("page") ?? "1");
+        if (page === 1) {
+          return jsonResponse([
+            {
+              number: 10,
+              title: "Old merged task",
+              state: "closed",
+              html_url: "https://github.com/hoangthang1209-byte/attd.vn/issues/10",
+              updated_at: "2026-01-15T12:00:00.000Z",
+              closed_at: "2026-01-10T12:00:00.000Z",
+              labels: [{ name: "status:merged" }],
+            },
+            {
+              number: 11,
+              title: "Random closed bug",
+              state: "closed",
+              html_url: "https://github.com/hoangthang1209-byte/attd.vn/issues/11",
+              updated_at: "2026-01-14T12:00:00.000Z",
+              closed_at: "2026-01-12T12:00:00.000Z",
+              labels: [{ name: "bug" }],
+            },
+          ]);
+        }
+        return jsonResponse([]);
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssuesForView("all", AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.equal(result.issues.length, 1);
+    assert.equal(result.issues[0]?.number, 10);
+    assert.equal(result.historyTruncated, false);
+  });
+
+  it("surfaces history truncation metadata when REST pagination hits the cap", async () => {
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+
+      if (url.includes("/repos/") && url.includes("/issues?")) {
+        const page = Number(new URL(url).searchParams.get("page") ?? "1");
+        return jsonResponse(
+          Array.from({ length: 100 }, (_, index) => ({
+            number: (page - 1) * 100 + index + 1,
+            title: `Issue ${(page - 1) * 100 + index + 1}`,
+            state: "closed",
+            html_url: `https://github.com/hoangthang1209-byte/attd.vn/issues/${(page - 1) * 100 + index + 1}`,
+            updated_at: "2026-01-01T12:00:00.000Z",
+            closed_at: "2026-01-01T12:00:00.000Z",
+            labels: [{ name: "status:merged" }],
+          })),
+        );
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const listing = await listRepoIssuesPaginated("closed");
+    assert.equal(listing.truncated, true);
+    assert.equal(listing.loadedCount, 100 * 100);
   });
 
   it("continues with open operational data when closed history search fails", async () => {
