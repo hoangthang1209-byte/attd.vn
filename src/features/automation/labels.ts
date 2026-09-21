@@ -1,4 +1,8 @@
-import type { AutomationTaskRisk, NormalizedTaskStatus } from "@/features/automation/automation-task.types";
+import type {
+  AutomationTaskRisk,
+  NormalizedTaskStatus,
+  ProductionDeploymentStatus,
+} from "@/features/automation/automation-task.types";
 
 export const AUTOMATION_STATUS_LABELS: Record<NormalizedTaskStatus, string> = {
   backlog: "Chưa xử lý",
@@ -89,4 +93,18 @@ export const AUTOMATION_PR_STATE_SUFFIX: Record<"merged" | "open" | "closed", st
   merged: " (đã merge)",
   open: " (đang mở)",
   closed: " (đã đóng)",
+};
+
+export const AUTOMATION_PRODUCTION_STATUS_LABELS: Record<ProductionDeploymentStatus, string> = {
+  live: "Đã lên production",
+  deploying: "Đang deploy",
+  not_live: "Chưa lên production",
+  unknown: "Không xác định",
+};
+
+export const AUTOMATION_PRODUCTION_STATUS_BADGE_CLASS: Record<ProductionDeploymentStatus, string> = {
+  live: "admin-status-badge admin-status-badge--success",
+  deploying: "admin-status-badge admin-status-badge--info",
+  not_live: "admin-status-badge admin-status-badge--neutral",
+  unknown: "admin-status-badge admin-status-badge--warning",
 };

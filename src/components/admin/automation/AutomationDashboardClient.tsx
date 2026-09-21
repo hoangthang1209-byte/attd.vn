@@ -22,6 +22,8 @@ import {
   AUTOMATION_RISK_FILTER_OPTIONS,
   AUTOMATION_RISK_LABELS,
   AUTOMATION_STATUS_BADGE_CLASS,
+  AUTOMATION_PRODUCTION_STATUS_BADGE_CLASS,
+  AUTOMATION_PRODUCTION_STATUS_LABELS,
   AUTOMATION_STATUS_FILTER_OPTIONS,
   AUTOMATION_STATUS_LABELS,
 } from "@/features/automation/labels";
@@ -30,6 +32,7 @@ import type {
   AutomationSummaryMetric,
   AutomationTask,
 } from "@/features/automation/automation-task.types";
+import { formatShortCommitSha } from "@/features/automation/automation-production";
 import { AUTOMATION_PR_STATE_SUFFIX } from "@/features/automation/labels";
 import { formatQuoteDateTime } from "@/features/quotes/format";
 
@@ -243,6 +246,7 @@ export default function AutomationDashboardClient() {
                     <th>Trạng thái</th>
                     <th>Rủi ro</th>
                     <th>PR liên kết</th>
+                    <th>Production</th>
                     <th>Cập nhật</th>
                     <th>Blocker</th>
                     <th />
@@ -253,6 +257,7 @@ export default function AutomationDashboardClient() {
                     <AutomationTaskRow
                       key={task.issueNumber}
                       task={task}
+                      productionCommitSha={data.productionCommitSha}
                       expanded={expandedIssue === task.issueNumber}
                       onToggle={() =>
                         setExpandedIssue((current) =>
@@ -268,6 +273,17 @@ export default function AutomationDashboardClient() {
 
           <p className="admin-muted">
             Cập nhật lúc {data.fetchedAt ? formatQuoteDateTime(data.fetchedAt) : "—"} · bộ nhớ đệm 60 giây
+            {data.productionCommitSha ? (
+              <>
+                {" "}
+                · Production SHA: {formatShortCommitSha(data.productionCommitSha)}
+                {data.productionCheckedAt
+                  ? ` (kiểm tra ${formatQuoteDateTime(data.productionCheckedAt)})`
+                  : null}
+              </>
+            ) : (
+              " · Production SHA: không xác định (chỉ có trên Vercel Production)"
+            )}
           </p>
         </>
       ) : null}
@@ -305,14 +321,29 @@ function StatCard({
   );
 }
 
+function ProductionStatusBadge({ task }: { task: AutomationTask }) {
+  const { productionStatus } = task;
+  const label = AUTOMATION_PRODUCTION_STATUS_LABELS[productionStatus.status];
+  const badgeClass = AUTOMATION_PRODUCTION_STATUS_BADGE_CLASS[productionStatus.status];
+  const title = productionStatus.reason ?? undefined;
+
+  return (
+    <span className={badgeClass} title={title}>
+      {label}
+    </span>
+  );
+}
+
 function AutomationTaskRow({
   task,
   expanded,
   onToggle,
+  productionCommitSha,
 }: {
   task: AutomationTask;
   expanded: boolean;
   onToggle: () => void;
+  productionCommitSha: string | null;
 }) {
   return (
     <>
@@ -357,6 +388,9 @@ function AutomationTaskRow({
             "—"
           )}
         </td>
+        <td className="sales-follow-up__production-cell">
+          <ProductionStatusBadge task={task} />
+        </td>
         <td>{formatQuoteDateTime(task.latestUpdateAt)}</td>
         <td className="sales-follow-up__reason">{task.blockerReason ?? "—"}</td>
         <td>
@@ -367,10 +401,32 @@ function AutomationTaskRow({
       </tr>
       {expanded ? (
         <tr>
-          <td colSpan={9}>
+          <td colSpan={10}>
             <div className="admin-panel">
               <p>
                 <strong>Mảng:</strong> {task.taskArea}
+              </p>
+              <p>
+                <strong>Production:</strong>{" "}
+                {AUTOMATION_PRODUCTION_STATUS_LABELS[task.productionStatus.status]}
+                {task.productionStatus.mergedCommitSha ? (
+                  <>
+                    {" "}
+                    · Merge SHA: {formatShortCommitSha(task.productionStatus.mergedCommitSha)}
+                  </>
+                ) : null}
+                {productionCommitSha ? (
+                  <> · Production SHA: {formatShortCommitSha(productionCommitSha)}</>
+                ) : null}
+                {task.productionStatus.reason ? (
+                  <> · {task.productionStatus.reason}</>
+                ) : null}
+                {task.productionStatus.checkedAt ? (
+                  <>
+                    {" "}
+                    · Kiểm tra lúc {formatQuoteDateTime(task.productionStatus.checkedAt)}
+                  </>
+                ) : null}
               </p>
               <p>
                 <strong>Vấn đề GitHub:</strong>{" "}

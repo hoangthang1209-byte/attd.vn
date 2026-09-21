@@ -16,6 +16,15 @@ export type NormalizedTaskStatus =
 
 export type AutomationTaskRisk = "low" | "medium" | "high" | "unknown";
 
+export type ProductionDeploymentStatus = "live" | "deploying" | "not_live" | "unknown";
+
+export type AutomationProductionStatus = {
+  status: ProductionDeploymentStatus;
+  mergedCommitSha: string | null;
+  reason: string | null;
+  checkedAt: string;
+};
+
 export type AutomationLinkedPullRequest = {
   number: number;
   url: string;
@@ -24,6 +33,7 @@ export type AutomationLinkedPullRequest = {
   title: string;
   updatedAt: string;
   mergedAt: string | null;
+  mergeCommitSha: string | null;
 };
 
 export type AutomationStatusComment = {
@@ -50,6 +60,7 @@ export type AutomationTask = {
   githubIssueUrl: string;
   labels: string[];
   recentStatusComments: AutomationStatusComment[];
+  productionStatus: AutomationProductionStatus;
 };
 
 export type AutomationSummaryMetric = {
@@ -82,4 +93,6 @@ export type AutomationDashboardResponse = {
   tasks: AutomationTask[];
   fetchedAt: string;
   dataCompleteness?: AutomationDataCompleteness;
+  productionCommitSha: string | null;
+  productionCheckedAt: string | null;
 };
