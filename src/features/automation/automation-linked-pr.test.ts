@@ -53,6 +53,21 @@ describe("automation linked PR partial failure", () => {
     assert.equal(linkedPullRequest, null);
   });
 
+  it("returns null when linked PR timeline lookup fails with 404", async () => {
+    globalThis.fetch = async (input) => {
+      const url = decodeURIComponent(String(input));
+
+      if (url.includes("/issues/46/timeline")) {
+        return jsonResponse({ message: "not found" }, 404);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const linkedPullRequest = await fetchLinkedPullRequestSafe(46);
+    assert.equal(linkedPullRequest, null);
+  });
+
   const timelineWithLinkedPull = [
     {
       event: "cross-referenced",
