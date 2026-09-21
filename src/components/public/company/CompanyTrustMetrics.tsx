@@ -30,18 +30,26 @@ export default async function CompanyTrustMetrics({
     .filter(Boolean)
     .join(" ");
 
+  const content = (
+    <div className="container">
+      {variant === "section" ? (
+        <h2 className="section-title section-title--center">{settings.sectionTitle}</h2>
+      ) : null}
+      <div className="social-proof-grid">
+        {metrics.map((metric) => (
+          <TrustStatisticCard key={metric.key} value={metric.value} label={metric.label} />
+        ))}
+      </div>
+    </div>
+  );
+
+  if (variant === "embedded") {
+    return <div className={classes}>{content}</div>;
+  }
+
   return (
     <section className={classes} aria-label={settings.sectionTitle}>
-      <div className="container">
-        {variant === "section" ? (
-          <h2 className="section-title section-title--center">{settings.sectionTitle}</h2>
-        ) : null}
-        <div className="social-proof-grid">
-          {metrics.map((metric) => (
-            <TrustStatisticCard key={metric.key} value={metric.value} label={metric.label} />
-          ))}
-        </div>
-      </div>
+      {content}
     </section>
   );
 }

@@ -6,10 +6,12 @@ import type { HomepageProofItemConfig } from "@/features/home/homepage.types";
 import { HOMEPAGE_PROOF_ICONS } from "@/features/home/homepage-proof-icons";
 
 type Props = {
+  enabled: boolean;
   proofItems: HomepageProofItemConfig[];
 };
 
-export default async function HomeEarlyTrustBand({ proofItems }: Props) {
+export default async function HomeEarlyTrustBand({ enabled, proofItems }: Props) {
+  if (!enabled) return null;
   const logos = (await getVisibleClientLogosFromDb()).filter((client) =>
     isValidImageSrc(client.imageSrc),
   );

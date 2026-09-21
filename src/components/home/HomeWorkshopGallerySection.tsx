@@ -68,35 +68,41 @@ export default function HomeWorkshopGallerySection({ gallery, embedded = false }
 
   const layoutClass = getLayoutClass(gallery, items.length);
 
-  return (
-    <section
-      className={[
-        embedded ? "home-workshop-gallery--embedded" : "mp-section mp-section--tight",
-        "home-workshop-gallery",
-        layoutClass,
-      ].join(" ")}
-      aria-labelledby={embedded ? undefined : "home-workshop-gallery-title"}
-      aria-label={embedded ? gallery.title : undefined}
-    >
-      <div className="container">
-        {!embedded ? (
-          <div className="home-workshop-gallery__header">
-            <p className="home-workshop-gallery__eyebrow">{gallery.eyebrow}</p>
-            <h2 id="home-workshop-gallery-title" className="home-workshop-gallery__title">
-              {gallery.title}
-            </h2>
-            {gallery.description ? (
-              <p className="home-workshop-gallery__description">{gallery.description}</p>
-            ) : null}
-          </div>
-        ) : null}
+  const className = [
+    embedded ? "home-workshop-gallery--embedded" : "mp-section mp-section--tight",
+    "home-workshop-gallery",
+    layoutClass,
+  ].join(" ");
 
-        <div className="home-workshop-gallery__grid">
-          {items.map((item, index) => (
-            <WorkshopCard key={item.id || item.mediaAssetId} item={item} priority={index === 0} />
-          ))}
+  const inner = (
+    <div className="container">
+      {!embedded ? (
+        <div className="home-workshop-gallery__header">
+          <p className="home-workshop-gallery__eyebrow">{gallery.eyebrow}</p>
+          <h2 id="home-workshop-gallery-title" className="home-workshop-gallery__title">
+            {gallery.title}
+          </h2>
+          {gallery.description ? (
+            <p className="home-workshop-gallery__description">{gallery.description}</p>
+          ) : null}
         </div>
+      ) : null}
+
+      <div className="home-workshop-gallery__grid">
+        {items.map((item, index) => (
+          <WorkshopCard key={item.id || item.mediaAssetId} item={item} priority={index === 0} />
+        ))}
       </div>
+    </div>
+  );
+
+  if (embedded) {
+    return <div className={className}>{inner}</div>;
+  }
+
+  return (
+    <section className={className} aria-labelledby="home-workshop-gallery-title">
+      {inner}
     </section>
   );
 }

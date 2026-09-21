@@ -72,40 +72,48 @@ export default function CompanyFacts({
     .filter(Boolean)
     .join(" ");
 
+  const inner = (
+    <div className="container">
+      {!hideHeader ? (
+        <div className="company-facts__header">
+          <p className="company-facts__eyebrow">{cms?.eyebrow ?? "Thông tin công ty"}</p>
+          <h2 className="company-facts__title">{cms?.title ?? title}</h2>
+          {cms?.description || description ? (
+            <p className="company-facts__description">{cms?.description ?? description}</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="company-facts__grid">
+        {facts.map((fact, index) => {
+          const Icon = FACT_ICONS["iconKey" in fact ? fact.iconKey : fact.id] ?? Building2;
+          return (
+            <article
+              key={"itemKey" in fact ? fact.itemKey : fact.id}
+              className={`company-facts__card${"featured" in fact && fact.featured ? " company-facts__card--featured" : ""}`}
+            >
+              <span className="company-facts__icon" aria-hidden>
+                <Icon size={20} />
+              </span>
+              <h3 className="company-facts__card-title">{fact.title}</h3>
+              <p className="company-facts__card-desc">{fact.description}</p>
+              {"featured" in fact && fact.featured && index === 0 ? (
+                <span className="company-facts__meta">Năng lực cốt lõi</span>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  if (hideHeader) {
+    return <div className={classes}>{inner}</div>;
+  }
+
   return (
     <section className={classes} aria-label={cms?.title ?? title}>
-      <div className="container">
-        {!hideHeader ? (
-          <div className="company-facts__header">
-            <p className="company-facts__eyebrow">{cms?.eyebrow ?? "Thông tin công ty"}</p>
-            <h2 className="company-facts__title">{cms?.title ?? title}</h2>
-            {cms?.description || description ? (
-              <p className="company-facts__description">{cms?.description ?? description}</p>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="company-facts__grid">
-          {facts.map((fact, index) => {
-            const Icon = FACT_ICONS["iconKey" in fact ? fact.iconKey : fact.id] ?? Building2;
-            return (
-              <article
-                key={"itemKey" in fact ? fact.itemKey : fact.id}
-                className={`company-facts__card${"featured" in fact && fact.featured ? " company-facts__card--featured" : ""}`}
-              >
-                <span className="company-facts__icon" aria-hidden>
-                  <Icon size={20} />
-                </span>
-                <h3 className="company-facts__card-title">{fact.title}</h3>
-                <p className="company-facts__card-desc">{fact.description}</p>
-                {"featured" in fact && fact.featured && index === 0 ? (
-                  <span className="company-facts__meta">Năng lực cốt lõi</span>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      </div>
+      {inner}
     </section>
   );
 }

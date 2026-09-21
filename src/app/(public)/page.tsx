@@ -40,7 +40,7 @@ export default async function HomePage() {
     <main className="mp-home mp-home--v272">
       <HomeHeroSection hero={hero} categories={categories} trustLine={buildHeroTrustLine()} />
 
-      <HomeEarlyTrustBand proofItems={cms.proofStrip.items} />
+      <HomeEarlyTrustBand enabled={cms.proofStrip.enabled} proofItems={cms.proofStrip.items} />
 
       {cms.sourcingPathways.enabled ? (
         <HomeSourcingPathwaysSection pathways={cms.sourcingPathways.items} />

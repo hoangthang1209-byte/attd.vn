@@ -58,7 +58,7 @@ export const DEFAULT_SOURCING_PATHWAYS: HomepageSourcingPathwayConfig[] = [
     description:
       "Nguồn hàng quà tặng doanh nghiệp, merchandise và hàng tri ân cho sự kiện, khách hàng và nhân viên.",
     ctaLabel: "Xem nguồn hàng",
-    ctaUrl: "/dai-ly",
+    ctaUrl: "/qua-tang-doanh-nghiep",
     mediaAssetId: null,
     imageUrl: null,
     imageAlt: null,
