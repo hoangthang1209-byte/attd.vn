@@ -1,4 +1,6 @@
 import type { LeadSource } from "@prisma/client";
+import type { EmployeeRole } from "@prisma/client";
+import { isSalesCapableEmployeeRole } from "@/features/employees/employee-role";
 import type { LeadIntakeChannel, NormalizedLeadIntakeInput } from "@/features/crm/lead-intake.types";
 
 const METADATA_MAX_KEYS = 32;
@@ -97,4 +99,32 @@ export function buildOwnerChangeAuditContent(
   const prev = previousOwnerName?.trim() || previousOwnerId || "Chưa phân công";
   const next = nextOwnerName?.trim() || nextOwnerId || "Chưa phân công";
   return `${prev} → ${next}`;
+}
+
+export type SalesOwnerCandidate = {
+  id: string;
+  isActive: boolean;
+  role: EmployeeRole | null;
+};
+
+export function resolveValidatedSalesOwnerId(
+  employee: SalesOwnerCandidate | null | undefined
+): string | null {
+  if (!employee?.id?.trim() || !employee.isActive) return null;
+  if (!isSalesCapableEmployeeRole(employee.role)) return null;
+  return employee.id;
+}
+
+export function authorizeLeadIntakeRequest(params: {
+  authorizationHeader: string | null;
+  cronSecretHeader: string | null;
+  configuredSecret: string | null | undefined;
+}): boolean {
+  const secret = params.configuredSecret?.trim();
+  if (!secret) return false;
+
+  const auth = params.authorizationHeader ?? "";
+  const headerSecret = params.cronSecretHeader ?? "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  return bearer === secret || headerSecret === secret;
 }

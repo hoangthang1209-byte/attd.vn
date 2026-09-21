@@ -15,7 +15,7 @@ import {
 } from "@/features/crm/mappers";
 import { buildOwnerChangeAuditContent } from "@/features/crm/lead-intake.utils";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
-import { validateLeadOwnerId } from "@/features/crm/services/lead-intake.service";
+import { validateLeadOwnerId, LeadIntakeValidationError } from "@/features/crm/services/lead-intake.service";
 import { getEmployeeById } from "@/features/employees/employee.service";
 import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-product-interest-snapshot";
 import {
@@ -634,7 +634,11 @@ export async function updateCrmLead(
       nextAssignedTo = data.assignedTo?.trim() || null;
       if (nextAssignedTo) {
         const validated = await validateLeadOwnerId(nextAssignedTo);
-        if (!validated) return null;
+        if (!validated) {
+          throw new LeadIntakeValidationError(
+            "Sales owner không hợp lệ hoặc đã ngưng hoạt động."
+          );
+        }
         nextAssignedTo = validated;
       }
     }

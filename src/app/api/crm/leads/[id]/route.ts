@@ -6,7 +6,7 @@ import {
   isValidLeadStatus,
   updateCrmLead,
 } from "@/features/crm/services/crm-lead.service";
-import { validateLeadOwnerId } from "@/features/crm/services/lead-intake.service";
+import { validateLeadOwnerId, LeadIntakeValidationError } from "@/features/crm/services/lead-intake.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -150,10 +150,17 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });
   }
 
-  const lead = await updateCrmLead(id, patch);
-  if (!lead) {
-    return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
-  }
+  try {
+    const lead = await updateCrmLead(id, patch);
+    if (!lead) {
+      return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+    }
 
-  return NextResponse.json({ lead });
+    return NextResponse.json({ lead });
+  } catch (err) {
+    if (err instanceof LeadIntakeValidationError) {
+      return NextResponse.json({ message: err.message }, { status: 400 });
+    }
+    throw err;
+  }
 }
