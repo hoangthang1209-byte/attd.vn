@@ -1,8 +1,14 @@
+import type { AutomationDashboardView } from "@/features/automation/automation-task.types";
 import {
   buildAutomationSearchQueries,
   hasAnyAutomationStatusLabel,
   HISTORICAL_AUTOMATION_STATUS_LABELS,
 } from "@/features/automation/automation-github.queries";
+import {
+  hasDevelopmentTaskLabel,
+  hasRecognizedAutomationStatusLabel,
+  isRecognizedDevelopmentTask,
+} from "@/features/automation/automation-task.recognition";
 import {
   AUTOMATION_COMMENT_FETCH_CONCURRENCY,
   isRecoverableGitHubLookupError,
@@ -19,6 +25,13 @@ import {
 const DEFAULT_REPO = "hoangthang1209-byte/attd.vn";
 const SEARCH_PAGE_SIZE = 100;
 const MAX_SEARCH_PAGES = 10;
+const ISSUES_PAGE_SIZE = 100;
+/** Hard cap for full-history REST listing (100 pages × 100 items). */
+const MAX_ISSUES_PAGES = 100;
+/** Bound TASK_AREA comment lookups on the active open-search path. */
+export const MAX_UNLABELED_OPEN_COMMENT_CHECKS = 50;
+/** Bound TASK_AREA comment lookups on historical REST listing paths. */
+export const MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS = 100;
 
 function getAutomationRepo(): string {
   return process.env.GITHUB_AUTOMATION_REPO?.trim() || DEFAULT_REPO;
@@ -152,13 +165,66 @@ export type SearchIssuesPaginatedResult = {
   truncated: boolean;
 };
 
+export type TaskRecognitionCompleteness = {
+  taskAreaRecognitionTruncated: boolean;
+  unlabeledCommentChecksSkipped: number;
+  unlabeledCommentChecksPerformed: number;
+  commentLookupFailedCount: number;
+  recognitionDegraded: boolean;
+};
+
 export type FetchAutomationIssuesResult = {
   issues: GitHubIssuePayload[];
   openTasksTruncated: boolean;
   openTasksTotalCount: number | null;
   openTasksLoadedCount: number | null;
   closedHistoryUnavailable: boolean;
+  historyTruncated?: boolean;
+  historyLoadedCount?: number | null;
+  historyTotalCount?: number | null;
+  taskAreaRecognitionTruncated?: boolean;
+  unlabeledCommentChecksSkipped?: number;
+  unlabeledCommentChecksPerformed?: number;
+  commentLookupFailedCount?: number;
+  recognitionDegraded?: boolean;
 };
+
+type GitHubRestIssueItem = {
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  html_url: string;
+  updated_at: string;
+  closed_at: string | null;
+  labels: Array<{ name: string }>;
+  pull_request?: { url: string };
+};
+
+export type ListRepoIssuesPaginatedResult = {
+  items: GitHubRestIssueItem[];
+  truncated: boolean;
+  loadedCount: number;
+};
+
+function restIssueToIssuePayload(
+  item: GitHubRestIssueItem,
+  comments: GitHubIssueCommentsResponse,
+): GitHubIssuePayload {
+  return {
+    number: item.number,
+    title: item.title,
+    state: item.state === "open" ? "OPEN" : "CLOSED",
+    url: item.html_url,
+    updatedAt: item.updated_at,
+    closedAt: item.closed_at,
+    labels: item.labels.map((label) => ({ name: label.name })),
+    comments: comments.map((comment) => ({
+      author: comment.user ? { login: comment.user.login } : null,
+      body: comment.body,
+      createdAt: comment.created_at,
+    })),
+  };
+}
 
 function searchItemToIssuePayload(
   item: GitHubSearchIssuesResponse["items"][number],
@@ -225,18 +291,228 @@ async function fetchIssueComments(issueNumber: number): Promise<GitHubIssueComme
   );
 }
 
-async function fetchIssueCommentsSafe(issueNumber: number): Promise<GitHubIssueCommentsResponse> {
+type SafeCommentLookupResult = {
+  comments: GitHubIssueCommentsResponse;
+  failed: boolean;
+};
+
+async function fetchIssueCommentsSafe(issueNumber: number): Promise<SafeCommentLookupResult> {
   try {
-    return await fetchIssueComments(issueNumber);
+    return { comments: await fetchIssueComments(issueNumber), failed: false };
   } catch (error) {
     if (isRecoverableGitHubLookupError(error)) {
       console.warn(
         `[fetchAutomationIssues] comment lookup failed for issue #${issueNumber}; continuing with partial data`,
       );
-      return [];
+      return { comments: [], failed: true };
     }
     throw error;
   }
+}
+
+function mergeRecognitionCompleteness(
+  left: TaskRecognitionCompleteness,
+  right: TaskRecognitionCompleteness,
+): TaskRecognitionCompleteness {
+  const taskAreaRecognitionTruncated =
+    left.taskAreaRecognitionTruncated || right.taskAreaRecognitionTruncated;
+  const commentLookupFailedCount =
+    left.commentLookupFailedCount + right.commentLookupFailedCount;
+  return {
+    taskAreaRecognitionTruncated,
+    unlabeledCommentChecksSkipped:
+      left.unlabeledCommentChecksSkipped + right.unlabeledCommentChecksSkipped,
+    unlabeledCommentChecksPerformed:
+      left.unlabeledCommentChecksPerformed + right.unlabeledCommentChecksPerformed,
+    commentLookupFailedCount,
+    recognitionDegraded:
+      taskAreaRecognitionTruncated || commentLookupFailedCount > 0,
+  };
+}
+
+function emptyRecognitionCompleteness(): TaskRecognitionCompleteness {
+  return {
+    taskAreaRecognitionTruncated: false,
+    unlabeledCommentChecksSkipped: 0,
+    unlabeledCommentChecksPerformed: 0,
+    commentLookupFailedCount: 0,
+    recognitionDegraded: false,
+  };
+}
+
+function recognitionFieldsFromCompleteness(
+  completeness: TaskRecognitionCompleteness,
+): Pick<
+  FetchAutomationIssuesResult,
+  | "taskAreaRecognitionTruncated"
+  | "unlabeledCommentChecksSkipped"
+  | "unlabeledCommentChecksPerformed"
+  | "commentLookupFailedCount"
+  | "recognitionDegraded"
+> {
+  return {
+    taskAreaRecognitionTruncated: completeness.taskAreaRecognitionTruncated,
+    unlabeledCommentChecksSkipped: completeness.unlabeledCommentChecksSkipped,
+    unlabeledCommentChecksPerformed: completeness.unlabeledCommentChecksPerformed,
+    commentLookupFailedCount: completeness.commentLookupFailedCount,
+    recognitionDegraded: completeness.recognitionDegraded,
+  };
+}
+
+type IssueListItem = GitHubSearchIssuesResponse["items"][number] | GitHubRestIssueItem;
+
+function getIssueUpdatedAt(item: IssueListItem): string {
+  return item.updated_at;
+}
+
+export async function listRepoIssuesPaginated(
+  state: "open" | "closed" | "all",
+): Promise<ListRepoIssuesPaginatedResult> {
+  const config = getAutomationGitHubConfig();
+  if (!config.configured || !config.owner || !config.repo) {
+    throw new AutomationGitHubConfigError(
+      config.configMessage ?? "GitHub automation chưa được cấu hình.",
+    );
+  }
+
+  const collected: GitHubRestIssueItem[] = [];
+  let page = 1;
+  let truncated = false;
+
+  while (page <= MAX_ISSUES_PAGES) {
+    const issues = await githubRequest<GitHubRestIssueItem[]>(
+      `/repos/${config.owner}/${config.repo}/issues?state=${state}&sort=updated&direction=desc&per_page=${ISSUES_PAGE_SIZE}&page=${page}`,
+    );
+    const issueOnly = issues.filter((item) => !item.pull_request);
+    collected.push(...issueOnly);
+    if (issues.length < ISSUES_PAGE_SIZE) break;
+    page += 1;
+  }
+
+  if (page > MAX_ISSUES_PAGES) {
+    truncated = true;
+  }
+
+  return {
+    items: collected,
+    truncated,
+    loadedCount: collected.length,
+  };
+}
+
+type BuildRecognizedIssuesResult = {
+  issues: GitHubIssuePayload[];
+  recognition: TaskRecognitionCompleteness;
+};
+
+async function buildRecognizedIssuesFromItems(
+  items: IssueListItem[],
+  toPayload: (item: IssueListItem, comments: GitHubIssueCommentsResponse) => GitHubIssuePayload,
+  options?: { maxUnlabeledCommentChecks?: number },
+): Promise<BuildRecognizedIssuesResult> {
+  const statusLabeledItems = items.filter((item) => hasRecognizedAutomationStatusLabel(item.labels));
+  const developmentTaskOnlyItems = items.filter(
+    (item) =>
+      !hasRecognizedAutomationStatusLabel(item.labels) && hasDevelopmentTaskLabel(item.labels),
+  );
+  const unlabeledCandidates = items
+    .filter(
+      (item) =>
+        !hasRecognizedAutomationStatusLabel(item.labels) && !hasDevelopmentTaskLabel(item.labels),
+    )
+    .sort((left, right) => getIssueUpdatedAt(right).localeCompare(getIssueUpdatedAt(left)));
+
+  const maxChecks = options?.maxUnlabeledCommentChecks ?? Number.POSITIVE_INFINITY;
+  const unlabeledToCheck =
+    maxChecks === Number.POSITIVE_INFINITY
+      ? unlabeledCandidates
+      : unlabeledCandidates.slice(0, maxChecks);
+  const unlabeledCommentChecksSkipped = Math.max(
+    0,
+    unlabeledCandidates.length - unlabeledToCheck.length,
+  );
+
+  let commentLookupFailedCount = 0;
+
+  const developmentTaskIssues = developmentTaskOnlyItems.map((item) => toPayload(item, []));
+
+  const labeledIssues = await mapWithConcurrency(
+    statusLabeledItems,
+    AUTOMATION_COMMENT_FETCH_CONCURRENCY,
+    async (item) => {
+      const lookup = await fetchIssueCommentsSafe(item.number);
+      if (lookup.failed) commentLookupFailedCount += 1;
+      return toPayload(item, lookup.comments);
+    },
+  );
+
+  const unlabeledRecognized = await mapWithConcurrency(
+    unlabeledToCheck,
+    AUTOMATION_COMMENT_FETCH_CONCURRENCY,
+    async (item) => {
+      const lookup = await fetchIssueCommentsSafe(item.number);
+      if (lookup.failed) commentLookupFailedCount += 1;
+      if (!isRecognizedDevelopmentTask({ labels: item.labels, comments: lookup.comments })) {
+        return null;
+      }
+      return toPayload(item, lookup.comments);
+    },
+  );
+
+  const issueMap = new Map<number, GitHubIssuePayload>();
+  for (const issue of [...developmentTaskIssues, ...labeledIssues, ...unlabeledRecognized]) {
+    if (!issue) continue;
+    issueMap.set(issue.number, issue);
+  }
+
+  const taskAreaRecognitionTruncated = unlabeledCommentChecksSkipped > 0;
+
+  return {
+    issues: [...issueMap.values()],
+    recognition: {
+      taskAreaRecognitionTruncated,
+      unlabeledCommentChecksSkipped,
+      unlabeledCommentChecksPerformed: unlabeledToCheck.length,
+      commentLookupFailedCount,
+      recognitionDegraded: taskAreaRecognitionTruncated || commentLookupFailedCount > 0,
+    },
+  };
+}
+
+async function fetchAutomationIssuesFromRepoList(
+  state: "open" | "closed" | "all",
+): Promise<FetchAutomationIssuesResult> {
+  const listing = await listRepoIssuesPaginated(state);
+  const { issues, recognition } = await buildRecognizedIssuesFromItems(
+    listing.items,
+    restIssueToIssuePayload,
+    { maxUnlabeledCommentChecks: MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS },
+  );
+
+  return {
+    issues,
+    openTasksTruncated: false,
+    openTasksTotalCount: null,
+    openTasksLoadedCount: null,
+    closedHistoryUnavailable: false,
+    historyTruncated: listing.truncated,
+    historyLoadedCount: listing.loadedCount,
+    historyTotalCount: listing.truncated ? null : listing.loadedCount,
+    ...recognitionFieldsFromCompleteness(recognition),
+  };
+}
+
+export async function fetchAutomationIssuesForView(
+  view: AutomationDashboardView,
+  statusLabels: readonly string[],
+): Promise<FetchAutomationIssuesResult> {
+  if (view === "all") {
+    return fetchAutomationIssuesFromRepoList("all");
+  }
+  if (view === "completed") {
+    return fetchAutomationIssuesFromRepoList("closed");
+  }
+  return fetchAutomationIssues(statusLabels);
 }
 
 export async function fetchAutomationIssues(
@@ -259,7 +535,6 @@ export async function fetchAutomationIssues(
 
   const openIssueItems = new Map<number, GitHubSearchIssuesResponse["items"][number]>();
   for (const item of openSearchResult.items) {
-    if (!hasAnyAutomationStatusLabel(item, statusLabels)) continue;
     openIssueItems.set(item.number, item);
   }
 
@@ -294,14 +569,28 @@ export async function fetchAutomationIssues(
   }
 
   const issueItems = [...issueMap.values()];
-  const issues = await mapWithConcurrency(
-    issueItems,
-    AUTOMATION_COMMENT_FETCH_CONCURRENCY,
-    async (item) => {
-      const comments = await fetchIssueCommentsSafe(item.number);
-      return searchItemToIssuePayload(item, comments);
-    },
+  const openItems = issueItems.filter((item) => item.state === "open");
+  const closedItems = issueItems.filter((item) => item.state === "closed");
+
+  const [openResult, closedResult] = await Promise.all([
+    buildRecognizedIssuesFromItems(openItems, searchItemToIssuePayload, {
+      maxUnlabeledCommentChecks: MAX_UNLABELED_OPEN_COMMENT_CHECKS,
+    }),
+    buildRecognizedIssuesFromItems(closedItems, searchItemToIssuePayload, {
+      maxUnlabeledCommentChecks: MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS,
+    }),
+  ]);
+
+  const recognition = mergeRecognitionCompleteness(
+    openResult.recognition,
+    closedResult.recognition,
   );
+
+  const issuesMap = new Map<number, GitHubIssuePayload>();
+  for (const issue of [...openResult.issues, ...closedResult.issues]) {
+    issuesMap.set(issue.number, issue);
+  }
+  const issues = [...issuesMap.values()];
 
   return {
     issues,
@@ -309,6 +598,7 @@ export async function fetchAutomationIssues(
     openTasksTotalCount,
     openTasksLoadedCount,
     closedHistoryUnavailable,
+    ...recognitionFieldsFromCompleteness(recognition),
   };
 }
 

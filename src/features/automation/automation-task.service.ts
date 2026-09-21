@@ -10,10 +10,11 @@ import {
   resolveMergeTimestamp,
   shouldFetchLinkedPullRequest,
 } from "@/features/automation/automation-status.parser";
+import { matchesAutomationView } from "@/features/automation/automation-dashboard.views";
 import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,
-  fetchAutomationIssues,
+  fetchAutomationIssuesForView,
   fetchLinkedPullRequestSafe,
   getAutomationGitHubConfig,
 } from "@/features/automation/automation-github.client";
@@ -22,6 +23,7 @@ import { enrichTasksWithProductionStatus } from "@/features/automation/automatio
 import { buildSummary, mapIssueToTask } from "@/features/automation/automation-task.aggregation";
 import type {
   AutomationDashboardResponse,
+  AutomationDashboardView,
   AutomationDataCompleteness,
   AutomationTask,
 } from "@/features/automation/automation-task.types";
@@ -65,24 +67,36 @@ async function enrichTaskWithLinkedPullRequest(task: AutomationTask): Promise<Au
   } satisfies AutomationTask;
 }
 
-async function loadAutomationTasksUncached(): Promise<CachedAutomationPayload> {
+async function loadAutomationTasksUncached(view: AutomationDashboardView): Promise<CachedAutomationPayload> {
   const {
     issues,
     openTasksTruncated,
     openTasksTotalCount,
     openTasksLoadedCount,
     closedHistoryUnavailable,
-  } = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+    historyTruncated,
+    historyLoadedCount,
+    historyTotalCount,
+    taskAreaRecognitionTruncated,
+    unlabeledCommentChecksSkipped,
+    unlabeledCommentChecksPerformed,
+    commentLookupFailedCount,
+    recognitionDegraded,
+  } = await fetchAutomationIssuesForView(view, AUTOMATION_STATUS_GITHUB_LABELS);
 
   const baseTasks = issues
     .map(mapIssueToTask)
+    .filter((task) => matchesAutomationView(task, view))
     .sort((left, right) => right.latestUpdateAt.localeCompare(left.latestUpdateAt));
 
-  const tasksWithLinkedPullRequests = await mapWithConcurrency(
-    baseTasks,
-    AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
-    enrichTaskWithLinkedPullRequest,
-  );
+  const tasksWithLinkedPullRequests =
+    view === "active"
+      ? await mapWithConcurrency(
+          baseTasks,
+          AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
+          enrichTaskWithLinkedPullRequest,
+        )
+      : baseTasks;
 
   const productionCheckedAt = new Date().toISOString();
   const productionCommitSha = getProductionCommitShaFromEnv();
@@ -99,16 +113,28 @@ async function loadAutomationTasksUncached(): Promise<CachedAutomationPayload> {
       openTasksTotalCount,
       openTasksLoadedCount,
       closedHistoryUnavailable,
+      historyTruncated,
+      historyLoadedCount,
+      historyTotalCount,
+      taskAreaRecognitionTruncated,
+      unlabeledCommentChecksSkipped,
+      unlabeledCommentChecksPerformed,
+      commentLookupFailedCount,
+      recognitionDegraded,
     },
     productionCommitSha,
     productionCheckedAt,
   };
 }
 
-function getCachedAutomationTasks(repoSlug: string) {
-  return unstable_cache(loadAutomationTasksUncached, ["admin-automation-tasks", repoSlug], {
-    revalidate: CACHE_REVALIDATE_SECONDS,
-  });
+function getCachedAutomationTasks(repoSlug: string, view: AutomationDashboardView) {
+  return unstable_cache(
+    () => loadAutomationTasksUncached(view),
+    ["admin-automation-tasks", repoSlug, view],
+    {
+      revalidate: CACHE_REVALIDATE_SECONDS,
+    },
+  );
 }
 
 const EMPTY_SUMMARY = {
@@ -120,40 +146,47 @@ const EMPTY_SUMMARY = {
   mergedToday: { value: 0, isPartial: false },
 } as const;
 
-function emptyDashboard(configMessage: string | null): AutomationDashboardResponse {
+function emptyDashboard(
+  configMessage: string | null,
+  view: AutomationDashboardView = "active",
+): AutomationDashboardResponse {
   return {
     configured: false,
     configMessage,
     summary: EMPTY_SUMMARY,
     tasks: [],
     fetchedAt: new Date().toISOString(),
+    view,
     productionCommitSha: null,
     productionCheckedAt: null,
   };
 }
 
-export async function getAutomationDashboard(): Promise<AutomationDashboardResponse> {
+export async function getAutomationDashboard(
+  view: AutomationDashboardView = "active",
+): Promise<AutomationDashboardResponse> {
   const config = getAutomationGitHubConfig();
   if (!config.configured) {
-    return emptyDashboard(config.configMessage);
+    return emptyDashboard(config.configMessage, view);
   }
 
   try {
     const { tasks, dataCompleteness, productionCommitSha, productionCheckedAt } =
-      await getCachedAutomationTasks(config.repoSlug)();
+      await getCachedAutomationTasks(config.repoSlug, view)();
     return {
       configured: true,
       configMessage: null,
-      summary: buildSummary(tasks, dataCompleteness),
+      summary: buildSummary(tasks, dataCompleteness, view),
       tasks,
       fetchedAt: new Date().toISOString(),
+      view,
       dataCompleteness,
       productionCommitSha,
       productionCheckedAt,
     };
   } catch (error) {
     if (error instanceof AutomationGitHubConfigError) {
-      return emptyDashboard(error.message);
+      return emptyDashboard(error.message, view);
     }
 
     const loadError =
@@ -171,6 +204,7 @@ export async function getAutomationDashboard(): Promise<AutomationDashboardRespo
       summary: EMPTY_SUMMARY,
       tasks: [],
       fetchedAt: new Date().toISOString(),
+      view,
       productionCommitSha: null,
       productionCheckedAt: null,
     };

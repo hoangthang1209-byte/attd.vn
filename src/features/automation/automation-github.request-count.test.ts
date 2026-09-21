@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { AUTOMATION_STATUS_GITHUB_LABELS } from "@/features/automation/automation-status.parser";
-import { fetchAutomationIssues } from "@/features/automation/automation-github.loader";
+import { DEVELOPMENT_TASK_GITHUB_LABEL } from "@/features/automation/automation-task.recognition";
+import {
+  fetchAutomationIssues,
+  fetchAutomationIssuesForView,
+  listRepoIssuesPaginated,
+  MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS,
+  MAX_UNLABELED_OPEN_COMMENT_CHECKS,
+} from "@/features/automation/automation-github.loader";
 
 const originalFetch = globalThis.fetch;
 
@@ -183,6 +190,244 @@ describe("automation GitHub request-count regression", () => {
     assert.equal(result.openTasksTruncated, true);
     assert.equal(result.openTasksTotalCount, 1205);
     assert.equal(result.openTasksLoadedCount, 1000);
+  });
+
+  it("discovers TASK_AREA-only open tasks outside status labels", async () => {
+    globalThis.fetch = async (input) => {
+      const url = decodeURIComponent(String(input));
+
+      if (url.includes("/search/issues") && url.includes("is:open")) {
+        return jsonResponse({
+          total_count: 2,
+          items: [
+            ...buildSearchItems(1, 300, "enhancement"),
+            {
+              number: 301,
+              title: "Task area only",
+              state: "open" as const,
+              html_url: "https://github.com/hoangthang1209-byte/attd.vn/issues/301",
+              updated_at: "2026-09-20T12:00:00.000Z",
+              closed_at: null,
+              labels: [{ name: "documentation" }],
+            },
+          ],
+        });
+      }
+
+      if (url.includes("/search/issues")) {
+        return jsonResponse({ total_count: 0, items: [] });
+      }
+
+      if (url.includes("/issues/301/comments")) {
+        return jsonResponse([{ user: { login: "owner" }, body: "TASK_AREA: Automation Platform", created_at: "2026-01-01T00:00:00Z" }]);
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.deepEqual(
+      result.issues.map((issue) => issue.number),
+      [301],
+    );
+  });
+
+  it("loads full repo history for the all-tasks view via REST pagination", async () => {
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+
+      if (url.includes("/repos/") && url.includes("/issues?")) {
+        const page = Number(new URL(url).searchParams.get("page") ?? "1");
+        if (page === 1) {
+          return jsonResponse([
+            {
+              number: 10,
+              title: "Old merged task",
+              state: "closed",
+              html_url: "https://github.com/hoangthang1209-byte/attd.vn/issues/10",
+              updated_at: "2026-01-15T12:00:00.000Z",
+              closed_at: "2026-01-10T12:00:00.000Z",
+              labels: [{ name: "status:merged" }],
+            },
+            {
+              number: 11,
+              title: "Random closed bug",
+              state: "closed",
+              html_url: "https://github.com/hoangthang1209-byte/attd.vn/issues/11",
+              updated_at: "2026-01-14T12:00:00.000Z",
+              closed_at: "2026-01-12T12:00:00.000Z",
+              labels: [{ name: "bug" }],
+            },
+          ]);
+        }
+        return jsonResponse([]);
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssuesForView("all", AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.equal(result.issues.length, 1);
+    assert.equal(result.issues[0]?.number, 10);
+    assert.equal(result.historyTruncated, false);
+  });
+
+  it("surfaces history truncation metadata when REST pagination hits the cap", async () => {
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+
+      if (url.includes("/repos/") && url.includes("/issues?")) {
+        const page = Number(new URL(url).searchParams.get("page") ?? "1");
+        return jsonResponse(
+          Array.from({ length: 100 }, (_, index) => ({
+            number: (page - 1) * 100 + index + 1,
+            title: `Issue ${(page - 1) * 100 + index + 1}`,
+            state: "closed",
+            html_url: `https://github.com/hoangthang1209-byte/attd.vn/issues/${(page - 1) * 100 + index + 1}`,
+            updated_at: "2026-01-01T12:00:00.000Z",
+            closed_at: "2026-01-01T12:00:00.000Z",
+            labels: [{ name: "status:merged" }],
+          })),
+        );
+      }
+
+      if (url.includes("/comments")) {
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const listing = await listRepoIssuesPaginated("closed");
+    assert.equal(listing.truncated, true);
+    assert.equal(listing.loadedCount, 100 * 100);
+  });
+
+  it("bounds historical TASK_AREA comment lookups on all-tasks view", async () => {
+    let commentRequestCount = 0;
+    const unlabeledCount = MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS + 25;
+
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+
+      if (url.includes("/repos/") && url.includes("/issues?")) {
+        return jsonResponse(
+          Array.from({ length: unlabeledCount }, (_, index) => ({
+            number: index + 1,
+            title: `Unlabeled issue ${index + 1}`,
+            state: "open",
+            html_url: `https://github.com/hoangthang1209-byte/attd.vn/issues/${index + 1}`,
+            updated_at: `2026-01-${String((index % 28) + 1).padStart(2, "0")}T12:00:00.000Z`,
+            closed_at: null,
+            labels: [{ name: "bug" }],
+          })),
+        );
+      }
+
+      if (url.includes("/comments")) {
+        commentRequestCount += 1;
+        const issueNumber = Number(url.match(/\/issues\/(\d+)\/comments/)?.[1]);
+        if (issueNumber === 1) {
+          return jsonResponse([
+            { user: { login: "owner" }, body: "TASK_AREA: Automation Platform", created_at: "2026-01-01T00:00:00Z" },
+          ]);
+        }
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssuesForView("all", AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.equal(commentRequestCount, MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS);
+    assert.equal(result.issues.length, 1);
+    assert.equal(result.issues[0]?.number, 1);
+    assert.equal(result.taskAreaRecognitionTruncated, true);
+    assert.equal(result.unlabeledCommentChecksSkipped, 25);
+    assert.equal(result.unlabeledCommentChecksPerformed, MAX_UNLABELED_HISTORICAL_COMMENT_CHECKS);
+    assert.equal(result.recognitionDegraded, true);
+  });
+
+  it("short-circuits development-task label before comment lookup", async () => {
+    let commentRequestCount = 0;
+
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+
+      if (url.includes("/repos/") && url.includes("/issues?")) {
+        return jsonResponse([
+          {
+            number: 501,
+            title: "Development task label only",
+            state: "open",
+            html_url: "https://github.com/hoangthang1209-byte/attd.vn/issues/501",
+            updated_at: "2026-09-20T12:00:00.000Z",
+            closed_at: null,
+            labels: [{ name: DEVELOPMENT_TASK_GITHUB_LABEL }],
+          },
+        ]);
+      }
+
+      if (url.includes("/comments")) {
+        commentRequestCount += 1;
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssuesForView("all", AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.equal(commentRequestCount, 0);
+    assert.equal(result.issues.length, 1);
+    assert.equal(result.issues[0]?.number, 501);
+  });
+
+  it("caps active open TASK_AREA discovery at the configured limit", async () => {
+    let commentRequestCount = 0;
+    const unlabeledCount = MAX_UNLABELED_OPEN_COMMENT_CHECKS + 10;
+
+    globalThis.fetch = async (input) => {
+      const url = decodeURIComponent(String(input));
+
+      if (url.includes("/search/issues") && url.includes("is:open")) {
+        return jsonResponse({
+          total_count: unlabeledCount,
+          items: Array.from({ length: unlabeledCount }, (_, index) => ({
+            number: index + 1,
+            title: `Open unlabeled ${index + 1}`,
+            state: "open" as const,
+            html_url: `https://github.com/hoangthang1209-byte/attd.vn/issues/${index + 1}`,
+            updated_at: `2026-09-${String((index % 28) + 1).padStart(2, "0")}T12:00:00.000Z`,
+            closed_at: null,
+            labels: [{ name: "documentation" }],
+          })),
+        });
+      }
+
+      if (url.includes("/search/issues")) {
+        return jsonResponse({ total_count: 0, items: [] });
+      }
+
+      if (url.includes("/comments")) {
+        commentRequestCount += 1;
+        return jsonResponse([]);
+      }
+
+      return jsonResponse({}, 404);
+    };
+
+    const result = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
+    assert.equal(commentRequestCount, MAX_UNLABELED_OPEN_COMMENT_CHECKS);
+    assert.equal(result.taskAreaRecognitionTruncated, true);
+    assert.equal(result.unlabeledCommentChecksSkipped, 10);
   });
 
   it("continues with open operational data when closed history search fails", async () => {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAutomationDashboardPermission } from "@/features/automation/automation-api-auth";
+import { parseAutomationDashboardView } from "@/features/automation/automation-dashboard.views";
 
 export async function GET(request: NextRequest) {
   const permission = await requireAutomationDashboardPermission(request);
@@ -7,7 +8,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const { getAutomationDashboard } = await import("@/features/automation/automation-task.service");
-    const dashboard = await getAutomationDashboard();
+    const view = parseAutomationDashboardView(request.nextUrl.searchParams.get("view"));
+    const dashboard = await getAutomationDashboard(view);
     return NextResponse.json(dashboard);
   } catch (error) {
     console.error("[GET /api/admin/automation]", error);
