@@ -7,6 +7,7 @@ import type {
 
 type Props = {
   gallery: HomepageWorkshopGalleryConfig;
+  embedded?: boolean;
 };
 
 function getVisibleItems(gallery: HomepageWorkshopGalleryConfig): HomepageWorkshopMediaConfig[] {
@@ -61,7 +62,7 @@ function WorkshopCard({
   return <figure className="home-workshop-gallery__card">{content}</figure>;
 }
 
-export default function HomeWorkshopGallerySection({ gallery }: Props) {
+export default function HomeWorkshopGallerySection({ gallery, embedded = false }: Props) {
   const items = getVisibleItems(gallery);
   if (!gallery.enabled || items.length === 0) return null;
 
@@ -69,19 +70,26 @@ export default function HomeWorkshopGallerySection({ gallery }: Props) {
 
   return (
     <section
-      className={`mp-section mp-section--tight home-workshop-gallery ${layoutClass}`}
-      aria-labelledby="home-workshop-gallery-title"
+      className={[
+        embedded ? "home-workshop-gallery--embedded" : "mp-section mp-section--tight",
+        "home-workshop-gallery",
+        layoutClass,
+      ].join(" ")}
+      aria-labelledby={embedded ? undefined : "home-workshop-gallery-title"}
+      aria-label={embedded ? gallery.title : undefined}
     >
       <div className="container">
-        <div className="home-workshop-gallery__header">
-          <p className="home-workshop-gallery__eyebrow">{gallery.eyebrow}</p>
-          <h2 id="home-workshop-gallery-title" className="home-workshop-gallery__title">
-            {gallery.title}
-          </h2>
-          {gallery.description ? (
-            <p className="home-workshop-gallery__description">{gallery.description}</p>
-          ) : null}
-        </div>
+        {!embedded ? (
+          <div className="home-workshop-gallery__header">
+            <p className="home-workshop-gallery__eyebrow">{gallery.eyebrow}</p>
+            <h2 id="home-workshop-gallery-title" className="home-workshop-gallery__title">
+              {gallery.title}
+            </h2>
+            {gallery.description ? (
+              <p className="home-workshop-gallery__description">{gallery.description}</p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="home-workshop-gallery__grid">
           {items.map((item, index) => (

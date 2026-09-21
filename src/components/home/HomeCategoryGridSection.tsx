@@ -17,7 +17,10 @@ export default function HomeCategoryGridSection({
   return (
     <section id="home-categories" className="mp-section mp-section--alt mp-section--tight">
       <div className="container">
-        <MarketplaceSectionHeader title="Tìm nguồn hàng theo danh mục" />
+        <MarketplaceSectionHeader
+          title="Danh mục nguồn hàng"
+          description="Khám phá nhóm sản phẩm phù hợp nhu cầu đồng phục, merchandise và quà tặng doanh nghiệp."
+        />
         <div className="mp-category-grid mp-category-grid--marketplace">
           {categories.map((category) => (
             <CategoryCard

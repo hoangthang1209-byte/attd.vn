@@ -47,6 +47,7 @@ type Props = {
   className?: string;
   variant?: "default" | "compact";
   cms?: HomepageCompanyRealityConfig;
+  hideHeader?: boolean;
 };
 
 export default function CompanyFacts({
@@ -55,6 +56,7 @@ export default function CompanyFacts({
   className,
   variant = "default",
   cms,
+  hideHeader = false,
 }: Props) {
   const cmsFacts = selectPublicCmsFacts(cms);
   const facts = cmsFacts ?? COMPANY_FACTS;
@@ -73,13 +75,15 @@ export default function CompanyFacts({
   return (
     <section className={classes} aria-label={cms?.title ?? title}>
       <div className="container">
-        <div className="company-facts__header">
-          <p className="company-facts__eyebrow">{cms?.eyebrow ?? "Thông tin công ty"}</p>
-          <h2 className="company-facts__title">{cms?.title ?? title}</h2>
-          {cms?.description || description ? (
-            <p className="company-facts__description">{cms?.description ?? description}</p>
-          ) : null}
-        </div>
+        {!hideHeader ? (
+          <div className="company-facts__header">
+            <p className="company-facts__eyebrow">{cms?.eyebrow ?? "Thông tin công ty"}</p>
+            <h2 className="company-facts__title">{cms?.title ?? title}</h2>
+            {cms?.description || description ? (
+              <p className="company-facts__description">{cms?.description ?? description}</p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="company-facts__grid">
           {facts.map((fact, index) => {

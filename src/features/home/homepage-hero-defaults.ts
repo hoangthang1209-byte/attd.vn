@@ -1,12 +1,12 @@
 import type { HomepageHeroConfig } from "@/features/home/homepage.types";
 
 export const DEFAULT_HOMEPAGE_HERO: HomepageHeroConfig = {
-  eyebrow: "Nền tảng nguồn hàng B2B",
-  heading: "Nguồn hàng đồng phục & quà tặng cho doanh nghiệp",
+  eyebrow: "Nguồn hàng B2B",
+  heading: "Đồng phục, hàng may mặc & quà tặng doanh nghiệp",
   description:
-    "Khám phá sản phẩm sẵn kho, đặt OEM theo yêu cầu và kết nối nguồn hàng phù hợp cho đơn vị của bạn.",
-  primaryCtaLabel: "Khám phá nguồn hàng",
+    "ATTD giúp doanh nghiệp, đại lý và agency nguồn hàng trơn, in/thêu, OEM và triển khai đồng bộ — với MOQ và lead time rõ ràng.",
+  primaryCtaLabel: "Xem sản phẩm",
   primaryCtaUrl: "#home-categories",
-  secondaryCtaLabel: "Liên hệ báo giá sỉ",
+  secondaryCtaLabel: "Yêu cầu báo giá",
   secondaryCtaUrl: "/lien-he",
 };
