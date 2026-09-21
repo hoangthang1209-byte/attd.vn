@@ -99,9 +99,31 @@ describe("automation task service", () => {
     });
 
     assert.equal(summary.totalOpen.value, 1205);
-    assert.equal(summary.totalOpen.isPartial, true);
+    assert.equal(summary.totalOpen.isPartial, false);
     assert.equal(summary.building.value, 50);
     assert.equal(summary.building.isPartial, true);
+  });
+
+  it("marks totalOpen partial only when truncated without authoritative total_count", () => {
+    const openTasks = Array.from({ length: 50 }, (_, index) =>
+      mapIssueToTask(
+        issueFixture({
+          number: index + 1,
+          state: "OPEN",
+          closedAt: null,
+          labels: [{ name: "status:building" }],
+        }),
+      ),
+    );
+
+    const summary = buildSummary(openTasks, {
+      openTasksTruncated: true,
+      openTasksTotalCount: null as unknown as number,
+      openTasksLoadedCount: 50,
+    });
+
+    assert.equal(summary.totalOpen.value, 50);
+    assert.equal(summary.totalOpen.isPartial, true);
   });
 
   it("marks mergedToday partial when closed history is unavailable", () => {

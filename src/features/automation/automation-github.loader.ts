@@ -326,6 +326,19 @@ async function enrichPullRequestWithMergeTime(
   };
 }
 
+async function enrichPullRequestWithMergeTimeOrCandidate(
+  candidate: GitHubPullRequestPayload,
+): Promise<GitHubPullRequestPayload> {
+  try {
+    return await enrichPullRequestWithMergeTime(candidate);
+  } catch {
+    console.warn(
+      `[fetchLinkedPullRequest] pull detail enrichment failed for PR #${candidate.number}; returning timeline candidate without merge metadata`,
+    );
+    return candidate;
+  }
+}
+
 async function fetchLinkedPullRequest(
   issueNumber: number,
 ): Promise<GitHubPullRequestPayload | null> {
@@ -348,7 +361,7 @@ async function fetchLinkedPullRequest(
     candidates.find((candidate) => candidate.state === "OPEN") ?? candidates[0] ?? null;
   if (!preferred) return null;
 
-  return enrichPullRequestWithMergeTime(preferred);
+  return enrichPullRequestWithMergeTimeOrCandidate(preferred);
 }
 
 export async function fetchLinkedPullRequestSafe(

@@ -64,9 +64,11 @@ export function buildSummary(
     openTasksTruncated && dataCompleteness?.openTasksTotalCount != null
       ? dataCompleteness.openTasksTotalCount
       : loadedOpenCount;
+  const totalOpenIsPartial =
+    openTasksTruncated && dataCompleteness?.openTasksTotalCount == null;
 
   return {
-    totalOpen: partialMetric(authoritativeOpenTotal, openTasksTruncated),
+    totalOpen: partialMetric(authoritativeOpenTotal, totalOpenIsPartial),
     building: partialMetric(
       tasks.filter((task) => task.isOpen && task.status === "building").length,
       openTasksTruncated,
