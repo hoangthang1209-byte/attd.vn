@@ -8,6 +8,7 @@ import {
   parseTaskArea,
   resolveMergeTimestamp,
 } from "@/features/automation/automation-status.parser";
+import { createDefaultLifecycleFields } from "@/features/automation/automation-task.defaults";
 import type {
   AutomationDashboardView,
   AutomationDataCompleteness,
@@ -18,6 +19,7 @@ import type {
 import type { GitHubIssuePayload } from "@/features/automation/automation-github.types";
 
 export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
+  const checkedAt = new Date().toISOString();
   const labelNames = issue.labels.map((label) => label.name);
   const { status, statusLabel } = parseNormalizedStatus(labelNames);
   const { risk, riskLabel } = parseAutomationRisk(labelNames);
@@ -48,6 +50,7 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
     githubIssueUrl: issue.url,
     labels: labelNames,
     recentStatusComments: filterRecentStatusComments(comments),
+    ...createDefaultLifecycleFields(checkedAt),
   };
 }
 

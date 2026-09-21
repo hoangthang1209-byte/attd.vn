@@ -5,12 +5,11 @@ import {
   AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
   mapWithConcurrency,
 } from "@/features/automation/automation-async-utils";
+import { parseAutomationDashboardView } from "@/features/automation/automation-dashboard-view-parser";
 import {
-  AUTOMATION_STATUS_GITHUB_LABELS,
-  resolveMergeTimestamp,
-  shouldFetchLinkedPullRequest,
-} from "@/features/automation/automation-status.parser";
-import { matchesAutomationView } from "@/features/automation/automation-dashboard.views";
+  filterActiveViewTasks,
+  matchesAutomationView,
+} from "@/features/automation/automation-dashboard.views";
 import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,
@@ -18,6 +17,13 @@ import {
   fetchLinkedPullRequestSafe,
   getAutomationGitHubConfig,
 } from "@/features/automation/automation-github.client";
+import { enrichTasksWithLifecycle } from "@/features/automation/automation-lifecycle.enrichment";
+import { getProductionCommitShaFromEnv } from "@/features/automation/automation-production";
+import {
+  AUTOMATION_STATUS_GITHUB_LABELS,
+  resolveMergeTimestamp,
+  shouldFetchLinkedPullRequest,
+} from "@/features/automation/automation-status.parser";
 import { buildSummary, mapIssueToTask } from "@/features/automation/automation-task.aggregation";
 import type {
   AutomationDashboardResponse,
@@ -25,6 +31,8 @@ import type {
   AutomationDataCompleteness,
   AutomationTask,
 } from "@/features/automation/automation-task.types";
+
+export { parseAutomationDashboardView };
 
 const CACHE_REVALIDATE_SECONDS = 60;
 
@@ -49,6 +57,7 @@ async function enrichTaskWithLinkedPullRequest(task: AutomationTask): Promise<Au
     title: linkedPullRequest.title,
     updatedAt: linkedPullRequest.updatedAt,
     mergedAt: linkedPullRequest.mergedAt,
+    mergeCommitSha: linkedPullRequest.mergeCommitSha,
   } as const;
 
   return {
@@ -63,23 +72,14 @@ async function enrichTaskWithLinkedPullRequest(task: AutomationTask): Promise<Au
 }
 
 async function loadAutomationTasksUncached(view: AutomationDashboardView): Promise<CachedAutomationPayload> {
-  const {
-    issues,
-    openTasksTruncated,
-    openTasksTotalCount,
-    openTasksLoadedCount,
-    closedHistoryUnavailable,
-    historyTruncated,
-    historyLoadedCount,
-    historyTotalCount,
-  } = await fetchAutomationIssuesForView(view, AUTOMATION_STATUS_GITHUB_LABELS);
+  const fetchResult = await fetchAutomationIssuesForView(view, AUTOMATION_STATUS_GITHUB_LABELS);
 
-  const baseTasks = issues
+  const baseTasks = fetchResult.issues
     .map(mapIssueToTask)
     .filter((task) => matchesAutomationView(task, view))
     .sort((left, right) => right.latestUpdateAt.localeCompare(left.latestUpdateAt));
 
-  const tasks =
+  const tasksWithLinkedPr =
     view === "active"
       ? await mapWithConcurrency(
           baseTasks,
@@ -88,24 +88,31 @@ async function loadAutomationTasksUncached(view: AutomationDashboardView): Promi
         )
       : baseTasks;
 
+  const dataCompleteness: AutomationDataCompleteness = {
+    openTasksTruncated: fetchResult.openTasksTruncated,
+    openTasksTotalCount: fetchResult.openTasksTotalCount,
+    openTasksLoadedCount: fetchResult.openTasksLoadedCount,
+    closedHistoryUnavailable: fetchResult.closedHistoryUnavailable,
+    historyTruncated: fetchResult.historyTruncated,
+    historyLoadedCount: fetchResult.historyLoadedCount,
+    historyTotalCount: fetchResult.historyTotalCount,
+    issuesScanned: fetchResult.issuesScanned ?? null,
+    tasksRecognized: fetchResult.tasksRecognized ?? tasksWithLinkedPr.length,
+    commentCandidatesSkipped: fetchResult.commentCandidatesSkipped ?? null,
+    commentLookupFailures: fetchResult.commentLookupFailures ?? null,
+    activeCommentChecksCapped: fetchResult.activeCommentChecksCapped ?? false,
+  };
+
   return {
-    tasks,
-    dataCompleteness: {
-      openTasksTruncated,
-      openTasksTotalCount,
-      openTasksLoadedCount,
-      closedHistoryUnavailable,
-      historyTruncated,
-      historyLoadedCount,
-      historyTotalCount,
-    },
+    tasks: tasksWithLinkedPr,
+    dataCompleteness,
   };
 }
 
 function getCachedAutomationTasks(repoSlug: string, view: AutomationDashboardView) {
   return unstable_cache(
     () => loadAutomationTasksUncached(view),
-    ["admin-automation-tasks", repoSlug, view],
+    ["admin-automation-tasks-v2", repoSlug, view],
     {
       revalidate: CACHE_REVALIDATE_SECONDS,
     },
@@ -132,14 +139,9 @@ function emptyDashboard(
     tasks: [],
     fetchedAt: new Date().toISOString(),
     view,
+    productionCommitSha: null,
+    productionCheckedAt: null,
   };
-}
-
-export function parseAutomationDashboardView(
-  raw: string | null | undefined,
-): AutomationDashboardView {
-  if (raw === "all" || raw === "completed") return raw;
-  return "active";
 }
 
 export async function getAutomationDashboard(
@@ -151,15 +153,32 @@ export async function getAutomationDashboard(
   }
 
   try {
-    const { tasks, dataCompleteness } = await getCachedAutomationTasks(config.repoSlug, view)();
+    const { tasks: cachedTasks, dataCompleteness } = await getCachedAutomationTasks(
+      config.repoSlug,
+      view,
+    )();
+
+    const productionCheckedAt = new Date().toISOString();
+    const productionCommitSha = getProductionCommitShaFromEnv();
+    const enrichedTasks = await enrichTasksWithLifecycle(
+      cachedTasks,
+      productionCommitSha,
+      productionCheckedAt,
+    );
+
+    const viewTasks =
+      view === "active" ? filterActiveViewTasks(enrichedTasks) : enrichedTasks;
+
     return {
       configured: true,
       configMessage: null,
-      summary: buildSummary(tasks, dataCompleteness, view),
-      tasks,
+      summary: buildSummary(viewTasks, dataCompleteness, view),
+      tasks: viewTasks,
       fetchedAt: new Date().toISOString(),
       view,
       dataCompleteness,
+      productionCommitSha,
+      productionCheckedAt,
     };
   } catch (error) {
     if (error instanceof AutomationGitHubConfigError) {
@@ -182,6 +201,8 @@ export async function getAutomationDashboard(
       tasks: [],
       fetchedAt: new Date().toISOString(),
       view,
+      productionCommitSha: null,
+      productionCheckedAt: null,
     };
   }
 }

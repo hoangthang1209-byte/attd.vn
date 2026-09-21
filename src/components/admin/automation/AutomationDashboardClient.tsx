@@ -8,6 +8,7 @@ import {
   EmptyState,
   PageHeader,
 } from "@/components/admin/AdminUi";
+import { formatShortCommitSha } from "@/features/automation/automation-commit-format";
 import {
   collectTaskAreaFilterOptions,
   matchesAutomationTaskFilters,
@@ -19,11 +20,19 @@ import {
 import {
   AUTOMATION_DASHBOARD_VIEW_OPTIONS,
   defaultOpenFilterForView,
+  parseAutomationDashboardView,
   shouldShowTaskInCompletedDefaultList,
   type AutomationDashboardView,
 } from "@/features/automation/automation-dashboard.views";
 import {
+  AUTOMATION_CI_STATUS_BADGE_CLASS,
+  AUTOMATION_CI_STATUS_LABELS,
   AUTOMATION_OPEN_FILTER_OPTIONS,
+  AUTOMATION_PRODUCTION_STATUS_BADGE_CLASS,
+  AUTOMATION_PRODUCTION_STATUS_LABELS,
+  AUTOMATION_PR_STATE_SUFFIX,
+  AUTOMATION_REVIEWER_STATUS_BADGE_CLASS,
+  AUTOMATION_REVIEWER_STATUS_LABELS,
   AUTOMATION_RISK_BADGE_CLASS,
   AUTOMATION_RISK_FILTER_OPTIONS,
   AUTOMATION_RISK_LABELS,
@@ -36,20 +45,34 @@ import type {
   AutomationSummaryMetric,
   AutomationTask,
 } from "@/features/automation/automation-task.types";
-import { AUTOMATION_PR_STATE_SUFFIX } from "@/features/automation/labels";
 import { formatQuoteDateTime } from "@/features/quotes/format";
 
+function readInitialView(): AutomationDashboardView {
+  if (typeof window === "undefined") return "active";
+  const params = new URLSearchParams(window.location.search);
+  return parseAutomationDashboardView(params.get("view"));
+}
+
 export default function AutomationDashboardClient() {
-  const [view, setView] = useState<AutomationDashboardView>("active");
+  const [view, setView] = useState<AutomationDashboardView>(() => readInitialView());
   const [data, setData] = useState<AutomationDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<AutomationStatusFilter>("all");
   const [riskFilter, setRiskFilter] = useState<AutomationRiskFilter>("all");
-  const [openFilter, setOpenFilter] = useState<AutomationOpenFilter>("open");
+  const [openFilter, setOpenFilter] = useState<AutomationOpenFilter>(() =>
+    defaultOpenFilterForView(readInitialView()),
+  );
   const [taskAreaFilter, setTaskAreaFilter] = useState<AutomationTaskAreaFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
+
+  const syncViewToUrl = useCallback((nextView: AutomationDashboardView) => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", nextView);
+    window.history.replaceState(null, "", url.toString());
+  }, []);
 
   const load = useCallback(async (targetView: AutomationDashboardView) => {
     setLoading(true);
@@ -70,22 +93,20 @@ export default function AutomationDashboardClient() {
   const handleViewChange = useCallback(
     (nextView: AutomationDashboardView) => {
       setView(nextView);
+      syncViewToUrl(nextView);
       setOpenFilter(defaultOpenFilterForView(nextView));
       setStatusFilter("all");
       setExpandedIssue(null);
       void load(nextView);
     },
-    [load],
+    [load, syncViewToUrl],
   );
 
   useEffect(() => {
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) void load("active");
-    });
-    return () => {
-      cancelled = true;
-    };
+    const initialView = readInitialView();
+    setView(initialView);
+    setOpenFilter(defaultOpenFilterForView(initialView));
+    void load(initialView);
   }, [load]);
 
   const taskAreaFilterOptions = useMemo(
@@ -96,10 +117,7 @@ export default function AutomationDashboardClient() {
   const filteredTasks = useMemo(() => {
     if (!data) return [];
     return data.tasks.filter((task) => {
-      if (
-        view === "completed" &&
-        !shouldShowTaskInCompletedDefaultList(task, statusFilter)
-      ) {
+      if (view === "completed" && !shouldShowTaskInCompletedDefaultList(task, statusFilter)) {
         return false;
       }
       return matchesAutomationTaskFilters(task, {
@@ -140,7 +158,7 @@ export default function AutomationDashboardClient() {
     <AdminPageShell>
       <PageHeader
         title="Tự động hóa"
-        description="Trung tâm điều khiển task phát triển: theo dõi công việc đang chạy, toàn bộ lịch sử và task đã hoàn tất từ GitHub."
+        description="Automation Control Center: theo dõi lifecycle Issue → Builder → PR → CI → Reviewer → Production."
         actions={
           <button
             type="button"
@@ -168,33 +186,7 @@ export default function AutomationDashboardClient() {
         <p className="admin-error">{data.configMessage}</p>
       ) : null}
 
-      {data?.configured && data.dataCompleteness?.openTasksTruncated ? (
-        <p className="admin-error" role="status">
-          Dữ liệu task đang mở chưa đầy đủ: đã tải{" "}
-          {data.dataCompleteness.openTasksLoadedCount ?? data.tasks.filter((task) => task.isOpen).length}
-          {" / "}
-          {data.dataCompleteness.openTasksTotalCount ?? "?"} task theo GitHub Search API (giới hạn 1000 kết
-          quả). Các task còn lại không hiển thị. Số liệu theo trạng thái (trừ tổng mở) chỉ phản ánh phần
-          đã tải.
-        </p>
-      ) : null}
-
-      {data?.configured && view === "active" && data.dataCompleteness?.closedHistoryUnavailable ? (
-        <p className="admin-error" role="status">
-          Không thể tải lịch sử task đã đóng (merged/superseded 30 ngày). Dữ liệu task đang mở vẫn hiển thị;
-          số liệu &quot;Đã merge hôm nay&quot; có thể thiếu.
-        </p>
-      ) : null}
-
-      {data?.configured && data.dataCompleteness?.historyTruncated ? (
-        <p className="admin-error" role="status">
-          Lịch sử task chưa đầy đủ: đã tải {data.dataCompleteness.historyLoadedCount ?? data.tasks.length} issue
-          {data.dataCompleteness.historyTotalCount
-            ? ` / ${data.dataCompleteness.historyTotalCount}`
-            : ""}{" "}
-          (giới hạn phân trang GitHub REST). Các task cũ hơn có thể chưa hiển thị.
-        </p>
-      ) : null}
+      {renderCompletenessBanners(data, view)}
 
       {data?.configured ? (
         <>
@@ -225,8 +217,12 @@ export default function AutomationDashboardClient() {
           ) : (
             <p className="admin-muted" role="status">
               {view === "all"
-                ? `Hiển thị ${data.tasks.length} task đã nhận diện trong repo.`
-                : `Hiển thị ${data.tasks.length} task đã hoàn tất (merged/thất bại). Chọn trạng thái "Đã thay thế" để xem task superseded.`}
+                ? `Hiển thị ${data.tasks.length} task đã nhận diện${
+                    data.dataCompleteness?.issuesScanned
+                      ? ` (quét ${data.dataCompleteness.issuesScanned} issue)`
+                      : ""
+                  }.`
+                : `Hiển thị ${data.tasks.length} task đã hoàn tất (merged + production verified).`}
             </p>
           )}
 
@@ -252,7 +248,7 @@ export default function AutomationDashboardClient() {
               ))}
             </select>
             <select
-              className="admin-select"
+              className="admin-select automation-task-table__optional"
               value={riskFilter}
               onChange={(event) => setRiskFilter(event.target.value as AutomationRiskFilter)}
               aria-label="Lọc theo rủi ro"
@@ -303,14 +299,15 @@ export default function AutomationDashboardClient() {
                 <table className="admin-table admin-table--compact sales-follow-up__table automation-task-table">
                   <thead>
                     <tr>
-                      <th>Vấn đề</th>
                       <th>Mảng</th>
-                      <th>Tiêu đề</th>
-                      <th>Trạng thái</th>
-                      <th className="automation-task-table__optional">Rủi ro</th>
-                      <th>PR liên kết</th>
-                      <th>Cập nhật</th>
+                      <th>Task</th>
+                      <th>Status</th>
+                      <th>PR</th>
+                      <th>CI</th>
+                      <th>Reviewer</th>
+                      <th>Production</th>
                       <th className="automation-task-table__optional">Blocker</th>
+                      <th>Next</th>
                       <th />
                     </tr>
                   </thead>
@@ -319,6 +316,7 @@ export default function AutomationDashboardClient() {
                       <AutomationTaskRow
                         key={task.issueNumber}
                         task={task}
+                        productionCommitSha={data.productionCommitSha}
                         expanded={expandedIssue === task.issueNumber}
                         onToggle={() =>
                           setExpandedIssue((current) =>
@@ -335,6 +333,7 @@ export default function AutomationDashboardClient() {
                   <AutomationTaskCard
                     key={task.issueNumber}
                     task={task}
+                    productionCommitSha={data.productionCommitSha}
                     expanded={expandedIssue === task.issueNumber}
                     onToggle={() =>
                       setExpandedIssue((current) =>
@@ -348,12 +347,73 @@ export default function AutomationDashboardClient() {
           )}
 
           <p className="admin-muted">
-            Cập nhật lúc {data.fetchedAt ? formatQuoteDateTime(data.fetchedAt) : "—"} · bộ nhớ đệm 60 giây
+            Cập nhật lúc {data.fetchedAt ? formatQuoteDateTime(data.fetchedAt) : "—"} · GitHub cache 60 giây
+            {data.productionCommitSha ? (
+              <>
+                {" "}
+                · Production SHA: {formatShortCommitSha(data.productionCommitSha)}
+                {data.productionCheckedAt
+                  ? ` (kiểm tra ${formatQuoteDateTime(data.productionCheckedAt)})`
+                  : null}
+              </>
+            ) : (
+              " · Production SHA: không xác định (chỉ có trên Vercel Production)"
+            )}
           </p>
         </>
       ) : null}
     </AdminPageShell>
   );
+}
+
+function renderCompletenessBanners(
+  data: AutomationDashboardResponse | null,
+  view: AutomationDashboardView,
+) {
+  if (!data?.configured || !data.dataCompleteness) return null;
+  const banners: string[] = [];
+
+  if (data.dataCompleteness.openTasksTruncated) {
+    banners.push(
+      `Dữ liệu task đang mở chưa đầy đủ: đã tải ${data.dataCompleteness.openTasksLoadedCount ?? "?"} / ${data.dataCompleteness.openTasksTotalCount ?? "?"} task (Search API giới hạn 1000).`,
+    );
+  }
+
+  if (view === "active" && data.dataCompleteness.closedHistoryUnavailable) {
+    banners.push(
+      "Không thể tải lịch sử task đã đóng gần đây. Số liệu active vẫn hiển thị nhưng có thể thiếu merged hôm nay.",
+    );
+  }
+
+  if (data.dataCompleteness.historyTruncated) {
+    banners.push(
+      `Lịch sử chưa đầy đủ: quét ${data.dataCompleteness.issuesScanned ?? data.dataCompleteness.historyLoadedCount ?? "?"} issue, nhận diện ${data.dataCompleteness.tasksRecognized ?? data.tasks.length} task (giới hạn phân trang REST).`,
+    );
+  }
+
+  if ((data.dataCompleteness.commentCandidatesSkipped ?? 0) > 0) {
+    banners.push(
+      `Đã bỏ qua ${data.dataCompleteness.commentCandidatesSkipped} issue chưa có nhãn status khi tra comment TASK_AREA (giới hạn an toàn).`,
+    );
+  }
+
+  if ((data.dataCompleteness.commentLookupFailures ?? 0) > 0) {
+    banners.push(
+      `${data.dataCompleteness.commentLookupFailures} lần tra comment thất bại (403/429). Dữ liệu có thể thiếu task.`,
+    );
+  }
+
+  if (data.dataCompleteness.activeCommentChecksCapped) {
+    banners.push(
+      "Chế độ Active: giới hạn tra comment TASK_AREA đã đạt. Ưu tiên issue cập nhật gần đây.",
+    );
+  }
+
+  return banners.map((message) => (
+    <p key={message} className="admin-error" role="status">
+      {message}
+    </p>
+  ));
 }
 
 function formatSummaryMetric(metric: AutomationSummaryMetric): string {
@@ -379,7 +439,10 @@ function StatCard({
         {label}
         {partialHint}
       </span>
-      <strong className="sales-follow-up__stat-value" title={metric.isPartial ? "Số liệu chưa đầy đủ" : undefined}>
+      <strong
+        className="sales-follow-up__stat-value"
+        title={metric.isPartial ? "Số liệu chưa đầy đủ" : undefined}
+      >
         {displayValue}
       </strong>
     </article>
@@ -388,29 +451,40 @@ function StatCard({
 
 function AutomationTaskCard({
   task,
+  productionCommitSha,
   expanded,
   onToggle,
 }: {
   task: AutomationTask;
+  productionCommitSha: string | null;
   expanded: boolean;
   onToggle: () => void;
 }) {
   return (
     <article className="automation-task-card">
       <div className="automation-task-card__header">
+        <span className="admin-status-badge admin-status-badge--neutral">{task.taskArea}</span>
         <Link href={task.githubIssueUrl} className="admin-link" target="_blank" rel="noreferrer">
           #{task.issueNumber}
         </Link>
-        <span className={AUTOMATION_STATUS_BADGE_CLASS[task.status]}>
-          {AUTOMATION_STATUS_LABELS[task.status]}
-        </span>
       </div>
-      <p className="automation-task-card__area">
-        <span className="admin-status-badge admin-status-badge--neutral">{task.taskArea}</span>
-      </p>
       <p className="automation-task-card__title">
         <strong>{task.title}</strong>
       </p>
+      <div className="automation-task-card__badges">
+        <span className={AUTOMATION_STATUS_BADGE_CLASS[task.status]}>
+          {AUTOMATION_STATUS_LABELS[task.status]}
+        </span>
+        <span className={AUTOMATION_CI_STATUS_BADGE_CLASS[task.ciStatus.status]}>
+          {AUTOMATION_CI_STATUS_LABELS[task.ciStatus.status]}
+        </span>
+        <span className={AUTOMATION_REVIEWER_STATUS_BADGE_CLASS[task.reviewerStatus.status]}>
+          {AUTOMATION_REVIEWER_STATUS_LABELS[task.reviewerStatus.status]}
+        </span>
+        <span className={AUTOMATION_PRODUCTION_STATUS_BADGE_CLASS[task.productionStatus.status]}>
+          {AUTOMATION_PRODUCTION_STATUS_LABELS[task.productionStatus.status]}
+        </span>
+      </div>
       <p className="automation-task-card__meta">
         {task.linkedPullRequest ? (
           <Link href={task.linkedPullRequest.url} className="admin-link" target="_blank" rel="noreferrer">
@@ -420,17 +494,25 @@ function AutomationTaskCard({
           "Chưa có PR"
         )}
         {" · "}
-        {formatQuoteDateTime(task.latestUpdateAt)}
+        Next: {task.nextAction.label}
       </p>
       <button type="button" className="admin-btn admin-btn--xs admin-btn--secondary" onClick={onToggle}>
         {expanded ? "Thu gọn" : "Chi tiết"}
       </button>
-      {expanded ? <AutomationTaskDetails task={task} /> : null}
+      {expanded ? (
+        <AutomationTaskDetails task={task} productionCommitSha={productionCommitSha} />
+      ) : null}
     </article>
   );
 }
 
-function AutomationTaskDetails({ task }: { task: AutomationTask }) {
+function AutomationTaskDetails({
+  task,
+  productionCommitSha,
+}: {
+  task: AutomationTask;
+  productionCommitSha: string | null;
+}) {
   return (
     <div className="admin-panel automation-task-card__details">
       <p>
@@ -442,6 +524,36 @@ function AutomationTaskDetails({ task }: { task: AutomationTask }) {
           {AUTOMATION_RISK_LABELS[task.risk]}
         </span>
       </p>
+      <p>
+        <strong>Cập nhật:</strong> {formatQuoteDateTime(task.latestUpdateAt)}
+      </p>
+      <p>
+        <strong>CI:</strong> {AUTOMATION_CI_STATUS_LABELS[task.ciStatus.status]}
+        {task.ciStatus.reason ? ` · ${task.ciStatus.reason}` : ""}
+      </p>
+      <p>
+        <strong>Reviewer:</strong> {AUTOMATION_REVIEWER_STATUS_LABELS[task.reviewerStatus.status]}
+        {task.reviewerStatus.reason ? ` · ${task.reviewerStatus.reason}` : ""}
+      </p>
+      <p>
+        <strong>Production:</strong>{" "}
+        {AUTOMATION_PRODUCTION_STATUS_LABELS[task.productionStatus.status]}
+        {task.productionStatus.mergedCommitSha ? (
+          <> · Merge SHA: {formatShortCommitSha(task.productionStatus.mergedCommitSha)}</>
+        ) : null}
+        {productionCommitSha ? <> · Production SHA: {formatShortCommitSha(productionCommitSha)}</> : null}
+        {task.productionStatus.reason ? <> · {task.productionStatus.reason}</> : null}
+      </p>
+      {task.relationship?.supersededByIssueNumber ? (
+        <p>
+          <strong>Thay thế bởi:</strong> #{task.relationship.supersededByIssueNumber}
+        </p>
+      ) : null}
+      {task.relationship?.repairForIssueNumber ? (
+        <p>
+          <strong>Repair cho:</strong> #{task.relationship.repairForIssueNumber}
+        </p>
+      ) : null}
       <p>
         <strong>Vấn đề GitHub:</strong>{" "}
         <Link href={task.githubIssueUrl} target="_blank" rel="noreferrer">
@@ -460,9 +572,6 @@ function AutomationTaskDetails({ task }: { task: AutomationTask }) {
           <strong>PR liên kết:</strong> chưa có PR liên kết hoặc chưa tải
         </p>
       )}
-      <p>
-        <strong>Trạng thái CI / Review:</strong> {task.statusLabel ?? "—"}
-      </p>
       <p>
         <strong>Điểm chặn:</strong> {task.blockerReason ?? "Không có"}
       </p>
@@ -489,24 +598,26 @@ function AutomationTaskRow({
   task,
   expanded,
   onToggle,
+  productionCommitSha,
 }: {
   task: AutomationTask;
   expanded: boolean;
   onToggle: () => void;
+  productionCommitSha: string | null;
 }) {
   return (
     <>
       <tr>
+        <td className="sales-follow-up__area-cell" title={task.taskArea}>
+          <span className="admin-status-badge admin-status-badge--neutral">{task.taskArea}</span>
+        </td>
         <td>
           <Link href={task.githubIssueUrl} className="admin-link" target="_blank" rel="noreferrer">
             #{task.issueNumber}
           </Link>
-        </td>
-        <td className="sales-follow-up__area-cell" title={task.taskArea}>
-          <span className="admin-status-badge admin-status-badge--neutral">{task.taskArea}</span>
-        </td>
-        <td className="sales-follow-up__title-cell">
-          <strong>{task.title}</strong>
+          <div className="sales-follow-up__title-cell">
+            <strong>{task.title}</strong>
+          </div>
         </td>
         <td>
           <span className={AUTOMATION_STATUS_BADGE_CLASS[task.status]}>
@@ -514,19 +625,9 @@ function AutomationTaskRow({
           </span>
         </td>
         <td>
-          <span className={AUTOMATION_RISK_BADGE_CLASS[task.risk]}>
-            {AUTOMATION_RISK_LABELS[task.risk]}
-          </span>
-        </td>
-        <td>
           {task.linkedPullRequest ? (
-            <Link
-              href={task.linkedPullRequest.url}
-              className="admin-link"
-              target="_blank"
-              rel="noreferrer"
-            >
-              PR #{task.linkedPullRequest.number}
+            <Link href={task.linkedPullRequest.url} className="admin-link" target="_blank" rel="noreferrer">
+              #{task.linkedPullRequest.number}
               {task.linkedPullRequest.merged
                 ? AUTOMATION_PR_STATE_SUFFIX.merged
                 : task.linkedPullRequest.state === "open"
@@ -537,8 +638,34 @@ function AutomationTaskRow({
             "—"
           )}
         </td>
-        <td>{formatQuoteDateTime(task.latestUpdateAt)}</td>
-        <td className="sales-follow-up__reason">{task.blockerReason ?? "—"}</td>
+        <td>
+          <span
+            className={AUTOMATION_CI_STATUS_BADGE_CLASS[task.ciStatus.status]}
+            title={task.ciStatus.reason ?? undefined}
+          >
+            {AUTOMATION_CI_STATUS_LABELS[task.ciStatus.status]}
+          </span>
+        </td>
+        <td>
+          <span
+            className={AUTOMATION_REVIEWER_STATUS_BADGE_CLASS[task.reviewerStatus.status]}
+            title={task.reviewerStatus.reason ?? undefined}
+          >
+            {AUTOMATION_REVIEWER_STATUS_LABELS[task.reviewerStatus.status]}
+          </span>
+        </td>
+        <td className="sales-follow-up__production-cell">
+          <span
+            className={AUTOMATION_PRODUCTION_STATUS_BADGE_CLASS[task.productionStatus.status]}
+            title={task.productionStatus.reason ?? undefined}
+          >
+            {AUTOMATION_PRODUCTION_STATUS_LABELS[task.productionStatus.status]}
+          </span>
+        </td>
+        <td className="sales-follow-up__reason automation-task-table__optional">
+          {task.blockerReason ?? "—"}
+        </td>
+        <td>{task.nextAction.label}</td>
         <td>
           <button type="button" className="admin-btn admin-btn--xs admin-btn--secondary" onClick={onToggle}>
             {expanded ? "Thu gọn" : "Chi tiết"}
@@ -547,8 +674,8 @@ function AutomationTaskRow({
       </tr>
       {expanded ? (
         <tr>
-          <td colSpan={9}>
-            <AutomationTaskDetails task={task} />
+          <td colSpan={10}>
+            <AutomationTaskDetails task={task} productionCommitSha={productionCommitSha} />
           </td>
         </tr>
       ) : null}

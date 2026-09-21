@@ -5,6 +5,8 @@ import type {
 
 export type { AutomationDashboardView };
 
+export { parseAutomationDashboardView } from "@/features/automation/automation-dashboard-view-parser";
+
 export const AUTOMATION_DASHBOARD_VIEW_OPTIONS: Array<{
   value: AutomationDashboardView;
   label: string;
@@ -16,12 +18,6 @@ export const AUTOMATION_DASHBOARD_VIEW_OPTIONS: Array<{
 
 const EXCLUDED_FROM_ACTIVE_STATUSES = new Set<AutomationTask["status"]>(["merged", "superseded"]);
 
-const COMPLETED_TERMINAL_STATUSES = new Set<AutomationTask["status"]>([
-  "merged",
-  "failed",
-  "superseded",
-]);
-
 export function isActiveAutomationTask(task: AutomationTask): boolean {
   if (!task.isOpen) return false;
   return !EXCLUDED_FROM_ACTIVE_STATUSES.has(task.status);
@@ -29,7 +25,11 @@ export function isActiveAutomationTask(task: AutomationTask): boolean {
 
 export function isCompletedAutomationTask(task: AutomationTask): boolean {
   if (task.isOpen) return false;
-  return COMPLETED_TERMINAL_STATUSES.has(task.status);
+  if (task.status === "superseded" || task.status === "failed") return true;
+  if (task.status === "merged") {
+    return task.productionStatus.status === "live";
+  }
+  return false;
 }
 
 export function matchesAutomationView(

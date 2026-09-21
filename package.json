@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "security:public-token": "node scripts/security/check-public-token-safety.mjs",
+    "test": "node --import tsx --test src/features/automation/*.test.ts src/app/api/admin/automation/*.test.ts",
     "ci:verify": "npm run lint && npm run typecheck && npm run security:public-token && npm test --if-present && npm run build",
     "postinstall": "prisma generate",
     "media:recalculate-intelligence": "npx tsx scripts/recalculate-media-intelligence.ts",

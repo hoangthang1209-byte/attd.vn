@@ -6,8 +6,9 @@ export async function GET(request: NextRequest) {
   if (!permission.ok) return permission.response;
 
   try {
-    const { getAutomationDashboard, parseAutomationDashboardView } = await import(
-      "@/features/automation/automation-task.service"
+    const { getAutomationDashboard } = await import("@/features/automation/automation-task.service");
+    const { parseAutomationDashboardView } = await import(
+      "@/features/automation/automation-dashboard-view-parser"
     );
     const view = parseAutomationDashboardView(request.nextUrl.searchParams.get("view"));
     const dashboard = await getAutomationDashboard(view);

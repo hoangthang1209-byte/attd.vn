@@ -6,33 +6,11 @@ import {
   matchesAutomationView,
   shouldShowTaskInCompletedDefaultList,
 } from "@/features/automation/automation-dashboard.views";
-import type { AutomationTask } from "@/features/automation/automation-task.types";
-
-function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
-  return {
-    issueNumber: 57,
-    title: "Historical merged task",
-    taskArea: "Automation Platform",
-    status: "merged",
-    statusLabel: "status:merged",
-    risk: "low",
-    riskLabel: "risk:low",
-    linkedPullRequest: null,
-    latestUpdateAt: "2026-08-01T00:00:00.000Z",
-    closedAt: "2026-08-01T00:00:00.000Z",
-    mergedAt: "2026-08-01T00:00:00.000Z",
-    blockerReason: null,
-    isOpen: false,
-    githubIssueUrl: "https://github.com/hoangthang1209-byte/attd.vn/issues/57",
-    labels: ["status:merged"],
-    recentStatusComments: [],
-    ...overrides,
-  };
-}
+import { automationTaskFixture } from "@/features/automation/automation-task.test-fixtures";
 
 describe("automation dashboard views", () => {
   it("active excludes merged, superseded, and closed tasks", () => {
-    const building = taskFixture({
+    const building = automationTaskFixture({
       issueNumber: 87,
       status: "building",
       statusLabel: "status:building",
@@ -42,22 +20,22 @@ describe("automation dashboard views", () => {
     });
 
     assert.equal(isActiveAutomationTask(building), true);
-    assert.equal(isActiveAutomationTask(taskFixture()), false);
+    assert.equal(isActiveAutomationTask(automationTaskFixture()), false);
     assert.equal(
-      isActiveAutomationTask(taskFixture({ status: "superseded", isOpen: true })),
+      isActiveAutomationTask(automationTaskFixture({ status: "superseded", isOpen: true })),
       false,
     );
     assert.equal(matchesAutomationView(building, "active"), true);
-    assert.equal(matchesAutomationView(taskFixture(), "active"), false);
+    assert.equal(matchesAutomationView(automationTaskFixture(), "active"), false);
   });
 
   it("all includes active, backlog, and old merged tasks", () => {
-    const oldMerged = taskFixture({
+    const oldMerged = automationTaskFixture({
       latestUpdateAt: "2026-01-01T00:00:00.000Z",
       closedAt: "2026-01-01T00:00:00.000Z",
       mergedAt: "2026-01-01T00:00:00.000Z",
     });
-    const backlog = taskFixture({
+    const backlog = automationTaskFixture({
       issueNumber: 90,
       status: "backlog",
       statusLabel: null,
@@ -70,26 +48,48 @@ describe("automation dashboard views", () => {
     assert.equal(matchesAutomationView(backlog, "all"), true);
   });
 
-  it("completed includes historical merged tasks beyond the recent window", () => {
-    const oldMerged = taskFixture({
+  it("completed requires merged tasks to be production verified", () => {
+    const productionVerified = automationTaskFixture({
       latestUpdateAt: "2026-01-01T00:00:00.000Z",
       closedAt: "2026-01-01T00:00:00.000Z",
       mergedAt: "2026-01-01T00:00:00.000Z",
+      productionStatus: {
+        status: "live",
+        mergedCommitSha: "abc1234",
+        reason: null,
+        checkedAt: "2026-09-21T00:00:00.000Z",
+      },
+    });
+    const mergedNotLive = automationTaskFixture({
+      productionStatus: {
+        status: "deploying",
+        mergedCommitSha: "abc1234",
+        reason: "waiting",
+        checkedAt: "2026-09-21T00:00:00.000Z",
+      },
     });
 
-    assert.equal(isCompletedAutomationTask(oldMerged), true);
-    assert.equal(matchesAutomationView(oldMerged, "completed"), true);
+    assert.equal(isCompletedAutomationTask(productionVerified), true);
+    assert.equal(isCompletedAutomationTask(mergedNotLive), false);
+    assert.equal(matchesAutomationView(productionVerified, "completed"), true);
+    assert.equal(matchesAutomationView(mergedNotLive, "completed"), false);
   });
 
   it("hides superseded tasks from completed default list unless explicitly filtered", () => {
-    const superseded = taskFixture({
+    const superseded = automationTaskFixture({
       status: "superseded",
       statusLabel: "status:superseded",
       mergedAt: null,
+      productionStatus: {
+        status: "unknown",
+        mergedCommitSha: null,
+        reason: null,
+        checkedAt: "2026-09-21T00:00:00.000Z",
+      },
     });
 
     assert.equal(shouldShowTaskInCompletedDefaultList(superseded, "all"), false);
     assert.equal(shouldShowTaskInCompletedDefaultList(superseded, "superseded"), true);
-    assert.equal(shouldShowTaskInCompletedDefaultList(taskFixture(), "all"), true);
+    assert.equal(shouldShowTaskInCompletedDefaultList(automationTaskFixture(), "all"), true);
   });
 });
