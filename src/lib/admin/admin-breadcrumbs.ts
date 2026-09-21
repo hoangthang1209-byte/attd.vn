@@ -845,6 +845,15 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/automation",
+    meta: {
+      breadcrumbs: ["CẤU HÌNH", "Tự động hóa"],
+      title: "Tự động hóa",
+      description:
+        "Theo dõi task Builder, trạng thái PR/CI và blocker từ GitHub trong một màn hình duy nhất.",
+    },
+  },
+  {
     path: "/admin/settings/branding",
     meta: {
       breadcrumbs: ["HỆ THỐNG", "Branding"],
