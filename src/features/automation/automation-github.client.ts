@@ -9,6 +9,6 @@ export {
 export { buildAutomationSearchQueries, HISTORICAL_MERGED_LOOKBACK_DAYS, HISTORICAL_AUTOMATION_STATUS_LABELS } from "@/features/automation/automation-github.queries";
 export {
   fetchAutomationIssues,
-  fetchLinkedPullRequest,
+  fetchLinkedPullRequestSafe,
   getAutomationGitHubConfig,
 } from "@/features/automation/automation-github.loader";

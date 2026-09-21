@@ -326,7 +326,7 @@ async function enrichPullRequestWithMergeTime(
   };
 }
 
-export async function fetchLinkedPullRequest(
+async function fetchLinkedPullRequest(
   issueNumber: number,
 ): Promise<GitHubPullRequestPayload | null> {
   const config = getAutomationGitHubConfig();
@@ -349,4 +349,20 @@ export async function fetchLinkedPullRequest(
   if (!preferred) return null;
 
   return enrichPullRequestWithMergeTime(preferred);
+}
+
+export async function fetchLinkedPullRequestSafe(
+  issueNumber: number,
+): Promise<GitHubPullRequestPayload | null> {
+  try {
+    return await fetchLinkedPullRequest(issueNumber);
+  } catch (error) {
+    if (isRecoverableGitHubLookupError(error)) {
+      console.warn(
+        `[fetchLinkedPullRequestSafe] linked PR lookup failed for issue #${issueNumber}; continuing with partial data`,
+      );
+      return null;
+    }
+    throw error;
+  }
 }

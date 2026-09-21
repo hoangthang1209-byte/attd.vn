@@ -3,7 +3,6 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import {
   AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
-  isRecoverableGitHubLookupError,
   mapWithConcurrency,
 } from "@/features/automation/automation-async-utils";
 import {
@@ -15,7 +14,7 @@ import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,
   fetchAutomationIssues,
-  fetchLinkedPullRequest,
+  fetchLinkedPullRequestSafe,
   getAutomationGitHubConfig,
 } from "@/features/automation/automation-github.client";
 import { buildSummary, mapIssueToTask } from "@/features/automation/automation-task.aggregation";
@@ -37,38 +36,28 @@ async function enrichTaskWithLinkedPullRequest(task: AutomationTask): Promise<Au
     return task;
   }
 
-  try {
-    const linkedPullRequest = await fetchLinkedPullRequest(task.issueNumber);
-    if (!linkedPullRequest) return task;
+  const linkedPullRequest = await fetchLinkedPullRequestSafe(task.issueNumber);
+  if (!linkedPullRequest) return task;
 
-    const linked = {
-      number: linkedPullRequest.number,
-      url: linkedPullRequest.url,
-      state: linkedPullRequest.state === "OPEN" ? "open" : "closed",
-      merged: linkedPullRequest.merged,
-      title: linkedPullRequest.title,
-      updatedAt: linkedPullRequest.updatedAt,
-      mergedAt: linkedPullRequest.mergedAt,
-    } as const;
+  const linked = {
+    number: linkedPullRequest.number,
+    url: linkedPullRequest.url,
+    state: linkedPullRequest.state === "OPEN" ? "open" : "closed",
+    merged: linkedPullRequest.merged,
+    title: linkedPullRequest.title,
+    updatedAt: linkedPullRequest.updatedAt,
+    mergedAt: linkedPullRequest.mergedAt,
+  } as const;
 
-    return {
-      ...task,
-      linkedPullRequest: linked,
-      mergedAt: resolveMergeTimestamp({
-        status: task.status,
-        closedAt: task.closedAt,
-        linkedPullRequestMergedAt: linkedPullRequest.mergedAt,
-      }),
-    } satisfies AutomationTask;
-  } catch (error) {
-    if (isRecoverableGitHubLookupError(error)) {
-      console.warn(
-        `[getAutomationDashboard] linked PR lookup failed for issue #${task.issueNumber}; continuing with partial data`,
-      );
-      return task;
-    }
-    throw error;
-  }
+  return {
+    ...task,
+    linkedPullRequest: linked,
+    mergedAt: resolveMergeTimestamp({
+      status: task.status,
+      closedAt: task.closedAt,
+      linkedPullRequestMergedAt: linkedPullRequest.mergedAt,
+    }),
+  } satisfies AutomationTask;
 }
 
 async function loadAutomationTasksUncached(): Promise<CachedAutomationPayload> {
