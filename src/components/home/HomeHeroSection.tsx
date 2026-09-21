@@ -1,11 +1,17 @@
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import HomeCategoryDiscoveryRail from "@/components/home/HomeCategoryDiscoveryRail";
-import type { HomepageCategoryItem, HomepageHeroConfig } from "@/features/home/homepage.types";
+import { HOMEPAGE_PROOF_ICONS } from "@/features/home/homepage-proof-icons";
+import type {
+  HomepageCategoryItem,
+  HomepageHeroConfig,
+  HomepageProofItemConfig,
+} from "@/features/home/homepage.types";
 
 type Props = {
   hero: HomepageHeroConfig;
   categories: HomepageCategoryItem[];
+  proofItems?: HomepageProofItemConfig[];
 };
 
 function HeroSecondaryCta({ hero }: { hero: HomepageHeroConfig }) {
@@ -31,11 +37,30 @@ function HeroSecondaryCta({ hero }: { hero: HomepageHeroConfig }) {
   );
 }
 
-export default function HomeHeroSection({ hero, categories }: Props) {
+function HeroTrustLine({ items }: { items: HomepageProofItemConfig[] }) {
+  const visible = items.filter((item) => item.enabled).sort((a, b) => a.sortOrder - b.sortOrder);
+  if (visible.length === 0) return null;
+
   return (
-    <>
-      <section className="home-hero home-hero--centered" aria-labelledby="home-hero-title">
-        <div className="container">
+    <ul className="home-hero__trust" aria-label="Điểm mạnh nguồn hàng">
+      {visible.slice(0, 4).map((item) => {
+        const Icon = HOMEPAGE_PROOF_ICONS[item.iconKey];
+        return (
+          <li key={item.itemKey} className="home-hero__trust-item">
+            <Icon size={14} className="home-hero__trust-icon" aria-hidden />
+            <span>{item.title}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export default function HomeHeroSection({ hero, categories, proofItems = [] }: Props) {
+  return (
+    <section className="home-hero home-hero--editorial" aria-labelledby="home-hero-title">
+      <div className="container">
+        <div className="home-hero__shell">
           <div className="home-hero__copy home-hero__copy--centered">
             <p className="home-hero__eyebrow">{hero.eyebrow}</p>
             <h1 id="home-hero-title" className="home-hero__title">
@@ -48,11 +73,12 @@ export default function HomeHeroSection({ hero, categories }: Props) {
               </Link>
               <HeroSecondaryCta hero={hero} />
             </div>
+            <HeroTrustLine items={proofItems} />
           </div>
-
-          <HomeCategoryDiscoveryRail categories={categories} />
         </div>
-      </section>
-    </>
+
+        <HomeCategoryDiscoveryRail categories={categories} />
+      </div>
+    </section>
   );
 }
