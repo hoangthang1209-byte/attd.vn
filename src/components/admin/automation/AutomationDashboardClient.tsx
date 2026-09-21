@@ -103,10 +103,13 @@ export default function AutomationDashboardClient() {
   );
 
   useEffect(() => {
-    const initialView = readInitialView();
-    setView(initialView);
-    setOpenFilter(defaultOpenFilterForView(initialView));
-    void load(initialView);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void load(view);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   const taskAreaFilterOptions = useMemo(

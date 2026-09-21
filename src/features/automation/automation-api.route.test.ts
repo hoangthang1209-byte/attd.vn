@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
-import { afterEach, beforeEach, describe, it } from "node:test";
+import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
 import { NextRequest } from "next/server";
-import { GET } from "@/app/api/admin/automation/route";
 import { ADMIN_STAFF_SESSION_COOKIE } from "@/lib/admin-auth/constants";
 import type { SessionPermissionGrant } from "@/lib/admin-auth/admin-session.shared";
 import {
@@ -10,6 +9,34 @@ import {
 } from "@/lib/admin-auth/staff-session-node";
 
 process.env.ADMIN_PASSWORD = "test-admin-password";
+
+const EMPTY_SUMMARY = {
+  totalOpen: { value: 0, isPartial: false },
+  building: { value: 0, isPartial: false },
+  stalledOrFailed: { value: 0, isPartial: false },
+  needsFix: { value: 0, isPartial: false },
+  readyToMerge: { value: 0, isPartial: false },
+  mergedToday: { value: 0, isPartial: false },
+} as const;
+
+mock.module("@/features/automation/automation-task.service", {
+  namedExports: {
+    getAutomationDashboard: async (view: "active" | "all" | "completed" = "active") => ({
+      configured: false,
+      configMessage:
+        "Thiếu GITHUB_AUTOMATION_READ_TOKEN. Cấu hình token read-only trên Vercel để tải task automation từ GitHub.",
+      summary: EMPTY_SUMMARY,
+      tasks: [],
+      fetchedAt: new Date().toISOString(),
+      view,
+      productionCommitSha: null,
+      productionCheckedAt: null,
+    }),
+  },
+});
+
+type RouteModule = typeof import("@/app/api/admin/automation/route");
+let GET: RouteModule["GET"];
 
 function requestWithCookies(cookies: Record<string, string>) {
   const cookieHeader = Object.entries(cookies)
@@ -37,6 +64,10 @@ function createSessionToken(permissions: SessionPermissionGrant[]) {
 }
 
 describe("automation dashboard API GET authorization contract", () => {
+  before(async () => {
+    ({ GET } = await import("@/app/api/admin/automation/route"));
+  });
+
   beforeEach(() => {
     delete process.env.GITHUB_AUTOMATION_READ_TOKEN;
     delete process.env.GITHUB_AUTOMATION_REPO;
@@ -76,14 +107,7 @@ describe("automation dashboard API GET authorization contract", () => {
     const body = (await response.json()) as {
       configured: boolean;
       view: string;
-      summary: {
-        totalOpen: { value: number; isPartial: boolean };
-        building: { value: number; isPartial: boolean };
-        stalledOrFailed: { value: number; isPartial: boolean };
-        needsFix: { value: number; isPartial: boolean };
-        readyToMerge: { value: number; isPartial: boolean };
-        mergedToday: { value: number; isPartial: boolean };
-      };
+      summary: typeof EMPTY_SUMMARY;
       tasks: unknown[];
       fetchedAt: string;
     };
@@ -91,14 +115,7 @@ describe("automation dashboard API GET authorization contract", () => {
     assert.equal(body.configured, false);
     assert.equal(body.view, "active");
     assert.equal(typeof body.fetchedAt, "string");
-    assert.deepEqual(body.summary, {
-      totalOpen: { value: 0, isPartial: false },
-      building: { value: 0, isPartial: false },
-      stalledOrFailed: { value: 0, isPartial: false },
-      needsFix: { value: 0, isPartial: false },
-      readyToMerge: { value: 0, isPartial: false },
-      mergedToday: { value: 0, isPartial: false },
-    });
+    assert.deepEqual(body.summary, EMPTY_SUMMARY);
     assert.deepEqual(body.tasks, []);
   });
 
@@ -114,5 +131,14 @@ describe("automation dashboard API GET authorization contract", () => {
 
     const body = (await response.json()) as { view: string };
     assert.equal(body.view, "all");
+  });
+});
+
+describe("parseAutomationDashboardView route wiring", () => {
+  it("uses testable view parser module instead of server-only service export", async () => {
+    const { parseAutomationDashboardView } = await import(
+      "@/features/automation/automation-dashboard-view-parser"
+    );
+    assert.equal(parseAutomationDashboardView("completed"), "completed");
   });
 });

@@ -6,10 +6,8 @@ import {
   mapWithConcurrency,
 } from "@/features/automation/automation-async-utils";
 import { parseAutomationDashboardView } from "@/features/automation/automation-dashboard-view-parser";
-import {
-  filterActiveViewTasks,
-  matchesAutomationView,
-} from "@/features/automation/automation-dashboard.views";
+import { matchesAutomationView } from "@/features/automation/automation-dashboard.views";
+import { filterActiveViewTasks } from "@/features/automation/automation-task.relationships";
 import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,

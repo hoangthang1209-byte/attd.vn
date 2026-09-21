@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/features/automation/*.test.ts src/app/api/admin/automation/*.test.ts",
+    "security:public-token": "node scripts/security/check-public-token-safety.mjs",
+    "test": "node --experimental-test-module-mocks --import tsx --test src/features/automation/*.test.ts src/app/api/admin/automation/*.test.ts",
     "ci:verify": "npm run lint && npm run typecheck && npm run security:public-token && npm test --if-present && npm run build",
     "postinstall": "prisma generate",
     "media:recalculate-intelligence": "npx tsx scripts/recalculate-media-intelligence.ts",
@@ -72,6 +73,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
