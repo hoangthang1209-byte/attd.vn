@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { afterEach, before, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { NextRequest } from "next/server";
+import { handleAutomationDashboardGet } from "@/app/api/admin/automation/route";
 import { ADMIN_STAFF_SESSION_COOKIE } from "@/lib/admin-auth/constants";
 import type { SessionPermissionGrant } from "@/lib/admin-auth/admin-session.shared";
 import {
@@ -45,28 +46,23 @@ function createSessionToken(permissions: SessionPermissionGrant[]) {
   return identityToken;
 }
 
+async function loadMockDashboard() {
+  return {
+    getAutomationDashboard: async (requestedView: AutomationDashboardView = "active") => ({
+      configured: false,
+      configMessage:
+        "Thiếu GITHUB_AUTOMATION_READ_TOKEN. Cấu hình token read-only trên Vercel để tải task automation từ GitHub.",
+      summary: EMPTY_SUMMARY,
+      tasks: [],
+      fetchedAt: new Date().toISOString(),
+      view: requestedView,
+      productionCommitSha: null,
+      productionCheckedAt: null,
+    }),
+  };
+}
+
 describe("automation dashboard API GET authorization contract", () => {
-  let GET: (request: NextRequest) => Promise<Response>;
-
-  before(async () => {
-    mock.module("@/features/automation/automation-task.service", {
-      namedExports: {
-        getAutomationDashboard: async (view: AutomationDashboardView = "active") => ({
-          configured: false,
-          configMessage:
-            "Thiếu GITHUB_AUTOMATION_READ_TOKEN. Cấu hình token read-only trên Vercel để tải task automation từ GitHub.",
-          summary: EMPTY_SUMMARY,
-          tasks: [],
-          fetchedAt: new Date().toISOString(),
-          view,
-          productionCommitSha: null,
-          productionCheckedAt: null,
-        }),
-      },
-    });
-    ({ GET } = await import("@/app/api/admin/automation/route"));
-  });
-
   beforeEach(() => {
     delete process.env.GITHUB_AUTOMATION_READ_TOKEN;
     delete process.env.GITHUB_AUTOMATION_REPO;
@@ -78,7 +74,10 @@ describe("automation dashboard API GET authorization contract", () => {
   });
 
   it("returns 401 for unauthenticated requests", async () => {
-    const response = await GET(requestWithCookies({}));
+    const response = await handleAutomationDashboardGet(
+      requestWithCookies({}),
+      loadMockDashboard,
+    );
     assert.equal(response.status, 401);
 
     const body = (await response.json()) as { error?: { code?: string } };
@@ -87,8 +86,9 @@ describe("automation dashboard API GET authorization contract", () => {
 
   it("returns 403 for authenticated admin without dashboard.view", async () => {
     const token = createSessionToken([["crm.view", "ALL"]]);
-    const response = await GET(
+    const response = await handleAutomationDashboardGet(
       requestWithCookies({ [ADMIN_STAFF_SESSION_COOKIE]: token }),
+      loadMockDashboard,
     );
     assert.equal(response.status, 403);
 
@@ -98,8 +98,9 @@ describe("automation dashboard API GET authorization contract", () => {
 
   it("returns 200 with dashboard payload for authorized dashboard viewer", async () => {
     const token = createSessionToken([["dashboard.view", "ALL"]]);
-    const response = await GET(
+    const response = await handleAutomationDashboardGet(
       requestWithCookies({ [ADMIN_STAFF_SESSION_COOKIE]: token }),
+      loadMockDashboard,
     );
     assert.equal(response.status, 200);
 
@@ -131,11 +132,12 @@ describe("automation dashboard API GET authorization contract", () => {
 
   it("accepts view query parameter for all-tasks mode", async () => {
     const token = createSessionToken([["dashboard.view", "ALL"]]);
-    const response = await GET(
+    const response = await handleAutomationDashboardGet(
       new NextRequest("http://localhost/api/admin/automation?view=all", {
         method: "GET",
         headers: { cookie: `${ADMIN_STAFF_SESSION_COOKIE}=${encodeURIComponent(token)}` },
       }),
+      loadMockDashboard,
     );
     assert.equal(response.status, 200);
 
@@ -145,11 +147,12 @@ describe("automation dashboard API GET authorization contract", () => {
 
   it("accepts view query parameter for completed mode", async () => {
     const token = createSessionToken([["dashboard.view", "ALL"]]);
-    const response = await GET(
+    const response = await handleAutomationDashboardGet(
       new NextRequest("http://localhost/api/admin/automation?view=completed", {
         method: "GET",
         headers: { cookie: `${ADMIN_STAFF_SESSION_COOKIE}=${encodeURIComponent(token)}` },
       }),
+      loadMockDashboard,
     );
     assert.equal(response.status, 200);
 

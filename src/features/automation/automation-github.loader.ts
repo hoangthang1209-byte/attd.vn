@@ -11,9 +11,16 @@ import {
 } from "@/features/automation/automation-task.recognition";
 import {
   AUTOMATION_COMMENT_FETCH_CONCURRENCY,
+  AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
   isRecoverableGitHubLookupError,
   mapWithConcurrency,
 } from "@/features/automation/automation-async-utils";
+import {
+  dedupeLinkedPullRequestCandidates,
+  extractIssueClosedByCommitId,
+  selectCanonicalLinkedPullRequestCandidate,
+  type LinkedPullRequestCandidate,
+} from "@/features/automation/automation-linked-pr.resolver";
 import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,
@@ -132,6 +139,7 @@ type GitHubIssueCommentsResponse = Array<{
 
 type GitHubTimelineEvent = {
   event: string;
+  commit_id?: string | null;
   source?: {
     issue?: {
       number: number;
@@ -147,6 +155,7 @@ type GitHubTimelineEvent = {
 type GitHubPullDetailResponse = {
   number: number;
   title: string;
+  body: string | null;
   html_url: string;
   state: "open" | "closed";
   merged_at: string | null;
@@ -592,19 +601,20 @@ export async function fetchAutomationIssues(
   };
 }
 
-function timelineEventToPullCandidate(event: GitHubTimelineEvent): GitHubPullRequestPayload | null {
+function timelineEventToPullCandidate(
+  event: GitHubTimelineEvent,
+): LinkedPullRequestCandidate | null {
   const sourceIssue = event.source?.issue;
   if (!sourceIssue?.pull_request) return null;
+  if (event.event !== "cross-referenced" && event.event !== "connected") return null;
 
   return {
     number: sourceIssue.number,
     title: sourceIssue.title,
     url: sourceIssue.html_url,
     state: sourceIssue.state === "open" ? "OPEN" : "CLOSED",
-    merged: false,
-    mergedAt: null,
     updatedAt: sourceIssue.updated_at,
-    mergeCommitSha: null,
+    eventType: event.event,
   };
 }
 
@@ -671,6 +681,32 @@ export async function compareCommitsSafe(
   }
 }
 
+async function fetchPullRequestDetailForLinkedResolution(
+  candidate: LinkedPullRequestCandidate,
+): Promise<LinkedPullRequestCandidate> {
+  const config = getAutomationGitHubConfig();
+  if (!config.configured || !config.owner || !config.repo) {
+    return candidate;
+  }
+
+  try {
+    const detail = await githubRequest<GitHubPullDetailResponse>(
+      `/repos/${config.owner}/${config.repo}/pulls/${candidate.number}`,
+    );
+
+    return {
+      ...candidate,
+      title: detail.title,
+      body: detail.body,
+      state: detail.state === "open" ? "OPEN" : "CLOSED",
+      merged: Boolean(detail.merged_at),
+      mergeCommitSha: detail.merge_commit_sha ?? detail.head.sha ?? null,
+    };
+  } catch {
+    return candidate;
+  }
+}
+
 async function fetchLinkedPullRequest(
   issueNumber: number,
 ): Promise<GitHubPullRequestPayload | null> {
@@ -683,17 +719,38 @@ async function fetchLinkedPullRequest(
     `/repos/${config.owner}/${config.repo}/issues/${issueNumber}/timeline?per_page=100`,
   );
 
-  const candidates = timeline
-    .filter((event) => event.event === "cross-referenced" || event.event === "connected")
-    .map(timelineEventToPullCandidate)
-    .filter((candidate): candidate is GitHubPullRequestPayload => candidate !== null)
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  const issueClosedByCommitId = extractIssueClosedByCommitId(timeline);
 
-  const preferred =
-    candidates.find((candidate) => candidate.state === "OPEN") ?? candidates[0] ?? null;
+  const rawCandidates = timeline
+    .map(timelineEventToPullCandidate)
+    .filter((candidate): candidate is LinkedPullRequestCandidate => candidate !== null);
+
+  const uniqueCandidates = dedupeLinkedPullRequestCandidates(rawCandidates);
+  if (uniqueCandidates.length === 0) return null;
+
+  const detailedCandidates = await mapWithConcurrency(
+    uniqueCandidates,
+    AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
+    fetchPullRequestDetailForLinkedResolution,
+  );
+
+  const preferred = selectCanonicalLinkedPullRequestCandidate(
+    detailedCandidates,
+    issueNumber,
+    issueClosedByCommitId,
+  );
   if (!preferred) return null;
 
-  return enrichPullRequestWithMergeTimeOrCandidate(preferred);
+  return enrichPullRequestWithMergeTimeOrCandidate({
+    number: preferred.number,
+    title: preferred.title,
+    url: preferred.url,
+    state: preferred.state,
+    merged: preferred.merged ?? false,
+    mergedAt: null,
+    updatedAt: preferred.updatedAt,
+    mergeCommitSha: preferred.mergeCommitSha ?? null,
+  });
 }
 
 export async function fetchLinkedPullRequestSafe(
