@@ -12706,10 +12706,8 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 
 /* Homepage B2B lower sections */
 .home-b2b-benefits {
-  background:
-    radial-gradient(circle at 10% 10%, rgba(220, 38, 38, 0.08), transparent 34%),
-    #fff;
-  padding-top: 84px;
+  background: #fff;
+  padding-top: 48px;
 }
 .home-b2b-benefits__layout {
   display: grid;
@@ -12719,11 +12717,11 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
 }
 .home-b2b-benefits__intro {
   border: 1px solid rgba(17, 24, 39, 0.08);
-  border-radius: 24px;
-  padding: clamp(24px, 4vw, 36px);
-  background: linear-gradient(145deg, #111827 0%, #182235 60%, #2b1114 100%);
-  color: #fff;
-  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.14);
+  border-radius: 20px;
+  padding: clamp(24px, 4vw, 32px);
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 12px 40px rgba(17, 24, 39, 0.06);
 }
 .home-b2b-benefits__eyebrow {
   margin: 0 0 12px;
@@ -12731,22 +12729,22 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   font-weight: 800;
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.66);
+  color: var(--primary);
 }
 .home-b2b-benefits__title {
   margin: 0 0 14px;
   max-width: 480px;
-  font-size: clamp(26px, 4vw, 40px);
-  font-weight: 850;
-  line-height: 1.08;
-  letter-spacing: -0.045em;
+  font-size: clamp(24px, 4vw, 34px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
 }
 .home-b2b-benefits__description {
   margin: 0 0 24px;
   max-width: 520px;
   font-size: 15px;
   line-height: 1.72;
-  color: rgba(255, 255, 255, 0.74);
+  color: #6b7280;
 }
 .home-b2b-benefits__cta {
   width: fit-content;
@@ -16130,13 +16128,24 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   .mp-header-search-toggle { display: none !important; }
 }
 
-/* Homepage hero — centered B2B marketplace editorial */
+/* Homepage hero — B2B marketplace editorial (Phase 1 refresh) */
 .home-hero {
   padding: 16px 0 0;
   background: #fff;
   width: 100%;
   max-width: 100%;
   min-width: 0;
+}
+
+.home-hero--editorial {
+  background:
+    linear-gradient(180deg, #fafbfc 0%, #fff 72%);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.home-hero__shell {
+  max-width: 760px;
+  margin: 0 auto;
 }
 
 .home-hero .container {
@@ -16198,6 +16207,35 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   padding: 10px 18px;
   font-size: 14px;
   white-space: nowrap;
+}
+
+.home-hero__trust {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 12px;
+}
+
+.home-hero__trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.home-hero__trust-icon {
+  flex-shrink: 0;
+  color: var(--primary);
 }
 
 /* Category discovery rail */
@@ -16396,9 +16434,30 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   color: #6b7280;
 }
 
+.home-proof-strip__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .home-proof-strip__label {
   line-height: 1.35;
   min-width: 0;
+}
+
+.home-proof-strip__support {
+  display: none;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #6b7280;
+}
+
+@media (min-width: 900px) {
+  .home-proof-strip__support {
+    display: block;
+  }
 }
 
 @media (min-width: 768px) {
@@ -16444,8 +16503,106 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   }
 }
 
-.mp-home--v271 #home-categories {
+.mp-home--v271 #home-categories,
+.mp-home--v273 #home-categories {
   scroll-margin-top: 120px;
+}
+
+/* Homepage trust band — consolidated logos + metrics */
+.home-trust-band {
+  padding: 36px 0 8px;
+  background: var(--section-bg, #f9fafb);
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  overflow-x: clip;
+}
+
+.home-trust-band__header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.home-trust-band__eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.home-trust-band__title {
+  margin: 0;
+  font-size: clamp(20px, 3vw, 26px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #111827;
+}
+
+.home-trust-band__logos.section-compact,
+.home-trust-band__logos.customer-logo-strip--inline {
+  padding-top: 16px;
+  padding-bottom: 8px;
+  background: transparent;
+}
+
+.home-trust-band__logos .customer-logo-strip__label,
+.home-trust-band__metrics .section-title {
+  display: none;
+}
+
+.home-trust-band__metrics.section-compact {
+  padding-top: 8px;
+  padding-bottom: 28px;
+  background: transparent;
+}
+
+.home-trust-band__metrics .social-proof-grid {
+  margin-top: 0;
+}
+
+@media (max-width: 767px) {
+  .home-trust-band {
+    padding: 28px 0 4px;
+  }
+
+  .home-hero__trust {
+    gap: 6px;
+  }
+
+  .home-hero__trust-item {
+    font-size: 11px;
+    padding: 0 8px;
+  }
+}
+
+/* Homepage v273 — category & product discovery density */
+.mp-home--v273 .mp-category-grid--marketplace {
+  gap: 16px;
+}
+
+.mp-home--v273 .market-cat-card--marketplace {
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+}
+
+.mp-home--v273 .market-cat-card--marketplace .market-cat-card-body--minimal {
+  padding: 12px 14px 14px;
+}
+
+.mp-home--v273 .product-card--compact {
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+}
+
+.mp-home--v273 .mp-section-header {
+  margin-bottom: 24px;
+}
+
+.mp-home--v273 .mp-section-desc {
+  max-width: 640px;
 }
 
 /* ─── Sprint 27.1.1.1 — Header mega menu & mobile search QA fix ───────────── */

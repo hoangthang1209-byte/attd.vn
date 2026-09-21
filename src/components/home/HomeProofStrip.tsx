@@ -17,8 +17,13 @@ export default function HomeProofStrip({ items }: Props) {
             const Icon = HOMEPAGE_PROOF_ICONS[item.iconKey];
             return (
               <li key={item.itemKey} className="home-proof-strip__item">
-                <Icon size={18} className="home-proof-strip__icon" aria-hidden />
-                <span className="home-proof-strip__label">{item.title}</span>
+                <Icon size={16} className="home-proof-strip__icon" aria-hidden />
+                <span className="home-proof-strip__text">
+                  <span className="home-proof-strip__label">{item.title}</span>
+                  {item.supportingText ? (
+                    <span className="home-proof-strip__support">{item.supportingText}</span>
+                  ) : null}
+                </span>
               </li>
             );
           })}

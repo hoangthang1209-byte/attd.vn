@@ -22,6 +22,7 @@ export default function HomeProductDiscoverySection({ products }: Props) {
       <div className="container">
         <MarketplaceSectionHeader
           title="Sản phẩm sỉ nổi bật"
+          description="Sản phẩm mới và được chọn lọc — kèm MOQ, tình trạng tồn kho và thông tin lấy nguồn."
           actionHref="/san-pham"
           actionLabel="Xem tất cả"
         />
