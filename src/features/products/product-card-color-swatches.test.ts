@@ -346,7 +346,7 @@ describe("product-card-color-swatches", () => {
     assert.ok(!cardSource.includes("prisma."));
   });
 
-  it("10b ProductCard renders swatches after lead-time and before Liên hệ CTA", () => {
+  it("10b ProductCard renders swatches after lead-time and before quote CTA", () => {
     const cardSource = readFileSync(
       resolve(repoRoot, "components/public/ProductCard.tsx"),
       "utf8",
@@ -354,11 +354,11 @@ describe("product-card-color-swatches", () => {
     const leadTimeIdx = cardSource.indexOf("product-card-leadtime");
     const swatchIdx = cardSource.indexOf("<ProductCardColorSwatches colors={availableColors}");
     const contactIdx = cardSource.indexOf("product-card-footer");
-    const lienHeIdx = cardSource.indexOf("Liên hệ báo giá sỉ");
+    const quoteIdx = cardSource.indexOf("Yêu cầu báo giá");
 
     assert.ok(swatchIdx > 0, "swatch component must be rendered");
     assert.ok(contactIdx > swatchIdx, "swatches must appear before footer/contact CTA");
-    assert.ok(lienHeIdx > swatchIdx, "swatches must appear before Liên hệ CTA text");
+    assert.ok(quoteIdx > swatchIdx, "swatches must appear before quote CTA text");
     assert.ok(
       leadTimeIdx > 0 && swatchIdx > leadTimeIdx,
       "swatches must appear after lead-time row",

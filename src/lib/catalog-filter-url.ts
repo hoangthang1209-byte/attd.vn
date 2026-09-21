@@ -1,3 +1,5 @@
+import type { CatalogSortOption } from "@/lib/catalog-sort";
+
 export type CatalogFilters = {
   category?: string;
   q?: string;
@@ -6,11 +8,12 @@ export type CatalogFilters = {
   embroidery?: boolean;
   oem?: boolean;
   material?: string;
+  sort?: CatalogSortOption;
 };
 
 export function buildCatalogUrl(
   filters: CatalogFilters,
-  options?: { page?: number },
+  options?: { page?: number; sort?: CatalogSortOption },
 ): string {
   const p = new URLSearchParams();
   if (filters.category) p.set("category", filters.category);
@@ -20,6 +23,8 @@ export function buildCatalogUrl(
   if (filters.embroidery) p.set("embroidery", "1");
   if (filters.oem) p.set("oem", "1");
   if (filters.material) p.set("material", filters.material);
+  const sort = options?.sort ?? filters.sort;
+  if (sort && sort !== "newest") p.set("sort", sort);
   if (options?.page && options.page > 1) p.set("page", String(options.page));
   const qs = p.toString();
   return `/san-pham${qs ? `?${qs}` : ""}`;
