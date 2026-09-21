@@ -8,6 +8,7 @@ import {
   parseTaskArea,
   resolveMergeTimestamp,
 } from "@/features/automation/automation-status.parser";
+import { createInitialProductionStatus } from "@/features/automation/automation-production";
 import type {
   AutomationDataCompleteness,
   AutomationSummaryMetric,
@@ -17,6 +18,7 @@ import type {
 import type { GitHubIssuePayload } from "@/features/automation/automation-github.types";
 
 export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
+  const checkedAt = new Date().toISOString();
   const labelNames = issue.labels.map((label) => label.name);
   const { status, statusLabel } = parseNormalizedStatus(labelNames);
   const { risk, riskLabel } = parseAutomationRisk(labelNames);
@@ -47,6 +49,7 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
     githubIssueUrl: issue.url,
     labels: labelNames,
     recentStatusComments: filterRecentStatusComments(comments),
+    productionStatus: createInitialProductionStatus(checkedAt),
   };
 }
 

@@ -17,6 +17,8 @@ import {
   fetchLinkedPullRequestSafe,
   getAutomationGitHubConfig,
 } from "@/features/automation/automation-github.client";
+import { getProductionCommitShaFromEnv } from "@/features/automation/automation-production";
+import { enrichTasksWithProductionStatus } from "@/features/automation/automation-production.enrichment";
 import { buildSummary, mapIssueToTask } from "@/features/automation/automation-task.aggregation";
 import type {
   AutomationDashboardResponse,
@@ -29,6 +31,8 @@ const CACHE_REVALIDATE_SECONDS = 60;
 type CachedAutomationPayload = {
   tasks: AutomationTask[];
   dataCompleteness: AutomationDataCompleteness;
+  productionCommitSha: string | null;
+  productionCheckedAt: string;
 };
 
 async function enrichTaskWithLinkedPullRequest(task: AutomationTask): Promise<AutomationTask> {
@@ -47,6 +51,7 @@ async function enrichTaskWithLinkedPullRequest(task: AutomationTask): Promise<Au
     title: linkedPullRequest.title,
     updatedAt: linkedPullRequest.updatedAt,
     mergedAt: linkedPullRequest.mergedAt,
+    mergeCommitSha: linkedPullRequest.mergeCommitSha,
   } as const;
 
   return {
@@ -73,10 +78,18 @@ async function loadAutomationTasksUncached(): Promise<CachedAutomationPayload> {
     .map(mapIssueToTask)
     .sort((left, right) => right.latestUpdateAt.localeCompare(left.latestUpdateAt));
 
-  const tasks = await mapWithConcurrency(
+  const tasksWithLinkedPullRequests = await mapWithConcurrency(
     baseTasks,
     AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
     enrichTaskWithLinkedPullRequest,
+  );
+
+  const productionCheckedAt = new Date().toISOString();
+  const productionCommitSha = getProductionCommitShaFromEnv();
+  const tasks = await enrichTasksWithProductionStatus(
+    tasksWithLinkedPullRequests,
+    productionCommitSha,
+    productionCheckedAt,
   );
 
   return {
@@ -87,6 +100,8 @@ async function loadAutomationTasksUncached(): Promise<CachedAutomationPayload> {
       openTasksLoadedCount,
       closedHistoryUnavailable,
     },
+    productionCommitSha,
+    productionCheckedAt,
   };
 }
 
@@ -112,6 +127,8 @@ function emptyDashboard(configMessage: string | null): AutomationDashboardRespon
     summary: EMPTY_SUMMARY,
     tasks: [],
     fetchedAt: new Date().toISOString(),
+    productionCommitSha: null,
+    productionCheckedAt: null,
   };
 }
 
@@ -122,7 +139,8 @@ export async function getAutomationDashboard(): Promise<AutomationDashboardRespo
   }
 
   try {
-    const { tasks, dataCompleteness } = await getCachedAutomationTasks(config.repoSlug)();
+    const { tasks, dataCompleteness, productionCommitSha, productionCheckedAt } =
+      await getCachedAutomationTasks(config.repoSlug)();
     return {
       configured: true,
       configMessage: null,
@@ -130,6 +148,8 @@ export async function getAutomationDashboard(): Promise<AutomationDashboardRespo
       tasks,
       fetchedAt: new Date().toISOString(),
       dataCompleteness,
+      productionCommitSha,
+      productionCheckedAt,
     };
   } catch (error) {
     if (error instanceof AutomationGitHubConfigError) {
@@ -151,6 +171,8 @@ export async function getAutomationDashboard(): Promise<AutomationDashboardRespo
       summary: EMPTY_SUMMARY,
       tasks: [],
       fetchedAt: new Date().toISOString(),
+      productionCommitSha: null,
+      productionCheckedAt: null,
     };
   }
 }

@@ -138,6 +138,12 @@ type GitHubPullDetailResponse = {
   state: "open" | "closed";
   merged_at: string | null;
   updated_at: string;
+  merge_commit_sha: string | null;
+  head: { sha: string };
+};
+
+type GitHubCompareResponse = {
+  status: "identical" | "ahead" | "behind" | "diverged";
 };
 
 export type SearchIssuesPaginatedResult = {
@@ -318,6 +324,7 @@ function timelineEventToPullCandidate(event: GitHubTimelineEvent): GitHubPullReq
     merged: false,
     mergedAt: null,
     updatedAt: sourceIssue.updated_at,
+    mergeCommitSha: null,
   };
 }
 
@@ -339,6 +346,7 @@ async function enrichPullRequestWithMergeTime(
     merged: Boolean(pull.merged_at),
     mergedAt: pull.merged_at,
     updatedAt: pull.updated_at,
+    mergeCommitSha: pull.merge_commit_sha ?? pull.head.sha ?? null,
   };
 }
 
@@ -355,7 +363,31 @@ async function enrichPullRequestWithMergeTimeOrCandidate(
       ...candidate,
       merged: false,
       mergedAt: null,
+      mergeCommitSha: null,
     };
+  }
+}
+
+export async function compareCommitsSafe(
+  baseSha: string,
+  headSha: string,
+): Promise<GitHubCompareResponse["status"] | null> {
+  const config = getAutomationGitHubConfig();
+  if (!config.configured || !config.owner || !config.repo) return null;
+
+  try {
+    const compare = await githubRequest<GitHubCompareResponse>(
+      `/repos/${config.owner}/${config.repo}/compare/${baseSha}...${headSha}`,
+    );
+    return compare.status;
+  } catch (error) {
+    if (isRecoverableGitHubLookupError(error)) {
+      console.warn(
+        `[compareCommitsSafe] compare failed for ${baseSha.slice(0, 7)}...${headSha.slice(0, 7)}; continuing with partial data`,
+      );
+      return null;
+    }
+    throw error;
   }
 }
 
