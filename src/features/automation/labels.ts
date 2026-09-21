@@ -2,18 +2,19 @@ import type { AutomationTaskRisk, NormalizedTaskStatus } from "@/features/automa
 
 export const AUTOMATION_STATUS_LABELS: Record<NormalizedTaskStatus, string> = {
   backlog: "Backlog",
-  approved: "Approved",
-  building: "Building",
-  pr_open: "PR Open",
+  approved: "Đã duyệt",
+  building: "Đang build",
+  pr_open: "PR mở",
   ci_review: "CI / Review",
-  needs_fix: "Needs Fix",
-  ready_to_merge: "Ready to Merge",
-  merged: "Merged",
-  failed: "Failed",
-  blocked: "Blocked",
+  needs_fix: "Cần sửa",
+  ready_to_merge: "Sẵn sàng merge",
+  merged: "Đã merge",
+  failed: "Thất bại",
+  blocked: "Bị chặn",
+  queued: "Đang chờ",
   stalled: "Stalled",
-  superseded: "Superseded",
-  unknown: "Unknown",
+  superseded: "Đã thay thế",
+  unknown: "Không xác định",
 };
 
 export const AUTOMATION_RISK_LABELS: Record<AutomationTaskRisk, string> = {
@@ -34,6 +35,7 @@ export const AUTOMATION_STATUS_BADGE_CLASS: Record<NormalizedTaskStatus, string>
   merged: "admin-status-badge admin-status-badge--success",
   failed: "admin-status-badge admin-status-badge--danger",
   blocked: "admin-status-badge admin-status-badge--danger",
+  queued: "admin-status-badge admin-status-badge--warning",
   stalled: "admin-status-badge admin-status-badge--danger",
   superseded: "admin-status-badge admin-status-badge--neutral",
   unknown: "admin-status-badge admin-status-badge--neutral",
@@ -61,6 +63,7 @@ export const AUTOMATION_STATUS_FILTER_OPTIONS: Array<{
   { value: "merged", label: AUTOMATION_STATUS_LABELS.merged },
   { value: "failed", label: AUTOMATION_STATUS_LABELS.failed },
   { value: "blocked", label: AUTOMATION_STATUS_LABELS.blocked },
+  { value: "queued", label: AUTOMATION_STATUS_LABELS.queued },
   { value: "stalled", label: AUTOMATION_STATUS_LABELS.stalled },
   { value: "superseded", label: AUTOMATION_STATUS_LABELS.superseded },
 ];

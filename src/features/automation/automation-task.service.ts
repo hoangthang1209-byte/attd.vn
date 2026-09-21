@@ -3,116 +3,68 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import {
   AUTOMATION_STATUS_GITHUB_LABELS,
-  extractBlockerReason,
-  filterRecentStatusComments,
-  isMergedToday,
-  isOpenAutomationTask,
-  parseAutomationRisk,
-  parseNormalizedStatus,
+  resolveMergeTimestamp,
+  shouldFetchLinkedPullRequest,
 } from "@/features/automation/automation-status.parser";
-import type {
-  AutomationDashboardResponse,
-  AutomationTask,
-  AutomationTaskSummary,
-} from "@/features/automation/automation-task.types";
 import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,
-  fetchIssuesByStatusLabel,
+  fetchAutomationIssues,
   fetchLinkedPullRequest,
   getAutomationGitHubConfig,
-  type GitHubIssuePayload,
 } from "@/features/automation/automation-github.client";
+import { buildSummary, mapIssueToTask } from "@/features/automation/automation-task.aggregation";
+import type {
+  AutomationDashboardResponse,
+  AutomationTask,
+} from "@/features/automation/automation-task.types";
 
 const CACHE_REVALIDATE_SECONDS = 60;
 
-function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
-  const labelNames = issue.labels.map((label) => label.name);
-  const { status, statusLabel } = parseNormalizedStatus(labelNames);
-  const { risk, riskLabel } = parseAutomationRisk(labelNames);
-  const comments = issue.comments.map((comment) => ({
-    author: comment.author?.login ?? "unknown",
-    body: comment.body,
-    createdAt: comment.createdAt,
-  }));
-
-  return {
-    issueNumber: issue.number,
-    title: issue.title,
-    status,
-    statusLabel,
-    risk,
-    riskLabel,
-    linkedPullRequest: null,
-    latestUpdateAt: issue.updatedAt,
-    blockerReason: extractBlockerReason(comments),
-    isOpen: issue.state === "OPEN",
-    githubIssueUrl: issue.url,
-    labels: labelNames,
-    recentStatusComments: filterRecentStatusComments(comments),
-  };
-}
-
-function buildSummary(tasks: AutomationTask[]): AutomationTaskSummary {
-  return {
-    totalOpen: tasks.filter((task) => isOpenAutomationTask(task.status, task.isOpen)).length,
-    building: tasks.filter((task) => task.isOpen && task.status === "building").length,
-    stalledOrFailed: tasks.filter(
-      (task) =>
-        task.isOpen &&
-        (task.status === "stalled" || task.status === "failed" || task.status === "blocked"),
-    ).length,
-    needsFix: tasks.filter((task) => task.isOpen && task.status === "needs_fix").length,
-    readyToMerge: tasks.filter((task) => task.isOpen && task.status === "ready_to_merge").length,
-    mergedToday: tasks.filter(
-      (task) => task.status === "merged" && isMergedToday(task.latestUpdateAt),
-    ).length,
-  };
-}
-
 async function loadAutomationTasksUncached(): Promise<AutomationTask[]> {
-  const issueMap = new Map<number, GitHubIssuePayload>();
+  const issues = await fetchAutomationIssues(AUTOMATION_STATUS_GITHUB_LABELS);
 
-  await Promise.all(
-    AUTOMATION_STATUS_GITHUB_LABELS.map(async (label) => {
-      const issues = await fetchIssuesByStatusLabel(label);
-      for (const issue of issues) {
-        issueMap.set(issue.number, issue);
-      }
-    }),
-  );
-
-  const baseTasks = [...issueMap.values()]
+  const baseTasks = issues
     .map(mapIssueToTask)
     .sort((left, right) => right.latestUpdateAt.localeCompare(left.latestUpdateAt));
 
-  const tasksWithPullRequests = await Promise.all(
+  return Promise.all(
     baseTasks.map(async (task) => {
+      if (!shouldFetchLinkedPullRequest(task.status, task.isOpen)) {
+        return task;
+      }
+
       const linkedPullRequest = await fetchLinkedPullRequest(task.issueNumber);
       if (!linkedPullRequest) return task;
 
+      const linked = {
+        number: linkedPullRequest.number,
+        url: linkedPullRequest.url,
+        state: linkedPullRequest.state === "OPEN" ? "open" : "closed",
+        merged: linkedPullRequest.merged,
+        title: linkedPullRequest.title,
+        updatedAt: linkedPullRequest.updatedAt,
+        mergedAt: linkedPullRequest.mergedAt,
+      } as const;
+
       return {
         ...task,
-        linkedPullRequest: {
-          number: linkedPullRequest.number,
-          url: linkedPullRequest.url,
-          state: linkedPullRequest.state === "OPEN" ? "open" : "closed",
-          merged: linkedPullRequest.merged,
-          title: linkedPullRequest.title,
-          updatedAt: linkedPullRequest.updatedAt,
-        },
+        linkedPullRequest: linked,
+        mergedAt: resolveMergeTimestamp({
+          status: task.status,
+          closedAt: task.closedAt,
+          linkedPullRequestMergedAt: linkedPullRequest.mergedAt,
+        }),
       } satisfies AutomationTask;
     }),
   );
-
-  return tasksWithPullRequests;
 }
 
-const getCachedAutomationTasks = unstable_cache(
-  loadAutomationTasksUncached,
-  ["admin-automation-tasks"],
-  { revalidate: CACHE_REVALIDATE_SECONDS },
-);
+function getCachedAutomationTasks(repoSlug: string) {
+  return unstable_cache(loadAutomationTasksUncached, ["admin-automation-tasks", repoSlug], {
+    revalidate: CACHE_REVALIDATE_SECONDS,
+  });
+}
 
 function emptyDashboard(configMessage: string | null): AutomationDashboardResponse {
   return {
@@ -138,7 +90,7 @@ export async function getAutomationDashboard(): Promise<AutomationDashboardRespo
   }
 
   try {
-    const tasks = await getCachedAutomationTasks();
+    const tasks = await getCachedAutomationTasks(config.repoSlug)();
     return {
       configured: true,
       configMessage: null,

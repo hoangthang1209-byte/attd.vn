@@ -146,14 +146,14 @@ export default function AutomationDashboardClient() {
         <>
           <div className="sales-follow-up__stats">
             <StatCard label="Task đang mở" value={data.summary.totalOpen} />
-            <StatCard label="Building" value={data.summary.building} tone="info" />
+            <StatCard label="Đang build" value={data.summary.building} tone="info" />
             <StatCard
-              label="Stalled / Failed"
+              label="Stalled / Thất bại"
               value={data.summary.stalledOrFailed}
               tone="danger"
             />
-            <StatCard label="Needs Fix" value={data.summary.needsFix} tone="warning" />
-            <StatCard label="Ready to Merge" value={data.summary.readyToMerge} tone="success" />
+            <StatCard label="Cần sửa" value={data.summary.needsFix} tone="warning" />
+            <StatCard label="Sẵn sàng merge" value={data.summary.readyToMerge} tone="success" />
             <StatCard label="Merged hôm nay" value={data.summary.mergedToday} />
           </div>
 

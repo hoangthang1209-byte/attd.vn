@@ -33,13 +33,21 @@ Do not grant write, admin, or workflow permissions for this dashboard.
 ## Security
 
 - Route is protected by existing admin authentication middleware.
+- `/api/admin/automation` requires the `dashboard.view` permission, matching the nav entry’s `canViewDashboard` intent.
 - Token is used only in server modules (`server-only`) and the `/api/admin/automation` route.
 - API responses never include the token or other secrets.
 - No GitHub write/merge actions are performed.
 
 ## Caching
 
-GitHub responses are cached for 60 seconds via Next.js `unstable_cache` to reduce API usage.
+GitHub responses are cached for 60 seconds via Next.js `unstable_cache` to reduce API usage. Cache keys include the configured repository slug so different `GITHUB_AUTOMATION_REPO` values do not share entries.
+
+## GitHub API strategy
+
+- Status discovery uses **two consolidated Search API queries** per cache miss (open operational labels + date-bounded closed merged/superseded history), not one query per status label.
+- Search results paginate until complete (100 items per page, up to 10 pages per query).
+- Linked PR resolution uses REST timeline/pull endpoints and runs only for open, non-terminal tasks.
+- Issue comments are fetched via REST; search payloads supply issue metadata directly.
 
 ## Missing configuration
 

@@ -9,6 +9,7 @@ export type NormalizedTaskStatus =
   | "merged"
   | "failed"
   | "blocked"
+  | "queued"
   | "stalled"
   | "superseded"
   | "unknown";
@@ -22,6 +23,7 @@ export type AutomationLinkedPullRequest = {
   merged: boolean;
   title: string;
   updatedAt: string;
+  mergedAt: string | null;
 };
 
 export type AutomationStatusComment = {
@@ -39,6 +41,8 @@ export type AutomationTask = {
   riskLabel: string | null;
   linkedPullRequest: AutomationLinkedPullRequest | null;
   latestUpdateAt: string;
+  closedAt: string | null;
+  mergedAt: string | null;
   blockerReason: string | null;
   isOpen: boolean;
   githubIssueUrl: string;

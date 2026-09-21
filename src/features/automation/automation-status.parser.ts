@@ -41,7 +41,7 @@ const STATUS_LABEL_TO_NORMALIZED: Record<string, NormalizedTaskStatus> = {
   "status:blocked": "blocked",
   "status:stalled": "stalled",
   "status:superseded": "superseded",
-  "status:queued": "blocked",
+  "status:queued": "queued",
 };
 
 const RISK_LABEL_TO_NORMALIZED: Record<string, AutomationTaskRisk> = {
@@ -138,4 +138,25 @@ export function isMergedToday(isoTimestamp: string, now = new Date()): boolean {
 export function isOpenAutomationTask(status: NormalizedTaskStatus, isOpen: boolean): boolean {
   if (!isOpen) return false;
   return status !== "merged" && status !== "superseded";
+}
+
+const TERMINAL_TASK_STATUSES = new Set<NormalizedTaskStatus>(["merged", "superseded"]);
+
+/** Skip linked-PR REST lookups for closed or terminal tasks. */
+export function shouldFetchLinkedPullRequest(
+  status: NormalizedTaskStatus,
+  isOpen: boolean,
+): boolean {
+  if (!isOpen) return false;
+  return !TERMINAL_TASK_STATUSES.has(status);
+}
+
+/** Prefer PR merge time, then issue close time; avoid generic updated_at for merge metrics. */
+export function resolveMergeTimestamp(input: {
+  status: NormalizedTaskStatus;
+  closedAt: string | null;
+  linkedPullRequestMergedAt: string | null;
+}): string | null {
+  if (input.status !== "merged") return null;
+  return input.linkedPullRequestMergedAt ?? input.closedAt;
 }

@@ -7,6 +7,8 @@ import {
   isOpenAutomationTask,
   parseAutomationRisk,
   parseNormalizedStatus,
+  resolveMergeTimestamp,
+  shouldFetchLinkedPullRequest,
 } from "@/features/automation/automation-status.parser";
 
 describe("automation status parser", () => {
@@ -22,6 +24,13 @@ describe("automation status parser", () => {
     assert.deepEqual(parseNormalizedStatus(["status:ci-failed"]), {
       status: "needs_fix",
       statusLabel: "status:ci-failed",
+    });
+  });
+
+  it("maps status:queued to its own normalized state", () => {
+    assert.deepEqual(parseNormalizedStatus(["status:queued"]), {
+      status: "queued",
+      statusLabel: "status:queued",
     });
   });
 
@@ -75,10 +84,47 @@ describe("automation status parser", () => {
     assert.equal(isMergedToday("2026-09-19T23:59:59.000Z", now), false);
   });
 
+  it("prefers PR merge time over issue close time for merge metrics", () => {
+    assert.equal(
+      resolveMergeTimestamp({
+        status: "merged",
+        closedAt: "2026-09-19T10:00:00.000Z",
+        linkedPullRequestMergedAt: "2026-09-20T08:00:00.000Z",
+      }),
+      "2026-09-20T08:00:00.000Z",
+    );
+    assert.equal(
+      resolveMergeTimestamp({
+        status: "merged",
+        closedAt: "2026-09-20T08:00:00.000Z",
+        linkedPullRequestMergedAt: null,
+      }),
+      "2026-09-20T08:00:00.000Z",
+    );
+    assert.equal(
+      resolveMergeTimestamp({
+        status: "building",
+        closedAt: null,
+        linkedPullRequestMergedAt: "2026-09-20T08:00:00.000Z",
+      }),
+      null,
+    );
+  });
+
+  it("skips linked PR lookup for closed or terminal tasks", () => {
+    assert.equal(shouldFetchLinkedPullRequest("building", true), true);
+    assert.equal(shouldFetchLinkedPullRequest("queued", true), true);
+    assert.equal(shouldFetchLinkedPullRequest("merged", false), false);
+    assert.equal(shouldFetchLinkedPullRequest("merged", true), false);
+    assert.equal(shouldFetchLinkedPullRequest("superseded", true), false);
+    assert.equal(shouldFetchLinkedPullRequest("ready_to_merge", false), false);
+  });
+
   it("treats merged and superseded issues as not open automation tasks", () => {
     assert.equal(isOpenAutomationTask("merged", true), false);
     assert.equal(isOpenAutomationTask("superseded", true), false);
     assert.equal(isOpenAutomationTask("building", true), true);
+    assert.equal(isOpenAutomationTask("queued", true), true);
     assert.equal(isOpenAutomationTask("building", false), false);
   });
 });
