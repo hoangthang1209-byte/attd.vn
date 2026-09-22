@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AutomationLaneBoard from "@/components/admin/automation/AutomationLaneBoard";
 import {
   AdminLoadingState,
   AdminPageShell,
@@ -42,31 +43,60 @@ import type {
 import { formatShortCommitSha } from "@/features/automation/automation-production";
 import { formatQuoteDateTime } from "@/features/quotes/format";
 
+const AUTO_REFRESH_INTERVAL_MS = 45_000;
+
+type LoadOptions = {
+  background?: boolean;
+};
+
 export default function AutomationDashboardClient() {
   const [view, setView] = useState<AutomationDashboardView>("active");
   const [data, setData] = useState<AutomationDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshWarning, setRefreshWarning] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<AutomationStatusFilter>("all");
   const [riskFilter, setRiskFilter] = useState<AutomationRiskFilter>("all");
   const [openFilter, setOpenFilter] = useState<AutomationOpenFilter>("open");
   const [taskAreaFilter, setTaskAreaFilter] = useState<AutomationTaskAreaFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
+  const fetchInFlightRef = useRef(false);
+  const viewRef = useRef<AutomationDashboardView>("active");
 
-  const load = useCallback(async (targetView: AutomationDashboardView) => {
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+
+  const load = useCallback(async (targetView: AutomationDashboardView, options: LoadOptions = {}) => {
+    const { background = false } = options;
+    if (fetchInFlightRef.current) return;
+    fetchInFlightRef.current = true;
+
+    if (!background) {
+      setLoading(true);
+      setError(null);
+      setRefreshWarning(null);
+    }
+
     try {
       const response = await fetch(`/api/admin/automation?view=${targetView}`);
       const json = (await response.json()) as AutomationDashboardResponse & { message?: string };
       if (!response.ok) throw new Error(json.message ?? "Không thể tải dashboard automation");
       setData(json);
+      setRefreshWarning(null);
+      if (!background) setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
-      setData(null);
+      const message = err instanceof Error ? err.message : "Lỗi tải dữ liệu";
+      if (background) {
+        setRefreshWarning(`Không thể tự cập nhật: ${message}. Đang hiển thị dữ liệu lần tải trước.`);
+      } else {
+        setError(message);
+        setData(null);
+      }
     } finally {
-      setLoading(false);
+      fetchInFlightRef.current = false;
+      if (!background) setLoading(false);
     }
   }, []);
 
@@ -81,6 +111,12 @@ export default function AutomationDashboardClient() {
     [load],
   );
 
+  const handleLaneTaskSelect = useCallback((issueNumber: number) => {
+    setExpandedIssue(issueNumber);
+    const row = document.getElementById(`automation-task-${issueNumber}`);
+    row?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
@@ -90,6 +126,27 @@ export default function AutomationDashboardClient() {
       cancelled = true;
     };
   }, [load]);
+
+  useEffect(() => {
+    if (view !== "active" || !data?.configured) return;
+
+    const scheduleRefresh = () => {
+      if (document.hidden) return;
+      void load(viewRef.current, { background: true });
+    };
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) scheduleRefresh();
+    };
+
+    const intervalId = window.setInterval(scheduleRefresh, AUTO_REFRESH_INTERVAL_MS);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [data?.configured, load, view]);
 
   const taskAreaFilterOptions = useMemo(
     () => (data ? collectTaskAreaFilterOptions(data.tasks) : []),
@@ -156,6 +213,11 @@ export default function AutomationDashboardClient() {
       />
 
       {error ? <p className="admin-error">{error}</p> : null}
+      {refreshWarning ? (
+        <p className="admin-error" role="status">
+          {refreshWarning}
+        </p>
+      ) : null}
 
       {!data?.configured ? (
         <EmptyState
@@ -223,6 +285,14 @@ export default function AutomationDashboardClient() {
 
       {data?.configured ? (
         <>
+          {view === "active" ? (
+            <AutomationLaneBoard
+              tasks={data.tasks}
+              lastUpdatedAt={data.fetchedAt}
+              onSelectTask={handleLaneTaskSelect}
+            />
+          ) : null}
+
           <div className="sales-follow-up__filters" role="tablist" aria-label="Chế độ xem task">
             {AUTOMATION_DASHBOARD_VIEW_OPTIONS.map((option) => (
               <button
@@ -344,6 +414,7 @@ export default function AutomationDashboardClient() {
                     {filteredTasks.map((task) => (
                       <AutomationTaskRow
                         key={task.issueNumber}
+                        id={`automation-task-${task.issueNumber}`}
                         task={task}
                         productionCommitSha={data.productionCommitSha}
                         expanded={expandedIssue === task.issueNumber}
@@ -377,6 +448,7 @@ export default function AutomationDashboardClient() {
 
           <p className="admin-muted">
             Cập nhật lúc {data.fetchedAt ? formatQuoteDateTime(data.fetchedAt) : "—"} · bộ nhớ đệm 60 giây
+            {view === "active" ? " · Tự cập nhật ~60 giây" : ""}
             {data.productionCommitSha ? (
               <>
                 {" "}
@@ -565,11 +637,13 @@ function AutomationTaskCard({
 }
 
 function AutomationTaskRow({
+  id,
   task,
   expanded,
   onToggle,
   productionCommitSha,
 }: {
+  id: string;
   task: AutomationTask;
   expanded: boolean;
   onToggle: () => void;
@@ -577,7 +651,7 @@ function AutomationTaskRow({
 }) {
   return (
     <>
-      <tr>
+      <tr id={id}>
         <td>
           <Link href={task.githubIssueUrl} className="admin-link" target="_blank" rel="noreferrer">
             #{task.issueNumber}
