@@ -295,7 +295,9 @@ function AdminShellMain({
             ))}
           </div>
           <h1 className={styles.title}>{pageTitle}</h1>
-          <p className={styles.description}>{pageMeta.description}</p>
+          {pageMeta.description?.trim() ? (
+            <p className={styles.description}>{pageMeta.description}</p>
+          ) : null}
         </div>
         <div className={styles.headerActions}>
           <WorkspaceModeToggle />

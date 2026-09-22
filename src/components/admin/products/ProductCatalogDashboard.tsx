@@ -8,7 +8,13 @@ import ProductBulkDialogs, {
   type ProductBulkDialogKind,
 } from "@/components/admin/products/ProductBulkDialogs";
 import { TableLoading } from "@/components/ui/loading/ContextLoading";
-import { EmptyState } from "@/components/admin/AdminUi";
+import {
+  AdminListCard,
+  AdminMobileActionBar,
+  AdminResponsiveList,
+  EmptyState,
+  StatusBadge,
+} from "@/components/admin/AdminUi";
 import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import {
   evaluateProductReadiness,
@@ -312,7 +318,10 @@ export default function ProductCatalogDashboard() {
   const kpiValue = (value: number | undefined) => (loading ? "—" : String(value ?? 0));
 
   return (
-    <div className="admin-catalog-page product-admin-list" data-testid="admin-products-dashboard">
+    <div
+      className="admin-catalog-page product-admin-list admin-page-shell--mobile-actions"
+      data-testid="admin-products-dashboard"
+    >
       <div
         className="product-admin-summary-grid"
         data-testid="product-readiness-summary"
@@ -383,7 +392,7 @@ export default function ProductCatalogDashboard() {
           )}
           <span className="admin-field-hint">{data?.total ?? 0} sản phẩm</span>
         </div>
-        <div className="admin-catalog-toolbar-right" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div className="admin-catalog-toolbar-right admin-page-header__actions--hide-mobile" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <Link href="/admin/products/new" className="admin-btn admin-btn--primary product-admin-btn">
             Tạo sản phẩm mới
           </Link>
@@ -612,33 +621,195 @@ export default function ProductCatalogDashboard() {
           }
         />
       ) : (
-        <div className="admin-catalog-table-wrap product-admin-table-wrap">
-          <table className="admin-catalog-table admin-catalog-table--dense product-admin-table">
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    onChange={(e) => toggleSelectAllVisible(e.target.checked)}
-                    aria-label="Chọn tất cả sản phẩm đang hiển thị"
-                  />
-                </th>
-                <th>Tên sản phẩm</th>
-                <th>Danh mục</th>
-                <th>Mã hàng</th>
-                <th>Trạng thái</th>
-                <th>Sẵn sàng</th>
-                <th>SKU</th>
-                <th>Tồn kho</th>
-                <th>MOQ</th>
-                <th>Lead-time</th>
-                <th>Tính năng</th>
-                <th>Cập nhật</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
+        <AdminResponsiveList
+          desktop={
+            <div className="admin-catalog-table-wrap product-admin-table-wrap">
+              <table className="admin-catalog-table admin-catalog-table--dense product-admin-table">
+                <thead>
+                  <tr>
+                    <th>
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={(e) => toggleSelectAllVisible(e.target.checked)}
+                        aria-label="Chọn tất cả sản phẩm đang hiển thị"
+                      />
+                    </th>
+                    <th>Tên sản phẩm</th>
+                    <th>Danh mục</th>
+                    <th>Mã hàng</th>
+                    <th>Trạng thái</th>
+                    <th>Sẵn sàng</th>
+                    <th>SKU</th>
+                    <th>Tồn kho</th>
+                    <th>MOQ</th>
+                    <th>Lead-time</th>
+                    <th>Tính năng</th>
+                    <th>Cập nhật</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleProducts.map(({ product: p, readiness }) => {
+                    const statusInfo = STATUS_LABELS[p.status] ?? { label: p.status, cls: "" };
+                    const lowCount = p.variants.filter((v) => v.stockStatus === "LOW_STOCK").length;
+                    const outCount = p.variants.filter((v) => v.stockStatus === "OUT_OF_STOCK").length;
+                    const stockSummary =
+                      outCount > 0
+                        ? STOCK_STATUS_LABELS.OUT_OF_STOCK
+                        : lowCount > 0
+                          ? STOCK_STATUS_LABELS.LOW_STOCK
+                          : STOCK_STATUS_LABELS.IN_STOCK;
+
+                    const primaryThumb = getPublicMediaUrl(
+                      p.featuredImage ?? p.images[0]?.imageUrl ?? (p.gallery ?? [])[0] ?? null,
+                    );
+                    return (
+                      <tr key={p.id} data-testid={`product-row-${p.id}`}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(p.id)}
+                            onChange={(e) => toggleSelect(p.id, e.target.checked)}
+                            aria-label={`Chọn sản phẩm ${p.name}`}
+                          />
+                        </td>
+                        <td>
+                          <div className="admin-catalog-product-name">
+                            {primaryThumb && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={primaryThumb}
+                                alt={p.name}
+                                className="admin-catalog-thumb"
+                              />
+                            )}
+                            <span>{p.name}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="admin-field-hint">{p.category.name}</span>
+                          {p.category.skuCode && (
+                            <span className="admin-kb-tag">{p.category.skuCode}</span>
+                          )}
+                        </td>
+                        <td>
+                          <code className="admin-catalog-code">{p.productCode ?? "—"}</code>
+                        </td>
+                        <td>
+                          <span className={`admin-kb-badge ${statusInfo.cls}`}>{statusInfo.label}</span>
+                        </td>
+                        <td>
+                          <div
+                            className="admin-product-readiness-badges"
+                            data-testid={`product-readiness-${p.id}`}
+                          >
+                            {readiness.badges.map((badge) => (
+                              <span key={badge} className={READINESS_BADGE_CLASS[badge]}>
+                                {PRODUCT_READINESS_BADGE_LABELS[badge]}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="admin-field-hint">{p.variants.length} SKU</span>
+                        </td>
+                        <td>
+                          {p.variants.length > 0 ? (
+                            <span className={`admin-kb-badge ${stockSummary.cls}`}>
+                              {stockSummary.label}
+                            </span>
+                          ) : (
+                            <span className="admin-field-hint">—</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className="admin-field-hint">
+                            {p.defaultMoq ? `${p.defaultMoq} cái` : "—"}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="admin-field-hint" style={{ whiteSpace: "nowrap" }}>
+                            {p.leadTime ?? "—"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="admin-catalog-badges">
+                            {p.supportsPrinting && <span className="admin-kb-tag">In</span>}
+                            {p.supportsEmbroidery && <span className="admin-kb-tag">Thêu</span>}
+                            {p.supportsOem && <span className="admin-kb-tag">OEM</span>}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="admin-field-hint">
+                            {new Date(p.updatedAt).toLocaleDateString("vi-VN")}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="admin-catalog-actions-cell product-admin-row-actions">
+                            <Link
+                              href={`/admin/products/${p.id}/edit`}
+                              className="admin-btn admin-btn--primary admin-btn--xs product-admin-btn-row"
+                              data-testid={`product-complete-${p.id}`}
+                            >
+                              {readiness.isReady ? "Sửa" : "Hoàn thiện"}
+                            </Link>
+                            {readiness.hasBrokenImage && (
+                              <Link
+                                href={`/admin/products/${p.id}/edit#section-media`}
+                                className="admin-btn admin-btn--secondary admin-btn--xs product-admin-btn-row"
+                              >
+                                Sửa ảnh
+                              </Link>
+                            )}
+                            <details className="product-admin-action-menu">
+                              <summary className="admin-btn admin-btn--secondary admin-btn--xs product-admin-btn-row">
+                                Thao tác
+                              </summary>
+                              <div className="product-admin-action-menu__panel" role="menu">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  onClick={() => router.push(`/admin/products/${p.id}/edit`)}
+                                >
+                                  Sửa
+                                </button>
+                                {p.slug ? (
+                                  <a
+                                    href={`/san-pham/${p.slug}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    role="menuitem"
+                                  >
+                                    Xem
+                                  </a>
+                                ) : (
+                                  <button type="button" role="menuitem" disabled title="Sản phẩm chưa có slug">
+                                    Xem
+                                  </button>
+                                )}
+                                {p.status === "ARCHIVED" ? (
+                                  <button type="button" role="menuitem" onClick={() => void restoreProduct(p.id)}>
+                                    Khôi phục
+                                  </button>
+                                ) : (
+                                  <button type="button" role="menuitem" onClick={() => void archiveProduct(p.id)}>
+                                    Lưu trữ
+                                  </button>
+                                )}
+                              </div>
+                            </details>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          }
+          mobile={
+            <>
               {visibleProducts.map(({ product: p, readiness }) => {
                 const statusInfo = STATUS_LABELS[p.status] ?? { label: p.status, cls: "" };
                 const lowCount = p.variants.filter((v) => v.stockStatus === "LOW_STOCK").length;
@@ -649,154 +820,81 @@ export default function ProductCatalogDashboard() {
                     : lowCount > 0
                       ? STOCK_STATUS_LABELS.LOW_STOCK
                       : STOCK_STATUS_LABELS.IN_STOCK;
-
                 const primaryThumb = getPublicMediaUrl(
                   p.featuredImage ?? p.images[0]?.imageUrl ?? (p.gallery ?? [])[0] ?? null,
                 );
+
                 return (
-                  <tr key={p.id} data-testid={`product-row-${p.id}`}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(p.id)}
-                        onChange={(e) => toggleSelect(p.id, e.target.checked)}
-                        aria-label={`Chọn sản phẩm ${p.name}`}
-                      />
-                    </td>
-                    <td>
-                      <div className="admin-catalog-product-name">
-                        {primaryThumb && (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={primaryThumb}
-                            alt={p.name}
-                            className="admin-catalog-thumb"
-                          />
-                        )}
-                        <span>{p.name}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="admin-field-hint">{p.category.name}</span>
-                      {p.category.skuCode && (
-                        <span className="admin-kb-tag">{p.category.skuCode}</span>
-                      )}
-                    </td>
-                    <td>
+                  <AdminListCard
+                    key={p.id}
+                    title={p.name}
+                    subtitle={
                       <code className="admin-catalog-code">{p.productCode ?? "—"}</code>
-                    </td>
-                    <td>
-                      <span className={`admin-kb-badge ${statusInfo.cls}`}>{statusInfo.label}</span>
-                    </td>
-                    <td>
-                      <div
-                        className="admin-product-readiness-badges"
-                        data-testid={`product-readiness-${p.id}`}
-                      >
-                        {readiness.badges.map((badge) => (
-                          <span key={badge} className={READINESS_BADGE_CLASS[badge]}>
-                            {PRODUCT_READINESS_BADGE_LABELS[badge]}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="admin-field-hint">{p.variants.length} SKU</span>
-                    </td>
-                    <td>
-                      {p.variants.length > 0 ? (
-                        <span className={`admin-kb-badge ${stockSummary.cls}`}>
-                          {stockSummary.label}
-                        </span>
+                    }
+                    media={
+                      primaryThumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={primaryThumb}
+                          alt={p.name}
+                          className="admin-catalog-thumb admin-list-card__thumb"
+                        />
                       ) : (
-                        <span className="admin-field-hint">—</span>
-                      )}
-                    </td>
-                    <td>
-                      <span className="admin-field-hint">
-                        {p.defaultMoq ? `${p.defaultMoq} cái` : "—"}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="admin-field-hint" style={{ whiteSpace: "nowrap" }}>
-                        {p.leadTime ?? "—"}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="admin-catalog-badges">
-                        {p.supportsPrinting && <span className="admin-kb-tag">In</span>}
-                        {p.supportsEmbroidery && <span className="admin-kb-tag">Thêu</span>}
-                        {p.supportsOem && <span className="admin-kb-tag">OEM</span>}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="admin-field-hint">
-                        {new Date(p.updatedAt).toLocaleDateString("vi-VN")}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="admin-catalog-actions-cell product-admin-row-actions">
-                        <Link
-                          href={`/admin/products/${p.id}/edit`}
-                          className="admin-btn admin-btn--primary admin-btn--xs product-admin-btn-row"
-                          data-testid={`product-complete-${p.id}`}
-                        >
-                          {readiness.isReady ? "Sửa" : "Hoàn thiện"}
-                        </Link>
-                        {readiness.hasBrokenImage && (
-                          <Link
-                            href={`/admin/products/${p.id}/edit#section-media`}
-                            className="admin-btn admin-btn--secondary admin-btn--xs product-admin-btn-row"
-                          >
-                            Sửa ảnh
-                          </Link>
+                        <span className="admin-list-card__thumb-placeholder" aria-hidden>
+                          —
+                        </span>
+                      )
+                    }
+                    badges={
+                      <>
+                        <span className={`admin-kb-badge ${statusInfo.cls}`}>{statusInfo.label}</span>
+                        {p.variants.length > 0 && (
+                          <span className={`admin-kb-badge ${stockSummary.cls}`}>
+                            {stockSummary.label}
+                          </span>
                         )}
-                        <details className="product-admin-action-menu">
-                          <summary className="admin-btn admin-btn--secondary admin-btn--xs product-admin-btn-row">
-                            Thao tác
-                          </summary>
-                          <div className="product-admin-action-menu__panel" role="menu">
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={() => router.push(`/admin/products/${p.id}/edit`)}
-                            >
-                              Sửa
-                            </button>
-                            {p.slug ? (
-                              <a
-                                href={`/san-pham/${p.slug}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                role="menuitem"
-                              >
-                                Xem
-                              </a>
-                            ) : (
-                              <button type="button" role="menuitem" disabled title="Sản phẩm chưa có slug">
-                                Xem
-                              </button>
-                            )}
-                            {p.status === "ARCHIVED" ? (
-                              <button type="button" role="menuitem" onClick={() => void restoreProduct(p.id)}>
-                                Khôi phục
-                              </button>
-                            ) : (
-                              <button type="button" role="menuitem" onClick={() => void archiveProduct(p.id)}>
-                                Lưu trữ
-                              </button>
-                            )}
-                          </div>
-                        </details>
-                      </div>
-                    </td>
-                  </tr>
+                      </>
+                    }
+                    fields={[
+                      { label: "Danh mục", value: p.category.name },
+                      { label: "SKU", value: `${p.variants.length} biến thể` },
+                      {
+                        label: "Sẵn sàng",
+                        value: readiness.isReady ? (
+                          <StatusBadge tone="success">Sẵn sàng</StatusBadge>
+                        ) : (
+                          <StatusBadge tone="warning">Cần bổ sung</StatusBadge>
+                        ),
+                      },
+                    ]}
+                    actions={
+                      <Link
+                        href={`/admin/products/${p.id}/edit`}
+                        className="admin-btn admin-btn--primary"
+                        data-testid={`product-mobile-complete-${p.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {readiness.isReady ? "Sửa" : "Hoàn thiện"}
+                      </Link>
+                    }
+                    onClick={() => router.push(`/admin/products/${p.id}/edit`)}
+                    aria-label={`Sửa sản phẩm ${p.name}`}
+                  />
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </>
+          }
+        />
       )}
+
+      <AdminMobileActionBar
+        ariaLabel="Thao tác sản phẩm"
+        primaryAction={
+          <Link href="/admin/products/new" className="admin-btn admin-btn--primary product-admin-btn">
+            Tạo sản phẩm mới
+          </Link>
+        }
+      />
     </div>
   );
 }

@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import type { QuoteStatus } from "@prisma/client";
 import QuoteStatusBadge from "@/components/admin/quotes/QuoteStatusBadge";
 import {
+  AdminListCard,
   AdminLoadingState,
+  AdminMobileActionBar,
   AdminPageShell,
+  AdminResponsiveList,
   DataToolbar,
   EmptyState,
   PageHeader,
@@ -44,15 +47,30 @@ export default function QuoteListManager() {
 
   useEffect(() => { void load(); }, [load]);
 
+  function openQuote(id: string) {
+    router.push(`/admin/quotes/${id}`);
+  }
+
+  function quoteAmount(q: QuoteListRecord) {
+    return formatQuoteCurrency(
+      q.manualOverride && q.manualTotalAmount != null ? q.manualTotalAmount : q.totalAmount,
+    );
+  }
+
+  const createQuoteAction = (
+    <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
+      Tạo báo giá
+    </Link>
+  );
+
   return (
-    <AdminPageShell>
+    <AdminPageShell className="admin-page-shell--mobile-actions">
       <PageHeader
+        className="admin-page-header--shell-context"
         description="Theo dõi báo giá, thời hạn hiệu lực và giá trị giao dịch."
         meta={<span>Tổng: {quotes.length} báo giá</span>}
         actions={
-          <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
-            Tạo báo giá
-          </Link>
+          <div className="admin-page-header__actions--hide-mobile">{createQuoteAction}</div>
         }
       />
 
@@ -74,38 +92,67 @@ export default function QuoteListManager() {
         <EmptyState
           title="Chưa có báo giá phù hợp"
           description="Hãy tạo báo giá mới hoặc điều chỉnh bộ lọc để xem thêm kết quả."
-          action={<Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">Tạo báo giá</Link>}
+          action={createQuoteAction}
         />
       ) : (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Mã báo giá</th>
-                <th>Khách hàng</th>
-                <th>Lead</th>
-                <th>Trạng thái</th>
-                <th>Tổng tiền</th>
-                <th>Hiệu lực đến</th>
-                <th>Ngày tạo</th>
-              </tr>
-            </thead>
-            <tbody>
+        <AdminResponsiveList
+          desktop={
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Mã báo giá</th>
+                    <th>Khách hàng</th>
+                    <th>Lead</th>
+                    <th>Trạng thái</th>
+                    <th>Tổng tiền</th>
+                    <th>Hiệu lực đến</th>
+                    <th>Ngày tạo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quotes.map((q) => (
+                    <tr key={q.id} style={{ cursor: "pointer" }} onClick={() => openQuote(q.id)}>
+                      <td><code>{q.quoteNo}</code></td>
+                      <td>{q.customerLabel ?? "—"}</td>
+                      <td>{q.leadLabel ?? "—"}</td>
+                      <td><QuoteStatusBadge status={q.status} /></td>
+                      <td>{quoteAmount(q)}</td>
+                      <td>{formatQuoteDate(q.validUntil)}</td>
+                      <td>{formatQuoteDateTime(q.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          }
+          mobile={
+            <>
               {quotes.map((q) => (
-                <tr key={q.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/quotes/${q.id}`)}>
-                  <td><code>{q.quoteNo}</code></td>
-                  <td>{q.customerLabel ?? "—"}</td>
-                  <td>{q.leadLabel ?? "—"}</td>
-                  <td><QuoteStatusBadge status={q.status} /></td>
-                  <td>{formatQuoteCurrency(q.manualOverride && q.manualTotalAmount != null ? q.manualTotalAmount : q.totalAmount)}</td>
-                  <td>{formatQuoteDate(q.validUntil)}</td>
-                  <td>{formatQuoteDateTime(q.createdAt)}</td>
-                </tr>
+                <AdminListCard
+                  key={q.id}
+                  title={<code>{q.quoteNo}</code>}
+                  subtitle={q.customerLabel ?? q.leadLabel ?? "—"}
+                  badges={<QuoteStatusBadge status={q.status} />}
+                  fields={[
+                    { label: "Tổng tiền", value: quoteAmount(q) },
+                    { label: "Hiệu lực đến", value: formatQuoteDate(q.validUntil) },
+                    { label: "Lead", value: q.leadLabel ?? "—" },
+                    { label: "Ngày tạo", value: formatQuoteDateTime(q.createdAt) },
+                  ]}
+                  onClick={() => openQuote(q.id)}
+                  aria-label={`Mở báo giá ${q.quoteNo}`}
+                />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </>
+          }
+        />
       )}
+
+      <AdminMobileActionBar
+        ariaLabel="Thao tác báo giá"
+        primaryAction={createQuoteAction}
+      />
     </AdminPageShell>
   );
 }
