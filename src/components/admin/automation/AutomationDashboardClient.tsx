@@ -40,10 +40,12 @@ import type {
   AutomationSummaryMetric,
   AutomationTask,
 } from "@/features/automation/automation-task.types";
+import { createDashboardFetchSequencer } from "@/features/automation/automation-dashboard-fetch";
 import { formatShortCommitSha } from "@/features/automation/automation-production";
 import { formatQuoteDateTime } from "@/features/quotes/format";
 
 const AUTO_REFRESH_INTERVAL_MS = 45_000;
+const AUTO_REFRESH_LABEL = "Tự cập nhật ~45 giây";
 
 type LoadOptions = {
   background?: boolean;
@@ -52,7 +54,9 @@ type LoadOptions = {
 export default function AutomationDashboardClient() {
   const [view, setView] = useState<AutomationDashboardView>("active");
   const [data, setData] = useState<AutomationDashboardResponse | null>(null);
+  const [activeLaneData, setActiveLaneData] = useState<AutomationDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshWarning, setRefreshWarning] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<AutomationStatusFilter>("all");
@@ -61,44 +65,85 @@ export default function AutomationDashboardClient() {
   const [taskAreaFilter, setTaskAreaFilter] = useState<AutomationTaskAreaFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
-  const fetchInFlightRef = useRef(false);
+  const fetchSequencerRef = useRef(createDashboardFetchSequencer());
+  const foregroundAbortRef = useRef<AbortController | null>(null);
   const viewRef = useRef<AutomationDashboardView>("active");
 
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
 
+  const applyDashboardPayload = useCallback(
+    (targetView: AutomationDashboardView, json: AutomationDashboardResponse) => {
+      if (targetView === "active") {
+        setActiveLaneData(json);
+      }
+
+      if (targetView === viewRef.current) {
+        setData(json);
+      }
+    },
+    [],
+  );
+
   const load = useCallback(async (targetView: AutomationDashboardView, options: LoadOptions = {}) => {
     const { background = false } = options;
-    if (fetchInFlightRef.current) return;
-    fetchInFlightRef.current = true;
+    const ticket = fetchSequencerRef.current.beginRequest(
+      targetView,
+      background ? "background" : "foreground",
+    );
+    if (!ticket) return;
 
+    let abortController: AbortController | null = null;
     if (!background) {
-      setLoading(true);
+      foregroundAbortRef.current?.abort();
+      abortController = new AbortController();
+      foregroundAbortRef.current = abortController;
+
+      if (data) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
       setRefreshWarning(null);
     }
 
     try {
-      const response = await fetch(`/api/admin/automation?view=${targetView}`);
+      const response = await fetch(`/api/admin/automation?view=${targetView}`, {
+        signal: abortController?.signal,
+      });
       const json = (await response.json()) as AutomationDashboardResponse & { message?: string };
       if (!response.ok) throw new Error(json.message ?? "Không thể tải dashboard automation");
-      setData(json);
+
+      if (!fetchSequencerRef.current.shouldApplyResponse(ticket, viewRef.current)) {
+        return;
+      }
+
+      applyDashboardPayload(targetView, json);
       setRefreshWarning(null);
       if (!background) setError(null);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+
       const message = err instanceof Error ? err.message : "Lỗi tải dữ liệu";
       if (background) {
         setRefreshWarning(`Không thể tự cập nhật: ${message}. Đang hiển thị dữ liệu lần tải trước.`);
-      } else {
+      } else if (fetchSequencerRef.current.shouldApplyResponse(ticket, viewRef.current)) {
         setError(message);
         setData(null);
+        if (targetView === "active") {
+          setActiveLaneData(null);
+        }
       }
     } finally {
-      fetchInFlightRef.current = false;
-      if (!background) setLoading(false);
+      fetchSequencerRef.current.endRequest(ticket);
+      if (!background) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, []);
+  }, [applyDashboardPayload, data]);
 
   const handleViewChange = useCallback(
     (nextView: AutomationDashboardView) => {
@@ -111,11 +156,9 @@ export default function AutomationDashboardClient() {
     [load],
   );
 
-  const handleLaneTaskSelect = useCallback((issueNumber: number) => {
-    setExpandedIssue(issueNumber);
-    const row = document.getElementById(`automation-task-${issueNumber}`);
-    row?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, []);
+  const handleManualRefresh = useCallback(() => {
+    void load(viewRef.current);
+  }, [load]);
 
   useEffect(() => {
     let cancelled = false;
@@ -128,11 +171,12 @@ export default function AutomationDashboardClient() {
   }, [load]);
 
   useEffect(() => {
-    if (view !== "active" || !data?.configured) return;
+    const laneConfigured = activeLaneData?.configured ?? data?.configured;
+    if (!laneConfigured) return;
 
     const scheduleRefresh = () => {
       if (document.hidden) return;
-      void load(viewRef.current, { background: true });
+      void load("active", { background: true });
     };
 
     const onVisibilityChange = () => {
@@ -146,7 +190,7 @@ export default function AutomationDashboardClient() {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [data?.configured, load, view]);
+  }, [activeLaneData?.configured, data?.configured, load]);
 
   const taskAreaFilterOptions = useMemo(
     () => (data ? collectTaskAreaFilterOptions(data.tasks) : []),
@@ -171,6 +215,28 @@ export default function AutomationDashboardClient() {
       });
     });
   }, [data, openFilter, riskFilter, searchQuery, statusFilter, taskAreaFilter, view]);
+
+  const filteredIssueNumbers = useMemo(
+    () => new Set(filteredTasks.map((task) => task.issueNumber)),
+    [filteredTasks],
+  );
+
+  const canScrollToLaneTask = useCallback(
+    (issueNumber: number) => filteredIssueNumbers.has(issueNumber),
+    [filteredIssueNumbers],
+  );
+
+  const handleLaneTaskScroll = useCallback(
+    (issueNumber: number) => {
+      if (!filteredIssueNumbers.has(issueNumber)) return;
+      setExpandedIssue(issueNumber);
+      const row = document.getElementById(`automation-task-${issueNumber}`);
+      row?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    },
+    [filteredIssueNumbers],
+  );
+
+  const laneBoardData = activeLaneData ?? (view === "active" ? data : null);
 
   if (loading) {
     return <AdminLoadingState label="Đang tải dashboard automation…" />;
@@ -205,12 +271,20 @@ export default function AutomationDashboardClient() {
           <button
             type="button"
             className="admin-btn admin-btn--secondary"
-            onClick={() => void load(view)}
+            onClick={handleManualRefresh}
+            disabled={refreshing}
+            aria-busy={refreshing}
           >
-            Làm mới
+            {refreshing ? "Đang làm mới…" : "Làm mới"}
           </button>
         }
       />
+
+      {refreshing ? (
+        <p className="admin-muted" role="status">
+          Đang làm mới dữ liệu…
+        </p>
+      ) : null}
 
       {error ? <p className="admin-error">{error}</p> : null}
       {refreshWarning ? (
@@ -285,11 +359,13 @@ export default function AutomationDashboardClient() {
 
       {data?.configured ? (
         <>
-          {view === "active" ? (
+          {laneBoardData ? (
             <AutomationLaneBoard
-              tasks={data.tasks}
-              lastUpdatedAt={data.fetchedAt}
-              onSelectTask={handleLaneTaskSelect}
+              tasks={laneBoardData.tasks}
+              lastUpdatedAt={laneBoardData.fetchedAt}
+              autoRefreshLabel={AUTO_REFRESH_LABEL}
+              onScrollToTask={handleLaneTaskScroll}
+              canScrollToTask={canScrollToLaneTask}
             />
           ) : null}
 
@@ -448,7 +524,7 @@ export default function AutomationDashboardClient() {
 
           <p className="admin-muted">
             Cập nhật lúc {data.fetchedAt ? formatQuoteDateTime(data.fetchedAt) : "—"} · bộ nhớ đệm 60 giây
-            {view === "active" ? " · Tự cập nhật ~60 giây" : ""}
+            {laneBoardData ? ` · ${AUTO_REFRESH_LABEL}` : ""}
             {data.productionCommitSha ? (
               <>
                 {" "}

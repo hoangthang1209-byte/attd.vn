@@ -93,6 +93,31 @@ describe("automation lane board", () => {
     assert.equal(selectedNeedsFix?.issueNumber, 101);
   });
 
+  it("prefers successful merged tasks over closed failed tasks in fallback", () => {
+    const failedClosed = taskFixture({
+      issueNumber: 95,
+      isOpen: false,
+      status: "failed",
+      latestUpdateAt: "2026-09-22T00:00:00.000Z",
+    });
+    const merged = taskFixture({
+      issueNumber: 94,
+      isOpen: false,
+      status: "merged",
+      mergedAt: "2026-09-15T00:00:00.000Z",
+      latestUpdateAt: "2026-09-15T00:00:00.000Z",
+      productionStatus: {
+        status: "live",
+        mergedCommitSha: "abc123",
+        reason: null,
+        checkedAt: "2026-09-15T00:00:00.000Z",
+      },
+    });
+
+    const selected = selectLaneRepresentativeTask([failedClosed, merged]);
+    assert.equal(selected?.issueNumber, 94);
+  });
+
   it("falls back to the most recent completed task when no open task exists", () => {
     const olderMerged = taskFixture({
       issueNumber: 90,

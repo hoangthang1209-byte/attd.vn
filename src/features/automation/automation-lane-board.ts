@@ -78,12 +78,15 @@ function compareTasksByOperationalPriority(left: AutomationTask, right: Automati
   return Date.parse(right.latestUpdateAt) - Date.parse(left.latestUpdateAt);
 }
 
-function isCompletedRepresentativeTask(task: AutomationTask): boolean {
-  if (task.status === "merged") return true;
-  if (!task.isOpen && (task.mergedAt || task.status === "superseded" || task.status === "failed")) {
-    return true;
-  }
-  return false;
+function isSuccessfulCompletedTask(task: AutomationTask): boolean {
+  return task.status === "merged" || task.status === "superseded";
+}
+
+function isClosedFailureTask(task: AutomationTask): boolean {
+  return (
+    !task.isOpen &&
+    (task.status === "failed" || task.status === "stalled" || task.status === "blocked")
+  );
 }
 
 /** Select the canonical representative task for one lane bucket. */
@@ -95,11 +98,19 @@ export function selectLaneRepresentativeTask(tasksInLane: AutomationTask[]): Aut
     return [...openTasks].sort(compareTasksByOperationalPriority)[0] ?? null;
   }
 
-  const completedTasks = tasksInLane
-    .filter(isCompletedRepresentativeTask)
+  const successfulCompletedTasks = tasksInLane
+    .filter(isSuccessfulCompletedTask)
     .sort((left, right) => Date.parse(right.latestUpdateAt) - Date.parse(left.latestUpdateAt));
 
-  return completedTasks[0] ?? null;
+  if (successfulCompletedTasks.length > 0) {
+    return successfulCompletedTasks[0] ?? null;
+  }
+
+  const closedFailureTasks = tasksInLane
+    .filter(isClosedFailureTask)
+    .sort(compareTasksByOperationalPriority);
+
+  return closedFailureTasks[0] ?? null;
 }
 
 export function mapLaneOverallState(task: AutomationTask | null): AutomationLaneOverallState {

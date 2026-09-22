@@ -32,14 +32,16 @@ type AutomationLaneBoardProps = {
   tasks: AutomationTask[];
   lastUpdatedAt: string | null;
   autoRefreshLabel?: string;
-  onSelectTask?: (issueNumber: number) => void;
+  onScrollToTask?: (issueNumber: number) => void;
+  canScrollToTask?: (issueNumber: number) => boolean;
 };
 
 export default function AutomationLaneBoard({
   tasks,
   lastUpdatedAt,
   autoRefreshLabel,
-  onSelectTask,
+  onScrollToTask,
+  canScrollToTask,
 }: AutomationLaneBoardProps) {
   const board = useMemo(() => buildLaneBoard(tasks), [tasks]);
   const summary = useMemo(() => buildLaneBoardSummary(board), [board]);
@@ -51,7 +53,7 @@ export default function AutomationLaneBoard({
           <h2 className="automation-lane-board__title">Bảng điều khiển 7 mảng</h2>
           <p className="admin-muted automation-lane-board__subtitle">
             Tổng quan trạng thái từng mảng phát triển ·{" "}
-            {autoRefreshLabel ?? "Tự cập nhật ~60 giây"}
+            {autoRefreshLabel ?? "Tự cập nhật ~45 giây"}
             {lastUpdatedAt ? <> · Cập nhật lúc {formatQuoteDateTime(lastUpdatedAt)}</> : null}
           </p>
         </div>
@@ -92,7 +94,12 @@ export default function AutomationLaneBoard({
           </thead>
           <tbody>
             {board.map((entry) => (
-              <AutomationLaneBoardRow key={entry.laneId} entry={entry} onSelectTask={onSelectTask} />
+              <AutomationLaneBoardRow
+                key={entry.laneId}
+                entry={entry}
+                onScrollToTask={onScrollToTask}
+                canScrollToTask={canScrollToTask}
+              />
             ))}
           </tbody>
         </table>
@@ -100,7 +107,12 @@ export default function AutomationLaneBoard({
 
       <div className="automation-lane-board__cards">
         {board.map((entry) => (
-          <AutomationLaneBoardCard key={entry.laneId} entry={entry} onSelectTask={onSelectTask} />
+          <AutomationLaneBoardCard
+            key={entry.laneId}
+            entry={entry}
+            onScrollToTask={onScrollToTask}
+            canScrollToTask={canScrollToTask}
+          />
         ))}
       </div>
     </section>
@@ -117,27 +129,33 @@ function LaneStateBadge({ entry }: { entry: AutomationLaneBoardEntry }) {
 
 function TaskLink({
   task,
-  onSelectTask,
+  onScrollToTask,
+  canScrollToTask,
 }: {
   task: AutomationTask;
-  onSelectTask?: (issueNumber: number) => void;
+  onScrollToTask?: (issueNumber: number) => void;
+  canScrollToTask?: (issueNumber: number) => boolean;
 }) {
-  if (onSelectTask) {
-    return (
-      <button
-        type="button"
-        className="admin-link automation-lane-board__task-link"
-        onClick={() => onSelectTask(task.issueNumber)}
-      >
-        #{task.issueNumber} — {task.title}
-      </button>
-    );
-  }
+  const showScrollAffordance =
+    onScrollToTask && (canScrollToTask?.(task.issueNumber) ?? false);
 
   return (
-    <Link href={task.githubIssueUrl} className="admin-link" target="_blank" rel="noreferrer">
-      #{task.issueNumber} — {task.title}
-    </Link>
+    <span className="automation-lane-board__task-link-wrap">
+      <Link href={task.githubIssueUrl} className="admin-link" target="_blank" rel="noreferrer">
+        #{task.issueNumber} — {task.title}
+      </Link>
+      {showScrollAffordance ? (
+        <button
+          type="button"
+          className="admin-btn admin-btn--xs admin-btn--secondary automation-lane-board__scroll-btn"
+          onClick={() => onScrollToTask(task.issueNumber)}
+          aria-label={`Xem task #${task.issueNumber} trong danh sách`}
+          title="Xem trong danh sách"
+        >
+          ↓
+        </button>
+      ) : null}
+    </span>
   );
 }
 
@@ -174,17 +192,23 @@ function ProductionCell({ task }: { task: AutomationTask | null }) {
 
 function AutomationLaneBoardRow({
   entry,
-  onSelectTask,
+  onScrollToTask,
+  canScrollToTask,
 }: {
   entry: AutomationLaneBoardEntry;
-  onSelectTask?: (issueNumber: number) => void;
+  onScrollToTask?: (issueNumber: number) => void;
+  canScrollToTask?: (issueNumber: number) => boolean;
 }) {
   return (
     <tr>
       <td className="automation-lane-board__lane-cell">{entry.laneLabel}</td>
       <td className="automation-lane-board__task-cell">
         {entry.task ? (
-          <TaskLink task={entry.task} onSelectTask={onSelectTask} />
+          <TaskLink
+            task={entry.task}
+            onScrollToTask={onScrollToTask}
+            canScrollToTask={canScrollToTask}
+          />
         ) : (
           <span className="admin-muted">{AUTOMATION_LANE_OVERALL_STATE_LABELS.chua_co_task}</span>
         )}
@@ -207,10 +231,12 @@ function AutomationLaneBoardRow({
 
 function AutomationLaneBoardCard({
   entry,
-  onSelectTask,
+  onScrollToTask,
+  canScrollToTask,
 }: {
   entry: AutomationLaneBoardEntry;
-  onSelectTask?: (issueNumber: number) => void;
+  onScrollToTask?: (issueNumber: number) => void;
+  canScrollToTask?: (issueNumber: number) => boolean;
 }) {
   return (
     <article className="automation-lane-board__card">
@@ -221,7 +247,11 @@ function AutomationLaneBoardCard({
 
       <p className="automation-lane-board__card-task">
         {entry.task ? (
-          <TaskLink task={entry.task} onSelectTask={onSelectTask} />
+          <TaskLink
+            task={entry.task}
+            onScrollToTask={onScrollToTask}
+            canScrollToTask={canScrollToTask}
+          />
         ) : (
           <span className="admin-muted">{AUTOMATION_LANE_OVERALL_STATE_LABELS.chua_co_task}</span>
         )}
