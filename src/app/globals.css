@@ -32810,3 +32810,75 @@ body:has(.blog-article-page) .floating-contact {
   .automation-task-card__meta { margin: 0; font-size: 12px; color: #6b7280; }
   .automation-task-card__details { margin-top: 4px; }
 }
+
+/* Automation 7-Lane Control Board */
+.automation-lane-board {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.automation-lane-board__header { margin-bottom: 12px; }
+.automation-lane-board__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.automation-lane-board__subtitle { margin: 0; font-size: 13px; }
+.automation-lane-board__summary { margin-bottom: 12px; }
+.automation-lane-board__table-wrap { margin-top: 8px; }
+.automation-lane-board__lane-cell { min-width: 140px; font-weight: 600; }
+.automation-lane-board__task-cell { min-width: 180px; max-width: 320px; word-break: break-word; }
+.automation-lane-board__task-link {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.automation-lane-board__cards { display: none; }
+
+@media (max-width: 768px) {
+  .automation-lane-board__table-wrap { display: none; }
+  .automation-lane-board__cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .automation-lane-board__card {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px 14px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .automation-lane-board__card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .automation-lane-board__card-task { margin: 0; word-break: break-word; }
+  .automation-lane-board__card-meta {
+    margin: 0;
+    display: grid;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .automation-lane-board__card-meta div {
+    display: grid;
+    grid-template-columns: minmax(90px, 38%) 1fr;
+    gap: 8px;
+    align-items: start;
+  }
+  .automation-lane-board__card-meta dt {
+    margin: 0;
+    color: #6b7280;
+    font-weight: 500;
+  }
+  .automation-lane-board__card-meta dd { margin: 0; }
+}
