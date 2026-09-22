@@ -11,6 +11,7 @@ import LeadSourceDisplay from "@/components/admin/LeadSourceDisplay";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
 import { CRM_PRIORITY_LABELS, CRM_SOURCE_LABELS, CRM_STATUS_LABELS, displayLeadCompanyName, displayLeadContactName } from "@/features/crm/labels";
 import { formatCrmCurrency, formatCrmDateTime } from "@/features/crm/format";
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
 import {
   CRM_LEAD_PRIORITIES,
   CRM_LEAD_SOURCES,
@@ -25,6 +26,7 @@ type LoadState = "loading" | "error" | "empty" | "ready";
 
 export default function CrmLeadsManager() {
   const router = useRouter();
+  const { developerMode } = useWorkspaceMode();
   const [leads, setLeads] = useState<CrmLeadRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [kpis, setKpis] = useState<CrmLeadKpis | null>(null);
@@ -105,8 +107,13 @@ export default function CrmLeadsManager() {
       </div>
       {!tableReady && loadState !== "loading" && (
         <p className="admin-message admin-message--error" role="alert">
-          Bảng CRM chưa sẵn sàng. Chạy{" "}
-          <code>npx prisma migrate deploy</code>.
+          {developerMode ? (
+            <>
+              Bảng CRM chưa sẵn sàng. Chạy <code>npx prisma migrate deploy</code>.
+            </>
+          ) : (
+            "Dữ liệu CRM chưa sẵn sàng. Vui lòng liên hệ bộ phận kỹ thuật."
+          )}
         </p>
       )}
 
