@@ -9,6 +9,7 @@ import BlogTags from "@/components/blog/BlogTags";
 import RelatedPosts from "@/components/blog/RelatedPosts";
 import BlogArticleCta from "@/components/public/BlogArticleCta";
 import ArticleSchema, { buildArticleDescription } from "@/components/seo/ArticleSchema";
+import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import FaqSchema from "@/components/seo/FaqSchema";
 import { parseFaqJson, parseTagsJson } from "@/features/blog/content-processor";
 import { prepareBlogArticleContent } from "@/features/blog/prepare-content";
@@ -98,8 +99,19 @@ export default async function BlogDetailPage({ params }: PageProps) {
     title: post.title,
   });
 
+  const primaryCategory = categories[0]?.category;
+
   return (
     <main className="blog-article-page">
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Blog", href: "/blog" },
+          ...(primaryCategory
+            ? [{ name: primaryCategory.name, href: `/blog/danh-muc/${primaryCategory.slug}` }]
+            : []),
+          { name: post.title, href: `/blog/${slug}` },
+        ]}
+      />
       <ArticleSchema
         headline={post.title}
         description={description}

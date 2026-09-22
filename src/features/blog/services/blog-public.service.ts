@@ -450,4 +450,28 @@ export async function listPublishedBlogSlugsForStaticParams(): Promise<string[]>
   return legacy.map((post) => post.slug).filter(Boolean);
 }
 
+/** Visible blog categories with at least one published post — for sitemap generation. */
+export async function listIndexableBlogCategoriesForSitemap(): Promise<
+  Array<{ slug: string; updatedAt: Date }>
+> {
+  const categories = await prisma.blogCategory.findMany({
+    where: {
+      isVisible: true,
+      slug: { not: "" },
+      posts: {
+        some: {
+          post: {
+            status: "PUBLISHED",
+            slug: { not: "" },
+          },
+        },
+      },
+    },
+    select: { slug: true, updatedAt: true },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  return categories.filter((category) => category.slug.trim().length > 0);
+}
+
 export type PublicBlogPost = Awaited<ReturnType<typeof getPublishedBlogPostBySlug>>;
