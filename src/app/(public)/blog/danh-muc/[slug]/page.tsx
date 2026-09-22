@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PublicBlogCard from "@/components/blog/PublicBlogCard";
+import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import { getPublishedPostsByCategorySlug } from "@/features/blog/services/blog-public.service";
 import { SITE_NAME } from "@/lib/seo";
 import { buildBlogCategoryMetadata } from "@/lib/seo/indexation-policy";
@@ -44,6 +45,12 @@ export default async function BlogCategoryPage({ params, searchParams }: PagePro
 
   return (
     <main className="mp-blog-listing">
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Blog", href: "/blog" },
+          { name: category.name, href: `/blog/danh-muc/${slug}` },
+        ]}
+      />
       <section className="section blog-category-hero">
         <div className="container">
           <nav className="blog-breadcrumb blog-category-breadcrumb" aria-label="Đường dẫn">

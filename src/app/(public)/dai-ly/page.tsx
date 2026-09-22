@@ -5,7 +5,7 @@ import LandingHeroVisual from "@/components/public/LandingHeroVisual";
 import ManufacturingEvidenceGrid from "@/components/public/manufacturing/ManufacturingEvidenceGrid";
 import { TRUST_REASSURANCE_DEALER_PRIVACY } from "@/lib/b2b-trust-v2-copy";
 import { getManufacturingEvidenceForSurfaceAsync } from "@/lib/manufacturing-library.server";
-import { canonicalUrl } from "@/lib/seo";
+import { canonicalUrl, buildOgImages } from "@/lib/seo";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
 import { getLandingDemoImage } from "@/features/demo/demo-image-map";
 
@@ -17,6 +17,15 @@ export async function generateMetadata(): Promise<Metadata> {
     title: landing.metaTitle,
     description: landing.metaDescription,
     alternates: { canonical: canonicalUrl("/dai-ly") },
+    openGraph: {
+      title: landing.metaTitle,
+      description: landing.metaDescription,
+      images: buildOgImages(),
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: buildOgImages(),
+    },
   };
 }
 

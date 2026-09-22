@@ -27,10 +27,38 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { buildHomepageMetadata } from "@/lib/seo/indexation-policy";
+import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
+import { getBrandingSettings } from "@/features/settings/services/settings.service";
 
 export const revalidate = 3600;
 
-export const metadata: Metadata = buildHomepageMetadata();
+const HOMEPAGE_TITLE = "ATTD - Kho sỉ đồng phục và quà tặng doanh nghiệp";
+const HOMEPAGE_DESCRIPTION =
+  "Nguồn hàng B2B cho đại lý, xưởng in và doanh nghiệp trên toàn quốc. Hàng có sẵn, nhiều màu, nhiều size, giá sỉ tận kho.";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getBrandingSettings();
+  const ogImage =
+    branding.defaultOgImageUrl ?? process.env.NEXT_PUBLIC_DEFAULT_OG_IMAGE ?? undefined;
+  const ogImages = buildOgImages(ogImage);
+
+  return buildHomepageMetadata({
+    title: HOMEPAGE_TITLE,
+    description: HOMEPAGE_DESCRIPTION,
+    openGraph: {
+      title: HOMEPAGE_TITLE,
+      description: HOMEPAGE_DESCRIPTION,
+      url: canonicalUrl("/"),
+      siteName: SITE_NAME,
+      images: ogImages,
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: ogImages,
+    },
+  });
+}
 
 const WHY_ATTD: Array<{
   title: string;

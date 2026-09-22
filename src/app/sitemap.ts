@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 import { SITE_URL } from "@/lib/seo";
+import { listIndexableBlogCategoriesForSitemap } from "@/features/blog/services/blog-public.service";
 import {
   INDEXABLE_STATIC_COMMERCIAL_PATHS,
   isIndexableCategoryLanding,
@@ -52,12 +53,13 @@ type DynamicSitemapData = {
   categories: Array<{ slug: string; updatedAt: Date }>;
   products: Array<{ slug: string; updatedAt: Date }>;
   posts: Array<{ slug: string; updatedAt: Date }>;
+  blogCategories: Array<{ slug: string; updatedAt: Date }>;
 };
 
 /** Load DB-backed sitemap entries; fall back to static-only when DB is unavailable. */
 async function loadDynamicSitemapData(): Promise<DynamicSitemapData> {
   try {
-    const [categories, products, blogPosts, legacyPosts] = await Promise.all([
+    const [categories, products, blogPosts, legacyPosts, blogCategories] = await Promise.all([
       prisma.category.findMany({
         where: { slug: { not: "" }, isActive: true },
         select: { slug: true, updatedAt: true },
@@ -78,25 +80,27 @@ async function loadDynamicSitemapData(): Promise<DynamicSitemapData> {
         select: { slug: true, updatedAt: true },
         orderBy: { updatedAt: "desc" },
       }),
+      listIndexableBlogCategoriesForSitemap(),
     ]);
 
     return {
       categories,
       products: products.filter((product) => !isDemoOrSampleProductMetadata(product.metadata)),
       posts: blogPosts.length > 0 ? blogPosts : legacyPosts,
+      blogCategories,
     };
   } catch (error) {
     console.warn(
       "[sitemap] Database unavailable during sitemap generation; serving static routes only.",
       error,
     );
-    return { categories: [], products: [], posts: [] };
+    return { categories: [], products: [], posts: [], blogCategories: [] };
   }
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes = buildStaticSitemapRoutes();
-  const { categories, products, posts } = await loadDynamicSitemapData();
+  const { categories, products, posts, blogCategories } = await loadDynamicSitemapData();
 
   const categoryRoutes: MetadataRoute.Sitemap = categories
     .filter((cat) => {
@@ -130,5 +134,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
 
-  return dedup([...staticRoutes, ...categoryRoutes, ...productRoutes, ...blogRoutes]);
+  const blogCategoryRoutes: MetadataRoute.Sitemap = blogCategories
+    .filter((category) => isValidSlug(category.slug))
+    .map((category) => ({
+      url: `${SITE_URL}/blog/danh-muc/${category.slug}`,
+      lastModified: category.updatedAt,
+      changeFrequency: "weekly" as const,
+      priority: 0.55,
+    }));
+
+  return dedup([
+    ...staticRoutes,
+    ...categoryRoutes,
+    ...productRoutes,
+    ...blogRoutes,
+    ...blogCategoryRoutes,
+  ]);
 }
