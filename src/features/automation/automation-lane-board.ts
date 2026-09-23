@@ -93,7 +93,26 @@ function hasOrchestratorRepairLabel(labels: string[]): boolean {
   return labels.some((label) => label.startsWith("orchestrator:"));
 }
 
-/** Select the task eligible for Duyệt & chạy, preferring repair issues over in-flight work. */
+/** Statuses where another Builder/CI pipeline is already active in the lane. */
+const LANE_ACTIVE_PIPELINE_STATUSES = new Set<NormalizedTaskStatus>([
+  "building",
+  "approved",
+  "pr_open",
+  "ci_review",
+  "queued",
+]);
+
+function laneHasActivePipelineTask(tasksInLane: AutomationTask[]): boolean {
+  return tasksInLane.some(
+    (task) => task.isOpen && LANE_ACTIVE_PIPELINE_STATUSES.has(task.status),
+  );
+}
+
+/**
+ * Select the task eligible for Duyệt & chạy.
+ * When another task in the lane is already in an active pipeline, only orchestrator repair
+ * issues may be surfaced so the lane cannot start multiple Builder implementations.
+ */
 export function selectLaneApprovalTask(tasksInLane: AutomationTask[]): AutomationTask | null {
   const eligibleTasks = tasksInLane.filter(
     (task) => task.isOpen && evaluateApproveBuildEligibility(task).eligible,
@@ -101,6 +120,15 @@ export function selectLaneApprovalTask(tasksInLane: AutomationTask[]): Automatio
   if (eligibleTasks.length === 0) return null;
 
   const repairEligible = eligibleTasks.filter((task) => hasOrchestratorRepairLabel(task.labels));
+  const hasActivePipeline = laneHasActivePipelineTask(tasksInLane);
+
+  if (hasActivePipeline) {
+    if (repairEligible.length === 0) return null;
+    return [...repairEligible].sort(
+      (left, right) => Date.parse(right.latestUpdateAt) - Date.parse(left.latestUpdateAt),
+    )[0] ?? null;
+  }
+
   const pool = repairEligible.length > 0 ? repairEligible : eligibleTasks;
 
   return [...pool].sort(

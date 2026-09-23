@@ -71,6 +71,22 @@ describe("automation lane board", () => {
     assert.ok(board.every((entry) => entry.overallState === "chua_co_task"));
   });
 
+  it("returns null for normal backlog approval when another task is actively building", () => {
+    const building = taskFixture({
+      issueNumber: 100,
+      status: "building",
+      latestUpdateAt: "2026-09-22T10:00:00.000Z",
+    });
+    const backlogAwaitingApproval = taskFixture({
+      issueNumber: 120,
+      status: "backlog",
+      labels: ["status:backlog", "risk:low"],
+      latestUpdateAt: "2026-09-23T02:00:00.000Z",
+    });
+
+    assert.equal(selectLaneApprovalTask([building, backlogAwaitingApproval]), null);
+  });
+
   it("surfaces repair issues awaiting approval even when another task is in-flight", () => {
     const building = taskFixture({
       issueNumber: 100,
