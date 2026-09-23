@@ -101,7 +101,7 @@ jobs:
         run: npx tsx --experimental-test-module-mocks --test src/features/automation/*.test.ts
 
       - name: SEO structured data tests
-        run: npx tsx --test src/lib/organization-schema.test.ts
+        run: npx tsx --test src/lib/organization-schema.test.ts src/lib/seo/indexation-policy.test.ts
 
       - name: Production build
         run: npm run build
