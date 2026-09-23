@@ -32828,13 +32828,16 @@ body:has(.blog-article-page) .floating-contact {
 .automation-lane-board__table-wrap { margin-top: 8px; }
 .automation-lane-board__lane-cell { min-width: 140px; font-weight: 600; }
 .automation-lane-board__task-cell { min-width: 180px; max-width: 320px; word-break: break-word; }
-.automation-lane-board__task-link {
-  background: none;
-  border: none;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
+.automation-lane-board__task-link-wrap {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.automation-lane-board__scroll-btn {
+  flex-shrink: 0;
+  min-width: 28px;
+  padding-inline: 6px;
 }
 .automation-lane-board__cards { display: none; }
 
