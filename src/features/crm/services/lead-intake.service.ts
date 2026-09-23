@@ -14,10 +14,10 @@ import {
   type LeadIntakeResult,
   type NormalizedLeadIntakeInput,
 } from "@/features/crm/lead-intake.types";
+import { crmOwnerValidationDeps } from "@/features/crm/services/crm-owner-validation.deps";
 import { getCrmLeadById, isCrmLeadTableReady } from "@/features/crm/services/crm-lead.service";
 import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-product-interest-snapshot";
 import type { CreateProductInterestInput } from "@/features/crm/types";
-import { getEmployeeById } from "@/features/employees/employee.service";
 
 async function validateAssignedSalesId(
   assignedSalesId: string | null | undefined,
@@ -31,7 +31,7 @@ async function validateAssignedSalesId(
     return null;
   }
 
-  const employee = await getEmployeeById(id);
+  const employee = await crmOwnerValidationDeps.getEmployeeById(id);
   return resolveExplicitSalesOwnerId(
     id,
     employee
@@ -48,15 +48,6 @@ async function returnExistingLeadBySourceRef(
     where: { source, sourceRef },
   });
   if (!existing) return null;
-
-  await prisma.cRMActivity.create({
-    data: {
-      leadId: existing.id,
-      type: "NOTE",
-      title: buildIntakeAuditTitle(false, "source_ref"),
-      content: `Nguồn ${source}, sourceRef=${sourceRef}`,
-    },
-  });
 
   const lead = await getCrmLeadById(existing.id);
   if (!lead) return null;
@@ -80,13 +71,14 @@ export async function intakeLead(
   const sourceRef = sanitizeSourceRef(input.sourceRef);
   const identity = resolveLeadIntakeIdentity(input);
   const metadata = sanitizeIntakeMetadata(input.intakeMetadata);
-  const assignedTo = await validateAssignedSalesId(input.assignedSalesId, { required: false });
   const receivedAt = input.receivedAt ?? new Date();
 
   if (sourceRef) {
     const existingResult = await returnExistingLeadBySourceRef(source, sourceRef);
     if (existingResult) return existingResult;
   }
+
+  const assignedTo = await validateAssignedSalesId(input.assignedSalesId, { required: false });
 
   const interests = collectProductInterests(input);
   const code = await generateLeadCode();

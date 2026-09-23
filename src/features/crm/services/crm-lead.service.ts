@@ -19,7 +19,7 @@ import {
 } from "@/features/crm/lead-intake.utils";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
 import { validateLeadOwnerId, LeadIntakeValidationError } from "@/features/crm/services/lead-intake.service";
-import { getEmployeeById } from "@/features/employees/employee.service";
+import { crmOwnerValidationDeps } from "@/features/crm/services/crm-owner-validation.deps";
 import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-product-interest-snapshot";
 import {
   CRM_LEAD_PRIORITIES,
@@ -683,8 +683,12 @@ export async function updateCrmLead(
 
       if (shouldCreateOwnerChangeAudit(existing.assignedTo, nextAssignedTo)) {
         const [prevEmployee, nextEmployee] = await Promise.all([
-          existing.assignedTo ? getEmployeeById(existing.assignedTo) : Promise.resolve(null),
-          nextAssignedTo ? getEmployeeById(nextAssignedTo) : Promise.resolve(null),
+          existing.assignedTo
+            ? crmOwnerValidationDeps.getEmployeeById(existing.assignedTo)
+            : Promise.resolve(null),
+          nextAssignedTo
+            ? crmOwnerValidationDeps.getEmployeeById(nextAssignedTo)
+            : Promise.resolve(null),
         ]);
         await tx.cRMActivity.create({
           data: {
