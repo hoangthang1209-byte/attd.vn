@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   ROBOTS_INDEX_FOLLOW,
   ROBOTS_NOINDEX_FOLLOW,
+  buildBlogCategoryCanonicalUrl,
   buildBlogCategoryMetadata,
   buildBlogIndexMetadata,
   buildCatalogMetadata,
@@ -128,6 +129,15 @@ describe("buildBlogCategoryMetadata", () => {
     const meta = buildBlogCategoryMetadata("huong-dan", { page: "2" });
     assert.equal(canonicalOf(meta), "https://www.attd.vn/blog/danh-muc/huong-dan?page=2");
     assert.deepEqual(robotsOf(meta), ROBOTS_NOINDEX_FOLLOW);
+  });
+
+  it("buildBlogCategoryCanonicalUrl matches metadata canonical", () => {
+    const searchParams = { page: "2" };
+    const meta = buildBlogCategoryMetadata("huong-dan", searchParams);
+    assert.equal(
+      buildBlogCategoryCanonicalUrl("huong-dan", searchParams),
+      canonicalOf(meta),
+    );
   });
 
   it("noindexes empty tracking param to clean category archive canonical", () => {

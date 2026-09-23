@@ -145,19 +145,29 @@ function isCategoryOnlySubstantiveQuery(meaningful: URLSearchParams): boolean {
   return keys.length === 1 && keys[0] === "category" && Boolean(meaningful.get("category")?.trim());
 }
 
+function buildArchiveCanonicalUrl(basePath: string, partitioned: PartitionedSearchParams): string {
+  if (!hasSubstantiveQuery(partitioned.meaningful)) {
+    return canonicalFromPath(basePath);
+  }
+
+  return canonicalFromPath(basePath, partitioned.meaningful);
+}
+
 function buildCleanArchiveMetadata(
   basePath: string,
   partitioned: PartitionedSearchParams,
 ): Pick<Metadata, "alternates" | "robots"> {
+  const canonical = buildArchiveCanonicalUrl(basePath, partitioned);
+
   if (!hasSubstantiveQuery(partitioned.meaningful)) {
     return {
-      ...buildCanonicalMetadata(basePath),
+      alternates: { canonical },
       robots: partitioned.hadTrackingParams ? ROBOTS_NOINDEX_FOLLOW : ROBOTS_INDEX_FOLLOW,
     };
   }
 
   return {
-    ...buildCanonicalMetadata(basePath, partitioned.meaningful),
+    alternates: { canonical },
     robots: ROBOTS_NOINDEX_FOLLOW,
   };
 }
@@ -198,6 +208,17 @@ export function buildCatalogMetadata(searchParams: SearchParamInput): Metadata {
 /** `/blog` archive metadata policy — any substantive query is noindex with self canonical. */
 export function buildBlogIndexMetadata(searchParams: SearchParamInput): Metadata {
   return buildCleanArchiveMetadata("/blog", partitionSearchParams(searchParams));
+}
+
+/** Canonical URL for `/blog/danh-muc/[slug]` — shared by metadata and CollectionPage JSON-LD. */
+export function buildBlogCategoryCanonicalUrl(
+  slug: string,
+  searchParams: SearchParamInput,
+): string {
+  return buildArchiveCanonicalUrl(
+    `/blog/danh-muc/${slug}`,
+    partitionSearchParams(searchParams),
+  );
 }
 
 /** `/blog/danh-muc/[slug]` archive metadata policy — any substantive query is noindex with self canonical. */

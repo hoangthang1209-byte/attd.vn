@@ -5,8 +5,11 @@ import PublicBlogCard from "@/components/blog/PublicBlogCard";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
 import CollectionSchema from "@/components/seo/CollectionSchema";
 import { getPublishedPostsByCategorySlug } from "@/features/blog/services/blog-public.service";
-import { SITE_NAME, canonicalUrl } from "@/lib/seo";
-import { buildBlogCategoryMetadata } from "@/lib/seo/indexation-policy";
+import { SITE_NAME } from "@/lib/seo";
+import {
+  buildBlogCategoryCanonicalUrl,
+  buildBlogCategoryMetadata,
+} from "@/lib/seo/indexation-policy";
 
 export const revalidate = 3600;
 
@@ -35,8 +38,8 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 }
 
 export default async function BlogCategoryPage({ params, searchParams }: PageProps) {
-  const { slug } = await params;
-  const { page: pageParam } = await searchParams;
+  const [{ slug }, query] = await Promise.all([params, searchParams]);
+  const { page: pageParam } = query;
   const currentPage = Math.max(1, parseInt(pageParam ?? "1", 10));
 
   const result = await getPublishedPostsByCategorySlug(slug, currentPage, PER_PAGE);
@@ -52,7 +55,7 @@ export default async function BlogCategoryPage({ params, searchParams }: PagePro
       <CollectionSchema
         title={category.name}
         description={categoryDescription}
-        url={canonicalUrl(`/blog/danh-muc/${slug}`)}
+        url={buildBlogCategoryCanonicalUrl(slug, query)}
       />
       <BreadcrumbJsonLd
         items={[
