@@ -147,10 +147,10 @@ export default function CrmLeadsManager() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/employees?active=1&salesCapable=1&limit=200");
+        const res = await fetch("/api/crm/sales-owners");
         const data = await res.json();
-        if (!cancelled && Array.isArray(data.employees)) {
-          setEmployees(data.employees);
+        if (!cancelled && Array.isArray(data.salesOwners)) {
+          setEmployees(data.salesOwners);
         }
       } catch {
         // ignore employee list failures for lead table rendering
