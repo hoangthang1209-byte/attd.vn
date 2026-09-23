@@ -41,6 +41,10 @@ import type {
   AutomationTask,
 } from "@/features/automation/automation-task.types";
 import { createDashboardFetchSequencer } from "@/features/automation/automation-dashboard-fetch";
+import {
+  needsActiveLaneSeed,
+  resolveManualRefreshTargets,
+} from "@/features/automation/automation-dashboard-lane-cache";
 import { formatShortCommitSha } from "@/features/automation/automation-production";
 import { formatQuoteDateTime } from "@/features/quotes/format";
 
@@ -70,6 +74,7 @@ export default function AutomationDashboardClient() {
   const viewRef = useRef<AutomationDashboardView>("active");
   const hasLoadedDataRef = useRef(false);
   const laneConfiguredRef = useRef(false);
+  const activeLaneDataRef = useRef<AutomationDashboardResponse | null>(null);
 
   useEffect(() => {
     viewRef.current = view;
@@ -78,6 +83,10 @@ export default function AutomationDashboardClient() {
   useEffect(() => {
     hasLoadedDataRef.current = data !== null;
   }, [data]);
+
+  useEffect(() => {
+    activeLaneDataRef.current = activeLaneData;
+  }, [activeLaneData]);
 
   useEffect(() => {
     laneConfiguredRef.current = activeLaneData?.configured ?? data?.configured ?? false;
@@ -167,12 +176,19 @@ export default function AutomationDashboardClient() {
       setStatusFilter("all");
       setExpandedIssue(null);
       void loadRef.current(nextView);
+      if (needsActiveLaneSeed(nextView, activeLaneDataRef.current)) {
+        void loadRef.current("active", { background: true });
+      }
     },
     [],
   );
 
   const handleManualRefresh = useCallback(() => {
-    void loadRef.current(viewRef.current);
+    const targets = resolveManualRefreshTargets(viewRef.current);
+    for (const targetView of targets) {
+      const background = targetView === "active" && viewRef.current !== "active";
+      void loadRef.current(targetView, background ? { background: true } : undefined);
+    }
   }, []);
 
   const handleLaneBackgroundRefresh = useCallback(() => {
@@ -188,6 +204,12 @@ export default function AutomationDashboardClient() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!needsActiveLaneSeed(view, activeLaneData)) return;
+    if (!data?.configured && !laneConfiguredRef.current) return;
+    void loadRef.current("active", { background: true });
+  }, [activeLaneData, data?.configured, view]);
 
   useEffect(() => {
     if (!laneConfiguredRef.current) return;
