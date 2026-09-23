@@ -10,23 +10,32 @@
 
 ## Recommended operator primitives
 
-### P1: Order operational summary (new composite, UI-only initially)
+### P1: Per-order workspace summary (consolidation, not greenfield)
 
-Aggregate from existing services:
+**Existing global summary (do not rename or replace):**
+
+- `getOrderOperationalSummary()` in `order-operations.service.ts` — aggregates KPIs across **all active orders**
+- `GET /api/orders/operations-summary` — consumed by `/admin/operations` (`OperationsDashboard`)
+
+**Proposed per-order primitive (distinct name to avoid collision):**
 
 ```
-buildOrderOperationalSummary(orderId) → {
+buildOrderWorkspaceSummary(orderId) → {
   orderStatus, customerLabel, quoteLink,
   salesOwner, productionOwner, deliveryOwner,
   promisedDate, isOverdue, blockerCodes[],
-  nextAction: { label, href, permission },
-  productionSummary: { planStatus, itemCount, blockedCount },
+  nextAction: { label, href, permission },   // rollup: gates + item-level Lean Ops nextAction
+  productionSummary: { planStatus, itemCount, blockedCount },  // extend aggregateProductionSummary
   deliverySummary: { executionStatus, readyQty, pendingQty }
 }
 ```
 
-**Implementation home:** `src/features/orders/order-operational-summary.service.ts` (Phase 2)  
-**Consumers:** Order workspace header, orders list row enrichment, notification center.
+**Reuse path:** Extend existing workspace helpers (`deriveOrderMilestones`, `aggregateProductionSummary`, `getOrderProductionSummary`, production/delivery readiness services) rather than parallel abstractions.
+
+**Implementation home:** `src/features/orders/order-workspace-summary.service.ts` (Phase 2)  
+**Consumers:** `OrderWorkspaceHeader` / summary cards (enhance existing components), orders list row enrichment, notification center.
+
+**Naming rule:** `getOrderOperationalSummary()` = global dashboard scope; `buildOrderWorkspaceSummary(orderId)` = single-order workspace scope.
 
 ### P2: Next-action resolver
 
@@ -79,16 +88,18 @@ flowchart TB
   end
   subgraph Domain
     OS[order.service]
-    OCS[order-operational-summary]
+    OWS[order-workspace-summary]
+    OOS[getOrderOperationalSummary]
     PES[production-execution.service]
     PPS[production-plan.service]
     IPS[item-production.service]
     DES[delivery-execution.service]
   end
-  OW --> OCS
-  OCS --> OS
-  OCS --> PES
-  OCS --> DES
+  OW --> OWS
+  OWS --> OS
+  OWS --> PES
+  OWS --> DES
+  OD[OperationsDashboard] --> OOS
   PP --> PPS
   PP --> IPS
   DB --> DES

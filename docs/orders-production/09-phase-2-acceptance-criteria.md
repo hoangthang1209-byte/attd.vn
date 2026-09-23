@@ -24,9 +24,10 @@ Use these as starting acceptance criteria when opening Phase 2 implementation is
 
 ## OP3 — Order Workspace
 
-- [ ] Order detail shows operational summary: customer, quote link, owners, promised date
-- [ ] Next-action chip visible when gate failure or overdue
-- [ ] Production and delivery summary cards reflect live service data
+- [ ] Existing workspace components (`OrderWorkspaceShell`, summary cards, production panel) enhanced — not replaced
+- [ ] Order detail shows consolidated summary: customer, quote link, owners, promised date
+- [ ] Order-level next-action chip visible when gate failure, overdue, or item-level Lean Ops next action applies
+- [ ] Production and delivery summary cards reflect live service data (execution-first for delivery)
 - [ ] No regression to payment or actual cost tabs
 
 ## OP4 — Quote → Order Continuity
@@ -51,7 +52,7 @@ Use these as starting acceptance criteria when opening Phase 2 implementation is
 
 - [ ] `ORDER_OVERDUE` unchanged; add at least one production-related notification type
 - [ ] Orders list shows due date column (sortable or filterable)
-- [ ] Next-action resolver unit tested with gate combinations
+- [ ] `buildOrderWorkspaceSummary(orderId)` unit tested with gate combinations (distinct from global `getOrderOperationalSummary()`)
 
 ## OP8 — Delivery Handoff
 

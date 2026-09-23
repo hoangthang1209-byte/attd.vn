@@ -27,17 +27,21 @@ Refined from issue #105 suggested roadmap after Phase 1 audit.
 
 **Out of scope:** Pricing formula changes.
 
-## OP3 — Order Workspace
+## OP3 — Order Workspace (consolidation / enhancement)
 
-**Problem:** Context spread across tabs, document routes, and boards.
+**Problem:** Existing workspace has summary cards and production panel, but context is still spread across tabs; order-level next action and quote link are not prominent; delivery card reads header fields instead of execution state.
 
-**Scope:**
-- Operational summary header (P1 primitive)
-- Inline production/delivery summary cards
-- Next-action chip
+**Existing baseline (already shipped):**
+- `OrderWorkspaceShell`, `OrderWorkspaceSummaryCards`, `OrderProductionSummaryPanel`
+- `deriveOrderMilestones`, `aggregateProductionSummary`
+
+**Scope (enhance, do not rebuild):**
+- Order-level next-action chip in header (rollup of gates + item-level Lean Ops `nextAction`)
+- Quote source link prominence in summary cards
+- Delivery summary card prefers execution state over header-only fields
 - Link to production sheet / delivery note without leaving workspace
 
-**Out of scope:** Rewriting entire `OrderDetailView` in one PR — incremental extraction.
+**Out of scope:** Rewriting entire `OrderDetailView` in one PR — incremental enhancement of existing components.
 
 ## OP4 — Quote → Order Continuity
 
@@ -75,7 +79,7 @@ Refined from issue #105 suggested roadmap after Phase 1 audit.
 **Problem:** Signals scattered; weak notifications.
 
 **Scope:**
-- `buildOrderOperationalSummary()` service
+- `buildOrderWorkspaceSummary(orderId)` service — distinct from existing global `getOrderOperationalSummary()`
 - Extend notification center: production blocked, approval pending
 - Orders list columns: due date, next action
 

@@ -9,12 +9,35 @@
 | `/admin/orders` | `OrderListManager` | KPI dashboard, filters, search, pagination |
 | `/admin/orders/new` | `OrderForm` | Full manual create |
 | `/admin/orders/new/quick` | `QuickOrderForm` | Bulk/spreadsheet entry, Excel import |
-| `/admin/orders/[id]` | `OrderDetailView` | Workspace: products, info, delivery, payment, activity, notes |
+| `/admin/orders/[id]` | `OrderDetailView` → `OrderWorkspaceShell` | Workspace: products, info, delivery, payment, activity, notes |
 | `/admin/orders/[id]/edit` | `OrderForm` | Edit (financial admin permission required) |
 | `/admin/orders/[id]/production-sheet` | Document view | Production sheet HTML/PDF |
 | `/admin/orders/[id]/delivery-note` | Document view | Delivery note (requires `executionId`) |
 
 **Key UI modules:** `src/components/admin/orders/` — workspace shell, forms, execution sections, document components.
+
+### Existing order workspace primitives
+
+The order detail workspace is **not greenfield** — key components already exist:
+
+| Component | Path | Role |
+|-----------|------|------|
+| `OrderWorkspaceShell` | `workspace/OrderWorkspaceShell.tsx` | Tab layout, data hooks, role-based default tab |
+| `OrderWorkspaceHeader` | `workspace/OrderWorkspaceHeader.tsx` | Status, actions, document links |
+| `OrderWorkspaceSummaryCards` | `workspace/OrderWorkspaceSummaryCards.tsx` | Customer, payment, milestones, delivery summary cards |
+| `OrderProductionSummaryPanel` | `workspace/OrderProductionSummaryPanel.tsx` | Aggregated production counts from execution bundle |
+| `OrderProductTable` | `workspace/OrderProductTable.tsx` | Line items with per-item production badges |
+| `useOrderWorkspaceData` | `workspace/useOrderWorkspaceData.ts` | Loads production execution bundle for workspace |
+
+**Domain helpers already wired to the workspace:**
+
+| Helper | Path | Role |
+|--------|------|------|
+| `deriveOrderMilestones` | `order-workspace-milestones.ts` | Order progress milestone strip |
+| `aggregateProductionSummary` | `order-workspace-status.ts` | Counts for production summary panel |
+| `getOrderProductionSummary` | `item-production-tracking/item-production.service.ts` | Per-order Lean Ops summary (`GET /api/orders/[id]/item-production-summary`) |
+
+**Phase 2 OP3 scope:** consolidate and enhance these existing primitives (next-action chip, quote link prominence, execution-first delivery card) — not rebuild the workspace from scratch.
 
 ### Production
 
@@ -45,7 +68,7 @@
 |---------|----------------|
 | `order.service.ts` | CRUD, status transitions, payments, list queries |
 | `order-conversion.service.ts` | Quote → order (idempotent) |
-| `order-operations.service.ts` | Production & delivery board data |
+| `order-operations.service.ts` | Production & delivery board data; **global** operational summary (`getOrderOperationalSummary`) |
 | `order-list-dashboard.service.ts` | List KPIs |
 | `production-pack.service.ts` | Files, BOM copy, material requirements |
 | `production-readiness.service.ts` | Pre-`IN_PRODUCTION` checklist |
@@ -95,6 +118,8 @@ Notable endpoints:
 
 - `POST /api/orders/from-quote/[quoteId]` — quote conversion
 - `PATCH /api/orders/[id]/status` — gated status transitions
+- `GET /api/orders/operations-summary` — **global** dashboard KPIs (all active orders; consumed by `/admin/operations`)
+- `GET /api/orders/[id]/item-production-summary` — per-order Lean Ops production summary
 - `GET/POST .../production-execution` — execution bundle
 - `.../delivery-executions/*` — shipment lifecycle
 

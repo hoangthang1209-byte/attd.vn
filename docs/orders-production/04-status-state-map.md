@@ -96,13 +96,22 @@ stateDiagram-v2
   IN_TRANSIT --> PARTIALLY_DELIVERED
   IN_TRANSIT --> DELIVERED
   PARTIALLY_DELIVERED --> DELIVERED
-  DISPATCHED --> FAILED
+  DISPATCHED --> DELIVERY_FAILED
+  IN_TRANSIT --> DELIVERY_FAILED
   IN_TRANSIT --> RETURNING
   RETURNING --> RETURNED
   DRAFT --> CANCELLED
 ```
 
 Line items track planned / dispatched / delivered / returned / damaged quantities per variant.
+
+**Note:** Failure transitions to `DELIVERY_FAILED` are often driven by delivery attempt results (`DeliveryAttemptResult.FAILED`) in `delivery-execution.service.ts`, not only by direct status updates.
+
+## Item production next action (Lean Ops)
+
+**Source:** `ItemProductionTracking` model (`nextAction`, `nextActionDueDate`)
+
+Item-level next action exists in Lean Ops tracking data but is **not aggregated or surfaced** in the order workspace header or summary cards today. Phase 2 OP3/OP7 should roll up item-level signals into an order-level next-action chip rather than duplicating per-item fields.
 
 ## Cross-layer sync (current behavior)
 
@@ -112,7 +121,7 @@ Line items track planned / dispatched / delivered / returned / damaged quantitie
 | Order status ↔ Production plan status | **No** | Independent per item |
 | Order status ↔ Delivery execution | **Partial** | Gates check fulfillment at SHIPPED/COMPLETED only |
 | Lean Ops ↔ Legacy stages | **Bridged** | `lean-ops-execution-bridge.ts`; Lean Ops preferred when initialized |
-| Order `deliveredAt` ↔ Execution DELIVERED | **Verify manually** | Fulfillment service drives completion, not automatic header sync |
+| Order `shippedAt` / `deliveredAt` ↔ Execution DELIVERED | **No** | Order header timestamps are set on admin order status transition to `SHIPPED` (`order.service.ts` sets both if absent); execution `deliveredAt` is set when execution status becomes `DELIVERED` or `PARTIALLY_DELIVERED` (`delivery-execution.service.ts`). No automatic sync between layers. |
 
 ## Operator-facing label map
 

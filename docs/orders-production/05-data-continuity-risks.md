@@ -31,7 +31,7 @@
 
 | Risk | Severity | Detail | Mitigation |
 |------|----------|--------|------------|
-| Header vs execution divergence | **High (ops)** | Order delivery fields vs `OrderDeliveryExecution` records | OP8: workspace shows execution as source of truth; header as summary |
+| Header vs execution divergence | **High (ops)** | Order delivery header fields vs `OrderDeliveryExecution` records — header `shippedAt`/`deliveredAt` set on order status transition to SHIPPED, not when execution reaches DELIVERED | OP8: workspace shows execution as source of truth; header as summary |
 | Carrier/method snapshot | Low | Snapshots stored on order at assignment | Master data edits don't retroactively change orders — expected |
 | Legacy delivery skip | Medium | Legacy orders skip execution requirements | Migration path to create executions for active legacy orders |
 

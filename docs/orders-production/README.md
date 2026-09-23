@@ -20,7 +20,7 @@ The goal is to distinguish **existing capability** from **real gaps** so Phase 2
 | Area | Maturity | Summary |
 |------|----------|---------|
 | Order intake | **Strong** | Manual, quick, and quote→order paths exist with validation, BOM seed, and cost continuity |
-| Order workspace | **Moderate** | Rich detail view with tabs; production/delivery split across sections and document routes |
+| Order workspace | **Moderate–Strong** | `OrderWorkspaceShell` with summary cards, production panel, and milestone strip already exist; gaps are next-action rollup, quote link prominence, and execution-first delivery card |
 | Production handoff | **Moderate** | Lean Ops timeline + legacy stages + production plan coexist; initialization is manual |
 | Production visibility | **Moderate** | Multiple boards/plan views with KPIs; overlapping entry points |
 | Delivery handoff | **Moderate** | Execution model with fulfillment gates; order header fields can diverge |

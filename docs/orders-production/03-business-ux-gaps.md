@@ -41,11 +41,12 @@ Gaps are assessed against Phase 1 business goals from issue #105.
 |--------|---------|
 | ✅ Exists | `ORDER_OVERDUE` notification (delivery expected date) |
 | ✅ Exists | Production plan risk/KPI indicators |
+| ✅ Exists | Item-level `nextAction` / `nextActionDueDate` on `ItemProductionTracking` (Lean Ops) |
 | ⚠️ Gap | No in-app alert for production blocked, QC failed, or approval pending |
-| ⚠️ Gap | Order workspace lacks prominent "next action" chip derived from gates |
+| ⚠️ Gap | Order workspace lacks prominent order-level "next action" chip — item-level Lean Ops next action is not rolled up to the header |
 | ⚠️ Gap | No owner workload view |
 
-**Recommendation (OP7):** Unified next-action resolver on order workspace + notification extensions.
+**Recommendation (OP7):** Unified next-action resolver on order workspace (rollup of item-level Lean Ops signals + gate failures) + notification extensions.
 
 ## Goal: reduce manual coordination
 
@@ -54,7 +55,7 @@ Gaps are assessed against Phase 1 business goals from issue #105.
 | ✅ Exists | Readiness/handover/fulfillment gate services |
 | ⚠️ Gap | Order status not synced from item production or delivery execution |
 | ⚠️ Gap | Override-with-reason escape hatches reduce gate enforcement |
-| ⚠️ Gap | Delivery header fields vs execution records can diverge |
+| ⚠️ Gap | Delivery header fields vs execution records can diverge — order `shippedAt`/`deliveredAt` are set on order status transition, not when execution records reach DELIVERED |
 
 **Recommendation (OP5, OP8):** Optional auto-advance suggestions (not silent auto-status) when all items reach milestone.
 
