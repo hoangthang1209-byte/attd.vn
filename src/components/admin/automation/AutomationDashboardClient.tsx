@@ -53,6 +53,7 @@ const AUTO_REFRESH_LABEL = "Tự cập nhật ~45 giây";
 
 type LoadOptions = {
   background?: boolean;
+  preemptActiveBackground?: boolean;
 };
 
 export default function AutomationDashboardClient() {
@@ -92,24 +93,12 @@ export default function AutomationDashboardClient() {
     laneConfiguredRef.current = activeLaneData?.configured ?? data?.configured ?? false;
   }, [activeLaneData?.configured, data?.configured]);
 
-  const applyDashboardPayload = useCallback(
-    (targetView: AutomationDashboardView, json: AutomationDashboardResponse) => {
-      if (targetView === "active") {
-        setActiveLaneData(json);
-      }
-
-      if (targetView === viewRef.current) {
-        setData(json);
-      }
-    },
-    [],
-  );
-
   const load = useCallback(async (targetView: AutomationDashboardView, options: LoadOptions = {}) => {
-    const { background = false } = options;
+    const { background = false, preemptActiveBackground = false } = options;
     const ticket = fetchSequencerRef.current.beginRequest(
       targetView,
       background ? "background" : "foreground",
+      { preemptActiveBackground },
     );
     if (!ticket) return;
 
@@ -135,23 +124,36 @@ export default function AutomationDashboardClient() {
       const json = (await response.json()) as AutomationDashboardResponse & { message?: string };
       if (!response.ok) throw new Error(json.message ?? "Không thể tải dashboard automation");
 
-      if (!fetchSequencerRef.current.shouldApplyResponse(ticket, viewRef.current)) {
+      const applyList = fetchSequencerRef.current.shouldApplyResponse(ticket, viewRef.current);
+      const applyLane = fetchSequencerRef.current.shouldApplyActiveLaneResponse(ticket);
+
+      if (!applyList && !applyLane) {
         return;
       }
 
-      applyDashboardPayload(targetView, json);
+      if (applyLane && targetView === "active") {
+        setActiveLaneData(json);
+      }
+      if (applyList) {
+        setData(json);
+      }
       setRefreshWarning(null);
-      if (!background) setError(null);
+      if (!background && applyList) setError(null);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
 
       const message = err instanceof Error ? err.message : "Lỗi tải dữ liệu";
       if (background) {
         setRefreshWarning(`Không thể tự cập nhật: ${message}. Đang hiển thị dữ liệu lần tải trước.`);
-      } else if (fetchSequencerRef.current.shouldApplyResponse(ticket, viewRef.current)) {
-        setError(message);
-        setData(null);
-        if (targetView === "active") {
+      } else {
+        const applyList = fetchSequencerRef.current.shouldApplyResponse(ticket, viewRef.current);
+        const applyLane = fetchSequencerRef.current.shouldApplyActiveLaneResponse(ticket);
+
+        if (applyList) {
+          setError(message);
+          setData(null);
+        }
+        if (applyLane && targetView === "active") {
           setActiveLaneData(null);
         }
       }
@@ -162,7 +164,7 @@ export default function AutomationDashboardClient() {
         setRefreshing(false);
       }
     }
-  }, [applyDashboardPayload]);
+  }, []);
 
   const loadRef = useRef(load);
   useEffect(() => {
@@ -177,7 +179,7 @@ export default function AutomationDashboardClient() {
       setExpandedIssue(null);
       void loadRef.current(nextView);
       if (needsActiveLaneSeed(nextView, activeLaneDataRef.current)) {
-        void loadRef.current("active", { background: true });
+        void loadRef.current("active", { background: true, preemptActiveBackground: true });
       }
     },
     [],
@@ -187,7 +189,12 @@ export default function AutomationDashboardClient() {
     const targets = resolveManualRefreshTargets(viewRef.current);
     for (const targetView of targets) {
       const background = targetView === "active" && viewRef.current !== "active";
-      void loadRef.current(targetView, background ? { background: true } : undefined);
+      void loadRef.current(
+        targetView,
+        background
+          ? { background: true, preemptActiveBackground: true }
+          : undefined,
+      );
     }
   }, []);
 
@@ -207,9 +214,8 @@ export default function AutomationDashboardClient() {
 
   useEffect(() => {
     if (!needsActiveLaneSeed(view, activeLaneData)) return;
-    if (!data?.configured && !laneConfiguredRef.current) return;
-    void loadRef.current("active", { background: true });
-  }, [activeLaneData, data?.configured, view]);
+    void loadRef.current("active", { background: true, preemptActiveBackground: true });
+  }, [activeLaneData, view]);
 
   useEffect(() => {
     if (!laneConfiguredRef.current) return;

@@ -8,12 +8,22 @@ export type DashboardFetchTicket = {
   kind: DashboardFetchKind;
 };
 
+export type DashboardFetchBeginOptions = {
+  /** Replace an in-flight active background fetch (seed/manual lane refresh). */
+  preemptActiveBackground?: boolean;
+};
+
 export type DashboardFetchSequencer = {
-  beginRequest: (targetView: AutomationDashboardView, kind: DashboardFetchKind) => DashboardFetchTicket | null;
+  beginRequest: (
+    targetView: AutomationDashboardView,
+    kind: DashboardFetchKind,
+    options?: DashboardFetchBeginOptions,
+  ) => DashboardFetchTicket | null;
   shouldApplyResponse: (
     ticket: DashboardFetchTicket,
     currentView: AutomationDashboardView,
   ) => boolean;
+  shouldApplyActiveLaneResponse: (ticket: DashboardFetchTicket) => boolean;
   endRequest: (ticket: DashboardFetchTicket) => void;
   isLatestForegroundRequest: (ticket: DashboardFetchTicket) => boolean;
 };
@@ -22,17 +32,29 @@ export type DashboardFetchSequencer = {
 export function createDashboardFetchSequencer(): DashboardFetchSequencer {
   let nextRequestId = 0;
   let latestForegroundRequestId = 0;
+  let latestActiveTargetRequestId = 0;
   let backgroundInFlight = false;
+  let activeBackgroundInFlight = false;
 
   return {
-    beginRequest(targetView, kind) {
-      if (kind === "background") {
-        if (backgroundInFlight) return null;
-        backgroundInFlight = true;
-        return { requestId: ++nextRequestId, targetView, kind };
+    beginRequest(targetView, kind, options = {}) {
+      const requestId = ++nextRequestId;
+      if (targetView === "active") {
+        latestActiveTargetRequestId = requestId;
       }
 
-      const requestId = ++nextRequestId;
+      if (kind === "background") {
+        if (targetView === "active") {
+          if (activeBackgroundInFlight && !options.preemptActiveBackground) return null;
+          activeBackgroundInFlight = true;
+          return { requestId, targetView, kind };
+        }
+
+        if (backgroundInFlight) return null;
+        backgroundInFlight = true;
+        return { requestId, targetView, kind };
+      }
+
       latestForegroundRequestId = requestId;
       return { requestId, targetView, kind: "foreground" };
     },
@@ -47,10 +69,14 @@ export function createDashboardFetchSequencer(): DashboardFetchSequencer {
       }
 
       if (ticket.targetView === "active") {
-        return true;
+        return currentView === "active";
       }
 
       return currentView === ticket.targetView;
+    },
+
+    shouldApplyActiveLaneResponse(ticket) {
+      return ticket.targetView === "active" && ticket.requestId === latestActiveTargetRequestId;
     },
 
     isLatestForegroundRequest(ticket) {
@@ -59,7 +85,11 @@ export function createDashboardFetchSequencer(): DashboardFetchSequencer {
 
     endRequest(ticket) {
       if (ticket.kind === "background") {
-        backgroundInFlight = false;
+        if (ticket.targetView === "active") {
+          activeBackgroundInFlight = false;
+        } else {
+          backgroundInFlight = false;
+        }
       }
     },
   };

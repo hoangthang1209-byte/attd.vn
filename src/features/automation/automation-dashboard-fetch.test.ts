@@ -50,7 +50,8 @@ describe("automation dashboard fetch sequencer", () => {
     const background = sequencer.beginRequest("active", "background");
     assert.ok(background);
 
-    assert.equal(sequencer.shouldApplyResponse(background!, "completed"), true);
+    assert.equal(sequencer.shouldApplyResponse(background!, "completed"), false);
+    assert.equal(sequencer.shouldApplyActiveLaneResponse(background!), true);
   });
 
   it("drops background list refresh when the user switched away from that view", () => {
@@ -70,13 +71,37 @@ describe("automation dashboard fetch sequencer", () => {
     assert.equal(sequencer.shouldApplyResponse(background!, "all"), false);
   });
 
-  it("drops stale active background refresh after a newer foreground request", () => {
+  it("keeps active lane cache authoritative after a newer foreground tab switch", () => {
     const sequencer = createDashboardFetchSequencer();
     const background = sequencer.beginRequest("active", "background");
     sequencer.beginRequest("completed", "foreground");
 
     assert.ok(background);
     assert.equal(sequencer.shouldApplyResponse(background!, "completed"), false);
+    assert.equal(sequencer.shouldApplyActiveLaneResponse(background!), true);
+  });
+
+  it("drops stale active lane cache after a newer active-target request", () => {
+    const sequencer = createDashboardFetchSequencer();
+    const first = sequencer.beginRequest("active", "background");
+    const second = sequencer.beginRequest("active", "background", { preemptActiveBackground: true });
+
+    assert.ok(first);
+    assert.ok(second);
+
+    assert.equal(sequencer.shouldApplyActiveLaneResponse(first!), false);
+    assert.equal(sequencer.shouldApplyActiveLaneResponse(second!), true);
+  });
+
+  it("allows preempting an in-flight active background refresh", () => {
+    const sequencer = createDashboardFetchSequencer();
+    const first = sequencer.beginRequest("active", "background");
+    const blocked = sequencer.beginRequest("active", "background");
+    const preempted = sequencer.beginRequest("active", "background", { preemptActiveBackground: true });
+
+    assert.ok(first);
+    assert.equal(blocked, null);
+    assert.ok(preempted);
   });
 
   it("tracks latest foreground request for loading state cleanup", () => {

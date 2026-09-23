@@ -41,4 +41,9 @@ describe("automation dashboard lane cache", () => {
     assert.deepEqual(resolveManualRefreshTargets("all"), ["all", "active"]);
     assert.deepEqual(resolveManualRefreshTargets("completed"), ["completed", "active"]);
   });
+
+  it("requires lane seed after rapid early switches away from Active", () => {
+    assert.equal(needsActiveLaneSeed("completed", null), true);
+    assert.equal(needsActiveLaneSeed("all", lanePayload()), false);
+  });
 });
