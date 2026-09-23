@@ -1,19 +1,5 @@
-import { DEFAULT_DESCRIPTION, SITE_NAME, SITE_URL, canonicalUrl } from "@/lib/seo";
-
-const ORG_PUBLISHER = {
-  "@type": "Organization" as const,
-  name: SITE_NAME,
-  url: SITE_URL,
-  telephone: "+84934337667",
-  contactPoint: {
-    "@type": "ContactPoint" as const,
-    telephone: "+84934337667",
-    contactType: "customer service",
-    areaServed: "VN",
-    availableLanguage: "Vietnamese",
-  },
-  sameAs: ["https://zalo.me/0934337667"],
-};
+import { getOrganizationJsonLd, organizationEntityFromJsonLd } from "@/lib/organization-schema";
+import { DEFAULT_DESCRIPTION, canonicalUrl } from "@/lib/seo";
 
 type ArticleSchemaProps = {
   headline: string;
@@ -24,15 +10,18 @@ type ArticleSchemaProps = {
   dateModified: string;
 };
 
-export default function ArticleSchema({
-  headline,
-  description,
-  slug,
-  image,
-  datePublished,
-  dateModified,
-}: ArticleSchemaProps) {
-  const jsonLd = {
+export function buildArticleJsonLd(
+  {
+    headline,
+    description,
+    slug,
+    image,
+    datePublished,
+    dateModified,
+  }: ArticleSchemaProps,
+  organization: Record<string, unknown>,
+) {
+  return {
     "@context": "https://schema.org",
     "@type": "Article",
     headline,
@@ -40,10 +29,15 @@ export default function ArticleSchema({
     ...(image ? { image } : {}),
     datePublished,
     dateModified,
-    author: ORG_PUBLISHER,
-    publisher: ORG_PUBLISHER,
+    author: organization,
+    publisher: organization,
     url: canonicalUrl(`/blog/${slug}`),
   };
+}
+
+export default async function ArticleSchema(props: ArticleSchemaProps) {
+  const organization = organizationEntityFromJsonLd(await getOrganizationJsonLd());
+  const jsonLd = buildArticleJsonLd(props, organization);
 
   return (
     <script

@@ -3,8 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import PublicBlogCard from "@/components/blog/PublicBlogCard";
 import BreadcrumbJsonLd from "@/components/seo/BreadcrumbJsonLd";
+import CollectionSchema from "@/components/seo/CollectionSchema";
 import { getPublishedPostsByCategorySlug } from "@/features/blog/services/blog-public.service";
-import { SITE_NAME } from "@/lib/seo";
+import { SITE_NAME, canonicalUrl } from "@/lib/seo";
 import { buildBlogCategoryMetadata } from "@/lib/seo/indexation-policy";
 
 export const revalidate = 3600;
@@ -42,9 +43,17 @@ export default async function BlogCategoryPage({ params, searchParams }: PagePro
   if (!result) notFound();
 
   const { category, posts, total, totalPages } = result;
+  const categoryDescription =
+    category.description ??
+    `Bài viết về ${category.name} — kiến thức B2B từ ATTD.`;
 
   return (
     <main className="mp-blog-listing">
+      <CollectionSchema
+        title={category.name}
+        description={categoryDescription}
+        url={canonicalUrl(`/blog/danh-muc/${slug}`)}
+      />
       <BreadcrumbJsonLd
         items={[
           { name: "Blog", href: "/blog" },

@@ -6,12 +6,12 @@ interface CollectionSchemaProps {
   url: string;
 }
 
-export default function CollectionSchema({
+export function buildCollectionPageJsonLd({
   title,
   description,
   url,
 }: CollectionSchemaProps) {
-  const jsonLd = {
+  return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: title,
@@ -22,6 +22,10 @@ export default function CollectionSchema({
       name: SITE_NAME,
     },
   };
+}
+
+export default function CollectionSchema(props: CollectionSchemaProps) {
+  const jsonLd = buildCollectionPageJsonLd(props);
 
   return (
     <script
