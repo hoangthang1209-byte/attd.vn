@@ -8,6 +8,7 @@ import {
   deriveLaneNextAction,
   formatLaneCiReview,
   mapLaneOverallState,
+  selectLaneApprovalTask,
   selectLaneRepresentativeTask,
 } from "@/features/automation/automation-lane-board";
 import type { AutomationTask } from "@/features/automation/automation-task.types";
@@ -68,6 +69,45 @@ describe("automation lane board", () => {
       ],
     );
     assert.ok(board.every((entry) => entry.overallState === "chua_co_task"));
+  });
+
+  it("surfaces repair issues awaiting approval even when another task is in-flight", () => {
+    const building = taskFixture({
+      issueNumber: 100,
+      status: "building",
+      latestUpdateAt: "2026-09-22T10:00:00.000Z",
+    });
+    const repairAwaitingApproval = taskFixture({
+      issueNumber: 118,
+      status: "backlog",
+      labels: ["status:backlog", "orchestrator:review-repair"],
+      latestUpdateAt: "2026-09-23T02:00:00.000Z",
+    });
+
+    const representative = selectLaneRepresentativeTask([building, repairAwaitingApproval]);
+    assert.equal(representative?.issueNumber, 100);
+
+    const approvalTask = selectLaneApprovalTask([building, repairAwaitingApproval]);
+    assert.equal(approvalTask?.issueNumber, 118);
+  });
+
+  it("includes approvalTask on lane board entries", () => {
+    const building = taskFixture({
+      issueNumber: 100,
+      status: "building",
+      latestUpdateAt: "2026-09-22T10:00:00.000Z",
+    });
+    const repairAwaitingApproval = taskFixture({
+      issueNumber: 118,
+      status: "backlog",
+      labels: ["status:backlog", "orchestrator:review-repair"],
+      latestUpdateAt: "2026-09-23T02:00:00.000Z",
+    });
+
+    const board = buildLaneBoard([building, repairAwaitingApproval]);
+    const automationLane = board.find((entry) => entry.laneId === "automation-platform");
+    assert.equal(automationLane?.task?.issueNumber, 100);
+    assert.equal(automationLane?.approvalTask?.issueNumber, 118);
   });
 
   it("prefers higher-priority open tasks when multiple exist in a lane", () => {

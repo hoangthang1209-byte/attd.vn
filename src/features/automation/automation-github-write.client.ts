@@ -1,6 +1,11 @@
 import "server-only";
 
 import { BUILD_APPROVED_COMMENT } from "@/features/automation/automation-build-approved";
+import {
+  ISSUE_COMMENTS_MAX_PAGES,
+  ISSUE_COMMENTS_PAGE_SIZE,
+  shouldFetchNextCommentPage,
+} from "@/features/automation/automation-issue-comments.pagination";
 import { getAutomationGitHubConfig } from "@/features/automation/automation-github.client";
 import {
   AutomationGitHubConfigError,
@@ -32,6 +37,12 @@ export type GitHubIssueApprovalPayload = {
   comments: Array<{ body: string }>;
 };
 
+export type WriteTokenOwnerIdentity = {
+  valid: boolean;
+  authenticatedLogin: string | null;
+  message: string | null;
+};
+
 type GitHubIssueDetailResponse = {
   number: number;
   title: string;
@@ -45,6 +56,15 @@ type GitHubIssueCommentResponse = {
   id: number;
   body: string;
 };
+
+type GitHubAuthenticatedUserResponse = {
+  login: string;
+};
+
+const OWNER_IDENTITY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let cachedOwnerIdentity: (WriteTokenOwnerIdentity & { checkedAtMs: number; owner: string }) | null =
+  null;
 
 function getAutomationWriteToken(): string | null {
   const token = process.env.GITHUB_AUTOMATION_WRITE_TOKEN?.trim();
@@ -113,6 +133,88 @@ async function githubWriteRequest<T>(
   return (await response.json()) as T;
 }
 
+/** Fail-closed: write token must authenticate as the configured repository owner. */
+export async function validateWriteTokenOwnerIdentity(
+  config: Extract<AutomationGitHubWriteConfig, { configured: true }>,
+): Promise<WriteTokenOwnerIdentity> {
+  const now = Date.now();
+  if (
+    cachedOwnerIdentity &&
+    cachedOwnerIdentity.owner === config.owner &&
+    now - cachedOwnerIdentity.checkedAtMs < OWNER_IDENTITY_CACHE_TTL_MS
+  ) {
+    return {
+      valid: cachedOwnerIdentity.valid,
+      authenticatedLogin: cachedOwnerIdentity.authenticatedLogin,
+      message: cachedOwnerIdentity.message,
+    };
+  }
+
+  let authenticatedLogin: string;
+  try {
+    const user = await githubWriteRequest<GitHubAuthenticatedUserResponse>(config, "/user");
+    authenticatedLogin = user.login;
+  } catch (error) {
+    const message =
+      error instanceof AutomationGitHubRequestError
+        ? `Không thể xác minh GITHUB_AUTOMATION_WRITE_TOKEN (${error.status}). Token phải thuộc owner ${config.owner}.`
+        : "Không thể xác minh GITHUB_AUTOMATION_WRITE_TOKEN. Token phải thuộc repository owner.";
+
+    cachedOwnerIdentity = {
+      checkedAtMs: now,
+      owner: config.owner,
+      valid: false,
+      authenticatedLogin: null,
+      message,
+    };
+    return {
+      valid: false,
+      authenticatedLogin: null,
+      message,
+    };
+  }
+
+  const valid = authenticatedLogin.toLowerCase() === config.owner.toLowerCase();
+  const message = valid
+    ? null
+    : `GITHUB_AUTOMATION_WRITE_TOKEN phải thuộc tài khoản owner "${config.owner}" (hiện tại: "${authenticatedLogin}"). Builder orchestrator chỉ chấp nhận BUILD_APPROVED từ repository owner — xem docs/github-task-status.md.`;
+
+  cachedOwnerIdentity = {
+    checkedAtMs: now,
+    owner: config.owner,
+    valid,
+    authenticatedLogin,
+    message,
+  };
+
+  return { valid, authenticatedLogin, message };
+}
+
+/** Paginate issue comments until BUILD_APPROVED is found or pages are exhausted. */
+export async function fetchAllIssueCommentsForApproval(
+  config: Extract<AutomationGitHubWriteConfig, { configured: true }>,
+  issueNumber: number,
+): Promise<Array<{ body: string }>> {
+  const comments: Array<{ body: string }> = [];
+
+  for (let page = 1; page <= ISSUE_COMMENTS_MAX_PAGES; page += 1) {
+    const pageComments = await githubWriteRequest<GitHubIssueCommentsResponse>(
+      config,
+      `/repos/${config.owner}/${config.repo}/issues/${issueNumber}/comments?per_page=${ISSUE_COMMENTS_PAGE_SIZE}&page=${page}`,
+    );
+
+    comments.push(...pageComments);
+
+    if (
+      !shouldFetchNextCommentPage(pageComments, comments, page)
+    ) {
+      return comments;
+    }
+  }
+
+  return comments;
+}
+
 export async function fetchIssueForApproval(
   issueNumber: number,
   configOverride?: AutomationGitHubWriteConfig,
@@ -129,10 +231,7 @@ export async function fetchIssueForApproval(
       config,
       `/repos/${config.owner}/${config.repo}/issues/${issueNumber}`,
     ),
-    githubWriteRequest<GitHubIssueCommentsResponse>(
-      config,
-      `/repos/${config.owner}/${config.repo}/issues/${issueNumber}/comments?per_page=100`,
-    ),
+    fetchAllIssueCommentsForApproval(config, issueNumber),
   ]);
 
   return {
@@ -168,4 +267,9 @@ export async function postBuildApprovedComment(
   );
 
   return { commentId: comment.id };
+}
+
+/** Test helper: reset cached owner identity validation. */
+export function resetWriteTokenOwnerIdentityCacheForTests(): void {
+  cachedOwnerIdentity = null;
 }

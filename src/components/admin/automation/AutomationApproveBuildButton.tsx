@@ -56,6 +56,10 @@ export default function AutomationApproveBuildButton({
 
   if (!task) return <>—</>;
 
+  if (!eligibility.eligible) {
+    return <>—</>;
+  }
+
   if (!writeActionConfigured) {
     return (
       <span className="automation-lane-board__approve-hint" title={writeActionConfigMessage ?? undefined}>
@@ -63,14 +67,10 @@ export default function AutomationApproveBuildButton({
           Duyệt &amp; chạy
         </button>
         <span className="admin-muted automation-lane-board__approve-setup">
-          Cần GITHUB_AUTOMATION_WRITE_TOKEN
+          {writeActionConfigMessage ?? "Cần GITHUB_AUTOMATION_WRITE_TOKEN"}
         </span>
       </span>
     );
-  }
-
-  if (!eligibility.eligible) {
-    return <>—</>;
   }
 
   const label =

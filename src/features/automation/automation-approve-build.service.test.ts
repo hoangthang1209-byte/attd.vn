@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   approveBuildForIssue,
+  resetApproveBuildInFlightForTests,
   type ApproveBuildDependencies,
 } from "@/features/automation/automation-approve-build.service";
 import type {
@@ -31,6 +32,7 @@ function createDependencies(
 ): ApproveBuildDependencies {
   return {
     getWriteConfig: () => configuredWriteConfig,
+    validateOwnerIdentity: async () => ({ valid: true, message: null }),
     fetchIssue: async () => eligibleIssue,
     postApproval: async () => ({ commentId: 1 }),
     ...overrides,
@@ -54,6 +56,20 @@ describe("approve build service", () => {
     assert.equal(result.result, "not_configured");
   });
 
+  it("returns not_configured when write token is not repository owner", async () => {
+    const result = await approveBuildForIssue(
+      "116",
+      createDependencies({
+        validateOwnerIdentity: async () => ({
+          valid: false,
+          message: 'Token owner mismatch: expected "hoangthang1209-byte", got "other-user".',
+        }),
+      }),
+    );
+    assert.equal(result.result, "not_configured");
+    assert.match(result.message, /owner/i);
+  });
+
   it("dedupes when BUILD_APPROVED already exists", async () => {
     const result = await approveBuildForIssue(
       "116",
@@ -68,6 +84,62 @@ describe("approve build service", () => {
       }),
     );
     assert.equal(result.result, "already_approved");
+  });
+
+  it("dedupes when BUILD_APPROVED appears on pre-post refresh", async () => {
+    let fetchCount = 0;
+    const result = await approveBuildForIssue(
+      "116",
+      createDependencies({
+        fetchIssue: async () => {
+          fetchCount += 1;
+          if (fetchCount >= 2) {
+            return {
+              ...eligibleIssue,
+              comments: [...eligibleIssue.comments, { body: "BUILD_APPROVED" }],
+            };
+          }
+          return eligibleIssue;
+        },
+        postApproval: async () => {
+          throw new Error("should not post");
+        },
+      }),
+    );
+    assert.equal(result.result, "already_approved");
+    assert.ok(fetchCount >= 2);
+  });
+
+  it("serializes concurrent approvals for the same issue", async () => {
+    resetApproveBuildInFlightForTests();
+    let postCount = 0;
+    let fetchCount = 0;
+
+    const slowDeps = createDependencies({
+      fetchIssue: async () => {
+        fetchCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        return eligibleIssue;
+      },
+      postApproval: async () => {
+        postCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        return { commentId: 1 };
+      },
+    });
+
+    const [first, second] = await Promise.all([
+      approveBuildForIssue("116", slowDeps),
+      approveBuildForIssue("116", slowDeps),
+    ]);
+
+    assert.equal(postCount, 1);
+    assert.ok(
+      (first.result === "approved_now" && second.result === "approved_now") ||
+        first.result === "already_approved" ||
+        second.result === "already_approved",
+    );
+    assert.ok(fetchCount >= 2);
   });
 
   it("rejects closed issues", async () => {

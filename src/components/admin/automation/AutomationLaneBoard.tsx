@@ -230,7 +230,7 @@ function AutomationLaneBoardRow({
       <td>{entry.nextAction}</td>
       <td>
         <AutomationApproveBuildButton
-          task={entry.task}
+          task={entry.approvalTask}
           writeActionConfigured={writeActionConfigured}
           writeActionConfigMessage={writeActionConfigMessage}
           onApproved={() => onRefresh?.()}
@@ -302,7 +302,7 @@ function AutomationLaneBoardCard({
           <dt>Duyệt</dt>
           <dd>
             <AutomationApproveBuildButton
-              task={entry.task}
+              task={entry.approvalTask}
               writeActionConfigured={writeActionConfigured}
               writeActionConfigMessage={writeActionConfigMessage}
               onApproved={() => onRefresh?.()}

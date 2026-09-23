@@ -40,6 +40,8 @@ Use a separate fine-grained PAT with the minimum permissions for one-click appro
 
 Do **not** grant Contents write, Pull requests write, Actions/workflows write, Administration, Secrets, Deployments, or Organization permissions.
 
+**Critical:** `GITHUB_AUTOMATION_WRITE_TOKEN` must authenticate as the **repository owner** account (the same identity accepted by the F1a/F1b build orchestrator for `BUILD_APPROVED`). A PAT from any other account will post the comment successfully but Builder automation will ignore it — see `docs/github-task-status.md` (authorized author = `github.repository_owner`). The dashboard validates token identity via GitHub `/user` and surfaces a configuration error when the login does not match the configured owner.
+
 ## Security
 
 - Route is protected by existing admin authentication middleware.
