@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import AutomationApproveBuildButton from "@/components/admin/automation/AutomationApproveBuildButton";
 import {
   AUTOMATION_LANE_OVERALL_STATE_LABELS,
   buildLaneBoard,
@@ -32,16 +33,22 @@ type AutomationLaneBoardProps = {
   tasks: AutomationTask[];
   lastUpdatedAt: string | null;
   autoRefreshLabel?: string;
+  writeActionConfigured: boolean;
+  writeActionConfigMessage: string | null;
   onScrollToTask?: (issueNumber: number) => void;
   canScrollToTask?: (issueNumber: number) => boolean;
+  onRefresh?: () => void;
 };
 
 export default function AutomationLaneBoard({
   tasks,
   lastUpdatedAt,
   autoRefreshLabel,
+  writeActionConfigured,
+  writeActionConfigMessage,
   onScrollToTask,
   canScrollToTask,
+  onRefresh,
 }: AutomationLaneBoardProps) {
   const board = useMemo(() => buildLaneBoard(tasks), [tasks]);
   const summary = useMemo(() => buildLaneBoardSummary(board), [board]);
@@ -89,6 +96,7 @@ export default function AutomationLaneBoard({
               <th>CI / Review</th>
               <th>Production</th>
               <th>Việc tiếp theo</th>
+              <th>Duyệt</th>
               <th>Cập nhật</th>
             </tr>
           </thead>
@@ -99,6 +107,9 @@ export default function AutomationLaneBoard({
                 entry={entry}
                 onScrollToTask={onScrollToTask}
                 canScrollToTask={canScrollToTask}
+                writeActionConfigured={writeActionConfigured}
+                writeActionConfigMessage={writeActionConfigMessage}
+                onRefresh={onRefresh}
               />
             ))}
           </tbody>
@@ -112,6 +123,9 @@ export default function AutomationLaneBoard({
             entry={entry}
             onScrollToTask={onScrollToTask}
             canScrollToTask={canScrollToTask}
+            writeActionConfigured={writeActionConfigured}
+            writeActionConfigMessage={writeActionConfigMessage}
+            onRefresh={onRefresh}
           />
         ))}
       </div>
@@ -194,10 +208,16 @@ function AutomationLaneBoardRow({
   entry,
   onScrollToTask,
   canScrollToTask,
+  writeActionConfigured,
+  writeActionConfigMessage,
+  onRefresh,
 }: {
   entry: AutomationLaneBoardEntry;
   onScrollToTask?: (issueNumber: number) => void;
   canScrollToTask?: (issueNumber: number) => boolean;
+  writeActionConfigured: boolean;
+  writeActionConfigMessage: string | null;
+  onRefresh?: () => void;
 }) {
   return (
     <tr>
@@ -224,6 +244,14 @@ function AutomationLaneBoardRow({
         <ProductionCell task={entry.task} />
       </td>
       <td>{entry.nextAction}</td>
+      <td>
+        <AutomationApproveBuildButton
+          task={entry.approvalTask}
+          writeActionConfigured={writeActionConfigured}
+          writeActionConfigMessage={writeActionConfigMessage}
+          onApproved={() => onRefresh?.()}
+        />
+      </td>
       <td>{entry.lastUpdateAt ? formatQuoteDateTime(entry.lastUpdateAt) : "—"}</td>
     </tr>
   );
@@ -233,10 +261,16 @@ function AutomationLaneBoardCard({
   entry,
   onScrollToTask,
   canScrollToTask,
+  writeActionConfigured,
+  writeActionConfigMessage,
+  onRefresh,
 }: {
   entry: AutomationLaneBoardEntry;
   onScrollToTask?: (issueNumber: number) => void;
   canScrollToTask?: (issueNumber: number) => boolean;
+  writeActionConfigured: boolean;
+  writeActionConfigMessage: string | null;
+  onRefresh?: () => void;
 }) {
   return (
     <article className="automation-lane-board__card">
@@ -286,6 +320,17 @@ function AutomationLaneBoardCard({
             </dd>
           </div>
         ) : null}
+        <div>
+          <dt>Duyệt</dt>
+          <dd>
+            <AutomationApproveBuildButton
+              task={entry.approvalTask}
+              writeActionConfigured={writeActionConfigured}
+              writeActionConfigMessage={writeActionConfigMessage}
+              onApproved={() => onRefresh?.()}
+            />
+          </dd>
+        </div>
       </dl>
     </article>
   );

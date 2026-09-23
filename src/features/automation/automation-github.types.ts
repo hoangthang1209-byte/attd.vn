@@ -47,6 +47,14 @@ export class AutomationGitHubRequestError extends Error {
   }
 }
 
+/** Raised when an exact BUILD_APPROVED comment already exists on the issue. */
+export class BuildApprovedAlreadyExistsError extends Error {
+  constructor() {
+    super("BUILD_APPROVED already exists on issue");
+    this.name = "BuildApprovedAlreadyExistsError";
+  }
+}
+
 export type AutomationGitHubConfig =
   | {
       configured: false;

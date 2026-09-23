@@ -1,3 +1,4 @@
+import { hasBuildApprovedComment } from "@/features/automation/automation-build-approved";
 import {
   extractBlockerReason,
   filterRecentStatusComments,
@@ -50,6 +51,7 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
     githubIssueUrl: issue.url,
     labels: labelNames,
     recentStatusComments: filterRecentStatusComments(comments),
+    hasBuildApproved: hasBuildApprovedComment(comments),
     productionStatus: createInitialProductionStatus(checkedAt),
   };
 }

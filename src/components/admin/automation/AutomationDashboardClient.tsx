@@ -68,10 +68,20 @@ export default function AutomationDashboardClient() {
   const fetchSequencerRef = useRef(createDashboardFetchSequencer());
   const foregroundAbortRef = useRef<AbortController | null>(null);
   const viewRef = useRef<AutomationDashboardView>("active");
+  const hasLoadedDataRef = useRef(false);
+  const laneConfiguredRef = useRef(false);
 
   useEffect(() => {
     viewRef.current = view;
   }, [view]);
+
+  useEffect(() => {
+    hasLoadedDataRef.current = data !== null;
+  }, [data]);
+
+  useEffect(() => {
+    laneConfiguredRef.current = activeLaneData?.configured ?? data?.configured ?? false;
+  }, [activeLaneData?.configured, data?.configured]);
 
   const applyDashboardPayload = useCallback(
     (targetView: AutomationDashboardView, json: AutomationDashboardResponse) => {
@@ -100,7 +110,7 @@ export default function AutomationDashboardClient() {
       abortController = new AbortController();
       foregroundAbortRef.current = abortController;
 
-      if (data) {
+      if (hasLoadedDataRef.current) {
         setRefreshing(true);
       } else {
         setLoading(true);
@@ -138,12 +148,17 @@ export default function AutomationDashboardClient() {
       }
     } finally {
       fetchSequencerRef.current.endRequest(ticket);
-      if (!background) {
+      if (!background && fetchSequencerRef.current.isLatestForegroundRequest(ticket)) {
         setLoading(false);
         setRefreshing(false);
       }
     }
-  }, [applyDashboardPayload, data]);
+  }, [applyDashboardPayload]);
+
+  const loadRef = useRef(load);
+  useEffect(() => {
+    loadRef.current = load;
+  }, [load]);
 
   const handleViewChange = useCallback(
     (nextView: AutomationDashboardView) => {
@@ -151,32 +166,35 @@ export default function AutomationDashboardClient() {
       setOpenFilter(defaultOpenFilterForView(nextView));
       setStatusFilter("all");
       setExpandedIssue(null);
-      void load(nextView);
+      void loadRef.current(nextView);
     },
-    [load],
+    [],
   );
 
   const handleManualRefresh = useCallback(() => {
-    void load(viewRef.current);
-  }, [load]);
+    void loadRef.current(viewRef.current);
+  }, []);
+
+  const handleLaneBackgroundRefresh = useCallback(() => {
+    void loadRef.current("active", { background: true });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
-      if (!cancelled) void load("active");
+      if (!cancelled) void loadRef.current("active");
     });
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, []);
 
   useEffect(() => {
-    const laneConfigured = activeLaneData?.configured ?? data?.configured;
-    if (!laneConfigured) return;
+    if (!laneConfiguredRef.current) return;
 
     const scheduleRefresh = () => {
       if (document.hidden) return;
-      void load("active", { background: true });
+      void loadRef.current("active", { background: true });
     };
 
     const onVisibilityChange = () => {
@@ -190,7 +208,7 @@ export default function AutomationDashboardClient() {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [activeLaneData?.configured, data?.configured, load]);
+  }, [activeLaneData?.configured, data?.configured]);
 
   const taskAreaFilterOptions = useMemo(
     () => (data ? collectTaskAreaFilterOptions(data.tasks) : []),
@@ -237,6 +255,10 @@ export default function AutomationDashboardClient() {
   );
 
   const laneBoardData = activeLaneData ?? (view === "active" ? data : null);
+  const laneWriteActionConfigured =
+    laneBoardData?.writeActionConfigured ?? data?.writeActionConfigured ?? false;
+  const laneWriteActionConfigMessage =
+    laneBoardData?.writeActionConfigMessage ?? data?.writeActionConfigMessage ?? null;
 
   if (loading) {
     return <AdminLoadingState label="Đang tải dashboard automation…" />;
@@ -252,7 +274,7 @@ export default function AutomationDashboardClient() {
             <button
               type="button"
               className="admin-btn admin-btn--secondary"
-              onClick={() => void load(view)}
+              onClick={() => void loadRef.current(view)}
             >
               Thử lại
             </button>
@@ -364,8 +386,11 @@ export default function AutomationDashboardClient() {
               tasks={laneBoardData.tasks}
               lastUpdatedAt={laneBoardData.fetchedAt}
               autoRefreshLabel={AUTO_REFRESH_LABEL}
+              writeActionConfigured={laneWriteActionConfigured}
+              writeActionConfigMessage={laneWriteActionConfigMessage}
               onScrollToTask={handleLaneTaskScroll}
               canScrollToTask={canScrollToLaneTask}
+              onRefresh={handleLaneBackgroundRefresh}
             />
           ) : null}
 

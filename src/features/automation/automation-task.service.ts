@@ -18,6 +18,10 @@ import {
   fetchLinkedPullRequestSafe,
   getAutomationGitHubConfig,
 } from "@/features/automation/automation-github.client";
+import {
+  getAutomationGitHubWriteConfig,
+  validateWriteTokenOwnerIdentity,
+} from "@/features/automation/automation-github-write.client";
 import { getProductionCommitShaFromEnv } from "@/features/automation/automation-production";
 import { enrichTasksWithProductionStatus } from "@/features/automation/automation-production.enrichment";
 import { buildSummary, mapIssueToTask } from "@/features/automation/automation-task.aggregation";
@@ -146,13 +150,40 @@ const EMPTY_SUMMARY = {
   mergedToday: { value: 0, isPartial: false },
 } as const;
 
-function emptyDashboard(
+async function resolveWriteActionState() {
+  const writeConfig = getAutomationGitHubWriteConfig();
+  if (!writeConfig.configured) {
+    return {
+      writeActionConfigured: false,
+      writeActionConfigMessage: writeConfig.configMessage,
+    };
+  }
+
+  const ownerIdentity = await validateWriteTokenOwnerIdentity(writeConfig);
+  if (!ownerIdentity.valid) {
+    return {
+      writeActionConfigured: false,
+      writeActionConfigMessage:
+        ownerIdentity.message ??
+        "GITHUB_AUTOMATION_WRITE_TOKEN phải thuộc repository owner để Builder nhận BUILD_APPROVED.",
+    };
+  }
+
+  return {
+    writeActionConfigured: true,
+    writeActionConfigMessage: null,
+  };
+}
+
+async function emptyDashboard(
   configMessage: string | null,
   view: AutomationDashboardView = "active",
-): AutomationDashboardResponse {
+): Promise<AutomationDashboardResponse> {
+  const writeAction = await resolveWriteActionState();
   return {
     configured: false,
     configMessage,
+    ...writeAction,
     summary: EMPTY_SUMMARY,
     tasks: [],
     fetchedAt: new Date().toISOString(),
@@ -173,9 +204,11 @@ export async function getAutomationDashboard(
   try {
     const { tasks, dataCompleteness, productionCommitSha, productionCheckedAt } =
       await getCachedAutomationTasks(config.repoSlug, view)();
+    const writeAction = await resolveWriteActionState();
     return {
       configured: true,
       configMessage: null,
+      ...writeAction,
       summary: buildSummary(tasks, dataCompleteness, view),
       tasks,
       fetchedAt: new Date().toISOString(),
@@ -198,9 +231,11 @@ export async function getAutomationDashboard(
       console.error("[getAutomationDashboard]", error);
     }
 
+    const writeAction = await resolveWriteActionState();
     return {
       configured: true,
       configMessage: loadError,
+      ...writeAction,
       summary: EMPTY_SUMMARY,
       tasks: [],
       fetchedAt: new Date().toISOString(),

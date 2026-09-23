@@ -52,6 +52,9 @@ async function loadMockDashboard() {
       configured: false,
       configMessage:
         "Thiếu GITHUB_AUTOMATION_READ_TOKEN. Cấu hình token read-only trên Vercel để tải task automation từ GitHub.",
+      writeActionConfigured: false,
+      writeActionConfigMessage:
+        "Thiếu GITHUB_AUTOMATION_WRITE_TOKEN. Cấu hình token write-only (Issues Read/Write) trên Vercel để dùng Duyệt & chạy.",
       summary: EMPTY_SUMMARY,
       tasks: [],
       fetchedAt: new Date().toISOString(),

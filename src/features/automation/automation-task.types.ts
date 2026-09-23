@@ -60,6 +60,8 @@ export type AutomationTask = {
   githubIssueUrl: string;
   labels: string[];
   recentStatusComments: AutomationStatusComment[];
+  /** True when any issue comment body is exactly BUILD_APPROVED. */
+  hasBuildApproved: boolean;
   productionStatus: AutomationProductionStatus;
 };
 
@@ -103,6 +105,9 @@ export type AutomationDashboardView = "active" | "all" | "completed";
 export type AutomationDashboardResponse = {
   configured: boolean;
   configMessage: string | null;
+  /** Whether GITHUB_AUTOMATION_WRITE_TOKEN is configured for Duyệt & chạy. */
+  writeActionConfigured: boolean;
+  writeActionConfigMessage: string | null;
   summary: AutomationTaskSummary;
   tasks: AutomationTask[];
   fetchedAt: string;

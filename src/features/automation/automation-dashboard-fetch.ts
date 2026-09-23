@@ -15,6 +15,7 @@ export type DashboardFetchSequencer = {
     currentView: AutomationDashboardView,
   ) => boolean;
   endRequest: (ticket: DashboardFetchTicket) => void;
+  isLatestForegroundRequest: (ticket: DashboardFetchTicket) => boolean;
 };
 
 /** Coordinates foreground/background dashboard fetches with stale-response protection. */
@@ -41,15 +42,19 @@ export function createDashboardFetchSequencer(): DashboardFetchSequencer {
         return ticket.requestId === latestForegroundRequestId;
       }
 
-      if (ticket.targetView === "active") {
-        return true;
-      }
-
       if (ticket.requestId < latestForegroundRequestId) {
         return false;
       }
 
+      if (ticket.targetView === "active") {
+        return true;
+      }
+
       return currentView === ticket.targetView;
+    },
+
+    isLatestForegroundRequest(ticket) {
+      return ticket.kind === "foreground" && ticket.requestId === latestForegroundRequestId;
     },
 
     endRequest(ticket) {

@@ -69,4 +69,25 @@ describe("automation dashboard fetch sequencer", () => {
     assert.ok(background);
     assert.equal(sequencer.shouldApplyResponse(background!, "all"), false);
   });
+
+  it("drops stale active background refresh after a newer foreground request", () => {
+    const sequencer = createDashboardFetchSequencer();
+    const background = sequencer.beginRequest("active", "background");
+    sequencer.beginRequest("completed", "foreground");
+
+    assert.ok(background);
+    assert.equal(sequencer.shouldApplyResponse(background!, "completed"), false);
+  });
+
+  it("tracks latest foreground request for loading state cleanup", () => {
+    const sequencer = createDashboardFetchSequencer();
+    const first = sequencer.beginRequest("active", "foreground");
+    const second = sequencer.beginRequest("all", "foreground");
+
+    assert.ok(first);
+    assert.ok(second);
+
+    assert.equal(sequencer.isLatestForegroundRequest(first!), false);
+    assert.equal(sequencer.isLatestForegroundRequest(second!), true);
+  });
 });

@@ -6,8 +6,11 @@ import {
   buildLaneBoard,
   buildLaneBoardSummary,
   deriveLaneNextAction,
+  filterCurrentChainOpenTasks,
   formatLaneCiReview,
   mapLaneOverallState,
+  resolveLaneOverallStateLabel,
+  selectLaneApprovalTask,
   selectLaneRepresentativeTask,
 } from "@/features/automation/automation-lane-board";
 import type { AutomationTask } from "@/features/automation/automation-task.types";
@@ -30,6 +33,7 @@ function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
     githubIssueUrl: "https://github.com/hoangthang1209-byte/attd.vn/issues/83",
     labels: ["status:building", "risk:low"],
     recentStatusComments: [],
+    hasBuildApproved: false,
     productionStatus: {
       status: "unknown",
       mergedCommitSha: null,
@@ -69,7 +73,62 @@ describe("automation lane board", () => {
     assert.ok(board.every((entry) => entry.overallState === "chua_co_task"));
   });
 
-  it("prefers higher-priority open tasks when multiple exist in a lane", () => {
+  it("returns null for normal backlog approval when another task is actively building", () => {
+    const building = taskFixture({
+      issueNumber: 100,
+      status: "building",
+      latestUpdateAt: "2026-09-22T10:00:00.000Z",
+    });
+    const backlogAwaitingApproval = taskFixture({
+      issueNumber: 120,
+      status: "backlog",
+      labels: ["status:backlog", "risk:low"],
+      latestUpdateAt: "2026-09-23T02:00:00.000Z",
+    });
+
+    assert.equal(selectLaneApprovalTask([building, backlogAwaitingApproval]), null);
+  });
+
+  it("surfaces repair issues awaiting approval even when another task is in-flight", () => {
+    const building = taskFixture({
+      issueNumber: 100,
+      status: "building",
+      latestUpdateAt: "2026-09-22T10:00:00.000Z",
+    });
+    const repairAwaitingApproval = taskFixture({
+      issueNumber: 118,
+      status: "backlog",
+      labels: ["status:backlog", "orchestrator:review-repair"],
+      latestUpdateAt: "2026-09-23T02:00:00.000Z",
+    });
+
+    const representative = selectLaneRepresentativeTask([building, repairAwaitingApproval]);
+    assert.equal(representative?.issueNumber, 118);
+
+    const approvalTask = selectLaneApprovalTask([building, repairAwaitingApproval]);
+    assert.equal(approvalTask?.issueNumber, 118);
+  });
+
+  it("includes approvalTask on lane board entries", () => {
+    const building = taskFixture({
+      issueNumber: 100,
+      status: "building",
+      latestUpdateAt: "2026-09-22T10:00:00.000Z",
+    });
+    const repairAwaitingApproval = taskFixture({
+      issueNumber: 118,
+      status: "backlog",
+      labels: ["status:backlog", "orchestrator:review-repair"],
+      latestUpdateAt: "2026-09-23T02:00:00.000Z",
+    });
+
+    const board = buildLaneBoard([building, repairAwaitingApproval]);
+    const automationLane = board.find((entry) => entry.laneId === "automation-platform");
+    assert.equal(automationLane?.task?.issueNumber, 118);
+    assert.equal(automationLane?.approvalTask?.issueNumber, 118);
+  });
+
+  it("prefers higher-priority blocking tasks within the current chain", () => {
     const building = taskFixture({
       issueNumber: 100,
       status: "building",
@@ -91,6 +150,125 @@ describe("automation lane board", () => {
 
     const selectedNeedsFix = selectLaneRepresentativeTask([building, needsFix]);
     assert.equal(selectedNeedsFix?.issueNumber, 101);
+  });
+
+  it("prefers the newest open chain over stale superseded pr-open work (CRM #71 vs #95)", () => {
+    const stale = taskFixture({
+      issueNumber: 71,
+      taskArea: "Lead & Sales / CRM",
+      status: "pr_open",
+      statusLabel: "status:pr-open",
+      latestUpdateAt: "2026-08-01T00:00:00.000Z",
+    });
+    const current = taskFixture({
+      issueNumber: 95,
+      taskArea: "Lead & Sales / CRM",
+      status: "building",
+      latestUpdateAt: "2026-09-20T00:00:00.000Z",
+    });
+
+    assert.equal(selectLaneRepresentativeTask([stale, current])?.issueNumber, 95);
+    assert.deepEqual(filterCurrentChainOpenTasks([stale, current]).map((task) => task.issueNumber), [95]);
+  });
+
+  it("prefers the newest automation repair chain over stale pr-open work (#87/#111/#113)", () => {
+    const stale = taskFixture({
+      issueNumber: 87,
+      status: "pr_open",
+      statusLabel: "status:pr-open",
+      latestUpdateAt: "2026-08-01T00:00:00.000Z",
+    });
+    const midChain = taskFixture({
+      issueNumber: 111,
+      status: "merged",
+      isOpen: false,
+      mergedAt: "2026-09-18T00:00:00.000Z",
+      latestUpdateAt: "2026-09-18T00:00:00.000Z",
+    });
+    const current = taskFixture({
+      issueNumber: 113,
+      status: "backlog",
+      statusLabel: "status:backlog",
+      hasBuildApproved: true,
+      latestUpdateAt: "2026-09-23T00:00:00.000Z",
+    });
+
+    assert.equal(selectLaneRepresentativeTask([stale, midChain, current])?.issueNumber, 113);
+  });
+
+  it("prefers the newest mobile repair over older pr-open work (#106 vs #107)", () => {
+    const stale = taskFixture({
+      issueNumber: 106,
+      taskArea: "Internal Admin Mobile UX",
+      status: "pr_open",
+      statusLabel: "status:pr-open",
+      latestUpdateAt: "2026-09-10T00:00:00.000Z",
+    });
+    const current = taskFixture({
+      issueNumber: 107,
+      taskArea: "Internal Admin Mobile UX",
+      status: "needs_fix",
+      latestUpdateAt: "2026-09-22T00:00:00.000Z",
+    });
+
+    assert.equal(selectLaneRepresentativeTask([stale, current])?.issueNumber, 107);
+  });
+
+  it("uses merged SEO fallback when no open task exists (#100)", () => {
+    const merged = taskFixture({
+      issueNumber: 100,
+      taskArea: "Marketing / Content / SEO",
+      status: "merged",
+      isOpen: false,
+      mergedAt: "2026-09-15T00:00:00.000Z",
+      latestUpdateAt: "2026-09-15T00:00:00.000Z",
+      productionStatus: {
+        status: "live",
+        mergedCommitSha: "abc123",
+        reason: null,
+        checkedAt: "2026-09-15T00:00:00.000Z",
+      },
+    });
+
+    const board = buildLaneBoard([merged]);
+    const seoLane = board.find((entry) => entry.laneId === "marketing-content-seo");
+    assert.equal(seoLane?.task?.issueNumber, 100);
+    assert.equal(seoLane?.overallState, "production");
+  });
+
+  it("represents order/production repair over queued successor (#105/#108/#110/#109)", () => {
+    const tasks = [
+      taskFixture({
+        issueNumber: 105,
+        taskArea: "Order & Production Operations",
+        status: "merged",
+        isOpen: false,
+        mergedAt: "2026-09-01T00:00:00.000Z",
+        latestUpdateAt: "2026-09-01T00:00:00.000Z",
+      }),
+      taskFixture({
+        issueNumber: 108,
+        taskArea: "Order & Production Operations",
+        status: "pr_open",
+        statusLabel: "status:pr-open",
+        latestUpdateAt: "2026-09-10T00:00:00.000Z",
+      }),
+      taskFixture({
+        issueNumber: 109,
+        taskArea: "Order & Production Operations",
+        status: "queued",
+        statusLabel: "status:queued",
+        latestUpdateAt: "2026-09-12T00:00:00.000Z",
+      }),
+      taskFixture({
+        issueNumber: 110,
+        taskArea: "Order & Production Operations",
+        status: "needs_fix",
+        latestUpdateAt: "2026-09-20T00:00:00.000Z",
+      }),
+    ];
+
+    assert.equal(selectLaneRepresentativeTask(tasks)?.issueNumber, 110);
   });
 
   it("prefers successful merged tasks over closed failed tasks in fallback", () => {
@@ -173,6 +351,20 @@ describe("automation lane board", () => {
     assert.equal(mapLaneOverallState(null), "chua_co_task");
   });
 
+  it("labels BUILD_APPROVED backlog work as approved build state", () => {
+    const approvedRepair = taskFixture({
+      issueNumber: 113,
+      status: "backlog",
+      hasBuildApproved: true,
+      latestUpdateAt: "2026-09-23T00:00:00.000Z",
+    });
+
+    const overallState = mapLaneOverallState(approvedRepair);
+    assert.equal(overallState, "dang_build");
+    assert.equal(resolveLaneOverallStateLabel(approvedRepair, overallState), "Đã duyệt build");
+    assert.equal(deriveLaneNextAction(approvedRepair, overallState), "Chờ Builder");
+  });
+
   it("derives concise next actions", () => {
     assert.equal(
       deriveLaneNextAction(taskFixture({ status: "building" }), "dang_build"),
@@ -192,9 +384,13 @@ describe("automation lane board", () => {
     assert.equal(deriveLaneNextAction(null, "chua_co_task"), "—");
   });
 
-  it("formats CI/review display from structured status", () => {
+  it("formats CI/review display without raw status labels", () => {
     assert.equal(formatLaneCiReview(taskFixture({ status: "ready_to_merge" })), "CI ✅ · Review ✅");
     assert.equal(formatLaneCiReview(taskFixture({ status: "needs_fix" })), "CI ❌ · cần sửa");
+    assert.equal(
+      formatLaneCiReview(taskFixture({ status: "pr_open", statusLabel: "status:pr-open" })),
+      "PR đang mở",
+    );
     assert.equal(formatLaneCiReview(null), "—");
   });
 
