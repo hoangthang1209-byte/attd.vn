@@ -65,3 +65,12 @@ export async function getOrganizationJsonLd(): Promise<OrganizationJsonLd> {
 
   return buildOrganizationJsonLd(company, branding);
 }
+
+/** Nested JSON-LD entity without top-level @context (Article publisher, etc.). */
+export function organizationEntityFromJsonLd(
+  orgJsonLd: OrganizationJsonLd,
+): Record<string, unknown> {
+  const entity = { ...orgJsonLd };
+  delete entity["@context"];
+  return entity;
+}
