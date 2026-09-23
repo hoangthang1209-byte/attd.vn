@@ -289,7 +289,10 @@ export default function AutomationDashboardClient() {
             <AutomationLaneBoard
               tasks={data.tasks}
               lastUpdatedAt={data.fetchedAt}
+              writeActionConfigured={data.writeActionConfigured}
+              writeActionConfigMessage={data.writeActionConfigMessage}
               onSelectTask={handleLaneTaskSelect}
+              onRefresh={() => void load(view, { background: true })}
             />
           ) : null}
 

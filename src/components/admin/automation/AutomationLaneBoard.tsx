@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import AutomationApproveBuildButton from "@/components/admin/automation/AutomationApproveBuildButton";
 import {
   AUTOMATION_LANE_OVERALL_STATE_LABELS,
   buildLaneBoard,
@@ -32,14 +33,20 @@ type AutomationLaneBoardProps = {
   tasks: AutomationTask[];
   lastUpdatedAt: string | null;
   autoRefreshLabel?: string;
+  writeActionConfigured: boolean;
+  writeActionConfigMessage: string | null;
   onSelectTask?: (issueNumber: number) => void;
+  onRefresh?: () => void;
 };
 
 export default function AutomationLaneBoard({
   tasks,
   lastUpdatedAt,
   autoRefreshLabel,
+  writeActionConfigured,
+  writeActionConfigMessage,
   onSelectTask,
+  onRefresh,
 }: AutomationLaneBoardProps) {
   const board = useMemo(() => buildLaneBoard(tasks), [tasks]);
   const summary = useMemo(() => buildLaneBoardSummary(board), [board]);
@@ -87,12 +94,20 @@ export default function AutomationLaneBoard({
               <th>CI / Review</th>
               <th>Production</th>
               <th>Việc tiếp theo</th>
+              <th>Duyệt</th>
               <th>Cập nhật</th>
             </tr>
           </thead>
           <tbody>
             {board.map((entry) => (
-              <AutomationLaneBoardRow key={entry.laneId} entry={entry} onSelectTask={onSelectTask} />
+              <AutomationLaneBoardRow
+                key={entry.laneId}
+                entry={entry}
+                onSelectTask={onSelectTask}
+                writeActionConfigured={writeActionConfigured}
+                writeActionConfigMessage={writeActionConfigMessage}
+                onRefresh={onRefresh}
+              />
             ))}
           </tbody>
         </table>
@@ -100,7 +115,14 @@ export default function AutomationLaneBoard({
 
       <div className="automation-lane-board__cards">
         {board.map((entry) => (
-          <AutomationLaneBoardCard key={entry.laneId} entry={entry} onSelectTask={onSelectTask} />
+          <AutomationLaneBoardCard
+            key={entry.laneId}
+            entry={entry}
+            onSelectTask={onSelectTask}
+            writeActionConfigured={writeActionConfigured}
+            writeActionConfigMessage={writeActionConfigMessage}
+            onRefresh={onRefresh}
+          />
         ))}
       </div>
     </section>
@@ -175,9 +197,15 @@ function ProductionCell({ task }: { task: AutomationTask | null }) {
 function AutomationLaneBoardRow({
   entry,
   onSelectTask,
+  writeActionConfigured,
+  writeActionConfigMessage,
+  onRefresh,
 }: {
   entry: AutomationLaneBoardEntry;
   onSelectTask?: (issueNumber: number) => void;
+  writeActionConfigured: boolean;
+  writeActionConfigMessage: string | null;
+  onRefresh?: () => void;
 }) {
   return (
     <tr>
@@ -200,6 +228,14 @@ function AutomationLaneBoardRow({
         <ProductionCell task={entry.task} />
       </td>
       <td>{entry.nextAction}</td>
+      <td>
+        <AutomationApproveBuildButton
+          task={entry.task}
+          writeActionConfigured={writeActionConfigured}
+          writeActionConfigMessage={writeActionConfigMessage}
+          onApproved={() => onRefresh?.()}
+        />
+      </td>
       <td>{entry.lastUpdateAt ? formatQuoteDateTime(entry.lastUpdateAt) : "—"}</td>
     </tr>
   );
@@ -208,9 +244,15 @@ function AutomationLaneBoardRow({
 function AutomationLaneBoardCard({
   entry,
   onSelectTask,
+  writeActionConfigured,
+  writeActionConfigMessage,
+  onRefresh,
 }: {
   entry: AutomationLaneBoardEntry;
   onSelectTask?: (issueNumber: number) => void;
+  writeActionConfigured: boolean;
+  writeActionConfigMessage: string | null;
+  onRefresh?: () => void;
 }) {
   return (
     <article className="automation-lane-board__card">
@@ -256,6 +298,17 @@ function AutomationLaneBoardCard({
             </dd>
           </div>
         ) : null}
+        <div>
+          <dt>Duyệt</dt>
+          <dd>
+            <AutomationApproveBuildButton
+              task={entry.task}
+              writeActionConfigured={writeActionConfigured}
+              writeActionConfigMessage={writeActionConfigMessage}
+              onApproved={() => onRefresh?.()}
+            />
+          </dd>
+        </div>
       </dl>
     </article>
   );

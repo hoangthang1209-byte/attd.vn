@@ -18,6 +18,7 @@ import {
   fetchLinkedPullRequestSafe,
   getAutomationGitHubConfig,
 } from "@/features/automation/automation-github.client";
+import { getAutomationGitHubWriteConfig } from "@/features/automation/automation-github-write.client";
 import { getProductionCommitShaFromEnv } from "@/features/automation/automation-production";
 import { enrichTasksWithProductionStatus } from "@/features/automation/automation-production.enrichment";
 import { buildSummary, mapIssueToTask } from "@/features/automation/automation-task.aggregation";
@@ -146,13 +147,23 @@ const EMPTY_SUMMARY = {
   mergedToday: { value: 0, isPartial: false },
 } as const;
 
+function resolveWriteActionState() {
+  const writeConfig = getAutomationGitHubWriteConfig();
+  return {
+    writeActionConfigured: writeConfig.configured,
+    writeActionConfigMessage: writeConfig.configured ? null : writeConfig.configMessage,
+  };
+}
+
 function emptyDashboard(
   configMessage: string | null,
   view: AutomationDashboardView = "active",
 ): AutomationDashboardResponse {
+  const writeAction = resolveWriteActionState();
   return {
     configured: false,
     configMessage,
+    ...writeAction,
     summary: EMPTY_SUMMARY,
     tasks: [],
     fetchedAt: new Date().toISOString(),
@@ -173,9 +184,11 @@ export async function getAutomationDashboard(
   try {
     const { tasks, dataCompleteness, productionCommitSha, productionCheckedAt } =
       await getCachedAutomationTasks(config.repoSlug, view)();
+    const writeAction = resolveWriteActionState();
     return {
       configured: true,
       configMessage: null,
+      ...writeAction,
       summary: buildSummary(tasks, dataCompleteness, view),
       tasks,
       fetchedAt: new Date().toISOString(),
@@ -198,9 +211,11 @@ export async function getAutomationDashboard(
       console.error("[getAutomationDashboard]", error);
     }
 
+    const writeAction = resolveWriteActionState();
     return {
       configured: true,
       configMessage: loadError,
+      ...writeAction,
       summary: EMPTY_SUMMARY,
       tasks: [],
       fetchedAt: new Date().toISOString(),

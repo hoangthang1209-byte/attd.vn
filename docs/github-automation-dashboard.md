@@ -18,6 +18,7 @@ Configure on Vercel (Production + Preview) for the admin app:
 | Variable | Required | Description |
 | --- | --- | --- |
 | `GITHUB_AUTOMATION_READ_TOKEN` | Yes | Server-only read-only GitHub token. Never expose to the browser or commit to git. |
+| `GITHUB_AUTOMATION_WRITE_TOKEN` | No | Server-only GitHub token used **only** by the `Duyệt & chạy` action to post the exact `BUILD_APPROVED` comment. Dashboard read access works without it; the approve button stays disabled with a setup hint when absent. |
 | `GITHUB_AUTOMATION_REPO` | No | Repository in `owner/repo` form. Defaults to `hoangthang1209-byte/attd.vn`. |
 
 ### Minimum token permissions
@@ -28,16 +29,26 @@ Use a fine-grained or classic PAT with **read-only** access:
 - Pull requests: Read
 - Metadata: Read (required by GitHub API)
 
-Do not grant write, admin, or workflow permissions for this dashboard.
+Do not grant write, admin, or workflow permissions for the read token.
+
+### Write token permissions (`GITHUB_AUTOMATION_WRITE_TOKEN`)
+
+Use a separate fine-grained PAT with the minimum permissions for one-click approval:
+
+- Metadata: Read
+- Issues: Read and Write
+
+Do **not** grant Contents write, Pull requests write, Actions/workflows write, Administration, Secrets, Deployments, or Organization permissions.
 
 ## Security
 
 - Route is protected by existing admin authentication middleware.
 - **Page guard:** `/admin/automation` calls `requireAdminPermissionPage("dashboard.view", "/admin/dashboard")` so direct navigation matches nav and API authorization. Authenticated admins without `dashboard.view` are redirected to the dashboard with a forbidden message; unauthenticated access is handled by existing admin middleware.
 - **API guard:** `/api/admin/automation` requires the `dashboard.view` permission via `requireAutomationDashboardPermission()`, matching the nav entry’s `canViewDashboard` intent (401 unauthenticated, 403 without permission).
-- Token is used only in server modules (`server-only`) and the `/api/admin/automation` route.
-- API responses never include the token or other secrets.
-- No GitHub write/merge actions are performed.
+- Read token is used only in server modules (`server-only`) and the `/api/admin/automation` GET route.
+- Write token is used only in server modules and `POST /api/admin/automation/issues/[issueNumber]/approve-build`.
+- API responses never include either token or other secrets.
+- The only GitHub write action is posting the fixed exact comment `BUILD_APPROVED` on eligible open issues in the configured repo. No merge, deploy, label, or arbitrary comment writes are performed.
 
 ## Caching
 
