@@ -131,7 +131,7 @@ export default function CatalogFilterToolbar({
   }
 
   function clearDraft() {
-    setDraft({ q: filters.q });
+    setDraft({ q: filters.q, sort: filters.sort });
   }
 
   function toggleFilterOpen() {
@@ -162,7 +162,7 @@ export default function CatalogFilterToolbar({
           <button
             type="button"
             className="mp-catalog-filter-clear"
-            onClick={() => router.push(buildClearFiltersUrl(filters.q))}
+            onClick={() => router.push(buildClearFiltersUrl(filters.q, filters.sort))}
           >
             Xóa bộ lọc
           </button>

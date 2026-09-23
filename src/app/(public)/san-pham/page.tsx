@@ -22,7 +22,7 @@ import Breadcrumb from "@/components/seo/Breadcrumb";
 import { SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { buildCatalogMetadata } from "@/lib/seo/indexation-policy";
 import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
-import { buildClearFiltersUrl } from "@/lib/catalog-filter-url";
+import { buildClearFiltersUrl, buildCatalogUrl, removeCatalogFilterParam } from "@/lib/catalog-filter-url";
 import { publicCategoryHref } from "@/features/categories/public-category-url";
 import { buildCatalogQuickNavCategories } from "@/features/categories/catalog-category-nav.utils";
 import { parseCatalogSort } from "@/lib/catalog-sort";
@@ -85,6 +85,16 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
     sort,
   };
 
+  const quickNavBaseFilters = {
+    q,
+    inStock: filters.inStock,
+    print: filters.print,
+    embroidery: filters.embroidery,
+    oem: filters.oem,
+    material,
+    sort,
+  };
+
   const [{ products, total, perPage }, categoryTree, categoryContext] =
     await Promise.all([
       getProductsForPublicListing({
@@ -98,23 +108,16 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
       category ? resolveCatalogCategoryContext(category) : Promise.resolve(null),
     ]);
 
-  const quickNavCategories = buildCatalogQuickNavCategories(categoryTree, category);
+  const quickNavCategories = buildCatalogQuickNavCategories(
+    categoryTree,
+    category,
+    quickNavBaseFilters,
+  );
 
   const totalPages = Math.ceil(total / perPage);
 
   function buildUrl(nextPage?: number) {
-    const p = new URLSearchParams();
-    if (category) p.set("category", category);
-    if (q) p.set("q", q);
-    if (filters.inStock) p.set("inStock", "1");
-    if (filters.print) p.set("print", "1");
-    if (filters.embroidery) p.set("embroidery", "1");
-    if (filters.oem) p.set("oem", "1");
-    if (material) p.set("material", material);
-    if (sort !== "newest") p.set("sort", sort);
-    if (nextPage && nextPage > 1) p.set("page", String(nextPage));
-    const qs = p.toString();
-    return `/san-pham${qs ? `?${qs}` : ""}`;
+    return buildCatalogUrl(catalogFilters, { page: nextPage });
   }
 
   const pageTitle = categoryContext?.title ?? "Sản phẩm";
@@ -144,7 +147,11 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
               <CatalogSourcingBadges />
             </div>
             <div className="mp-catalog-hero-search">
-              <MarketplaceSearchBar defaultValue={q ?? ""} size="large" />
+              <MarketplaceSearchBar
+                defaultValue={q ?? ""}
+                size="large"
+                catalogContext={quickNavBaseFilters}
+              />
               <p className="mp-catalog-search-hint">
                 Tìm theo sản phẩm, mã hàng, chất liệu hoặc nhóm quà tặng doanh nghiệp.
               </p>
@@ -209,7 +216,10 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                           : "Thử điều chỉnh bộ lọc hoặc gửi yêu cầu để ATTD gợi ý nguồn hàng phù hợp."
                     }
                   />
-                  <CatalogEmptyActions showClearFilters={Boolean(category || filters.inStock || filters.print || filters.embroidery || filters.oem || material)} clearFiltersHref={buildClearFiltersUrl(q)} />
+                  <CatalogEmptyActions
+                    showClearFilters={Boolean(category || filters.inStock || filters.print || filters.embroidery || filters.oem || material)}
+                    clearFiltersHref={buildClearFiltersUrl(q, sort)}
+                  />
                 </div>
               ) : (
                 <div className="mp-product-grid mp-product-grid--catalog">
@@ -273,7 +283,9 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                   title="Cần tư vấn nguồn hàng theo nhu cầu?"
                   description="Gửi số lượng, logo và thời gian cần hàng — ATTD gợi ý phương án thay thế hoặc OEM phù hợp ngân sách B2B."
                   primaryLabel="Tư vấn nguồn hàng"
-                  secondaryHref={category ? buildClearFiltersUrl(q) : "/danh-muc-san-pham"}
+                  secondaryHref={
+                    category ? removeCatalogFilterParam(catalogFilters, "category") : "/danh-muc-san-pham"
+                  }
                   secondaryLabel={category ? "Xóa bộ lọc danh mục" : "Xem danh mục"}
                 />
               ) : null}

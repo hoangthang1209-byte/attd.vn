@@ -50,8 +50,11 @@ export function hasActiveCatalogFilters(filters: CatalogFilters): boolean {
   return countActiveCatalogFilters(filters) > 0;
 }
 
-export function buildClearFiltersUrl(q?: string): string {
-  return buildCatalogUrl({ q: q || undefined });
+export function buildClearFiltersUrl(q?: string, sort?: CatalogSortOption): string {
+  return buildCatalogUrl({
+    q: q || undefined,
+    sort: sort && sort !== "newest" ? sort : undefined,
+  });
 }
 
 export function removeCatalogFilterParam(

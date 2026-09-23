@@ -3,7 +3,9 @@ import type {
   CmsCategoryTreeNode,
 } from "@/features/categories/services/category.service";
 import { publicCategoryHref } from "@/features/categories/public-category-url";
-import { buildCatalogUrl } from "@/lib/catalog-filter-url";
+import { buildCatalogUrl, type CatalogFilters } from "@/lib/catalog-filter-url";
+
+export type CatalogQuickNavBaseFilters = Omit<CatalogFilters, "category">;
 
 type NavTreeChild = {
   id: string;
@@ -91,6 +93,7 @@ function findNode(
 export function buildCatalogQuickNavCategories(
   tree: Array<CatalogCategoryFilterNode | CmsCategoryTreeNode>,
   activeCategorySlug?: string,
+  baseFilters?: CatalogQuickNavBaseFilters,
 ): CatalogNavCategory[] {
   const navTree = tree as NavTreeNode[];
   const normalized = activeCategorySlug?.trim();
@@ -111,7 +114,7 @@ export function buildCatalogQuickNavCategories(
       const parent = section ?? navTree.find((p) => p.children.some((c) => c.id === child.id));
       return toNavCategory(
         child,
-        buildCatalogUrl({ category: child.slug }),
+        buildCatalogUrl({ ...baseFilters, category: child.slug }),
         parent?.name ?? null,
       );
     });
