@@ -2,9 +2,19 @@
 
 **Issue:** [#101](https://github.com/hoangthang1209-byte/attd.vn/issues/101)  
 **Lane:** Quotation / Quote Builder  
-**Date:** 2026-09-22  
+**Date:** 2026-09-22 (revised 2026-09-23 — Q1 final repair)  
 **Risk level:** Low (analysis-only; no production behavior changes)  
 **Schema label in codebase:** Sprint 26.2.0 — Quotation Builder MVP
+
+### Document conventions
+
+| Label | Meaning |
+|-------|---------|
+| **Verified (current)** | Observed in codebase as of audit date; cite file paths. |
+| **Proposed (Q2+)** | Recommendation for a future phase; not implemented in Q1. |
+| **Deferred (high-risk)** | Requires explicit `HIGH_RISK_APPROVED` and/or cross-lane coordination before any implementation. |
+
+Sections 1–2 and gap tables in §3 describe **verified current** behavior unless marked otherwise. §5–7 are **proposed** guidance for Q2+.
 
 ---
 
@@ -18,9 +28,11 @@ The ATTD quotation system is a **mature MVP** with substantial functionality alr
 2. **Searchable product/variant picker** — replace capped `<select>` lists (200 products, no search).
 3. **Unified send workflow** — preview → copy link / PDF → mark SENT → CRM activity in one guided flow.
 4. **List pipeline upgrades** — pagination, sort, owner/customer filters, expiring-soon view.
-5. **Sales rep FK fix** — `QuoteForm` stores `Employee.id` but schema FK expects `SalesRepresentative.id`.
+5. **Sales rep ID resolution (Q2, medium)** — **Verified:** `QuoteForm.applySalesEmployee()` writes `Employee.id` into `salesRepresentativeId`, but the Prisma FK on `Quote.salesRepresentativeId` references `SalesRepresentative.id`. **Proposed:** resolve employee → representative server-side in `quote.service` (see §7); no schema change.
 
-**Do not rebuild** existing models, pricing formulas, permission model, or CRM/Order domains. Future pricing-formula or permission-model changes require explicit `HIGH_RISK_APPROVED`.
+**Do not rebuild** existing models, pricing formulas, permission model, or CRM/Order domains.
+
+**Deferred without `HIGH_RISK_APPROVED`:** VAT/`INCLUDING_VAT` formula changes, permission-model / row-level ACL changes, Pricing Engine formula changes, destructive migrations.
 
 ---
 
@@ -125,18 +137,21 @@ flowchart LR
 
 **API routes (no server actions):**
 
-| Route | Methods | Permission |
-|-------|---------|------------|
-| `/api/quotes` | GET, POST | `quotes.view` / `commercial/create` |
-| `/api/quotes/prefill` | GET | `quotes.view` |
-| `/api/quotes/[id]` | GET, PATCH | `quotes.view` / `commercial/update` |
-| `/api/quotes/[id]/status` | POST | `commercial/update` |
-| `/api/quotes/[id]/duplicate` | POST | `commercial/create` |
-| `/api/quotes/[id]/pdf` | GET | `commercial/export` |
+| Route | Methods | Permission / auth |
+|-------|---------|-------------------|
+| `/api/quotes` | GET, POST | GET: `quotes.view` via middleware only. POST: `commercial/create` (route-level) |
+| `/api/quotes/prefill` | GET | `quotes.view` via middleware only |
+| `/api/quotes/[id]` | GET, PATCH | GET: `quotes.view` via middleware only. PATCH: `commercial/update` (route-level) |
+| `/api/quotes/[id]/status` | POST | `commercial/update` (route-level) |
+| `/api/quotes/[id]/duplicate` | POST | `commercial/create` (route-level) |
+| `/api/quotes/[id]/pdf` | GET | `commercial/export` (route-level) |
+| `/api/quotes/[id]/manufacturing-evidence` | GET, PUT | `requireAdminApiFromCookies` only — **not** `requireAdminPermission` |
 | `/api/quotes/public/[token]` | GET | Public token + data minimization |
 | `/api/quotes/public/[token]/pdf` | GET | Public token + data minimization |
-| `/api/pricing/costing-batches/[id]/create-quote` | POST | `commercial/create` |
-| `/api/orders/from-quote/[quoteId]` | POST | `commercial/create` |
+| `/api/pricing/costing-batches/[id]/create-quote` | POST | `commercial/create` (route-level) |
+| `/api/orders/from-quote/[quoteId]` | POST | `commercial/create` (route-level) |
+
+**Auth note (verified):** GET quote routes rely on middleware for `quotes.view`; they do not call `requireAdminPermission` in the handler. Mutations add route-level `commercial/*` guards for defense in depth.
 
 ### 2.3 Data model (preserved — do not rebuild)
 
@@ -147,6 +162,13 @@ flowchart LR
 **Enums:** `QuoteStatus`, `QuoteSourceType`, `QuotePriceVatType` (`EXCLUDING_VAT` | `INCLUDING_VAT`).
 
 **Related:** `SalesOpportunity.quoteId` (optional FK — not wired in quote create flow), `Order.quoteId` (1:1 conversion).
+
+**Sales identity model difference (verified):**
+
+| Model | Sales fields | Resolution |
+|-------|--------------|--------------|
+| `Quote` | `salesRepresentativeId` only (+ snapshot strings) | Form sends value directly to `quote.service`; no `salesEmployeeId` column |
+| `Order` | `salesEmployeeId` + `salesRepresentativeId` (+ snapshots) | `order.service` calls `resolveSalesEmployeeSnapshot(salesEmployeeId)` on create/update |
 
 ### 2.4 Features confirmed present (issue checklist)
 
@@ -198,12 +220,13 @@ flowchart LR
 | No line-item reorder UI | P2 | `sortOrder` exists in schema; no drag-and-drop |
 | Edit UI partial lock feedback | P2 | Server blocks financial edits after SENT; UI only warns for ACCEPTED/REJECTED |
 | `priceGroupId` not in form | P2 | Model supports it; not exposed in builder |
-| Sales rep FK mismatch | **P0** | Form sets `salesRepresentativeId` to `Employee.id`; schema FK is `SalesRepresentative.id`. OrderForm uses `resolveSalesEmployeeSnapshot()` — QuoteForm does not |
-| Manufacturing evidence picker unwired | P2 | `QuoteManufacturingEvidencePicker` exists; not on detail/form |
+| Sales rep FK mismatch | **P0 (Q2)** | **Verified:** `QuoteForm.applySalesEmployee()` sets `salesRepresentativeId` to `Employee.id`; schema FK references `SalesRepresentative.id`. **Verified:** Order lane resolves via `resolveSalesEmployeeSnapshot()` in `order.service`, not in the form. **Impact:** invalid FK values may fail create/update or leave `salesRepresentativeId` null while snapshots are populated; existing production rows may already have mismatched IDs. |
+| Manufacturing evidence picker unwired | P2 | `QuoteManufacturingEvidencePicker` exists; API at `/api/quotes/[id]/manufacturing-evidence` works but picker not on detail/form |
+| Mobile long-scroll usability | P3 | **Verified:** responsive CSS (`.quote-form__*`) exists; single long scroll on small screens remains high cognitive load — acceptable for MVP, improve via section decomposition in Q2 |
 
 **Positive patterns to preserve:** snapshot decoupling from CRM, live totals via `computeQuoteFromItems`, responsive CSS (`.quote-form__*` in `globals.css`), default terms from `DEFAULT_QUOTE_TERMS`, draft vs save-and-view modes.
 
-**Recommendation:** Decompose into section components (Settings, Party, Lines, Commercial, Notes) without changing save API contract. Fix sales rep resolution in Q2.
+**Recommendation (proposed Q2):** Decompose into section components (Settings, Party, Lines, Commercial, Notes) without changing save API contract. Fix sales rep resolution server-side (§7) — do not add `salesEmployeeId` to the Quote schema.
 
 ### 3.2 Product / variant selection
 
@@ -253,7 +276,7 @@ flowchart LR
 
 | Gap | Severity | Detail |
 |-----|----------|--------|
-| `INCLUDING_VAT` stored but not calculated differently | **P0 (pricing display)** | `computeQuoteTotals` always adds VAT on taxable base; `priceVatType` is label-only. **Any formula fix = HIGH-RISK** |
+| `INCLUDING_VAT` stored but not calculated differently | **Deferred (high-risk)** | **Verified:** `computeQuoteTotals()` in `quote-totals.ts` does not accept or branch on `priceVatType`; VAT is always `taxableBase * vatRate / 100`. The enum value is stored and displayed as a label only. **Any formula fix = HIGH-RISK — requires `HIGH_RISK_APPROVED`; out of scope for Q2–Q10 unless explicitly approved** |
 | No re-sync from pricing calc after create | P2 | One-way import by design |
 | Manual lines don't invoke Pricing Engine | P2 | Document as intentional for Q2; engine integration is future scope |
 
@@ -295,7 +318,7 @@ flowchart LR
 | Gap | Severity | Detail |
 |-----|----------|--------|
 | Table-only; no pipeline/kanban | P1 | Status exists but no board view |
-| 100-row cap, no pagination | P1 | Hard server limit |
+| 100-row cap, no pagination | P1 | **Verified:** `listQuotes()` uses `take: params?.limit ?? 100` and returns `total: rows.length` (not a DB count) |
 | Fixed sort (`createdAt desc`) | P1 | No amount/validUntil/status sort |
 | Missing filters | P1 | No date range, sourceType, sales rep, expiring soon, owner |
 | No bulk actions | P3 | — |
@@ -341,7 +364,7 @@ flowchart LR
 | Public token at creation | P2 | Pre-send leak surface if token exposed |
 | No rate limiting on public endpoints | P3 | Short code is 4 chars + quoteNo |
 
-**Audit scope constraint:** Do not change permission model in Q1–Q2 without `HIGH_RISK_APPROVED`.
+**Audit scope constraint (deferred):** Permission model changes, row-level ACL, and ME route auth hardening (`requireAdminApiFromCookies` → `requireAdminPermission`) are **out of scope for Q2** and require `HIGH_RISK_APPROVED` before implementation.
 
 ---
 
@@ -349,8 +372,8 @@ flowchart LR
 
 | ID | Item | Risk | Gate |
 |----|------|------|------|
-| R-P0-1 | Sales rep FK (`Employee.id` vs `SalesRepresentative.id`) | Medium (data integrity) | Standard review |
-| R-P0-2 | `INCLUDING_VAT` math not applied | **High (pricing)** | `HIGH_RISK_APPROVED` before any formula change |
+| R-P0-1 | Sales rep FK (`Employee.id` vs `SalesRepresentative.id`) | Medium (data integrity) | Q2 application-layer fix; standard review; **no schema change** |
+| R-P0-2 | `INCLUDING_VAT` math not applied | **High (pricing)** | **Deferred** — `HIGH_RISK_APPROVED` before any formula change; not in Q2 scope |
 | R-P1-1 | Quote form UX / decomposition | Low | — |
 | R-P1-2 | Product search picker | Low | — |
 | R-P1-3 | List pagination/sort/filters | Low | — |
@@ -382,7 +405,7 @@ src/features/quotes/           # Unchanged authority
 src/components/admin/quotes/
   sections/
     QuoteFormSettings.tsx      # title, dates, currency, VAT type, source
-    QuoteFormParty.tsx         # customer, contact, sales, preparedBy
+    QuoteFormParty.tsx         # customer, contact, sales employee picker, preparedBy
     QuoteFormLines.tsx         # item list + add/remove
     QuoteFormCommercial.tsx    # discount, shipping, overrides
     QuoteFormNotes.tsx         # terms, notes, sample block
@@ -406,7 +429,7 @@ src/components/admin/quotes/
 
 | Phase | Theme | Scope | Risk |
 |-------|-------|-------|------|
-| **Q2** | Quote Builder V2 | Form decomposition, sales rep FK fix, list pagination/sort/basic filters, improved validation feedback | Low |
+| **Q2** | Quote Builder V2 | Form decomposition, sales rep server-side resolution (no schema change), list pagination/sort/basic filters, improved validation feedback | Low–Medium (sales rep fix) |
 | **Q3** | Product/Variant picker | Searchable async picker, variant cascade, 200-cap removal | Low |
 | **Q4** | CRM prefill polish | Lead→customer sync, "refresh snapshots", VIEWED activity | Low–Medium |
 | **Q5** | Preview-before-send | Inline document preview on detail before SENT | Low |
@@ -429,27 +452,37 @@ src/components/admin/quotes/
 
 ### Q2: Quote Builder V2
 
-**In scope**
+**Risk level:** Low overall; **medium** for sales rep resolution (data integrity, no schema change).
+
+**In scope (low/medium risk only)**
 
 - [ ] `QuoteForm` split into ≥4 section components; orchestrator <250 lines
-- [ ] Sales representative selection uses `SalesRepresentative` FK correctly (match OrderForm pattern)
-- [ ] Quote list: server pagination (default 25, max 100), sort by `createdAt`, `validUntil`, `totalAmount`, `status`
+- [ ] **Sales rep resolution (application layer, no Prisma schema change):**
+  - [ ] UI sends a transient `salesEmployeeId` (or equivalent) in the quote create/update payload — **not** raw `Employee.id` as `salesRepresentativeId`
+  - [ ] `createQuote` / `updateQuote` in `quote.service.ts` call `resolveSalesEmployeeSnapshot(salesEmployeeId)` (same helper as Order lane) and persist the returned `salesRepresentativeId` + snapshot strings
+  - [ ] Do **not** add `salesEmployeeId` to the `Quote` model; do **not** mirror OrderForm's dual-field persistence on Quote
+  - [ ] Add unit/integration tests for employee → representative resolution and invalid/inactive employee rejection
+  - [ ] Document/manual check: existing quotes with mismatched FK values are out of scope for automatic backfill unless a separate approved migration task is opened
+- [ ] Quote list: replace `total: rows.length` with a DB `count` query; server pagination (default 25, max 100); sort by `createdAt`, `validUntil`, `totalAmount`, `status`
 - [ ] Quote list: filters for status (existing), `sourceType`, expiring within 7 days
 - [ ] Improved inline validation errors (field-level, Vietnamese labels)
-- [ ] No changes to pricing formulas, permission model, or Prisma schema (unless sales rep fix requires none — FK fix is application-layer only)
-- [ ] All existing quote tests pass; add tests for sales rep resolution if fixed
 
-**Out of scope for Q2**
+**Explicitly out of scope for Q2 (deferred or later phases)**
 
-- Product search picker (Q3)
-- Send modal / email (Q5–Q6)
-- Revision schema (Q7)
-- VAT calculation changes
-- Public page restyle
+| Item | Reason |
+|------|--------|
+| Product search picker | Q3 |
+| Send modal / email | Q5–Q6 |
+| Revision schema (`parentQuoteId`) | Q7; medium-risk migration |
+| VAT / `INCLUDING_VAT` formula changes | **High-risk — requires `HIGH_RISK_APPROVED`** |
+| Permission model / row-level ACL / ME route auth hardening | **High-risk — requires `HIGH_RISK_APPROVED`** |
+| Pricing Engine formula or invocation changes | **High-risk — requires `HIGH_RISK_APPROVED`** |
+| Public page restyle | Later phase |
+| Production data backfill for invalid `salesRepresentativeId` | Separate approved task if needed |
 
 **Verification**
 
-- Manual: create manual quote, from lead, from pricing calc; send; view public link; accept; convert to order
+- Manual: create manual quote with sales employee selected; confirm `salesRepresentativeId` matches linked `SalesRepresentative.id`; create from lead, from pricing calc; send; view public link; accept; convert to order
 - CI: lint (changed files), typecheck, security:public-token, test, build
 
 ---
@@ -553,4 +586,4 @@ flowchart TB
 
 ---
 
-*This document satisfies Issue #101 deliverables. No production behavior, pricing logic, permission model, or schema changes were made as part of Q1.*
+*This document satisfies Issue #101 deliverables. Q1 is analysis-only: no production behavior, pricing logic, permission model, or schema changes. Q2 acceptance criteria above are **proposed** implementation guidance — verified current behavior is in §1–3; high-risk items remain explicitly deferred.*
