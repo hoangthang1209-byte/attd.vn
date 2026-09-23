@@ -3,8 +3,8 @@ import { describe, it } from "node:test";
 import {
   buildCatalogQuickNavCategories,
   buildCategoryPageNavContext,
-} from "@/features/categories/catalog-category-nav.utils";
-import type { CmsCategoryTreeNode } from "@/features/categories/services/category.service";
+} from "./catalog-category-nav.utils";
+import type { CmsCategoryTreeNode } from "./services/category.service";
 
 const tree: CmsCategoryTreeNode[] = [
   {
@@ -86,6 +86,19 @@ describe("catalog-category-nav.utils", () => {
   it("buildCatalogQuickNavCategories scopes to active parent section", () => {
     const items = buildCatalogQuickNavCategories(tree, "ao-thun-tron");
     assert.deepEqual(items.map((item) => item.slug), ["ao-thun-tron"]);
+  });
+
+  it("buildCatalogQuickNavCategories preserves base catalog filters in chip hrefs", () => {
+    const baseFilters = {
+      q: "polo",
+      inStock: true,
+      sort: "name" as const,
+    };
+    const items = buildCatalogQuickNavCategories(tree, "ao-thun-tron", baseFilters);
+    assert.equal(
+      items[0]?.href,
+      "/san-pham?category=ao-thun-tron&q=polo&inStock=1&sort=name",
+    );
   });
 
   it("buildCategoryPageNavContext returns child and related categories", () => {
