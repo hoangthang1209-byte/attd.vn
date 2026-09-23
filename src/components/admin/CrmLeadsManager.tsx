@@ -92,6 +92,8 @@ export default function CrmLeadsManager() {
   }, [search, sourceFilter, statusFilter, priorityFilter]);
 
   useEffect(() => {
+    // Legacy client fetch on mount/filter change; setState runs inside async load().
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional initial fetch pattern
     void load();
   }, [load]);
 
@@ -229,10 +231,7 @@ export default function CrmLeadsManager() {
       )}
 
       {loadState === "empty" && (
-        <EmptyState
-          title="Chưa có lead nào"
-          action={createLeadAction}
-        />
+        <EmptyState title="Chưa có lead nào" />
       )}
 
       {loadState === "ready" && (

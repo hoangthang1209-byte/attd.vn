@@ -45,7 +45,11 @@ export default function QuoteListManager() {
     }
   }, [search, status]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // Legacy client fetch on mount/filter change; setState runs inside async load().
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional initial fetch pattern
+    void load();
+  }, [load]);
 
   function openQuote(id: string) {
     router.push(`/admin/quotes/${id}`);
@@ -92,7 +96,6 @@ export default function QuoteListManager() {
         <EmptyState
           title="Chưa có báo giá phù hợp"
           description="Hãy tạo báo giá mới hoặc điều chỉnh bộ lọc để xem thêm kết quả."
-          action={createQuoteAction}
         />
       ) : (
         <AdminResponsiveList

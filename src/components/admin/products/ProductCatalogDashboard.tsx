@@ -148,6 +148,8 @@ export default function ProductCatalogDashboard() {
   }, [search, categoryId, status, stockStatus]);
 
   useEffect(() => {
+    // Legacy client fetch on mount/filter change; setState runs inside async fetchProducts().
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional initial fetch pattern
     void fetchProducts();
   }, [fetchProducts]);
 
@@ -612,13 +614,6 @@ export default function ProductCatalogDashboard() {
               ? "Thử đổi từ khóa, danh mục hoặc bộ lọc sẵn sàng."
               : "Thêm sản phẩm mới hoặc tạo dữ liệu mẫu để bắt đầu."
           }
-          action={
-            filtersActive ? undefined : (
-              <Link href="/admin/products/new" className="admin-btn admin-btn--primary product-admin-btn">
-                Tạo sản phẩm mới
-              </Link>
-            )
-          }
         />
       ) : (
         <AdminResponsiveList
@@ -872,13 +867,10 @@ export default function ProductCatalogDashboard() {
                         href={`/admin/products/${p.id}/edit`}
                         className="admin-btn admin-btn--primary"
                         data-testid={`product-mobile-complete-${p.id}`}
-                        onClick={(event) => event.stopPropagation()}
                       >
                         {readiness.isReady ? "Sửa" : "Hoàn thiện"}
                       </Link>
                     }
-                    onClick={() => router.push(`/admin/products/${p.id}/edit`)}
-                    aria-label={`Sửa sản phẩm ${p.name}`}
                   />
                 );
               })}
