@@ -86,6 +86,21 @@ describe("approve build service", () => {
     assert.equal(result.result, "already_approved");
   });
 
+  it("dedupes when postApproval raises BuildApprovedAlreadyExistsError from immediate pre-post re-check", async () => {
+    const { BuildApprovedAlreadyExistsError } = await import(
+      "@/features/automation/automation-github.types"
+    );
+    const result = await approveBuildForIssue(
+      "116",
+      createDependencies({
+        postApproval: async () => {
+          throw new BuildApprovedAlreadyExistsError();
+        },
+      }),
+    );
+    assert.equal(result.result, "already_approved");
+  });
+
   it("dedupes when BUILD_APPROVED appears on pre-post refresh", async () => {
     let fetchCount = 0;
     const result = await approveBuildForIssue(

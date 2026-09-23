@@ -1,6 +1,9 @@
 import "server-only";
 
-import { BUILD_APPROVED_COMMENT } from "@/features/automation/automation-build-approved";
+import {
+  BUILD_APPROVED_COMMENT,
+  hasBuildApprovedComment,
+} from "@/features/automation/automation-build-approved";
 import {
   ISSUE_COMMENTS_MAX_PAGES,
   ISSUE_COMMENTS_PAGE_SIZE,
@@ -10,6 +13,7 @@ import { getAutomationGitHubConfig } from "@/features/automation/automation-gith
 import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,
+  BuildApprovedAlreadyExistsError,
 } from "@/features/automation/automation-github.types";
 
 export type AutomationGitHubWriteConfig =
@@ -252,6 +256,12 @@ export async function postBuildApprovedComment(
     throw new AutomationGitHubConfigError(
       config.configMessage ?? "GitHub automation write chưa được cấu hình.",
     );
+  }
+
+  // Immediate re-check immediately before post to minimize the TOCTOU window.
+  const existingComments = await fetchAllIssueCommentsForApproval(config, issueNumber);
+  if (hasBuildApprovedComment(existingComments)) {
+    throw new BuildApprovedAlreadyExistsError();
   }
 
   const comment = await githubWriteRequest<GitHubIssueCommentResponse>(

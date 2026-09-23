@@ -66,6 +66,22 @@ GitHub responses are cached for 60 seconds via Next.js `unstable_cache` to reduc
 - When open search pagination is truncated, summary cards use loaded automation task counts and mark open metrics as partial (`+` suffix) because additional automation tasks may exist beyond the loaded search pages.
 - Linked PR resolution uses REST timeline/pull endpoints and runs only for open, non-terminal tasks.
 - Issue comments are fetched via REST; search payloads supply issue metadata directly.
+- **BUILD_APPROVED detection** paginates issue comments (100 per page, up to 50 pages) on both the dashboard read path and the approve write path, stopping early when an exact `BUILD_APPROVED` comment is found. This keeps UI eligibility aligned with server-side dedupe on issues with more than 100 comments.
+
+### Approve idempotency and serverless limits
+
+The `Duyệt & chạy` action uses three layers of duplicate protection:
+
+1. **Per-issue in-flight mutex** — concurrent requests in the same serverless instance share one approval promise.
+2. **Pre-post comment re-fetch** — the service re-loads paginated comments before posting.
+3. **Immediate pre-post re-check** — `postBuildApprovedComment` performs a final paginated comment fetch immediately before the GitHub POST.
+
+**Cross-instance limitation:** Vercel serverless instances do not share in-memory mutexes. Two simultaneous approve requests routed to different instances could both pass the final re-check and post duplicate exact `BUILD_APPROVED` comments. This is rare in practice (requires concurrent clicks across instances within a narrow window) and is **benign downstream**:
+
+- F1a `task-status-build-approved.yml` re-applies `status:approved` idempotently on each authorized comment.
+- F1b orchestrator guards (`issue_has_orchestrator_build_approved`, terminal PR markers) prevent duplicate repair triggers and duplicate Builder queue entries when `BUILD_APPROVED` already exists.
+
+No database or Redis lock was added for this narrow write surface; operators should treat duplicate exact `BUILD_APPROVED` comments as harmless if they occur.
 
 ## Missing configuration
 

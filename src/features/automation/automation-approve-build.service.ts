@@ -7,6 +7,7 @@ import type {
 import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,
+  BuildApprovedAlreadyExistsError,
 } from "@/features/automation/automation-github.types";
 
 export type ApproveBuildResultCode =
@@ -158,6 +159,14 @@ async function approveBuildForIssueInternal(
       message: "Đã duyệt · chờ Builder",
     };
   } catch (error) {
+    if (error instanceof BuildApprovedAlreadyExistsError) {
+      return {
+        result: "already_approved",
+        issueNumber,
+        message: "Issue đã có BUILD_APPROVED.",
+      };
+    }
+
     if (error instanceof AutomationGitHubRequestError) {
       console.error(
         `[approveBuildForIssue] GitHub write failed for issue #${issueNumber} (${error.status})`,
