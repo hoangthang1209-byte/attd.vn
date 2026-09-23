@@ -22,6 +22,11 @@ import {
   type LinkedPullRequestCandidate,
 } from "@/features/automation/automation-linked-pr.resolver";
 import {
+  ISSUE_COMMENTS_MAX_PAGES,
+  ISSUE_COMMENTS_PAGE_SIZE,
+  shouldFetchNextCommentPage,
+} from "@/features/automation/automation-issue-comments.pagination";
+import {
   AutomationGitHubConfigError,
   AutomationGitHubRequestError,
   type AutomationGitHubConfig,
@@ -287,6 +292,7 @@ export async function searchIssuesPaginated(query: string): Promise<SearchIssues
   };
 }
 
+/** Paginate issue comments until BUILD_APPROVED is found or pages are exhausted (read path). */
 async function fetchIssueComments(issueNumber: number): Promise<GitHubIssueCommentsResponse> {
   const config = getAutomationGitHubConfig();
   if (!config.configured || !config.owner || !config.repo) {
@@ -295,9 +301,27 @@ async function fetchIssueComments(issueNumber: number): Promise<GitHubIssueComme
     );
   }
 
-  return githubRequest<GitHubIssueCommentsResponse>(
-    `/repos/${config.owner}/${config.repo}/issues/${issueNumber}/comments?per_page=100`,
-  );
+  const comments: GitHubIssueCommentsResponse = [];
+
+  for (let page = 1; page <= ISSUE_COMMENTS_MAX_PAGES; page += 1) {
+    const pageComments = await githubRequest<GitHubIssueCommentsResponse>(
+      `/repos/${config.owner}/${config.repo}/issues/${issueNumber}/comments?per_page=${ISSUE_COMMENTS_PAGE_SIZE}&page=${page}`,
+    );
+
+    comments.push(...pageComments);
+
+    if (
+      !shouldFetchNextCommentPage(
+        pageComments.map((comment) => ({ body: comment.body })),
+        comments.map((comment) => ({ body: comment.body })),
+        page,
+      )
+    ) {
+      return comments;
+    }
+  }
+
+  return comments;
 }
 
 type SafeCommentLookupResult = {

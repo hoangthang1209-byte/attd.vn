@@ -28,6 +28,7 @@ function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
     githubIssueUrl: "https://github.com/hoangthang1209-byte/attd.vn/issues/57",
     labels: ["status:merged"],
     recentStatusComments: [],
+    hasBuildApproved: false,
     productionStatus: createInitialProductionStatus("2026-08-01T00:00:00.000Z"),
     ...overrides,
   };

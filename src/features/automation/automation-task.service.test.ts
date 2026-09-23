@@ -59,6 +59,20 @@ describe("automation task service", () => {
     assert.equal(summary.mergedToday.value, 1);
   });
 
+  it("marks hasBuildApproved when an exact approval comment exists", () => {
+    const task = mapIssueToTask(
+      issueFixture({
+        state: "OPEN",
+        closedAt: null,
+        comments: [
+          { author: { login: "owner" }, body: "TASK_AREA: Automation Platform", createdAt: "2026-01-01T00:00:00Z" },
+          { author: { login: "owner" }, body: "BUILD_APPROVED", createdAt: "2026-01-01T01:00:00Z" },
+        ],
+      }),
+    );
+    assert.equal(task.hasBuildApproved, true);
+  });
+
   it("does not count queued tasks in stalledOrFailed", () => {
     const queuedTask = mapIssueToTask(
       issueFixture({
