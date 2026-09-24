@@ -60,6 +60,25 @@ export function resolveLeadIntakeIdentity(input: NormalizedLeadIntakeInput) {
   };
 }
 
+export const VIETNAM_BUSINESS_TIMEZONE = "Asia/Ho_Chi_Minh";
+
+function formatVietnamCalendarDate(now: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: VIETNAM_BUSINESS_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+/** Start/end of the current business day in Vietnam (UTC+7, no DST). */
+export function getVietnamBusinessDayBounds(now: Date = new Date()): { start: Date; end: Date } {
+  const vnDate = formatVietnamCalendarDate(now);
+  const start = new Date(`${vnDate}T00:00:00+07:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, end };
+}
+
 export function isLeadFollowUpOverdue(
   nextFollowUpAt: string | Date | null | undefined,
   followUpAt: string | Date | null | undefined,
@@ -71,7 +90,7 @@ export function isLeadFollowUpOverdue(
   const due = target instanceof Date ? target : new Date(target);
   if (Number.isNaN(due.getTime())) return false;
 
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const { start: startOfToday } = getVietnamBusinessDayBounds(now);
   return due < startOfToday;
 }
 

@@ -13,7 +13,8 @@ import type {
 } from "@/features/dealer/dealer-rfq.types";
 import { DealerValidationError, normalizeOptionalString } from "@/features/dealer/dealer-validation";
 import { createDealerActivity } from "@/features/dealer/services/dealer-activity.service";
-import { createCrmLead, linkLeadToExistingCustomer } from "@/features/crm/services/crm-lead.service";
+import { linkLeadToExistingCustomer } from "@/features/crm/services/crm-lead.service";
+import { intakeLead } from "@/features/crm/services/lead-intake.service";
 import {
   DEALER_RFQ_PROJECT_TYPE_LABELS,
   DEALER_RFQ_STATUS_LABELS,
@@ -595,8 +596,10 @@ export async function convertDealerRFQToLead(id: string): Promise<DealerRFQRecor
     note: rfq.note,
     items: rfq.items,
   });
-  const lead = await createCrmLead({
+  const intakeResult = await intakeLead({
+    channel: "OTHER",
     source: "DEALER",
+    sourceRef: rfq.id,
     sourceDetail: `B2B Portal RFQ ${rfq.code}`,
     contactName: rfq.contactName ?? undefined,
     companyName: rfq.companyName ?? rfq.dealerCompany.name,
@@ -614,7 +617,8 @@ export async function convertDealerRFQToLead(id: string): Promise<DealerRFQRecor
     })),
   });
 
-  if (!lead) throw new DealerValidationError("Không thể tạo Lead CRM từ RFQ.");
+  if (!intakeResult) throw new DealerValidationError("Không thể tạo Lead CRM từ RFQ.");
+  const lead = intakeResult.lead;
 
   const customerId = rfq.customerId ?? rfq.dealerCompany.customerId ?? null;
   if (customerId) {

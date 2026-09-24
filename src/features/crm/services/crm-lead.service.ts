@@ -15,6 +15,7 @@ import {
 } from "@/features/crm/mappers";
 import {
   buildOwnerChangeAuditContent,
+  getVietnamBusinessDayBounds,
   shouldCreateOwnerChangeAudit,
 } from "@/features/crm/lead-intake.utils";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
@@ -486,10 +487,7 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
 
     const limit = Math.min(200, Math.max(1, params.limit ?? 100));
 
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(startOfToday);
-    endOfToday.setDate(endOfToday.getDate() + 1);
+    const { start: startOfToday, end: endOfToday } = getVietnamBusinessDayBounds();
 
     const activeFollowUp = { status: { notIn: ["WON", "LOST", "NOT_FIT"] as LeadStatus[] } };
 

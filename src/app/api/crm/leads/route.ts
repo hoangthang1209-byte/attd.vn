@@ -13,15 +13,33 @@ import {
   LeadIntakeValidationError,
 } from "@/features/crm/services/lead-intake.service";
 import type { CreateProductInterestInput } from "@/features/crm/types";
+import {
+  assertCanViewCrmLeads,
+  resolveCrmLeadListAssignedToFilter,
+} from "@/features/crm/services/crm-lead-access";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  try {
+    assertCanViewCrmLeads(session);
+  } catch {
+    return NextResponse.json(
+      { message: "Bạn không có quyền xem CRM leads." },
+      { status: 403 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? undefined;
   const sourceParam = searchParams.get("source") ?? undefined;
   const statusParam = searchParams.get("status") ?? undefined;
   const priorityParam = searchParams.get("priority") ?? undefined;
-  const assignedTo = searchParams.get("assignedTo") ?? undefined;
+  const assignedTo = resolveCrmLeadListAssignedToFilter(
+    session,
+    searchParams.get("assignedTo") ?? undefined
+  );
   const overdueOnly = searchParams.get("overdueOnly") === "1";
   const debug = searchParams.get("debug") === "1";
 
