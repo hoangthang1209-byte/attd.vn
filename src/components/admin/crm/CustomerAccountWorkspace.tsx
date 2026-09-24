@@ -147,12 +147,20 @@ export default function CustomerAccountWorkspace({
             <div className="admin-section-header">
               <h3>Báo giá đang xử lý</h3>
               {capabilities.canCreateQuote && (
-                <Link
-                  href={`/admin/quotes/new?customerId=${overview.customerId}`}
-                  className="admin-btn admin-btn--secondary admin-btn--xs"
-                >
-                  Tạo báo giá
-                </Link>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <Link
+                    href={`/admin/quotes/quick?customerId=${overview.customerId}`}
+                    className="admin-btn admin-btn--primary admin-btn--xs"
+                  >
+                    Quick Quote
+                  </Link>
+                  <Link
+                    href={`/admin/quotes/new?customerId=${overview.customerId}`}
+                    className="admin-btn admin-btn--secondary admin-btn--xs"
+                  >
+                    Tạo báo giá
+                  </Link>
+                </div>
               )}
             </div>
             {overview.openQuotes.length === 0 ? (

@@ -50,9 +50,14 @@ export default function QuoteListManager() {
         description="Theo dõi báo giá, thời hạn hiệu lực và giá trị giao dịch."
         meta={<span>Tổng: {quotes.length} báo giá</span>}
         actions={
-          <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
-            Tạo báo giá
-          </Link>
+          <>
+            <Link href="/admin/quotes/quick" className="admin-btn admin-btn--secondary">
+              Quick Quote
+            </Link>
+            <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
+              Tạo báo giá
+            </Link>
+          </>
         }
       />
 

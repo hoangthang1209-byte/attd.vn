@@ -11,10 +11,17 @@ type Props = {
   leadId?: string;
   customerId?: string;
   createHref: string;
+  quickCreateHref?: string;
   title?: string;
 };
 
-export default function CrmRelatedQuotes({ leadId, customerId, createHref, title = "Báo giá liên quan" }: Props) {
+export default function CrmRelatedQuotes({
+  leadId,
+  customerId,
+  createHref,
+  quickCreateHref,
+  title = "Báo giá liên quan",
+}: Props) {
   const [quotes, setQuotes] = useState<QuoteListRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +39,16 @@ export default function CrmRelatedQuotes({ leadId, customerId, createHref, title
     <div className="admin-section-card">
       <div className="admin-section-header">
         <h3>{title}</h3>
-        <Link href={createHref} className="admin-btn admin-btn--secondary admin-btn--xs">Tạo báo giá</Link>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {quickCreateHref && (
+            <Link href={quickCreateHref} className="admin-btn admin-btn--primary admin-btn--xs">
+              Quick Quote
+            </Link>
+          )}
+          <Link href={createHref} className="admin-btn admin-btn--secondary admin-btn--xs">
+            Tạo báo giá
+          </Link>
+        </div>
       </div>
       {loading ? (
         <TableLoading title="Đang tải báo giá liên quan..." tone="admin" rows={3} />
