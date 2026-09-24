@@ -5,7 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LeadPriority, LeadSource, LeadStatus } from "@prisma/client";
 import CrmFollowUpWidget from "@/components/admin/CrmFollowUpWidget";
-import { AdminLoadingState } from "@/components/admin/AdminUi";
+import {
+  AdminListCard,
+  AdminLoadingState,
+  AdminMobileActionBar,
+  AdminPageShell,
+  AdminResponsiveList,
+  DataToolbar,
+  EmptyState,
+  PageHeader,
+} from "@/components/admin/AdminUi";
 import LeadPriorityBadge from "@/components/admin/LeadPriorityBadge";
 import LeadSourceDisplay from "@/components/admin/LeadSourceDisplay";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
@@ -83,6 +92,8 @@ export default function CrmLeadsManager() {
   }, [search, sourceFilter, statusFilter, priorityFilter]);
 
   useEffect(() => {
+    // Legacy client fetch on mount/filter change; setState runs inside async load().
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional initial fetch pattern
     void load();
   }, [load]);
 
@@ -95,14 +106,22 @@ export default function CrmLeadsManager() {
     router.push(`/admin/crm/leads/${id}`);
   }
 
+  const createLeadAction = (
+    <Link href="/admin/crm/leads/new" className="admin-btn admin-btn--primary">
+      Thêm lead
+    </Link>
+  );
+
   return (
-    <div className="admin-panel">
-      <div className="admin-section-header">
-        <p>Tổng: {total} lead</p>
-        <Link href="/admin/crm/leads/new" className="admin-btn admin-btn--primary">
-          Thêm lead
-        </Link>
-      </div>
+    <AdminPageShell className="admin-page-shell--mobile-actions">
+      <PageHeader
+        className="admin-page-header--shell-context"
+        meta={<span>Tổng: {total} lead</span>}
+        actions={
+          <div className="admin-page-header__actions--hide-mobile">{createLeadAction}</div>
+        }
+      />
+
       {!tableReady && loadState !== "loading" && (
         <p className="admin-message admin-message--error" role="alert">
           Bảng CRM chưa sẵn sàng. Chạy{" "}
@@ -111,13 +130,16 @@ export default function CrmLeadsManager() {
       )}
 
       {loadState === "error" && errorMessage && (
-        <div className="admin-empty-state admin-empty-state--error">
-          <p>Không thể tải dữ liệu CRM</p>
-          <p className="admin-empty-hint">{errorMessage}</p>
-          <button type="button" className="admin-btn" onClick={() => void load()}>
-            Thử lại
-          </button>
-        </div>
+        <EmptyState
+          tone="error"
+          title="Không thể tải dữ liệu CRM"
+          description={errorMessage}
+          action={
+            <button type="button" className="admin-btn" onClick={() => void load()}>
+              Thử lại
+            </button>
+          }
+        />
       )}
 
       {loadState === "loading" && <AdminLoadingState label="Đang tải leads CRM…" />}
@@ -156,134 +178,171 @@ export default function CrmLeadsManager() {
       )}
 
       {loadState !== "loading" && loadState !== "error" && (
-        <form className="admin-crm-filters" onSubmit={applyFilters}>
-          <input
-            type="search"
-            placeholder="Tìm tên, SĐT, email, công ty..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="admin-input"
-          />
-          <select
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value as LeadSource | "")}
-            className="admin-input"
-          >
-            <option value="">Tất cả nguồn</option>
-            {CRM_LEAD_SOURCES.map((source) => (
-              <option key={source} value={source}>
-                {CRM_SOURCE_LABELS[source]}
-              </option>
-            ))}
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as LeadStatus | "")}
-            className="admin-input"
-          >
-            <option value="">Tất cả trạng thái</option>
-            {CRM_LEAD_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {CRM_STATUS_LABELS[status]}
-              </option>
-            ))}
-          </select>
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value as LeadPriority | "")}
-            className="admin-input"
-          >
-            <option value="">Tất cả ưu tiên</option>
-            {CRM_LEAD_PRIORITIES.map((priority) => (
-              <option key={priority} value={priority}>
-                {CRM_PRIORITY_LABELS[priority]}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="admin-btn">
-            Lọc
-          </button>
+        <form onSubmit={applyFilters}>
+          <DataToolbar>
+            <input
+              type="search"
+              placeholder="Tìm tên, SĐT, email, công ty..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="admin-input admin-data-toolbar__search"
+            />
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value as LeadSource | "")}
+              className="admin-input"
+            >
+              <option value="">Tất cả nguồn</option>
+              {CRM_LEAD_SOURCES.map((source) => (
+                <option key={source} value={source}>
+                  {CRM_SOURCE_LABELS[source]}
+                </option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as LeadStatus | "")}
+              className="admin-input"
+            >
+              <option value="">Tất cả trạng thái</option>
+              {CRM_LEAD_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {CRM_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value as LeadPriority | "")}
+              className="admin-input"
+            >
+              <option value="">Tất cả ưu tiên</option>
+              {CRM_LEAD_PRIORITIES.map((priority) => (
+                <option key={priority} value={priority}>
+                  {CRM_PRIORITY_LABELS[priority]}
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="admin-btn admin-btn--secondary">
+              Lọc
+            </button>
+          </DataToolbar>
         </form>
       )}
 
       {loadState === "empty" && (
-        <div className="admin-empty-state">
-          <p>Chưa có lead nào</p>
-          <Link href="/admin/crm/leads/new" className="admin-btn admin-btn--primary">
-            Thêm lead
-          </Link>
-        </div>
+        <EmptyState title="Chưa có lead nào" />
       )}
 
       {loadState === "ready" && (
-        <div className="admin-table-wrap admin-table-wrap--crm">
-          <table className="admin-table admin-table--crm">
-            <thead>
-              <tr>
-                <th>Mã lead</th>
-                <th>Công ty</th>
-                <th>Người liên hệ</th>
-                <th>SĐT</th>
-                <th>Nhu cầu</th>
-                <th>Nguồn</th>
-                <th>Trạng thái</th>
-                <th>Ưu tiên</th>
-                <th>Khách hàng</th>
-                <th>Follow-up</th>
-                <th>Ngày tạo</th>
-              </tr>
-            </thead>
-            <tbody>
+        <AdminResponsiveList
+          desktop={
+            <div className="admin-table-wrap admin-table-wrap--crm">
+              <table className="admin-table admin-table--crm">
+                <thead>
+                  <tr>
+                    <th>Mã lead</th>
+                    <th>Công ty</th>
+                    <th>Người liên hệ</th>
+                    <th>SĐT</th>
+                    <th>Nhu cầu</th>
+                    <th>Nguồn</th>
+                    <th>Trạng thái</th>
+                    <th>Ưu tiên</th>
+                    <th>Khách hàng</th>
+                    <th>Follow-up</th>
+                    <th>Ngày tạo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leads.map((lead) => (
+                    <tr
+                      key={lead.id}
+                      className="admin-crm-row"
+                      onClick={() => openLead(lead.id)}
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openLead(lead.id);
+                        }
+                      }}
+                    >
+                      <td>{lead.code || "—"}</td>
+                      <td>{displayLeadCompanyName(lead) || "—"}</td>
+                      <td>{displayLeadContactName(lead)}</td>
+                      <td>{lead.phone}</td>
+                      <td className="admin-table-cell-truncate">
+                        {lead.demand || lead.message || "—"}
+                      </td>
+                      <td>
+                        <LeadSourceDisplay lead={lead} />
+                      </td>
+                      <td>
+                        <LeadStatusBadge status={lead.status} />
+                      </td>
+                      <td>
+                        <LeadPriorityBadge priority={lead.priority} />
+                      </td>
+                      <td>
+                        {lead.customer ? (
+                          <Link
+                            href={`/admin/crm/customers/${lead.customer.id}`}
+                            className="admin-crm-row-link"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {lead.customer.code} — {lead.customer.name}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td>{formatCrmDateTime(lead.nextFollowUpAt ?? lead.followUpAt)}</td>
+                      <td>{formatCrmDateTime(lead.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          }
+          mobile={
+            <>
               {leads.map((lead) => (
-                <tr
+                <AdminListCard
                   key={lead.id}
-                  className="admin-crm-row"
+                  title={displayLeadContactName(lead)}
+                  subtitle={displayLeadCompanyName(lead) || lead.code || "—"}
+                  badges={
+                    <>
+                      <LeadStatusBadge status={lead.status} />
+                      <LeadPriorityBadge priority={lead.priority} />
+                    </>
+                  }
+                  fields={[
+                    { label: "SĐT", value: lead.phone || "—" },
+                    { label: "Nguồn", value: <LeadSourceDisplay lead={lead} /> },
+                    {
+                      label: "Follow-up",
+                      value: formatCrmDateTime(lead.nextFollowUpAt ?? lead.followUpAt),
+                    },
+                    {
+                      label: "Phụ trách",
+                      value: lead.assignedTo ?? "—",
+                    },
+                  ]}
                   onClick={() => openLead(lead.id)}
-                  tabIndex={0}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openLead(lead.id);
-                    }
-                  }}
-                >
-                  <td>{lead.code || "—"}</td>
-                  <td>{displayLeadCompanyName(lead) || "—"}</td>
-                  <td>{displayLeadContactName(lead)}</td>
-                  <td>{lead.phone}</td>
-                  <td className="admin-table-cell-truncate">
-                    {lead.demand || lead.message || "—"}
-                  </td>
-                  <td>
-                    <LeadSourceDisplay lead={lead} />
-                  </td>
-                  <td>
-                    <LeadStatusBadge status={lead.status} />
-                  </td>
-                  <td>
-                    <LeadPriorityBadge priority={lead.priority} />
-                  </td>
-                  <td>
-                    {lead.customer ? (
-                      <Link
-                        href={`/admin/crm/customers/${lead.customer.id}`}
-                        className="admin-crm-row-link"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        {lead.customer.code} — {lead.customer.name}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>{formatCrmDateTime(lead.nextFollowUpAt ?? lead.followUpAt)}</td>
-                  <td>{formatCrmDateTime(lead.createdAt)}</td>
-                </tr>
+                  aria-label={`Mở lead ${displayLeadContactName(lead)}`}
+                />
               ))}
-            </tbody>
-          </table>
-        </div>
+            </>
+          }
+        />
       )}
-    </div>
+
+      <AdminMobileActionBar
+        ariaLabel="Thao tác lead"
+        primaryAction={createLeadAction}
+      />
+    </AdminPageShell>
   );
 }
