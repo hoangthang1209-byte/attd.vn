@@ -50,9 +50,14 @@ export default function QuoteListManager() {
         description="Theo dõi báo giá, thời hạn hiệu lực và giá trị giao dịch."
         meta={<span>Tổng: {quotes.length} báo giá</span>}
         actions={
-          <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
-            Tạo báo giá
-          </Link>
+          <>
+            <Link href="/admin/quotes/new/quick" className="admin-btn admin-btn--secondary">
+              Báo giá nhanh
+            </Link>
+            <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
+              Tạo báo giá
+            </Link>
+          </>
         }
       />
 
@@ -74,7 +79,16 @@ export default function QuoteListManager() {
         <EmptyState
           title="Chưa có báo giá phù hợp"
           description="Hãy tạo báo giá mới hoặc điều chỉnh bộ lọc để xem thêm kết quả."
-          action={<Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">Tạo báo giá</Link>}
+          action={
+            <>
+              <Link href="/admin/quotes/new/quick" className="admin-btn admin-btn--secondary">
+                Báo giá nhanh
+              </Link>
+              <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
+                Tạo báo giá
+              </Link>
+            </>
+          }
         />
       ) : (
         <div className="admin-table-wrap">
