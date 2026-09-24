@@ -67,9 +67,13 @@ export default function LeadImportClient() {
         <Link href="/admin/crm/intake">Xem Intake Hub</Link>
       </p>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-        <a href="/api/admin/crm/leads/import/template" className="admin-btn admin-btn--secondary">
+        <Link
+          href="/api/admin/crm/leads/import/template"
+          className="admin-btn admin-btn--secondary"
+          prefetch={false}
+        >
           <Download size={16} /> Tải mẫu CSV
-        </a>
+        </Link>
         <button type="button" className="admin-btn" onClick={() => inputRef.current?.click()}>
           <Upload size={16} /> Chọn file
         </button>
