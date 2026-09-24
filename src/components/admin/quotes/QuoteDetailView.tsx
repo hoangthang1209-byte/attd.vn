@@ -4,10 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { QuoteStatus } from "@prisma/client";
+import { Copy } from "lucide-react";
 import QuoteStatusBadge from "@/components/admin/quotes/QuoteStatusBadge";
 import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
 import { QuotePartyColumns } from "@/components/quotes/QuoteDocumentSections";
 import { formatQuoteCurrency, formatQuoteDate, formatQuoteDateTime } from "@/features/quotes/format";
+import { copyQuoteNumber } from "@/features/quotes/quote-number-clipboard";
 import { formatPricingPercent } from "@/features/pricing/format";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
 import { useAdminMutation } from "@/hooks/useAdminAction";
@@ -103,7 +105,8 @@ export default function QuoteDetailView({ id }: { id: string }) {
   const [quote, setQuote] = useState<QuoteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [quoteNumberCopyStatus, setQuoteNumberCopyStatus] = useState<"idle" | "success" | "error">("idle");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -135,6 +138,15 @@ export default function QuoteDetailView({ id }: { id: string }) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (quoteNumberCopyStatus === "idle") return;
+
+    const timer = window.setTimeout(() => {
+      setQuoteNumberCopyStatus("idle");
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [quoteNumberCopyStatus]);
 
   async function updateStatus(status: QuoteStatus) {
     setBusy(true);
@@ -197,8 +209,14 @@ export default function QuoteDetailView({ id }: { id: string }) {
     const url = publicUrl();
     if (!url) return;
     await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
+
+  async function handleCopyQuoteNumber() {
+    if (!quote) return;
+    const copied = await copyQuoteNumber(quote.quoteNo);
+    setQuoteNumberCopyStatus(copied ? "success" : "error");
   }
 
   const [pdfDownloading, setPdfDownloading] = useState(false);
@@ -276,7 +294,29 @@ export default function QuoteDetailView({ id }: { id: string }) {
     <div className="admin-panel">
       <div className="admin-section-header">
         <div>
-          <p className="admin-crm-detail-code">{quote.quoteNo}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <p className="admin-crm-detail-code">{quote.quoteNo}</p>
+            <button
+              type="button"
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+              aria-label={`Sao chép số báo giá ${quote.quoteNo}`}
+              title="Sao chép số báo giá"
+              onClick={() => void handleCopyQuoteNumber()}
+            >
+              <Copy size={14} aria-hidden="true" />
+            </button>
+            <span
+              className="admin-field-hint"
+              role="status"
+              aria-live="polite"
+            >
+              {quoteNumberCopyStatus === "success"
+                ? "Đã sao chép"
+                : quoteNumberCopyStatus === "error"
+                  ? "Không thể sao chép"
+                  : null}
+            </span>
+          </div>
           <h2>{quote.title ?? "Báo giá"}</h2>
           <QuoteStatusBadge status={quote.status} />
           <p className="admin-field-hint">Tạo lúc {formatQuoteDateTime(quote.createdAt)} · Hiệu lực đến {formatQuoteDate(quote.validUntil)}</p>
@@ -390,7 +430,7 @@ export default function QuoteDetailView({ id }: { id: string }) {
         {url ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <code>{url}</code>
-            <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void copyLink()}>{copied ? "Đã sao chép" : "Sao chép liên kết"}</button>
+            <button type="button" className="admin-btn admin-btn--secondary admin-btn--xs" onClick={() => void copyLink()}>{linkCopied ? "Đã sao chép" : "Sao chép liên kết"}</button>
             <a href={url} target="_blank" rel="noopener noreferrer" className="admin-btn admin-btn--secondary admin-btn--xs">Mở trang báo giá</a>
             <button
               type="button"
