@@ -321,6 +321,7 @@ export default function CrmLeadsManager() {
                 <th>SĐT</th>
                 <th>Nhu cầu</th>
                 <th>Nguồn</th>
+                <th>Tiếp nhận</th>
                 <th>Phụ trách</th>
                 <th>Trạng thái</th>
                 <th>Ưu tiên</th>
@@ -353,6 +354,7 @@ export default function CrmLeadsManager() {
                   <td>
                     <LeadSourceDisplay lead={lead} />
                   </td>
+                  <td>{formatCrmDateTime(lead.receivedAt ?? lead.createdAt)}</td>
                   <td>{resolveEmployeeLabel(employees, lead.assignedTo)}</td>
                   <td>
                     <LeadStatusBadge status={lead.status} />

@@ -184,39 +184,15 @@ export type GmailLeadIntakeInput = {
 export async function intakeLeadFromGmail(
   input: GmailLeadIntakeInput
 ): Promise<LeadIntakeResult | null> {
-  const messageId = sanitizeSourceRef(input.messageId);
-  if (!messageId) {
-    throw new LeadIntakeValidationError("Gmail message id is required.");
-  }
-
-  const receivedAt =
-    input.receivedAt instanceof Date
-      ? input.receivedAt
-      : input.receivedAt
-        ? new Date(input.receivedAt)
-        : new Date();
-
-  if (Number.isNaN(receivedAt.getTime())) {
-    throw new LeadIntakeValidationError("receivedAt không hợp lệ.");
-  }
-
-  const contactName = input.senderName?.trim() || input.senderEmail?.trim() || null;
-  const messageParts = [input.subject?.trim(), input.bodySnippet?.trim()].filter(Boolean);
-
-  return intakeLead({
-    channel: "GMAIL",
-    source: "GMAIL",
-    sourceRef: messageId,
-    receivedAt,
-    contactName,
-    email: input.senderEmail?.trim() || null,
-    message: messageParts.length > 0 ? messageParts.join("\n\n") : null,
-    assignedSalesId: input.assignedSalesId,
-    intakeMetadata: {
-      ...(input.intakeMetadata ?? {}),
-      gmailThreadId: input.threadId?.trim() || null,
-    },
-  });
+  const { gmailInboundAdapter } = await import("@/features/crm/lead-intake/adapters/gmail.adapter");
+  const { runLeadIntakeAdapter } = await import("@/features/crm/lead-intake/run-intake-adapter");
+  const result = await runLeadIntakeAdapter(gmailInboundAdapter, input);
+  if (!result) return null;
+  return {
+    lead: result.lead,
+    created: result.created,
+    matchedBy: result.matchedBy,
+  };
 }
 
 export async function validateLeadOwnerId(ownerId: string | null | undefined): Promise<string | null> {
@@ -239,6 +215,12 @@ export function isValidIntakeSource(value: string): value is LeadSource {
     "SOURCING",
     "LANDING_PAGE",
     "PRODUCT_INQUIRY",
+    "ZALO",
+    "FACEBOOK",
+    "PHONE",
+    "REFERRAL",
+    "OLD_CUSTOMER",
+    "DIRECT",
     "OTHER",
   ].includes(value);
 }

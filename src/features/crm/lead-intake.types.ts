@@ -2,7 +2,13 @@ import type { LeadSource, LeadStatus } from "@prisma/client";
 import type { CreateProductInterestInput, CrmLeadRecord } from "@/features/crm/types";
 
 /** Intake channel — how the lead entered the normalized pipeline. */
-export type LeadIntakeChannel = "WEBSITE" | "GMAIL" | "MANUAL" | "OTHER";
+export type LeadIntakeChannel =
+  | "WEBSITE"
+  | "GMAIL"
+  | "MANUAL"
+  | "WEBHOOK"
+  | "CSV_IMPORT"
+  | "OTHER";
 
 export type NormalizedLeadIntakeInput = {
   channel: LeadIntakeChannel;

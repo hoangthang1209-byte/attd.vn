@@ -102,6 +102,10 @@ export function mapIntakeChannelToDefaultSource(channel: LeadIntakeChannel): Lea
       return "MANUAL";
     case "WEBSITE":
       return "WEBSITE";
+    case "WEBHOOK":
+      return "OTHER";
+    case "CSV_IMPORT":
+      return "MANUAL";
     default:
       return "OTHER";
   }

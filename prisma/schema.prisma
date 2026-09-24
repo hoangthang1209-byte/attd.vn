@@ -317,6 +317,25 @@ model Lead {
   @@unique([source, sourceRef])
 }
 
+enum LeadIntakeOutcome {
+  CREATED
+  DUPLICATE
+  ERROR
+}
+
+model LeadIntakeEvent {
+  id           String            @id @default(cuid())
+  adapterKey   String
+  source       LeadSource?
+  sourceRef    String?
+  outcome      LeadIntakeOutcome
+  errorMessage String?           @db.Text
+  createdAt    DateTime          @default(now())
+
+  @@index([adapterKey, createdAt])
+  @@index([outcome, createdAt])
+}
+
 model AdministrativeProvince {
   id        String               @id @default(cuid())
   code      String               @unique
