@@ -33,6 +33,11 @@ import {
   type GitHubIssuePayload,
   type GitHubPullRequestPayload,
 } from "@/features/automation/automation-github.types";
+import type {
+  PullRequestVerification,
+  PullRequestVerificationCiStatus,
+  PullRequestVerificationReviewStatus,
+} from "@/features/automation/automation-task.types";
 
 const DEFAULT_REPO = "hoangthang1209-byte/attd.vn";
 const SEARCH_PAGE_SIZE = 100;
@@ -171,6 +176,15 @@ type GitHubPullDetailResponse = {
 
 type GitHubCompareResponse = {
   status: "identical" | "ahead" | "behind" | "diverged";
+};
+
+type GitHubCommitStatusResponse = {
+  state: "pending" | "success" | "failure" | "error";
+};
+
+type GitHubPullReviewResponse = {
+  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING";
+  submitted_at: string;
 };
 
 export type SearchIssuesPaginatedResult = {
@@ -786,6 +800,70 @@ export async function fetchLinkedPullRequestSafe(
     if (isRecoverableGitHubLookupError(error)) {
       console.warn(
         `[fetchLinkedPullRequestSafe] linked PR lookup failed for issue #${issueNumber}; continuing with partial data`,
+      );
+      return null;
+    }
+    throw error;
+  }
+}
+
+function mapCombinedStatusState(state: GitHubCommitStatusResponse["state"]): PullRequestVerificationCiStatus {
+  switch (state) {
+    case "success":
+      return "success";
+    case "failure":
+    case "error":
+      return "failure";
+    case "pending":
+      return "pending";
+    default:
+      return "unknown";
+  }
+}
+
+function mapPullReviewState(reviews: GitHubPullReviewResponse[]): PullRequestVerificationReviewStatus {
+  const meaningfulReviews = reviews
+    .filter((review) => review.state === "APPROVED" || review.state === "CHANGES_REQUESTED")
+    .sort((left, right) => Date.parse(right.submitted_at) - Date.parse(left.submitted_at));
+
+  if (meaningfulReviews.length === 0) {
+    return reviews.length > 0 ? "pending" : "unknown";
+  }
+
+  return meaningfulReviews[0]?.state === "CHANGES_REQUESTED" ? "changes_requested" : "approved";
+}
+
+export async function fetchPullRequestVerificationSafe(
+  pullNumber: number,
+): Promise<PullRequestVerification | null> {
+  const config = getAutomationGitHubConfig();
+  if (!config.configured || !config.owner || !config.repo) {
+    return null;
+  }
+
+  try {
+    const pull = await githubRequest<GitHubPullDetailResponse>(
+      `/repos/${config.owner}/${config.repo}/pulls/${pullNumber}`,
+    );
+
+    const headSha = pull.head.sha;
+    const [combinedStatus, reviews] = await Promise.all([
+      githubRequest<GitHubCommitStatusResponse>(
+        `/repos/${config.owner}/${config.repo}/commits/${headSha}/status`,
+      ),
+      githubRequest<GitHubPullReviewResponse[]>(
+        `/repos/${config.owner}/${config.repo}/pulls/${pullNumber}/reviews`,
+      ),
+    ]);
+
+    return {
+      ciStatus: mapCombinedStatusState(combinedStatus.state),
+      reviewStatus: mapPullReviewState(reviews),
+    };
+  } catch (error) {
+    if (isRecoverableGitHubLookupError(error)) {
+      console.warn(
+        `[fetchPullRequestVerificationSafe] verification lookup failed for PR #${pullNumber}; continuing with partial data`,
       );
       return null;
     }

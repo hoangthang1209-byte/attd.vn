@@ -5,6 +5,7 @@ import {
   AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
   mapWithConcurrency,
 } from "@/features/automation/automation-async-utils";
+import { prepareLaneBoardTasks } from "@/features/automation/automation-lane-board";
 import {
   AUTOMATION_STATUS_GITHUB_LABELS,
   resolveMergeTimestamp,
@@ -16,6 +17,7 @@ import {
   AutomationGitHubRequestError,
   fetchAutomationIssuesForView,
   fetchLinkedPullRequestSafe,
+  fetchPullRequestVerificationSafe,
   getAutomationGitHubConfig,
 } from "@/features/automation/automation-github.client";
 import {
@@ -36,18 +38,33 @@ const CACHE_REVALIDATE_SECONDS = 60;
 
 type CachedAutomationPayload = {
   tasks: AutomationTask[];
+  laneBoardTasks: AutomationTask[] | null;
   dataCompleteness: AutomationDataCompleteness;
   productionCommitSha: string | null;
   productionCheckedAt: string;
 };
 
-async function enrichTaskWithLinkedPullRequest(task: AutomationTask): Promise<AutomationTask> {
+type LinkedPullRequestEnrichmentOptions = {
+  fetchVerification?: boolean;
+};
+
+async function enrichTaskWithLinkedPullRequest(
+  task: AutomationTask,
+  options: LinkedPullRequestEnrichmentOptions = {},
+): Promise<AutomationTask> {
   if (!shouldFetchLinkedPullRequest(task.status, task.isOpen)) {
     return task;
   }
 
   const linkedPullRequest = await fetchLinkedPullRequestSafe(task.issueNumber);
   if (!linkedPullRequest) return task;
+
+  const verification =
+    options.fetchVerification &&
+    linkedPullRequest.state === "OPEN" &&
+    !linkedPullRequest.merged
+      ? await fetchPullRequestVerificationSafe(linkedPullRequest.number)
+      : null;
 
   const linked = {
     number: linkedPullRequest.number,
@@ -58,6 +75,7 @@ async function enrichTaskWithLinkedPullRequest(task: AutomationTask): Promise<Au
     updatedAt: linkedPullRequest.updatedAt,
     mergedAt: linkedPullRequest.mergedAt,
     mergeCommitSha: linkedPullRequest.mergeCommitSha,
+    verification,
   } as const;
 
   return {
@@ -88,17 +106,18 @@ async function loadAutomationTasksUncached(view: AutomationDashboardView): Promi
     recognitionDegraded,
   } = await fetchAutomationIssuesForView(view, AUTOMATION_STATUS_GITHUB_LABELS);
 
-  const baseTasks = issues
+  const allMappedTasks = issues
     .map(mapIssueToTask)
-    .filter((task) => matchesAutomationView(task, view))
     .sort((left, right) => right.latestUpdateAt.localeCompare(left.latestUpdateAt));
+
+  const baseTasks = allMappedTasks.filter((task) => matchesAutomationView(task, view));
 
   const tasksWithLinkedPullRequests =
     view === "active"
       ? await mapWithConcurrency(
           baseTasks,
           AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
-          enrichTaskWithLinkedPullRequest,
+          (task) => enrichTaskWithLinkedPullRequest(task),
         )
       : baseTasks;
 
@@ -110,8 +129,24 @@ async function loadAutomationTasksUncached(view: AutomationDashboardView): Promi
     productionCheckedAt,
   );
 
+  let laneBoardTasks: AutomationTask[] | null = null;
+  if (view === "active") {
+    const laneBoardCandidates = prepareLaneBoardTasks(allMappedTasks);
+    const enrichedLaneBoardCandidates = await mapWithConcurrency(
+      laneBoardCandidates,
+      AUTOMATION_LINKED_PR_FETCH_CONCURRENCY,
+      (task) => enrichTaskWithLinkedPullRequest(task, { fetchVerification: true }),
+    );
+    laneBoardTasks = await enrichTasksWithProductionStatus(
+      enrichedLaneBoardCandidates,
+      productionCommitSha,
+      productionCheckedAt,
+    );
+  }
+
   return {
     tasks,
+    laneBoardTasks,
     dataCompleteness: {
       openTasksTruncated,
       openTasksTotalCount,
@@ -202,7 +237,7 @@ export async function getAutomationDashboard(
   }
 
   try {
-    const { tasks, dataCompleteness, productionCommitSha, productionCheckedAt } =
+    const { tasks, laneBoardTasks, dataCompleteness, productionCommitSha, productionCheckedAt } =
       await getCachedAutomationTasks(config.repoSlug, view)();
     const writeAction = await resolveWriteActionState();
     return {
@@ -211,6 +246,7 @@ export async function getAutomationDashboard(
       ...writeAction,
       summary: buildSummary(tasks, dataCompleteness, view),
       tasks,
+      laneBoardTasks: laneBoardTasks ?? undefined,
       fetchedAt: new Date().toISOString(),
       view,
       dataCompleteness,

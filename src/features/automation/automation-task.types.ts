@@ -25,6 +25,19 @@ export type AutomationProductionStatus = {
   checkedAt: string;
 };
 
+export type PullRequestVerificationCiStatus = "success" | "failure" | "pending" | "unknown";
+
+export type PullRequestVerificationReviewStatus =
+  | "approved"
+  | "changes_requested"
+  | "pending"
+  | "unknown";
+
+export type PullRequestVerification = {
+  ciStatus: PullRequestVerificationCiStatus;
+  reviewStatus: PullRequestVerificationReviewStatus;
+};
+
 export type AutomationLinkedPullRequest = {
   number: number;
   url: string;
@@ -34,6 +47,8 @@ export type AutomationLinkedPullRequest = {
   updatedAt: string;
   mergedAt: string | null;
   mergeCommitSha: string | null;
+  /** Derived from PR head checks and review submissions when available. */
+  verification?: PullRequestVerification | null;
 };
 
 export type AutomationStatusComment = {
@@ -110,6 +125,8 @@ export type AutomationDashboardResponse = {
   writeActionConfigMessage: string | null;
   summary: AutomationTaskSummary;
   tasks: AutomationTask[];
+  /** Operator-truth task set for the lane board; includes merged fallback per lane on active view. */
+  laneBoardTasks?: AutomationTask[];
   fetchedAt: string;
   view: AutomationDashboardView;
   dataCompleteness?: AutomationDataCompleteness;

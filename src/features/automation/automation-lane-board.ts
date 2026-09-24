@@ -5,6 +5,7 @@ import {
   resolveCanonicalLaneId,
   type AutomationCanonicalLaneId,
 } from "@/features/automation/automation-lane.constants";
+import { derivePullRequestVerificationDisplay } from "@/features/automation/automation-pull-request-verification";
 import type { AutomationTask, NormalizedTaskStatus } from "@/features/automation/automation-task.types";
 
 export type AutomationLaneOverallState =
@@ -88,15 +89,48 @@ function compareTasksByOperationalPriority(left: AutomationTask, right: Automati
   return Date.parse(right.latestUpdateAt) - Date.parse(left.latestUpdateAt);
 }
 
+/** Recency for chain supersession: merged completion time when available, else latest activity. */
+export function resolveTaskRecencyTimestamp(task: AutomationTask): number {
+  if (task.mergedAt) return Date.parse(task.mergedAt);
+  return Date.parse(task.latestUpdateAt);
+}
+
 function isSupersededByNewerOpenTask(task: AutomationTask, openTasks: AutomationTask[]): boolean {
-  return openTasks.some((other) => other.issueNumber > task.issueNumber);
+  const taskRecency = resolveTaskRecencyTimestamp(task);
+  return openTasks.some((other) => {
+    if (other.issueNumber === task.issueNumber) return false;
+    return resolveTaskRecencyTimestamp(other) > taskRecency;
+  });
+}
+
+function isSupersededByNewerCompletedTask(
+  task: AutomationTask,
+  completedTasks: AutomationTask[],
+): boolean {
+  const taskRecency = resolveTaskRecencyTimestamp(task);
+  return completedTasks.some((other) => {
+    if (!isSuccessfulCompletedTask(other)) return false;
+    if (other.issueNumber === task.issueNumber) return false;
+    return resolveTaskRecencyTimestamp(other) > taskRecency;
+  });
 }
 
 /** Drop stale superseded open tasks unless they are still blocking the current chain. */
-export function filterCurrentChainOpenTasks(openTasks: AutomationTask[]): AutomationTask[] {
+export function filterCurrentChainOpenTasks(
+  openTasks: AutomationTask[],
+  completedTasks: AutomationTask[] = [],
+): AutomationTask[] {
   return openTasks.filter((task) => {
-    if (!isSupersededByNewerOpenTask(task, openTasks)) return true;
-    return CHAIN_BLOCKING_STATUSES.has(task.status);
+    if (isSupersededByNewerOpenTask(task, openTasks) && !CHAIN_BLOCKING_STATUSES.has(task.status)) {
+      return false;
+    }
+    if (
+      isSupersededByNewerCompletedTask(task, completedTasks) &&
+      !CHAIN_BLOCKING_STATUSES.has(task.status)
+    ) {
+      return false;
+    }
+    return true;
   });
 }
 
@@ -107,11 +141,11 @@ function compareOpenTasksForRepresentative(left: AutomationTask, right: Automati
   return compareTasksByOperationalPriority(left, right);
 }
 
-function isSuccessfulCompletedTask(task: AutomationTask): boolean {
+export function isSuccessfulCompletedTask(task: AutomationTask): boolean {
   return task.status === "merged" || task.status === "superseded";
 }
 
-function isClosedFailureTask(task: AutomationTask): boolean {
+export function isClosedFailureTask(task: AutomationTask): boolean {
   return (
     !task.isOpen &&
     (task.status === "failed" || task.status === "stalled" || task.status === "blocked")
@@ -143,8 +177,12 @@ function laneHasActivePipelineTask(tasksInLane: AutomationTask[]): boolean {
  * issues may be surfaced so the lane cannot start multiple Builder implementations.
  */
 export function selectLaneApprovalTask(tasksInLane: AutomationTask[]): AutomationTask | null {
-  const eligibleTasks = tasksInLane.filter(
-    (task) => task.isOpen && evaluateApproveBuildEligibility(task).eligible,
+  const completedTasks = tasksInLane.filter(isSuccessfulCompletedTask);
+  const openTasks = tasksInLane.filter((task) => task.isOpen && task.status !== "superseded");
+  const currentChainOpenTasks = filterCurrentChainOpenTasks(openTasks, completedTasks);
+
+  const eligibleTasks = currentChainOpenTasks.filter(
+    (task) => evaluateApproveBuildEligibility(task).eligible,
   );
   if (eligibleTasks.length === 0) return null;
 
@@ -169,11 +207,13 @@ export function selectLaneApprovalTask(tasksInLane: AutomationTask[]): Automatio
 export function selectLaneRepresentativeTask(tasksInLane: AutomationTask[]): AutomationTask | null {
   if (tasksInLane.length === 0) return null;
 
+  const completedTasks = tasksInLane.filter(isSuccessfulCompletedTask);
   const openTasks = tasksInLane.filter((task) => task.isOpen && task.status !== "superseded");
   if (openTasks.length > 0) {
-    const chainTasks = filterCurrentChainOpenTasks(openTasks);
-    const pool = chainTasks.length > 0 ? chainTasks : openTasks;
-    return [...pool].sort(compareOpenTasksForRepresentative)[0] ?? null;
+    const chainTasks = filterCurrentChainOpenTasks(openTasks, completedTasks);
+    if (chainTasks.length > 0) {
+      return [...chainTasks].sort(compareOpenTasksForRepresentative)[0] ?? null;
+    }
   }
 
   const successfulCompletedTasks = tasksInLane
@@ -304,12 +344,17 @@ export function formatLaneCiReview(task: AutomationTask | null): string {
     return "Chưa có PR · đã duyệt build";
   }
 
+  const verificationDisplay = derivePullRequestVerificationDisplay(task);
+  if (verificationDisplay) return verificationDisplay;
+
   if (task.status === "pr_open") {
     return "PR đang mở";
   }
 
   if (task.status === "ci_review" || task.status === "queued") {
-    return isRawStatusLabel(task.statusLabel) ? "Chưa có dữ liệu CI/Review" : (task.statusLabel ?? "Chưa có dữ liệu CI/Review");
+    return isRawStatusLabel(task.statusLabel)
+      ? "Chưa có dữ liệu CI/Review"
+      : (task.statusLabel ?? "Chưa có dữ liệu CI/Review");
   }
 
   if (task.status === "backlog" || task.status === "approved" || task.status === "unknown") {
@@ -319,7 +364,9 @@ export function formatLaneCiReview(task: AutomationTask | null): string {
   return isRawStatusLabel(task.statusLabel) ? "Chưa có dữ liệu CI/Review" : (task.statusLabel ?? "—");
 }
 
-function groupTasksByLane(tasks: AutomationTask[]): Map<AutomationCanonicalLaneId, AutomationTask[]> {
+export function groupTasksByLane(
+  tasks: AutomationTask[],
+): Map<AutomationCanonicalLaneId, AutomationTask[]> {
   const grouped = new Map<AutomationCanonicalLaneId, AutomationTask[]>();
 
   for (const lane of AUTOMATION_CANONICAL_LANES) {
@@ -373,6 +420,49 @@ const RUNNING_LANE_STATES = new Set<AutomationLaneOverallState>([
 
 const BLOCKED_OR_NEEDS_FIX_STATES = new Set<AutomationLaneOverallState>(["blocked", "can_sua"]);
 
+export function isLaneProductionOrComplete(entry: AutomationLaneBoardEntry): boolean {
+  if (entry.overallState === "production") return true;
+  return entry.task?.status === "merged";
+}
+
+/** Build lane-board task input from the full mapped task list on active view. */
+export function prepareLaneBoardTasks(allTasks: AutomationTask[]): AutomationTask[] {
+  const grouped = groupTasksByLane(allTasks);
+  const selected: AutomationTask[] = [];
+  const seenIssueNumbers = new Set<number>();
+
+  function addTask(task: AutomationTask | undefined) {
+    if (!task || seenIssueNumbers.has(task.issueNumber)) return;
+    seenIssueNumbers.add(task.issueNumber);
+    selected.push(task);
+  }
+
+  for (const tasksInLane of grouped.values()) {
+    for (const task of tasksInLane) {
+      if (task.isOpen && task.status !== "superseded") {
+        addTask(task);
+      }
+    }
+
+    const successfulCompletedTasks = tasksInLane
+      .filter(isSuccessfulCompletedTask)
+      .sort((left, right) => Date.parse(right.latestUpdateAt) - Date.parse(left.latestUpdateAt));
+    addTask(successfulCompletedTasks[0]);
+
+    const hasOpenWork = tasksInLane.some((task) => task.isOpen && task.status !== "superseded");
+    if (!hasOpenWork) {
+      const closedFailureTasks = tasksInLane
+        .filter(isClosedFailureTask)
+        .sort(
+          (left, right) => Date.parse(right.latestUpdateAt) - Date.parse(left.latestUpdateAt),
+        );
+      addTask(closedFailureTasks[0]);
+    }
+  }
+
+  return selected;
+}
+
 export function buildLaneBoardSummary(entries: AutomationLaneBoardEntry[]): AutomationLaneBoardSummary {
   return {
     totalLanes: entries.length,
@@ -380,6 +470,6 @@ export function buildLaneBoardSummary(entries: AutomationLaneBoardEntry[]): Auto
     blockedOrNeedsFixCount: entries.filter((entry) =>
       BLOCKED_OR_NEEDS_FIX_STATES.has(entry.overallState),
     ).length,
-    productionCount: entries.filter((entry) => entry.overallState === "production").length,
+    productionCount: entries.filter((entry) => isLaneProductionOrComplete(entry)).length,
   };
 }
