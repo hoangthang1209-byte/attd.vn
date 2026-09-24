@@ -32811,7 +32811,36 @@ body:has(.blog-article-page) .floating-contact {
   .automation-task-card__details { margin-top: 4px; }
 }
 
+/* Automation task history (secondary section below lane board) */
+.automation-task-history-section {
+  margin-top: 8px;
+}
+.automation-task-history-section__summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 0;
+  list-style: none;
+}
+.automation-task-history-section__summary::-webkit-details-marker {
+  display: none;
+}
+.automation-task-history-section__summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+.automation-task-history-section[open] > .automation-task-history-section__summary::before {
+  transform: rotate(90deg);
+}
+.automation-task-history-section__content {
+  padding-top: 4px;
+}
+
 /* Automation 7-Lane Control Board */
+.automation-lane-board__incompleteness {
+  margin: 0 0 12px;
+}
 .automation-lane-board {
   margin-bottom: 20px;
   padding-bottom: 16px;

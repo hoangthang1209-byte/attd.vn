@@ -89,17 +89,30 @@ function compareTasksByOperationalPriority(left: AutomationTask, right: Automati
   return Date.parse(right.latestUpdateAt) - Date.parse(left.latestUpdateAt);
 }
 
+/** Recency for chain supersession: merged completion time when available, else latest activity. */
+export function resolveTaskRecencyTimestamp(task: AutomationTask): number {
+  if (task.mergedAt) return Date.parse(task.mergedAt);
+  return Date.parse(task.latestUpdateAt);
+}
+
 function isSupersededByNewerOpenTask(task: AutomationTask, openTasks: AutomationTask[]): boolean {
-  return openTasks.some((other) => other.issueNumber > task.issueNumber);
+  const taskRecency = resolveTaskRecencyTimestamp(task);
+  return openTasks.some((other) => {
+    if (other.issueNumber === task.issueNumber) return false;
+    return resolveTaskRecencyTimestamp(other) > taskRecency;
+  });
 }
 
 function isSupersededByNewerCompletedTask(
   task: AutomationTask,
   completedTasks: AutomationTask[],
 ): boolean {
-  return completedTasks.some(
-    (other) => other.issueNumber > task.issueNumber && isSuccessfulCompletedTask(other),
-  );
+  const taskRecency = resolveTaskRecencyTimestamp(task);
+  return completedTasks.some((other) => {
+    if (!isSuccessfulCompletedTask(other)) return false;
+    if (other.issueNumber === task.issueNumber) return false;
+    return resolveTaskRecencyTimestamp(other) > taskRecency;
+  });
 }
 
 /** Drop stale superseded open tasks unless they are still blocking the current chain. */
@@ -164,8 +177,12 @@ function laneHasActivePipelineTask(tasksInLane: AutomationTask[]): boolean {
  * issues may be surfaced so the lane cannot start multiple Builder implementations.
  */
 export function selectLaneApprovalTask(tasksInLane: AutomationTask[]): AutomationTask | null {
-  const eligibleTasks = tasksInLane.filter(
-    (task) => task.isOpen && evaluateApproveBuildEligibility(task).eligible,
+  const completedTasks = tasksInLane.filter(isSuccessfulCompletedTask);
+  const openTasks = tasksInLane.filter((task) => task.isOpen && task.status !== "superseded");
+  const currentChainOpenTasks = filterCurrentChainOpenTasks(openTasks, completedTasks);
+
+  const eligibleTasks = currentChainOpenTasks.filter(
+    (task) => evaluateApproveBuildEligibility(task).eligible,
   );
   if (eligibleTasks.length === 0) return null;
 

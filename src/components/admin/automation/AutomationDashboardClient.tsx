@@ -410,19 +410,33 @@ export default function AutomationDashboardClient() {
       {data?.configured ? (
         <>
           {laneBoardData ? (
-            <AutomationLaneBoard
-              tasks={laneBoardData.tasks}
-              laneBoardTasks={laneBoardData.laneBoardTasks}
-              lastUpdatedAt={laneBoardData.fetchedAt}
-              autoRefreshLabel={AUTO_REFRESH_LABEL}
-              writeActionConfigured={laneWriteActionConfigured}
-              writeActionConfigMessage={laneWriteActionConfigMessage}
-              onScrollToTask={handleLaneTaskScroll}
-              canScrollToTask={canScrollToLaneTask}
-              onRefresh={handleLaneBackgroundRefresh}
-            />
+            <>
+              {data.dataCompleteness?.closedHistoryUnavailable ? (
+                <p className="admin-error automation-lane-board__incompleteness" role="status">
+                  Bảng 7 mảng có thể thiếu task đã merge: không tải được lịch sử task đóng (merged/superseded
+                  30 ngày). Các mảng chỉ hiển thị task đang mở có thể không phản ánh trạng thái vận hành thực
+                  tế cho đến khi lịch sử tải lại thành công.
+                </p>
+              ) : null}
+              <AutomationLaneBoard
+                tasks={laneBoardData.tasks}
+                laneBoardTasks={laneBoardData.laneBoardTasks}
+                lastUpdatedAt={laneBoardData.fetchedAt}
+                autoRefreshLabel={AUTO_REFRESH_LABEL}
+                writeActionConfigured={laneWriteActionConfigured}
+                writeActionConfigMessage={laneWriteActionConfigMessage}
+                onScrollToTask={handleLaneTaskScroll}
+                canScrollToTask={canScrollToLaneTask}
+                onRefresh={handleLaneBackgroundRefresh}
+              />
+            </>
           ) : null}
 
+          <details className="automation-task-history-section">
+            <summary className="automation-task-history-section__summary">
+              Tất cả task / Lịch sử
+            </summary>
+            <div className="automation-task-history-section__content">
           <div className="sales-follow-up__filters" role="tablist" aria-label="Chế độ xem task">
             {AUTOMATION_DASHBOARD_VIEW_OPTIONS.map((option) => (
               <button
@@ -591,6 +605,8 @@ export default function AutomationDashboardClient() {
               " · Production SHA: không xác định (chỉ có trên Vercel Production)"
             )}
           </p>
+            </div>
+          </details>
         </>
       ) : null}
     </AdminPageShell>

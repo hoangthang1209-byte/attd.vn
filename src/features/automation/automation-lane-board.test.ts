@@ -412,6 +412,62 @@ describe("automation lane board", () => {
     assert.equal(formatLaneCiReview(null), "—");
   });
 
+  it("prefers merged #115 over stale open #116 when #119 is absent from lane input", () => {
+    const staleFoundation = taskFixture({
+      issueNumber: 116,
+      status: "pr_open",
+      statusLabel: "status:pr-open",
+      latestUpdateAt: "2026-09-10T00:00:00.000Z",
+    });
+    const laneBoardRepair = taskFixture({
+      issueNumber: 115,
+      status: "merged",
+      isOpen: false,
+      mergedAt: "2026-09-22T00:00:00.000Z",
+      latestUpdateAt: "2026-09-22T00:00:00.000Z",
+      productionStatus: {
+        status: "live",
+        mergedCommitSha: "abc123",
+        reason: null,
+        checkedAt: "2026-09-22T00:00:00.000Z",
+      },
+    });
+
+    const laneInput = prepareLaneBoardTasks([staleFoundation, laneBoardRepair]);
+    const board = buildLaneBoard(laneInput);
+    const automationLane = board.find((entry) => entry.laneId === "automation-platform");
+    assert.equal(automationLane?.task?.issueNumber, 115);
+    assert.equal(automationLane?.overallState, "production");
+    assert.equal(selectLaneApprovalTask(laneInput), null);
+  });
+
+  it("does not offer Duyệt & chạy on superseded backlog when merged repair exists", () => {
+    const staleFoundation = taskFixture({
+      issueNumber: 116,
+      status: "backlog",
+      statusLabel: "status:backlog",
+      latestUpdateAt: "2026-09-10T00:00:00.000Z",
+    });
+    const laneBoardRepair = taskFixture({
+      issueNumber: 115,
+      status: "merged",
+      isOpen: false,
+      mergedAt: "2026-09-22T00:00:00.000Z",
+      latestUpdateAt: "2026-09-22T00:00:00.000Z",
+      productionStatus: {
+        status: "live",
+        mergedCommitSha: "abc123",
+        reason: null,
+        checkedAt: "2026-09-22T00:00:00.000Z",
+      },
+    });
+
+    const laneInput = prepareLaneBoardTasks([staleFoundation, laneBoardRepair]);
+    const board = buildLaneBoard(laneInput);
+    const automationLane = board.find((entry) => entry.laneId === "automation-platform");
+    assert.equal(automationLane?.approvalTask, null);
+  });
+
   it("prefers newer merged automation repair over stale open foundation (#116 vs #118/#119/#113/#115)", () => {
     const staleFoundation = taskFixture({
       issueNumber: 116,
