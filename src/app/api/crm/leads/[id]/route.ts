@@ -6,7 +6,9 @@ import {
   isValidLeadStatus,
   updateCrmLead,
 } from "@/features/crm/services/crm-lead.service";
+import { assertCanViewCrmLeadDetail } from "@/features/crm/services/crm-lead-access";
 import { validateLeadOwnerId, LeadIntakeValidationError } from "@/features/crm/services/lead-intake.service";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -20,12 +22,22 @@ function parseDate(value: unknown): Date | null | undefined {
   return date;
 }
 
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
+  const session = getAdminSessionFromRequest(req);
   const { id } = await context.params;
   const lead = await getCrmLeadById(id);
 
   if (!lead) {
     return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+  }
+
+  try {
+    assertCanViewCrmLeadDetail(session, lead);
+  } catch {
+    return NextResponse.json(
+      { message: "Bạn không có quyền xem lead này." },
+      { status: 403 }
+    );
   }
 
   return NextResponse.json({ lead });

@@ -8,8 +8,10 @@ import {
   buildIntakeAuditTitle,
   buildOwnerChangeAuditContent,
   isIntakeSourceRefUniqueViolation,
+  getVietnamBusinessDayBounds,
   isLeadFollowUpOverdue,
   mapIntakeChannelToDefaultSource,
+  VIETNAM_BUSINESS_TIMEZONE,
   resolveExplicitSalesOwnerId,
   resolveLeadIntakeIdentity,
   resolveValidatedSalesOwnerId,
@@ -61,12 +63,28 @@ describe("resolveLeadIntakeIdentity", () => {
   });
 });
 
+describe("getVietnamBusinessDayBounds", () => {
+  it("uses Asia/Ho_Chi_Minh calendar day boundaries", () => {
+    assert.equal(VIETNAM_BUSINESS_TIMEZONE, "Asia/Ho_Chi_Minh");
+    const now = new Date("2026-09-21T17:00:00Z");
+    const { start, end } = getVietnamBusinessDayBounds(now);
+    assert.equal(start.toISOString(), "2026-09-21T17:00:00.000Z");
+    assert.equal(end.toISOString(), "2026-09-22T17:00:00.000Z");
+  });
+});
+
 describe("isLeadFollowUpOverdue", () => {
-  it("detects overdue follow-up before start of today", () => {
+  it("detects overdue follow-up before Vietnam business day start", () => {
     const now = new Date("2026-09-21T10:00:00Z");
     assert.equal(isLeadFollowUpOverdue("2026-09-20T15:00:00Z", null, now), true);
     assert.equal(isLeadFollowUpOverdue("2026-09-21T15:00:00Z", null, now), false);
     assert.equal(isLeadFollowUpOverdue(null, null, now), false);
+  });
+
+  it("aligns overdue with Vietnam midnight, not server-local midnight", () => {
+    const now = new Date("2026-09-21T17:00:00Z");
+    assert.equal(isLeadFollowUpOverdue("2026-09-21T10:00:00Z", null, now), true);
+    assert.equal(isLeadFollowUpOverdue("2026-09-21T20:00:00Z", null, now), false);
   });
 });
 
