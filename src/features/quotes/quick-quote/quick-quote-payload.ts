@@ -97,6 +97,10 @@ export function validateQuickQuoteItems(items: QuoteItemInput[]): string | null 
     if (!item.quantity || item.quantity <= 0) {
       return "Số lượng phải lớn hơn 0.";
     }
+    const unitPrice = item.manualUnitPrice ?? item.unitPrice ?? item.baseUnitPrice ?? 0;
+    if (unitPrice <= 0) {
+      return "Vui lòng nhập đơn giá lớn hơn 0 cho mỗi dòng sản phẩm.";
+    }
   }
   return null;
 }

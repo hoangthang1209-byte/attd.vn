@@ -76,6 +76,15 @@ describe("validateQuickQuoteItems", () => {
     );
   });
 
+  it("requires a positive unit price for each line", () => {
+    assert.match(
+      validateQuickQuoteItems([
+        { productNameSnapshot: "Áo thun", quantity: 100, unitPrice: 0, baseUnitPrice: 0 },
+      ]) ?? "",
+      /đơn giá lớn hơn 0/,
+    );
+  });
+
   it("accepts valid items", () => {
     assert.equal(
       validateQuickQuoteItems([
