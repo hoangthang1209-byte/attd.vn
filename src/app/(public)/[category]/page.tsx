@@ -5,6 +5,9 @@ import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import { mapProductCardAvailableColors } from "@/features/products/product-card-color-swatches";
 import CatalogSourcingBadges from "@/components/marketplace/CatalogSourcingBadges";
+import CatalogCategoryNav from "@/components/marketplace/CatalogCategoryNav";
+import CatalogRelatedCategories from "@/components/marketplace/CatalogRelatedCategories";
+import CatalogSourcingCta from "@/components/marketplace/CatalogSourcingCta";
 import InternalLinkBlock from "@/components/public/InternalLinkBlock";
 import EmptyState from "@/components/public/EmptyState";
 import Breadcrumb from "@/components/seo/Breadcrumb";
@@ -14,8 +17,12 @@ import CollectionSEOContent from "@/components/seo/CollectionSEOContent";
 import ItemListSchema from "@/components/seo/ItemListSchema";
 import {
   getCategoryBySlug,
+  getPublicCmsCategoryTree,
   listPublicCategorySlugsForStaticParams,
+  resolveCatalogCategoryContext,
 } from "@/features/categories/services/category.service";
+import { buildCategoryPageNavContext } from "@/features/categories/catalog-category-nav.utils";
+import { publicCategoryHref } from "@/features/categories/public-category-url";
 import { loadCollectionContent } from "@/features/landing-pages/load-collection-cms";
 import {
   SITE_NAME,
@@ -199,12 +206,16 @@ export default async function CategoryPage({ params }: PageProps) {
   const { category } = await params;
   if (isBlockedDynamicCategorySegment(category)) notFound();
 
-  const [cat, content] = await Promise.all([
+  const [cat, content, categoryTree, categoryContext] = await Promise.all([
     getCategoryBySlug(category),
     loadCollectionContent(category),
+    getPublicCmsCategoryTree(),
+    resolveCatalogCategoryContext(category),
   ]);
 
   if (!cat) notFound();
+
+  const navContext = buildCategoryPageNavContext(categoryTree, category);
 
   const pageTitle = content?.seoTitle ?? cat.seoTitle ?? `${cat.name} | ${SITE_NAME}`;
   const pageDescription =
@@ -236,7 +247,17 @@ export default async function CategoryPage({ params }: PageProps) {
       )}
 
       {/* ── Breadcrumb (visual + JSON-LD) ──────────────────────────────── */}
-      <Breadcrumb items={[{ name: cat.name }]} />
+      <Breadcrumb
+        items={[
+          { name: "Sản phẩm", href: "/san-pham" },
+          ...(categoryContext?.parentName && categoryContext.parentSlug
+            ? [{ name: categoryContext.parentName, href: publicCategoryHref(categoryContext.parentSlug) }]
+            : navContext.parent
+              ? [{ name: navContext.parent.name, href: navContext.parent.href }]
+              : []),
+          { name: cat.name },
+        ]}
+      />
 
       {/* ── Category Hero ──────────────────────────────────────────────── */}
       <section className="mp-category-listing-hero">
@@ -296,6 +317,15 @@ export default async function CategoryPage({ params }: PageProps) {
               </div>
             )}
           </div>
+
+          {navContext.children.length > 0 ? (
+            <CatalogCategoryNav
+              categories={navContext.children}
+              activeSlug={category}
+              title={`Danh mục con · ${cat.name}`}
+              variant="landing"
+            />
+          ) : null}
 
           <div id="category-products" className="mp-category-listing-section-header">
             <div>
@@ -359,6 +389,24 @@ export default async function CategoryPage({ params }: PageProps) {
               })}
             </div>
           )}
+
+          {cat.products.length > 0 ? (
+            <CatalogSourcingCta
+              title={`Cần báo giá ${cat.name} cho doanh nghiệp?`}
+              description="Gửi số lượng, logo và thời gian cần hàng — ATTD tư vấn MOQ, tồn kho và phương án thay thế nếu chưa chọn được mẫu."
+              primaryLabel="Yêu cầu báo giá"
+              secondaryHref={`/san-pham?category=${category}`}
+              secondaryLabel="Xem đầy đủ trong catalog"
+            />
+          ) : null}
+
+          {navContext.related.length > 0 ? (
+            <CatalogRelatedCategories
+              title="Khám phá danh mục liên quan"
+              description="Các nhóm nguồn hàng cùng phân khúc — phù hợp khi cần so sánh mẫu trước khi gửi yêu cầu báo giá."
+              categories={navContext.related}
+            />
+          ) : null}
 
           <section className="mp-category-use-cases" aria-labelledby="category-use-cases-title">
             <div className="mp-category-use-cases__header">

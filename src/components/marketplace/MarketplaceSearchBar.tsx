@@ -14,6 +14,7 @@ import {
 import { ChevronRight, Search } from "lucide-react";
 import { trackSearchSubmitted, trackSearchSuggestionClicked } from "@/lib/analytics";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import { buildCatalogUrl, type CatalogFilters } from "@/lib/catalog-filter-url";
 
 const SEARCH_SUGGESTIONS = [
   { label: "Áo thun trơn", query: "áo thun trơn" },
@@ -40,6 +41,8 @@ type MarketplaceSearchBarProps = {
   inputRef?: RefObject<HTMLInputElement | null>;
   /** Called after a successful mobile/catalog search submit (before navigation). */
   onSubmitNavigate?: () => void;
+  /** Preserve active catalog filters/sort when searching from /san-pham. */
+  catalogContext?: Omit<CatalogFilters, "q">;
 };
 
 export default function MarketplaceSearchBar({
@@ -51,6 +54,7 @@ export default function MarketplaceSearchBar({
   autoFocus = false,
   inputRef,
   onSubmitNavigate,
+  catalogContext,
 }: MarketplaceSearchBarProps) {
   const router = useRouter();
   const [query, setQuery] = useState(defaultValue);
@@ -79,6 +83,13 @@ export default function MarketplaceSearchBar({
   const isMobileHeader = variant === "mobile-header";
   const searchSource = isMobileHeader ? "header_mobile" : size === "large" ? "catalog_hero" : "header";
 
+  function buildCatalogSearchHref(nextQuery: string): string {
+    if (!catalogContext) {
+      return nextQuery ? `/san-pham?q=${encodeURIComponent(nextQuery)}` : "/san-pham";
+    }
+    return buildCatalogUrl({ ...catalogContext, q: nextQuery || undefined });
+  }
+
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -87,7 +98,7 @@ export default function MarketplaceSearchBar({
     resolvedInputRef.current?.blur();
     setPanelOpen(false);
     onSubmitNavigate?.();
-    router.push(q ? `/san-pham?q=${encodeURIComponent(q)}` : "/san-pham");
+    router.push(buildCatalogSearchHref(q));
   }
 
   function handleQueryChange(value: string) {
@@ -200,7 +211,7 @@ export default function MarketplaceSearchBar({
               {SEARCH_SUGGESTIONS.map((item) => (
                 <Link
                   key={item.query}
-                  href={`/san-pham?q=${encodeURIComponent(item.query)}`}
+                  href={buildCatalogSearchHref(item.query)}
                   className="mp-search-discovery__chip"
                   onClick={() => handleSuggestionClick(item.label, item.query)}
                 >

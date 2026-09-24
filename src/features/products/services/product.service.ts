@@ -26,6 +26,7 @@ import {
   parseProductDescriptionBlocks,
   type ProductDescriptionBlock,
 } from "@/features/products/product-description-blocks";
+import { catalogSortOrderBy, parseCatalogSort, type CatalogSortOption } from "@/lib/catalog-sort";
 import {
   PUBLIC_CACHE_REVALIDATE_SECONDS,
   PUBLIC_CACHE_TAGS,
@@ -349,6 +350,7 @@ export async function getProductsForPublicListing(params: {
   supportsEmbroidery?: boolean;
   supportsOem?: boolean;
   material?: string;
+  sort?: CatalogSortOption | string;
 } = {}) {
   const {
     categorySlug,
@@ -360,7 +362,9 @@ export async function getProductsForPublicListing(params: {
     supportsEmbroidery,
     supportsOem,
     material,
+    sort: sortParam,
   } = params;
+  const sort = parseCatalogSort(typeof sortParam === "string" ? sortParam : sortParam);
 
   const normalizedSearch = search?.trim().toLowerCase() || "";
   const normalizedMaterial = material?.trim().toLowerCase() || "";
@@ -378,6 +382,7 @@ export async function getProductsForPublicListing(params: {
     supportsEmbroidery ? "1" : "0",
     supportsOem ? "1" : "0",
     normalizedMaterial,
+    sort,
   ];
 
   return unstable_cache(
@@ -393,6 +398,7 @@ export async function getProductsForPublicListing(params: {
           supportsEmbroidery,
           supportsOem,
           material: material?.trim() || undefined,
+          sort,
         }),
       ),
     cacheKey,
@@ -413,6 +419,7 @@ async function loadProductsForPublicListingUncached(params: {
   supportsEmbroidery?: boolean;
   supportsOem?: boolean;
   material?: string;
+  sort?: CatalogSortOption;
 }) {
   const {
     categorySlug,
@@ -424,6 +431,7 @@ async function loadProductsForPublicListingUncached(params: {
     supportsEmbroidery,
     supportsOem,
     material,
+    sort = "newest",
   } = params;
 
   let categoryIds: string[] | undefined;
@@ -448,7 +456,7 @@ async function loadProductsForPublicListingUncached(params: {
     prisma.product.findMany({
       where,
       select: PUBLIC_PRODUCT_CARD_SELECT,
-      orderBy: { createdAt: "desc" },
+      orderBy: catalogSortOrderBy(sort),
       take: perPage,
       skip: (page - 1) * perPage,
     }),
@@ -459,7 +467,7 @@ async function loadProductsForPublicListingUncached(params: {
   const publicProducts = products.filter(
     (product) => !isDemoOrSampleProductMetadata(product.metadata),
   );
-  return { products: publicProducts, total, page, perPage };
+  return { products: publicProducts, total, page, perPage, sort };
 }
 
 /** Lightweight counts for homepage marketplace strip. */

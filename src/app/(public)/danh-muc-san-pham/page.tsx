@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import CategoryCard from "@/components/public/CategoryCard";
+import Breadcrumb from "@/components/seo/Breadcrumb";
 import { getPublicCmsCategoryTree } from "@/features/categories/services/category.service";
 import { buildPublicCategoryHierarchy } from "@/features/categories/public-category-hierarchy.utils";
 import { PUBLIC_ALL_CATEGORIES_PATH } from "@/features/home/homepage-category.constants";
@@ -27,11 +29,22 @@ export default async function ProductCategoriesPage() {
 
   return (
     <main className="mp-page mp-page--categories">
+      <Breadcrumb
+        items={[
+          { name: "Sản phẩm", href: "/san-pham" },
+          { name: "Danh mục" },
+        ]}
+      />
       <div className="container">
         <header className="mp-category-index-header">
-          <p className="mp-category-index-eyebrow">DANH MỤC SẢN PHẨM</p>
+          <p className="mp-category-index-eyebrow">Danh mục</p>
           <h1 className="mp-category-index-title">Danh mục sản phẩm</h1>
           <p className="mp-category-index-desc">{PAGE_DESCRIPTION}</p>
+          <div className="mp-category-index-actions">
+            <Link href="/san-pham" className="btn-primary">
+              Xem danh sách sản phẩm
+            </Link>
+          </div>
         </header>
 
         {sections.length === 0 ? (

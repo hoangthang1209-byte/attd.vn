@@ -9,6 +9,9 @@ import ProductCard from "@/components/public/ProductCard";
 import { mapPublicProductCardSalesBadges } from "@/features/products/product-sales-badges";
 import { mapProductCardAvailableColors } from "@/features/products/product-card-color-swatches";
 import CatalogFilterToolbar from "@/components/marketplace/CatalogFilterToolbar";
+import CatalogCategoryNav from "@/components/marketplace/CatalogCategoryNav";
+import CatalogSortControl from "@/components/marketplace/CatalogSortControl";
+import CatalogSourcingCta from "@/components/marketplace/CatalogSourcingCta";
 import CatalogSearchTracking from "@/components/analytics/CatalogSearchTracking";
 import CatalogEmptyActions from "@/components/marketplace/CatalogEmptyActions";
 import MarketplaceSearchBar from "@/components/marketplace/MarketplaceSearchBar";
@@ -19,8 +22,10 @@ import Breadcrumb from "@/components/seo/Breadcrumb";
 import { SITE_NAME, DEFAULT_DESCRIPTION } from "@/lib/seo";
 import { buildCatalogMetadata } from "@/lib/seo/indexation-policy";
 import { getPrimaryProductImageFromProduct, getProductCardHoverImageFromProduct } from "@/lib/productImages";
-import { buildClearFiltersUrl } from "@/lib/catalog-filter-url";
+import { buildClearFiltersUrl, buildCatalogUrl, removeCatalogFilterParam } from "@/lib/catalog-filter-url";
 import { publicCategoryHref } from "@/features/categories/public-category-url";
+import { buildCatalogQuickNavCategories } from "@/features/categories/catalog-category-nav.utils";
+import { parseCatalogSort } from "@/lib/catalog-sort";
 
 export const revalidate = 3600;
 
@@ -56,9 +61,10 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 
 export default async function ProductCatalogPage({ searchParams }: Props) {
   const params = await searchParams;
-  const { category, page: pageStr, inStock, print, embroidery, oem, material } = params;
+  const { category, page: pageStr, inStock, print, embroidery, oem, material, sort: sortParam } = params;
   const q = params.q ?? params.search;
   const page = Math.max(1, Number(pageStr) || 1);
+  const sort = parseCatalogSort(sortParam);
 
   const filters = {
     inStock: inStock === "1",
@@ -68,38 +74,56 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
     material,
   };
 
+  const catalogFilters = {
+    category,
+    q,
+    inStock: filters.inStock,
+    print: filters.print,
+    embroidery: filters.embroidery,
+    oem: filters.oem,
+    material,
+    sort,
+  };
+
+  const quickNavBaseFilters = {
+    q,
+    inStock: filters.inStock,
+    print: filters.print,
+    embroidery: filters.embroidery,
+    oem: filters.oem,
+    material,
+    sort,
+  };
+
   const [{ products, total, perPage }, categoryTree, categoryContext] =
     await Promise.all([
       getProductsForPublicListing({
         categorySlug: category,
         search: q,
         page,
+        sort,
         ...filters,
       }),
       getCategoryTreeForCatalogFilter(),
       category ? resolveCatalogCategoryContext(category) : Promise.resolve(null),
     ]);
 
+  const quickNavCategories = buildCatalogQuickNavCategories(
+    categoryTree,
+    category,
+    quickNavBaseFilters,
+  );
+
   const totalPages = Math.ceil(total / perPage);
 
   function buildUrl(nextPage?: number) {
-    const p = new URLSearchParams();
-    if (category) p.set("category", category);
-    if (q) p.set("q", q);
-    if (filters.inStock) p.set("inStock", "1");
-    if (filters.print) p.set("print", "1");
-    if (filters.embroidery) p.set("embroidery", "1");
-    if (filters.oem) p.set("oem", "1");
-    if (material) p.set("material", material);
-    if (nextPage && nextPage > 1) p.set("page", String(nextPage));
-    const qs = p.toString();
-    return `/san-pham${qs ? `?${qs}` : ""}`;
+    return buildCatalogUrl(catalogFilters, { page: nextPage });
   }
 
-  const pageTitle = categoryContext?.title ?? "Danh mục sản phẩm";
+  const pageTitle = categoryContext?.title ?? "Sản phẩm";
   const pageDescription =
     categoryContext?.subtitle ??
-    "Tìm nguồn hàng đồng phục & quà tặng — lọc theo danh mục, tình trạng hàng và khả năng gia công.";
+    "Danh sách nguồn hàng đồng phục và quà tặng B2B — lọc theo danh mục, tình trạng hàng và khả năng in/thêu/OEM.";
 
   const breadcrumbItems = [
     { name: "Sản phẩm", href: "/san-pham" },
@@ -117,13 +141,17 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
         <div className="container">
           <div className="mp-catalog-hero-card">
             <div className="mp-catalog-hero-copy">
-              <p className="mp-catalog-eyebrow">Catalog nguồn hàng B2B</p>
+              <p className="mp-catalog-eyebrow">Nguồn hàng B2B</p>
               <h1 className="mp-catalog-title">{pageTitle}</h1>
               <p className="mp-catalog-desc">{pageDescription}</p>
               <CatalogSourcingBadges />
             </div>
             <div className="mp-catalog-hero-search">
-              <MarketplaceSearchBar defaultValue={q ?? ""} size="large" />
+              <MarketplaceSearchBar
+                defaultValue={q ?? ""}
+                size="large"
+                catalogContext={quickNavBaseFilters}
+              />
               <p className="mp-catalog-search-hint">
                 Tìm theo sản phẩm, mã hàng, chất liệu hoặc nhóm quà tặng doanh nghiệp.
               </p>
@@ -134,34 +162,40 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
       <section className="mp-catalog-body">
         <div className="container">
+          <CatalogCategoryNav
+            categories={quickNavCategories}
+            activeSlug={category}
+            title={categoryContext ? `Danh mục · ${categoryContext.parentName ?? "Nguồn hàng"}` : "Danh mục nguồn hàng"}
+          />
+
           <CatalogSearchTracking query={q} resultCount={products.length} />
           <div className="mp-catalog-layout mp-catalog-layout--compact">
             <div className="mp-catalog-main">
               <div className="mp-catalog-results-bar">
-                <div>
-                  <p className="mp-catalog-results-kicker">Danh sách nguồn hàng</p>
+                <div className="mp-catalog-results-summary">
+                  <p className="mp-catalog-results-kicker">Danh sách sản phẩm</p>
                   <p className="mp-catalog-count">
                     {total > 0
-                      ? `${total} sản phẩm phù hợp${categoryContext ? ` · ${categoryContext.name}` : ""}`
+                      ? `${total} sản phẩm${categoryContext ? ` · ${categoryContext.name}` : ""}`
                       : "Không tìm thấy sản phẩm"}
                   </p>
                   {total > 0 && q ? (
                     <p className="mp-catalog-query-context">Từ khóa: “{q}”</p>
                   ) : null}
+                  {total > 0 && totalPages > 1 ? (
+                    <p className="mp-catalog-query-context">
+                      Hiển thị {(page - 1) * perPage + 1}–{Math.min(page * perPage, total)} / {total}
+                    </p>
+                  ) : null}
                 </div>
-                <CatalogFilterToolbar
-                  categoryTree={categoryTree}
-                  filters={{
-                    category,
-                    q,
-                    inStock: filters.inStock,
-                    print: filters.print,
-                    embroidery: filters.embroidery,
-                    oem: filters.oem,
-                    material,
-                  }}
-                  categoryLabel={categoryContext?.name ?? null}
-                />
+                <div className="mp-catalog-results-controls">
+                  <CatalogSortControl filters={catalogFilters} sort={sort} />
+                  <CatalogFilterToolbar
+                    categoryTree={categoryTree}
+                    filters={catalogFilters}
+                    categoryLabel={categoryContext?.name ?? null}
+                  />
+                </div>
               </div>
 
               {products.length === 0 ? (
@@ -182,7 +216,10 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                           : "Thử điều chỉnh bộ lọc hoặc gửi yêu cầu để ATTD gợi ý nguồn hàng phù hợp."
                     }
                   />
-                  <CatalogEmptyActions showClearFilters={Boolean(category || filters.inStock || filters.print || filters.embroidery || filters.oem || material)} clearFiltersHref={buildClearFiltersUrl(q)} />
+                  <CatalogEmptyActions
+                    showClearFilters={Boolean(category || filters.inStock || filters.print || filters.embroidery || filters.oem || material)}
+                    clearFiltersHref={buildClearFiltersUrl(q, sort)}
+                  />
                 </div>
               ) : (
                 <div className="mp-product-grid mp-product-grid--catalog">
@@ -224,7 +261,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
               )}
 
               {totalPages > 1 && (
-                <div className="mp-catalog-pagination">
+                <nav className="mp-catalog-pagination" aria-label="Phân trang sản phẩm">
                   {page > 1 && (
                     <Link href={buildUrl(page - 1)} className="mp-page-btn">
                       Trang trước
@@ -238,8 +275,20 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
                       Trang tiếp
                     </Link>
                   )}
-                </div>
+                </nav>
               )}
+
+              {products.length > 0 ? (
+                <CatalogSourcingCta
+                  title="Cần tư vấn nguồn hàng theo nhu cầu?"
+                  description="Gửi số lượng, logo và thời gian cần hàng — ATTD gợi ý phương án thay thế hoặc OEM phù hợp ngân sách B2B."
+                  primaryLabel="Tư vấn nguồn hàng"
+                  secondaryHref={
+                    category ? removeCatalogFilterParam(catalogFilters, "category") : "/danh-muc-san-pham"
+                  }
+                  secondaryLabel={category ? "Xóa bộ lọc danh mục" : "Xem danh mục"}
+                />
+              ) : null}
             </div>
           </div>
         </div>

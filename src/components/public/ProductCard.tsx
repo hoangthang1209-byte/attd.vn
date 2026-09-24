@@ -138,7 +138,7 @@ export default function ProductCard({
               onClick={openQuote}
               aria-label={`Yêu cầu báo giá cho ${name}`}
             >
-              Liên hệ báo giá sỉ
+              Yêu cầu báo giá
             </button>
             <Link
               href={productHref}
