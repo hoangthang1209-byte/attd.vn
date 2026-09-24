@@ -31,6 +31,7 @@ const LANE_STATE_BADGE_CLASS: Record<AutomationLaneOverallState, string> = {
 
 type AutomationLaneBoardProps = {
   tasks: AutomationTask[];
+  laneBoardTasks?: AutomationTask[];
   lastUpdatedAt: string | null;
   autoRefreshLabel?: string;
   writeActionConfigured: boolean;
@@ -42,6 +43,7 @@ type AutomationLaneBoardProps = {
 
 export default function AutomationLaneBoard({
   tasks,
+  laneBoardTasks,
   lastUpdatedAt,
   autoRefreshLabel,
   writeActionConfigured,
@@ -50,7 +52,10 @@ export default function AutomationLaneBoard({
   canScrollToTask,
   onRefresh,
 }: AutomationLaneBoardProps) {
-  const board = useMemo(() => buildLaneBoard(tasks), [tasks]);
+  const board = useMemo(
+    () => buildLaneBoard(laneBoardTasks ?? tasks),
+    [laneBoardTasks, tasks],
+  );
   const summary = useMemo(() => buildLaneBoardSummary(board), [board]);
 
   return (

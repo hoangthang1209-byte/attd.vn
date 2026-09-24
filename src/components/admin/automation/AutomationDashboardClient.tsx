@@ -412,6 +412,7 @@ export default function AutomationDashboardClient() {
           {laneBoardData ? (
             <AutomationLaneBoard
               tasks={laneBoardData.tasks}
+              laneBoardTasks={laneBoardData.laneBoardTasks}
               lastUpdatedAt={laneBoardData.fetchedAt}
               autoRefreshLabel={AUTO_REFRESH_LABEL}
               writeActionConfigured={laneWriteActionConfigured}

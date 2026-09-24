@@ -8,7 +8,9 @@ import {
   deriveLaneNextAction,
   filterCurrentChainOpenTasks,
   formatLaneCiReview,
+  isLaneProductionOrComplete,
   mapLaneOverallState,
+  prepareLaneBoardTasks,
   resolveLaneOverallStateLabel,
   selectLaneApprovalTask,
   selectLaneRepresentativeTask,
@@ -388,10 +390,115 @@ describe("automation lane board", () => {
     assert.equal(formatLaneCiReview(taskFixture({ status: "ready_to_merge" })), "CI ✅ · Review ✅");
     assert.equal(formatLaneCiReview(taskFixture({ status: "needs_fix" })), "CI ❌ · cần sửa");
     assert.equal(
-      formatLaneCiReview(taskFixture({ status: "pr_open", statusLabel: "status:pr-open" })),
-      "PR đang mở",
+      formatLaneCiReview(
+        taskFixture({
+          status: "pr_open",
+          statusLabel: "status:pr-open",
+          linkedPullRequest: {
+            number: 98,
+            url: "https://github.com/hoangthang1209-byte/attd.vn/pull/98",
+            state: "open",
+            merged: false,
+            title: "Public UI",
+            updatedAt: "2026-09-20T00:00:00.000Z",
+            mergedAt: null,
+            mergeCommitSha: null,
+            verification: { ciStatus: "success", reviewStatus: "approved" },
+          },
+        }),
+      ),
+      "CI ✅ · Review ✅",
     );
     assert.equal(formatLaneCiReview(null), "—");
+  });
+
+  it("prefers newer merged automation repair over stale open foundation (#116 vs #118/#119/#113/#115)", () => {
+    const staleFoundation = taskFixture({
+      issueNumber: 116,
+      status: "pr_open",
+      statusLabel: "status:pr-open",
+      latestUpdateAt: "2026-09-10T00:00:00.000Z",
+    });
+    const laneBoardRepair = taskFixture({
+      issueNumber: 115,
+      status: "merged",
+      isOpen: false,
+      mergedAt: "2026-09-22T00:00:00.000Z",
+      latestUpdateAt: "2026-09-22T00:00:00.000Z",
+      productionStatus: {
+        status: "live",
+        mergedCommitSha: "abc123",
+        reason: null,
+        checkedAt: "2026-09-22T00:00:00.000Z",
+      },
+    });
+    const approveBuildRepair = taskFixture({
+      issueNumber: 119,
+      status: "merged",
+      isOpen: false,
+      mergedAt: "2026-09-23T00:00:00.000Z",
+      latestUpdateAt: "2026-09-23T00:00:00.000Z",
+      productionStatus: {
+        status: "live",
+        mergedCommitSha: "def456",
+        reason: null,
+        checkedAt: "2026-09-23T00:00:00.000Z",
+      },
+    });
+
+    const activeOnly = [staleFoundation];
+    assert.equal(selectLaneRepresentativeTask(activeOnly)?.issueNumber, 116);
+
+    const operatorTruth = prepareLaneBoardTasks([staleFoundation, laneBoardRepair, approveBuildRepair]);
+    const board = buildLaneBoard(operatorTruth);
+    const automationLane = board.find((entry) => entry.laneId === "automation-platform");
+    assert.equal(automationLane?.task?.issueNumber, 119);
+    assert.equal(automationLane?.overallState, "production");
+  });
+
+  it("shows CRM #95/#97 CI review truth instead of missing-data copy", () => {
+    const crmTask = taskFixture({
+      issueNumber: 95,
+      taskArea: "Lead & Sales / CRM",
+      status: "ci_review",
+      statusLabel: "status:ci-review",
+      linkedPullRequest: {
+        number: 97,
+        url: "https://github.com/hoangthang1209-byte/attd.vn/pull/97",
+        state: "open",
+        merged: false,
+        title: "Lead intake hardening",
+        updatedAt: "2026-09-20T00:00:00.000Z",
+        mergedAt: null,
+        mergeCommitSha: null,
+        verification: { ciStatus: "success", reviewStatus: "pending" },
+      },
+    });
+
+    assert.equal(formatLaneCiReview(crmTask), "CI ✅ · Review ⏳");
+  });
+
+  it("uses SEO #120/#121 merged fallback in active-view lane board input", () => {
+    const mergedSeo = taskFixture({
+      issueNumber: 121,
+      taskArea: "Marketing / Content / SEO",
+      status: "merged",
+      isOpen: false,
+      mergedAt: "2026-09-24T00:00:00.000Z",
+      latestUpdateAt: "2026-09-24T00:00:00.000Z",
+      productionStatus: {
+        status: "live",
+        mergedCommitSha: "seo121",
+        reason: null,
+        checkedAt: "2026-09-24T00:00:00.000Z",
+      },
+    });
+
+    const laneInput = prepareLaneBoardTasks([mergedSeo]);
+    const board = buildLaneBoard(laneInput);
+    const seoLane = board.find((entry) => entry.laneId === "marketing-content-seo");
+    assert.equal(seoLane?.task?.issueNumber, 121);
+    assert.ok(isLaneProductionOrComplete(seoLane!));
   });
 
   it("builds summary counts from lane aggregation", () => {
@@ -421,6 +528,34 @@ describe("automation lane board", () => {
     assert.equal(summary.runningCount, 1);
     assert.equal(summary.blockedOrNeedsFixCount, 1);
     assert.equal(summary.productionCount, 1);
+
+    const mergedOnlyBoard = buildLaneBoard([
+      taskFixture({
+        issueNumber: 119,
+        taskArea: "Automation Platform",
+        status: "merged",
+        isOpen: false,
+        productionStatus: {
+          status: "live",
+          mergedCommitSha: "abc",
+          reason: null,
+          checkedAt: "2026-09-21T00:00:00.000Z",
+        },
+      }),
+      taskFixture({
+        issueNumber: 121,
+        taskArea: "Marketing / Content / SEO",
+        status: "merged",
+        isOpen: false,
+        productionStatus: {
+          status: "unknown",
+          mergedCommitSha: "def",
+          reason: "Không xác định được commit production hiện tại (chỉ có trên Vercel Production).",
+          checkedAt: "2026-09-21T00:00:00.000Z",
+        },
+      }),
+    ]);
+    assert.equal(buildLaneBoardSummary(mergedOnlyBoard).productionCount, 2);
 
     const automationLane = board.find((entry) => entry.laneId === "automation-platform");
     assert.equal(automationLane?.overallStateLabel, AUTOMATION_LANE_OVERALL_STATE_LABELS.dang_build);

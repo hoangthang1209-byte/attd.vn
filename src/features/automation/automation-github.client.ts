@@ -17,6 +17,7 @@ export {
   fetchAutomationIssues,
   fetchAutomationIssuesForView,
   fetchLinkedPullRequestSafe,
+  fetchPullRequestVerificationSafe,
   getAutomationGitHubConfig,
   listRepoIssuesPaginated,
 } from "@/features/automation/automation-github.loader";
