@@ -389,4 +389,24 @@
     max-width: none;
     padding: 20px 16px 40px;
   }
+
+  .headerQuickQuote {
+    gap: 8px;
+    padding: 12px 16px 10px;
+  }
+
+  .headerQuickQuote .breadcrumbs {
+    margin-bottom: 4px;
+    font-size: 10px;
+  }
+
+  .headerQuickQuote .title {
+    font-size: 1.25rem;
+    line-height: 1.2;
+  }
+
+  .contentQuickQuote {
+    overflow-x: clip;
+    padding-top: 12px;
+  }
 }

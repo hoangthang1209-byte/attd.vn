@@ -246,6 +246,7 @@ function AdminShellMain({
   const { title } = useAdminTitle();
   const pageMeta = getAdminBreadcrumbMeta(pathname);
   const pageTitle = title || pageMeta.title;
+  const isQuickQuotePage = pathname === "/admin/quotes/quick";
   const mainRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLElement>(null);
 
@@ -278,7 +279,10 @@ function AdminShellMain({
       <Suspense fallback={null}>
         <AdminScrollRestoration />
       </Suspense>
-      <header ref={headerRef} className={styles.header}>
+      <header
+        ref={headerRef}
+        className={`${styles.header}${isQuickQuotePage ? ` ${styles.headerQuickQuote}` : ""}`}
+      >
         <button
           type="button"
           className={styles.mobileHeaderToggle}
@@ -295,13 +299,19 @@ function AdminShellMain({
             ))}
           </div>
           <h1 className={styles.title}>{pageTitle}</h1>
-          <p className={styles.description}>{pageMeta.description}</p>
+          {pageMeta.description.trim() ? (
+            <p className={styles.description}>{pageMeta.description}</p>
+          ) : null}
         </div>
         <div className={styles.headerActions}>
           <WorkspaceModeToggle />
         </div>
       </header>
-      <div className={`${styles.content} admin-main-content`}>{children}</div>
+      <div
+        className={`${styles.content} admin-main-content${isQuickQuotePage ? ` ${styles.contentQuickQuote}` : ""}`}
+      >
+        {children}
+      </div>
     </main>
   );
 }
