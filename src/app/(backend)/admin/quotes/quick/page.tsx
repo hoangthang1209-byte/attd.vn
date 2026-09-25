@@ -12,7 +12,7 @@ export default async function QuickQuotePage({ searchParams }: Props) {
   const params = await searchParams;
   return (
     <>
-      <AdminPageTitle title="Quick Quote" />
+      <AdminPageTitle title="Báo giá nhanh" />
       <QuickQuoteForm
         prefillParams={{
           leadId: params.leadId,

@@ -451,7 +451,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
   if (loading) {
     return (
       <SectionLoading
-        title="Đang chuẩn bị Quick Quote…"
+        title="Đang chuẩn bị báo giá nhanh…"
         description="Tải thông tin khách hàng và sản phẩm."
         tone="admin"
       />
@@ -464,10 +464,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
   return (
     <div className="quick-quote-page">
       <div className="quick-quote-page__top">
-        <AdminBackLink href="/admin/quotes" label="Quay lại danh sách báo giá" />
-        <p className="quick-quote-page__hint">
-          Tạo báo giá nhanh trên di động — tối ưu cho cuộc gọi khách hàng trực tiếp.
-        </p>
+        <AdminBackLink href="/admin/quotes" label="Quay lại" />
         {step !== "success" && (
           <div className="quick-quote-steps" aria-label="Tiến trình">
             {(["customer", "products", "preview"] as const).map((s, i) => (
@@ -499,7 +496,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
           <CustomerSearchField
             value={selectedCustomer}
             allowQuickCreate
-            quickCreateContextLabel="Quick Quote"
+            quickCreateContextLabel="Báo giá nhanh"
             hideHint
             label="Tìm hoặc tạo khách hàng"
             onSelect={(customer) => {

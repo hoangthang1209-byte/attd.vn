@@ -103,10 +103,8 @@ export default function CustomerSearchField({
     const placement =
       roomBelow < 220 && roomAbove > roomBelow ? "top" : "bottom";
     const availableHeight = placement === "bottom" ? roomBelow : roomAbove;
-    const width = Math.min(
-      Math.max(rect.width, 320),
-      window.innerWidth - viewportPadding * 2,
-    );
+    const maxWidth = window.innerWidth - viewportPadding * 2;
+    const width = Math.min(Math.max(rect.width, Math.min(280, maxWidth)), maxWidth);
     const left = Math.min(
       Math.max(viewportPadding, rect.left),
       window.innerWidth - width - viewportPadding,
