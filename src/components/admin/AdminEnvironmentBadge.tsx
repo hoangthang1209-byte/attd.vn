@@ -1,3 +1,7 @@
+"use client";
+
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
+
 /**
  * Read-only environment badge shown in the authenticated admin shell.
  *
@@ -6,6 +10,8 @@
  * bundle at build time, so the production build tree-shakes this badge away and
  * never ships a non-production label. Only a safe environment label is exposed —
  * no environment variable values or secrets.
+ *
+ * Hidden from team mode unless Developer Mode is on.
  */
 
 const NON_PRODUCTION_ENV_LABELS: Record<string, string> = {
@@ -23,8 +29,10 @@ export function getNonProductionEnvLabel(
 }
 
 export default function AdminEnvironmentBadge() {
+  const { developerMode } = useWorkspaceMode();
   const label = getNonProductionEnvLabel(process.env.NODE_ENV);
-  if (!label) return null;
+
+  if (!label || !developerMode) return null;
 
   return (
     <span
