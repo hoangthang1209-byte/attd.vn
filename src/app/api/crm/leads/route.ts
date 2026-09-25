@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { LeadPriority, LeadSource, LeadStatus } from "@prisma/client";
 import {
-  createAdminLead,
-  createCrmLead,
   getCrmDiagnostics,
   isCrmLeadTableReady,
   isValidLeadPriority,
@@ -10,15 +8,39 @@ import {
   isValidLeadStatus,
   listCrmLeads,
 } from "@/features/crm/services/crm-lead.service";
+import {
+  intakeLead,
+  LeadIntakeValidationError,
+} from "@/features/crm/services/lead-intake.service";
 import type { CreateProductInterestInput } from "@/features/crm/types";
+import {
+  assertCanViewCrmLeads,
+  resolveCrmLeadListAssignedToFilter,
+} from "@/features/crm/services/crm-lead-access";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 export async function GET(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  try {
+    assertCanViewCrmLeads(session);
+  } catch {
+    return NextResponse.json(
+      { message: "Bạn không có quyền xem CRM leads." },
+      { status: 403 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? undefined;
   const sourceParam = searchParams.get("source") ?? undefined;
   const statusParam = searchParams.get("status") ?? undefined;
   const priorityParam = searchParams.get("priority") ?? undefined;
+  const assignedTo = resolveCrmLeadListAssignedToFilter(
+    session,
+    searchParams.get("assignedTo") ?? undefined
+  );
+  const overdueOnly = searchParams.get("overdueOnly") === "1";
   const debug = searchParams.get("debug") === "1";
 
   if (sourceParam && !isValidLeadSource(sourceParam)) {
@@ -38,6 +60,8 @@ export async function GET(req: NextRequest) {
       source: sourceParam as LeadSource | undefined,
       status: statusParam as LeadStatus | undefined,
       priority: priorityParam as LeadPriority | undefined,
+      assignedTo,
+      overdueOnly,
     });
 
     if (result.error) {
@@ -159,32 +183,45 @@ export async function POST(req: NextRequest) {
     const productInterests = parseProductInterests(raw.productInterests);
     const singleInterest = parseProductInterest(raw.productInterest);
 
-    const lead = await createAdminLead({
-      contactName: contactName || fullName || null,
-      companyName: companyName || null,
-      phone: phone || undefined,
-      email: email || null,
-      zalo: typeof raw.zalo === "string" ? raw.zalo : null,
-      source,
-      sourceDetail: typeof raw.sourceDetail === "string" ? raw.sourceDetail : null,
-      demand: typeof raw.demand === "string" ? raw.demand : null,
-      note: typeof raw.note === "string" ? raw.note : null,
-      status,
-      priority,
-      nextFollowUpAt,
-      estimatedValue: Number.isFinite(estimatedValue!) ? estimatedValue : null,
-      productInterests:
-        productInterests.length > 0
-          ? productInterests
-          : singleInterest
-            ? [singleInterest]
-            : [],
-    });
+    try {
+      const result = await intakeLead({
+        channel: "MANUAL",
+        contactName: contactName || fullName || null,
+        companyName: companyName || null,
+        phone: phone || undefined,
+        email: email || null,
+        zalo: typeof raw.zalo === "string" ? raw.zalo : null,
+        source: source as LeadSource,
+        sourceDetail: typeof raw.sourceDetail === "string" ? raw.sourceDetail : null,
+        demand: typeof raw.demand === "string" ? raw.demand : null,
+        note: typeof raw.note === "string" ? raw.note : null,
+        status,
+        priority,
+        nextFollowUpAt,
+        assignedSalesId:
+          typeof raw.assignedTo === "string" ? raw.assignedTo : null,
+        estimatedValue: Number.isFinite(estimatedValue!) ? estimatedValue : null,
+        productInterests:
+          productInterests.length > 0
+            ? productInterests
+            : singleInterest
+              ? [singleInterest]
+              : [],
+      });
 
-    if (!lead) {
-      return NextResponse.json({ message: "Không thể tạo lead" }, { status: 500 });
+      if (!result) {
+        return NextResponse.json({ message: "Không thể tạo lead" }, { status: 500 });
+      }
+      return NextResponse.json(
+        { lead: result.lead, created: result.created },
+        { status: result.created ? 201 : 200 }
+      );
+    } catch (err) {
+      if (err instanceof LeadIntakeValidationError) {
+        return NextResponse.json({ message: err.message }, { status: 400 });
+      }
+      throw err;
     }
-    return NextResponse.json({ lead }, { status: 201 });
   }
 
   if (!fullName) {
@@ -207,23 +244,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Follow-up không hợp lệ" }, { status: 400 });
   }
 
-  const lead = await createCrmLead({
+  const result = await intakeLead({
+    channel: "WEBSITE",
     fullName,
     phone,
     email: typeof raw.email === "string" ? raw.email : null,
-    company: typeof raw.company === "string" ? raw.company : null,
-    source,
+    companyName: typeof raw.company === "string" ? raw.company : null,
+    source: source as LeadSource,
     message: typeof raw.message === "string" ? raw.message : null,
     status,
-    followUpAt,
+    nextFollowUpAt: followUpAt,
   });
 
-  if (!lead) {
+  if (!result) {
     return NextResponse.json(
       { message: "Không thể tạo lead. Kiểm tra migration CRM." },
       { status: 500 }
     );
   }
 
-  return NextResponse.json({ lead }, { status: 201 });
+  return NextResponse.json(
+    { lead: result.lead, created: result.created },
+    { status: result.created ? 201 : 200 }
+  );
 }
