@@ -268,7 +268,10 @@ model Lead {
   companyName           String?
   zalo                  String?
   source                LeadSource            @default(WEBSITE)
+  sourceRef             String?
   sourceDetail          String?
+  receivedAt            DateTime?
+  intakeMetadata        Json?
   demand                String?               @db.Text
   status                LeadStatus            @default(NEW)
   priority              LeadPriority          @default(NORMAL)
@@ -309,6 +312,28 @@ model Lead {
   @@index([createdAt])
   @@index([followUpAt])
   @@index([nextFollowUpAt])
+  @@index([assignedTo])
+  @@index([sourceRef])
+  @@unique([source, sourceRef])
+}
+
+enum LeadIntakeOutcome {
+  CREATED
+  DUPLICATE
+  ERROR
+}
+
+model LeadIntakeEvent {
+  id           String            @id @default(cuid())
+  adapterKey   String
+  source       LeadSource?
+  sourceRef    String?
+  outcome      LeadIntakeOutcome
+  errorMessage String?           @db.Text
+  createdAt    DateTime          @default(now())
+
+  @@index([adapterKey, createdAt])
+  @@index([outcome, createdAt])
 }
 
 model AdministrativeProvince {
@@ -2252,6 +2277,8 @@ enum LeadSource {
   SOURCING
   LANDING_PAGE
   WEBSITE
+  GMAIL
+  MANUAL
   ZALO
   FACEBOOK
   PHONE

@@ -1,6 +1,11 @@
 import type { EmployeeRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { isEmployeeRole } from "@/features/employees/employee-role";
+import type { Prisma } from "@prisma/client";
+import {
+  buildSalesCapableEmployeeRoleFilter,
+  isEmployeeRole,
+  isSalesCapableEmployeeRole,
+} from "@/features/employees/employee-role";
 
 export class EmployeeValidationError extends Error {
   constructor(message: string) {
@@ -79,25 +84,38 @@ export async function listEmployees(params?: {
   includeInactive?: boolean;
   role?: EmployeeRole;
   roles?: EmployeeRole[];
+  salesCapableOnly?: boolean;
   limit?: number;
 }) {
   const search = params?.search?.trim();
-  const where: {
-    isActive?: boolean;
-    role?: EmployeeRole | { in: EmployeeRole[] };
-    OR?: Array<Record<string, unknown>>;
-  } = {};
+  const where: Prisma.EmployeeWhereInput = {};
+  const andFilters: Prisma.EmployeeWhereInput[] = [];
+
   if (params?.activeOnly) where.isActive = true;
-  if (params?.role) where.role = params.role;
-  if (params?.roles?.length) where.role = { in: params.roles };
+  if (params?.salesCapableOnly) {
+    andFilters.push(buildSalesCapableEmployeeRoleFilter());
+  } else if (params?.role) {
+    where.role = params.role;
+  } else if (params?.roles?.length) {
+    where.role = { in: params.roles };
+  }
+
   if (search) {
-    where.OR = [
-      { employeeCode: { contains: search, mode: "insensitive" } },
-      { fullName: { contains: search, mode: "insensitive" } },
-      { phone: { contains: search, mode: "insensitive" } },
-      { email: { contains: search, mode: "insensitive" } },
-      { department: { contains: search, mode: "insensitive" } },
-    ];
+    andFilters.push({
+      OR: [
+        { employeeCode: { contains: search, mode: "insensitive" } },
+        { fullName: { contains: search, mode: "insensitive" } },
+        { phone: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { department: { contains: search, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  if (andFilters.length === 1) {
+    Object.assign(where, andFilters[0]);
+  } else if (andFilters.length > 1) {
+    where.AND = andFilters;
   }
 
   const limit = Math.min(200, Math.max(1, params?.limit ?? 100));
@@ -207,7 +225,7 @@ export async function resolveSalesEmployeeSnapshot(employeeId: string | null | u
   });
   if (!employee) throw new EmployeeValidationError("Nhân viên tư vấn không hợp lệ.");
   if (!employee.isActive) throw new EmployeeValidationError("Nhân viên đã ngừng hoạt động.");
-  if (employee.role && employee.role !== "SALES" && employee.role !== "ADMIN") {
+  if (!isSalesCapableEmployeeRole(employee.role)) {
     throw new EmployeeValidationError("Nhân viên được chọn không thuộc vai trò kinh doanh.");
   }
 
