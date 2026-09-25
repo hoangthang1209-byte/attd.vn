@@ -253,6 +253,7 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
       <CrmRelatedQuotes
         leadId={lead.id}
         createHref={`/admin/quotes/new?leadId=${lead.id}`}
+        quickCreateHref={`/admin/quotes/quick?leadId=${lead.id}`}
       />
 
       <CrmRelatedOrders leadId={lead.id} />

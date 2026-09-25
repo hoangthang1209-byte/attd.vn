@@ -115,6 +115,14 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
     },
   },
   {
+    path: "/admin/quotes/quick",
+    meta: {
+      breadcrumbs: ["BÁN HÀNG", "Báo giá", "Quick Quote"],
+      title: "Quick Quote",
+      description: "Tạo báo giá nhanh trên di động cho cuộc gọi khách hàng.",
+    },
+  },
+  {
     path: "/admin/quotes/:id/edit",
     meta: {
       breadcrumbs: ["BÁN HÀNG", "Báo giá", "Chỉnh sửa"],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { QuoteStatus } from "@prisma/client";
@@ -23,26 +23,57 @@ export default function QuoteListManager() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<QuoteStatus | "">("");
+  const [fetchParams, setFetchParams] = useState<{ search: string; status: QuoteStatus | "" }>({
+    search: "",
+    status: "",
+  });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
-      if (status) params.set("status", status);
-      const res = await fetch(`/api/quotes?${params}`);
-      const data = await res.json() as { quotes?: QuoteListRecord[]; message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Không thể tải báo giá");
-      setQuotes(data.quotes ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
-    } finally {
-      setLoading(false);
-    }
-  }, [search, status]);
+  const applyFilters = useCallback(
+    (next?: { search: string; status: QuoteStatus | "" }) => {
+      setLoading(true);
+      setFetchParams(next ?? { search, status });
+    },
+    [search, status],
+  );
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (fetchParams.search.trim()) params.set("search", fetchParams.search.trim());
+        if (fetchParams.status) params.set("status", fetchParams.status);
+        const res = await fetch(`/api/quotes?${params}`);
+        const data = (await res.json()) as { quotes?: QuoteListRecord[]; message?: string };
+        if (!res.ok) throw new Error(data.message ?? "Không thể tải báo giá");
+        if (!cancelled) {
+          setError(null);
+          setQuotes(data.quotes ?? []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchParams]);
+
+  function handleFiltersSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    applyFilters({ search, status });
+  }
+
+  function handleStatusChange(nextStatus: QuoteStatus | "") {
+    setStatus(nextStatus);
+    applyFilters({ search, status: nextStatus });
+  }
 
   return (
     <AdminPageShell>
@@ -50,16 +81,21 @@ export default function QuoteListManager() {
         description="Theo dõi báo giá, thời hạn hiệu lực và giá trị giao dịch."
         meta={<span>Tổng: {quotes.length} báo giá</span>}
         actions={
-          <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
-            Tạo báo giá
-          </Link>
+          <>
+            <Link href="/admin/quotes/quick" className="admin-btn admin-btn--secondary">
+              Quick Quote
+            </Link>
+            <Link href="/admin/quotes/new" className="admin-btn admin-btn--primary">
+              Tạo báo giá
+            </Link>
+          </>
         }
       />
 
-      <form onSubmit={(e) => { e.preventDefault(); void load(); }}>
+      <form onSubmit={handleFiltersSubmit}>
         <DataToolbar>
           <input className="admin-input admin-data-toolbar__search" placeholder="Tìm mã, khách hàng, lead..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          <select className="admin-input" value={status} onChange={(e) => setStatus(e.target.value as QuoteStatus | "")}>
+          <select className="admin-input" value={status} onChange={(e) => handleStatusChange(e.target.value as QuoteStatus | "")}>
             <option value="">Tất cả trạng thái</option>
             {(Object.keys(QUOTE_STATUS_LABELS) as QuoteStatus[]).map((s) => (
               <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>
