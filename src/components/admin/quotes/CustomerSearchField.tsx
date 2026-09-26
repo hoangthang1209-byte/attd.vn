@@ -114,8 +114,13 @@ export default function CustomerSearchField({
       Math.max(viewportLeft + viewportPadding, rect.left),
       viewportRight - width - viewportPadding,
     );
-    const maxHeight = Math.max(0, Math.min(280, availableHeight));
-    const top = placement === "bottom"
+    const useViewportOverlay = availableHeight < 96;
+    const maxHeight = useViewportOverlay
+      ? Math.max(0, Math.min(280, viewportBottom - viewportTop - viewportPadding * 2))
+      : Math.max(0, Math.min(280, availableHeight));
+    const top = useViewportOverlay
+      ? viewportTop + viewportPadding
+      : placement === "bottom"
       ? Math.min(rect.bottom + gap, viewportBottom - viewportPadding - maxHeight)
       : Math.max(rect.top - gap, viewportTop + viewportPadding + maxHeight);
 
@@ -124,7 +129,7 @@ export default function CustomerSearchField({
       top,
       width,
       maxHeight,
-      placement,
+      placement: useViewportOverlay ? "bottom" : placement,
     });
   }, []);
 

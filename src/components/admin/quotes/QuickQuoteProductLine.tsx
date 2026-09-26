@@ -35,7 +35,11 @@ export default function QuickQuoteProductLine({
   const [searchOpen, setSearchOpen] = useState(false);
   const [results, setResults] = useState<ProductOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dropdownSpace, setDropdownSpace] = useState({ above: false, height: 240 });
+  const [dropdownSpace, setDropdownSpace] = useState({
+    above: false,
+    height: 240,
+    overlay: null as { top: number; left: number; width: number } | null,
+  });
   const productLabel = item.productNameSnapshot ?? "";
 
   const positionDropdown = useCallback(() => {
@@ -43,14 +47,23 @@ export default function QuickQuoteProductLine({
     if (!input) return;
     const rect = input.getBoundingClientRect();
     const viewport = window.visualViewport;
+    const viewportLeft = viewport?.offsetLeft ?? 0;
+    const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth);
     const top = viewport?.offsetTop ?? 0;
     const bottom = top + (viewport?.height ?? window.innerHeight);
     const below = bottom - rect.bottom - 16;
     const above = rect.top - top - 16;
     const useAbove = below < 180 && above > below;
+    const available = useAbove ? above : below;
+    const useViewportOverlay = available < 96;
     setDropdownSpace({
-      above: useAbove,
-      height: Math.max(0, Math.min(240, useAbove ? above : below)),
+      above: useAbove && !useViewportOverlay,
+      height: Math.max(0, Math.min(240, useViewportOverlay ? bottom - top - 24 : available)),
+      overlay: useViewportOverlay ? {
+        top: top + 12,
+        left: viewportLeft + 12,
+        width: Math.max(0, viewportRight - viewportLeft - 24),
+      } : null,
     });
   }, []);
 
@@ -153,7 +166,16 @@ export default function QuickQuoteProductLine({
             <ul
               className={`quick-quote-product-search__dropdown${dropdownSpace.above ? " quick-quote-product-search__dropdown--top" : ""}`}
               role="listbox"
-              style={{ maxHeight: dropdownSpace.height }}
+              style={{
+                maxHeight: dropdownSpace.height,
+                ...(dropdownSpace.overlay ? {
+                  position: "fixed" as const,
+                  top: dropdownSpace.overlay.top,
+                  left: dropdownSpace.overlay.left,
+                  right: "auto",
+                  width: dropdownSpace.overlay.width,
+                } : {}),
+              }}
             >
               {loading && (
                 <li className="quick-quote-product-search__empty">Đang tìm…</li>
