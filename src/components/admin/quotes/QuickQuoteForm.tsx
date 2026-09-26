@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AdminBackLink from "@/components/admin/AdminBackLink";
@@ -107,6 +107,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
   const router = useRouter();
   const mutate = useAdminMutation();
   const toast = useAdminToast();
+  const pageRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>("customer");
@@ -121,6 +122,33 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
   const [createdQuote, setCreatedQuote] = useState<CreatedQuote | null>(null);
   const [copied, setCopied] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const updateKeyboardInset = () => {
+      const active = document.activeElement;
+      const editing = active instanceof HTMLElement &&
+        pageRef.current?.contains(active) &&
+        active.matches("input, select, textarea");
+      const inset = editing
+        ? Math.max(0, window.innerHeight - viewport.offsetTop - viewport.height)
+        : 0;
+      pageRef.current?.style.setProperty("--quick-quote-keyboard-inset", `${inset}px`);
+    };
+    updateKeyboardInset();
+    viewport.addEventListener("resize", updateKeyboardInset);
+    viewport.addEventListener("scroll", updateKeyboardInset);
+    document.addEventListener("focusin", updateKeyboardInset);
+    document.addEventListener("focusout", updateKeyboardInset);
+    return () => {
+      viewport.removeEventListener("resize", updateKeyboardInset);
+      viewport.removeEventListener("scroll", updateKeyboardInset);
+      document.removeEventListener("focusin", updateKeyboardInset);
+      document.removeEventListener("focusout", updateKeyboardInset);
+    };
+  }, [loading]);
 
   const preview = useMemo(
     () =>
@@ -462,7 +490,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
   const stepIndex = stepOrder.indexOf(step);
 
   return (
-    <div className="quick-quote-page">
+    <div className="quick-quote-page" ref={pageRef}>
       <div className="quick-quote-page__top">
         <AdminBackLink href="/admin/quotes" label="Quay lại" />
         {step !== "success" && (

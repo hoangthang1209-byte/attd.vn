@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { QuoteItemRow } from "@/components/admin/quotes/QuoteItemFormRow";
 
 type ProductOption = { id: string; name: string; productCode?: string | null };
@@ -35,7 +35,42 @@ export default function QuickQuoteProductLine({
   const [searchOpen, setSearchOpen] = useState(false);
   const [results, setResults] = useState<ProductOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dropdownSpace, setDropdownSpace] = useState({ above: false, height: 240 });
   const productLabel = item.productNameSnapshot ?? "";
+
+  const positionDropdown = useCallback(() => {
+    const input = wrapRef.current?.querySelector("input");
+    if (!input) return;
+    const rect = input.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const top = viewport?.offsetTop ?? 0;
+    const bottom = top + (viewport?.height ?? window.innerHeight);
+    const below = bottom - rect.bottom - 16;
+    const above = rect.top - top - 16;
+    const useAbove = below < 180 && above > below;
+    setDropdownSpace({
+      above: useAbove,
+      height: Math.max(0, Math.min(240, useAbove ? above : below)),
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (searchOpen) positionDropdown();
+  }, [searchOpen, positionDropdown]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    window.addEventListener("resize", positionDropdown);
+    window.addEventListener("scroll", positionDropdown, true);
+    window.visualViewport?.addEventListener("resize", positionDropdown);
+    window.visualViewport?.addEventListener("scroll", positionDropdown);
+    return () => {
+      window.removeEventListener("resize", positionDropdown);
+      window.removeEventListener("scroll", positionDropdown, true);
+      window.visualViewport?.removeEventListener("resize", positionDropdown);
+      window.visualViewport?.removeEventListener("scroll", positionDropdown);
+    };
+  }, [searchOpen, positionDropdown]);
 
   const searchProducts = useCallback(async (q: string) => {
     setLoading(true);
@@ -110,11 +145,16 @@ export default function QuickQuoteProductLine({
             }}
             onFocus={() => {
               setSearchOpen(true);
+              window.requestAnimationFrame(positionDropdown);
               void searchProducts(productLabel);
             }}
           />
           {searchOpen && (
-            <ul className="quick-quote-product-search__dropdown" role="listbox">
+            <ul
+              className={`quick-quote-product-search__dropdown${dropdownSpace.above ? " quick-quote-product-search__dropdown--top" : ""}`}
+              role="listbox"
+              style={{ maxHeight: dropdownSpace.height }}
+            >
               {loading && (
                 <li className="quick-quote-product-search__empty">Đang tìm…</li>
               )}

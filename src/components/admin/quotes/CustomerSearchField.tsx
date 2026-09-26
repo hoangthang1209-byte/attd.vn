@@ -96,25 +96,34 @@ export default function CustomerSearchField({
     if (!input) return;
 
     const rect = input.getBoundingClientRect();
+    const visualViewport = window.visualViewport;
+    const viewportLeft = visualViewport?.offsetLeft ?? 0;
+    const viewportTop = visualViewport?.offsetTop ?? 0;
+    const viewportRight = viewportLeft + (visualViewport?.width ?? window.innerWidth);
+    const viewportBottom = viewportTop + (visualViewport?.height ?? window.innerHeight);
     const viewportPadding = 12;
     const gap = 6;
-    const roomBelow = window.innerHeight - rect.bottom - viewportPadding - gap;
-    const roomAbove = rect.top - viewportPadding - gap;
+    const roomBelow = viewportBottom - rect.bottom - viewportPadding - gap;
+    const roomAbove = rect.top - viewportTop - viewportPadding - gap;
     const placement =
       roomBelow < 220 && roomAbove > roomBelow ? "top" : "bottom";
     const availableHeight = placement === "bottom" ? roomBelow : roomAbove;
-    const maxWidth = window.innerWidth - viewportPadding * 2;
+    const maxWidth = Math.max(0, viewportRight - viewportLeft - viewportPadding * 2);
     const width = Math.min(Math.max(rect.width, Math.min(280, maxWidth)), maxWidth);
     const left = Math.min(
-      Math.max(viewportPadding, rect.left),
-      window.innerWidth - width - viewportPadding,
+      Math.max(viewportLeft + viewportPadding, rect.left),
+      viewportRight - width - viewportPadding,
     );
+    const maxHeight = Math.max(0, Math.min(280, availableHeight));
+    const top = placement === "bottom"
+      ? Math.min(rect.bottom + gap, viewportBottom - viewportPadding - maxHeight)
+      : Math.max(rect.top - gap, viewportTop + viewportPadding + maxHeight);
 
     setDropdownPosition({
       left,
-      top: placement === "bottom" ? rect.bottom + gap : rect.top - gap,
+      top,
       width,
-      maxHeight: Math.max(160, Math.min(280, availableHeight)),
+      maxHeight,
       placement,
     });
   }, []);
@@ -129,9 +138,15 @@ export default function CustomerSearchField({
 
     window.addEventListener("resize", updateDropdownPosition);
     window.addEventListener("scroll", updateDropdownPosition, true);
+    window.visualViewport?.addEventListener("resize", updateDropdownPosition);
+    window.visualViewport?.addEventListener("scroll", updateDropdownPosition);
+    const frame = window.requestAnimationFrame(updateDropdownPosition);
     return () => {
+      window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", updateDropdownPosition);
       window.removeEventListener("scroll", updateDropdownPosition, true);
+      window.visualViewport?.removeEventListener("resize", updateDropdownPosition);
+      window.visualViewport?.removeEventListener("scroll", updateDropdownPosition);
     };
   }, [open, updateDropdownPosition, value]);
 
@@ -187,6 +202,7 @@ export default function CustomerSearchField({
             }}
             onFocus={() => {
               setOpen(true);
+              window.requestAnimationFrame(updateDropdownPosition);
               void searchCustomers(query);
             }}
           />
