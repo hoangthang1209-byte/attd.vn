@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { QuoteItemRow } from "@/components/admin/quotes/QuoteItemFormRow";
+import MediaPicker from "@/components/admin/media/MediaPicker";
 
 type ProductOption = { id: string; name: string; productCode?: string | null };
 type VariantOption = {
@@ -119,6 +120,7 @@ export default function QuickQuoteProductLine({
       productId: product.id,
       variantId: null,
       productNameSnapshot: product.name,
+      designImageUrl: null,
     });
     onLoadVariants(product.id);
     void onProductSelect(product.id);
@@ -153,6 +155,7 @@ export default function QuickQuoteProductLine({
                 productNameSnapshot: e.target.value,
                 productId: null,
                 variantId: null,
+                designImageUrl: null,
               });
               setSearchOpen(true);
             }}
@@ -292,6 +295,18 @@ export default function QuickQuoteProductLine({
             value={item.itemNote ?? ""}
             onChange={(e) => onChange({ itemNote: e.target.value || null })}
           />
+        </div>
+        <div className="admin-field admin-field--full">
+          <details className="quick-quote-line__image-picker" open={Boolean(item.designImageUrl) || undefined}>
+            <summary>{item.designImageUrl ? "Ảnh sản phẩm đã chọn" : "Thêm ảnh sản phẩm (tùy chọn)"}</summary>
+            <p className="admin-field-hint">Ảnh thật của mẫu hoặc thiết kế sẽ hiển thị nhỏ cạnh tên sản phẩm trên báo giá.</p>
+            <MediaPicker
+              folder="products"
+              usageType="auto"
+              value={item.designImageUrl ?? null}
+              onChange={(url) => onChange({ designImageUrl: url || null })}
+            />
+          </details>
         </div>
       </div>
     </div>

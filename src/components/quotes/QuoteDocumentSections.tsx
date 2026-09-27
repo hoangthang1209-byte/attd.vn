@@ -97,7 +97,6 @@ type QuoteDocMetaProps = {
 export function QuoteDocMeta({ quote }: QuoteDocMetaProps) {
   return (
     <div className="quote-doc__meta-bar">
-      <span><strong>Mã báo giá:</strong> {quote.quoteNo}</span>
       <span><strong>Ngày báo giá:</strong> {formatQuoteDate(quote.quoteDate)}</span>
       <span><strong>Hiệu lực đến:</strong> {formatQuoteDate(quote.validUntil)}</span>
       <span><strong>Loại tiền:</strong> {quote.currency}</span>
@@ -109,9 +108,10 @@ export function QuoteDocMeta({ quote }: QuoteDocMetaProps) {
 type QuoteCompanyHeaderProps = {
   company: QuoteCompanyProfile;
   logoUrl?: string | null;
+  quoteNo: string;
 };
 
-export function QuoteCompanyHeader({ company, logoUrl }: QuoteCompanyHeaderProps) {
+export function QuoteCompanyHeader({ company, logoUrl, quoteNo }: QuoteCompanyHeaderProps) {
   const legalName = company.legalName?.trim();
 
   return (
@@ -121,25 +121,17 @@ export function QuoteCompanyHeader({ company, logoUrl }: QuoteCompanyHeaderProps
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logoUrl} alt={company.brandName} className="quote-doc__logo" />
         )}
-      </div>
-
-      <div className="quote-doc__header-center">
-        <h1 className="quote-doc__title">BẢNG BÁO GIÁ</h1>
+        <div className="quote-doc__header-company">
+          {legalName && <p className="quote-doc__header-legal">{legalName}</p>}
+          {company.address?.trim() && <p><strong>Địa chỉ:</strong> {company.address}</p>}
+          {company.phone?.trim() && <p><strong>Điện thoại:</strong> {company.phone}</p>}
+          {company.email?.trim() && <p><strong>Email:</strong> {company.email}</p>}
+        </div>
       </div>
 
       <div className="quote-doc__header-right">
-        {legalName && (
-          <p className="quote-doc__header-legal">{legalName}</p>
-        )}
-        {company.address?.trim() && (
-          <p><strong>Địa chỉ:</strong> {company.address}</p>
-        )}
-        {company.phone?.trim() && (
-          <p><strong>Điện thoại:</strong> {company.phone}</p>
-        )}
-        {company.email?.trim() && (
-          <p><strong>Email:</strong> {company.email}</p>
-        )}
+        <h1 className="quote-doc__title">BÁO GIÁ</h1>
+        <p className="quote-doc__header-number">{quoteNo}</p>
       </div>
     </header>
   );

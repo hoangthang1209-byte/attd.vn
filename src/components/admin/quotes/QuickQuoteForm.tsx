@@ -249,6 +249,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
         defaultMoq?: number;
         leadTime?: string | null;
         category?: { name?: string };
+        images?: Array<{ imageUrl: string }>;
       };
       variants?: VariantOption[];
     };
@@ -257,13 +258,14 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
     }
     setItems((prev) =>
       prev.map((row, i) =>
-        i === itemIndex
+        i === itemIndex && row.productId === productId
           ? {
               ...row,
               productNameSnapshot: data.product?.name ?? row.productNameSnapshot,
               categorySnapshot: data.product?.category?.name ?? row.categorySnapshot,
               moqSnapshot: data.product?.defaultMoq ?? row.moqSnapshot,
               productionLeadTime: data.product?.leadTime ?? row.productionLeadTime,
+              designImageUrl: row.designImageUrl || data.product?.images?.[0]?.imageUrl || null,
             }
           : row,
       ),
