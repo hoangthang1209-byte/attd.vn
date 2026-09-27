@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import type { QuotePdfData } from "@/features/quotes/quote-document";
 import { generateQuotePdfWithFallback } from "@/features/quotes/pdf/quote-pdf.service";
 import { quotePdfFilename } from "@/features/quotes/pdf/quote-pdf-filename";
-import { isCompactQuoteDocument } from "@/features/quotes/quote-document-layout";
 import { generateQuoteHtmlPdfByToken } from "@/features/quotes/pdf/quote-html-pdf.service";
 import { getQuotePdfTraceId } from "@/features/quotes/pdf/quote-pdf-chromium-error";
 import {
@@ -125,7 +124,7 @@ export async function buildQuotePdfResponse(
         quoteNo: pdfData.quoteNo,
         itemCount,
         imageCount,
-        compact: isCompactQuoteDocument(pdfData),
+        compact: true,
         requestHeaders: options.requestHeaders,
       });
 

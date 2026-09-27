@@ -514,3 +514,6 @@
     min-width: 180px;
   }
 }
+.quick-quote-line__image-picker { border-top: 1px solid #e5e7eb; padding-top: 10px; }
+.quick-quote-line__image-picker summary { cursor: pointer; color: #334155; font-weight: 600; }
+.quick-quote-line__image-picker[open] summary { margin-bottom: 8px; }

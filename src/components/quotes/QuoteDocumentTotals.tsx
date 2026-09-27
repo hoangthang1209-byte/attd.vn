@@ -23,22 +23,20 @@ export default function QuoteDocumentTotals({ quote }: Props) {
       : quote.totalAmount;
 
   return (
-    <div className="quote-document-totals quote-doc__totals">
-      <p>Tạm tính: {formatQuoteMoney(quote.subtotal, quote.currency)}</p>
+    <dl className="quote-document-totals quote-doc__totals">
+      <div><dt>Tạm tính</dt><dd>{formatQuoteMoney(quote.subtotal, quote.currency)}</dd></div>
       {quote.discountAmount > 0 && (
-        <p>Chiết khấu: {formatQuoteMoney(quote.discountAmount, quote.currency)}</p>
+        <div><dt>Chiết khấu</dt><dd>−{formatQuoteMoney(quote.discountAmount, quote.currency)}</dd></div>
       )}
       {quote.shippingFee > 0 && (
-        <p>Phí vận chuyển: {formatQuoteMoney(quote.shippingFee, quote.currency)}</p>
+        <div><dt>Phí vận chuyển</dt><dd>{formatQuoteMoney(quote.shippingFee, quote.currency)}</dd></div>
       )}
       {quote.vatAmount > 0 && (
-        <p>
-          VAT ({quote.vatRate}%): {formatQuoteMoney(quote.vatAmount, quote.currency)}
-        </p>
+        <div><dt>VAT ({quote.vatRate}%)</dt><dd>{formatQuoteMoney(quote.vatAmount, quote.currency)}</dd></div>
       )}
-      <p className="quote-doc__grand-total">
-        <strong>Tổng cộng: {formatQuoteMoney(displayTotal, quote.currency)}</strong>
-      </p>
-    </div>
+      <div className="quote-doc__grand-total">
+        <dt>Tổng thanh toán</dt><dd>{formatQuoteMoney(displayTotal, quote.currency)}</dd>
+      </div>
+    </dl>
   );
 }

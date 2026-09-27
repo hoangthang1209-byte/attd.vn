@@ -1,17 +1,75 @@
-.quote-party-cols--no-contact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-.quote-doc__table.quote-doc__table--compact { font-size: 11px; }
-.quote-doc__table.quote-doc__table--compact th { font-size: 10px; }
-.quote-doc__table.quote-doc__table--compact th,
-.quote-doc__table.quote-doc__table--compact td { padding: 9px 8px; }
-.quote-doc__product-detail { display: block; margin-top: 4px; white-space: pre-wrap; color: #4b5563; }
-.quote-doc__price-type { margin: 6px 0 0; font-size: 10px; color: #6b7280; }
-
-.quote-document-root[data-mode="pdf"] .quote-doc__table--compact { font-size: 10.5px; }
-.quote-document-root[data-mode="pdf"] .quote-doc__table--compact th { font-size: 9.5px; }
-.quote-document-root[data-mode="pdf"] .quote-doc__table--compact th,
-.quote-document-root[data-mode="pdf"] .quote-doc__table--compact td { padding: 6px 7px; }
-
-@media (max-width: 900px) {
-  .quote-party-cols--no-contact { grid-template-columns: 1fr; }
+/* Shared customer-facing document: quiet typography and a readable five-column offer. */
+.quote-document-root { color: #182237; font-family: Arial, "DejaVu Sans", sans-serif; }
+.quote-document-root .quote-doc__paper { border-radius: 0; }
+.quote-document-root .quote-doc__header {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
+  gap: 24px; border-bottom: 1px solid #d9dfe7; padding-bottom: 17px; margin-bottom: 17px;
 }
+.quote-document-root .quote-doc__header-left { align-items: flex-start; gap: 16px; min-width: 0; }
+.quote-document-root .quote-doc__logo { max-width: 100px; max-height: 48px; }
+.quote-document-root .quote-doc__header-company { font-size: 11px; line-height: 1.4; color: #647085; }
+.quote-document-root .quote-doc__header-company p { margin: 0 0 3px; }
+.quote-document-root .quote-doc__header-legal { color: #182237; font-size: 12px; }
+.quote-document-root .quote-doc__header-right { text-align: right; }
+.quote-document-root .quote-doc__title { font-size: 22px; font-weight: 750; letter-spacing: -.02em; }
+.quote-document-root .quote-doc__header-number { color: #c9252a; font-size: 13px; font-weight: 700; margin: 4px 0 0; }
+.quote-document-root .quote-doc__meta-bar {
+  display: flex; gap: 8px 24px; padding: 0 0 14px; margin: 0;
+  background: none; border: 0; border-bottom: 1px solid #d9dfe7;
+  border-radius: 0; color: #647085;
+}
+.quote-document-root .quote-doc__meta-bar strong { color: #182237; }
+.quote-document-root .quote-party-cols { border-top: 0; border-bottom: 1px solid #d9dfe7; gap: 20px; margin: 0; padding: 17px 0; }
+.quote-document-root .quote-party-cols--no-contact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.quote-document-root .quote-party-col__title { color: #182237; letter-spacing: .06em; }
+.quote-document-root .quote-doc__table-wrap--modern { overflow-x: auto; margin: 18px 0 0; }
+.quote-document-root .quote-doc__table--modern { min-width: 650px; font-size: 11px; line-height: 1.45; }
+.quote-document-root .quote-doc__table--modern th,
+.quote-document-root .quote-doc__table--modern td { background: #fff; border: 0; border-bottom: 1px solid #d9dfe7; padding: 12px 8px; }
+.quote-document-root .quote-doc__table--modern th { color: #475467; text-transform: uppercase; letter-spacing: .04em; font-size: 10px; font-weight: 700; }
+.quote-document-root .quote-doc__table--modern tbody tr:nth-child(even) { background: #fff; }
+.quote-document-root .quote-doc__table--modern th:nth-child(n+3) { text-align: right; }
+.quote-document-root .quote-doc__table--modern td:nth-child(3) { text-align: right; white-space: nowrap; }
+.quote-document-root .quote-doc__table--modern td:last-child { font-weight: 700; }
+.quote-document-root .quote-doc__product-content { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.quote-document-root .quote-doc__product-copy { min-width: 0; }
+.quote-document-root .quote-doc__product-copy strong { display: block; color: #182237; font-size: 12px; }
+.quote-document-root .quote-doc__product-detail { display: block; margin-top: 3px; white-space: pre-wrap; color: #647085; overflow-wrap: anywhere; }
+.quote-document-root .quote-doc__design-thumb { flex: 0 0 54px; width: 54px; height: 58px; border: 1px solid #edf0f3; border-radius: 2px; object-fit: contain; }
+.quote-document-root .quote-doc__summary-row { justify-content: flex-end; margin-top: 18px; gap: 28px; }
+.quote-document-root .quote-doc__totals { min-width: 270px; line-height: 1.7; }
+.quote-document-root .quote-doc__totals { margin-bottom: 0; }
+.quote-document-root .quote-doc__totals > div { display: flex; justify-content: space-between; gap: 24px; padding: 3px 0; }
+.quote-document-root .quote-doc__totals dt { color: #647085; text-align: left; }
+.quote-document-root .quote-doc__totals dd { margin: 0; font-weight: 600; white-space: nowrap; }
+.quote-document-root .quote-doc__grand-total { border-top: 1px solid #d9dfe7; padding-top: 8px; margin-top: 8px !important; font-size: 18px; color: #c9252a; }
+.quote-document-root .quote-doc__grand-total dt { color: #182237; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.quote-document-root .quote-doc__grand-total dd { color: #c9252a; font-weight: 800; }
+.quote-document-root .quote-doc__notes h3,
+.quote-document-root .quote-doc__terms h3 { border-top: 1px solid #d9dfe7; padding-top: 15px; font-size: 12px; color: #182237; }
+.quote-document-root .quote-doc__notes p,
+.quote-document-root .quote-doc__terms pre { color: #475467; }
+.quote-document-root .quote-doc__summary-row,
+.quote-document-root .quote-doc__notes,
+.quote-document-root .quote-doc__terms { break-inside: avoid; }
+
+@media (max-width: 640px) {
+  .quote-document-root[data-mode="screen"] .quote-doc__header { grid-template-columns: 1fr; }
+  .quote-document-root[data-mode="screen"] .quote-doc__header-right { text-align: left; }
+  .quote-document-root[data-mode="screen"] .quote-party-cols { grid-template-columns: 1fr; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table-wrap--modern { margin-left: -12px; margin-right: -12px; }
+}
+
+@media print {
+  .quote-document-root .quote-doc__table--modern th { background: #fff !important; color: #475467 !important; }
+  .quote-document-root .quote-doc__table--modern tbody tr:nth-child(even) { background: #fff !important; }
+  .quote-document-root .quote-doc__meta-bar { background: none !important; border-color: #d9dfe7 !important; }
+}
+
+.quote-document-root[data-mode="pdf"] .quote-doc__table--modern,
+.quote-document-root[data-mode="print"] .quote-doc__table--modern { min-width: 0; font-size: 10px; }
+.quote-document-root[data-mode="pdf"] .quote-doc__table--modern th,
+.quote-document-root[data-mode="print"] .quote-doc__table--modern th { font-size: 9px; }
+.quote-document-root[data-mode="pdf"] .quote-doc__table--modern th,
+.quote-document-root[data-mode="pdf"] .quote-doc__table--modern td { padding: 10px 5px; }
+.quote-document-root[data-mode="pdf"] .quote-doc__table--modern .quote-doc__design-thumb { width: 46px; height: 52px; flex-basis: 46px; }

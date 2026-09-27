@@ -39,7 +39,7 @@ export default function QuoteDocumentContent({
 
   return (
     <QuoteDocumentShell variant={variant}>
-      <QuoteCompanyHeader company={company} logoUrl={resolvedLogo} />
+      <QuoteCompanyHeader company={company} logoUrl={resolvedLogo} quoteNo={quote.quoteNo} />
       <QuoteDocMeta quote={quote} />
       <QuotePartyColumns quote={quote} />
       <QuoteDocumentItemsTable
