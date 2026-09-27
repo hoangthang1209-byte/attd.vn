@@ -1,5 +1,5 @@
 /* Shared customer-facing document: quiet typography and a readable five-column offer. */
-.quote-document-root { color: #182237; font-family: Arial, "DejaVu Sans", sans-serif; }
+.quote-document-root.quote-doc[data-mode] { color: #182237; font-family: "Be Vietnam Pro", sans-serif; }
 .quote-document-root .quote-doc__paper { border-radius: 0; }
 .quote-document-root .quote-doc__header {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
@@ -53,14 +53,70 @@
 .quote-document-root .quote-doc__notes,
 .quote-document-root .quote-doc__terms { break-inside: avoid; }
 
+/* A4 is narrower than the browser viewport: never apply mobile stacking to the PDF. */
+.quote-document-root[data-mode="pdf"] .quote-party-cols,
+.quote-document-root[data-mode="print"] .quote-party-cols {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.quote-document-root[data-mode="pdf"] .quote-party-cols--no-contact,
+.quote-document-root[data-mode="print"] .quote-party-cols--no-contact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.quote-document-root[data-mode="pdf"] .quote-party-col,
+.quote-document-root[data-mode="print"] .quote-party-col { min-width: 0; overflow-wrap: anywhere; }
+.quote-document-root[data-mode="pdf"] .quote-doc__summary-row,
+.quote-document-root[data-mode="print"] .quote-doc__summary-row {
+  flex-direction: row; align-items: flex-start; justify-content: flex-end;
+}
+.quote-document-root[data-mode="pdf"] .quote-doc__totals,
+.quote-document-root[data-mode="print"] .quote-doc__totals { flex: 0 0 340px; width: 340px; }
+.quote-document-root[data-mode="pdf"] .quote-doc__grand-total dt,
+.quote-document-root[data-mode="print"] .quote-doc__grand-total dt { white-space: nowrap; }
+
 @media (max-width: 640px) {
   .quote-document-root[data-mode="screen"] .quote-doc__header { grid-template-columns: 1fr; }
   .quote-document-root[data-mode="screen"] .quote-doc__header-right { text-align: left; }
   .quote-document-root[data-mode="screen"] .quote-party-cols { grid-template-columns: 1fr; }
-  .quote-document-root[data-mode="screen"] .quote-doc__table-wrap--modern { margin-left: -12px; margin-right: -12px; }
+  .quote-document-root[data-mode="screen"] .quote-doc__paper { padding: 22px 18px; }
+  .quote-document-root[data-mode="screen"] .quote-doc__header { gap: 14px; }
+  .quote-document-root[data-mode="screen"] .quote-doc__header-right { display: flex; align-items: baseline; gap: 12px; }
+  .quote-document-root[data-mode="screen"] .quote-party-cols { gap: 12px; }
+  .quote-document-root[data-mode="screen"] .quote-party-col__row { overflow-wrap: anywhere; }
+}
+
+/* On the public link, each item becomes a readable card instead of a clipped five-column table. */
+@media (max-width: 767px) {
+  .quote-document-root[data-mode="screen"] .quote-party-cols { grid-template-columns: 1fr; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table-wrap--modern { overflow: visible; max-width: 100%; margin: 18px 0; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern { display: block; width: 100%; min-width: 0; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern colgroup,
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern thead { display: none; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern tbody { display: grid; gap: 12px; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern tr {
+    display: grid; grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px 12px; padding: 16px 14px; border: 1px solid #dce2e9;
+    border-radius: 10px; background: #fff;
+  }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern td { display: block; min-width: 0; padding: 0; border: 0; text-align: left; white-space: normal; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern td:first-child { color: #98a2b3; font-size: 11px; padding-top: 3px; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern td:nth-child(2) { grid-column: 2 / -1; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern td:nth-child(3) { grid-column: 2; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern td:nth-child(4) { grid-column: 3; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern td:nth-child(5) { grid-column: 2 / -1; border-top: 1px solid #e8ecf0; padding-top: 10px; color: #c9252a; font-size: 15px; }
+  .quote-document-root[data-mode="screen"] .quote-doc__table--modern td:nth-child(n+3)::before {
+    content: attr(data-label); display: block; color: #667085; font-size: 10px;
+    font-weight: 500; letter-spacing: .02em; margin-bottom: 3px;
+  }
+  .quote-document-root[data-mode="screen"] .quote-doc__product-content { gap: 10px; }
+  .quote-document-root[data-mode="screen"] .quote-doc__product-detail { line-height: 1.5; }
+  .quote-document-root[data-mode="screen"] .quote-doc__summary-row { flex-direction: row; justify-content: flex-end; }
+  .quote-document-root[data-mode="screen"] .quote-doc__totals { min-width: 0; width: 100%; }
+  .quote-document-root[data-mode="screen"] .quote-doc__grand-total { font-size: 16px; }
 }
 
 @media print {
+  @page { size: A4 portrait; margin: 8mm; }
   .quote-document-root .quote-doc__table--modern th { background: #fff !important; color: #475467 !important; }
   .quote-document-root .quote-doc__table--modern tbody tr:nth-child(even) { background: #fff !important; }
   .quote-document-root .quote-doc__meta-bar { background: none !important; border-color: #d9dfe7 !important; }

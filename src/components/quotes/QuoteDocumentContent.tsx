@@ -10,6 +10,10 @@ import {
 import QuoteDocumentItemsTable from "@/components/quotes/QuoteDocumentItemsTable";
 import QuoteDocumentSummaryRow from "@/components/quotes/QuoteDocumentSummaryRow";
 import QuoteDocumentNotes from "@/components/quotes/QuoteDocumentNotes";
+import "@fontsource/be-vietnam-pro/400.css";
+import "@fontsource/be-vietnam-pro/500.css";
+import "@fontsource/be-vietnam-pro/600.css";
+import "@fontsource/be-vietnam-pro/700.css";
 import "@/styles/quote-document-compact.css";
 
 type Props = {
