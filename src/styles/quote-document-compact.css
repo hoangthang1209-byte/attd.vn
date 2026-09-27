@@ -1,0 +1,17 @@
+.quote-party-cols--no-contact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.quote-doc__table.quote-doc__table--compact { font-size: 11px; }
+.quote-doc__table.quote-doc__table--compact th { font-size: 10px; }
+.quote-doc__table.quote-doc__table--compact th,
+.quote-doc__table.quote-doc__table--compact td { padding: 9px 8px; }
+.quote-doc__product-detail { display: block; margin-top: 4px; white-space: pre-wrap; color: #4b5563; }
+.quote-doc__price-type { margin: 6px 0 0; font-size: 10px; color: #6b7280; }
+
+.quote-document-root[data-mode="pdf"] .quote-doc__table--compact { font-size: 10.5px; }
+.quote-document-root[data-mode="pdf"] .quote-doc__table--compact th { font-size: 9.5px; }
+.quote-document-root[data-mode="pdf"] .quote-doc__table--compact th,
+.quote-document-root[data-mode="pdf"] .quote-doc__table--compact td { padding: 6px 7px; }
+
+@media (max-width: 900px) {
+  .quote-party-cols--no-contact { grid-template-columns: 1fr; }
+}

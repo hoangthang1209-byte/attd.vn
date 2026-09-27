@@ -30,7 +30,17 @@ export type QuickQuoteCommercialState = {
   salesEmail: string;
   salesAddress: string;
   customerNote: string;
+  paymentTerms?: string;
+  deliveryTerms?: string;
 };
+
+export function buildQuickQuoteTerms(commercial: QuickQuoteCommercialState): string {
+  return [
+    commercial.deliveryTerms?.trim() && `Giao hàng: ${commercial.deliveryTerms.trim()}`,
+    commercial.paymentTerms?.trim() && `Thanh toán: ${commercial.paymentTerms.trim()}`,
+    DEFAULT_QUOTE_TERMS,
+  ].filter(Boolean).join("\n");
+}
 
 export function buildQuickQuotePayload(
   party: QuickQuotePartyState,
@@ -72,7 +82,7 @@ export function buildQuickQuotePayload(
     manualOverrideReason: null,
     customerNote: commercial.customerNote || null,
     internalNote: null,
-    terms: DEFAULT_QUOTE_TERMS,
+    terms: buildQuickQuoteTerms(commercial),
     sampleFee: null,
     sampleLeadTime: null,
     sampleRefundCondition: null,

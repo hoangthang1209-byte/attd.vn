@@ -27,6 +27,7 @@ type HtmlPdfOptions = {
   quoteNo?: string;
   itemCount?: number;
   imageCount?: number;
+  compact?: boolean;
   requestHeaders?: Headers;
 };
 
@@ -225,7 +226,7 @@ async function waitForImages(
 
 export async function generateQuoteHtmlPdf(
   documentUrl: string,
-  meta?: Pick<HtmlPdfOptions, "quoteNo" | "itemCount" | "imageCount">,
+  meta?: Pick<HtmlPdfOptions, "quoteNo" | "itemCount" | "imageCount" | "compact">,
 ): Promise<Buffer> {
   const traceId = createQuotePdfTraceId();
   const quoteNo = meta?.quoteNo ?? "unknown";
@@ -290,7 +291,7 @@ export async function generateQuoteHtmlPdf(
 
     await page.emulateMediaType("screen");
     logChromiumStage(traceId, "generate-pdf:start");
-    const pdf = await page.pdf(QUOTE_PDF_OPTIONS);
+    const pdf = await page.pdf({ ...QUOTE_PDF_OPTIONS, landscape: !meta?.compact });
     const buffer = Buffer.from(pdf);
     logChromiumStage(traceId, "generate-pdf:success", { bytes: buffer.length });
 
@@ -332,5 +333,6 @@ export async function generateQuoteHtmlPdfByToken(
     quoteNo: options.quoteNo,
     itemCount: options.itemCount,
     imageCount: options.imageCount,
+    compact: options.compact,
   });
 }

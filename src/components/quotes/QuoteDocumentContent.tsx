@@ -10,6 +10,7 @@ import {
 import QuoteDocumentItemsTable from "@/components/quotes/QuoteDocumentItemsTable";
 import QuoteDocumentSummaryRow from "@/components/quotes/QuoteDocumentSummaryRow";
 import QuoteDocumentNotes from "@/components/quotes/QuoteDocumentNotes";
+import "@/styles/quote-document-compact.css";
 
 type Props = {
   quote: PublicQuoteDocument;

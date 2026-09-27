@@ -390,7 +390,4 @@ export async function generateQuotePdfWithFallback(
   }
 }
 
-export function quotePdfFilename(quoteNo: string): string {
-  const safe = safeText(quoteNo).replace(/[^a-zA-Z0-9-]/g, "");
-  return `bao-gia-${safe || "attd"}.pdf`;
-}
+export { quotePdfFilename } from "@/features/quotes/pdf/quote-pdf-filename";
