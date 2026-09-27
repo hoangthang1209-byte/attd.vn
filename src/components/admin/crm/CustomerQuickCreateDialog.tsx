@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CustomerLegacyType } from "@prisma/client";
 import { CUSTOMER_LEGACY_TYPE_LABELS } from "@/features/crm/labels";
@@ -53,6 +53,9 @@ export default function CustomerQuickCreateDialog({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [duplicateMatches, setDuplicateMatches] = useState<CrmCustomerRecord[]>([]);
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const hasDuplicateSearchInput = Boolean(
+    name.trim() || taxCode.trim() || contactEmail.trim() || email.trim(),
+  );
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setMounted(true));
@@ -68,7 +71,7 @@ export default function CustomerQuickCreateDialog({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, pending, onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const viewport = window.visualViewport;
     if (!viewport) return;
@@ -287,7 +290,7 @@ export default function CustomerQuickCreateDialog({
         <div className="customer-quick-create-modal__body">
           {formError && <p className="admin-error customer-quick-create-modal__form-error">{formError}</p>}
 
-          {duplicateMatches.length > 0 && (
+          {hasDuplicateSearchInput && duplicateMatches.length > 0 && (
             <div className="customer-quick-create-modal__duplicates" role="status">
               <p className="admin-field-hint" style={{ marginBottom: 8 }}>
                 {checkingDuplicates ? "Đang kiểm tra trùng…" : "Có thể khách hàng này đã tồn tại"}

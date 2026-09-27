@@ -15407,28 +15407,6 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   flex-shrink: 0;
 }
 
-@media (max-width: 640px) {
-  .customer-quick-create-modal {
-    padding: 12px;
-  }
-
-  .customer-quick-create-modal__panel {
-    width: calc(100vw - 24px);
-    max-height: calc(100vh - 24px);
-  }
-
-  .customer-quick-create-modal__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .customer-quick-create-modal__header,
-  .customer-quick-create-modal__body,
-  .customer-quick-create-modal__footer {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-}
-
 /* Shared admin quick-create modal shell (Sprint 26.3.3.2) */
 .admin-quick-create-modal {
   position: fixed;
@@ -21829,6 +21807,17 @@ select.admin-input:focus {
   .customer-quick-create-modal__grid,
   .customer-quick-create-modal__grid .admin-field {
     min-width: 0;
+  }
+
+  .customer-quick-create-modal__header,
+  .customer-quick-create-modal__body,
+  .customer-quick-create-modal__footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .customer-quick-create-modal__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .customer-quick-create-modal input,
