@@ -280,6 +280,8 @@
   min-width: 0;
 }
 
+.quick-quote-advanced__body .admin-field--full { grid-column: 1 / -1; }
+
 @media (min-width: 640px) {
   .quick-quote-advanced__body {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -312,6 +314,14 @@
   overflow-wrap: anywhere;
 }
 
+.quick-quote-preview-detail {
+  display: block;
+  margin-top: 4px;
+  color: var(--admin-muted, #6b7280);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+}
+
 .quick-quote-preview-list li > strong {
   min-width: 0;
   text-align: right;
@@ -320,6 +330,22 @@
 
 .quick-quote-preview-list li:last-child {
   border-bottom: none;
+}
+
+.quick-quote-preview-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.875rem;
+}
+
+.quick-quote-preview-terms {
+  margin: 0;
+  color: var(--admin-muted, #6b7280);
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .quick-quote-totals {

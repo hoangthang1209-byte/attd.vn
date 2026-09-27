@@ -90,6 +90,8 @@ function defaultCommercial(): QuickQuoteCommercialState {
     salesEmail: "",
     salesAddress: "",
     customerNote: "",
+    paymentTerms: "",
+    deliveryTerms: "",
   };
 }
 
@@ -461,7 +463,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
     setSubmitting(true);
     const payload = buildQuickQuotePayload(
       party,
-      commercial,
+      { ...commercial, quoteDate: toDateInputValue(new Date().toISOString()) },
       items.map(toQuoteItemInput),
       "DRAFT",
     );
@@ -635,7 +637,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
           </section>
 
           <details className="quick-quote-advanced">
-            <summary>Chiết khấu, VAT &amp; ghi chú</summary>
+            <summary>Chiết khấu, VAT &amp; điều kiện gửi khách</summary>
             <div className="quick-quote-advanced__body">
               <div className="admin-field">
                 <label className="admin-label">Chiết khấu</label>
@@ -674,6 +676,24 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
                 />
               </div>
               <div className="admin-field admin-field--full">
+                <label className="admin-label">Giao hàng (nếu đã xác nhận)</label>
+                <input
+                  className="admin-input"
+                  placeholder="Địa điểm, thời gian hoặc phí giao hàng"
+                  value={commercial.deliveryTerms ?? ""}
+                  onChange={(e) => setCommercial((prev) => ({ ...prev, deliveryTerms: e.target.value }))}
+                />
+              </div>
+              <div className="admin-field admin-field--full">
+                <label className="admin-label">Thanh toán (nếu đã xác nhận)</label>
+                <input
+                  className="admin-input"
+                  placeholder="Ví dụ: đặt cọc theo thỏa thuận"
+                  value={commercial.paymentTerms ?? ""}
+                  onChange={(e) => setCommercial((prev) => ({ ...prev, paymentTerms: e.target.value }))}
+                />
+              </div>
+              <div className="admin-field admin-field--full">
                 <label className="admin-label">Ghi chú cho khách</label>
                 <textarea
                   className="admin-textarea"
@@ -704,6 +724,8 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
                   {item.productNameSnapshot}
                   {item.variantNameSnapshot ? ` (${item.variantNameSnapshot})` : ""} ×{" "}
                   {item.quantity}
+                  {item.description?.trim() && <small className="quick-quote-preview-detail">{item.description}</small>}
+                  {item.productionLeadTime?.trim() && <small className="quick-quote-preview-detail">Sản xuất: {item.productionLeadTime}</small>}
                 </span>
                 <strong>
                   {formatQuoteCurrency((item.unitPrice ?? 0) * item.quantity)}
@@ -711,6 +733,17 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
               </li>
             ))}
           </ul>
+          {items.some((item) => !item.description?.trim()) && (
+            <p className="quick-quote-preview-warning">
+              Chưa có thông số cho một hoặc nhiều sản phẩm. Hãy bổ sung trước khi gửi khách.
+            </p>
+          )}
+          {(commercial.deliveryTerms || commercial.paymentTerms) && (
+            <p className="quick-quote-preview-terms">
+              {commercial.deliveryTerms && <>Giao hàng: {commercial.deliveryTerms}<br /></>}
+              {commercial.paymentTerms && <>Thanh toán: {commercial.paymentTerms}</>}
+            </p>
+          )}
           <QuickQuotePreviewTotals totals={preview.totals} />
           <div className="admin-field" style={{ marginTop: 12 }}>
             <label className="admin-label">Nhân viên tư vấn</label>
@@ -772,6 +805,12 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
             >
               Xem PDF
             </button>
+            <a
+              className="admin-btn admin-btn--secondary"
+              href={`/api/quotes/${encodeURIComponent(createdQuote.id)}/pdf?disposition=attachment`}
+            >
+              Tải PDF để gửi khách
+            </a>
             <button
               type="button"
               className="admin-btn admin-btn--secondary"

@@ -2,10 +2,9 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import type { QuotePdfData } from "@/features/quotes/quote-document";
-import {
-  generateQuotePdfWithFallback,
-  quotePdfFilename,
-} from "@/features/quotes/pdf/quote-pdf.service";
+import { generateQuotePdfWithFallback } from "@/features/quotes/pdf/quote-pdf.service";
+import { quotePdfFilename } from "@/features/quotes/pdf/quote-pdf-filename";
+import { isCompactQuoteDocument } from "@/features/quotes/quote-document-layout";
 import { generateQuoteHtmlPdfByToken } from "@/features/quotes/pdf/quote-html-pdf.service";
 import { getQuotePdfTraceId } from "@/features/quotes/pdf/quote-pdf-chromium-error";
 import {
@@ -101,7 +100,7 @@ export async function buildQuotePdfResponse(
   context: PdfRouteContext,
   options?: BuildQuotePdfOptions,
 ): Promise<NextResponse> {
-  const filename = quotePdfFilename(pdfData.quoteNo);
+  const filename = quotePdfFilename(pdfData.quoteNo, pdfData.customerCompany);
   const itemCount = pdfData.items.length;
   const imageCount = countDesignImages(pdfData);
   const disposition = options?.disposition ?? "attachment";
@@ -126,6 +125,7 @@ export async function buildQuotePdfResponse(
         quoteNo: pdfData.quoteNo,
         itemCount,
         imageCount,
+        compact: isCompactQuoteDocument(pdfData),
         requestHeaders: options.requestHeaders,
       });
 

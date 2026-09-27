@@ -49,7 +49,7 @@ export default function PublicQuoteDocument({
       const apiUrl = quotePdfDownloadUrlPublic(token);
       await downloadQuotePdfFromApi(
         apiUrl,
-        quotePdfDownloadFilename(quote?.quoteNo ?? token),
+        quotePdfDownloadFilename(quote?.quoteNo ?? token, quote?.customerCompany),
       );
     } catch (err) {
       console.error("[PublicQuoteDocument] PDF download failed", err);

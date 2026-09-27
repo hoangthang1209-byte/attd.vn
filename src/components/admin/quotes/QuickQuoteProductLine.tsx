@@ -262,7 +262,29 @@ export default function QuickQuoteProductLine({
         </div>
 
         <div className="admin-field admin-field--full">
-          <label className="admin-label">Ghi chú nhanh (tùy chọn)</label>
+          <label className="admin-label">Thông số sản phẩm</label>
+          <textarea
+            className="admin-textarea"
+            rows={3}
+            placeholder="Chất liệu, định lượng, màu, size, vị trí in/thêu, đóng gói…"
+            value={item.description ?? ""}
+            onChange={(e) => onChange({ description: e.target.value || null })}
+          />
+        </div>
+
+        <div className="admin-field admin-field--full">
+          <label className="admin-label">Thời gian sản xuất (nếu đã xác nhận)</label>
+          <input
+            className="admin-input"
+            type="text"
+            placeholder="Ví dụ: 15 ngày làm việc sau duyệt mẫu"
+            value={item.productionLeadTime ?? ""}
+            onChange={(e) => onChange({ productionLeadTime: e.target.value || null })}
+          />
+        </div>
+
+        <div className="admin-field admin-field--full">
+          <label className="admin-label">Ghi chú thêm (tùy chọn)</label>
           <input
             className="admin-input"
             type="text"

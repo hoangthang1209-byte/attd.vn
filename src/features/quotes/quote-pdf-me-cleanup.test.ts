@@ -108,8 +108,8 @@ describe("Quote-PDF-1 chromium / download reliability", () => {
   });
 
   it("filename stays safe and quote-coded", () => {
-    assert.equal(quotePdfDownloadFilename("BG-000003"), "bao-gia-BG-000003.pdf");
-    assert.equal(quotePdfDownloadFilename("BG/000003"), "bao-gia-BG000003.pdf");
+    assert.equal(quotePdfDownloadFilename("BG-000003"), "Bao-gia-ATTD-BG-000003.pdf");
+    assert.equal(quotePdfDownloadFilename("BG/000003"), "Bao-gia-ATTD-BG000003.pdf");
   });
 
   it("document base URL prefers live request host over env", () => {

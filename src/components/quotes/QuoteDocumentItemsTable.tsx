@@ -3,6 +3,7 @@ import { formatQuoteMoney, formatQuoteMoq } from "@/features/quotes/quote-format
 import { quotePriceVatTypeLabel } from "@/features/quotes/labels";
 import { resolveAbsoluteMediaUrl } from "@/features/quotes/resolve-absolute-media-url";
 import QuoteDesignThumb from "@/components/quotes/QuoteDesignThumb";
+import { isCompactQuoteDocument } from "@/features/quotes/quote-document-layout";
 
 type Props = {
   quote: PublicQuoteDocument;
@@ -36,6 +37,44 @@ export default function QuoteDocumentItemsTable({
 }: Props) {
   const priceTypeLabel = quotePriceVatTypeLabel(quote.priceVatType);
   const colWidths = buildTableColWidths();
+
+  if (isCompactQuoteDocument(quote)) {
+    return (
+      <div className="quote-doc__table-wrap quote-doc__table-wrap--compact">
+        <table className="quote-document-table quote-doc__table quote-doc__table--compact">
+          <colgroup>
+            {[6, 45, 11, 18, 20].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}
+          </colgroup>
+          <thead><tr><th>STT</th><th>Sản phẩm và thông số</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
+          <tbody>
+            {quote.items.map((item, index) => {
+              const details = [
+                item.description?.trim(),
+                item.colorSnapshot?.trim() && `Màu: ${item.colorSnapshot.trim()}`,
+                item.skuSnapshot?.trim() && `SKU: ${item.skuSnapshot.trim()}`,
+                item.moqSnapshot != null && `MOQ: ${formatQuoteMoq(item.moqSnapshot)}`,
+                item.itemNote?.trim(),
+                item.productionLeadTime?.trim() && `Sản xuất: ${formatProductionLeadTime(item.productionLeadTime)}`,
+              ].filter(Boolean);
+              return (
+                <tr key={index}>
+                  <td className="quote-doc__cell-center">{index + 1}</td>
+                  <td className="quote-doc__cell-product">
+                    <strong>{[item.productNameSnapshot, item.variantNameSnapshot].filter(Boolean).join(" · ") || "Sản phẩm"}</strong>
+                    {details.map((detail, detailIndex) => <span className="quote-doc__product-detail" key={detailIndex}>{detail}</span>)}
+                  </td>
+                  <td className="quote-doc__cell-center">{item.quantity} {item.unit}</td>
+                  <td className="quote-doc__cell-money">{formatQuoteMoney(item.unitPrice, quote.currency)}</td>
+                  <td className="quote-doc__cell-money">{formatQuoteMoney(item.lineTotal, quote.currency)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <p className="quote-doc__price-type">{priceTypeLabel}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="quote-doc__table-wrap">

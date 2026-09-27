@@ -36,6 +36,8 @@ describe("buildQuickQuotePayload", () => {
         salesEmail: "sales@attd.vn",
         salesAddress: "",
         customerNote: "Giao nhanh",
+        deliveryTerms: "Giao tại TP.HCM trong 20 ngày làm việc",
+        paymentTerms: "Đặt cọc theo thỏa thuận",
       },
       [
         {
@@ -59,6 +61,8 @@ describe("buildQuickQuotePayload", () => {
     assert.equal(payload.salesRepresentativeId, null);
     assert.equal(payload.salesName, "Sales Rep");
     assert.equal(payload.salesPhone, "0900000000");
+    assert.match(payload.terms, /Giao hàng: Giao tại TP.HCM/);
+    assert.match(payload.terms, /Thanh toán: Đặt cọc theo thỏa thuận/);
   });
 });
 

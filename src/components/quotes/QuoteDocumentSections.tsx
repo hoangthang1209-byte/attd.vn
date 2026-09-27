@@ -44,8 +44,12 @@ type QuotePartyColumnsProps = {
 };
 
 export function QuotePartyColumns({ quote, className = "" }: QuotePartyColumnsProps) {
+  const showContact = Boolean(
+    quote.customerContactName?.trim() || quote.customerContactTitle?.trim() ||
+    quote.customerContactPhone?.trim() || quote.customerContactEmail?.trim(),
+  );
   return (
-    <div className={`quote-party-cols ${className}`.trim()}>
+    <div className={`quote-party-cols${showContact ? "" : " quote-party-cols--no-contact"} ${className}`.trim()}>
       <section className="quote-party-col">
         <h3 className="quote-party-col__title">Khách hàng</h3>
         <FieldList
@@ -57,7 +61,7 @@ export function QuotePartyColumns({ quote, className = "" }: QuotePartyColumnsPr
           ]}
         />
       </section>
-      <section className="quote-party-col">
+      {showContact && <section className="quote-party-col">
         <h3 className="quote-party-col__title">Người liên hệ</h3>
         <FieldList
           fields={[
@@ -67,7 +71,7 @@ export function QuotePartyColumns({ quote, className = "" }: QuotePartyColumnsPr
             { label: "Email", value: quote.customerContactEmail },
           ]}
         />
-      </section>
+      </section>}
       <section className="quote-party-col">
         <h3 className="quote-party-col__title">Nhân viên tư vấn</h3>
         <FieldList

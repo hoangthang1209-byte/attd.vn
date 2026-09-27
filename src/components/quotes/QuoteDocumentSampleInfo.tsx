@@ -15,25 +15,27 @@ export default function QuoteDocumentSampleInfo({ quote }: Props) {
       value:
         quote.sampleFee != null && quote.sampleFee > 0
           ? formatQuoteMoney(quote.sampleFee, quote.currency)
-          : "—",
+          : null,
     },
     {
       label: "Thời gian làm mẫu",
-      value: quote.sampleLeadTime?.trim() || "—",
+      value: quote.sampleLeadTime?.trim() || null,
     },
     {
       label: "Điều kiện hoàn phí",
-      value: quote.sampleRefundCondition?.trim() || "—",
+      value: quote.sampleRefundCondition?.trim() || null,
       multiline: Boolean(quote.sampleRefundCondition?.trim()),
     },
   ];
+  const visibleRows = rows.filter((row) => row.value);
+  if (visibleRows.length === 0) return null;
 
   return (
     <section className="quote-doc__sample-info">
       <h3 className="quote-doc__sample-info-title">THÔNG TIN MẪU</h3>
       <table className="quote-doc__sample-table">
         <tbody>
-          {rows.map((row) => (
+          {visibleRows.map((row) => (
             <tr key={row.label}>
               <th scope="row">{row.label}</th>
               <td className={row.multiline ? "quote-doc__sample-value--multiline" : undefined}>
