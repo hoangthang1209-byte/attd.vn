@@ -36,6 +36,7 @@ export default function CustomerQuickCreateDialog({
 }: Props) {
   const mutate = useAdminMutation();
   const submitLock = useRef(false);
+  const modalRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [pending, setPending] = useState(false);
   const [type, setType] = useState<CustomerLegacyType>("BUSINESS");
@@ -54,7 +55,8 @@ export default function CustomerQuickCreateDialog({
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
@@ -67,12 +69,35 @@ export default function CustomerQuickCreateDialog({
   }, [open, pending, onClose]);
 
   useEffect(() => {
+    if (!open) return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const updateVisibleArea = () => {
+      modalRef.current?.style.setProperty("--customer-modal-viewport-top", `${viewport.offsetTop}px`);
+      modalRef.current?.style.setProperty("--customer-modal-viewport-height", `${viewport.height}px`);
+    };
+    updateVisibleArea();
+    viewport.addEventListener("resize", updateVisibleArea);
+    viewport.addEventListener("scroll", updateVisibleArea);
+    const frame = window.requestAnimationFrame(updateVisibleArea);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      viewport.removeEventListener("resize", updateVisibleArea);
+      viewport.removeEventListener("scroll", updateVisibleArea);
+    };
+  }, [open]);
+
+  useEffect(() => {
     if (open) return;
-    setFormError(null);
-    setFieldErrors({});
-    setPending(false);
-    setDuplicateMatches([]);
-    submitLock.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      setFormError(null);
+      setFieldErrors({});
+      setPending(false);
+      setDuplicateMatches([]);
+      submitLock.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [open]);
 
   useEffect(() => {
@@ -81,8 +106,8 @@ export default function CustomerQuickCreateDialog({
     const trimmedTax = taxCode.trim();
     const trimmedEmail = contactEmail.trim() || email.trim();
     if (!trimmedName && !trimmedTax && !trimmedEmail) {
-      setDuplicateMatches([]);
-      return;
+      const frame = window.requestAnimationFrame(() => setDuplicateMatches([]));
+      return () => window.cancelAnimationFrame(frame);
     }
 
     const timer = setTimeout(() => {
@@ -229,6 +254,7 @@ export default function CustomerQuickCreateDialog({
 
   return createPortal(
     <div
+      ref={modalRef}
       className="customer-quick-create-modal"
       role="dialog"
       aria-modal="true"
@@ -270,16 +296,6 @@ export default function CustomerQuickCreateDialog({
                 <div
                   key={match.id}
                   className="customer-quick-create-modal__duplicate-row"
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 8,
-                    padding: "8px 10px",
-                    border: "1px solid var(--admin-border, #e5e7eb)",
-                    borderRadius: 6,
-                  }}
                 >
                   <div>
                     <strong>{match.name}</strong>

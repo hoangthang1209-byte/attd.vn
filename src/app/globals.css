@@ -15359,6 +15359,17 @@ body:has(.mobile-action-bar) .mp-catalog-filter-sheet {
   margin: 0 0 16px;
 }
 
+.customer-quick-create-modal__duplicate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 6px;
+}
+
 .customer-quick-create-modal__section {
   margin-bottom: 4px;
 }
@@ -21788,6 +21799,56 @@ select.admin-input:focus {
 .admin-quick-create-modal__panel,
 .customer-quick-create-modal__panel {
   max-height: calc(100dvh - 24px);
+}
+
+@media (max-width: 640px) {
+  .customer-quick-create-modal {
+    box-sizing: border-box;
+    inset: auto 0 auto 0;
+    top: var(--customer-modal-viewport-top, 0px);
+    height: var(--customer-modal-viewport-height, 100dvh);
+    align-items: stretch;
+    padding: max(12px, env(safe-area-inset-top)) 12px
+      max(12px, env(safe-area-inset-bottom));
+  }
+
+  .customer-quick-create-modal__panel {
+    box-sizing: border-box;
+    flex: 1;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .customer-quick-create-modal__header,
+  .customer-quick-create-modal__body,
+  .customer-quick-create-modal__footer,
+  .customer-quick-create-modal__section,
+  .customer-quick-create-modal__grid,
+  .customer-quick-create-modal__grid .admin-field {
+    min-width: 0;
+  }
+
+  .customer-quick-create-modal input,
+  .customer-quick-create-modal select,
+  .customer-quick-create-modal textarea {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+  }
+
+  .customer-quick-create-modal__duplicate-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .customer-quick-create-modal__duplicate-row > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 }
 
 .section-header {
