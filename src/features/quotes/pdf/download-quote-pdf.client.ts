@@ -1,5 +1,7 @@
 "use client";
 
+import { quotePdfFilename } from "@/features/quotes/pdf/quote-pdf-filename";
+
 const VISUAL_PDF_ERROR =
   "Không thể tạo file PDF giao diện báo giá. Vui lòng thử lại.";
 
@@ -72,7 +74,6 @@ export async function downloadQuotePdfFromApi(
   }
 }
 
-export function quotePdfDownloadFilename(quoteNo: string): string {
-  const safe = quoteNo.replace(/[^a-zA-Z0-9-]/g, "");
-  return `bao-gia-${safe || "attd"}.pdf`;
+export function quotePdfDownloadFilename(quoteNo: string, customerName?: string | null): string {
+  return quotePdfFilename(quoteNo, customerName);
 }
