@@ -56,6 +56,9 @@ describe("buildQuickQuotePayload", () => {
     assert.equal(payload.status, "DRAFT");
     assert.equal(payload.items.length, 1);
     assert.equal(payload.sourceType, "MANUAL");
+    assert.equal(payload.salesRepresentativeId, null);
+    assert.equal(payload.salesName, "Sales Rep");
+    assert.equal(payload.salesPhone, "0900000000");
   });
 });
 

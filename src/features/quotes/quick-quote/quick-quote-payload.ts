@@ -56,7 +56,9 @@ export function buildQuickQuotePayload(
     customerContactTitleSnapshot: party.customerContactTitle || null,
     customerPhoneSnapshot: party.customerPhone || null,
     customerEmailSnapshot: party.customerEmail || null,
-    salesRepresentativeId: commercial.salesRepresentativeId || null,
+    // The quick form selects Employee records, while Quote.salesRepresentativeId
+    // references SalesRepresentative records. Keep the employee snapshots only.
+    salesRepresentativeId: null,
     salesName: commercial.salesName || null,
     salesTitleSnapshot: commercial.salesTitle || null,
     salesPhone: commercial.salesPhone || null,

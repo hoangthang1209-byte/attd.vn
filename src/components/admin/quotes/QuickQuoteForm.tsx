@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import AdminBackLink from "@/components/admin/AdminBackLink";
 import CustomerSearchField from "@/components/admin/quotes/CustomerSearchField";
 import QuickQuoteProductLine from "@/components/admin/quotes/QuickQuoteProductLine";
-import QuoteTotalsSummary from "@/components/admin/quotes/QuoteTotalsSummary";
 import { emptyQuoteItem, type QuoteItemRow } from "@/components/admin/quotes/QuoteItemFormRow";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { useAdminToast } from "@/components/admin/AdminToastProvider";
@@ -16,6 +15,7 @@ import { SectionLoading } from "@/components/ui/loading/ContextLoading";
 import { toDateInputValue } from "@/features/quotes/format";
 import { formatQuoteCurrency } from "@/features/quotes/format";
 import { computeQuoteFromItems } from "@/features/quotes/quote-totals";
+import type { QuoteTotals } from "@/features/quotes/types";
 import {
   contactToQuoteSnapshots,
   customerToQuoteSnapshots,
@@ -101,6 +101,31 @@ function toQuoteItemInput(row: QuoteItemRow) {
   const { key: _rowKey, ...item } = row;
   void _rowKey;
   return item;
+}
+
+function QuickQuotePreviewTotals({ totals }: { totals: QuoteTotals }) {
+  return (
+    <dl className="quick-quote-totals">
+      <div><dt>Tạm tính</dt><dd>{formatQuoteCurrency(totals.subtotal)}</dd></div>
+      {totals.serviceTotal + totals.setupTotal > 0 && (
+        <p className="quick-quote-totals__note">
+          Đã gồm {formatQuoteCurrency(totals.serviceTotal + totals.setupTotal)} phí dịch vụ và setup.
+        </p>
+      )}
+      {totals.discountAmount > 0 && (
+        <div><dt>Chiết khấu</dt><dd>−{formatQuoteCurrency(totals.discountAmount)}</dd></div>
+      )}
+      {totals.shippingFee > 0 && (
+        <div><dt>Phí vận chuyển</dt><dd>{formatQuoteCurrency(totals.shippingFee)}</dd></div>
+      )}
+      {totals.vatAmount > 0 && (
+        <div><dt>VAT ({totals.vatRate}%)</dt><dd>{formatQuoteCurrency(totals.vatAmount)}</dd></div>
+      )}
+      <div className="quick-quote-totals__grand">
+        <dt>Tổng cộng</dt><dd>{formatQuoteCurrency(totals.totalAmount)}</dd>
+      </div>
+    </dl>
+  );
 }
 
 export default function QuickQuoteForm({ prefillParams }: Props) {
@@ -444,6 +469,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
     const saved = await mutate({
       loadingMessage: "Đang tạo báo giá…",
       successMessage: "Đã tạo báo giá.",
+      onError: setError,
       action: async () => {
         const res = await fetch("/api/quotes", {
           method: "POST",
@@ -455,10 +481,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
     });
 
     setSubmitting(false);
-    if (!saved) {
-      setError("Không thể tạo báo giá.");
-      return;
-    }
+    if (!saved) return;
 
     clearQuickQuoteDraft();
     setCreatedQuote(saved);
@@ -514,7 +537,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
       </div>
 
       {draftRestored && step !== "success" && (
-        <p className="admin-toast">Đã khôi phục bản nháp chưa lưu.</p>
+        <p className="quick-quote-draft-notice">Đã khôi phục bản nháp chưa lưu.</p>
       )}
       {error && <p className="admin-error">{error}</p>}
 
@@ -688,7 +711,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
               </li>
             ))}
           </ul>
-          <QuoteTotalsSummary totals={preview.totals} />
+          <QuickQuotePreviewTotals totals={preview.totals} />
           <div className="admin-field" style={{ marginTop: 12 }}>
             <label className="admin-label">Nhân viên tư vấn</label>
             <select
@@ -714,20 +737,10 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
               ))}
             </select>
           </div>
-          <button
-            type="button"
-            className="admin-btn admin-btn--ghost admin-btn--xs"
-            onClick={() => setStep("products")}
-          >
-            Sửa sản phẩm
-          </button>
-          <button
-            type="button"
-            className="admin-btn admin-btn--ghost admin-btn--xs"
-            onClick={() => setStep("customer")}
-          >
-            Sửa khách hàng
-          </button>
+          <div className="quick-quote-preview-edit">
+            <button type="button" onClick={() => setStep("products")}>Sửa sản phẩm</button>
+            <button type="button" onClick={() => setStep("customer")}>Sửa khách hàng</button>
+          </div>
         </section>
       )}
 
@@ -775,7 +788,7 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
 
       {step !== "success" && (
         <div className="quick-quote-footer">
-          <div className="quick-quote-footer__total">
+          {step !== "preview" && <div className="quick-quote-footer__total">
             <span className="quick-quote-footer__total-label">Tổng tạm tính</span>
             <span className="quick-quote-footer__total-value">
               {formatQuoteCurrency(
@@ -784,8 +797,8 @@ export default function QuickQuoteForm({ prefillParams }: Props) {
                   : preview.totals.totalAmount,
               )}
             </span>
-          </div>
-          <div className="quick-quote-footer__actions">
+          </div>}
+          <div className={`quick-quote-footer__actions quick-quote-footer__actions--${step}`}>
             {step === "products" && (
               <button
                 type="button"
