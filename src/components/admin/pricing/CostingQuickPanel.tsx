@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
@@ -60,7 +62,6 @@ export default function CostingQuickPanel({
   const [customCostError, setCustomCostError] = useState<string | null>(null);
   const [libraryItems, setLibraryItems] = useState<CostLibraryItem[]>([]);
   const [libraryError, setLibraryError] = useState<string | null>(null);
-  const [focusLineIndex, setFocusLineIndex] = useState(0);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const loadLibrary = useCallback(async () => {
@@ -102,7 +103,6 @@ export default function CostingQuickPanel({
             `FINAL ${data.calculation.code} — lưu sẽ tạo phiên bản WORKING mới, bản FINAL không thay đổi.`,
           );
         }
-        setFocusLineIndex(0);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -134,10 +134,9 @@ export default function CostingQuickPanel({
       costEstimate: preview.totalCost,
       sellingPricePerUnit: sell,
     });
-  }, [preview, row?.quantity, row?.sellingPricePerUnit]);
+  }, [preview, row]);
 
   function focusLine(index: number) {
-    setFocusLineIndex(index);
     setTimeout(() => inputRefs.current[index]?.focus(), 0);
   }
 
@@ -212,7 +211,7 @@ export default function CostingQuickPanel({
   function handleLineKeyDown(
     e: React.KeyboardEvent,
     lineIndex: number,
-    line: QuickCostLine,
+    _line: QuickCostLine,
   ) {
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
