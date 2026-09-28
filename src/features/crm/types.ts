@@ -323,6 +323,8 @@ export const CRM_LEAD_PRIORITIES: LeadPriority[] = [
 
 export const CRM_LEAD_SOURCES: LeadSource[] = [
   "WEBSITE",
+  "EMAIL",
+  "WHATSAPP",
   "ZALO",
   "FACEBOOK",
   "PHONE",
