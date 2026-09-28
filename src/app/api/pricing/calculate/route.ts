@@ -1,6 +1,7 @@
 import type { PricingCalculationType, PricingServiceType } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { calculatePricing } from "@/features/pricing/services/pricing-engine.service";
+import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 import { parseCalculateBody } from "@/features/pricing/pricing-calculate-input";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
@@ -31,6 +32,9 @@ export async function POST(req: NextRequest) {
     const result = await calculatePricing(input);
     return NextResponse.json({ result });
   } catch (err) {
+    if (err instanceof PricingValidationError) {
+      return NextResponse.json({ message: err.message }, { status: 400 });
+    }
     console.error("[POST /api/pricing/calculate]", err);
     return NextResponse.json({ message: "Không thể tính giá" }, { status: 500 });
   }
