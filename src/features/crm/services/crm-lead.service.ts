@@ -673,8 +673,18 @@ export async function updateCrmLead(
                 company: data.companyName?.trim() || null,
               }
             : {}),
-          ...(data.phone !== undefined ? { phone: data.phone?.trim() || "—" } : {}),
-          ...(data.email !== undefined ? { email: data.email?.trim() || null } : {}),
+          ...(data.phone !== undefined
+            ? {
+                phone: data.phone?.trim() || "—",
+                phoneNormalized: normalizeLeadPhone(data.phone),
+              }
+            : {}),
+          ...(data.email !== undefined
+            ? {
+                email: data.email?.trim() || null,
+                emailNormalized: normalizeLeadEmail(data.email),
+              }
+            : {}),
           ...(data.zalo !== undefined ? { zalo: data.zalo?.trim() || null } : {}),
           ...(data.source !== undefined ? { source: data.source } : {}),
           ...(data.sourceDetail !== undefined
@@ -698,13 +708,37 @@ export async function updateCrmLead(
           },
         });
       }
+      if (data.priority !== undefined && data.priority !== existing.priority) {
+        await tx.cRMActivity.create({
+          data: {
+            leadId: id,
+            type: "NOTE",
+            title: "Cập nhật mức ưu tiên",
+            content: `${existing.priority} → ${data.priority}`,
+          },
+        });
+      }
+      if (
+        data.nextFollowUpAt !== undefined &&
+        data.nextFollowUpAt?.getTime() !== existing.nextFollowUpAt?.getTime()
+      ) {
+        await tx.cRMActivity.create({
+          data: {
+            leadId: id,
+            type: "FOLLOW_UP",
+            title: data.nextFollowUpAt ? "Đặt lịch follow-up" : "Xóa lịch follow-up",
+            nextFollowUpAt: data.nextFollowUpAt,
+          },
+        });
+      }
 
       return updated;
     });
 
     return getCrmLeadById(row.id);
-  } catch {
-    return null;
+  } catch (error) {
+    console.error("[CRM] updateCrmLead failed:", error);
+    throw error;
   }
 }
 
