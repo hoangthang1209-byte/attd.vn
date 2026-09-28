@@ -57,7 +57,10 @@ export type CrmLeadRecord = {
   zalo: string | null;
   company: string | null;
   source: LeadSource;
+  sourceRef: string | null;
   sourceDetail: string | null;
+  receivedAt: string | null;
+  intakeMetadata: Record<string, unknown> | null;
   demand: string | null;
   status: LeadStatus;
   priority: LeadPriority;
@@ -291,6 +294,8 @@ export const CRM_LEAD_PRIORITIES: LeadPriority[] = [
 
 export const CRM_LEAD_SOURCES: LeadSource[] = [
   "WEBSITE",
+  "GMAIL",
+  "MANUAL",
   "ZALO",
   "FACEBOOK",
   "PHONE",

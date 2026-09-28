@@ -6,6 +6,7 @@ import {
   isValidLeadStatus,
   updateCrmLead,
 } from "@/features/crm/services/crm-lead.service";
+import { validateLeadOwnerId } from "@/features/crm/services/lead-intake.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -130,7 +131,19 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     patch.note = typeof raw.note === "string" ? raw.note : null;
   }
   if (raw.assignedTo !== undefined) {
-    patch.assignedTo = typeof raw.assignedTo === "string" ? raw.assignedTo : null;
+    const ownerRaw = typeof raw.assignedTo === "string" ? raw.assignedTo.trim() : "";
+    if (ownerRaw) {
+      const validated = await validateLeadOwnerId(ownerRaw);
+      if (!validated) {
+        return NextResponse.json(
+          { message: "Sales owner không hợp lệ hoặc đã ngưng hoạt động." },
+          { status: 400 }
+        );
+      }
+      patch.assignedTo = validated;
+    } else {
+      patch.assignedTo = null;
+    }
   }
 
   if (Object.keys(patch).length === 0) {
