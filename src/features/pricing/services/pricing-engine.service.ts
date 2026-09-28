@@ -134,6 +134,30 @@ function computeServiceAmounts(
 
 export async function calculatePricing(input: CalculatePricingInput): Promise<CalculatePricingResult> {
   const warnings: string[] = [];
+  const nonNegativeFields: Array<[string, number | undefined]> = [
+    ["Chiết khấu", input.discountAmount],
+    ["Phí vận chuyển", input.shippingFee],
+    ["Tổng tiền chỉnh tay", input.manualTotalAmount],
+  ];
+  for (const [label, value] of nonNegativeFields) {
+    if (value != null && (!Number.isFinite(value) || value < 0)) {
+      throw new PricingValidationError(`${label} phải là số không âm.`);
+    }
+  }
+  if (input.vatRate != null && (!Number.isFinite(input.vatRate) || input.vatRate < 0 || input.vatRate > 100)) {
+    throw new PricingValidationError("VAT phải nằm trong khoảng 0–100%.");
+  }
+  for (const item of input.items) {
+    if (!Number.isFinite(item.quantity) || item.quantity < 1) {
+      throw new PricingValidationError("Số lượng sản phẩm phải lớn hơn 0.");
+    }
+    if (item.manualUnitPrice != null && (!Number.isFinite(item.manualUnitPrice) || item.manualUnitPrice < 0)) {
+      throw new PricingValidationError("Đơn giá chỉnh tay phải là số không âm.");
+    }
+    if (item.discountAmount != null && (!Number.isFinite(item.discountAmount) || item.discountAmount < 0)) {
+      throw new PricingValidationError("Chiết khấu dòng sản phẩm phải là số không âm.");
+    }
+  }
   let priceGroupRow = input.priceGroupId
     ? await prisma.priceGroup.findUnique({ where: { id: input.priceGroupId } })
     : await getDefaultPriceGroup();
@@ -288,6 +312,9 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
   const shippingFee = input.shippingFee ?? 0;
   const vatRate = input.vatRate ?? 0;
   const taxableBase = roundMoney(subtotal - discountAmount + shippingFee);
+  if (taxableBase < 0) {
+    throw new PricingValidationError("Tổng sau chiết khấu và vận chuyển không được âm.");
+  }
   const vatAmount = roundMoney((taxableBase * vatRate) / 100);
   const calculatedTotalAmount = roundMoney(taxableBase + vatAmount);
 
