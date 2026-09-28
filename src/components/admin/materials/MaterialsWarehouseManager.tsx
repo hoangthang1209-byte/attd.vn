@@ -69,8 +69,28 @@ export default function MaterialsWarehouseManager() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void fetch("/api/materials?view=warehouse")
+      .then(async (res) => {
+        const data = (await res.json()) as { rows?: WarehouseRow[] };
+        if (!res.ok) throw new Error("Không thể tải tồn kho vật tư.");
+        return data;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setRows(data.rows ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRows([]);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function openHistory(materialId: string) {
     setPanelMaterialId(materialId);
