@@ -14,6 +14,7 @@ import type {
 } from "@/features/pricing/costing-types";
 import { previewCostingCalculation } from "@/features/pricing/costing-preview";
 import { usesV2CostLines, validateCostingLinesForSave } from "@/features/pricing/costing-v2";
+import { requestedQuantityTiers } from "@/features/pricing/pricing-p1-guards";
 
 const PROCESS_COMPONENT_TYPES: CostingComponentType[] = [
   "CUTTING",
@@ -279,11 +280,9 @@ export async function saveCostingCalculation(
     if (lineError) throw new CostingCalculatorValidationError(lineError);
   }
   const result = await calculateCosting(input);
-  const requestedQuantityTiers = (input.quantityBreaks ?? [])
-    .map((item) => Math.round(positive(item.quantity)))
-    .filter((quantity) => quantity > 0);
-  const quantityBreaks = requestedQuantityTiers.length > 0
-    ? await calculateCostingQuantityBreaks(input, requestedQuantityTiers)
+  const quantityTiers = requestedQuantityTiers(input.quantityBreaks);
+  const quantityBreaks = quantityTiers.length > 0
+    ? await calculateCostingQuantityBreaks(input, quantityTiers)
     : [];
   const costingSnapshot = { ...result, quantityBreaks };
   const code = await generatePricingCalculationCode();
@@ -399,11 +398,9 @@ export async function updateCostingCalculation(
   }
 
   const result = await calculateCosting(input);
-  const requestedQuantityTiers = (input.quantityBreaks ?? [])
-    .map((item) => Math.round(positive(item.quantity)))
-    .filter((quantity) => quantity > 0);
-  const quantityBreaks = requestedQuantityTiers.length > 0
-    ? await calculateCostingQuantityBreaks(input, requestedQuantityTiers)
+  const quantityTiers = requestedQuantityTiers(input.quantityBreaks);
+  const quantityBreaks = quantityTiers.length > 0
+    ? await calculateCostingQuantityBreaks(input, quantityTiers)
     : [];
   const costingSnapshot = { ...result, quantityBreaks };
 
