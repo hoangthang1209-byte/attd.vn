@@ -67,23 +67,29 @@ export default function PricingOverviewDashboard() {
       </div>
 
       <div className="admin-section-header" style={{ marginTop: 24 }}>
-        <h3 className="admin-subtitle">Truy cập nhanh</h3>
+        <h3 className="admin-subtitle">Tính giá</h3>
       </div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">
-          Costing & báo giá nhanh
+          Tính giá nhanh
         </Link>
         <Link href="/admin/pricing/costing/batch" className="admin-btn admin-btn--primary">
-          Costing batch (nhiều style)
+          Tính giá nhiều sản phẩm
         </Link>
-        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary">
-          Bộ tính giá
+        <Link href="/admin/pricing/history" className="admin-btn admin-btn--primary">
+          Lịch sử tính giá
         </Link>
+      </div>
+
+      <div className="admin-section-header" style={{ marginTop: 24 }}>
+        <h3 className="admin-subtitle">Cấu hình giá</h3>
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Link href="/admin/pricing/price-groups" className="admin-btn admin-btn--secondary">
           Nhóm giá
         </Link>
         <Link href="/admin/pricing/product-tiers" className="admin-btn admin-btn--secondary">
-          Bảng giá sản phẩm
+          Bảng giá chuẩn
         </Link>
         <Link href="/admin/pricing/cost-library" className="admin-btn admin-btn--secondary">
           Thư viện chi phí
@@ -91,8 +97,8 @@ export default function PricingOverviewDashboard() {
         <Link href="/admin/pricing/service-rules" className="admin-btn admin-btn--secondary">
           Phí dịch vụ
         </Link>
-        <Link href="/admin/pricing/history" className="admin-btn admin-btn--secondary">
-          Lịch sử tính giá
+        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary">
+          Tính theo bảng giá / quy tắc
         </Link>
       </div>
 
