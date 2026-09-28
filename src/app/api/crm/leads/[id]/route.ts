@@ -9,7 +9,7 @@ import {
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import { prisma } from "@/lib/prisma";
 import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
-import { can, getPermissionScope } from "@/features/auth/admin-permissions";
+import { can } from "@/features/auth/admin-permissions";
 import { canAccessLeadRecord } from "@/features/auth/lead-scope";
 import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 
@@ -66,8 +66,10 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   if (!scopeRow) {
     return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
   }
-  if (getPermissionScope(session, "leads.update") !== "NONE" &&
-      !canAccessLeadRecord(session, scopeRow, "leads.update")) {
+  if (!can(session, "leads.update")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
+  if (!canAccessLeadRecord(session, scopeRow, "leads.update")) {
     return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
   }
 
