@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MessageCircle, FileText } from "lucide-react";
 import TrackedLink from "@/components/analytics/TrackedLink";
