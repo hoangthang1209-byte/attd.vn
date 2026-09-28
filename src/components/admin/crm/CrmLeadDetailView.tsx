@@ -56,6 +56,9 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
   const [salesEmployees, setSalesEmployees] = useState<Array<{ id: string; fullName: string }>>([]);
   const [assignedEmployeeId, setAssignedEmployeeId] = useState(initialLead.assignedEmployeeId ?? "");
   const [assigning, setAssigning] = useState(false);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDueAt, setTaskDueAt] = useState("");
+  const [taskSaving, setTaskSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   const isLinked = Boolean(lead.customerId);
@@ -109,6 +112,49 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
       },
     });
     setAssigning(false);
+  }
+
+  async function createTask() {
+    if (!taskTitle.trim()) return;
+    setTaskSaving(true);
+    await mutate({
+      loadingMessage: "Đang tạo việc cần làm…",
+      successMessage: "Đã tạo việc cần làm.",
+      action: async () => {
+        const res = await fetch(`/api/crm/leads/${lead.id}/tasks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: taskTitle,
+            dueAt: taskDueAt ? new Date(taskDueAt).toISOString() : null,
+            ownerId: assignedEmployeeId || null,
+          }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.task);
+      },
+      onSuccess: () => {
+        setTaskTitle("");
+        setTaskDueAt("");
+        void refreshLead();
+      },
+    });
+    setTaskSaving(false);
+  }
+
+  async function completeTask(taskId: string) {
+    await mutate({
+      loadingMessage: "Đang hoàn tất việc…",
+      successMessage: "Đã hoàn tất việc.",
+      action: async () => {
+        const res = await fetch(`/api/crm/leads/${lead.id}/tasks`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.task);
+      },
+      onSuccess: () => void refreshLead(),
+    });
   }
 
   async function saveUpdates() {
@@ -221,6 +267,76 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
             </AdminLoadingButton>
           </div>
         </div>
+      </section>
+
+      <section className="admin-section-card">
+        <div className="admin-section-header">
+          <div>
+            <h3>Việc cần làm tiếp theo</h3>
+            <p className="admin-field-hint">
+              Ưu tiên một hành động cụ thể thay vì chỉ đặt trạng thái lead.
+            </p>
+          </div>
+        </div>
+        <div className="admin-form admin-form--compact admin-form-grid">
+          <label className="admin-form-grid-span-2">
+            Nội dung
+            <input
+              className="admin-input"
+              value={taskTitle}
+              onChange={(event) => setTaskTitle(event.target.value)}
+              placeholder="Ví dụ: Gọi xác nhận số lượng và deadline"
+            />
+          </label>
+          <label>
+            Thời hạn
+            <input
+              type="datetime-local"
+              className="admin-input"
+              value={taskDueAt}
+              onChange={(event) => setTaskDueAt(event.target.value)}
+            />
+          </label>
+          <div style={{ alignSelf: "end" }}>
+            <AdminLoadingButton
+              type="button"
+              variant="primary"
+              pending={taskSaving}
+              pendingLabel="Đang tạo..."
+              onClick={() => void createTask()}
+            >
+              + Thêm việc
+            </AdminLoadingButton>
+          </div>
+        </div>
+        {lead.tasks?.length ? (
+          <ul className="admin-crm-related-list">
+            {lead.tasks.slice(0, 8).map((task) => (
+              <li key={task.id}>
+                <div>
+                  <strong>{task.title}</strong>
+                  <span className="admin-field-hint">
+                    {task.owner?.fullName ? ` · ${task.owner.fullName}` : ""}
+                    {task.dueAt ? ` · ${formatCrmDateTime(task.dueAt)}` : ""}
+                  </span>
+                </div>
+                {task.completedAt ? (
+                  <span className="admin-badge admin-badge--success">Đã xong</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary admin-btn--small"
+                    onClick={() => void completeTask(task.id)}
+                  >
+                    Hoàn tất
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="admin-empty-hint">Chưa có việc cần làm.</p>
+        )}
       </section>
 
       <div className="admin-crm-detail-grid">
