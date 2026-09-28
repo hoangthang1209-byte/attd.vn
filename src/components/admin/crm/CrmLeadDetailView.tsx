@@ -18,6 +18,7 @@ import CrmRelatedOrders from "@/components/admin/crm/CrmRelatedOrders";
 import {
   CRM_PRIORITY_LABELS,
   CRM_STATUS_LABELS,
+  getLeadSourceLabel,
   displayLeadCompanyName,
   displayLeadContactName,
 } from "@/features/crm/labels";
@@ -327,6 +328,45 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
           <CrmProductInterestForm leadId={lead.id} onCreated={() => void refreshLead()} />
         </section>
       </div>
+
+      {(lead.inboundEvents?.length || lead.assignmentHistory?.length) ? (
+        <div className="admin-crm-detail-grid">
+          <section className="admin-section-card">
+            <h3>Dữ liệu nguồn</h3>
+            {lead.inboundEvents?.length ? (
+              <ul className="admin-crm-related-list">
+                {lead.inboundEvents.slice(0, 10).map((event) => (
+                  <li key={event.id}>
+                    <strong>{event.channel}</strong>
+                    <span>{getLeadSourceLabel(event.source)}</span>
+                    <span className="admin-field-hint">{formatCrmDateTime(event.receivedAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="admin-field-hint">Lead cũ chưa có dữ liệu intake event.</p>
+            )}
+          </section>
+
+          <section className="admin-section-card">
+            <h3>Lịch sử phân công</h3>
+            {lead.assignmentHistory?.length ? (
+              <ul className="admin-crm-related-list">
+                {lead.assignmentHistory.slice(0, 10).map((event) => (
+                  <li key={event.id}>
+                    <strong>{event.toEmployeeName || "Bỏ phân công"}</strong>
+                    {event.fromEmployeeName ? <span>Từ: {event.fromEmployeeName}</span> : null}
+                    {event.reason ? <span>{event.reason}</span> : null}
+                    <span className="admin-field-hint">{formatCrmDateTime(event.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="admin-field-hint">Chưa có lịch sử phân công.</p>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       <CrmRelatedQuotes
         leadId={lead.id}
