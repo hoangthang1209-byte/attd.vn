@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LeadPriority, LeadStatus } from "@prisma/client";
@@ -52,9 +52,29 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
   const [note, setNote] = useState(initialLead.note ?? "");
   const [demand, setDemand] = useState(initialLead.demand ?? "");
   const [saving, setSaving] = useState(false);
+  const [salesEmployees, setSalesEmployees] = useState<Array<{ id: string; fullName: string }>>([]);
+  const [assignedEmployeeId, setAssignedEmployeeId] = useState(initialLead.assignedEmployeeId ?? "");
+  const [assigning, setAssigning] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   const isLinked = Boolean(lead.customerId);
+
+  useEffect(() => {
+    void fetch("/api/employees?active=1&role=SALES&limit=200")
+      .then((response) => (response.ok ? response.json() : { employees: [] }))
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : data.employees;
+        setSalesEmployees(
+          Array.isArray(rows)
+            ? rows.map((employee: { id: string; fullName: string }) => ({
+                id: employee.id,
+                fullName: employee.fullName,
+              }))
+            : [],
+        );
+      })
+      .catch(() => setSalesEmployees([]));
+  }, []);
 
   async function refreshLead() {
     const res = await fetch(`/api/crm/leads/${lead.id}`);
@@ -63,8 +83,31 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
       setLead(data.lead);
       setStatus(data.lead.status);
       setPriority(data.lead.priority);
+      setAssignedEmployeeId(data.lead.assignedEmployeeId ?? "");
     }
     router.refresh();
+  }
+
+  async function assignOwner() {
+    setAssigning(true);
+    await mutate({
+      loadingMessage: "Đang phân công lead…",
+      successMessage: "Đã cập nhật sales phụ trách.",
+      action: async () => {
+        const res = await fetch(`/api/crm/leads/${lead.id}/assign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ employeeId: assignedEmployeeId || null }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.lead as CrmLeadRecord);
+      },
+      onSuccess: (updatedLead) => {
+        setLead(updatedLead);
+        setAssignedEmployeeId(updatedLead.assignedEmployeeId ?? "");
+        router.refresh();
+      },
+    });
+    setAssigning(false);
   }
 
   async function saveUpdates() {
@@ -143,6 +186,41 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
           {message.text}
         </p>
       )}
+
+      <section className="admin-section-card">
+        <div className="admin-section-header">
+          <div>
+            <h3>Sales phụ trách</h3>
+            <p className="admin-field-hint">
+              {lead.assignedEmployee?.fullName || lead.assignedTo || "Lead chưa được phân công"}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <select
+              className="admin-input"
+              value={assignedEmployeeId}
+              onChange={(event) => setAssignedEmployeeId(event.target.value)}
+              aria-label="Sales phụ trách"
+            >
+              <option value="">— Chưa phân công —</option>
+              {salesEmployees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.fullName}
+                </option>
+              ))}
+            </select>
+            <AdminLoadingButton
+              type="button"
+              variant="secondary"
+              pending={assigning}
+              pendingLabel="Đang phân công..."
+              onClick={() => void assignOwner()}
+            >
+              Cập nhật
+            </AdminLoadingButton>
+          </div>
+        </div>
+      </section>
 
       <div className="admin-crm-detail-grid">
         <section className="admin-section-card">
