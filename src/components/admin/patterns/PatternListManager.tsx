@@ -93,13 +93,13 @@ function formatPatternListDate(value: string): string {
 
 function formatPatternDeleteError(data: PatternDeleteResponse): string {
   const message = data.message ?? data.error ?? "Không thể xóa rập.";
-  if (data.traceId) return \`\${message} Mã tra cứu: \${data.traceId}\`;
+  if (data.traceId) return `${message} Mã tra cứu: ${data.traceId}`;
   return message;
 }
 
 function technicalSummary(row: PatternRow): string {
   const parts = [];
-  if (row.baseSize) parts.push(\`Base \${row.baseSize}\`);
+  if (row.baseSize) parts.push(`Base ${row.baseSize}`);
   if (row.sizeRange) parts.push(row.sizeRange);
   return parts.join(" · ") || "Chưa có size";
 }
@@ -134,7 +134,7 @@ export default function PatternListManager() {
       if (statusFilter) params.set("status", statusFilter);
       if (appliedSearch.trim()) params.set("search", appliedSearch.trim());
 
-      const res = await fetch(\`/api/patterns?\${params.toString()}\`);
+      const res = await fetch(`/api/patterns?${params.toString()}`);
       const data = (await res.json()) as PatternListResponse;
       if (!res.ok) throw new Error(data.message ?? "Không thể tải danh sách rập");
 
@@ -183,12 +183,12 @@ export default function PatternListManager() {
 
   async function handleArchive(row: PatternRow) {
     if (archivingId || row.status === "ARCHIVED") return;
-    if (!window.confirm(\`Lưu trữ \${row.code} — \${row.name}?\`)) return;
+    if (!window.confirm(`Lưu trữ ${row.code} — ${row.name}?`)) return;
 
     setArchivingId(row.id);
     setError(null);
     try {
-      const res = await fetch(\`/api/patterns/\${row.id}/archive\`, { method: "POST" });
+      const res = await fetch(`/api/patterns/${row.id}/archive`, { method: "POST" });
       const data = (await res.json().catch(() => ({}))) as { message?: string };
       if (!res.ok) throw new Error(data.message ?? "Không thể lưu trữ rập.");
       await load();
@@ -202,14 +202,14 @@ export default function PatternListManager() {
   async function handleDelete(row: PatternRow) {
     if (!canDeletePattern || deletingId) return;
     const confirmed = window.confirm(
-      \`Xóa vĩnh viễn \${row.code} — \${row.name}? Chỉ nên dùng cho dữ liệu nhập nhầm hoặc bản nháp chưa sử dụng.\`,
+      `Xóa vĩnh viễn ${row.code} — ${row.name}? Chỉ nên dùng cho dữ liệu nhập nhầm hoặc bản nháp chưa sử dụng.`,
     );
     if (!confirmed) return;
 
     setDeletingId(row.id);
     setError(null);
     try {
-      const res = await fetch(\`/api/patterns/\${row.id}\`, { method: "DELETE" });
+      const res = await fetch(`/api/patterns/${row.id}`, { method: "DELETE" });
       const data = (await res.json().catch(() => ({}))) as PatternDeleteResponse;
       if (!res.ok) throw new Error(formatPatternDeleteError(data));
       await load();
@@ -276,7 +276,7 @@ export default function PatternListManager() {
           <div className={styles.searchWrap}>
             <Search className={styles.searchIcon} aria-hidden="true" />
             <input
-              className={\`admin-input \${styles.searchInput}\`}
+              className={`admin-input ${styles.searchInput}`}
               placeholder="Tìm mã rập, tên, sản phẩm, khách hàng, nhà cung cấp..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -427,7 +427,7 @@ export default function PatternListManager() {
                               {canDeletePattern && (
                                 <button
                                   type="button"
-                                  className={\`\${styles.menuButton} \${styles.menuButtonDanger}\`}
+                                  className={`${styles.menuButton} ${styles.menuButtonDanger}`}
                                   onClick={() => void handleDelete(row)}
                                   disabled={deletingId === row.id}
                                 >
