@@ -133,6 +133,9 @@ export async function POST(req: NextRequest) {
       request: req,
     });
     if (!permission.ok) return permission.response;
+    if (!can(permission.session, "leads.create")) {
+      return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+    }
 
     if (!contactName && !companyName && !phone && !email && !fullName) {
       return NextResponse.json(
