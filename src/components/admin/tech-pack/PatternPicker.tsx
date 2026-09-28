@@ -50,7 +50,7 @@ export default function PatternPicker({ value, onChange, disabled }: Props) {
       setLoading(true);
       const params = new URLSearchParams();
       if (query.trim()) params.set("search", query.trim());
-      params.set("limit", "40");
+      params.set("pageSize", "100");
       void fetch(`/api/patterns?${params.toString()}`)
         .then((r) => r.json())
         .then((data: { items?: PatternPickerOption[] }) => {
