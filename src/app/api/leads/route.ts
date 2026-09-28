@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import {
+  assertLeadIntakeRateLimit,
   buildDailyLeadIdempotencyKey,
   ingestCrmLead,
+  LeadIntakeRateLimitError,
 } from "@/features/crm/services/crm-lead-intake.service";
 
 export async function GET() {
@@ -90,6 +92,7 @@ export async function POST(request: Request) {
   } as const;
 
   try {
+    await assertLeadIntakeRateLimit({ phone, email });
     const { lead, deduplicated } = await ingestCrmLead({
       lead: leadInput,
       channel: inquiry?.productId ? "WEBSITE_PRODUCT_INQUIRY" : "WEBSITE_CONTACT",
@@ -118,6 +121,9 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ...lead, deduplicated }, { status: deduplicated ? 200 : 201 });
   } catch (error) {
+    if (error instanceof LeadIntakeRateLimitError) {
+      return NextResponse.json({ message: error.message }, { status: 429 });
+    }
     console.error("[POST /api/leads]", error);
     return NextResponse.json(
       { message: "Không thể lưu lead. Vui lòng thử lại." },
