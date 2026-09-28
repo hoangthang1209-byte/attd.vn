@@ -1,3 +1,6 @@
+ALTER TYPE "LeadSource" ADD VALUE IF NOT EXISTS 'EMAIL';
+ALTER TYPE "LeadSource" ADD VALUE IF NOT EXISTS 'WHATSAPP';
+
 -- CRM lead foundation v2 (additive / backward-compatible)
 
 ALTER TABLE "Lead"
