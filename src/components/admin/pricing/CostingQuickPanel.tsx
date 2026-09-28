@@ -211,7 +211,6 @@ export default function CostingQuickPanel({
   function handleLineKeyDown(
     e: React.KeyboardEvent,
     lineIndex: number,
-    _line: QuickCostLine,
   ) {
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
@@ -368,7 +367,7 @@ export default function CostingQuickPanel({
                         value={line.unitCost}
                         disabled={saving}
                         onChange={(e) => updateLineUnitCost(line, e.target.value)}
-                        onKeyDown={(e) => handleLineKeyDown(e, index, line)}
+                        onKeyDown={(e) => handleLineKeyDown(e, index)}
                       />
                     </td>
                     <td>
