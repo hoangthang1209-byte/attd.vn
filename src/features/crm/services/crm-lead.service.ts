@@ -256,7 +256,7 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
             note: input.note?.trim() || null,
             status: input.status ?? "NEW",
             priority: input.priority ?? "NORMAL",
-            followUpAt: input.followUpAt ?? input.nextFollowUpAt ?? null,
+            followUpAt: null,
             nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
             estimatedValue: input.estimatedValue ?? null,
             assignedTo: input.assignedTo?.trim() || null,
@@ -311,7 +311,7 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
         note: input.note?.trim() || null,
         status: input.status ?? "NEW",
         priority: input.priority ?? "NORMAL",
-        followUpAt: input.followUpAt ?? input.nextFollowUpAt ?? null,
+        followUpAt: null,
         nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
         estimatedValue: input.estimatedValue ?? null,
         assignedTo: input.assignedTo?.trim() || null,
@@ -395,7 +395,7 @@ export async function createAdminLead(
           status: input.status ?? "NEW",
           priority: input.priority ?? "NORMAL",
           nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
-          followUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
+          followUpAt: null,
           estimatedValue: input.estimatedValue ?? null,
           assignedTo: input.assignedTo?.trim() || null,
           phoneNormalized: normalizeLeadPhone(identity.phone),
@@ -645,15 +645,17 @@ export async function updateCrmLead(
     const existing = await prisma.lead.findUnique({ where: { id } });
     if (!existing) return null;
 
+    const canonicalFollowUp =
+      data.nextFollowUpAt !== undefined ? data.nextFollowUpAt : data.followUpAt;
+
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.lead.update({
         where: { id },
         data: {
           ...(data.status !== undefined ? { status: data.status } : {}),
           ...(data.priority !== undefined ? { priority: data.priority } : {}),
-          ...(data.followUpAt !== undefined ? { followUpAt: data.followUpAt } : {}),
-          ...(data.nextFollowUpAt !== undefined
-            ? { nextFollowUpAt: data.nextFollowUpAt }
+          ...(canonicalFollowUp !== undefined
+            ? { nextFollowUpAt: canonicalFollowUp }
             : {}),
           ...(data.estimatedValue !== undefined
             ? { estimatedValue: data.estimatedValue }
@@ -719,15 +721,15 @@ export async function updateCrmLead(
         });
       }
       if (
-        data.nextFollowUpAt !== undefined &&
-        data.nextFollowUpAt?.getTime() !== existing.nextFollowUpAt?.getTime()
+        canonicalFollowUp !== undefined &&
+        canonicalFollowUp?.getTime() !== existing.nextFollowUpAt?.getTime()
       ) {
         await tx.cRMActivity.create({
           data: {
             leadId: id,
             type: "FOLLOW_UP",
-            title: data.nextFollowUpAt ? "Đặt lịch follow-up" : "Xóa lịch follow-up",
-            nextFollowUpAt: data.nextFollowUpAt,
+            title: canonicalFollowUp ? "Đặt lịch follow-up" : "Xóa lịch follow-up",
+            nextFollowUpAt: canonicalFollowUp,
           },
         });
       }
