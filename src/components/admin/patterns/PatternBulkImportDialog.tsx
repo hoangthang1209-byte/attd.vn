@@ -111,6 +111,7 @@ function downloadTemplate() {
 export default function PatternBulkImportDialog({ onClose, onImported }: Props) {
   const spreadsheetInputRef = useRef<HTMLInputElement | null>(null);
   const localFilesInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
   const [sourceFileName, setSourceFileName] = useState("");
   const [rows, setRows] = useState<PatternBulkImportRow[]>([]);
   const [localFiles, setLocalFiles] = useState<File[]>([]);
@@ -318,6 +319,13 @@ export default function PatternBulkImportDialog({ onClose, onImported }: Props) 
                 >
                   <FolderOpen size={14} />
                   &nbsp;Chọn nhiều file
+                </button>{" "}
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--sm"
+                  onClick={() => folderInputRef.current?.click()}
+                >
+                  Chọn thư mục
                 </button>
               </div>
               <input
@@ -331,8 +339,41 @@ export default function PatternBulkImportDialog({ onClose, onImported }: Props) 
                   event.currentTarget.value = "";
                 }}
               />
+              <input
+                ref={(element) => {
+                  folderInputRef.current = element;
+                  if (element) element.setAttribute("webkitdirectory", "");
+                }}
+                className={styles.hiddenInput}
+                type="file"
+                multiple
+                onChange={(event) => {
+                  setLocalFiles(Array.from(event.target.files ?? []));
+                  event.currentTarget.value = "";
+                }}
+              />
               <div className={styles.fileMeta}>
-                {localFiles.length ? `Đã chọn ${localFiles.length} file` : "Có thể bỏ qua và bổ sung file sau"}
+                {localFiles.length ? (
+                  <>
+                    Đã chọn {localFiles.length} file{" "}
+                    {!rows.length && (
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn--sm"
+                        onClick={() => {
+                          setRows(buildRowsFromLocalFiles(localFiles));
+                          setSourceFileName("Tạo từ tên file");
+                          setResult(null);
+                          setError(null);
+                        }}
+                      >
+                        Tạo danh sách từ tên file
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  "Có thể bỏ qua và bổ sung file sau"
+                )}
               </div>
             </div>
           </div>
