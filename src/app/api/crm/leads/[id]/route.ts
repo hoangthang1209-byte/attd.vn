@@ -7,6 +7,11 @@ import {
   updateCrmLead,
 } from "@/features/crm/services/crm-lead.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
+import { prisma } from "@/lib/prisma";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
+import { can, getPermissionScope } from "@/features/auth/admin-permissions";
+import { canAccessLeadRecord } from "@/features/auth/lead-scope";
+import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -19,14 +24,28 @@ function parseDate(value: unknown): Date | null | undefined {
   return date;
 }
 
-export async function GET(_req: NextRequest, context: RouteContext) {
-  const { id } = await context.params;
-  const lead = await getCrmLeadById(id);
+export async function GET(req: NextRequest, context: RouteContext) {
+  const session = getAdminSessionFromRequest(req);
+  if (!can(session, "leads.view")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
 
+  const { id } = await context.params;
+  const scopeRow = await prisma.lead.findUnique({
+    where: { id },
+    select: { assignedEmployeeId: true },
+  });
+  if (!scopeRow) {
+    return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+  }
+  if (!canAccessLeadRecord(session, scopeRow, "leads.view")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
+
+  const lead = await getCrmLeadById(id);
   if (!lead) {
     return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
   }
-
   return NextResponse.json({ lead });
 }
 
@@ -39,6 +58,18 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   if (!permission.ok) return permission.response;
 
   const { id } = await context.params;
+  const session = getAdminSessionFromRequest(req);
+  const scopeRow = await prisma.lead.findUnique({
+    where: { id },
+    select: { assignedEmployeeId: true },
+  });
+  if (!scopeRow) {
+    return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+  }
+  if (getPermissionScope(session, "leads.update") !== "NONE" &&
+      !canAccessLeadRecord(session, scopeRow, "leads.update")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
 
   let body: unknown;
   try {
