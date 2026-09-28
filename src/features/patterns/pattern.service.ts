@@ -94,31 +94,27 @@ export async function listPatterns(input?: {
   const page = Math.max(input?.page ?? 1, 1);
   const skip = (page - 1) * pageSize;
 
-  const [items, total, statusGroups, allCount] = await prisma.$transaction([
-    prisma.pattern.findMany({
-      where,
-      include: {
-        productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
-        product: { select: { id: true, name: true, productCode: true } },
-        customer: { select: { id: true, name: true, code: true } },
-        patternSupplier: { select: PATTERN_SUPPLIER_SELECT },
-        _count: { select: { files: true, techPacks: true } },
-      },
-      orderBy: [{ updatedAt: "desc" }],
-      skip,
-      take: pageSize,
-    }),
-    prisma.pattern.count({ where }),
-    prisma.pattern.groupBy({
-      by: ["status"],
-      _count: { _all: true },
-    }),
-    prisma.pattern.count(),
-  ]);
-
-  const statusCounts = Object.fromEntries(
-    statusGroups.map((group) => [group.status, group._count._all]),
-  ) as Partial<Record<PatternStatus, number>>;
+  const [items, total, allCount, draftCount, approvedCount, archivedCount] =
+    await prisma.$transaction([
+      prisma.pattern.findMany({
+        where,
+        include: {
+          productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
+          product: { select: { id: true, name: true, productCode: true } },
+          customer: { select: { id: true, name: true, code: true } },
+          patternSupplier: { select: PATTERN_SUPPLIER_SELECT },
+          _count: { select: { files: true, techPacks: true } },
+        },
+        orderBy: [{ updatedAt: "desc" }],
+        skip,
+        take: pageSize,
+      }),
+      prisma.pattern.count({ where }),
+      prisma.pattern.count(),
+      prisma.pattern.count({ where: { status: PatternStatus.DRAFT } }),
+      prisma.pattern.count({ where: { status: PatternStatus.APPROVED } }),
+      prisma.pattern.count({ where: { status: PatternStatus.ARCHIVED } }),
+    ]);
 
   return {
     items,
@@ -128,9 +124,9 @@ export async function listPatterns(input?: {
     pageCount: Math.max(1, Math.ceil(total / pageSize)),
     stats: {
       all: allCount,
-      draft: statusCounts.DRAFT ?? 0,
-      approved: statusCounts.APPROVED ?? 0,
-      archived: statusCounts.ARCHIVED ?? 0,
+      draft: draftCount,
+      approved: approvedCount,
+      archived: archivedCount,
     },
   };
 }
