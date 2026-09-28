@@ -78,3 +78,32 @@ ALTER TABLE "LeadAssignmentHistory"
   ADD CONSTRAINT "LeadAssignmentHistory_toEmployeeId_fkey"
   FOREIGN KEY ("toEmployeeId") REFERENCES "Employee"("id")
   ON DELETE SET NULL ON UPDATE CASCADE;
+
+CREATE TABLE "LeadTask" (
+  "id" TEXT NOT NULL,
+  "leadId" TEXT NOT NULL,
+  "ownerId" TEXT,
+  "title" TEXT NOT NULL,
+  "note" TEXT,
+  "dueAt" TIMESTAMP(3),
+  "completedAt" TIMESTAMP(3),
+  "outcome" TEXT,
+  "createdBy" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "LeadTask_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX "LeadTask_leadId_completedAt_dueAt_idx"
+  ON "LeadTask"("leadId", "completedAt", "dueAt");
+CREATE INDEX "LeadTask_ownerId_completedAt_dueAt_idx"
+  ON "LeadTask"("ownerId", "completedAt", "dueAt");
+
+ALTER TABLE "LeadTask"
+  ADD CONSTRAINT "LeadTask_leadId_fkey"
+  FOREIGN KEY ("leadId") REFERENCES "Lead"("id")
+  ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "LeadTask"
+  ADD CONSTRAINT "LeadTask_ownerId_fkey"
+  FOREIGN KEY ("ownerId") REFERENCES "Employee"("id")
+  ON DELETE SET NULL ON UPDATE CASCADE;
