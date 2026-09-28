@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { can, getPermissionScope } from "@/features/auth/admin-permissions";
+import { can } from "@/features/auth/admin-permissions";
 import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
+import { getLeadPermissionScope } from "@/features/auth/lead-scope";
 import { assignLead } from "@/features/crm/services/crm-lead-assignment.service";
 import { getCrmLeadById } from "@/features/crm/services/crm-lead.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: "Nhân viên phụ trách không hợp lệ" }, { status: 400 });
   }
 
-  const scope = getPermissionScope(permission.session, "leads.update");
+  const scope = getLeadPermissionScope(permission.session, "leads.update");
   if (scope === "OWN" || scope === "ASSIGNED") {
     const me = permission.session.employeeId;
     const canSelfManage =
