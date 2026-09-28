@@ -268,6 +268,11 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
 
     const lineSubtotal = roundMoney(unitPrice * item.quantity + lineSetupFee + lineServiceFee);
     const itemDiscount = item.discountAmount ?? 0;
+    if (itemDiscount > lineSubtotal) {
+      throw new PricingValidationError(
+        `Chiết khấu dòng "${productName}" không được vượt quá thành tiền trước chiết khấu.`,
+      );
+    }
     const lineTotal = roundMoney(lineSubtotal - itemDiscount);
 
     let marginAmount: number | null = null;
