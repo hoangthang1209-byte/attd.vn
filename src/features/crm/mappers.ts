@@ -59,6 +59,15 @@ export function mapLeadRow(row: {
     externalId: string | null;
     receivedAt: Date;
   }>;
+  tasks?: Array<{
+    id: string;
+    title: string;
+    note: string | null;
+    dueAt: Date | null;
+    completedAt: Date | null;
+    outcome: string | null;
+    owner?: { id: string; fullName: string } | null;
+  }>;
   assignmentHistory?: Array<{
     id: string;
     fromEmployeeId: string | null;
@@ -129,6 +138,15 @@ export function mapLeadRow(row: {
       channel: event.channel,
       externalId: event.externalId,
       receivedAt: event.receivedAt.toISOString(),
+    })),
+    tasks: row.tasks?.map((task) => ({
+      id: task.id,
+      title: task.title,
+      note: task.note,
+      dueAt: task.dueAt?.toISOString() ?? null,
+      completedAt: task.completedAt?.toISOString() ?? null,
+      outcome: task.outcome,
+      owner: task.owner ? { id: task.owner.id, fullName: task.owner.fullName } : null,
     })),
     assignmentHistory: row.assignmentHistory?.map((event) => ({
       id: event.id,
@@ -324,6 +342,11 @@ export const LEAD_DETAIL_INCLUDE = {
   productInterests: { orderBy: { createdAt: "desc" as const } },
   customer: true,
   assignedEmployee: { select: { id: true, fullName: true, employeeCode: true } },
+  tasks: {
+    orderBy: [{ completedAt: "asc" as const }, { dueAt: "asc" as const }, { createdAt: "desc" as const }],
+    take: 50,
+    include: { owner: { select: { id: true, fullName: true } } },
+  },
   inboundEvents: {
     orderBy: { receivedAt: "desc" as const },
     take: 50,
