@@ -4,9 +4,40 @@ import type { LeadSource, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { normalizeLeadEmail, normalizeLeadPhone } from "@/features/crm/lead-identity";
 import { createCrmLead, getCrmLeadById } from "@/features/crm/services/crm-lead.service";
+import { autoAssignLead } from "@/features/crm/services/crm-lead-assignment.service";
 import type { CreateCrmLeadInput, CrmLeadRecord } from "@/features/crm/types";
 
 const ACTIVE_STATUSES = ["NEW","CONTACTED","QUALIFIED","NEED_PRICING","QUOTING","QUOTED","NEGOTIATING"] as const;
+
+export class LeadIntakeRateLimitError extends Error {
+  constructor() {
+    super("Bạn đã gửi quá nhiều yêu cầu trong thời gian ngắn. Vui lòng thử lại sau.");
+    this.name = "LeadIntakeRateLimitError";
+  }
+}
+
+export async function assertLeadIntakeRateLimit(input: {
+  phone?: string | null;
+  email?: string | null;
+  windowMinutes?: number;
+  maxEvents?: number;
+}) {
+  const phoneNormalized = normalizeLeadPhone(input.phone);
+  const emailNormalized = normalizeLeadEmail(input.email);
+  if (!phoneNormalized && !emailNormalized) return;
+
+  const cutoff = new Date(Date.now() - (input.windowMinutes ?? 10) * 60_000);
+  const identity: Prisma.LeadInboundEventWhereInput[] = [];
+  if (phoneNormalized) identity.push({ phoneNormalized });
+  if (emailNormalized) identity.push({ emailNormalized });
+  const count = await prisma.leadInboundEvent.count({
+    where: {
+      receivedAt: { gte: cutoff },
+      OR: identity,
+    },
+  });
+  if (count >= (input.maxEvents ?? 5)) throw new LeadIntakeRateLimitError();
+}
 
 export function buildDailyLeadIdempotencyKey(input: {
   channel: string;
@@ -128,6 +159,10 @@ export async function ingestCrmLead(input: {
     } else {
       throw error;
     }
+  }
+
+  if (!deduplicated) {
+    await autoAssignLead(leadId);
   }
 
   const result = await getCrmLeadById(leadId);
