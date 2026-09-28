@@ -49,11 +49,8 @@ function buildLeadNote(input: WhatsAppAssistantInput, analysis: WhatsAppAssistan
     "Gợi ý bước tiếp theo:",
     analysis.suggestedNextActionVi,
     "",
-    "Raw WhatsApp chat:",
-    input.rawChatText,
-    "",
-    "JSON phân tích:",
-    JSON.stringify(analysis, null, 2),
+    "Ghi chú nội bộ AI:",
+    analysis.internalNotesVi || "Không có.",
   ]
     .filter((item) => item !== null)
     .join("\n");
