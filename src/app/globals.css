@@ -1505,6 +1505,27 @@ body:has(.mobile-action-bar) .site-footer {
   overflow: hidden;
 }
 
+.product-card-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.product-card-capability {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .product-card-footer {
   display: flex;
   align-items: center;
