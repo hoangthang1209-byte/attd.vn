@@ -279,17 +279,12 @@ export async function saveCostingCalculation(
     if (lineError) throw new CostingCalculatorValidationError(lineError);
   }
   const result = await calculateCosting(input);
-  const quantityBreaks = (input.quantityBreaks ?? [])
-    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
-    .map((item) => ({
-      quantity: Math.round(item.quantity),
-      totalCostPerUnit: roundMoney(positive(item.totalCostPerUnit)),
-      suggestedSellingPricePerUnit: roundMoney(positive(item.suggestedSellingPricePerUnit)),
-      revenueBeforeVat: roundMoney(positive(item.revenueBeforeVat)),
-      grossProfit: roundMoney(positive(item.grossProfit)),
-      actualMarginRate: roundMoney(positive(item.actualMarginRate)),
-      finalQuotePrice: roundMoney(positive(item.finalQuotePrice)),
-    }));
+  const requestedQuantityTiers = (input.quantityBreaks ?? [])
+    .map((item) => Math.round(positive(item.quantity)))
+    .filter((quantity) => quantity > 0);
+  const quantityBreaks = requestedQuantityTiers.length > 0
+    ? await calculateCostingQuantityBreaks(input, requestedQuantityTiers)
+    : [];
   const costingSnapshot = { ...result, quantityBreaks };
   const code = await generatePricingCalculationCode();
 
@@ -404,17 +399,12 @@ export async function updateCostingCalculation(
   }
 
   const result = await calculateCosting(input);
-  const quantityBreaks = (input.quantityBreaks ?? [])
-    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
-    .map((item) => ({
-      quantity: Math.round(item.quantity),
-      totalCostPerUnit: roundMoney(positive(item.totalCostPerUnit)),
-      suggestedSellingPricePerUnit: roundMoney(positive(item.suggestedSellingPricePerUnit)),
-      revenueBeforeVat: roundMoney(positive(item.revenueBeforeVat)),
-      grossProfit: roundMoney(positive(item.grossProfit)),
-      actualMarginRate: roundMoney(positive(item.actualMarginRate)),
-      finalQuotePrice: roundMoney(positive(item.finalQuotePrice)),
-    }));
+  const requestedQuantityTiers = (input.quantityBreaks ?? [])
+    .map((item) => Math.round(positive(item.quantity)))
+    .filter((quantity) => quantity > 0);
+  const quantityBreaks = requestedQuantityTiers.length > 0
+    ? await calculateCostingQuantityBreaks(input, requestedQuantityTiers)
+    : [];
   const costingSnapshot = { ...result, quantityBreaks };
 
   const useManualSell = calcItem.manualOverride && calcItem.manualUnitPrice != null;
