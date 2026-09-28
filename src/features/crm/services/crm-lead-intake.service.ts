@@ -66,6 +66,7 @@ export async function ingestCrmLead(input: {
   idempotencyKey?: string | null;
   externalId?: string | null;
   payload?: Prisma.InputJsonValue;
+  dedupeByIdentity?: boolean;
 }): Promise<{ lead: CrmLeadRecord; deduplicated: boolean }> {
   const phoneNormalized = normalizeLeadPhone(input.lead.phone);
   const emailNormalized = normalizeLeadEmail(input.lead.email);
@@ -91,7 +92,7 @@ export async function ingestCrmLead(input: {
     identityOr.push({ email: { equals: input.lead.email?.trim(), mode: "insensitive" } });
   }
 
-  const existing = identityOr.length
+  const existing = input.dedupeByIdentity !== false && identityOr.length
     ? await prisma.lead.findFirst({
         where: {
           status: { in: [...ACTIVE_STATUSES] },
