@@ -14,6 +14,7 @@ import {
   mapLeadRow,
 } from "@/features/crm/mappers";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
+import { normalizeLeadEmail, normalizeLeadPhone } from "@/features/crm/lead-identity";
 import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-product-interest-snapshot";
 import {
   CRM_LEAD_PRIORITIES,
@@ -259,6 +260,9 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
             nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
             estimatedValue: input.estimatedValue ?? null,
             assignedTo: input.assignedTo?.trim() || null,
+            phoneNormalized: normalizeLeadPhone(identity.phone),
+            emailNormalized: normalizeLeadEmail(identity.email),
+            lastInboundAt: new Date(),
             landingPage: input.landingPage?.trim() || null,
             utmSource: input.utmSource?.trim() || null,
             utmMedium: input.utmMedium?.trim() || null,
@@ -394,6 +398,9 @@ export async function createAdminLead(
           followUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
           estimatedValue: input.estimatedValue ?? null,
           assignedTo: input.assignedTo?.trim() || null,
+          phoneNormalized: normalizeLeadPhone(identity.phone),
+          emailNormalized: normalizeLeadEmail(identity.email),
+          lastInboundAt: new Date(),
         },
       });
 
@@ -435,10 +442,16 @@ export type ListCrmLeadsParams = {
   source?: LeadSource;
   status?: LeadStatus;
   priority?: LeadPriority;
-  limit?: number;
+  assignedEmployeeId?: string;
+  unassigned?: boolean;
+  page?: number;
+  pageSize?: number;
 };
 
-export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<ListCrmLeadsResult> {
+export async function listCrmLeads(
+  params: ListCrmLeadsParams = {},
+  scopeWhere: Prisma.LeadWhereInput = {},
+): Promise<ListCrmLeadsResult> {
   const emptyKpis = Object.fromEntries(
     CRM_LEAD_STATUSES.map((status) => [status, 0])
   ) as CrmLeadKpis;
@@ -457,10 +470,11 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
   try {
     await ensureCrmLeadsSynced();
 
-    const where: Prisma.LeadWhereInput = {};
+    const filters: Prisma.LeadWhereInput = {};
+    const where: Prisma.LeadWhereInput = { AND: [scopeWhere, filters] };
     const search = params.search?.trim();
     if (search) {
-      where.OR = [
+      filters.OR = [
         { fullName: { contains: search, mode: "insensitive" } },
         { contactName: { contains: search, mode: "insensitive" } },
         { companyName: { contains: search, mode: "insensitive" } },
@@ -471,11 +485,16 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
         { company: { contains: search, mode: "insensitive" } },
       ];
     }
-    if (params.source) where.source = params.source;
-    if (params.status) where.status = params.status;
-    if (params.priority) where.priority = params.priority;
+    if (params.source) filters.source = params.source;
+    if (params.status) filters.status = params.status;
+    if (params.priority) filters.priority = params.priority;
 
-    const limit = Math.min(200, Math.max(1, params.limit ?? 100));
+    if (params.unassigned) filters.assignedEmployeeId = null;
+    else if (params.assignedEmployeeId) filters.assignedEmployeeId = params.assignedEmployeeId;
+
+    const page = Math.max(params.page ?? 1, 1);
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 50));
+    const skip = (page - 1) * pageSize;
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -511,38 +530,43 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
     ] = await Promise.all([
       prisma.lead.findMany({
         where,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        include: { customer: true },
+        orderBy: [{ nextFollowUpAt: "asc" }, { createdAt: "desc" }],
+        skip,
+        take: pageSize,
+        include: {
+          customer: true,
+          assignedEmployee: { select: { id: true, fullName: true, employeeCode: true } },
+        },
       }),
       prisma.lead.count({ where }),
       prisma.lead.groupBy({
         by: ["status"],
+        where: scopeWhere,
         _count: { _all: true },
       }),
       prisma.lead.count({
-        where: { ...activeFollowUp, ...followUpFilter },
+        where: { AND: [scopeWhere, activeFollowUp, followUpFilter] },
       }),
       prisma.lead.count({
-        where: { ...activeFollowUp, ...overdueFilter },
+        where: { AND: [scopeWhere, activeFollowUp, overdueFilter] },
       }),
       prisma.lead.findMany({
-        where: { ...activeFollowUp, ...followUpFilter },
+        where: { AND: [scopeWhere, activeFollowUp, followUpFilter] },
         orderBy: [{ nextFollowUpAt: "asc" }, { followUpAt: "asc" }],
         take: 20,
       }),
       prisma.lead.findMany({
-        where: { ...activeFollowUp, ...overdueFilter },
+        where: { AND: [scopeWhere, activeFollowUp, overdueFilter] },
         orderBy: [{ nextFollowUpAt: "asc" }, { followUpAt: "asc" }],
         take: 20,
       }),
       prisma.lead.aggregate({
         _sum: { estimatedValue: true },
-        where: { status: { notIn: ["WON", "LOST", "NOT_FIT"] } },
+        where: { AND: [scopeWhere, { status: { notIn: ["WON", "LOST", "NOT_FIT"] } }] },
       }),
       prisma.lead.aggregate({
         _sum: { estimatedValue: true },
-        where: { status: "WON" },
+        where: { AND: [scopeWhere, { status: "WON" }] },
       }),
     ]);
 
@@ -554,6 +578,8 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
     return {
       leads: rows.map(mapLeadRow),
       total,
+      page,
+      pageSize,
       kpis,
       valueKpis: {
         pipelineTotal: decimalToString(pipelineAgg._sum.estimatedValue),
