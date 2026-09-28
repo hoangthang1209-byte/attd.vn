@@ -67,6 +67,15 @@ export type CrmLeadRecord = {
   nextFollowUpAt: string | null;
   estimatedValue: string | null;
   assignedTo: string | null;
+  assignedEmployeeId: string | null;
+  assignedAt: string | null;
+  assignmentSource: string | null;
+  lastInboundAt: string | null;
+  assignedEmployee?: {
+    id: string;
+    fullName: string;
+    employeeCode: string;
+  } | null;
   customerId: string | null;
   contactId: string | null;
   convertedAt: string | null;
@@ -263,6 +272,8 @@ export type UpdateContactInput = {
 export type ListCrmLeadsResult = {
   leads: CrmLeadRecord[];
   total: number;
+  page?: number;
+  pageSize?: number;
   kpis: CrmLeadKpis;
   valueKpis: CrmLeadValueKpis;
   reminders: CrmLeadReminders;
