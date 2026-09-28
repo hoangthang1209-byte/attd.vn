@@ -5,7 +5,7 @@ import { can, getPermissionScope } from "@/features/auth/admin-permissions";
 type LeadScopeFields = Pick<Lead, "assignedEmployeeId">;
 const NO_ACCESS: Prisma.LeadWhereInput = { id: "__no_access__" };
 
-function resolveLeadScope(
+export function getLeadPermissionScope(
   session: AdminSessionUser,
   permissionCode: string,
 ): PermissionScope {
@@ -24,7 +24,7 @@ export function buildScopedLeadWhere(
   session: AdminSessionUser,
   permissionCode = "leads.view",
 ): Prisma.LeadWhereInput {
-  const scope = resolveLeadScope(session, permissionCode);
+  const scope = getLeadPermissionScope(session, permissionCode);
   if (scope === "NONE") return NO_ACCESS;
   if (scope === "ALL" || scope === "TEAM") return {};
   if (!session.employeeId) return NO_ACCESS;
@@ -45,7 +45,7 @@ export function canAccessLeadRecord(
   lead: LeadScopeFields,
   permissionCode = "leads.view",
 ): boolean {
-  const scope = resolveLeadScope(session, permissionCode);
+  const scope = getLeadPermissionScope(session, permissionCode);
   if (scope === "NONE") return false;
   if (scope === "ALL" || scope === "TEAM") return true;
   if (!session.employeeId) return false;
