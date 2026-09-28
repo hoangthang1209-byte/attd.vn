@@ -1,20 +1,41 @@
-import type { Lead, Prisma } from "@prisma/client";
+import type { Lead, PermissionScope, Prisma } from "@prisma/client";
 import type { AdminSessionUser } from "@/features/auth/admin-session.types";
-import { getPermissionScope } from "@/features/auth/admin-permissions";
+import { can, getPermissionScope } from "@/features/auth/admin-permissions";
 
 type LeadScopeFields = Pick<Lead, "assignedEmployeeId">;
 const NO_ACCESS: Prisma.LeadWhereInput = { id: "__no_access__" };
+
+function resolveLeadScope(
+  session: AdminSessionUser,
+  permissionCode: string,
+): PermissionScope {
+  const explicit = getPermissionScope(session, permissionCode);
+  if (explicit !== "NONE") return explicit;
+
+  if (!can(session, permissionCode)) return "NONE";
+  if (session.mode === "legacy") {
+    if (session.legacyEmployeeRole === "ADMIN") return "ALL";
+    if (session.legacyEmployeeRole === "SALES") return "OWN";
+  }
+  return "NONE";
+}
 
 export function buildScopedLeadWhere(
   session: AdminSessionUser,
   permissionCode = "leads.view",
 ): Prisma.LeadWhereInput {
-  const scope = getPermissionScope(session, permissionCode);
+  const scope = resolveLeadScope(session, permissionCode);
   if (scope === "NONE") return NO_ACCESS;
   if (scope === "ALL" || scope === "TEAM") return {};
   if (!session.employeeId) return NO_ACCESS;
+
   if (scope === "OWN" || scope === "ASSIGNED") {
-    return { assignedEmployeeId: session.employeeId };
+    return {
+      OR: [
+        { assignedEmployeeId: session.employeeId },
+        { assignedEmployeeId: null },
+      ],
+    };
   }
   return NO_ACCESS;
 }
@@ -24,9 +45,9 @@ export function canAccessLeadRecord(
   lead: LeadScopeFields,
   permissionCode = "leads.view",
 ): boolean {
-  const scope = getPermissionScope(session, permissionCode);
+  const scope = resolveLeadScope(session, permissionCode);
   if (scope === "NONE") return false;
   if (scope === "ALL" || scope === "TEAM") return true;
   if (!session.employeeId) return false;
-  return lead.assignedEmployeeId === session.employeeId;
+  return lead.assignedEmployeeId === null || lead.assignedEmployeeId === session.employeeId;
 }
