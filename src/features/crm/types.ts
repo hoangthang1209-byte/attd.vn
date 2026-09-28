@@ -46,6 +46,25 @@ export type CrmProductInterestRecord = {
   updatedAt: string;
 };
 
+export type CrmLeadInboundEventRecord = {
+  id: string;
+  source: LeadSource;
+  channel: string;
+  externalId: string | null;
+  receivedAt: string;
+};
+
+export type CrmLeadAssignmentHistoryRecord = {
+  id: string;
+  fromEmployeeId: string | null;
+  toEmployeeId: string | null;
+  fromEmployeeName: string | null;
+  toEmployeeName: string | null;
+  actorId: string | null;
+  reason: string | null;
+  createdAt: string;
+};
+
 export type CrmLeadRecord = {
   id: string;
   code: string | null;
@@ -89,6 +108,8 @@ export type CrmLeadRecord = {
   notes?: CrmLeadNoteRecord[];
   activities?: CrmActivityRecord[];
   productInterests?: CrmProductInterestRecord[];
+  inboundEvents?: CrmLeadInboundEventRecord[];
+  assignmentHistory?: CrmLeadAssignmentHistoryRecord[];
   customer?: CrmCustomerRecord | null;
 };
 
