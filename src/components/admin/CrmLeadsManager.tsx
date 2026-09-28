@@ -149,12 +149,62 @@ export default function CrmLeadsManager() {
 
       {loadState !== "loading" && loadState !== "error" && kpis && (
         <div className="admin-crm-kpi-grid">
-          {CRM_LEAD_STATUSES.map((status) => (
-            <div key={status} className="admin-dashboard-card">
-              <p className="admin-dashboard-label">{CRM_STATUS_LABELS[status]}</p>
-              <p className="admin-dashboard-value">{kpis[status] ?? 0}</p>
-            </div>
-          ))}
+          <button
+            type="button"
+            className="admin-dashboard-card"
+            onClick={() => {
+              setStatusFilter("NEW");
+              setPage(1);
+            }}
+          >
+            <p className="admin-dashboard-label">Lead mới</p>
+            <p className="admin-dashboard-value">{kpis.NEW ?? 0}</p>
+          </button>
+          <button
+            type="button"
+            className="admin-dashboard-card"
+            onClick={() => {
+              setStatusFilter("");
+              setPage(1);
+            }}
+          >
+            <p className="admin-dashboard-label">Cần follow-up hôm nay</p>
+            <p className="admin-dashboard-value">{reminders?.dueToday ?? 0}</p>
+          </button>
+          <button
+            type="button"
+            className="admin-dashboard-card admin-dashboard-card--danger"
+            onClick={() => {
+              setStatusFilter("");
+              setPage(1);
+            }}
+          >
+            <p className="admin-dashboard-label">Quá hạn</p>
+            <p className="admin-dashboard-value">{reminders?.overdue ?? 0}</p>
+          </button>
+          <button
+            type="button"
+            className="admin-dashboard-card"
+            onClick={() => selectQuickFilter("unassigned")}
+          >
+            <p className="admin-dashboard-label">Chưa phân sales</p>
+            <p className="admin-dashboard-value">
+              {quickFilter === "unassigned" ? total : "—"}
+            </p>
+          </button>
+          <div className="admin-dashboard-card">
+            <p className="admin-dashboard-label">Đang xử lý</p>
+            <p className="admin-dashboard-value">
+              {(
+                (kpis.CONTACTED ?? 0) +
+                (kpis.QUALIFIED ?? 0) +
+                (kpis.NEED_PRICING ?? 0) +
+                (kpis.QUOTING ?? 0) +
+                (kpis.QUOTED ?? 0) +
+                (kpis.NEGOTIATING ?? 0)
+              ).toLocaleString("vi-VN")}
+            </p>
+          </div>
         </div>
       )}
 
