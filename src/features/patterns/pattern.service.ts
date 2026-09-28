@@ -146,6 +146,17 @@ export async function createPattern(input: {
   baseSize?: string | null;
   sizeRange?: string | null;
   gradingRule?: string | null;
+  productionMaterialCategory?: ProductionMaterialCategory | null;
+  sourceType?: PatternSourceType | null;
+  patternSupplierId?: string | null;
+  sourceSupplierCode?: string | null;
+  sourceSupplier?: string | null;
+  sourceSupplierContact?: string | null;
+  sourcePhone?: string | null;
+  sourceEmail?: string | null;
+  customerId?: string | null;
+  customerNameSnapshot?: string | null;
+  sourceNotes?: string | null;
   notes?: string | null;
   createdBy?: string | null;
 }) {
@@ -162,6 +173,17 @@ export async function createPattern(input: {
       baseSize: input.baseSize?.trim() || null,
       sizeRange: input.sizeRange?.trim() || null,
       gradingRule: input.gradingRule?.trim() || null,
+      productionMaterialCategory: input.productionMaterialCategory ?? null,
+      sourceType: input.sourceType ?? null,
+      patternSupplierId: input.patternSupplierId || null,
+      sourceSupplierCode: input.sourceSupplierCode?.trim() || null,
+      sourceSupplier: input.sourceSupplier?.trim() || null,
+      sourceSupplierContact: input.sourceSupplierContact?.trim() || null,
+      sourcePhone: input.sourcePhone?.trim() || null,
+      sourceEmail: input.sourceEmail?.trim() || null,
+      customerId: input.customerId || null,
+      customerNameSnapshot: input.customerNameSnapshot?.trim() || null,
+      sourceNotes: input.sourceNotes?.trim() || null,
       notes: input.notes?.trim() || null,
       createdBy: input.createdBy?.trim() || null,
     },
