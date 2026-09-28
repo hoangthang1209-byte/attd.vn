@@ -26,7 +26,7 @@ export default function QuoteDocumentItemsTable({
 }: Props) {
   return (
     <div className="quote-doc__table-wrap quote-doc__table-wrap--modern">
-        <table className="quote-document-table quote-doc__table quote-doc__table--modern">
+      <table className="quote-document-table quote-doc__table quote-doc__table--modern">
         <colgroup>
           {[6, 46, 12, 17, 19].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}
         </colgroup>
@@ -67,11 +67,11 @@ export default function QuoteDocumentItemsTable({
                     </div>
                   </div>
                 </td>
-                <td className="quote-doc__cell-center">{item.quantity} {item.unit}</td>
-                <td className="quote-doc__cell-money">
+                <td className="quote-doc__cell-center" data-label="Số lượng">{item.quantity} {item.unit}</td>
+                <td className="quote-doc__cell-money" data-label="Đơn giá">
                   {formatQuoteMoney(item.unitPrice, quote.currency)}
                 </td>
-                <td className="quote-doc__cell-money">
+                <td className="quote-doc__cell-money" data-label="Thành tiền">
                   {formatQuoteMoney(item.lineTotal, quote.currency)}
                 </td>
               </tr>

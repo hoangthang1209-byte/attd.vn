@@ -41,5 +41,8 @@ test("renders multiple products in a five-column quotation, with only real thumb
   assert.equal((html.match(/class="quote-doc__design-thumb"/g) ?? []).length, 1);
   assert.match(html, /Nỉ 350gsm/);
   assert.match(html, /35\.000\.000/);
+  assert.match(html, /data-label="Số lượng"/);
+  assert.match(html, /data-label="Đơn giá"/);
+  assert.match(html, /data-label="Thành tiền"/);
   assert.doesNotMatch(html, /Chưa có/);
 });
