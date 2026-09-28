@@ -14,64 +14,99 @@ function clean(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
-async function resolveCategory(value: string) {
-  const q = clean(value);
-  if (!q) return null;
-  return prisma.category.findFirst({
-    where: {
-      OR: [
-        { name: { equals: q, mode: "insensitive" } },
-        { skuCode: { equals: q, mode: "insensitive" } },
-      ],
-    },
-    select: { id: true, name: true },
-  });
+function lookupKey(value: string | null | undefined): string {
+  return clean(value).toLocaleLowerCase("vi-VN");
 }
 
-async function resolveProduct(value: string) {
-  const q = clean(value);
-  if (!q) return null;
-  return prisma.product.findFirst({
-    where: {
-      OR: [
-        { name: { equals: q, mode: "insensitive" } },
-        { productCode: { equals: q, mode: "insensitive" } },
-      ],
-    },
-    select: { id: true, name: true },
-  });
+function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values.map(clean).filter(Boolean)));
 }
 
-async function resolveCustomer(value: string) {
-  const q = clean(value);
-  if (!q) return null;
-  return prisma.customer.findFirst({
-    where: {
-      OR: [
-        { name: { equals: q, mode: "insensitive" } },
-        { code: { equals: q, mode: "insensitive" } },
-      ],
-    },
-    select: { id: true, name: true },
-  });
+async function loadReferenceMaps(rows: PatternBulkImportRow[]) {
+  const categoryKeys = uniqueValues(rows.map((row) => row.category));
+  const productKeys = uniqueValues(rows.map((row) => row.product));
+  const customerKeys = uniqueValues(rows.map((row) => row.customer));
+  const supplierKeys = uniqueValues(rows.map((row) => row.supplier));
+
+  const [categories, products, customers, suppliers] = await Promise.all([
+    categoryKeys.length
+      ? prisma.category.findMany({
+          where: {
+            OR: [
+              { name: { in: categoryKeys, mode: "insensitive" } },
+              { skuCode: { in: categoryKeys, mode: "insensitive" } },
+            ],
+          },
+          select: { id: true, name: true, skuCode: true },
+        })
+      : Promise.resolve([]),
+    productKeys.length
+      ? prisma.product.findMany({
+          where: {
+            OR: [
+              { name: { in: productKeys, mode: "insensitive" } },
+              { productCode: { in: productKeys, mode: "insensitive" } },
+            ],
+          },
+          select: { id: true, name: true, productCode: true },
+        })
+      : Promise.resolve([]),
+    customerKeys.length
+      ? prisma.customer.findMany({
+          where: {
+            OR: [
+              { name: { in: customerKeys, mode: "insensitive" } },
+              { code: { in: customerKeys, mode: "insensitive" } },
+            ],
+          },
+          select: { id: true, name: true, code: true },
+        })
+      : Promise.resolve([]),
+    supplierKeys.length
+      ? prisma.productionSupplier.findMany({
+          where: {
+            OR: [
+              { name: { in: supplierKeys, mode: "insensitive" } },
+              { code: { in: supplierKeys, mode: "insensitive" } },
+            ],
+          },
+          select: { id: true, name: true, code: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const categoryMap = new Map<string, (typeof categories)[number]>();
+  for (const item of categories) {
+    categoryMap.set(lookupKey(item.name), item);
+    if (item.skuCode) categoryMap.set(lookupKey(item.skuCode), item);
+  }
+
+  const productMap = new Map<string, (typeof products)[number]>();
+  for (const item of products) {
+    productMap.set(lookupKey(item.name), item);
+    if (item.productCode) productMap.set(lookupKey(item.productCode), item);
+  }
+
+  const customerMap = new Map<string, (typeof customers)[number]>();
+  for (const item of customers) {
+    customerMap.set(lookupKey(item.name), item);
+    if (item.code) customerMap.set(lookupKey(item.code), item);
+  }
+
+  const supplierMap = new Map<string, (typeof suppliers)[number]>();
+  for (const item of suppliers) {
+    supplierMap.set(lookupKey(item.name), item);
+    if (item.code) supplierMap.set(lookupKey(item.code), item);
+  }
+
+  return { categoryMap, productMap, customerMap, supplierMap };
 }
 
-async function resolveSupplier(value: string) {
-  const q = clean(value);
-  if (!q) return null;
-  return prisma.productionSupplier.findFirst({
-    where: {
-      OR: [
-        { name: { equals: q, mode: "insensitive" } },
-        { code: { equals: q, mode: "insensitive" } },
-      ],
-    },
-    select: { id: true, name: true, code: true },
-  });
-}
+type ReferenceMaps = Awaited<ReturnType<typeof loadReferenceMaps>>;
 
 async function importOne(
   row: PatternBulkImportRow,
+  refs: ReferenceMaps,
   createdBy: string | null,
 ): Promise<PatternBulkImportResultItem> {
   const name = clean(row.name);
@@ -84,12 +119,10 @@ async function importOne(
     };
   }
 
-  const [category, product, customer, supplier] = await Promise.all([
-    resolveCategory(row.category),
-    resolveProduct(row.product),
-    resolveCustomer(row.customer),
-    resolveSupplier(row.supplier),
-  ]);
+  const category = refs.categoryMap.get(lookupKey(row.category)) ?? null;
+  const product = refs.productMap.get(lookupKey(row.product)) ?? null;
+  const customer = refs.customerMap.get(lookupKey(row.customer)) ?? null;
+  const supplier = refs.supplierMap.get(lookupKey(row.supplier)) ?? null;
 
   const warnings: string[] = [];
   if (row.category && !category) warnings.push(`Không tìm thấy danh mục "${row.category}".`);
@@ -148,12 +181,13 @@ export async function bulkImportPatterns(input: {
   createdBy?: string | null;
 }): Promise<PatternBulkImportResponse> {
   const rows = input.rows.slice(0, PATTERN_IMPORT_MAX_ROWS);
+  const refs = await loadReferenceMaps(rows);
   const items: PatternBulkImportResultItem[] = [];
 
-  // Sequential creation intentionally avoids bursts of code-generation collisions and
-  // keeps database load predictable during legacy imports.
+  // Keep creation sequential to reduce code-generation collisions while reference
+  // resolution is batched into four queries for large legacy imports.
   for (const row of rows) {
-    items.push(await importOne(row, input.createdBy ?? null));
+    items.push(await importOne(row, refs, input.createdBy ?? null));
   }
 
   return {
