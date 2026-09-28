@@ -1,12 +1,14 @@
 import type { PublicQuoteDocument } from "@/features/quotes/types";
 import { DEFAULT_QUOTE_TERMS } from "@/features/quotes/quote-code";
+import { resolveQuoteIssuerName } from "@/features/quotes/quote-issuer";
 
 type Props = {
-  quote: Pick<PublicQuoteDocument, "customerNote" | "terms" | "preparedBy">;
+  quote: Pick<PublicQuoteDocument, "customerNote" | "terms" | "preparedBy" | "salesName">;
 };
 
 export default function QuoteDocumentNotes({ quote }: Props) {
   const termsText = quote.terms?.trim() || DEFAULT_QUOTE_TERMS;
+  const issuerName = resolveQuoteIssuerName(quote.preparedBy, quote.salesName);
 
   return (
     <>
@@ -22,8 +24,13 @@ export default function QuoteDocumentNotes({ quote }: Props) {
         <pre>{termsText}</pre>
       </section>
 
-      {quote.preparedBy && (
-        <p className="quote-doc__prepared">Người lập: {quote.preparedBy}</p>
+      {issuerName && (
+        <section className="quote-doc__issuer" aria-label="Người báo giá">
+          <div className="quote-doc__issuer-content">
+            <h3>NGƯỜI BÁO GIÁ</h3>
+            <p>{issuerName}</p>
+          </div>
+        </section>
       )}
     </>
   );

@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import type { QuotePdfData } from "@/features/quotes/quote-document";
+import { resolveQuoteIssuerName } from "@/features/quotes/quote-issuer";
 import { registerQuotePdfFonts } from "@/features/quotes/pdf/quote-pdf-fonts";
 import {
   designCellLabel,
@@ -105,10 +106,12 @@ export async function generateFallbackQuotePdf(data: QuotePdfData): Promise<Buff
     doc.font(fonts.regularName, 10).text(terms, { width: pageW });
   }
 
-  const preparedBy = safeText(data.preparedBy).trim();
-  if (preparedBy) {
+  const issuerName = resolveQuoteIssuerName(data.preparedBy, data.salesName);
+  if (issuerName) {
     doc.moveDown(0.5);
-    doc.font(fonts.regularName, 10).text(`Người lập: ${preparedBy}`, { align: "right" });
+    doc.font(fonts.boldName, 10).text("NGƯỜI BÁO GIÁ", { align: "right" });
+    doc.moveDown(1);
+    doc.font(fonts.regularName, 10).text(issuerName, { align: "right" });
   }
 
   appendDevFallbackWatermark(doc);
