@@ -277,7 +277,14 @@ model Lead {
   followUpAt            DateTime?
   nextFollowUpAt        DateTime?
   estimatedValue        Decimal?              @db.Decimal(12, 2)
+  /// Legacy free-text owner. New writes use assignedEmployeeId.
   assignedTo            String?
+  assignedEmployeeId    String?
+  assignedAt            DateTime?
+  assignmentSource      String?
+  phoneNormalized       String?
+  emailNormalized       String?
+  lastInboundAt         DateTime?
   customerId            String?
   contactId             String?
   convertedAt           DateTime?
@@ -290,6 +297,9 @@ model Lead {
   updatedAt             DateTime              @updatedAt
   customer              Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
   contact               Contact?              @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  assignedEmployee      Employee?             @relation("LeadAssignedEmployee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  assignmentHistory     LeadAssignmentHistory[]
+  inboundEvents         LeadInboundEvent[]
   notes                 LeadNote[]
   activities            CRMActivity[]
   productInterests      CRMProductInterest[]
@@ -305,11 +315,51 @@ model Lead {
   @@index([priority])
   @@index([phone])
   @@index([email])
+  @@index([phoneNormalized])
+  @@index([emailNormalized])
+  @@index([assignedEmployeeId])
+  @@index([lastInboundAt])
   @@index([customerId])
   @@index([createdAt])
   @@index([followUpAt])
   @@index([nextFollowUpAt])
 }
+
+model LeadInboundEvent {
+  id              String     @id @default(cuid())
+  leadId          String
+  source          LeadSource
+  channel         String
+  externalId      String?
+  idempotencyKey  String?    @unique
+  phoneNormalized String?
+  emailNormalized String?
+  payload         Json?
+  receivedAt      DateTime   @default(now())
+  lead            Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([channel, externalId])
+  @@index([leadId, receivedAt])
+  @@index([phoneNormalized])
+  @@index([emailNormalized])
+}
+
+model LeadAssignmentHistory {
+  id             String    @id @default(cuid())
+  leadId         String
+  fromEmployeeId String?
+  toEmployeeId   String?
+  actorId        String?
+  reason         String?
+  createdAt      DateTime  @default(now())
+  lead           Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  fromEmployee   Employee? @relation("LeadAssignmentFromEmployee", fields: [fromEmployeeId], references: [id], onDelete: SetNull)
+  toEmployee     Employee? @relation("LeadAssignmentToEmployee", fields: [toEmployeeId], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+  @@index([toEmployeeId])
+}
+
 
 model AdministrativeProvince {
   id        String               @id @default(cuid())
@@ -4380,6 +4430,9 @@ model Employee {
   productionOrders               Order[]                   @relation("OrderProductionOwner")
   deliveryOrders                 Order[]                   @relation("OrderDeliveryOwner")
   salesOrders                    Order[]                   @relation("OrderSalesEmployee")
+  assignedLeads                  Lead[]                    @relation("LeadAssignedEmployee")
+  leadAssignmentsFrom            LeadAssignmentHistory[]   @relation("LeadAssignmentFromEmployee")
+  leadAssignmentsTo              LeadAssignmentHistory[]   @relation("LeadAssignmentToEmployee")
   salesRepresentative            SalesRepresentative?
   materialStockAdjustments       MaterialStockAdjustment[]
   purchaseRequests               PurchaseRequest[]
