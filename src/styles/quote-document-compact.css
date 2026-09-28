@@ -30,6 +30,8 @@
 .quote-document-root .quote-doc__table--modern tbody tr:nth-child(even) { background: #fff; }
 .quote-document-root .quote-doc__table--modern th:nth-child(n+3) { text-align: right; }
 .quote-document-root .quote-doc__table--modern td:nth-child(3) { text-align: right; white-space: nowrap; }
+.quote-document-root .quote-doc__table--modern td:nth-child(4),
+.quote-document-root .quote-doc__table--modern td:nth-child(5) { text-align: right; }
 .quote-document-root .quote-doc__table--modern td:last-child { font-weight: 700; }
 .quote-document-root .quote-doc__product-content { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
 .quote-document-root .quote-doc__product-copy { min-width: 0; }
