@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { canonicalUrl, buildOgImages } from "@/lib/seo";
-import { CTA } from "@/lib/ctaConfig";
 import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import FaqSchema from "@/components/seo/FaqSchema";
@@ -51,7 +50,7 @@ export default async function OemPage() {
 
   return (
     <main>
-      {faqItems.length > 0 && <FaqSchema items={landing.faq} />}
+      {faqItems.length > 0 && <FaqSchema items={faqItems.map(({ q, a }) => ({ question: q, answer: a }))} />}
       <LandingHeroVisual
         eyebrow="OEM / Private Label"
         title="OEM / Private Label cho đồng phục & merchandise doanh nghiệp"
