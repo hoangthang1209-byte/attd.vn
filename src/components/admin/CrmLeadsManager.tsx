@@ -92,7 +92,10 @@ export default function CrmLeadsManager() {
   }, [search, sourceFilter, statusFilter, priorityFilter, quickFilter, page, pageSize]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   function applyFilters(event: React.FormEvent) {
