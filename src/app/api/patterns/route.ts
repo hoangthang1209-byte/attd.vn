@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PatternStatus } from "@prisma/client";
 import {
-  approvePattern,
-  archivePattern,
   createPattern,
   listPatterns,
   PatternValidationError,
