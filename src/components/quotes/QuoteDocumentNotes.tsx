@@ -1,5 +1,6 @@
 import type { PublicQuoteDocument } from "@/features/quotes/types";
 import { DEFAULT_QUOTE_TERMS } from "@/features/quotes/quote-code";
+import { resolveQuoteIssuerName } from "@/features/quotes/quote-issuer";
 
 type Props = {
   quote: Pick<PublicQuoteDocument, "customerNote" | "terms" | "preparedBy" | "salesName">;
@@ -7,7 +8,7 @@ type Props = {
 
 export default function QuoteDocumentNotes({ quote }: Props) {
   const termsText = quote.terms?.trim() || DEFAULT_QUOTE_TERMS;
-  const issuerName = quote.preparedBy?.trim() || quote.salesName?.trim();
+  const issuerName = resolveQuoteIssuerName(quote.preparedBy, quote.salesName);
 
   return (
     <>

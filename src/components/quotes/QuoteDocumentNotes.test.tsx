@@ -20,3 +20,16 @@ test("uses the sales consultant when the preparer is absent", () => {
   assert.match(html, /NGƯỜI BÁO GIÁ/);
   assert.match(html, /Trần Thị Linh/);
 });
+
+test("uses the consultant for a blank preparer and omits an unknown issuer", () => {
+  const fallback = renderToStaticMarkup(
+    <QuoteDocumentNotes quote={{ customerNote: null, terms: null, preparedBy: "  ", salesName: "Trần Thị Linh" }} />,
+  );
+  assert.match(fallback, /NGƯỜI BÁO GIÁ/);
+  assert.match(fallback, /Trần Thị Linh/);
+
+  const unknown = renderToStaticMarkup(
+    <QuoteDocumentNotes quote={{ customerNote: null, terms: null, preparedBy: null, salesName: null }} />,
+  );
+  assert.doesNotMatch(unknown, /NGƯỜI BÁO GIÁ/);
+});

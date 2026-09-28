@@ -2,6 +2,7 @@ import "server-only";
 
 import PDFDocument from "pdfkit";
 import type { QuotePdfData } from "@/features/quotes/quote-document";
+import { resolveQuoteIssuerName } from "@/features/quotes/quote-issuer";
 import { registerQuotePdfFonts } from "@/features/quotes/pdf/quote-pdf-fonts";
 import { generateFallbackQuotePdf } from "@/features/quotes/pdf/quote-pdf-fallback";
 import {
@@ -339,9 +340,13 @@ export async function generateQuotePdf(data: QuotePdfData): Promise<Buffer> {
     doc.font(fonts.regularName, 7).text(terms, 28, tableY + 12, { width: pageW });
   }
 
-  const preparedBy = safeText(data.preparedBy).trim();
-  if (preparedBy) {
-    doc.font(fonts.regularName, 9).text(`Người lập: ${preparedBy}`, 28, doc.page.height - 60, {
+  const issuerName = resolveQuoteIssuerName(data.preparedBy, data.salesName);
+  if (issuerName) {
+    doc.font(fonts.boldName, 9).text("NGƯỜI BÁO GIÁ", 28, doc.page.height - 78, {
+      align: "right",
+      width: pageW,
+    });
+    doc.font(fonts.regularName, 9).text(issuerName, 28, doc.page.height - 60, {
       align: "right",
       width: pageW,
     });
