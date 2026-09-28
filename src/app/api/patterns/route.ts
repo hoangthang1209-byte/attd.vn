@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const pageParam = Number.parseInt(searchParams.get("page") ?? "1", 10);
-    const pageSizeParam = Number.parseInt(searchParams.get("pageSize") ?? "25", 10);
+    const pageSizeParam = Number.parseInt(
+      searchParams.get("pageSize") ?? searchParams.get("limit") ?? "25",
+      10,
+    );
     const result = await listPatterns({
       status,
       productCategoryId: searchParams.get("productCategoryId") ?? undefined,
