@@ -46,7 +46,10 @@ export async function GET(req: NextRequest) {
       source: sourceParam as LeadSource | undefined,
       status: statusParam as LeadStatus | undefined,
       priority: priorityParam as LeadPriority | undefined,
-      assignedEmployeeId: searchParams.get("assignedEmployeeId") ?? undefined,
+      assignedEmployeeId:
+        searchParams.get("mine") === "1"
+          ? session.employeeId ?? undefined
+          : searchParams.get("assignedEmployeeId") ?? undefined,
       unassigned: searchParams.get("unassigned") === "1",
       page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
       pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : 50,
