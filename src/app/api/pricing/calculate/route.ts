@@ -1,4 +1,3 @@
-import type { PricingCalculationType, PricingServiceType } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { calculatePricing } from "@/features/pricing/services/pricing-engine.service";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
