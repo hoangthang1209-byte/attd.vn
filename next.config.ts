@@ -11,6 +11,11 @@ const PDF_RUNTIME_TRACE_INCLUDES = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Neon preview builds have a small connection pool. Serializing page
+    // generation avoids concurrent catalog renders exhausting that pool.
+    staticGenerationMaxConcurrency: 1,
+  },
   serverExternalPackages: [
     "pdfkit",
     "puppeteer-core",
