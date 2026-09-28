@@ -7,6 +7,7 @@ import type {
 import { prisma } from "@/lib/prisma";
 import {
   assertNonNegative,
+  assertReturnDoesNotExceedIssued,
   computeAvailableQuantity,
   MaterialValidationError,
   toDecimal,
@@ -156,15 +157,6 @@ export type StockAdjustmentInput = {
   referenceOrderId?: string | null;
   createdByEmployeeId?: string | null;
 };
-
-export function assertReturnDoesNotExceedIssued(
-  returnQuantity: Prisma.Decimal,
-  issuedQuantity: Prisma.Decimal,
-) {
-  if (returnQuantity.gt(issuedQuantity)) {
-    throw new MaterialValidationError("Số lượng trả không được vượt số lượng đã cấp cho sản xuất.");
-  }
-}
 
 export async function applyStockAdjustment(input: StockAdjustmentInput, existingTx?: Tx) {
   const qty = toDecimal(input.quantity);
