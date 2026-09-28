@@ -141,6 +141,7 @@ export async function getPatternDetail(id: string): Promise<PatternDetail | null
 
 export async function createPattern(input: {
   name: string;
+  code?: string | null;
   productCategoryId?: string | null;
   productId?: string | null;
   baseSize?: string | null;
@@ -186,7 +187,7 @@ export async function createPattern(input: {
   };
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const code = await generatePatternCode();
+    const code = attempt === 0 && input.code?.trim() ? input.code.trim() : await generatePatternCode();
     try {
       return await prisma.pattern.create({
         data: { code, ...createData },
