@@ -718,13 +718,34 @@ export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadReco
     lead.companyName?.trim() || lead.company?.trim() || lead.contactName?.trim() || lead.fullName;
 
   try {
+    const duplicateCustomer = await prisma.customer.findFirst({
+      where: {
+        OR: [
+          ...(lead.phone && lead.phone !== "—" ? [{ phone: lead.phone }] : []),
+          ...(lead.email ? [{ email: { equals: lead.email, mode: "insensitive" as const } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (duplicateCustomer) {
+      return linkLeadToExistingCustomer(leadId, {
+        customerId: duplicateCustomer.id,
+        createContact: true,
+      });
+    }
+
+    const defaultBusinessType = await prisma.customerType.findUnique({
+      where: { code: "BUSINESS" },
+      select: { id: true },
+    });
+
     await prisma.$transaction(async (tx) => {
       const customerCode = await generateCustomerCode();
       const customer = await tx.customer.create({
         data: {
           code: customerCode,
           legacyType: "BUSINESS",
-          customerTypeId: "ct_business",
+          customerTypeId: defaultBusinessType?.id ?? null,
           name: customerName,
           phone: lead.phone !== "—" ? lead.phone : null,
           email: lead.email,
