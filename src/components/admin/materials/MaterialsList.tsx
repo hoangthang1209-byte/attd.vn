@@ -77,10 +77,6 @@ export default function MaterialsList() {
 
   const pageCount = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
 
-  useEffect(() => {
-    if (page > pageCount) setPage(pageCount);
-  }, [page, pageCount]);
-
   function warehouseLabel(m: MaterialRow): string {
     if (!m.warehouseBalance) return WAREHOUSE_STATUS_LABELS.undeclared;
     const available = Number(m.warehouseBalance.availableQuantity);
