@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getDefaultPriceGroup, getPriceGroupById } from "@/features/pricing/services/price-group.service";
 import { getServiceRulesForPricing } from "@/features/pricing/services/service-rule.service";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
+import { lineDiscountIsValid, pricingMarginRate } from "@/features/pricing/pricing-p1-guards";
 import type {
   CalculatePricingInput,
   CalculatePricingResult,
@@ -268,7 +269,7 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
 
     const lineSubtotal = roundMoney(unitPrice * item.quantity + lineSetupFee + lineServiceFee);
     const itemDiscount = item.discountAmount ?? 0;
-    if (itemDiscount > lineSubtotal) {
+    if (!lineDiscountIsValid(lineSubtotal, itemDiscount)) {
       throw new PricingValidationError(
         `Chiết khấu dòng "${productName}" không được vượt quá thành tiền trước chiết khấu.`,
       );
@@ -280,7 +281,7 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
     if (costEstimate != null && lineTotal > 0) {
       const totalCost = roundMoney(costEstimate * item.quantity);
       marginAmount = roundMoney(lineTotal - totalCost);
-      marginRate = totalCost > 0 ? roundMoney((marginAmount / lineTotal) * 100) : 100;
+      marginRate = pricingMarginRate(lineTotal, totalCost);
     }
 
     itemBreakdowns.push({
