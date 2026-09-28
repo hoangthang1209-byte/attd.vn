@@ -12,8 +12,16 @@ import {
 } from "@/features/crm/services/crm-lead.service";
 import type { CreateProductInterestInput } from "@/features/crm/types";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
+import { can } from "@/features/auth/admin-permissions";
+import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
+import { buildScopedLeadWhere } from "@/features/auth/lead-scope";
 
 export async function GET(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  if (!can(session, "leads.view")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? undefined;
   const sourceParam = searchParams.get("source") ?? undefined;
@@ -38,7 +46,11 @@ export async function GET(req: NextRequest) {
       source: sourceParam as LeadSource | undefined,
       status: statusParam as LeadStatus | undefined,
       priority: priorityParam as LeadPriority | undefined,
-    });
+      assignedEmployeeId: searchParams.get("assignedEmployeeId") ?? undefined,
+      unassigned: searchParams.get("unassigned") === "1",
+      page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
+      pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : 50,
+    }, buildScopedLeadWhere(session, "leads.view"));
 
     if (result.error) {
       const diagnostics = debug ? await getCrmDiagnostics() : undefined;
