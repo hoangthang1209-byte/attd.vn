@@ -300,6 +300,7 @@ model Lead {
   assignedEmployee      Employee?             @relation("LeadAssignedEmployee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
   assignmentHistory     LeadAssignmentHistory[]
   inboundEvents         LeadInboundEvent[]
+  tasks                 LeadTask[]
   notes                 LeadNote[]
   activities            CRMActivity[]
   productInterests      CRMProductInterest[]
@@ -324,6 +325,26 @@ model Lead {
   @@index([followUpAt])
   @@index([nextFollowUpAt])
 }
+
+model LeadTask {
+  id          String   @id @default(cuid())
+  leadId      String
+  ownerId     String?
+  title       String
+  note        String?  @db.Text
+  dueAt       DateTime?
+  completedAt DateTime?
+  outcome     String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  owner       Employee? @relation("LeadTaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([leadId, completedAt, dueAt])
+  @@index([ownerId, completedAt, dueAt])
+}
+
 
 model LeadInboundEvent {
   id              String     @id @default(cuid())
@@ -4435,6 +4456,7 @@ model Employee {
   assignedLeads                  Lead[]                    @relation("LeadAssignedEmployee")
   leadAssignmentsFrom            LeadAssignmentHistory[]   @relation("LeadAssignmentFromEmployee")
   leadAssignmentsTo              LeadAssignmentHistory[]   @relation("LeadAssignmentToEmployee")
+  leadTasks                      LeadTask[]                 @relation("LeadTaskOwner")
   salesRepresentative            SalesRepresentative?
   materialStockAdjustments       MaterialStockAdjustment[]
   purchaseRequests               PurchaseRequest[]
