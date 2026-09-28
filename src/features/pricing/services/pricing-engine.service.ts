@@ -2,6 +2,7 @@ import type { PricingCalculationType, ProductPriceTier } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDefaultPriceGroup, getPriceGroupById } from "@/features/pricing/services/price-group.service";
 import { getServiceRulesForPricing } from "@/features/pricing/services/service-rule.service";
+import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 import type {
   CalculatePricingInput,
   CalculatePricingResult,
@@ -58,7 +59,14 @@ function variantLabel(variant: {
 function computeServiceAmounts(
   item: PricingItemInput,
   serviceOptions: PricingServiceOptionInput[],
-  rulesById: Map<string, { calculationType: PricingCalculationType; unitPrice: number; setupFee: number; name: string }>
+  rulesById: Map<string, {
+    calculationType: PricingCalculationType;
+    unitPrice: number;
+    setupFee: number;
+    name: string;
+    minQuantity: number;
+    maxQuantity: number | null;
+  }>
 ): { perItemAdd: number; lineServiceFee: number; lineSetupFee: number; serviceDetails: unknown[] } {
   let perItemAdd = 0;
   let lineServiceFee = 0;
@@ -67,6 +75,14 @@ function computeServiceAmounts(
 
   for (const opt of serviceOptions) {
     const rule = opt.ruleId ? rulesById.get(opt.ruleId) : undefined;
+    if (opt.ruleId && !rule) {
+      throw new PricingValidationError("Phí dịch vụ không thuộc nhóm giá đang chọn hoặc không còn hoạt động.");
+    }
+    if (rule && (item.quantity < rule.minQuantity || (rule.maxQuantity != null && item.quantity > rule.maxQuantity))) {
+      throw new PricingValidationError(
+        `Phí dịch vụ "${rule.name}" không áp dụng cho số lượng ${item.quantity}.`,
+      );
+    }
     const calcType = opt.calculationType ?? rule?.calculationType ?? "PER_ITEM";
     const unitPrice = opt.unitPrice ?? rule?.unitPrice ?? 0;
     const setupFee = opt.setupFee ?? rule?.setupFee ?? 0;
@@ -174,6 +190,8 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
         unitPrice: r.unitPrice.toNumber(),
         setupFee: r.setupFee.toNumber(),
         name: r.name,
+        minQuantity: r.minQuantity,
+        maxQuantity: r.maxQuantity,
       },
     ])
   );
@@ -233,7 +251,7 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
     if (costEstimate != null && lineTotal > 0) {
       const totalCost = roundMoney(costEstimate * item.quantity);
       marginAmount = roundMoney(lineTotal - totalCost);
-      marginRate = totalCost > 0 ? roundMoney((marginAmount / lineTotal) * 100) : null;
+      marginRate = totalCost > 0 ? roundMoney((marginAmount / lineTotal) * 100) : 100;
     }
 
     itemBreakdowns.push({
