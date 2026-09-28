@@ -27,30 +27,35 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const steps = [
-  { n: "01", title: "Liên hệ tư vấn", body: "Gửi yêu cầu qua form hoặc Zalo. Đội ngũ ATTD phản hồi trong vòng 24 giờ." },
-  { n: "02", title: "Chọn sản phẩm & số lượng", body: "Chọn dòng sản phẩm, màu sắc, size theo bảng màu và catalog ATTD." },
-  { n: "03", title: "Xác nhận đơn hàng", body: "Ký xác nhận đơn hàng, thanh toán cọc theo chính sách." },
-  { n: "04", title: "Nhận hàng & kiểm tra", body: "Hàng được đóng gói theo yêu cầu, giao toàn quốc qua đơn vị vận chuyển uy tín." },
+  { n: "01", title: "Gửi brief / mẫu tham khảo", body: "Gửi sản phẩm, số lượng, logo, chất liệu mong muốn hoặc mẫu thực tế. Brief chưa đầy đủ vẫn có thể bắt đầu." },
+  { n: "02", title: "Chốt cấu hình & phương án sản xuất", body: "ATTD rà soát nguồn hàng, chất liệu, in/thêu, nhãn tag, đóng gói, MOQ và tiến độ phù hợp." },
+  { n: "03", title: "Mẫu / xác nhận kỹ thuật", body: "Thống nhất thông số, màu sắc, kỹ thuật hoàn thiện và mẫu khi dự án cần duyệt trước bulk." },
+  { n: "04", title: "Triển khai, QC & giao hàng", body: "ATTD điều phối các công đoạn sản xuất, kiểm hàng, hoàn thiện, đóng gói và bàn giao theo tiến độ đã thống nhất." },
 ];
 
 const capabilities = [
-  { title: "Hàng trơn sẵn kho", body: "Áo thun, polo, tote bag, nón — nhiều màu, nhiều size, giao ngay." },
-  { title: "Nhãn & tag theo yêu cầu", body: "Hỗ trợ gắn nhãn thương hiệu, woven label, giấy tag theo đơn hàng." },
-  { title: "Đóng gói riêng", body: "Đóng gói poly bag, hộp carton hoặc theo yêu cầu thương hiệu." },
-  { title: "Tư vấn chọn chất liệu", body: "Cotton 100%, Cotton/Poly blend, Polyester — theo mục đích sử dụng." },
+  { title: "Nguồn hàng & phát triển sản phẩm", body: "Bắt đầu từ hàng trơn sẵn có hoặc phát triển cấu hình riêng theo yêu cầu dự án." },
+  { title: "In / thêu / hoàn thiện thương hiệu", body: "Tư vấn kỹ thuật in, thêu, vị trí logo và phương án phù hợp chất liệu, số lượng." },
+  { title: "Nhãn, tag & đóng gói riêng", body: "Woven label, nhãn cổ, hangtag, poly bag, hộp và các yêu cầu private label." },
+  { title: "Điều phối sản xuất & QC", body: "ATTD quản lý đầu việc sản xuất, kiểm hàng và hoàn thiện thông qua năng lực nội bộ cùng mạng lưới đối tác." },
 ];
 
 export default async function OemPage() {
   const landing = await resolveBespokeLanding("oem");
-  const faqItems = landing.faq.map((item) => ({ q: item.question, a: item.answer }));
+  const faqItems = landing.faq.map((item) => {
+    const answer = /không cung cấp dịch vụ in ấn/i.test(item.answer)
+      ? "Có. ATTD tư vấn và điều phối các công đoạn in, thêu, nhãn tag, đóng gói và hoàn thiện thương hiệu theo yêu cầu từng dự án. Tùy cấu hình, một số công đoạn được thực hiện cùng mạng lưới đối tác sản xuất chuyên môn."
+      : item.answer;
+    return { q: item.question, a: answer };
+  });
 
   return (
     <main>
       {faqItems.length > 0 && <FaqSchema items={landing.faq} />}
       <LandingHeroVisual
         eyebrow="OEM / Private Label"
-        title={landing.heroTitle}
-        description={landing.heroDescription}
+        title="OEM / Private Label cho đồng phục & merchandise doanh nghiệp"
+        description="ATTD hỗ trợ từ chọn nguồn hàng, cấu hình sản phẩm, in/thêu, nhãn tag và đóng gói đến điều phối sản xuất, QC và giao hàng theo yêu cầu dự án."
         imageUrl={getLandingDemoImage("oem")}
         primaryCta={{ href: landing.primaryCtaHref, label: landing.primaryCtaLabel }}
         secondaryCta={{ href: getZaloUrl(), label: "Chat Zalo" }}
@@ -61,7 +66,7 @@ export default async function OemPage() {
         <div className="container">
           <h2 className="section-title">ATTD OEM hỗ trợ gì?</h2>
           <p className="section-description">
-            Nguồn hàng áo trơn phù hợp cho thương hiệu cần sản phẩm gắn nhãn riêng.
+            Từ hàng sẵn có đến sản phẩm phát triển riêng — một đầu mối để kiểm soát cấu hình, hoàn thiện thương hiệu, tiến độ và QC.
           </p>
 
           <div
