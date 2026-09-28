@@ -66,7 +66,8 @@ export async function listPatterns(input?: {
   status?: PatternStatus;
   productCategoryId?: string;
   search?: string;
-  limit?: number;
+  page?: number;
+  pageSize?: number;
 }) {
   const where: Prisma.PatternWhereInput = {};
   if (input?.status) where.status = input.status;
@@ -83,22 +84,55 @@ export async function listPatterns(input?: {
       { customerNameSnapshot: { contains: q, mode: "insensitive" } },
       { customer: { name: { contains: q, mode: "insensitive" } } },
       { customer: { code: { contains: q, mode: "insensitive" } } },
+      { product: { name: { contains: q, mode: "insensitive" } } },
+      { product: { productCode: { contains: q, mode: "insensitive" } } },
+      { productCategory: { name: { contains: q, mode: "insensitive" } } },
     ];
   }
 
-  const items = await prisma.pattern.findMany({
-    where,
-    include: {
-      productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
-      customer: { select: { id: true, name: true, code: true } },
-      patternSupplier: { select: PATTERN_SUPPLIER_SELECT },
-      _count: { select: { files: true, techPacks: true } },
-    },
-    orderBy: [{ updatedAt: "desc" }],
-    take: input?.limit ?? 100,
-  });
+  const pageSize = Math.min(Math.max(input?.pageSize ?? 25, 10), 100);
+  const page = Math.max(input?.page ?? 1, 1);
+  const skip = (page - 1) * pageSize;
 
-  return { items };
+  const [items, total, statusGroups, allCount] = await prisma.$transaction([
+    prisma.pattern.findMany({
+      where,
+      include: {
+        productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
+        product: { select: { id: true, name: true, productCode: true } },
+        customer: { select: { id: true, name: true, code: true } },
+        patternSupplier: { select: PATTERN_SUPPLIER_SELECT },
+        _count: { select: { files: true, techPacks: true } },
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      skip,
+      take: pageSize,
+    }),
+    prisma.pattern.count({ where }),
+    prisma.pattern.groupBy({
+      by: ["status"],
+      _count: { _all: true },
+    }),
+    prisma.pattern.count(),
+  ]);
+
+  const statusCounts = Object.fromEntries(
+    statusGroups.map((group) => [group.status, group._count._all]),
+  ) as Partial<Record<PatternStatus, number>>;
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    pageCount: Math.max(1, Math.ceil(total / pageSize)),
+    stats: {
+      all: allCount,
+      draft: statusCounts.DRAFT ?? 0,
+      approved: statusCounts.APPROVED ?? 0,
+      archived: statusCounts.ARCHIVED ?? 0,
+    },
+  };
 }
 
 export async function getPatternDetail(id: string): Promise<PatternDetail | null> {
@@ -389,9 +423,26 @@ export async function deletePattern(id: string): Promise<{
 }> {
   const pattern = await prisma.pattern.findUnique({
     where: { id },
-    include: { files: { select: { r2ObjectKey: true, cloudinaryPublicId: true } } },
+    include: {
+      files: { select: { r2ObjectKey: true, cloudinaryPublicId: true } },
+      _count: { select: { techPacks: true } },
+    },
   });
   if (!pattern) throw new PatternValidationError("Không tìm thấy rập.", undefined, "NOT_FOUND");
+  if (pattern._count.techPacks > 0) {
+    throw new PatternValidationError(
+      "Rập đã được liên kết Tech Pack nên không thể xóa. Hãy lưu trữ rập để giữ lịch sử sản xuất.",
+      undefined,
+      "CONFLICT",
+    );
+  }
+  if (pattern.status === PatternStatus.APPROVED) {
+    throw new PatternValidationError(
+      "Rập đã duyệt không thể xóa trực tiếp. Hãy lưu trữ rập trước.",
+      undefined,
+      "CONFLICT",
+    );
+  }
 
   const r2Keys = pattern.files
     .map((file) => file.r2ObjectKey)
