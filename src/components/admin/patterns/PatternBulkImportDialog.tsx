@@ -158,7 +158,7 @@ export default function PatternBulkImportDialog({ onClose, onImported }: Props) 
       setRows(parsed);
       setSourceFileName(file.name);
       if (records.length > PATTERN_IMPORT_MAX_ROWS) {
-        setError(\`Chỉ lấy \${PATTERN_IMPORT_MAX_ROWS} dòng đầu tiên trong lần nhập này.\`);
+        setError(`Chỉ lấy ${PATTERN_IMPORT_MAX_ROWS} dòng đầu tiên trong lần nhập này.`);
       }
     } catch (err) {
       setRows([]);
@@ -192,21 +192,21 @@ export default function PatternBulkImportDialog({ onClose, onImported }: Props) 
         const key = baseName(requestedName).toLocaleLowerCase("vi-VN");
         const matched = selectedFileMap.get(key)?.[0];
         if (!matched) {
-          warnings.push(\`Chưa chọn file "\${requestedName}" từ máy tính.\`);
+          warnings.push(`Chưa chọn file "${requestedName}" từ máy tính.`);
           continue;
         }
 
         const formData = new FormData();
         formData.append("file", matched);
         formData.append("type", "OTHER");
-        const response = await fetch(\`/api/patterns/\${item.id}/files\`, {
+        const response = await fetch(`/api/patterns/${item.id}/files`, {
           method: "POST",
           body: formData,
         });
         if (!response.ok) {
           const body = (await response.json().catch(() => ({}))) as { message?: string };
           warnings.push(
-            \`Không tải được "\${matched.name}": \${body.message ?? "lỗi tải file"}.\`,
+            `Không tải được "${matched.name}": ${body.message ?? "lỗi tải file"}.`,
           );
         }
       }
@@ -299,7 +299,7 @@ export default function PatternBulkImportDialog({ onClose, onImported }: Props) 
                 }}
               />
               <div className={styles.fileMeta}>
-                {sourceFileName ? \`\${sourceFileName} · \${rows.length} dòng\` : "Chưa chọn file dữ liệu"}
+                {sourceFileName ? `${sourceFileName} · ${rows.length} dòng` : "Chưa chọn file dữ liệu"}
               </div>
             </div>
 
@@ -332,7 +332,7 @@ export default function PatternBulkImportDialog({ onClose, onImported }: Props) 
                 }}
               />
               <div className={styles.fileMeta}>
-                {localFiles.length ? \`Đã chọn \${localFiles.length} file\` : "Có thể bỏ qua và bổ sung file sau"}
+                {localFiles.length ? `Đã chọn ${localFiles.length} file` : "Có thể bỏ qua và bổ sung file sau"}
               </div>
             </div>
           </div>
@@ -350,7 +350,7 @@ export default function PatternBulkImportDialog({ onClose, onImported }: Props) 
                 <h3 className={styles.previewTitle}>Kiểm tra trước khi nhập</h3>
                 <span className={styles.previewMeta}>
                   {rows.length} rập · {localFiles.length} file đã chọn
-                  {rows.length > previewRows.length ? \` · đang xem \${previewRows.length} dòng đầu\` : ""}
+                  {rows.length > previewRows.length ? ` · đang xem ${previewRows.length} dòng đầu` : ""}
                 </span>
               </div>
               <div className={styles.previewWrap}>
@@ -408,12 +408,12 @@ export default function PatternBulkImportDialog({ onClose, onImported }: Props) 
               </div>
               <ul className={styles.resultList}>
                 {result.items.map((item) => (
-                  <li key={\`\${item.rowNumber}-\${item.code ?? item.name}\`}>
+                  <li key={`${item.rowNumber}-${item.code ?? item.name}`}>
                     Dòng {item.rowNumber}:{" "}
                     {item.status === "created"
-                      ? \`\${item.code ?? ""} \${item.name}\`.trim()
-                      : \`\${item.name || "(không tên)"} — \${item.message ?? "Lỗi"}\`}
-                    {item.warnings?.length ? \` — \${item.warnings.join(" ")}\` : ""}
+                      ? `${item.code ?? ""} ${item.name}`.trim()
+                      : `${item.name || "(không tên)"} — ${item.message ?? "Lỗi"}`}
+                    {item.warnings?.length ? ` — ${item.warnings.join(" ")}` : ""}
                   </li>
                 ))}
               </ul>
@@ -435,7 +435,7 @@ export default function PatternBulkImportDialog({ onClose, onImported }: Props) 
               onClick={() => void runImport()}
               disabled={!rows.length || invalidRows > 0 || importing}
             >
-              {importing ? "Đang nhập..." : \`Nhập \${rows.length || ""} rập\`}
+              {importing ? "Đang nhập..." : `Nhập ${rows.length || ""} rập`}
             </button>
           </div>
         </footer>
