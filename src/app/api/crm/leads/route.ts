@@ -16,6 +16,7 @@ import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { can } from "@/features/auth/admin-permissions";
 import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 import { buildScopedLeadWhere } from "@/features/auth/lead-scope";
+import { assignLead, autoAssignLead } from "@/features/crm/services/crm-lead-assignment.service";
 
 export async function GET(req: NextRequest) {
   const session = getAdminSessionFromRequest(req);
@@ -202,7 +203,21 @@ export async function POST(req: NextRequest) {
     if (!lead) {
       return NextResponse.json({ message: "Không thể tạo lead" }, { status: 500 });
     }
-    return NextResponse.json({ lead }, { status: 201 });
+
+    if (permission.session.employeeId && permission.session.legacyEmployeeRole === "SALES") {
+      await assignLead({
+        leadId: lead.id,
+        employeeId: permission.session.employeeId,
+        actorId: permission.session.userId ?? permission.session.username ?? permission.session.employeeId,
+        source: "MANUAL_SELF",
+        reason: "Lead được sales tạo thủ công.",
+      });
+    } else {
+      await autoAssignLead(lead.id);
+    }
+
+    const assignedLead = await getCrmLeadById(lead.id);
+    return NextResponse.json({ lead: assignedLead ?? lead }, { status: 201 });
   }
 
   if (!fullName) {
