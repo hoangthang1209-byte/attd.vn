@@ -7,7 +7,7 @@ import type {
 import { prisma } from "@/lib/prisma";
 import { generateMaterialCode } from "@/features/materials/material-code";
 import { MATERIAL_TYPES } from "@/features/materials/material-labels";
-import { MaterialValidationError } from "@/features/materials/material-decimal";
+import { MaterialValidationError, toDecimal } from "@/features/materials/material-decimal";
 
 export type MaterialRecord = Material & {
   warehouseBalance: MaterialWarehouseBalance | null;
@@ -79,6 +79,9 @@ export async function createMaterial(input: CreateMaterialInput): Promise<Materi
   if (!MATERIAL_TYPES.includes(input.materialType)) {
     throw new MaterialValidationError("Loại vật tư không hợp lệ.");
   }
+  if (input.reorderPoint != null && toDecimal(input.reorderPoint).lt(0)) {
+    throw new MaterialValidationError("Mức tồn tối thiểu không được âm.");
+  }
 
   const materialCode = await generateMaterialCode();
   const row = await prisma.material.create({
@@ -117,6 +120,22 @@ async function materialHasReferences(materialId: string): Promise<boolean> {
 export async function updateMaterial(id: string, input: UpdateMaterialInput): Promise<MaterialRecord> {
   const existing = await prisma.material.findUnique({ where: { id } });
   if (!existing) throw new MaterialValidationError("Không tìm thấy vật tư.");
+
+  if (input.name !== undefined && !input.name.trim()) {
+    throw new MaterialValidationError("Tên vật tư là bắt buộc.");
+  }
+  if (input.unit !== undefined && !input.unit.trim()) {
+    throw new MaterialValidationError("Đơn vị là bắt buộc.");
+  }
+  if (input.materialType !== undefined && !MATERIAL_TYPES.includes(input.materialType)) {
+    throw new MaterialValidationError("Loại vật tư không hợp lệ.");
+  }
+  if (input.reorderPoint != null && toDecimal(input.reorderPoint).lt(0)) {
+    throw new MaterialValidationError("Mức tồn tối thiểu không được âm.");
+  }
+  if (input.materialCode !== undefined && !input.materialCode.trim()) {
+    throw new MaterialValidationError("Mã vật tư không được để trống.");
+  }
 
   if (input.materialCode && input.materialCode !== existing.materialCode) {
     const referenced = await materialHasReferences(id);
