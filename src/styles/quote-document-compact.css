@@ -51,6 +51,18 @@
 .quote-document-root .quote-doc__terms h3 { border-top: 1px solid #d9dfe7; padding-top: 15px; font-size: 12px; color: #182237; }
 .quote-document-root .quote-doc__notes p,
 .quote-document-root .quote-doc__terms pre { color: #475467; }
+.quote-document-root .quote-doc__issuer {
+  display: flex; justify-content: flex-end; margin-top: 24px;
+  break-inside: avoid; page-break-inside: avoid;
+}
+.quote-document-root .quote-doc__issuer-content { min-width: 190px; max-width: 260px; text-align: center; }
+.quote-document-root .quote-doc__issuer h3 {
+  margin: 0; color: #182237; font-size: 11px; font-weight: 700;
+  letter-spacing: .06em;
+}
+.quote-document-root .quote-doc__issuer p {
+  margin: 32px 0 0; color: #182237; font-size: 12px; font-weight: 600;
+}
 .quote-document-root .quote-doc__summary-row,
 .quote-document-root .quote-doc__notes,
 .quote-document-root .quote-doc__terms { break-inside: avoid; }
