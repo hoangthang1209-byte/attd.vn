@@ -17,6 +17,7 @@ import CostingSourcePickerDialog, {
 } from "@/components/admin/pricing/costing/CostingSourcePickerDialog";
 import CostingStructuredSection from "@/components/admin/pricing/costing/CostingStructuredSection";
 import CostingSummaryPanel from "@/components/admin/pricing/costing/CostingSummaryPanel";
+import CostingTargetMarginField from "@/components/admin/pricing/costing/CostingTargetMarginField";
 import { formatPricingCurrency } from "@/features/pricing/format";
 import { formatBomMergeToast, mergeBomCostLines } from "@/features/pricing/costing-bom-merge";
 import { COSTING_BOM_PRESETS } from "@/features/pricing/costing-bom-presets";
@@ -233,6 +234,7 @@ export default function CostingCalculator() {
     if (!fromCalculationId) return;
 
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clone fetch lifecycle
     setLoadingClone(true);
     setError(null);
 
@@ -268,6 +270,7 @@ export default function CostingCalculator() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clone when fromCalculationId changes
   }, [fromCalculationId]);
 
   useEffect(() => {
@@ -315,6 +318,7 @@ export default function CostingCalculator() {
 
   useEffect(() => {
     if (!customerId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear contacts when customer cleared
       setContacts([]);
       setContactId("");
       return;
@@ -648,17 +652,10 @@ export default function CostingCalculator() {
               <label className="admin-label">Đơn vị</label>
               <input className="admin-input" value={unit} onChange={(e) => setUnit(e.target.value)} />
             </div>
-            <div className="admin-field">
-              <label className="admin-label">Target margin (%)</label>
-              <input
-                className="admin-input"
-                type="number"
-                min="0"
-                max="99"
-                value={targetMarginRate}
-                onChange={(e) => setTargetMarginRate(e.target.value)}
-              />
-            </div>
+            <CostingTargetMarginField
+              value={targetMarginRate}
+              onChange={setTargetMarginRate}
+            />
             <div className="admin-field">
               <label className="admin-label">Nhóm giá</label>
               <select
@@ -675,6 +672,9 @@ export default function CostingCalculator() {
                     </option>
                   ))}
               </select>
+              <p className="admin-field-hint">
+                Nhóm giá hiện chỉ lưu trên bản tính; chưa thay đổi công thức costing trừ khi có chính sách giá riêng.
+              </p>
             </div>
           </div>
 
@@ -839,10 +839,10 @@ export default function CostingCalculator() {
         </details>
 
         <details className="costing-details">
-          <summary>Bảng giá theo số lượng</summary>
+          <summary>Mô phỏng theo số lượng</summary>
           <div className="admin-seo-brief-form-grid" style={{ marginTop: 12 }}>
             <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
-              <label className="admin-label">Các mốc số lượng (phân tách bằng dấu phẩy)</label>
+              <label className="admin-label">Các mốc số lượng mô phỏng (phân tách bằng dấu phẩy)</label>
               <input
                 className="admin-input"
                 value={quantityTiers}
@@ -855,10 +855,10 @@ export default function CostingCalculator() {
                 variant="secondary"
                 onClick={() => void postQuantityBreaks()}
                 pending={loadingBreaks}
-                pendingLabel="Đang tính bảng giá…"
+                pendingLabel="Đang mô phỏng…"
                 disabled={loading || saving}
               >
-                Tính bảng giá
+                Mô phỏng theo số lượng
               </AdminLoadingButton>
             </div>
           </div>

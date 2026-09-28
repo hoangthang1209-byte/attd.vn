@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatPricingCurrency, formatPricingDateTime } from "@/features/pricing/format";
 import { getPricingStatusLabel } from "@/features/pricing/labels";
+import {
+  pricingCalculationMethodBadgeClass,
+  pricingCalculationMethodLabel,
+} from "@/features/pricing/pricing-calculation-method";
 import { AdminLoadingState, EmptyState } from "@/components/admin/AdminUi";
-import type { PricingCalculationListRecord, PricingOverviewStats } from "@/features/pricing/types";
+import type { PricingOverviewStats } from "@/features/pricing/types";
 
 export default function PricingOverviewDashboard() {
   const [stats, setStats] = useState<PricingOverviewStats | null>(null);
@@ -26,6 +30,7 @@ export default function PricingOverviewDashboard() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial dashboard fetch on mount
     reload();
   }, []);
 
@@ -67,23 +72,32 @@ export default function PricingOverviewDashboard() {
       </div>
 
       <div className="admin-section-header" style={{ marginTop: 24 }}>
-        <h3 className="admin-subtitle">Truy cập nhanh</h3>
+        <h3 className="admin-subtitle">Luồng tính giá chính</h3>
       </div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">
-          Costing & báo giá nhanh
+          Tính giá nhanh
         </Link>
         <Link href="/admin/pricing/costing/batch" className="admin-btn admin-btn--primary">
-          Costing batch (nhiều style)
+          Tính giá nhiều sản phẩm
         </Link>
-        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary">
-          Bộ tính giá
+        <Link href="/admin/pricing/history" className="admin-btn admin-btn--primary">
+          Lịch sử tính giá
         </Link>
+      </div>
+
+      <div className="admin-section-header" style={{ marginTop: 28 }}>
+        <div>
+          <h3 className="admin-subtitle">Cấu hình giá</h3>
+          <p className="admin-field-hint">Thiết lập nhóm giá, bảng giá chuẩn, thư viện chi phí và phí dịch vụ.</p>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Link href="/admin/pricing/price-groups" className="admin-btn admin-btn--secondary">
           Nhóm giá
         </Link>
         <Link href="/admin/pricing/product-tiers" className="admin-btn admin-btn--secondary">
-          Bảng giá sản phẩm
+          Bảng giá chuẩn
         </Link>
         <Link href="/admin/pricing/cost-library" className="admin-btn admin-btn--secondary">
           Thư viện chi phí
@@ -91,8 +105,17 @@ export default function PricingOverviewDashboard() {
         <Link href="/admin/pricing/service-rules" className="admin-btn admin-btn--secondary">
           Phí dịch vụ
         </Link>
-        <Link href="/admin/pricing/history" className="admin-btn admin-btn--secondary">
-          Lịch sử tính giá
+      </div>
+
+      <div className="admin-section-header" style={{ marginTop: 28 }}>
+        <div>
+          <h3 className="admin-subtitle">Công cụ bảng giá (tương thích)</h3>
+          <p className="admin-field-hint">
+            Bộ tính theo bảng giá sản phẩm và quy tắc phí dịch vụ — không thay thế costing V2.
+          </p>
+        </div>
+        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary admin-btn--xs">
+          Mở bộ tính bảng giá
         </Link>
       </div>
 
@@ -118,33 +141,34 @@ export default function PricingOverviewDashboard() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Mã bản tính</th>
-                <th>Khách hàng / Lead</th>
-                <th>Nhóm giá</th>
-                <th>Tổng tiền</th>
+                <th>Mã</th>
+                <th>Loại</th>
+                <th>Lead / KH</th>
+                <th>Tổng</th>
                 <th>Trạng thái</th>
-                <th>Ngày tạo</th>
+                <th>Ngày</th>
               </tr>
             </thead>
             <tbody>
-              {stats?.recentCalculations.map((row: PricingCalculationListRecord) => (
-                <tr key={row.id}>
-                  <td>
-                    <Link href={`/admin/pricing/history/${row.id}`}>{row.code}</Link>
-                  </td>
-                  <td>{row.customerLabel ?? row.leadLabel ?? "—"}</td>
-                  <td>{row.priceGroupName ?? "—"}</td>
-                  <td>
-                    {formatPricingCurrency(
-                      row.manualOverride && row.manualTotalAmount != null
-                        ? row.manualTotalAmount
-                        : row.totalAmount,
-                    )}
-                  </td>
-                  <td>{getPricingStatusLabel(row.status)}</td>
-                  <td>{formatPricingDateTime(row.createdAt)}</td>
-                </tr>
-              ))}
+              {stats!.recentCalculations.map((row) => {
+                const method = row.calculationMethod;
+                return (
+                  <tr key={row.id}>
+                    <td>
+                      <Link href={`/admin/pricing/history/${row.id}`}>{row.code}</Link>
+                    </td>
+                    <td>
+                      <span className={pricingCalculationMethodBadgeClass(method)}>
+                        {pricingCalculationMethodLabel(method)}
+                      </span>
+                    </td>
+                    <td>{row.leadLabel ?? row.customerLabel ?? "—"}</td>
+                    <td>{formatPricingCurrency(row.totalAmount)}</td>
+                    <td>{getPricingStatusLabel(row.status)}</td>
+                    <td>{formatPricingDateTime(row.createdAt)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

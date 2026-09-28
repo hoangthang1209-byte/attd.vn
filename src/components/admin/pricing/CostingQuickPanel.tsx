@@ -14,10 +14,7 @@ import {
   type CostingWorkspaceClone,
 } from "@/features/pricing/costing-calculation-clone";
 import { computeSellingPriceCommercials } from "@/features/pricing/costing-batch-selling-price";
-import {
-  BUILTIN_COST_LIBRARY,
-  type CostLibraryItem,
-} from "@/features/pricing/cost-library";
+import type { CostLibraryItem } from "@/features/pricing/cost-library";
 import { costingComponentTypeLabel } from "@/features/pricing/costing-component-labels";
 import { previewCostingCalculation } from "@/features/pricing/costing-preview";
 import {
@@ -61,22 +58,43 @@ export default function CostingQuickPanel({
   const [customCostOpen, setCustomCostOpen] = useState(false);
   const [customCostBusy, setCustomCostBusy] = useState(false);
   const [customCostError, setCustomCostError] = useState<string | null>(null);
-  const [libraryItems, setLibraryItems] = useState<CostLibraryItem[]>(BUILTIN_COST_LIBRARY);
-  const [focusLineIndex, setFocusLineIndex] = useState(0);
+  const [libraryItems, setLibraryItems] = useState<CostLibraryItem[]>([]);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [, setFocusLineIndex] = useState(0);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const loadLibrary = useCallback(async () => {
+    setLibraryLoading(true);
+    setLibraryError(null);
     try {
       const res = await fetch("/api/pricing/cost-library");
-      const data = (await res.json()) as { items?: CostLibraryItem[] };
-      setLibraryItems(data.items ?? BUILTIN_COST_LIBRARY);
-    } catch {
-      setLibraryItems(BUILTIN_COST_LIBRARY);
+      const data = (await res.json()) as { items?: CostLibraryItem[]; message?: string };
+      if (!res.ok) {
+        throw new Error(data.message ?? "Không thể tải thư viện chi phí");
+      }
+      const items = data.items ?? [];
+      setLibraryItems(items);
+      if (items.length === 0) {
+        setLibraryError(
+          "Thư viện chi phí đang trống. Thêm mục trong Cấu hình giá → Thư viện chi phí trước khi chọn chi phí nhanh.",
+        );
+      }
+    } catch (err) {
+      setLibraryItems([]);
+      setLibraryError(
+        err instanceof Error
+          ? err.message
+          : "Không thể tải thư viện chi phí. Thử lại hoặc mở Thư viện chi phí để kiểm tra.",
+      );
+    } finally {
+      setLibraryLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (!open || !row?.calculationId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load panel data when opened
     setLoading(true);
     setError(null);
     setRevisionNote(null);
@@ -109,6 +127,7 @@ export default function CostingQuickPanel({
 
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset panel on close
       setWorkspace(null);
       setError(null);
     }
@@ -124,6 +143,7 @@ export default function CostingQuickPanel({
     return previewCostingCalculation(workspaceToCalculatorInput(workspace));
   }, [workspace]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- derived from row + preview
   const commercial = useMemo(() => {
     if (!preview || !row?.quantity) return null;
     const sell = row.sellingPricePerUnit;
@@ -208,11 +228,7 @@ export default function CostingQuickPanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, handleSave]);
 
-  function handleLineKeyDown(
-    e: React.KeyboardEvent,
-    lineIndex: number,
-    line: QuickCostLine,
-  ) {
+  function handleLineKeyDown(e: React.KeyboardEvent, lineIndex: number) {
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       const next = nextQuickCostCellIndex(lineIndex, quickLines.length, 1);
@@ -262,6 +278,8 @@ export default function CostingQuickPanel({
 
         {loading && <p className="admin-field-hint">Đang tải…</p>}
         {error && <p className="admin-error">{error}</p>}
+        {libraryError && <p className="admin-error">{libraryError}</p>}
+        {libraryLoading && <p className="admin-field-hint">Đang tải thư viện chi phí…</p>}
         {revisionNote && (
           <p className="admin-kb-badge admin-kb-badge--medium costing-quick-panel__revision-note">
             {revisionNote}
@@ -317,6 +335,7 @@ export default function CostingQuickPanel({
               <button
                 type="button"
                 className="admin-btn admin-btn--secondary admin-btn--xs"
+                disabled={Boolean(libraryError) || libraryLoading}
                 onClick={() => setCostPickerOpen(true)}
               >
                 + Chi phí
@@ -363,7 +382,7 @@ export default function CostingQuickPanel({
                         value={line.unitCost}
                         disabled={saving}
                         onChange={(e) => updateLineUnitCost(line, e.target.value)}
-                        onKeyDown={(e) => handleLineKeyDown(e, index, line)}
+                        onKeyDown={(e) => handleLineKeyDown(e, index)}
                       />
                     </td>
                     <td>

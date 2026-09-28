@@ -14,6 +14,8 @@ import type {
 } from "@/features/pricing/costing-types";
 import { previewCostingCalculation } from "@/features/pricing/costing-preview";
 import { usesV2CostLines, validateCostingLinesForSave } from "@/features/pricing/costing-v2";
+import { validateCostingCommercialInput } from "@/features/pricing/pricing-commercial-validation";
+import { recomputeCostingQuantityBreaksForSave } from "@/features/pricing/costing-quantity-break-recompute";
 
 const PROCESS_COMPONENT_TYPES: CostingComponentType[] = [
   "CUTTING",
@@ -274,22 +276,13 @@ export async function saveCostingCalculation(
   input: CostingCalculatorInput,
   options?: { batchItemId?: string },
 ): Promise<CostingSaveResult> {
+  validateCostingCommercialInput(input);
   if (usesV2CostLines(input)) {
     const lineError = validateCostingLinesForSave(input.costLines ?? [], input.quantity);
     if (lineError) throw new CostingCalculatorValidationError(lineError);
   }
   const result = await calculateCosting(input);
-  const quantityBreaks = (input.quantityBreaks ?? [])
-    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
-    .map((item) => ({
-      quantity: Math.round(item.quantity),
-      totalCostPerUnit: roundMoney(positive(item.totalCostPerUnit)),
-      suggestedSellingPricePerUnit: roundMoney(positive(item.suggestedSellingPricePerUnit)),
-      revenueBeforeVat: roundMoney(positive(item.revenueBeforeVat)),
-      grossProfit: roundMoney(positive(item.grossProfit)),
-      actualMarginRate: roundMoney(positive(item.actualMarginRate)),
-      finalQuotePrice: roundMoney(positive(item.finalQuotePrice)),
-    }));
+  const quantityBreaks = await recomputeCostingQuantityBreaksForSave(input);
   const costingSnapshot = { ...result, quantityBreaks };
   const code = await generatePricingCalculationCode();
 
@@ -398,23 +391,14 @@ export async function updateCostingCalculation(
   const calcItem = calc.items[0];
   if (!calcItem) throw new CostingCalculatorValidationError("Bản tính giá không có dòng sản phẩm.");
 
+  validateCostingCommercialInput(input);
   if (usesV2CostLines(input)) {
     const lineError = validateCostingLinesForSave(input.costLines ?? [], input.quantity);
     if (lineError) throw new CostingCalculatorValidationError(lineError);
   }
 
   const result = await calculateCosting(input);
-  const quantityBreaks = (input.quantityBreaks ?? [])
-    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
-    .map((item) => ({
-      quantity: Math.round(item.quantity),
-      totalCostPerUnit: roundMoney(positive(item.totalCostPerUnit)),
-      suggestedSellingPricePerUnit: roundMoney(positive(item.suggestedSellingPricePerUnit)),
-      revenueBeforeVat: roundMoney(positive(item.revenueBeforeVat)),
-      grossProfit: roundMoney(positive(item.grossProfit)),
-      actualMarginRate: roundMoney(positive(item.actualMarginRate)),
-      finalQuotePrice: roundMoney(positive(item.finalQuotePrice)),
-    }));
+  const quantityBreaks = await recomputeCostingQuantityBreaksForSave(input);
   const costingSnapshot = { ...result, quantityBreaks };
 
   const useManualSell = calcItem.manualOverride && calcItem.manualUnitPrice != null;
