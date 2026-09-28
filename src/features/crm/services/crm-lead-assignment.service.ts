@@ -1,5 +1,16 @@
 import "server-only";
+import type { LeadStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+
+const ACTIVE_LEAD_STATUSES: LeadStatus[] = [
+  "NEW",
+  "CONTACTED",
+  "QUALIFIED",
+  "NEED_PRICING",
+  "QUOTING",
+  "QUOTED",
+  "NEGOTIATING",
+];
 
 export async function assignLead(input: {
   leadId: string;
@@ -16,7 +27,7 @@ export async function assignLead(input: {
 
   if (input.employeeId) {
     const employee = await prisma.employee.findFirst({
-      where: { id: input.employeeId, isActive: true },
+      where: { id: input.employeeId, isActive: true, role: "SALES" },
       select: { id: true },
     });
     if (!employee) throw new Error("Nhân viên phụ trách không hợp lệ.");
@@ -52,4 +63,43 @@ export async function assignLead(input: {
       },
     }),
   ]);
+}
+
+export async function autoAssignLead(leadId: string): Promise<string | null> {
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    select: { assignedEmployeeId: true },
+  });
+  if (!lead || lead.assignedEmployeeId) return lead?.assignedEmployeeId ?? null;
+
+  const employees = await prisma.employee.findMany({
+    where: { isActive: true, role: "SALES" },
+    select: { id: true, employeeCode: true },
+    orderBy: { employeeCode: "asc" },
+  });
+  if (employees.length === 0) return null;
+
+  const counts = await prisma.lead.groupBy({
+    by: ["assignedEmployeeId"],
+    where: {
+      assignedEmployeeId: { in: employees.map((employee) => employee.id) },
+      status: { in: ACTIVE_LEAD_STATUSES },
+    },
+    _count: { _all: true },
+  });
+  const countMap = new Map(
+    counts.map((row) => [row.assignedEmployeeId, row._count._all]),
+  );
+  const selected = [...employees].sort((a, b) => {
+    const delta = (countMap.get(a.id) ?? 0) - (countMap.get(b.id) ?? 0);
+    return delta || a.employeeCode.localeCompare(b.employeeCode);
+  })[0];
+
+  await assignLead({
+    leadId,
+    employeeId: selected.id,
+    source: "AUTO_INTAKE",
+    reason: "Tự động phân công theo tải lead đang hoạt động.",
+  });
+  return selected.id;
 }
