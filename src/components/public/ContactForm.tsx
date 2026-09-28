@@ -17,10 +17,14 @@ function buildPrefillMessage(params: {
   productGroup?: string | null;
   quantity?: string | null;
   region?: string | null;
+  service?: string | null;
+  timeline?: string | null;
 }): string {
   const lines: string[] = [];
   if (params.productGroup?.trim()) lines.push(`Nhóm sản phẩm: ${params.productGroup.trim()}`);
   if (params.quantity?.trim()) lines.push(`Số lượng dự kiến: ${params.quantity.trim()}`);
+  if (params.service?.trim()) lines.push(`Nhu cầu hoàn thiện: ${params.service.trim()}`);
+  if (params.timeline?.trim()) lines.push(`Thời gian cần hàng: ${params.timeline.trim()}`);
   if (params.region?.trim()) lines.push(`Khu vực giao hàng: ${params.region.trim()}`);
   return lines.join("\n");
 }
@@ -40,6 +44,8 @@ export default function ContactForm() {
       productGroup: searchParams.get("product_group"),
       quantity: searchParams.get("quantity"),
       region: searchParams.get("region"),
+      service: searchParams.get("service"),
+      timeline: searchParams.get("timeline"),
     });
     if (prefill) setMessage(prefill);
   }, [searchParams]);
