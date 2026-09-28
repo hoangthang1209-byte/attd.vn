@@ -163,32 +163,50 @@ export async function createPattern(input: {
   const name = input.name?.trim();
   if (!name) throw new PatternValidationError("Tên rập là bắt buộc.");
 
-  const code = await generatePatternCode();
-  return prisma.pattern.create({
-    data: {
-      code,
-      name,
-      productCategoryId: input.productCategoryId || null,
-      productId: input.productId || null,
-      baseSize: input.baseSize?.trim() || null,
-      sizeRange: input.sizeRange?.trim() || null,
-      gradingRule: input.gradingRule?.trim() || null,
-      productionMaterialCategory: input.productionMaterialCategory ?? null,
-      sourceType: input.sourceType ?? null,
-      patternSupplierId: input.patternSupplierId || null,
-      sourceSupplierCode: input.sourceSupplierCode?.trim() || null,
-      sourceSupplier: input.sourceSupplier?.trim() || null,
-      sourceSupplierContact: input.sourceSupplierContact?.trim() || null,
-      sourcePhone: input.sourcePhone?.trim() || null,
-      sourceEmail: input.sourceEmail?.trim() || null,
-      customerId: input.customerId || null,
-      customerNameSnapshot: input.customerNameSnapshot?.trim() || null,
-      sourceNotes: input.sourceNotes?.trim() || null,
-      notes: input.notes?.trim() || null,
-      createdBy: input.createdBy?.trim() || null,
-    },
-    include: PATTERN_INCLUDE,
-  });
+  const createData = {
+    name,
+    productCategoryId: input.productCategoryId || null,
+    productId: input.productId || null,
+    baseSize: input.baseSize?.trim() || null,
+    sizeRange: input.sizeRange?.trim() || null,
+    gradingRule: input.gradingRule?.trim() || null,
+    productionMaterialCategory: input.productionMaterialCategory ?? null,
+    sourceType: input.sourceType ?? null,
+    patternSupplierId: input.patternSupplierId || null,
+    sourceSupplierCode: input.sourceSupplierCode?.trim() || null,
+    sourceSupplier: input.sourceSupplier?.trim() || null,
+    sourceSupplierContact: input.sourceSupplierContact?.trim() || null,
+    sourcePhone: input.sourcePhone?.trim() || null,
+    sourceEmail: input.sourceEmail?.trim() || null,
+    customerId: input.customerId || null,
+    customerNameSnapshot: input.customerNameSnapshot?.trim() || null,
+    sourceNotes: input.sourceNotes?.trim() || null,
+    notes: input.notes?.trim() || null,
+    createdBy: input.createdBy?.trim() || null,
+  };
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const code = await generatePatternCode();
+    try {
+      return await prisma.pattern.create({
+        data: { code, ...createData },
+        include: PATTERN_INCLUDE,
+      });
+    } catch (error) {
+      const target =
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.meta?.target
+          : undefined;
+      const targetText = Array.isArray(target) ? target.join(",") : String(target ?? "");
+      const isCodeCollision =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        targetText.toLowerCase().includes("code");
+      if (!isCodeCollision || attempt === 2) throw error;
+    }
+  }
+
+  throw new PatternValidationError("Không thể tạo mã rập duy nhất. Vui lòng thử lại.");
 }
 
 function buildPatternUpdateData(
