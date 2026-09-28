@@ -869,14 +869,12 @@ export async function linkLeadToExistingCustomer(
       }
 
       if (!contactId) {
-        const leadPhone = lead.phone !== "—" ? lead.phone.trim() : "";
-        const leadEmail = lead.email?.trim() || "";
+        const leadPhone = normalizeLeadPhone(lead.phone);
+        const leadEmail = normalizeLeadEmail(lead.email);
 
         const matched = customer.contacts.find((contact) => {
-          if (leadPhone && contact.phone?.trim() === leadPhone) return true;
-          if (leadEmail && contact.email?.trim()?.toLowerCase() === leadEmail.toLowerCase()) {
-            return true;
-          }
+          if (leadPhone && normalizeLeadPhone(contact.phone) === leadPhone) return true;
+          if (leadEmail && normalizeLeadEmail(contact.email) === leadEmail) return true;
           return false;
         });
 
@@ -893,7 +891,7 @@ export async function linkLeadToExistingCustomer(
               data: {
                 customerId: customer.id,
                 fullName: contactFullName,
-                phone: leadPhone || null,
+                phone: lead.phone !== "—" ? lead.phone : null,
                 email: lead.email,
                 zalo: lead.zalo,
                 isPrimary: customer.contacts.length === 0,
