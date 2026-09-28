@@ -22,10 +22,14 @@ export async function GET(req: NextRequest) {
       : undefined;
 
   try {
+    const pageParam = Number.parseInt(searchParams.get("page") ?? "1", 10);
+    const pageSizeParam = Number.parseInt(searchParams.get("pageSize") ?? "25", 10);
     const result = await listPatterns({
       status,
       productCategoryId: searchParams.get("productCategoryId") ?? undefined,
       search: searchParams.get("search") ?? undefined,
+      page: Number.isFinite(pageParam) ? pageParam : 1,
+      pageSize: Number.isFinite(pageSizeParam) ? pageSizeParam : 25,
     });
     return NextResponse.json(result);
   } catch (err) {
