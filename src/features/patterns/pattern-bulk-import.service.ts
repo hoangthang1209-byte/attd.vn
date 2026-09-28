@@ -105,6 +105,51 @@ async function loadReferenceMaps(rows: PatternBulkImportRow[]) {
 
 type ReferenceMaps = Awaited<ReturnType<typeof loadReferenceMaps>>;
 
+
+const LEGACY_TEST_PATTERNS = [
+  { code: "PT0001", name: "ATTD 001", targetCode: "TEST-0001" },
+  { code: "PT0002", name: "IMIN JERSEY 2026 V2", targetCode: "TEST-0002" },
+] as const;
+
+async function moveLegacyTestPatternsOutOfProductionSequence(): Promise<void> {
+  const sourceCodes = LEGACY_TEST_PATTERNS.map((item) => item.code);
+  const targetCodes = LEGACY_TEST_PATTERNS.map((item) => item.targetCode);
+
+  const existing = await prisma.pattern.findMany({
+    where: { code: { in: [...sourceCodes, ...targetCodes] } },
+    select: { id: true, code: true, name: true },
+  });
+
+  const occupiedTargets = new Set(
+    existing.filter((item) => targetCodes.includes(item.code as (typeof targetCodes)[number])).map((item) => item.code),
+  );
+
+  const moves = LEGACY_TEST_PATTERNS.filter((item) =>
+    existing.some(
+      (pattern) => pattern.code === item.code && pattern.name === item.name,
+    ),
+  );
+
+  if (moves.length === 0) return;
+
+  for (const move of moves) {
+    if (occupiedTargets.has(move.targetCode)) {
+      throw new Error(
+        `Không thể giải phóng ${move.code}: mã ${move.targetCode} đã tồn tại.`,
+      );
+    }
+  }
+
+  await prisma.$transaction(
+    moves.map((move) =>
+      prisma.pattern.updateMany({
+        where: { code: move.code, name: move.name },
+        data: { code: move.targetCode },
+      }),
+    ),
+  );
+}
+
 async function importOne(
   row: PatternBulkImportRow,
   reservedCode: string | undefined,
@@ -184,6 +229,11 @@ export async function bulkImportPatterns(input: {
   createdBy?: string | null;
 }): Promise<PatternBulkImportResponse> {
   const rows = input.rows.slice(0, PATTERN_IMPORT_MAX_ROWS);
+
+  // One-time compatibility cleanup for the two original test records. This only
+  // moves the known test names, so future real PT0001/PT0002 records are untouched.
+  await moveLegacyTestPatternsOutOfProductionSequence();
+
   const [refs, reservedCodes] = await Promise.all([
     loadReferenceMaps(rows),
     generatePatternCodes(rows.length),
