@@ -89,7 +89,7 @@ export async function createLeadFromWhatsAppAssistant(
       companyName,
       phone,
       email,
-      source: "OTHER",
+      source: "WHATSAPP",
       sourceDetail: "Vietnamclothing.vn / WhatsApp",
       demand: buildDemand(analysis),
       note,
@@ -111,7 +111,7 @@ export async function createLeadFromWhatsAppAssistant(
     channel: "VIETNAMCLOTHING_WHATSAPP",
     idempotencyKey: buildDailyLeadIdempotencyKey({
       channel: "VIETNAMCLOTHING_WHATSAPP",
-      source: "OTHER",
+      source: "WHATSAPP",
       phone,
       email,
       fingerprint: input.rawChatText,
