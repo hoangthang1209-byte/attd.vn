@@ -51,8 +51,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       quantity: raw.quantity != null ? String(raw.quantity) : "0",
       note: typeof raw.note === "string" ? raw.note : null,
       referenceOrderId: typeof raw.referenceOrderId === "string" ? raw.referenceOrderId : null,
-      createdByEmployeeId:
-        typeof raw.createdByEmployeeId === "string" ? raw.createdByEmployeeId : null,
+      createdByEmployeeId: permission.session.employeeId,
     });
     return NextResponse.json(result);
   } catch (err) {
