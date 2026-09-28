@@ -343,6 +343,20 @@ export async function updatePattern(
   if (existing.status === PatternStatus.ARCHIVED) {
     throw new PatternValidationError("Rập đã lưu trữ, không thể chỉnh sửa.");
   }
+  if (existing.status === PatternStatus.APPROVED) {
+    throw new PatternValidationError(
+      "Rập đã duyệt được khóa để bảo toàn dữ liệu sản xuất. Hãy tạo phiên bản mới trước khi chỉnh sửa.",
+      undefined,
+      "CONFLICT",
+    );
+  }
+  if (input.version !== undefined && input.version !== existing.version) {
+    throw new PatternValidationError(
+      "Version rập do hệ thống quản lý. Hãy dùng chức năng tạo phiên bản mới.",
+      { version: "Không thể sửa version trực tiếp." },
+      "CONFLICT",
+    );
+  }
 
   let supplierSnapshots: Awaited<ReturnType<typeof resolvePatternSupplierSnapshots>> | null = null;
   if (input.patternSupplierId !== undefined) {
@@ -504,6 +518,9 @@ export async function addPatternFile(
   if (pattern.status === PatternStatus.ARCHIVED) {
     throw new PatternValidationError("Rập đã lưu trữ.");
   }
+  if (pattern.status === PatternStatus.APPROVED) {
+    throw new PatternValidationError("Rập đã duyệt được khóa. Hãy tạo phiên bản mới trước khi thêm file.");
+  }
 
   return prisma.patternFile.create({
     data: {
@@ -532,8 +549,14 @@ export async function updatePatternFile(
     sortOrder: number;
   }>,
 ) {
-  const file = await prisma.patternFile.findFirst({ where: { id: fileId, patternId } });
+  const file = await prisma.patternFile.findFirst({
+    where: { id: fileId, patternId },
+    include: { pattern: { select: { status: true } } },
+  });
   if (!file) throw new PatternValidationError("Không tìm thấy file.");
+  if (file.pattern.status !== PatternStatus.DRAFT) {
+    throw new PatternValidationError("Chỉ rập bản nháp mới được chỉnh sửa file.");
+  }
 
   return prisma.patternFile.update({
     where: { id: fileId },
@@ -547,8 +570,14 @@ export async function updatePatternFile(
 }
 
 export async function deletePatternFile(patternId: string, fileId: string) {
-  const file = await prisma.patternFile.findFirst({ where: { id: fileId, patternId } });
+  const file = await prisma.patternFile.findFirst({
+    where: { id: fileId, patternId },
+    include: { pattern: { select: { status: true } } },
+  });
   if (!file) throw new PatternValidationError("Không tìm thấy file.");
+  if (file.pattern.status !== PatternStatus.DRAFT) {
+    throw new PatternValidationError("Chỉ rập bản nháp mới được xóa file.");
+  }
   await prisma.patternFile.delete({ where: { id: fileId } });
   if (file.r2ObjectKey) {
     try {
