@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { createCrmLead } from "@/features/crm/services/crm-lead.service";
 import {
   buildDailyLeadIdempotencyKey,
   ingestCrmLead,
