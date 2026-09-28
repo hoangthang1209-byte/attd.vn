@@ -29,6 +29,15 @@ export function assertNonNegative(value: Prisma.Decimal, label: string) {
   }
 }
 
+export function assertReturnDoesNotExceedIssued(
+  returnQuantity: Prisma.Decimal,
+  issuedQuantity: Prisma.Decimal,
+) {
+  if (returnQuantity.gt(issuedQuantity)) {
+    throw new MaterialValidationError("Số lượng trả không được vượt số lượng đã cấp cho sản xuất.");
+  }
+}
+
 export function maxDecimal(a: Prisma.Decimal, b: Prisma.Decimal): Prisma.Decimal {
   return a.gte(b) ? a : b;
 }
