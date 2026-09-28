@@ -48,6 +48,13 @@ export default function HomeHeroSection({ hero, categories }: Props) {
               </Link>
               <HeroSecondaryCta hero={hero} />
             </div>
+
+            <ul className="home-hero__commercial-proof" aria-label="Năng lực B2B nổi bật">
+              <li>Kho &amp; QC tại TP.HCM</li>
+              <li>In / thêu / OEM</li>
+              <li>MOQ theo nhu cầu</li>
+              <li>Giao hàng toàn quốc</li>
+            </ul>
           </div>
 
           <HomeCategoryDiscoveryRail categories={categories} />
