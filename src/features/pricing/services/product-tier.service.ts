@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { ProductPriceTierRecord } from "@/features/pricing/types";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 import { TIER_VARIANT_OWNERSHIP_ERROR } from "@/features/products/product-foundation-validation";
+import { priceTierRangesOverlap } from "@/features/pricing/pricing-p1-guards";
 
 function mapTier(row: {
   id: string;
@@ -68,21 +69,6 @@ function validateEffectiveDates(effectiveFrom: Date | null, effectiveTo: Date | 
   if (effectiveFrom && effectiveTo && effectiveTo < effectiveFrom) {
     throw new PricingValidationError("Ngày kết thúc hiệu lực phải sau ngày bắt đầu.");
   }
-}
-
-export function priceTierRangesOverlap(
-  a: { minQuantity: number; maxQuantity: number | null; effectiveFrom: Date | null; effectiveTo: Date | null },
-  b: { minQuantity: number; maxQuantity: number | null; effectiveFrom: Date | null; effectiveTo: Date | null },
-): boolean {
-  const quantityOverlap =
-    (a.maxQuantity == null || b.minQuantity <= a.maxQuantity) &&
-    (b.maxQuantity == null || a.minQuantity <= b.maxQuantity);
-  if (!quantityOverlap) return false;
-
-  const dateOverlap =
-    (a.effectiveTo == null || b.effectiveFrom == null || b.effectiveFrom <= a.effectiveTo) &&
-    (b.effectiveTo == null || a.effectiveFrom == null || a.effectiveFrom <= b.effectiveTo);
-  return dateOverlap;
 }
 
 type ProductTierDb = Pick<Prisma.TransactionClient, "productPriceTier" | "productVariant">;
