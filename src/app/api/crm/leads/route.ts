@@ -4,6 +4,7 @@ import {
   createAdminLead,
   createCrmLead,
   getCrmDiagnostics,
+  getCrmLeadById,
   isCrmLeadTableReady,
   isValidLeadPriority,
   isValidLeadSource,
@@ -204,7 +205,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "Không thể tạo lead" }, { status: 500 });
     }
 
-    if (permission.session.employeeId && permission.session.legacyEmployeeRole === "SALES") {
+    if (
+      permission.session.employeeId &&
+      (permission.session.roleCode === "SALES" || permission.session.legacyEmployeeRole === "SALES")
+    ) {
       await assignLead({
         leadId: lead.id,
         employeeId: permission.session.employeeId,
