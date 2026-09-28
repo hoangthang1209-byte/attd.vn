@@ -52,6 +52,23 @@ export function mapLeadRow(row: {
   notes?: { id: string; leadId: string; content: string; createdAt: Date }[];
   activities?: Parameters<typeof mapActivityRow>[0][];
   productInterests?: Parameters<typeof mapProductInterestRow>[0][];
+  inboundEvents?: Array<{
+    id: string;
+    source: LeadSource;
+    channel: string;
+    externalId: string | null;
+    receivedAt: Date;
+  }>;
+  assignmentHistory?: Array<{
+    id: string;
+    fromEmployeeId: string | null;
+    toEmployeeId: string | null;
+    actorId: string | null;
+    reason: string | null;
+    createdAt: Date;
+    fromEmployee?: { fullName: string } | null;
+    toEmployee?: { fullName: string } | null;
+  }>;
   customer?: Parameters<typeof mapCustomerRow>[0] | null;
 }): CrmLeadRecord {
   return {
@@ -106,6 +123,23 @@ export function mapLeadRow(row: {
     ),
     activities: row.activities?.map(mapActivityRow),
     productInterests: row.productInterests?.map(mapProductInterestRow),
+    inboundEvents: row.inboundEvents?.map((event) => ({
+      id: event.id,
+      source: event.source,
+      channel: event.channel,
+      externalId: event.externalId,
+      receivedAt: event.receivedAt.toISOString(),
+    })),
+    assignmentHistory: row.assignmentHistory?.map((event) => ({
+      id: event.id,
+      fromEmployeeId: event.fromEmployeeId,
+      toEmployeeId: event.toEmployeeId,
+      fromEmployeeName: event.fromEmployee?.fullName ?? null,
+      toEmployeeName: event.toEmployee?.fullName ?? null,
+      actorId: event.actorId,
+      reason: event.reason,
+      createdAt: event.createdAt.toISOString(),
+    })),
     customer: row.customer ? mapCustomerRow(row.customer) : null,
   };
 }
@@ -290,6 +324,18 @@ export const LEAD_DETAIL_INCLUDE = {
   productInterests: { orderBy: { createdAt: "desc" as const } },
   customer: true,
   assignedEmployee: { select: { id: true, fullName: true, employeeCode: true } },
+  inboundEvents: {
+    orderBy: { receivedAt: "desc" as const },
+    take: 50,
+  },
+  assignmentHistory: {
+    orderBy: { createdAt: "desc" as const },
+    take: 50,
+    include: {
+      fromEmployee: { select: { fullName: true } },
+      toEmployee: { select: { fullName: true } },
+    },
+  },
 } satisfies Prisma.LeadInclude;
 
 export const CUSTOMER_LIST_INCLUDE = {
