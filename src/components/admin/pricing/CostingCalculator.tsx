@@ -591,9 +591,6 @@ export default function CostingCalculator() {
                   </option>
                 ))}
               </select>
-              <p className="admin-field-hint">
-                Dùng để phân loại/lưu bản tính; hiện không tự thay đổi công thức costing.
-              </p>
             </div>
             <div className="admin-field">
               <label className="admin-label">Sản phẩm</label>
@@ -681,6 +678,9 @@ export default function CostingCalculator() {
                     </option>
                   ))}
               </select>
+              <p className="admin-field-hint">
+                Dùng để phân loại/lưu bản tính; hiện không tự thay đổi công thức costing.
+              </p>
             </div>
           </div>
 
