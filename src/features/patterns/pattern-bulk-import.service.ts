@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { createPattern } from "@/features/patterns/pattern.service";
+import { generatePatternCodes } from "@/features/patterns/pattern-code";
 import {
   normalizePatternImportSource,
   PATTERN_IMPORT_MAX_ROWS,
@@ -106,6 +107,7 @@ type ReferenceMaps = Awaited<ReturnType<typeof loadReferenceMaps>>;
 
 async function importOne(
   row: PatternBulkImportRow,
+  reservedCode: string | undefined,
   refs: ReferenceMaps,
   createdBy: string | null,
 ): Promise<PatternBulkImportResultItem> {
@@ -142,6 +144,7 @@ async function importOne(
   try {
     const created = await createPattern({
       name,
+      code: reservedCode ?? null,
       productCategoryId: category?.id ?? null,
       productId: product?.id ?? null,
       baseSize: clean(row.baseSize) || null,
@@ -181,13 +184,18 @@ export async function bulkImportPatterns(input: {
   createdBy?: string | null;
 }): Promise<PatternBulkImportResponse> {
   const rows = input.rows.slice(0, PATTERN_IMPORT_MAX_ROWS);
-  const refs = await loadReferenceMaps(rows);
+  const [refs, reservedCodes] = await Promise.all([
+    loadReferenceMaps(rows),
+    generatePatternCodes(rows.length),
+  ]);
   const items: PatternBulkImportResultItem[] = [];
 
-  // Keep creation sequential to reduce code-generation collisions while reference
-  // resolution is batched into four queries for large legacy imports.
-  for (const row of rows) {
-    items.push(await importOne(row, refs, input.createdBy ?? null));
+  // Keep writes sequential for predictable database load; code allocation and
+  // reference resolution are batched so large legacy imports stay efficient.
+  for (const [index, row] of rows.entries()) {
+    items.push(
+      await importOne(row, reservedCodes[index], refs, input.createdBy ?? null),
+    );
   }
 
   return {
