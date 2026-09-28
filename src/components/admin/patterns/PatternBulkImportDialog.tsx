@@ -82,6 +82,42 @@ function baseName(path: string): string {
   return path.split(/[\\\\/]/).at(-1)?.trim() ?? path.trim();
 }
 
+function fileStem(fileName: string): string {
+  const name = baseName(fileName);
+  const dotIndex = name.lastIndexOf(".");
+  return (dotIndex > 0 ? name.slice(0, dotIndex) : name).trim();
+}
+
+function buildRowsFromLocalFiles(files: File[]): PatternBulkImportRow[] {
+  const groups = new Map<string, { name: string; files: string[] }>();
+  for (const file of files) {
+    const stem = fileStem(file.name);
+    const key = stem.toLocaleLowerCase("vi-VN");
+    if (!key) continue;
+    const current = groups.get(key) ?? { name: stem, files: [] };
+    current.files.push(file.name);
+    groups.set(key, current);
+  }
+
+  return Array.from(groups.values())
+    .slice(0, PATTERN_IMPORT_MAX_ROWS)
+    .map((group, index) => ({
+      rowNumber: index + 2,
+      name: group.name,
+      category: "",
+      product: "",
+      baseSize: "",
+      sizeRange: "",
+      gradingRule: "",
+      sourceType: "",
+      supplier: "",
+      customer: "",
+      sourceNotes: "",
+      notes: "Nhập từ file rập cũ trên máy tính",
+      files: group.files,
+    }));
+}
+
 function downloadTemplate() {
   const example = {
     "Tên rập": "Áo thun regular ATTD",
