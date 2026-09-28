@@ -142,14 +142,14 @@ export async function updateServicePriceRule(
 }
 
 export async function getServiceRulesForPricing(priceGroupId: string | null, ruleIds: string[]) {
-  const rules = await prisma.servicePriceRule.findMany({
+  if (ruleIds.length === 0) return [];
+  return prisma.servicePriceRule.findMany({
     where: {
       isActive: true,
-      OR: [
-        { id: { in: ruleIds } },
-        ...(priceGroupId ? [{ priceGroupId }, { priceGroupId: null }] : [{ priceGroupId: null }]),
-      ],
+      id: { in: ruleIds },
+      OR: priceGroupId
+        ? [{ priceGroupId }, { priceGroupId: null }]
+        : [{ priceGroupId: null }],
     },
   });
-  return rules;
 }
