@@ -66,7 +66,8 @@ export async function listPatterns(input?: {
   status?: PatternStatus;
   productCategoryId?: string;
   search?: string;
-  limit?: number;
+  page?: number;
+  pageSize?: number;
 }) {
   const where: Prisma.PatternWhereInput = {};
   if (input?.status) where.status = input.status;
@@ -83,22 +84,51 @@ export async function listPatterns(input?: {
       { customerNameSnapshot: { contains: q, mode: "insensitive" } },
       { customer: { name: { contains: q, mode: "insensitive" } } },
       { customer: { code: { contains: q, mode: "insensitive" } } },
+      { product: { name: { contains: q, mode: "insensitive" } } },
+      { product: { productCode: { contains: q, mode: "insensitive" } } },
+      { productCategory: { name: { contains: q, mode: "insensitive" } } },
     ];
   }
 
-  const items = await prisma.pattern.findMany({
-    where,
-    include: {
-      productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
-      customer: { select: { id: true, name: true, code: true } },
-      patternSupplier: { select: PATTERN_SUPPLIER_SELECT },
-      _count: { select: { files: true, techPacks: true } },
-    },
-    orderBy: [{ updatedAt: "desc" }],
-    take: input?.limit ?? 100,
-  });
+  const pageSize = Math.min(Math.max(input?.pageSize ?? 25, 10), 100);
+  const page = Math.max(input?.page ?? 1, 1);
+  const skip = (page - 1) * pageSize;
 
-  return { items };
+  const [items, total, allCount, draftCount, approvedCount, archivedCount] =
+    await prisma.$transaction([
+      prisma.pattern.findMany({
+        where,
+        include: {
+          productCategory: { select: PATTERN_CATEGORY_VISUAL_SELECT },
+          product: { select: { id: true, name: true, productCode: true } },
+          customer: { select: { id: true, name: true, code: true } },
+          patternSupplier: { select: PATTERN_SUPPLIER_SELECT },
+          _count: { select: { files: true, techPacks: true } },
+        },
+        orderBy: [{ updatedAt: "desc" }],
+        skip,
+        take: pageSize,
+      }),
+      prisma.pattern.count({ where }),
+      prisma.pattern.count(),
+      prisma.pattern.count({ where: { status: PatternStatus.DRAFT } }),
+      prisma.pattern.count({ where: { status: PatternStatus.APPROVED } }),
+      prisma.pattern.count({ where: { status: PatternStatus.ARCHIVED } }),
+    ]);
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    pageCount: Math.max(1, Math.ceil(total / pageSize)),
+    stats: {
+      all: allCount,
+      draft: draftCount,
+      approved: approvedCount,
+      archived: archivedCount,
+    },
+  };
 }
 
 export async function getPatternDetail(id: string): Promise<PatternDetail | null> {
@@ -107,32 +137,73 @@ export async function getPatternDetail(id: string): Promise<PatternDetail | null
 
 export async function createPattern(input: {
   name: string;
+  code?: string | null;
   productCategoryId?: string | null;
   productId?: string | null;
   baseSize?: string | null;
   sizeRange?: string | null;
   gradingRule?: string | null;
+  productionMaterialCategory?: ProductionMaterialCategory | null;
+  sourceType?: PatternSourceType | null;
+  patternSupplierId?: string | null;
+  sourceSupplierCode?: string | null;
+  sourceSupplier?: string | null;
+  sourceSupplierContact?: string | null;
+  sourcePhone?: string | null;
+  sourceEmail?: string | null;
+  customerId?: string | null;
+  customerNameSnapshot?: string | null;
+  sourceNotes?: string | null;
   notes?: string | null;
   createdBy?: string | null;
 }) {
   const name = input.name?.trim();
   if (!name) throw new PatternValidationError("Tên rập là bắt buộc.");
 
-  const code = await generatePatternCode();
-  return prisma.pattern.create({
-    data: {
-      code,
-      name,
-      productCategoryId: input.productCategoryId || null,
-      productId: input.productId || null,
-      baseSize: input.baseSize?.trim() || null,
-      sizeRange: input.sizeRange?.trim() || null,
-      gradingRule: input.gradingRule?.trim() || null,
-      notes: input.notes?.trim() || null,
-      createdBy: input.createdBy?.trim() || null,
-    },
-    include: PATTERN_INCLUDE,
-  });
+  const createData = {
+    name,
+    productCategoryId: input.productCategoryId || null,
+    productId: input.productId || null,
+    baseSize: input.baseSize?.trim() || null,
+    sizeRange: input.sizeRange?.trim() || null,
+    gradingRule: input.gradingRule?.trim() || null,
+    productionMaterialCategory: input.productionMaterialCategory ?? null,
+    sourceType: input.sourceType ?? null,
+    patternSupplierId: input.patternSupplierId || null,
+    sourceSupplierCode: input.sourceSupplierCode?.trim() || null,
+    sourceSupplier: input.sourceSupplier?.trim() || null,
+    sourceSupplierContact: input.sourceSupplierContact?.trim() || null,
+    sourcePhone: input.sourcePhone?.trim() || null,
+    sourceEmail: input.sourceEmail?.trim() || null,
+    customerId: input.customerId || null,
+    customerNameSnapshot: input.customerNameSnapshot?.trim() || null,
+    sourceNotes: input.sourceNotes?.trim() || null,
+    notes: input.notes?.trim() || null,
+    createdBy: input.createdBy?.trim() || null,
+  };
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const code = attempt === 0 && input.code?.trim() ? input.code.trim() : await generatePatternCode();
+    try {
+      return await prisma.pattern.create({
+        data: { code, ...createData },
+        include: PATTERN_INCLUDE,
+      });
+    } catch (error) {
+      const target =
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.meta?.target
+          : undefined;
+      const targetText = Array.isArray(target) ? target.join(",") : String(target ?? "");
+      const isCodeCollision =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        targetText.toLowerCase().includes("code");
+      if (!isCodeCollision || attempt === 2) throw error;
+    }
+  }
+
+  throw new PatternValidationError("Không thể tạo mã rập duy nhất. Vui lòng thử lại.");
 }
 
 function buildPatternUpdateData(
@@ -287,6 +358,20 @@ export async function updatePattern(
   if (existing.status === PatternStatus.ARCHIVED) {
     throw new PatternValidationError("Rập đã lưu trữ, không thể chỉnh sửa.");
   }
+  if (existing.status === PatternStatus.APPROVED) {
+    throw new PatternValidationError(
+      "Rập đã duyệt được khóa để bảo toàn dữ liệu sản xuất. Hãy tạo phiên bản mới trước khi chỉnh sửa.",
+      undefined,
+      "CONFLICT",
+    );
+  }
+  if (input.version !== undefined && input.version !== existing.version) {
+    throw new PatternValidationError(
+      "Version rập do hệ thống quản lý. Hãy dùng chức năng tạo phiên bản mới.",
+      { version: "Không thể sửa version trực tiếp." },
+      "CONFLICT",
+    );
+  }
 
   let supplierSnapshots: Awaited<ReturnType<typeof resolvePatternSupplierSnapshots>> | null = null;
   if (input.patternSupplierId !== undefined) {
@@ -389,9 +474,26 @@ export async function deletePattern(id: string): Promise<{
 }> {
   const pattern = await prisma.pattern.findUnique({
     where: { id },
-    include: { files: { select: { r2ObjectKey: true, cloudinaryPublicId: true } } },
+    include: {
+      files: { select: { r2ObjectKey: true, cloudinaryPublicId: true } },
+      _count: { select: { techPacks: true } },
+    },
   });
   if (!pattern) throw new PatternValidationError("Không tìm thấy rập.", undefined, "NOT_FOUND");
+  if (pattern._count.techPacks > 0) {
+    throw new PatternValidationError(
+      "Rập đã được liên kết Tech Pack nên không thể xóa. Hãy lưu trữ rập để giữ lịch sử sản xuất.",
+      undefined,
+      "CONFLICT",
+    );
+  }
+  if (pattern.status === PatternStatus.APPROVED) {
+    throw new PatternValidationError(
+      "Rập đã duyệt không thể xóa trực tiếp. Hãy lưu trữ rập trước.",
+      undefined,
+      "CONFLICT",
+    );
+  }
 
   const r2Keys = pattern.files
     .map((file) => file.r2ObjectKey)
@@ -431,6 +533,9 @@ export async function addPatternFile(
   if (pattern.status === PatternStatus.ARCHIVED) {
     throw new PatternValidationError("Rập đã lưu trữ.");
   }
+  if (pattern.status === PatternStatus.APPROVED) {
+    throw new PatternValidationError("Rập đã duyệt được khóa. Hãy tạo phiên bản mới trước khi thêm file.");
+  }
 
   return prisma.patternFile.create({
     data: {
@@ -459,8 +564,14 @@ export async function updatePatternFile(
     sortOrder: number;
   }>,
 ) {
-  const file = await prisma.patternFile.findFirst({ where: { id: fileId, patternId } });
+  const file = await prisma.patternFile.findFirst({
+    where: { id: fileId, patternId },
+    include: { pattern: { select: { status: true } } },
+  });
   if (!file) throw new PatternValidationError("Không tìm thấy file.");
+  if (file.pattern.status !== PatternStatus.DRAFT) {
+    throw new PatternValidationError("Chỉ rập bản nháp mới được chỉnh sửa file.");
+  }
 
   return prisma.patternFile.update({
     where: { id: fileId },
@@ -474,8 +585,14 @@ export async function updatePatternFile(
 }
 
 export async function deletePatternFile(patternId: string, fileId: string) {
-  const file = await prisma.patternFile.findFirst({ where: { id: fileId, patternId } });
+  const file = await prisma.patternFile.findFirst({
+    where: { id: fileId, patternId },
+    include: { pattern: { select: { status: true } } },
+  });
   if (!file) throw new PatternValidationError("Không tìm thấy file.");
+  if (file.pattern.status !== PatternStatus.DRAFT) {
+    throw new PatternValidationError("Chỉ rập bản nháp mới được xóa file.");
+  }
   await prisma.patternFile.delete({ where: { id: fileId } });
   if (file.r2ObjectKey) {
     try {
