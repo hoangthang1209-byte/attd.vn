@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { createPattern, updatePattern } from "@/features/patterns/pattern.service";
+import { createPattern } from "@/features/patterns/pattern.service";
 import {
   normalizePatternImportSource,
   PATTERN_IMPORT_MAX_ROWS,
@@ -114,36 +114,23 @@ async function importOne(
       baseSize: clean(row.baseSize) || null,
       sizeRange: clean(row.sizeRange) || null,
       gradingRule: clean(row.gradingRule) || null,
+      sourceType,
+      patternSupplierId: supplier?.id ?? null,
+      sourceSupplierCode: supplier?.code ?? null,
+      sourceSupplier: supplier?.name ?? (clean(row.supplier) || null),
+      customerId: customer?.id ?? null,
+      customerNameSnapshot: customer?.name ?? (clean(row.customer) || null),
+      sourceNotes: clean(row.sourceNotes) || null,
       notes: clean(row.notes) || null,
       createdBy,
     });
 
-    const needsMetadataPatch =
-      Boolean(sourceType) ||
-      Boolean(supplier?.id) ||
-      Boolean(row.supplier) ||
-      Boolean(customer?.id) ||
-      Boolean(row.customer) ||
-      Boolean(row.sourceNotes);
-
-    const finalPattern = needsMetadataPatch
-      ? await updatePattern(created.id, {
-          sourceType,
-          patternSupplierId: supplier?.id ?? null,
-          sourceSupplierCode: supplier?.code ?? null,
-          sourceSupplier: supplier?.name ?? (clean(row.supplier) || null),
-          customerId: customer?.id ?? null,
-          customerNameSnapshot: customer?.name ?? (clean(row.customer) || null),
-          sourceNotes: clean(row.sourceNotes) || null,
-        })
-      : created;
-
     return {
       rowNumber: row.rowNumber,
       status: "created",
-      id: finalPattern.id,
-      code: finalPattern.code,
-      name: finalPattern.name,
+      id: created.id,
+      code: created.code,
+      name: created.name,
       warnings: warnings.length ? warnings : undefined,
     };
   } catch (error) {
