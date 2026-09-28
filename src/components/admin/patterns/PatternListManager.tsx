@@ -154,6 +154,8 @@ export default function PatternListManager() {
   }, [appliedSearch, page, statusFilter]);
 
   useEffect(() => {
+    // Fetch the current server page whenever filters or pagination change.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
