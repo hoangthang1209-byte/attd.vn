@@ -65,6 +65,16 @@ export type CrmLeadAssignmentHistoryRecord = {
   createdAt: string;
 };
 
+export type CrmLeadTaskRecord = {
+  id: string;
+  title: string;
+  note: string | null;
+  dueAt: string | null;
+  completedAt: string | null;
+  outcome: string | null;
+  owner: { id: string; fullName: string } | null;
+};
+
 export type CrmLeadRecord = {
   id: string;
   code: string | null;
@@ -110,6 +120,7 @@ export type CrmLeadRecord = {
   productInterests?: CrmProductInterestRecord[];
   inboundEvents?: CrmLeadInboundEventRecord[];
   assignmentHistory?: CrmLeadAssignmentHistoryRecord[];
+  tasks?: CrmLeadTaskRecord[];
   customer?: CrmCustomerRecord | null;
 };
 
