@@ -12,9 +12,6 @@ import AdminLoadingButton from "@/components/admin/feedback/AdminLoadingButton";
 import { PatternStatusBadge } from "@/components/admin/tech-pack/TechPackEntityStatusBadge";
 import PrivateFileUploadZone from "@/components/admin/tech-pack/PrivateFileUploadZone";
 import {
-  PATTERN_STATUS_LABELS,
-} from "@/features/tech-pack/tech-pack-labels";
-import {
   PRODUCTION_MATERIAL_CATEGORIES,
   PRODUCTION_MATERIAL_CATEGORY_LABELS,
 } from "@/features/production-master/production-master-labels";
@@ -406,7 +403,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   const [draft, setDraft] = useState<PatternDraft | null>(null);
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
-  const [uploading, setUploading] = useState(false);
+  const [, setUploading] = useState(false);
   const [activeFileMenuId, setActiveFileMenuId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -443,6 +440,8 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   }, [patternId]);
 
   useEffect(() => {
+    // Data fetching intentionally updates local view state after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
@@ -467,6 +466,8 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
 
   useEffect(() => {
     if (saveStatus === "saving") return;
+    // Keep the visible save-state badge synchronized with the draft snapshot.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSaveStatus(isDirty ? "dirty" : "saved");
   }, [isDirty, saveStatus]);
 
@@ -725,8 +726,6 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   const sourceBadge = formatPatternSourceBadge(
     (draft.sourceType as PatternSourceType) || pattern.sourceType,
   );
-  const customerLabel =
-    selectedCustomer?.name ?? (draft.customerNameSnapshot.trim() || null);
   const draftCategoryVisual: PatternCategoryVisualInput | null = (() => {
     if (draft.productCategoryId) {
       const fromPicker = categories.find((category) => category.id === draft.productCategoryId);
