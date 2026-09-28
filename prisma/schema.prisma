@@ -2297,6 +2297,8 @@ enum VariantStatus {
 
 enum LeadSource {
   CONTACT
+  EMAIL
+  WHATSAPP
   DEALER
   OEM
   SOURCING
