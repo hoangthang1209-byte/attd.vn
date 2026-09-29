@@ -37,6 +37,12 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       name: typeof body.name === "string" ? body.name : undefined,
       category: typeof body.category === "string" ? body.category : undefined,
       supplierId: body.supplierId === null ? null : typeof body.supplierId === "string" ? body.supplierId : undefined,
+      inventoryMaterialId:
+        body.inventoryMaterialId === null
+          ? null
+          : typeof body.inventoryMaterialId === "string"
+            ? body.inventoryMaterialId
+            : undefined,
       notes: body.notes === null ? null : typeof body.notes === "string" ? body.notes : undefined,
       isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
     });
