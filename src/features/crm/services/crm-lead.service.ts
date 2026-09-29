@@ -744,6 +744,16 @@ export async function updateCrmLead(
   }
 }
 
+export class LeadCustomerDuplicateError extends Error {
+  readonly customerId: string;
+
+  constructor(customerId: string) {
+    super("Đã có khách hàng trùng SĐT hoặc email. Vui lòng chọn gắn với khách hàng có sẵn.");
+    this.name = "LeadCustomerDuplicateError";
+    this.customerId = customerId;
+  }
+}
+
 export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadRecord | null> {
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
   if (!lead || lead.convertedAt || lead.customerId) {
@@ -764,10 +774,7 @@ export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadReco
       select: { id: true },
     });
     if (duplicateCustomer) {
-      return linkLeadToExistingCustomer(leadId, {
-        customerId: duplicateCustomer.id,
-        createContact: true,
-      });
+      throw new LeadCustomerDuplicateError(duplicateCustomer.id);
     }
 
     const defaultBusinessType = await prisma.customerType.findUnique({
