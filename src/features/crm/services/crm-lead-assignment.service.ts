@@ -21,7 +21,7 @@ export async function assignLead(input: {
 }) {
   const lead = await prisma.lead.findUnique({
     where: { id: input.leadId },
-    select: { id: true, assignedEmployeeId: true },
+    select: { id: true, assignedEmployeeId: true, assignedTo: true },
   });
   if (!lead) throw new Error("Không tìm thấy lead.");
 
@@ -33,13 +33,14 @@ export async function assignLead(input: {
     if (!employee) throw new Error("Nhân viên phụ trách không hợp lệ.");
   }
 
-  if (lead.assignedEmployeeId === input.employeeId) return;
+  if (lead.assignedEmployeeId === input.employeeId && lead.assignedTo === input.employeeId) return;
 
   await prisma.$transaction([
     prisma.lead.update({
       where: { id: input.leadId },
       data: {
         assignedEmployeeId: input.employeeId,
+        assignedTo: input.employeeId,
         assignedAt: input.employeeId ? new Date() : null,
         assignmentSource: input.source?.trim() || "MANUAL",
       },
