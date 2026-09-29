@@ -14,6 +14,7 @@ import type {
 } from "@/features/pricing/costing-types";
 import { previewCostingCalculation } from "@/features/pricing/costing-preview";
 import { usesV2CostLines, validateCostingLinesForSave } from "@/features/pricing/costing-v2";
+import { requestedQuantityTiers } from "@/features/pricing/pricing-p1-guards";
 
 const PROCESS_COMPONENT_TYPES: CostingComponentType[] = [
   "CUTTING",
@@ -279,17 +280,10 @@ export async function saveCostingCalculation(
     if (lineError) throw new CostingCalculatorValidationError(lineError);
   }
   const result = await calculateCosting(input);
-  const quantityBreaks = (input.quantityBreaks ?? [])
-    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
-    .map((item) => ({
-      quantity: Math.round(item.quantity),
-      totalCostPerUnit: roundMoney(positive(item.totalCostPerUnit)),
-      suggestedSellingPricePerUnit: roundMoney(positive(item.suggestedSellingPricePerUnit)),
-      revenueBeforeVat: roundMoney(positive(item.revenueBeforeVat)),
-      grossProfit: roundMoney(positive(item.grossProfit)),
-      actualMarginRate: roundMoney(positive(item.actualMarginRate)),
-      finalQuotePrice: roundMoney(positive(item.finalQuotePrice)),
-    }));
+  const quantityTiers = requestedQuantityTiers(input.quantityBreaks);
+  const quantityBreaks = quantityTiers.length > 0
+    ? await calculateCostingQuantityBreaks(input, quantityTiers)
+    : [];
   const costingSnapshot = { ...result, quantityBreaks };
   const code = await generatePricingCalculationCode();
 
@@ -404,17 +398,10 @@ export async function updateCostingCalculation(
   }
 
   const result = await calculateCosting(input);
-  const quantityBreaks = (input.quantityBreaks ?? [])
-    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
-    .map((item) => ({
-      quantity: Math.round(item.quantity),
-      totalCostPerUnit: roundMoney(positive(item.totalCostPerUnit)),
-      suggestedSellingPricePerUnit: roundMoney(positive(item.suggestedSellingPricePerUnit)),
-      revenueBeforeVat: roundMoney(positive(item.revenueBeforeVat)),
-      grossProfit: roundMoney(positive(item.grossProfit)),
-      actualMarginRate: roundMoney(positive(item.actualMarginRate)),
-      finalQuotePrice: roundMoney(positive(item.finalQuotePrice)),
-    }));
+  const quantityTiers = requestedQuantityTiers(input.quantityBreaks);
+  const quantityBreaks = quantityTiers.length > 0
+    ? await calculateCostingQuantityBreaks(input, quantityTiers)
+    : [];
   const costingSnapshot = { ...result, quantityBreaks };
 
   const useManualSell = calcItem.manualOverride && calcItem.manualUnitPrice != null;
