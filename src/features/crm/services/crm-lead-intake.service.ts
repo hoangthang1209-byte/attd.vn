@@ -227,6 +227,15 @@ export async function ingestCrmLead(input: {
     }
   }
 
+  if (!existingLeadId && keys.length) {
+    await prisma.leadIdentityKey.deleteMany({
+      where: {
+        key: { in: keys },
+        lead: { status: { notIn: [...ACTIVE_STATUSES] } },
+      },
+    });
+  }
+
   if (existingLeadId) {
     try {
       await appendInboundToLead(
