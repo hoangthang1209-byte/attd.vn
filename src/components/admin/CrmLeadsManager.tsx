@@ -37,6 +37,9 @@ export default function CrmLeadsManager() {
   const [sourceFilter, setSourceFilter] = useState<LeadSource | "">("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
   const [priorityFilter, setPriorityFilter] = useState<LeadPriority | "">("");
+  const [quickFilter, setQuickFilter] = useState<"all" | "mine" | "unassigned">("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const load = useCallback(async () => {
     setLoadState("loading");
@@ -47,6 +50,10 @@ export default function CrmLeadsManager() {
       if (sourceFilter) params.set("source", sourceFilter);
       if (statusFilter) params.set("status", statusFilter);
       if (priorityFilter) params.set("priority", priorityFilter);
+      if (quickFilter === "mine") params.set("mine", "1");
+      if (quickFilter === "unassigned") params.set("unassigned", "1");
+      params.set("page", String(page));
+      params.set("pageSize", String(pageSize));
 
       const res = await fetch(`/api/crm/leads?${params.toString()}`);
       const data = await res.json();
@@ -67,6 +74,8 @@ export default function CrmLeadsManager() {
       const nextLeads = Array.isArray(data.leads) ? data.leads : [];
       setLeads(nextLeads);
       setTotal(typeof data.total === "number" ? data.total : nextLeads.length);
+      if (typeof data.page === "number") setPage(data.page);
+      if (typeof data.pageSize === "number") setPageSize(data.pageSize);
       setKpis(data.kpis ?? null);
       setValueKpis(data.valueKpis ?? null);
       setReminders(data.reminders ?? null);
@@ -80,15 +89,24 @@ export default function CrmLeadsManager() {
       setReminders(null);
       setLoadState("error");
     }
-  }, [search, sourceFilter, statusFilter, priorityFilter]);
+  }, [search, sourceFilter, statusFilter, priorityFilter, quickFilter, page, pageSize]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   function applyFilters(event: React.FormEvent) {
     event.preventDefault();
+    setPage(1);
     void load();
+  }
+
+  function selectQuickFilter(value: "all" | "mine" | "unassigned") {
+    setQuickFilter(value);
+    setPage(1);
   }
 
   function openLead(id: string) {
@@ -131,12 +149,62 @@ export default function CrmLeadsManager() {
 
       {loadState !== "loading" && loadState !== "error" && kpis && (
         <div className="admin-crm-kpi-grid">
-          {CRM_LEAD_STATUSES.map((status) => (
-            <div key={status} className="admin-dashboard-card">
-              <p className="admin-dashboard-label">{CRM_STATUS_LABELS[status]}</p>
-              <p className="admin-dashboard-value">{kpis[status] ?? 0}</p>
-            </div>
-          ))}
+          <button
+            type="button"
+            className="admin-dashboard-card"
+            onClick={() => {
+              setStatusFilter("NEW");
+              setPage(1);
+            }}
+          >
+            <p className="admin-dashboard-label">Lead mới</p>
+            <p className="admin-dashboard-value">{kpis.NEW ?? 0}</p>
+          </button>
+          <button
+            type="button"
+            className="admin-dashboard-card"
+            onClick={() => {
+              setStatusFilter("");
+              setPage(1);
+            }}
+          >
+            <p className="admin-dashboard-label">Cần follow-up hôm nay</p>
+            <p className="admin-dashboard-value">{reminders?.dueToday ?? 0}</p>
+          </button>
+          <button
+            type="button"
+            className="admin-dashboard-card admin-dashboard-card--danger"
+            onClick={() => {
+              setStatusFilter("");
+              setPage(1);
+            }}
+          >
+            <p className="admin-dashboard-label">Quá hạn</p>
+            <p className="admin-dashboard-value">{reminders?.overdue ?? 0}</p>
+          </button>
+          <button
+            type="button"
+            className="admin-dashboard-card"
+            onClick={() => selectQuickFilter("unassigned")}
+          >
+            <p className="admin-dashboard-label">Chưa phân sales</p>
+            <p className="admin-dashboard-value">
+              {quickFilter === "unassigned" ? total : "—"}
+            </p>
+          </button>
+          <div className="admin-dashboard-card">
+            <p className="admin-dashboard-label">Đang xử lý</p>
+            <p className="admin-dashboard-value">
+              {(
+                (kpis.CONTACTED ?? 0) +
+                (kpis.QUALIFIED ?? 0) +
+                (kpis.NEED_PRICING ?? 0) +
+                (kpis.QUOTING ?? 0) +
+                (kpis.QUOTED ?? 0) +
+                (kpis.NEGOTIATING ?? 0)
+              ).toLocaleString("vi-VN")}
+            </p>
+          </div>
         </div>
       )}
 
@@ -152,6 +220,32 @@ export default function CrmLeadsManager() {
             <p className="admin-dashboard-label">Won Value</p>
             <p className="admin-dashboard-value">{formatCrmCurrency(valueKpis.wonTotal)}</p>
           </div>
+        </div>
+      )}
+
+      {loadState !== "loading" && loadState !== "error" && (
+        <div className="admin-crm-quick-filters" role="group" aria-label="Lọc nhanh lead">
+          <button
+            type="button"
+            className={`admin-btn admin-btn--small ${quickFilter === "all" ? "admin-btn--primary" : "admin-btn--secondary"}`}
+            onClick={() => selectQuickFilter("all")}
+          >
+            Tất cả
+          </button>
+          <button
+            type="button"
+            className={`admin-btn admin-btn--small ${quickFilter === "mine" ? "admin-btn--primary" : "admin-btn--secondary"}`}
+            onClick={() => selectQuickFilter("mine")}
+          >
+            Việc của tôi
+          </button>
+          <button
+            type="button"
+            className={`admin-btn admin-btn--small ${quickFilter === "unassigned" ? "admin-btn--primary" : "admin-btn--secondary"}`}
+            onClick={() => selectQuickFilter("unassigned")}
+          >
+            Chưa phân sales
+          </button>
         </div>
       )}
 
@@ -228,6 +322,7 @@ export default function CrmLeadsManager() {
                 <th>Nguồn</th>
                 <th>Trạng thái</th>
                 <th>Ưu tiên</th>
+                <th>Sales phụ trách</th>
                 <th>Khách hàng</th>
                 <th>Follow-up</th>
                 <th>Ngày tạo</th>
@@ -263,6 +358,7 @@ export default function CrmLeadsManager() {
                   <td>
                     <LeadPriorityBadge priority={lead.priority} />
                   </td>
+                  <td>{lead.assignedEmployee?.fullName || lead.assignedTo || "Chưa phân công"}</td>
                   <td>
                     {lead.customer ? (
                       <Link
@@ -282,6 +378,30 @@ export default function CrmLeadsManager() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {loadState === "ready" && total > pageSize && (
+        <div className="admin-pagination">
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--small"
+            disabled={page <= 1}
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+          >
+            ← Trước
+          </button>
+          <span className="admin-field-hint">
+            Trang {page} / {Math.max(1, Math.ceil(total / pageSize))}
+          </span>
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary admin-btn--small"
+            disabled={page >= Math.ceil(total / pageSize)}
+            onClick={() => setPage((value) => value + 1)}
+          >
+            Sau →
+          </button>
         </div>
       )}
     </div>
