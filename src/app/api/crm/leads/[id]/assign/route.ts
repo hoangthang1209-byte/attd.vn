@@ -56,7 +56,9 @@ export async function POST(req: NextRequest, context: RouteContext) {
     const canSelfManage =
       Boolean(me) &&
       employeeId === me &&
-      (lead.assignedEmployeeId === null || lead.assignedEmployeeId === me);
+      (lead.assignedEmployeeId === me ||
+        (lead.assignedEmployeeId === null &&
+          (lead.assignedTo === null || lead.assignedTo === me)));
     if (!canSelfManage) {
       return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
     }
