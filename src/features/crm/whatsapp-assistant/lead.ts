@@ -1,7 +1,10 @@
 import "server-only";
 import type { LeadPriority } from "@prisma/client";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
-import { createAdminLead } from "@/features/crm/services/crm-lead.service";
+import {
+  buildDailyLeadIdempotencyKey,
+  ingestCrmLead,
+} from "@/features/crm/services/crm-lead-intake.service";
 import type { CrmLeadRecord } from "@/features/crm/types";
 import type {
   WhatsAppAssistantAnalysis,
@@ -46,11 +49,8 @@ function buildLeadNote(input: WhatsAppAssistantInput, analysis: WhatsAppAssistan
     "Gợi ý bước tiếp theo:",
     analysis.suggestedNextActionVi,
     "",
-    "Raw WhatsApp chat:",
-    input.rawChatText,
-    "",
-    "JSON phân tích:",
-    JSON.stringify(analysis, null, 2),
+    "Ghi chú nội bộ AI:",
+    analysis.internalNotesVi || "Không có.",
   ]
     .filter((item) => item !== null)
     .join("\n");
@@ -83,32 +83,46 @@ export async function createLeadFromWhatsAppAssistant(
   const email = input.email?.trim() || extracted.email || null;
   const note = buildLeadNote(input, analysis);
 
-  const lead = await createAdminLead({
-    contactName,
-    companyName,
-    phone,
-    email,
-    source: "OTHER",
-    sourceDetail: "Vietnamclothing.vn / WhatsApp",
-    demand: buildDemand(analysis),
-    note,
-    priority: priorityFromQuality(analysis.leadQuality),
-    productInterests: [
-      {
-        productNameSnapshot: extracted.productType || "WhatsApp garment inquiry",
-        quantity: parseQuantity(extracted.quantity),
-        unit: "cái",
-        requirementNote: compactExtracted(extracted) || analysis.summaryVi,
-        serviceNeeds: {
-          oem: true,
-          export: true,
-          whatsappAssistant: true,
+  const intake = await ingestCrmLead({
+    lead: {
+      contactName,
+      companyName,
+      phone,
+      email,
+      source: "WHATSAPP",
+      sourceDetail: "Vietnamclothing.vn / WhatsApp",
+      demand: buildDemand(analysis),
+      note,
+      priority: priorityFromQuality(analysis.leadQuality),
+      productInterests: [
+        {
+          productNameSnapshot: extracted.productType || "WhatsApp garment inquiry",
+          quantity: parseQuantity(extracted.quantity),
+          unit: "cái",
+          requirementNote: compactExtracted(extracted) || analysis.summaryVi,
+          serviceNeeds: {
+            oem: true,
+            export: true,
+            whatsappAssistant: true,
+          },
         },
-      },
-    ],
+      ],
+    },
+    channel: "VIETNAMCLOTHING_WHATSAPP",
+    idempotencyKey: buildDailyLeadIdempotencyKey({
+      channel: "VIETNAMCLOTHING_WHATSAPP",
+      source: "WHATSAPP",
+      phone,
+      email,
+      fingerprint: input.rawChatText,
+    }),
+    payload: {
+      sourceWebsite: input.sourceWebsite || "Vietnamclothing.vn",
+      rawChatText: input.rawChatText,
+      analysis: JSON.parse(JSON.stringify(analysis)),
+    },
   });
-
-  if (!lead) return null;
+  const lead = intake.lead;
 
   await createCRMActivity({
     leadId: lead.id,
