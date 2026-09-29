@@ -8,7 +8,14 @@ import {
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, ctx: RouteContext) {
+export async function GET(req: NextRequest, ctx: RouteContext) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "view",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { id } = await ctx.params;
   try {
     const supplier = await getMaterialSupplierById(id);
@@ -29,7 +36,6 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
     request: req,
   });
   if (!permission.ok) return permission.response;
-
 
   const { id } = await ctx.params;
   let body: unknown;

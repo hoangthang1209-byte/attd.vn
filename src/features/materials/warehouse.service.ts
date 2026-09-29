@@ -7,6 +7,7 @@ import type {
 import { prisma } from "@/lib/prisma";
 import {
   assertNonNegative,
+  assertReturnDoesNotExceedIssued,
   computeAvailableQuantity,
   MaterialValidationError,
   toDecimal,
@@ -82,6 +83,7 @@ async function upsertBalanceTx(
     reservedQuantity: Prisma.Decimal;
     issuedQuantity: Prisma.Decimal;
   },
+  options: { markCounted?: boolean } = {},
 ) {
   const current = await tx.materialWarehouseBalance.findUnique({ where: { materialId } });
   const next = updater(current);
@@ -93,6 +95,7 @@ async function upsertBalanceTx(
   }
 
   const availableQuantity = computeAvailableQuantity(next.onHandQuantity, next.reservedQuantity);
+  const countedAt = options.markCounted ? new Date() : undefined;
 
   if (current) {
     return tx.materialWarehouseBalance.update({
@@ -102,7 +105,7 @@ async function upsertBalanceTx(
         reservedQuantity: next.reservedQuantity,
         issuedQuantity: next.issuedQuantity,
         availableQuantity,
-        lastCountedAt: new Date(),
+        ...(countedAt ? { lastCountedAt: countedAt } : {}),
       },
     });
   }
@@ -114,7 +117,7 @@ async function upsertBalanceTx(
       reservedQuantity: next.reservedQuantity,
       issuedQuantity: next.issuedQuantity,
       availableQuantity,
-      lastCountedAt: new Date(),
+      lastCountedAt: countedAt ?? null,
     },
   });
 }
@@ -169,6 +172,10 @@ export async function applyStockAdjustment(input: StockAdjustmentInput, existing
   }
 
   const run = async (tx: Tx) => {
+    // Serialize stock mutations per material to avoid lost updates when two requests
+    // read and update the same balance concurrently.
+    await tx.$queryRaw`SELECT "id" FROM "Material" WHERE "id" = ${input.materialId} FOR UPDATE`;
+
     const current = await tx.materialWarehouseBalance.findUnique({
       where: { materialId: input.materialId },
     });
@@ -205,8 +212,9 @@ export async function applyStockAdjustment(input: StockAdjustmentInput, existing
         delta = qty.neg();
         break;
       case "RETURN_FROM_PRODUCTION":
+        assertReturnDoesNotExceedIssued(qty, prevIssued);
         nextOnHand = prevOnHand.add(qty);
-        nextIssued = prevIssued.sub(qty).lt(0) ? toDecimal(0) : prevIssued.sub(qty);
+        nextIssued = prevIssued.sub(qty);
         delta = qty;
         break;
       default:
@@ -215,16 +223,25 @@ export async function applyStockAdjustment(input: StockAdjustmentInput, existing
 
     assertNonNegative(nextOnHand, "Tồn thực tế");
 
-    const balance = await upsertBalanceTx(tx, input.materialId, () => ({
-      onHandQuantity: nextOnHand,
-      reservedQuantity: prevReserved,
-      issuedQuantity: nextIssued,
-    }));
+    const balance = await upsertBalanceTx(
+      tx,
+      input.materialId,
+      () => ({
+        onHandQuantity: nextOnHand,
+        reservedQuantity: prevReserved,
+        issuedQuantity: nextIssued,
+      }),
+      {
+        markCounted:
+          input.adjustmentType === "OPENING_BALANCE" ||
+          input.adjustmentType === "CORRECTION",
+      },
+    );
 
     const adjustment = await recordAdjustmentTx(tx, {
       materialId: input.materialId,
       adjustmentType: input.adjustmentType,
-      quantity: delta.abs(),
+      quantity: delta,
       previousOnHandQuantity: prevOnHand,
       nextOnHandQuantity: nextOnHand,
       note: input.note,
@@ -277,6 +294,8 @@ export async function issueFromReservationTx(
   materialId: string,
   issueQty: Prisma.Decimal,
 ) {
+  await tx.$queryRaw`SELECT "id" FROM "Material" WHERE "id" = ${materialId} FOR UPDATE`;
+
   const current = await tx.materialWarehouseBalance.findUnique({ where: { materialId } });
   if (!current) throw new MaterialValidationError("Chưa khai báo tồn kho.");
 

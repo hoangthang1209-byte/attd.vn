@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
       search: searchParams.get("search") ?? undefined,
       materialType: typeParam && isMaterialType(typeParam) ? typeParam : undefined,
       activeOnly: searchParams.get("active") === "1",
-      limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : 100,
+      limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : 50,
+      offset: searchParams.get("offset") ? Number(searchParams.get("offset")) : 0,
     });
     return NextResponse.json(result);
   } catch (err) {

@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { MATERIAL_TYPE_LABELS, WAREHOUSE_STATUS_LABELS, STOCK_ADJUSTMENT_TYPE_LABELS } from "@/features/materials/material-labels";
+import {
+  MATERIAL_TYPE_LABELS,
+  WAREHOUSE_STATUS_LABELS,
+  STOCK_ADJUSTMENT_TYPE_LABELS,
+} from "@/features/materials/material-labels";
 import type { MaterialStockAdjustmentType } from "@prisma/client";
 import { useAdminMutation } from "@/hooks/useAdminAction";
 import { parseAdminJsonResponse } from "@/lib/admin/adminMutation";
@@ -18,8 +22,29 @@ type WarehouseRow = {
   onHandQuantity: string | null;
   reservedQuantity: string | null;
   availableQuantity: string | null;
+  issuedQuantity: string | null;
   warehouseStatus: keyof typeof WAREHOUSE_STATUS_LABELS;
 };
+
+type WarehouseHistoryRow = {
+  id: string;
+  adjustmentType: MaterialStockAdjustmentType;
+  quantity: string;
+  previousOnHandQuantity: string;
+  nextOnHandQuantity: string;
+  createdAt: string;
+  note: string | null;
+  referenceOrder: { id: string; orderNo: string } | null;
+  createdByEmployee: { id: string; fullName: string } | null;
+};
+
+function formatStockDelta(row: WarehouseHistoryRow): string {
+  const previous = Number(row.previousOnHandQuantity);
+  const next = Number(row.nextOnHandQuantity);
+  const delta = next - previous;
+  if (!Number.isFinite(delta)) return row.quantity;
+  return `${delta > 0 ? "+" : ""}${delta}`;
+}
 
 export default function MaterialsWarehouseManager() {
   const searchParams = useSearchParams();
@@ -32,14 +57,8 @@ export default function MaterialsWarehouseManager() {
   const [adjustType, setAdjustType] = useState<MaterialStockAdjustmentType>("RECEIVE");
   const [quantity, setQuantity] = useState("");
   const [note, setNote] = useState("");
-  const [history, setHistory] = useState<Array<{
-    id: string;
-    adjustmentType: MaterialStockAdjustmentType;
-    quantity: string;
-    nextOnHandQuantity: string;
-    createdAt: string;
-    note: string | null;
-  }>>([]);
+  const [history, setHistory] = useState<WarehouseHistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,14 +69,39 @@ export default function MaterialsWarehouseManager() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void fetch("/api/materials?view=warehouse")
+      .then(async (res) => {
+        const data = (await res.json()) as { rows?: WarehouseRow[] };
+        if (!res.ok) throw new Error("Không thể tải tồn kho vật tư.");
+        return data;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setRows(data.rows ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRows([]);
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function openHistory(materialId: string) {
     setPanelMaterialId(materialId);
-    const res = await fetch(`/api/materials/${materialId}/warehouse-history`);
-    const data = (await res.json()) as { history?: typeof history };
-    setHistory(data.history ?? []);
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/materials/${materialId}/warehouse-history`);
+      const data = (await res.json()) as { history?: WarehouseHistoryRow[] };
+      setHistory(data.history ?? []);
+    } finally {
+      setHistoryLoading(false);
+    }
   }
 
   async function submitAdjustment() {
@@ -83,8 +127,8 @@ export default function MaterialsWarehouseManager() {
       onSuccess: async () => {
         setQuantity("");
         setNote("");
-        setPanelMaterialId(null);
         await load();
+        await openHistory(panelMaterialId);
       },
     });
   }
@@ -106,6 +150,7 @@ export default function MaterialsWarehouseManager() {
                 <th>ĐVT</th>
                 <th>Tồn thực tế</th>
                 <th>Đã giữ</th>
+                <th>Đã cấp SX</th>
                 <th>Khả dụng</th>
                 <th>Mức tồn tối thiểu</th>
                 <th>Trạng thái</th>
@@ -117,10 +162,14 @@ export default function MaterialsWarehouseManager() {
                 <tr key={row.materialId}>
                   <td>{row.materialCode}</td>
                   <td>{row.name}</td>
-                  <td>{MATERIAL_TYPE_LABELS[row.materialType as keyof typeof MATERIAL_TYPE_LABELS] ?? row.materialType}</td>
+                  <td>
+                    {MATERIAL_TYPE_LABELS[row.materialType as keyof typeof MATERIAL_TYPE_LABELS] ??
+                      row.materialType}
+                  </td>
                   <td>{row.unit}</td>
                   <td>{row.onHandQuantity ?? "—"}</td>
                   <td>{row.reservedQuantity ?? "—"}</td>
+                  <td>{row.issuedQuantity ?? "—"}</td>
                   <td>{row.availableQuantity ?? "—"}</td>
                   <td>{row.reorderPoint ?? "—"}</td>
                   <td>{WAREHOUSE_STATUS_LABELS[row.warehouseStatus]}</td>
@@ -143,7 +192,15 @@ export default function MaterialsWarehouseManager() {
       {panelMaterialId && panelRow ? (
         <div className="admin-modal-backdrop" role="presentation">
           <div className="admin-modal admin-modal--wide">
-            <h3>{panelRow.materialCode} · {panelRow.name}</h3>
+            <h3>
+              {panelRow.materialCode} · {panelRow.name}
+            </h3>
+            <p className="admin-field-hint" style={{ marginTop: 0 }}>
+              Tồn {panelRow.onHandQuantity ?? "—"} {panelRow.unit} · Đã giữ{" "}
+              {panelRow.reservedQuantity ?? "—"} · Đã cấp SX {panelRow.issuedQuantity ?? "—"} ·
+              Khả dụng {panelRow.availableQuantity ?? "—"}
+            </p>
+
             <div className="admin-field">
               <label className="admin-label">Loại thao tác</label>
               <select
@@ -151,36 +208,91 @@ export default function MaterialsWarehouseManager() {
                 value={adjustType}
                 onChange={(e) => setAdjustType(e.target.value as MaterialStockAdjustmentType)}
               >
-                {Object.entries(STOCK_ADJUSTMENT_TYPE_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
+                {Object.entries(STOCK_ADJUSTMENT_TYPE_LABELS).map(([key, value]) => (
+                  <option key={key} value={key}>
+                    {value}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="admin-field">
               <label className="admin-label">Số lượng</label>
-              <input className="admin-input" type="number" step="0.001" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+              <input
+                className="admin-input"
+                type="number"
+                step="0.001"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+              />
+              {adjustType === "RETURN_FROM_PRODUCTION" ? (
+                <p className="admin-field-hint">
+                  Tối đa có thể trả: {panelRow.issuedQuantity ?? "0"} {panelRow.unit}.
+                </p>
+              ) : null}
             </div>
             <div className="admin-field">
               <label className="admin-label">Ghi chú</label>
-              <textarea className="admin-textarea" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+              <textarea
+                className="admin-textarea"
+                rows={2}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
             </div>
             <div className="admin-modal-actions">
-              <button type="button" className="admin-btn admin-btn--secondary" onClick={() => setPanelMaterialId(null)}>
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary"
+                onClick={() => setPanelMaterialId(null)}
+              >
                 Đóng
               </button>
-              <button type="button" className="admin-btn admin-btn--primary" onClick={() => void submitAdjustment()}>
+              <button
+                type="button"
+                className="admin-btn admin-btn--primary"
+                onClick={() => void submitAdjustment()}
+              >
                 Xác nhận
               </button>
             </div>
-            <h4>Lịch sử</h4>
-            <ul className="admin-list-compact">
-              {history.map((h) => (
-                <li key={h.id}>
-                  {STOCK_ADJUSTMENT_TYPE_LABELS[h.adjustmentType]} · {h.quantity} → tồn {h.nextOnHandQuantity}
-                  {h.note ? ` · ${h.note}` : ""}
-                </li>
-              ))}
-            </ul>
+
+            <h4>Lịch sử kho</h4>
+            {historyLoading ? (
+              <AdminInlineLoader message="Đang tải lịch sử kho…" />
+            ) : history.length === 0 ? (
+              <p className="admin-field-hint">Chưa có giao dịch kho.</p>
+            ) : (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Thời gian</th>
+                      <th>Thao tác</th>
+                      <th>Thay đổi</th>
+                      <th>Tồn trước</th>
+                      <th>Tồn sau</th>
+                      <th>Tham chiếu</th>
+                      <th>Người thao tác</th>
+                      <th>Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((row) => (
+                      <tr key={row.id}>
+                        <td>{new Date(row.createdAt).toLocaleString("vi-VN")}</td>
+                        <td>{STOCK_ADJUSTMENT_TYPE_LABELS[row.adjustmentType]}</td>
+                        <td>{formatStockDelta(row)}</td>
+                        <td>{row.previousOnHandQuantity}</td>
+                        <td>{row.nextOnHandQuantity}</td>
+                        <td>{row.referenceOrder?.orderNo ?? "—"}</td>
+                        <td>{row.createdByEmployee?.fullName ?? "—"}</td>
+                        <td>{row.note ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       ) : null}

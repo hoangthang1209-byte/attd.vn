@@ -7,6 +7,13 @@ import {
 } from "@/features/materials/material-supplier.service";
 
 export async function GET(req: NextRequest) {
+  const permission = await requireAdminPermission({
+    platform: "manufacturing",
+    action: "view",
+    request: req,
+  });
+  if (!permission.ok) return permission.response;
+
   const { searchParams } = new URL(req.url);
   try {
     const result = await listMaterialSuppliers({
@@ -27,7 +34,6 @@ export async function POST(req: NextRequest) {
     request: req,
   });
   if (!permission.ok) return permission.response;
-
 
   let body: unknown;
   try {
