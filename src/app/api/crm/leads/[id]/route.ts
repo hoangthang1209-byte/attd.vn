@@ -6,6 +6,9 @@ import {
   isValidLeadStatus,
   updateCrmLead,
 } from "@/features/crm/services/crm-lead.service";
+import { assertCanViewCrmLeadDetail } from "@/features/crm/services/crm-lead-access";
+import { validateLeadOwnerId, LeadIntakeValidationError } from "@/features/crm/services/lead-intake.service";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -19,12 +22,22 @@ function parseDate(value: unknown): Date | null | undefined {
   return date;
 }
 
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
+  const session = getAdminSessionFromRequest(req);
   const { id } = await context.params;
   const lead = await getCrmLeadById(id);
 
   if (!lead) {
     return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+  }
+
+  try {
+    assertCanViewCrmLeadDetail(session, lead);
+  } catch {
+    return NextResponse.json(
+      { message: "Bạn không có quyền xem lead này." },
+      { status: 403 }
+    );
   }
 
   return NextResponse.json({ lead });
@@ -129,18 +142,30 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   if (raw.note !== undefined) {
     patch.note = typeof raw.note === "string" ? raw.note : null;
   }
-  if (raw.assignedTo !== undefined) {
-    patch.assignedTo = typeof raw.assignedTo === "string" ? raw.assignedTo : null;
-  }
+  try {
+    if (raw.assignedTo !== undefined) {
+      const ownerRaw = typeof raw.assignedTo === "string" ? raw.assignedTo.trim() : "";
+      if (ownerRaw) {
+        patch.assignedTo = await validateLeadOwnerId(ownerRaw);
+      } else {
+        patch.assignedTo = null;
+      }
+    }
 
-  if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });
-  }
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });
+    }
 
-  const lead = await updateCrmLead(id, patch);
-  if (!lead) {
-    return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
-  }
+    const lead = await updateCrmLead(id, patch);
+    if (!lead) {
+      return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+    }
 
-  return NextResponse.json({ lead });
+    return NextResponse.json({ lead });
+  } catch (err) {
+    if (err instanceof LeadIntakeValidationError) {
+      return NextResponse.json({ message: err.message }, { status: 400 });
+    }
+    throw err;
+  }
 }

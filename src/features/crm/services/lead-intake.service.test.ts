@@ -1,0 +1,262 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { isSalesCapableEmployeeRole } from "@/features/employees/employee-role";
+import { Prisma } from "@prisma/client";
+import { LeadIntakeValidationError } from "@/features/crm/lead-intake.types";
+import {
+  authorizeLeadIntakeRequest,
+  buildIntakeAuditTitle,
+  buildOwnerChangeAuditContent,
+  isIntakeSourceRefUniqueViolation,
+  getVietnamBusinessDayBounds,
+  isLeadFollowUpOverdue,
+  mapIntakeChannelToDefaultSource,
+  VIETNAM_BUSINESS_TIMEZONE,
+  resolveExplicitSalesOwnerId,
+  resolveLeadIntakeIdentity,
+  resolveValidatedSalesOwnerId,
+  sanitizeIntakeMetadata,
+  sanitizeSourceRef,
+  shouldCreateOwnerChangeAudit,
+} from "@/features/crm/lead-intake.utils";
+import { mapOperationalStatusLabel } from "@/features/crm/services/lead-intake.service";
+
+describe("sanitizeSourceRef", () => {
+  it("trims and caps sourceRef length", () => {
+    const long = "a".repeat(300);
+    assert.equal(sanitizeSourceRef(long)?.length, 255);
+    assert.equal(sanitizeSourceRef("  gmail-msg-1  "), "gmail-msg-1");
+    assert.equal(sanitizeSourceRef(""), null);
+  });
+});
+
+describe("sanitizeIntakeMetadata", () => {
+  it("keeps safe scalar metadata only", () => {
+    const result = sanitizeIntakeMetadata({
+      campaign: "spring",
+      count: 3,
+      active: true,
+      nested: { bad: true },
+      huge: "x".repeat(600),
+    });
+    assert.ok(result);
+    assert.equal(result?.campaign, "spring");
+    assert.equal(result?.count, 3);
+    assert.equal(result?.active, true);
+    assert.equal("nested" in (result ?? {}), false);
+    assert.equal((result?.huge as string).length, 500);
+  });
+});
+
+describe("resolveLeadIntakeIdentity", () => {
+  it("prefers contact and company names", () => {
+    const identity = resolveLeadIntakeIdentity({
+      channel: "WEBSITE",
+      source: "WEBSITE",
+      contactName: "An",
+      companyName: "ATTD",
+      phone: "0900000000",
+    });
+    assert.equal(identity.contactName, "An");
+    assert.equal(identity.companyName, "ATTD");
+    assert.equal(identity.fullName, "An");
+  });
+});
+
+describe("getVietnamBusinessDayBounds", () => {
+  it("uses Asia/Ho_Chi_Minh calendar day boundaries", () => {
+    assert.equal(VIETNAM_BUSINESS_TIMEZONE, "Asia/Ho_Chi_Minh");
+    const now = new Date("2026-09-21T17:00:00Z");
+    const { start, end } = getVietnamBusinessDayBounds(now);
+    assert.equal(start.toISOString(), "2026-09-21T17:00:00.000Z");
+    assert.equal(end.toISOString(), "2026-09-22T17:00:00.000Z");
+  });
+});
+
+describe("isLeadFollowUpOverdue", () => {
+  it("detects overdue follow-up before Vietnam business day start", () => {
+    const now = new Date("2026-09-21T10:00:00Z");
+    assert.equal(isLeadFollowUpOverdue("2026-09-20T15:00:00Z", null, now), true);
+    assert.equal(isLeadFollowUpOverdue("2026-09-21T15:00:00Z", null, now), false);
+    assert.equal(isLeadFollowUpOverdue(null, null, now), false);
+  });
+
+  it("aligns overdue with Vietnam midnight, not server-local midnight", () => {
+    const now = new Date("2026-09-21T17:00:00Z");
+    assert.equal(isLeadFollowUpOverdue("2026-09-21T10:00:00Z", null, now), true);
+    assert.equal(isLeadFollowUpOverdue("2026-09-21T20:00:00Z", null, now), false);
+  });
+});
+
+describe("mapIntakeChannelToDefaultSource", () => {
+  it("maps Gmail channel to GMAIL source", () => {
+    assert.equal(mapIntakeChannelToDefaultSource("GMAIL"), "GMAIL");
+    assert.equal(mapIntakeChannelToDefaultSource("MANUAL"), "MANUAL");
+  });
+});
+
+describe("buildIntakeAuditTitle", () => {
+  it("labels idempotent replay distinctly", () => {
+    assert.match(buildIntakeAuditTitle(false, "source_ref"), /idempotent replay/);
+    assert.match(buildIntakeAuditTitle(true, "new"), /created/);
+  });
+});
+
+describe("buildOwnerChangeAuditContent", () => {
+  it("records owner transition with names when available", () => {
+    const content = buildOwnerChangeAuditContent("emp-1", "emp-2", "Alice", "Bob");
+    assert.equal(content, "Alice → Bob");
+  });
+});
+
+describe("mapOperationalStatusLabel", () => {
+  it("maps existing statuses to operational Vietnamese labels", () => {
+    assert.equal(mapOperationalStatusLabel("NEW"), "Mới");
+    assert.equal(mapOperationalStatusLabel("CONTACTED"), "Đang liên hệ");
+    assert.equal(mapOperationalStatusLabel("QUOTED"), "Đã báo giá");
+    assert.equal(mapOperationalStatusLabel("WON"), "Chốt");
+  });
+});
+
+describe("resolveValidatedSalesOwnerId", () => {
+  it("treats explicit empty owner as unassigned", () => {
+    assert.equal(resolveValidatedSalesOwnerId(null), null);
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "  ", isActive: true, role: "SALES" }),
+      null
+    );
+  });
+
+  it("accepts active SALES and ADMIN employees", () => {
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-1", isActive: true, role: "SALES" }),
+      "emp-1"
+    );
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-2", isActive: true, role: "ADMIN" }),
+      "emp-2"
+    );
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-3", isActive: true, role: null }),
+      "emp-3"
+    );
+  });
+
+  it("rejects inactive or non-sales-capable employees", () => {
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-4", isActive: false, role: "SALES" }),
+      null
+    );
+    assert.equal(
+      resolveValidatedSalesOwnerId({ id: "emp-5", isActive: true, role: "PRODUCTION" }),
+      null
+    );
+    assert.equal(resolveValidatedSalesOwnerId(null), null);
+  });
+});
+
+describe("isSalesCapableEmployeeRole", () => {
+  it("allows SALES, ADMIN, and unset role", () => {
+    assert.equal(isSalesCapableEmployeeRole("SALES"), true);
+    assert.equal(isSalesCapableEmployeeRole("ADMIN"), true);
+    assert.equal(isSalesCapableEmployeeRole(null), true);
+    assert.equal(isSalesCapableEmployeeRole("DELIVERY"), false);
+  });
+});
+
+describe("resolveExplicitSalesOwnerId", () => {
+  it("allows omitted or empty owner assignment", () => {
+    assert.equal(resolveExplicitSalesOwnerId(null, null), null);
+    assert.equal(resolveExplicitSalesOwnerId("", null), null);
+    assert.equal(resolveExplicitSalesOwnerId("   ", null), null);
+  });
+
+  it("accepts explicit valid sales-capable owner", () => {
+    assert.equal(
+      resolveExplicitSalesOwnerId("emp-1", { id: "emp-1", isActive: true, role: "SALES" }),
+      "emp-1"
+    );
+    assert.equal(
+      resolveExplicitSalesOwnerId("emp-2", { id: "emp-2", isActive: true, role: null }),
+      "emp-2"
+    );
+  });
+
+  it("rejects explicit invalid owner instead of silently unassigning", () => {
+    assert.throws(
+      () => resolveExplicitSalesOwnerId("emp-bad", null),
+      (err: unknown) => err instanceof LeadIntakeValidationError
+    );
+    assert.throws(
+      () =>
+        resolveExplicitSalesOwnerId("emp-prod", {
+          id: "emp-prod",
+          isActive: true,
+          role: "PRODUCTION",
+        }),
+      (err: unknown) => err instanceof LeadIntakeValidationError
+    );
+  });
+});
+
+describe("isIntakeSourceRefUniqueViolation", () => {
+  it("detects Prisma P2002 unique constraint races for sourceRef intake", () => {
+    const err = new Prisma.PrismaClientKnownRequestError("Unique constraint", {
+      code: "P2002",
+      clientVersion: "6.9.0",
+    });
+    assert.equal(isIntakeSourceRefUniqueViolation(err, "msg-1"), true);
+    assert.equal(isIntakeSourceRefUniqueViolation(err, null), false);
+    assert.equal(isIntakeSourceRefUniqueViolation(new Error("other"), "msg-1"), false);
+  });
+});
+
+describe("shouldCreateOwnerChangeAudit", () => {
+  it("creates audit only when owner actually changes", () => {
+    assert.equal(shouldCreateOwnerChangeAudit("emp-1", "emp-2"), true);
+    assert.equal(shouldCreateOwnerChangeAudit(null, "emp-1"), true);
+    assert.equal(shouldCreateOwnerChangeAudit("emp-1", "emp-1"), false);
+    assert.equal(shouldCreateOwnerChangeAudit("emp-1", null), true);
+    assert.equal(shouldCreateOwnerChangeAudit("emp-1", undefined), false);
+  });
+});
+
+describe("authorizeLeadIntakeRequest", () => {
+  it("accepts bearer or x-cron-secret when configured", () => {
+    assert.equal(
+      authorizeLeadIntakeRequest({
+        authorizationHeader: "Bearer secret-1",
+        cronSecretHeader: null,
+        configuredSecret: "secret-1",
+      }),
+      true
+    );
+    assert.equal(
+      authorizeLeadIntakeRequest({
+        authorizationHeader: null,
+        cronSecretHeader: "secret-1",
+        configuredSecret: "secret-1",
+      }),
+      true
+    );
+  });
+
+  it("rejects missing or mismatched secrets", () => {
+    assert.equal(
+      authorizeLeadIntakeRequest({
+        authorizationHeader: "Bearer wrong",
+        cronSecretHeader: null,
+        configuredSecret: "secret-1",
+      }),
+      false
+    );
+    assert.equal(
+      authorizeLeadIntakeRequest({
+        authorizationHeader: null,
+        cronSecretHeader: null,
+        configuredSecret: null,
+      }),
+      false
+    );
+  });
+});

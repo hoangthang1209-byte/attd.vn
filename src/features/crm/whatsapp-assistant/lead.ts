@@ -1,7 +1,8 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import type { LeadPriority } from "@prisma/client";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
-import { createAdminLead } from "@/features/crm/services/crm-lead.service";
+import { intakeLead } from "@/features/crm/services/lead-intake.service";
 import type { CrmLeadRecord } from "@/features/crm/types";
 import type {
   WhatsAppAssistantAnalysis,
@@ -72,6 +73,11 @@ function buildDemand(analysis: WhatsAppAssistantAnalysis): string {
     .join("\n");
 }
 
+function buildWhatsAppSourceRef(rawChatText: string): string {
+  const digest = createHash("sha256").update(rawChatText.trim()).digest("hex").slice(0, 64);
+  return `wa:${digest}`;
+}
+
 export async function createLeadFromWhatsAppAssistant(
   input: WhatsAppAssistantInput,
   analysis: WhatsAppAssistantAnalysis
@@ -83,16 +89,23 @@ export async function createLeadFromWhatsAppAssistant(
   const email = input.email?.trim() || extracted.email || null;
   const note = buildLeadNote(input, analysis);
 
-  const lead = await createAdminLead({
+  const result = await intakeLead({
+    channel: "OTHER",
+    source: "OTHER",
+    sourceRef: buildWhatsAppSourceRef(input.rawChatText),
+    sourceDetail: "Vietnamclothing.vn / WhatsApp",
     contactName,
     companyName,
     phone,
     email,
-    source: "OTHER",
-    sourceDetail: "Vietnamclothing.vn / WhatsApp",
     demand: buildDemand(analysis),
     note,
     priority: priorityFromQuality(analysis.leadQuality),
+    intakeMetadata: {
+      whatsappAssistant: true,
+      sourceWebsite: input.sourceWebsite ?? null,
+      leadQuality: analysis.leadQuality,
+    },
     productInterests: [
       {
         productNameSnapshot: extracted.productType || "WhatsApp garment inquiry",
@@ -108,15 +121,17 @@ export async function createLeadFromWhatsAppAssistant(
     ],
   });
 
-  if (!lead) return null;
+  if (!result) return null;
 
-  await createCRMActivity({
-    leadId: lead.id,
-    type: "NOTE",
-    title: "WhatsApp AI - phân tích lead",
-    content: note,
-    outcome: analysis.suggestedNextActionVi,
-  });
+  if (result.created) {
+    await createCRMActivity({
+      leadId: result.lead.id,
+      type: "NOTE",
+      title: "WhatsApp AI - phân tích lead",
+      content: note,
+      outcome: analysis.suggestedNextActionVi,
+    });
+  }
 
-  return lead;
+  return result.lead;
 }

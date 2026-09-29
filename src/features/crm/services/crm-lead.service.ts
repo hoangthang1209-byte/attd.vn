@@ -13,7 +13,14 @@ import {
   LEAD_DETAIL_INCLUDE,
   mapLeadRow,
 } from "@/features/crm/mappers";
+import {
+  buildOwnerChangeAuditContent,
+  getVietnamBusinessDayBounds,
+  shouldCreateOwnerChangeAudit,
+} from "@/features/crm/lead-intake.utils";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
+import { validateLeadOwnerId, LeadIntakeValidationError } from "@/features/crm/services/lead-intake.service";
+import { crmOwnerValidationDeps } from "@/features/crm/services/crm-owner-validation.deps";
 import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-product-interest-snapshot";
 import {
   CRM_LEAD_PRIORITIES,
@@ -435,6 +442,8 @@ export type ListCrmLeadsParams = {
   source?: LeadSource;
   status?: LeadStatus;
   priority?: LeadPriority;
+  assignedTo?: string;
+  overdueOnly?: boolean;
   limit?: number;
 };
 
@@ -474,13 +483,11 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
     if (params.source) where.source = params.source;
     if (params.status) where.status = params.status;
     if (params.priority) where.priority = params.priority;
+    if (params.assignedTo?.trim()) where.assignedTo = params.assignedTo.trim();
 
     const limit = Math.min(200, Math.max(1, params.limit ?? 100));
 
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const endOfToday = new Date(startOfToday);
-    endOfToday.setDate(endOfToday.getDate() + 1);
+    const { start: startOfToday, end: endOfToday } = getVietnamBusinessDayBounds();
 
     const activeFollowUp = { status: { notIn: ["WON", "LOST", "NOT_FIT"] as LeadStatus[] } };
 
@@ -497,6 +504,10 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
         { nextFollowUpAt: null, followUpAt: { lt: startOfToday } },
       ],
     };
+
+    if (params.overdueOnly) {
+      Object.assign(where, activeFollowUp, overdueFilter);
+    }
 
     const [
       rows,
@@ -619,6 +630,14 @@ export async function updateCrmLead(
     const existing = await prisma.lead.findUnique({ where: { id } });
     if (!existing) return null;
 
+    let nextAssignedTo: string | null | undefined;
+    if (data.assignedTo !== undefined) {
+      nextAssignedTo = data.assignedTo?.trim() || null;
+      if (nextAssignedTo) {
+        nextAssignedTo = await validateLeadOwnerId(nextAssignedTo);
+      }
+    }
+
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.lead.update({
         where: { id },
@@ -656,11 +675,33 @@ export async function updateCrmLead(
             : {}),
           ...(data.demand !== undefined ? { demand: data.demand?.trim() || null } : {}),
           ...(data.note !== undefined ? { note: data.note?.trim() || null } : {}),
-          ...(data.assignedTo !== undefined
-            ? { assignedTo: data.assignedTo?.trim() || null }
-            : {}),
+          ...(nextAssignedTo !== undefined ? { assignedTo: nextAssignedTo } : {}),
         },
       });
+
+      if (shouldCreateOwnerChangeAudit(existing.assignedTo, nextAssignedTo)) {
+        const [prevEmployee, nextEmployee] = await Promise.all([
+          existing.assignedTo
+            ? crmOwnerValidationDeps.getEmployeeById(existing.assignedTo)
+            : Promise.resolve(null),
+          nextAssignedTo
+            ? crmOwnerValidationDeps.getEmployeeById(nextAssignedTo)
+            : Promise.resolve(null),
+        ]);
+        await tx.cRMActivity.create({
+          data: {
+            leadId: id,
+            type: "NOTE",
+            title: "Thay đổi phụ trách sales",
+            content: buildOwnerChangeAuditContent(
+              existing.assignedTo,
+              nextAssignedTo ?? null,
+              prevEmployee?.fullName,
+              nextEmployee?.fullName
+            ),
+          },
+        });
+      }
 
       if (data.status !== undefined && data.status !== existing.status) {
         await tx.cRMActivity.create({
@@ -677,7 +718,10 @@ export async function updateCrmLead(
     });
 
     return getCrmLeadById(row.id);
-  } catch {
+  } catch (err) {
+    if (err instanceof LeadIntakeValidationError) {
+      throw err;
+    }
     return null;
   }
 }
