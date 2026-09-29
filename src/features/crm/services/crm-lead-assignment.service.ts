@@ -48,7 +48,7 @@ export async function assignLead(input: {
     prisma.leadAssignmentHistory.create({
       data: {
         leadId: input.leadId,
-        fromEmployeeId: lead.assignedEmployeeId,
+        fromEmployeeId: lead.assignedEmployeeId ?? lead.assignedTo,
         toEmployeeId: input.employeeId,
         actorId: input.actorId?.trim() || null,
         reason: input.reason?.trim() || null,
@@ -82,17 +82,21 @@ export async function autoAssignLead(leadId: string): Promise<string | null> {
   });
   if (employees.length === 0) return null;
 
-  const counts = await prisma.lead.groupBy({
-    by: ["assignedEmployeeId"],
+  const activeLeads = await prisma.lead.findMany({
     where: {
-      assignedEmployeeId: { in: employees.map((employee) => employee.id) },
       status: { in: ACTIVE_LEAD_STATUSES },
+      OR: [
+        { assignedEmployeeId: { in: employees.map((employee) => employee.id) } },
+        { assignedTo: { in: employees.map((employee) => employee.id) } },
+      ],
     },
-    _count: { _all: true },
+    select: { assignedEmployeeId: true, assignedTo: true },
   });
-  const countMap = new Map(
-    counts.map((row) => [row.assignedEmployeeId, row._count._all]),
-  );
+  const countMap = new Map<string, number>();
+  for (const row of activeLeads) {
+    const ownerId = row.assignedEmployeeId ?? row.assignedTo;
+    if (ownerId) countMap.set(ownerId, (countMap.get(ownerId) ?? 0) + 1);
+  }
   const selected = [...employees].sort((a, b) => {
     const delta = (countMap.get(a.id) ?? 0) - (countMap.get(b.id) ?? 0);
     return delta || a.employeeCode.localeCompare(b.employeeCode);
