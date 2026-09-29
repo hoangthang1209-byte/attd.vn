@@ -11,6 +11,8 @@ import LeadSourceDisplay from "@/components/admin/LeadSourceDisplay";
 import LeadStatusBadge from "@/components/admin/LeadStatusBadge";
 import { CRM_PRIORITY_LABELS, CRM_SOURCE_LABELS, CRM_STATUS_LABELS, displayLeadCompanyName, displayLeadContactName } from "@/features/crm/labels";
 import { formatCrmCurrency, formatCrmDateTime } from "@/features/crm/format";
+import { resolveEmployeeLabel } from "@/components/admin/crm/CrmLeadOwnerSelect";
+import { isLeadFollowUpOverdue } from "@/features/crm/lead-intake.utils";
 import {
   CRM_LEAD_PRIORITIES,
   CRM_LEAD_SOURCES,
@@ -37,6 +39,11 @@ export default function CrmLeadsManager() {
   const [sourceFilter, setSourceFilter] = useState<LeadSource | "">("");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "">("");
   const [priorityFilter, setPriorityFilter] = useState<LeadPriority | "">("");
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [employees, setEmployees] = useState<
+    { id: string; fullName: string; employeeCode: string }[]
+  >([]);
 
   const load = useCallback(async () => {
     setLoadState("loading");
@@ -47,6 +54,8 @@ export default function CrmLeadsManager() {
       if (sourceFilter) params.set("source", sourceFilter);
       if (statusFilter) params.set("status", statusFilter);
       if (priorityFilter) params.set("priority", priorityFilter);
+      if (ownerFilter) params.set("assignedTo", ownerFilter);
+      if (overdueOnly) params.set("overdueOnly", "1");
 
       const res = await fetch(`/api/crm/leads?${params.toString()}`);
       const data = await res.json();
@@ -80,11 +89,77 @@ export default function CrmLeadsManager() {
       setReminders(null);
       setLoadState("error");
     }
-  }, [search, sourceFilter, statusFilter, priorityFilter]);
+  }, [search, sourceFilter, statusFilter, priorityFilter, ownerFilter, overdueOnly]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (search.trim()) params.set("search", search.trim());
+        if (sourceFilter) params.set("source", sourceFilter);
+        if (statusFilter) params.set("status", statusFilter);
+        if (priorityFilter) params.set("priority", priorityFilter);
+        if (ownerFilter) params.set("assignedTo", ownerFilter);
+        if (overdueOnly) params.set("overdueOnly", "1");
+
+        const res = await fetch(`/api/crm/leads?${params.toString()}`);
+        const data = await res.json();
+        if (cancelled) return;
+
+        setTableReady(data.tableReady !== false);
+
+        if (!res.ok || data.error) {
+          const detail = data.error ?? data.message ?? `HTTP ${res.status}`;
+          setErrorMessage(detail);
+          setLeads([]);
+          setKpis(null);
+          setValueKpis(null);
+          setReminders(null);
+          setLoadState("error");
+          return;
+        }
+
+        const nextLeads = Array.isArray(data.leads) ? data.leads : [];
+        setLeads(nextLeads);
+        setTotal(typeof data.total === "number" ? data.total : nextLeads.length);
+        setKpis(data.kpis ?? null);
+        setValueKpis(data.valueKpis ?? null);
+        setReminders(data.reminders ?? null);
+        setLoadState(nextLeads.length === 0 ? "empty" : "ready");
+      } catch (err) {
+        if (cancelled) return;
+        const detail = err instanceof Error ? err.message : "Không thể tải dữ liệu CRM";
+        setErrorMessage(detail);
+        setLeads([]);
+        setKpis(null);
+        setValueKpis(null);
+        setReminders(null);
+        setLoadState("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [search, sourceFilter, statusFilter, priorityFilter, ownerFilter, overdueOnly]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/employees?active=1&salesCapable=1&limit=200");
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.employees)) {
+          setEmployees(data.employees);
+        }
+      } catch {
+        // ignore employee list failures for lead table rendering
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function applyFilters(event: React.FormEvent) {
     event.preventDefault();
@@ -200,6 +275,26 @@ export default function CrmLeadsManager() {
               </option>
             ))}
           </select>
+          <select
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
+            className="admin-input"
+          >
+            <option value="">Tất cả phụ trách</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.fullName}
+              </option>
+            ))}
+          </select>
+          <label className="admin-checkbox-inline">
+            <input
+              type="checkbox"
+              checked={overdueOnly}
+              onChange={(e) => setOverdueOnly(e.target.checked)}
+            />
+            Quá hạn follow-up
+          </label>
           <button type="submit" className="admin-btn">
             Lọc
           </button>
@@ -226,6 +321,7 @@ export default function CrmLeadsManager() {
                 <th>SĐT</th>
                 <th>Nhu cầu</th>
                 <th>Nguồn</th>
+                <th>Phụ trách</th>
                 <th>Trạng thái</th>
                 <th>Ưu tiên</th>
                 <th>Khách hàng</th>
@@ -257,6 +353,7 @@ export default function CrmLeadsManager() {
                   <td>
                     <LeadSourceDisplay lead={lead} />
                   </td>
+                  <td>{resolveEmployeeLabel(employees, lead.assignedTo)}</td>
                   <td>
                     <LeadStatusBadge status={lead.status} />
                   </td>
@@ -276,7 +373,12 @@ export default function CrmLeadsManager() {
                       "—"
                     )}
                   </td>
-                  <td>{formatCrmDateTime(lead.nextFollowUpAt ?? lead.followUpAt)}</td>
+                  <td>
+                    {formatCrmDateTime(lead.nextFollowUpAt ?? lead.followUpAt)}
+                    {isLeadFollowUpOverdue(lead.nextFollowUpAt, lead.followUpAt) && (
+                      <span className="admin-badge admin-badge--danger">Quá hạn</span>
+                    )}
+                  </td>
                   <td>{formatCrmDateTime(lead.createdAt)}</td>
                 </tr>
               ))}

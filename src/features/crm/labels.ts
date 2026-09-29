@@ -40,6 +40,8 @@ export const CRM_SOURCE_LABELS: Record<LeadSource, string> = {
   SOURCING: "Nguồn hàng",
   LANDING_PAGE: "Landing page",
   WEBSITE: "Website",
+  GMAIL: "Gmail",
+  MANUAL: "Nhập tay",
   ZALO: "Zalo",
   FACEBOOK: "Facebook",
   PHONE: "Điện thoại",

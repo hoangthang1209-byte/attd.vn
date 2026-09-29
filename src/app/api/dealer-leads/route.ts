@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { createCrmLead } from "@/features/crm/services/crm-lead.service";
 import { mapFormSourceToCrmSource } from "@/features/crm/labels";
+import { intakeLead } from "@/features/crm/services/lead-intake.service";
 
 // ─── POST /api/dealer-leads (public) ─────────────────────────────────────────
 
@@ -93,19 +93,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       select: { id: true },
     });
 
-    await createCrmLead({
-      id: created.id,
+    const crmSource = mapFormSourceToCrmSource(source);
+    await intakeLead({
+      channel: "WEBSITE",
+      leadId: created.id,
+      sourceRef: created.id,
       fullName: contactName,
+      contactName,
       phone,
       email,
-      company: companyName,
-      source: mapFormSourceToCrmSource(source),
+      companyName,
+      source: crmSource,
       message,
       landingPage,
       utmSource,
       utmMedium,
       utmCampaign,
       referrer,
+      intakeMetadata: city ? { city } : null,
     });
 
     const total = await prisma.dealerLead.count();
