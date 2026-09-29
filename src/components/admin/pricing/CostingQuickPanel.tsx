@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
@@ -14,10 +16,7 @@ import {
   type CostingWorkspaceClone,
 } from "@/features/pricing/costing-calculation-clone";
 import { computeSellingPriceCommercials } from "@/features/pricing/costing-batch-selling-price";
-import {
-  BUILTIN_COST_LIBRARY,
-  type CostLibraryItem,
-} from "@/features/pricing/cost-library";
+import type { CostLibraryItem } from "@/features/pricing/cost-library";
 import { costingComponentTypeLabel } from "@/features/pricing/costing-component-labels";
 import { previewCostingCalculation } from "@/features/pricing/costing-preview";
 import {
@@ -61,17 +60,20 @@ export default function CostingQuickPanel({
   const [customCostOpen, setCustomCostOpen] = useState(false);
   const [customCostBusy, setCustomCostBusy] = useState(false);
   const [customCostError, setCustomCostError] = useState<string | null>(null);
-  const [libraryItems, setLibraryItems] = useState<CostLibraryItem[]>(BUILTIN_COST_LIBRARY);
-  const [focusLineIndex, setFocusLineIndex] = useState(0);
+  const [libraryItems, setLibraryItems] = useState<CostLibraryItem[]>([]);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const loadLibrary = useCallback(async () => {
+    setLibraryError(null);
     try {
       const res = await fetch("/api/pricing/cost-library");
-      const data = (await res.json()) as { items?: CostLibraryItem[] };
-      setLibraryItems(data.items ?? BUILTIN_COST_LIBRARY);
-    } catch {
-      setLibraryItems(BUILTIN_COST_LIBRARY);
+      const data = (await res.json()) as { items?: CostLibraryItem[]; message?: string };
+      if (!res.ok) throw new Error(data.message ?? "Không thể tải thư viện chi phí.");
+      setLibraryItems(data.items ?? []);
+    } catch (err) {
+      setLibraryItems([]);
+      setLibraryError(err instanceof Error ? err.message : "Không thể tải thư viện chi phí.");
     }
   }, []);
 
@@ -101,7 +103,6 @@ export default function CostingQuickPanel({
             `FINAL ${data.calculation.code} — lưu sẽ tạo phiên bản WORKING mới, bản FINAL không thay đổi.`,
           );
         }
-        setFocusLineIndex(0);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
@@ -133,10 +134,9 @@ export default function CostingQuickPanel({
       costEstimate: preview.totalCost,
       sellingPricePerUnit: sell,
     });
-  }, [preview, row?.quantity, row?.sellingPricePerUnit]);
+  }, [preview, row]);
 
   function focusLine(index: number) {
-    setFocusLineIndex(index);
     setTimeout(() => inputRefs.current[index]?.focus(), 0);
   }
 
@@ -211,7 +211,6 @@ export default function CostingQuickPanel({
   function handleLineKeyDown(
     e: React.KeyboardEvent,
     lineIndex: number,
-    line: QuickCostLine,
   ) {
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
@@ -262,6 +261,11 @@ export default function CostingQuickPanel({
 
         {loading && <p className="admin-field-hint">Đang tải…</p>}
         {error && <p className="admin-error">{error}</p>}
+        {libraryError && (
+          <p className="admin-error" role="alert">
+            {libraryError} Không dùng giá mặc định thay thế để tránh báo sai giá.
+          </p>
+        )}
         {revisionNote && (
           <p className="admin-kb-badge admin-kb-badge--medium costing-quick-panel__revision-note">
             {revisionNote}
@@ -363,7 +367,7 @@ export default function CostingQuickPanel({
                         value={line.unitCost}
                         disabled={saving}
                         onChange={(e) => updateLineUnitCost(line, e.target.value)}
-                        onKeyDown={(e) => handleLineKeyDown(e, index, line)}
+                        onKeyDown={(e) => handleLineKeyDown(e, index)}
                       />
                     </td>
                     <td>
