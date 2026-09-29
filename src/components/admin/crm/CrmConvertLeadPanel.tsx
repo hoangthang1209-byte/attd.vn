@@ -59,16 +59,24 @@ export default function CrmConvertLeadPanel({ lead, onDone, onError }: Props) {
   async function createNewCustomer() {
     if (!confirm("Tạo khách hàng mới từ thông tin lead này?")) return;
     setSubmitting(true);
-    const updated = await mutate({
-      loadingMessage: "Đang lưu thông tin…",
-      successMessage: "Đã liên kết khách hàng.",
-      action: async () => {
-        const res = await fetch(`/api/crm/leads/${lead.id}/convert`, { method: "POST" });
-        return parseAdminJsonResponse(res, (data) => data.lead as CrmLeadRecord);
-      },
-    });
-    setSubmitting(false);
-    if (updated) onDone(updated);
+    try {
+      const res = await fetch(`/api/crm/leads/${lead.id}/convert`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data?.duplicateCustomerId) {
+        setMode("link");
+        setSelectedCustomerId(data.duplicateCustomerId);
+        setSearch(lead.phone && lead.phone !== "—" ? lead.phone : lead.email || "");
+        onError(data.message || "Đã có khách hàng trùng. Vui lòng xác nhận liên kết.");
+        return;
+      }
+      if (!res.ok) {
+        onError(data?.message || "Không thể tạo khách hàng.");
+        return;
+      }
+      if (data?.lead) onDone(data.lead as CrmLeadRecord);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function linkExistingCustomer() {
