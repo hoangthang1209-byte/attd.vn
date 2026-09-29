@@ -231,6 +231,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ lead: assignedLead ?? lead }, { status: 201 });
   }
 
+  const compatPermission = await requireAdminPermission({
+    platform: "crm",
+    action: "create",
+    request: req,
+  });
+  if (!compatPermission.ok) return compatPermission.response;
+  if (!can(compatPermission.session, "leads.create")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
+
   if (!fullName) {
     return NextResponse.json({ message: "Họ tên là bắt buộc" }, { status: 400 });
   }
