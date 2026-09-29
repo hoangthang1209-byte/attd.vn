@@ -69,9 +69,11 @@ export async function assignLead(input: {
 export async function autoAssignLead(leadId: string): Promise<string | null> {
   const lead = await prisma.lead.findUnique({
     where: { id: leadId },
-    select: { assignedEmployeeId: true },
+    select: { assignedEmployeeId: true, assignedTo: true },
   });
-  if (!lead || lead.assignedEmployeeId) return lead?.assignedEmployeeId ?? null;
+  if (!lead) return null;
+  if (lead.assignedEmployeeId) return lead.assignedEmployeeId;
+  if (lead.assignedTo) return lead.assignedTo;
 
   const employees = await prisma.employee.findMany({
     where: { isActive: true, role: "SALES" },
