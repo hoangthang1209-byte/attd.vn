@@ -5,8 +5,28 @@ import {
   ProductionMasterValidationError,
 } from "@/features/production-master/production-master.errors";
 import { getProductionMaterialUsageCount } from "@/features/production-master/production-master-usage";
+import { validateInventoryMaterialLink } from "@/features/production-master/production-inventory-link.service";
 
-const INCLUDE = { supplier: { select: { id: true, code: true, name: true } } } satisfies Prisma.ProductionMaterialInclude;
+const INCLUDE = {
+  supplier: { select: { id: true, code: true, name: true } },
+  inventoryMaterial: {
+    select: {
+      id: true,
+      materialCode: true,
+      name: true,
+      unit: true,
+      reorderPoint: true,
+      warehouseBalance: {
+        select: {
+          onHandQuantity: true,
+          reservedQuantity: true,
+          availableQuantity: true,
+          issuedQuantity: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.ProductionMaterialInclude;
 
 export async function listProductionMaterials(input?: {
   search?: string;
@@ -69,6 +89,7 @@ export async function createProductionMaterial(input: {
 }) {
   const name = input.name?.trim();
   if (!name) throw new ProductionMasterValidationError("Tên vật liệu là bắt buộc.");
+  await validateInventoryMaterialLink({ inventoryMaterialId: input.inventoryMaterialId ?? null });
   const code = await generateMasterCode("PM", "productionMaterial");
   return prisma.productionMaterial.create({
     data: {
@@ -79,6 +100,7 @@ export async function createProductionMaterial(input: {
       gsm: input.gsm?.trim() || null,
       width: input.width?.trim() || null,
       supplierId: input.supplierId || null,
+      inventoryMaterialId: input.inventoryMaterialId || null,
       defaultColor: input.defaultColor?.trim() || null,
       notes: input.notes?.trim() || null,
       isActive: input.isActive ?? true,
@@ -96,6 +118,7 @@ export async function updateProductionMaterial(
     gsm: string | null;
     width: string | null;
     supplierId: string | null;
+    inventoryMaterialId: string | null;
     defaultColor: string | null;
     notes: string | null;
     isActive: boolean;
@@ -103,6 +126,12 @@ export async function updateProductionMaterial(
 ) {
   const existing = await prisma.productionMaterial.findUnique({ where: { id } });
   if (!existing) throw new ProductionMasterValidationError("Không tìm thấy vật liệu.");
+  if (input.inventoryMaterialId !== undefined) {
+    await validateInventoryMaterialLink({
+      inventoryMaterialId: input.inventoryMaterialId,
+      productionMaterialId: id,
+    });
+  }
   return prisma.productionMaterial.update({
     where: { id },
     data: {
@@ -112,6 +141,7 @@ export async function updateProductionMaterial(
       gsm: input.gsm,
       width: input.width,
       supplierId: input.supplierId,
+      inventoryMaterialId: input.inventoryMaterialId,
       defaultColor: input.defaultColor,
       notes: input.notes,
       isActive: input.isActive,
