@@ -4,6 +4,7 @@ import {
   createAdminLead,
   createCrmLead,
   getCrmDiagnostics,
+  getCrmLeadById,
   isCrmLeadTableReady,
   isValidLeadPriority,
   isValidLeadSource,
@@ -12,14 +13,30 @@ import {
 } from "@/features/crm/services/crm-lead.service";
 import type { CreateProductInterestInput } from "@/features/crm/types";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
+import { getAdminSessionFromRequest } from "@/lib/admin-auth/get-admin-session";
+import { can } from "@/features/auth/admin-permissions";
+import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
+import { buildScopedLeadWhere } from "@/features/auth/lead-scope";
+import { assignLead, autoAssignLead } from "@/features/crm/services/crm-lead-assignment.service";
 
 export async function GET(req: NextRequest) {
+  const session = getAdminSessionFromRequest(req);
+  if (!can(session, "leads.view")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? undefined;
   const sourceParam = searchParams.get("source") ?? undefined;
   const statusParam = searchParams.get("status") ?? undefined;
   const priorityParam = searchParams.get("priority") ?? undefined;
   const debug = searchParams.get("debug") === "1";
+  const pageRaw = Number(searchParams.get("page") ?? "1");
+  const pageSizeRaw = Number(searchParams.get("pageSize") ?? "50");
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+  const pageSize =
+    Number.isFinite(pageSizeRaw) && pageSizeRaw > 0
+      ? Math.min(100, Math.floor(pageSizeRaw))
+      : 50;
 
   if (sourceParam && !isValidLeadSource(sourceParam)) {
     return NextResponse.json({ message: "Nguồn không hợp lệ" }, { status: 400 });
@@ -38,7 +55,14 @@ export async function GET(req: NextRequest) {
       source: sourceParam as LeadSource | undefined,
       status: statusParam as LeadStatus | undefined,
       priority: priorityParam as LeadPriority | undefined,
-    });
+      assignedEmployeeId:
+        searchParams.get("mine") === "1"
+          ? session.employeeId ?? undefined
+          : searchParams.get("assignedEmployeeId") ?? undefined,
+      unassigned: searchParams.get("unassigned") === "1",
+      page,
+      pageSize,
+    }, buildScopedLeadWhere(session, "leads.view"));
 
     if (result.error) {
       const diagnostics = debug ? await getCrmDiagnostics() : undefined;
@@ -121,6 +145,9 @@ export async function POST(req: NextRequest) {
       request: req,
     });
     if (!permission.ok) return permission.response;
+    if (!can(permission.session, "leads.create")) {
+      return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+    }
 
     if (!contactName && !companyName && !phone && !email && !fullName) {
       return NextResponse.json(
@@ -184,7 +211,24 @@ export async function POST(req: NextRequest) {
     if (!lead) {
       return NextResponse.json({ message: "Không thể tạo lead" }, { status: 500 });
     }
-    return NextResponse.json({ lead }, { status: 201 });
+
+    if (
+      permission.session.employeeId &&
+      (permission.session.roleCode === "SALES" || permission.session.legacyEmployeeRole === "SALES")
+    ) {
+      await assignLead({
+        leadId: lead.id,
+        employeeId: permission.session.employeeId,
+        actorId: permission.session.userId ?? permission.session.username ?? permission.session.employeeId,
+        source: "MANUAL_SELF",
+        reason: "Lead được sales tạo thủ công.",
+      });
+    } else {
+      await autoAssignLead(lead.id);
+    }
+
+    const assignedLead = await getCrmLeadById(lead.id);
+    return NextResponse.json({ lead: assignedLead ?? lead }, { status: 201 });
   }
 
   if (!fullName) {
