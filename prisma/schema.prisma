@@ -300,6 +300,7 @@ model Lead {
   assignedEmployee      Employee?             @relation("LeadAssignedEmployee", fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
   assignmentHistory     LeadAssignmentHistory[]
   inboundEvents         LeadInboundEvent[]
+  identityKeys          LeadIdentityKey[]
   tasks                 LeadTask[]
   notes                 LeadNote[]
   activities            CRMActivity[]
@@ -345,6 +346,15 @@ model LeadTask {
   @@index([ownerId, completedAt, dueAt])
 }
 
+
+model LeadIdentityKey {
+  key       String   @id
+  leadId    String
+  createdAt DateTime @default(now())
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+}
 
 model LeadInboundEvent {
   id              String     @id @default(cuid())
