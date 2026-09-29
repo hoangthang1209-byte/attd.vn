@@ -107,3 +107,15 @@ ALTER TABLE "LeadTask"
   ADD CONSTRAINT "LeadTask_ownerId_fkey"
   FOREIGN KEY ("ownerId") REFERENCES "Employee"("id")
   ON DELETE SET NULL ON UPDATE CASCADE;
+
+CREATE TABLE "LeadIdentityKey" (
+  "key" TEXT NOT NULL,
+  "leadId" TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "LeadIdentityKey_pkey" PRIMARY KEY ("key")
+);
+CREATE INDEX "LeadIdentityKey_leadId_idx" ON "LeadIdentityKey"("leadId");
+ALTER TABLE "LeadIdentityKey"
+  ADD CONSTRAINT "LeadIdentityKey_leadId_fkey"
+  FOREIGN KEY ("leadId") REFERENCES "Lead"("id")
+  ON DELETE CASCADE ON UPDATE CASCADE;
