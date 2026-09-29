@@ -170,10 +170,17 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ message: "Không có dữ liệu cập nhật" }, { status: 400 });
   }
 
-  const lead = await updateCrmLead(id, patch);
-  if (!lead) {
-    return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+  try {
+    const lead = await updateCrmLead(id, patch);
+    if (!lead) {
+      return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+    }
+    return NextResponse.json({ lead });
+  } catch (error) {
+    console.error("[PATCH /api/crm/leads/:id]", error);
+    return NextResponse.json(
+      { message: "Không thể cập nhật lead. Vui lòng thử lại." },
+      { status: 500 },
+    );
   }
-
-  return NextResponse.json({ lead });
 }
