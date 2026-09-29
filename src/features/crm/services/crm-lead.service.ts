@@ -490,16 +490,15 @@ export async function listCrmLeads(
     if (params.priority) filters.priority = params.priority;
 
     if (params.unassigned) {
-      filters.AND = [
-        ...(Array.isArray(filters.AND) ? filters.AND : []),
-        { assignedEmployeeId: null },
-        { assignedTo: null },
-      ];
+      filters.AND = [{ assignedEmployeeId: null, assignedTo: null }];
     } else if (params.assignedEmployeeId) {
-      filters.OR = [
-        ...(Array.isArray(filters.OR) ? filters.OR : []),
-        { assignedEmployeeId: params.assignedEmployeeId },
-        { assignedTo: params.assignedEmployeeId },
+      filters.AND = [
+        {
+          OR: [
+            { assignedEmployeeId: params.assignedEmployeeId },
+            { assignedTo: params.assignedEmployeeId },
+          ],
+        },
       ];
     }
 
