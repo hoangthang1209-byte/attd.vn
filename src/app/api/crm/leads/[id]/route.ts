@@ -163,7 +163,10 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     patch.note = typeof raw.note === "string" ? raw.note : null;
   }
   if (raw.assignedTo !== undefined) {
-    patch.assignedTo = typeof raw.assignedTo === "string" ? raw.assignedTo : null;
+    return NextResponse.json(
+      { message: "Vui lòng dùng chức năng phân công sales để đổi người phụ trách." },
+      { status: 400 },
+    );
   }
 
   if (Object.keys(patch).length === 0) {
