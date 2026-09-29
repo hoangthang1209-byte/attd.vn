@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import {
   assertLeadIntakeRateLimit,
@@ -7,12 +6,6 @@ import {
   LeadIntakeRateLimitError,
 } from "@/features/crm/services/crm-lead-intake.service";
 
-export async function GET() {
-  const leads = await prisma.lead.findMany({
-    orderBy: { createdAt: "desc" },
-  });
-  return NextResponse.json(leads);
-}
 
 type ProductInquiryBody = {
   productId?: string | null;
