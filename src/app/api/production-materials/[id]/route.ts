@@ -40,6 +40,12 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
       gsm: body.gsm === null ? null : typeof body.gsm === "string" ? body.gsm : undefined,
       width: body.width === null ? null : typeof body.width === "string" ? body.width : undefined,
       supplierId: body.supplierId === null ? null : typeof body.supplierId === "string" ? body.supplierId : undefined,
+      inventoryMaterialId:
+        body.inventoryMaterialId === null
+          ? null
+          : typeof body.inventoryMaterialId === "string"
+            ? body.inventoryMaterialId
+            : undefined,
       defaultColor: body.defaultColor === null ? null : typeof body.defaultColor === "string" ? body.defaultColor : undefined,
       notes: body.notes === null ? null : typeof body.notes === "string" ? body.notes : undefined,
       isActive: typeof body.isActive === "boolean" ? body.isActive : undefined,
