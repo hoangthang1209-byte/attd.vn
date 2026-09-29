@@ -1,7 +1,9 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { ProductPriceTierRecord } from "@/features/pricing/types";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 import { TIER_VARIANT_OWNERSHIP_ERROR } from "@/features/products/product-foundation-validation";
+import { priceTierRangesOverlap } from "@/features/pricing/pricing-p1-guards";
 
 function mapTier(row: {
   id: string;
@@ -56,10 +58,66 @@ function validateTierQuantities(minQuantity: number, maxQuantity: number | null)
   }
 }
 
+function parseEffectiveDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new PricingValidationError("Ngày hiệu lực không hợp lệ.");
+  return date;
+}
+
+function validateEffectiveDates(effectiveFrom: Date | null, effectiveTo: Date | null) {
+  if (effectiveFrom && effectiveTo && effectiveTo < effectiveFrom) {
+    throw new PricingValidationError("Ngày kết thúc hiệu lực phải sau ngày bắt đầu.");
+  }
+}
+
+type ProductTierDb = Pick<Prisma.TransactionClient, "productPriceTier" | "productVariant">;
+
+async function assertNoOverlappingTier(
+  input: {
+    excludeId?: string;
+    productId: string;
+    variantId: string | null;
+    priceGroupId: string;
+    minQuantity: number;
+    maxQuantity: number | null;
+    effectiveFrom: Date | null;
+    effectiveTo: Date | null;
+    isActive: boolean;
+  },
+  db: ProductTierDb = prisma,
+) {
+  if (!input.isActive) return;
+
+  const candidates = await db.productPriceTier.findMany({
+    where: {
+      id: input.excludeId ? { not: input.excludeId } : undefined,
+      productId: input.productId,
+      variantId: input.variantId,
+      priceGroupId: input.priceGroupId,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      minQuantity: true,
+      maxQuantity: true,
+      effectiveFrom: true,
+      effectiveTo: true,
+    },
+  });
+
+  const overlapping = candidates.find((candidate) => priceTierRangesOverlap(input, candidate));
+  if (overlapping) {
+    throw new PricingValidationError(
+      "Khoảng số lượng/hiệu lực bị chồng với một dòng giá đang hoạt động. Hãy điều chỉnh khoảng hoặc tắt dòng giá cũ.",
+    );
+  }
+}
+
 export async function assertVariantBelongsToProduct(
   productId: string,
   variantId: string | null | undefined,
-  db: Pick<typeof prisma, "productVariant"> = prisma,
+  db: ProductTierDb = prisma,
 ): Promise<void> {
   if (!variantId) return;
   const variant = await db.productVariant.findFirst({
@@ -117,29 +175,45 @@ export async function createProductPriceTier(input: {
   if (!input.priceGroupId) throw new PricingValidationError("Nhóm giá là bắt buộc.");
   if (input.unitPrice < 0) throw new PricingValidationError("Đơn giá phải >= 0.");
   validateTierQuantities(input.minQuantity, input.maxQuantity ?? null);
-  await assertVariantBelongsToProduct(input.productId, input.variantId ?? null);
+  const effectiveFrom = parseEffectiveDate(input.effectiveFrom);
+  const effectiveTo = parseEffectiveDate(input.effectiveTo);
+  validateEffectiveDates(effectiveFrom, effectiveTo);
 
-  const row = await prisma.productPriceTier.create({
-    data: {
+  return prisma.$transaction(async (tx) => {
+    await assertVariantBelongsToProduct(input.productId, input.variantId ?? null, tx);
+    await assertNoOverlappingTier({
       productId: input.productId,
       variantId: input.variantId || null,
       priceGroupId: input.priceGroupId,
       minQuantity: input.minQuantity,
       maxQuantity: input.maxQuantity ?? null,
-      unitPrice: input.unitPrice,
-      costPrice: input.costPrice ?? null,
-      effectiveFrom: input.effectiveFrom ? new Date(input.effectiveFrom) : null,
-      effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : null,
-      note: input.note?.trim() || null,
+      effectiveFrom,
+      effectiveTo,
       isActive: input.isActive ?? true,
-    },
-    include: {
-      product: { select: { name: true } },
-      variant: { select: { sku: true, colorName: true, sizeName: true } },
-      priceGroup: { select: { name: true, code: true } },
-    },
-  });
-  return mapTier(row);
+    }, tx);
+
+    const row = await tx.productPriceTier.create({
+      data: {
+        productId: input.productId,
+        variantId: input.variantId || null,
+        priceGroupId: input.priceGroupId,
+        minQuantity: input.minQuantity,
+        maxQuantity: input.maxQuantity ?? null,
+        unitPrice: input.unitPrice,
+        costPrice: input.costPrice ?? null,
+        effectiveFrom,
+        effectiveTo,
+        note: input.note?.trim() || null,
+        isActive: input.isActive ?? true,
+      },
+      include: {
+        product: { select: { name: true } },
+        variant: { select: { sku: true, colorName: true, sizeName: true } },
+        priceGroup: { select: { name: true, code: true } },
+      },
+    });
+    return mapTier(row);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function updateProductPriceTier(
@@ -157,50 +231,63 @@ export async function updateProductPriceTier(
     isActive?: boolean;
   }
 ) {
-  const existing = await prisma.productPriceTier.findUnique({ where: { id } });
-  if (!existing) throw new PricingValidationError("Không tìm thấy dòng giá.");
-
-  const minQuantity = input.minQuantity ?? existing.minQuantity;
-  const maxQuantity = input.maxQuantity !== undefined ? input.maxQuantity : existing.maxQuantity;
-  validateTierQuantities(minQuantity, maxQuantity);
   if (input.unitPrice !== undefined && input.unitPrice < 0) {
     throw new PricingValidationError("Đơn giá phải >= 0.");
   }
 
-  const nextVariantId = input.variantId !== undefined ? (input.variantId || null) : existing.variantId;
-  await assertVariantBelongsToProduct(existing.productId, nextVariantId);
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.productPriceTier.findUnique({ where: { id } });
+    if (!existing) throw new PricingValidationError("Không tìm thấy dòng giá.");
 
-  const row = await prisma.productPriceTier.update({
-    where: { id },
-    data: {
-      variantId: input.variantId !== undefined ? (input.variantId || null) : undefined,
-      priceGroupId: input.priceGroupId,
-      minQuantity: input.minQuantity,
-      maxQuantity: input.maxQuantity !== undefined ? input.maxQuantity : undefined,
-      unitPrice: input.unitPrice,
-      costPrice: input.costPrice !== undefined ? input.costPrice : undefined,
-      effectiveFrom:
-        input.effectiveFrom !== undefined
-          ? input.effectiveFrom
-            ? new Date(input.effectiveFrom)
-            : null
-          : undefined,
-      effectiveTo:
-        input.effectiveTo !== undefined
-          ? input.effectiveTo
-            ? new Date(input.effectiveTo)
-            : null
-          : undefined,
-      note: input.note !== undefined ? (input.note?.trim() || null) : undefined,
-      isActive: input.isActive,
-    },
-    include: {
-      product: { select: { name: true } },
-      variant: { select: { sku: true, colorName: true, sizeName: true } },
-      priceGroup: { select: { name: true, code: true } },
-    },
-  });
-  return mapTier(row);
+    const minQuantity = input.minQuantity ?? existing.minQuantity;
+    const maxQuantity = input.maxQuantity !== undefined ? input.maxQuantity : existing.maxQuantity;
+    validateTierQuantities(minQuantity, maxQuantity);
+
+    const nextVariantId = input.variantId !== undefined ? (input.variantId || null) : existing.variantId;
+    await assertVariantBelongsToProduct(existing.productId, nextVariantId, tx);
+    const nextPriceGroupId = input.priceGroupId ?? existing.priceGroupId;
+    const nextEffectiveFrom = input.effectiveFrom !== undefined
+      ? parseEffectiveDate(input.effectiveFrom)
+      : existing.effectiveFrom;
+    const nextEffectiveTo = input.effectiveTo !== undefined
+      ? parseEffectiveDate(input.effectiveTo)
+      : existing.effectiveTo;
+    const nextIsActive = input.isActive ?? existing.isActive;
+    validateEffectiveDates(nextEffectiveFrom, nextEffectiveTo);
+    await assertNoOverlappingTier({
+      excludeId: id,
+      productId: existing.productId,
+      variantId: nextVariantId,
+      priceGroupId: nextPriceGroupId,
+      minQuantity,
+      maxQuantity,
+      effectiveFrom: nextEffectiveFrom,
+      effectiveTo: nextEffectiveTo,
+      isActive: nextIsActive,
+    }, tx);
+
+    const row = await tx.productPriceTier.update({
+      where: { id },
+      data: {
+        variantId: input.variantId !== undefined ? (input.variantId || null) : undefined,
+        priceGroupId: input.priceGroupId,
+        minQuantity: input.minQuantity,
+        maxQuantity: input.maxQuantity !== undefined ? input.maxQuantity : undefined,
+        unitPrice: input.unitPrice,
+        costPrice: input.costPrice !== undefined ? input.costPrice : undefined,
+        effectiveFrom: input.effectiveFrom !== undefined ? nextEffectiveFrom : undefined,
+        effectiveTo: input.effectiveTo !== undefined ? nextEffectiveTo : undefined,
+        note: input.note !== undefined ? (input.note?.trim() || null) : undefined,
+        isActive: input.isActive,
+      },
+      include: {
+        product: { select: { name: true } },
+        variant: { select: { sku: true, colorName: true, sizeName: true } },
+        priceGroup: { select: { name: true, code: true } },
+      },
+    });
+    return mapTier(row);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function getTiersForPricing(productIds: string[], priceGroupId: string) {
