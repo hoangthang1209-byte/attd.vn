@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { createCrmLead } from "@/features/crm/services/crm-lead.service";
+import {
+  assertLeadIntakeRateLimit,
+  buildDailyLeadIdempotencyKey,
+  ingestCrmLead,
+  LeadIntakeRateLimitError,
+} from "@/features/crm/services/crm-lead-intake.service";
 
 export async function GET() {
   const leads = await prisma.lead.findMany({
@@ -64,12 +69,13 @@ export async function POST(request: Request) {
   const message = body.message?.trim() || null;
   const inquiry = body.productInquiry as ProductInquiryBody | undefined;
 
-  const lead = await createCrmLead({
+  const source = inquiry?.productId ? "PRODUCT_INQUIRY" : "CONTACT";
+  const leadInput = {
     fullName,
     phone,
     email,
     company,
-    source: inquiry?.productId ? "PRODUCT_INQUIRY" : "CONTACT",
+    source,
     sourceDetail: inquiry?.productUrl?.trim() || null,
     message,
     ...(inquiry?.productId
@@ -83,14 +89,45 @@ export async function POST(request: Request) {
           },
         }
       : {}),
-  });
+  } as const;
 
-  if (!lead) {
+  try {
+    await assertLeadIntakeRateLimit({ phone, email });
+    const { lead, deduplicated } = await ingestCrmLead({
+      lead: leadInput,
+      channel: inquiry?.productId ? "WEBSITE_PRODUCT_INQUIRY" : "WEBSITE_CONTACT",
+      idempotencyKey: buildDailyLeadIdempotencyKey({
+        channel: inquiry?.productId ? "WEBSITE_PRODUCT_INQUIRY" : "WEBSITE_CONTACT",
+        source,
+        phone,
+        email,
+        fingerprint: JSON.stringify({
+          productId: inquiry?.productId ?? null,
+          variantId: inquiry?.variantId ?? null,
+          quantity: inquiry?.quantity ?? null,
+          message,
+        }),
+      }),
+      payload: {
+        name: fullName,
+        phone,
+        email,
+        company,
+        message,
+        productId: inquiry?.productId ?? null,
+        variantId: inquiry?.variantId ?? null,
+        quantity: inquiry?.quantity ?? null,
+      },
+    });
+    return NextResponse.json({ ...lead, deduplicated }, { status: deduplicated ? 200 : 201 });
+  } catch (error) {
+    if (error instanceof LeadIntakeRateLimitError) {
+      return NextResponse.json({ message: error.message }, { status: 429 });
+    }
+    console.error("[POST /api/leads]", error);
     return NextResponse.json(
       { message: "Không thể lưu lead. Vui lòng thử lại." },
       { status: 500 },
     );
   }
-
-  return NextResponse.json(lead, { status: 201 });
 }
