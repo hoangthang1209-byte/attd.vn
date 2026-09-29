@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { convertLeadToCustomer } from "@/features/crm/services/crm-lead.service";
+import {
+  convertLeadToCustomer,
+  LeadCustomerDuplicateError,
+} from "@/features/crm/services/crm-lead.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
 import { prisma } from "@/lib/prisma";
 import { can } from "@/features/auth/admin-permissions";
@@ -30,14 +33,27 @@ export async function POST(req: NextRequest, context: RouteContext) {
   if (!canAccessLeadRecord(permission.session, scopeRow, "leads.update")) {
     return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
   }
-  const lead = await convertLeadToCustomer(id);
-
-  if (!lead) {
-    return NextResponse.json(
-      { message: "Không thể chuyển lead. Lead có thể đã được chuyển hoặc không tồn tại." },
-      { status: 400 }
-    );
+  try {
+    const lead = await convertLeadToCustomer(id);
+    if (!lead) {
+      return NextResponse.json(
+        { message: "Không thể chuyển lead. Lead có thể đã được chuyển hoặc không tồn tại." },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json({ lead });
+  } catch (error) {
+    if (error instanceof LeadCustomerDuplicateError) {
+      return NextResponse.json(
+        {
+          message: error.message,
+          duplicateCustomerId: error.customerId,
+          requiresConfirmation: true,
+        },
+        { status: 409 },
+      );
+    }
+    console.error("[POST /api/crm/leads/:id/convert]", error);
+    return NextResponse.json({ message: "Không thể chuyển lead." }, { status: 500 });
   }
-
-  return NextResponse.json({ lead });
 }
