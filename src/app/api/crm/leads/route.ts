@@ -30,6 +30,13 @@ export async function GET(req: NextRequest) {
   const statusParam = searchParams.get("status") ?? undefined;
   const priorityParam = searchParams.get("priority") ?? undefined;
   const debug = searchParams.get("debug") === "1";
+  const pageRaw = Number(searchParams.get("page") ?? "1");
+  const pageSizeRaw = Number(searchParams.get("pageSize") ?? "50");
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+  const pageSize =
+    Number.isFinite(pageSizeRaw) && pageSizeRaw > 0
+      ? Math.min(100, Math.floor(pageSizeRaw))
+      : 50;
 
   if (sourceParam && !isValidLeadSource(sourceParam)) {
     return NextResponse.json({ message: "Nguồn không hợp lệ" }, { status: 400 });
@@ -53,8 +60,8 @@ export async function GET(req: NextRequest) {
           ? session.employeeId ?? undefined
           : searchParams.get("assignedEmployeeId") ?? undefined,
       unassigned: searchParams.get("unassigned") === "1",
-      page: searchParams.get("page") ? Number(searchParams.get("page")) : 1,
-      pageSize: searchParams.get("pageSize") ? Number(searchParams.get("pageSize")) : 50,
+      page,
+      pageSize,
     }, buildScopedLeadWhere(session, "leads.view"));
 
     if (result.error) {
