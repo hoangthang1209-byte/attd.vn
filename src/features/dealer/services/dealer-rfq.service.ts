@@ -13,7 +13,8 @@ import type {
 } from "@/features/dealer/dealer-rfq.types";
 import { DealerValidationError, normalizeOptionalString } from "@/features/dealer/dealer-validation";
 import { createDealerActivity } from "@/features/dealer/services/dealer-activity.service";
-import { createCrmLead, linkLeadToExistingCustomer } from "@/features/crm/services/crm-lead.service";
+import { linkLeadToExistingCustomer } from "@/features/crm/services/crm-lead.service";
+import { ingestCrmLead } from "@/features/crm/services/crm-lead-intake.service";
 import {
   DEALER_RFQ_PROJECT_TYPE_LABELS,
   DEALER_RFQ_STATUS_LABELS,
@@ -595,26 +596,35 @@ export async function convertDealerRFQToLead(id: string): Promise<DealerRFQRecor
     note: rfq.note,
     items: rfq.items,
   });
-  const lead = await createCrmLead({
-    source: "DEALER",
-    sourceDetail: `B2B Portal RFQ ${rfq.code}`,
-    contactName: rfq.contactName ?? undefined,
-    companyName: rfq.companyName ?? rfq.dealerCompany.name,
-    phone: rfq.contactPhone ?? "—",
-    email: rfq.contactEmail ?? undefined,
-    message: rfq.note ?? undefined,
-    demand: rfq.productSummary ?? undefined,
-    note: leadNote,
-    productInterests: rfq.items.map((item) => ({
-      productId: item.productId ?? undefined,
-      variantId: item.variantId ?? undefined,
-      productNameSnapshot: item.productName,
-      quantity: item.quantity,
-      requirementNote: [item.decorationType, item.position, item.note].filter(Boolean).join(" · ") || undefined,
-    })),
+  const { lead } = await ingestCrmLead({
+    lead: {
+      source: "DEALER",
+      sourceDetail: `B2B Portal RFQ ${rfq.code}`,
+      contactName: rfq.contactName ?? undefined,
+      companyName: rfq.companyName ?? rfq.dealerCompany.name,
+      phone: rfq.contactPhone ?? "—",
+      email: rfq.contactEmail ?? undefined,
+      message: rfq.note ?? undefined,
+      demand: rfq.productSummary ?? undefined,
+      note: leadNote,
+      productInterests: rfq.items.map((item) => ({
+        productId: item.productId ?? undefined,
+        variantId: item.variantId ?? undefined,
+        productNameSnapshot: item.productName,
+        quantity: item.quantity,
+        requirementNote: [item.decorationType, item.position, item.note].filter(Boolean).join(" · ") || undefined,
+      })),
+    },
+    channel: "DEALER_RFQ",
+    externalId: rfq.id,
+    idempotencyKey: `dealer-rfq:${rfq.id}`,
+    dedupeByIdentity: false,
+    payload: {
+      rfqId: rfq.id,
+      rfqCode: rfq.code,
+      dealerCompanyId: rfq.dealerCompanyId,
+    },
   });
-
-  if (!lead) throw new DealerValidationError("Không thể tạo Lead CRM từ RFQ.");
 
   const customerId = rfq.customerId ?? rfq.dealerCompany.customerId ?? null;
   if (customerId) {

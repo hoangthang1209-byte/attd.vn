@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addCrmLeadNote, getCrmLeadById } from "@/features/crm/services/crm-lead.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
+import { prisma } from "@/lib/prisma";
+import { can } from "@/features/auth/admin-permissions";
+import { canAccessLeadRecord } from "@/features/auth/lead-scope";
+import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -13,6 +17,19 @@ export async function POST(req: NextRequest, context: RouteContext) {
   if (!permission.ok) return permission.response;
 
   const { id } = await context.params;
+  if (!can(permission.session, "leads.update")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
+  const scopeRow = await prisma.lead.findUnique({
+    where: { id },
+    select: { assignedEmployeeId: true, assignedTo: true },
+  });
+  if (!scopeRow) {
+    return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+  }
+  if (!canAccessLeadRecord(permission.session, scopeRow, "leads.update")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
 
   const lead = await getCrmLeadById(id);
   if (!lead) {

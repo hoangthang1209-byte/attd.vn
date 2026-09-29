@@ -14,6 +14,7 @@ import {
   mapLeadRow,
 } from "@/features/crm/mappers";
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
+import { normalizeLeadEmail, normalizeLeadPhone } from "@/features/crm/lead-identity";
 import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-product-interest-snapshot";
 import {
   CRM_LEAD_PRIORITIES,
@@ -255,10 +256,13 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
             note: input.note?.trim() || null,
             status: input.status ?? "NEW",
             priority: input.priority ?? "NORMAL",
-            followUpAt: input.followUpAt ?? input.nextFollowUpAt ?? null,
+            followUpAt: null,
             nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
             estimatedValue: input.estimatedValue ?? null,
             assignedTo: input.assignedTo?.trim() || null,
+            phoneNormalized: normalizeLeadPhone(identity.phone),
+            emailNormalized: normalizeLeadEmail(identity.email),
+            lastInboundAt: new Date(),
             landingPage: input.landingPage?.trim() || null,
             utmSource: input.utmSource?.trim() || null,
             utmMedium: input.utmMedium?.trim() || null,
@@ -307,7 +311,7 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
         note: input.note?.trim() || null,
         status: input.status ?? "NEW",
         priority: input.priority ?? "NORMAL",
-        followUpAt: input.followUpAt ?? input.nextFollowUpAt ?? null,
+        followUpAt: null,
         nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
         estimatedValue: input.estimatedValue ?? null,
         assignedTo: input.assignedTo?.trim() || null,
@@ -391,9 +395,12 @@ export async function createAdminLead(
           status: input.status ?? "NEW",
           priority: input.priority ?? "NORMAL",
           nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
-          followUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
+          followUpAt: null,
           estimatedValue: input.estimatedValue ?? null,
           assignedTo: input.assignedTo?.trim() || null,
+          phoneNormalized: normalizeLeadPhone(identity.phone),
+          emailNormalized: normalizeLeadEmail(identity.email),
+          lastInboundAt: new Date(),
         },
       });
 
@@ -435,10 +442,16 @@ export type ListCrmLeadsParams = {
   source?: LeadSource;
   status?: LeadStatus;
   priority?: LeadPriority;
-  limit?: number;
+  assignedEmployeeId?: string;
+  unassigned?: boolean;
+  page?: number;
+  pageSize?: number;
 };
 
-export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<ListCrmLeadsResult> {
+export async function listCrmLeads(
+  params: ListCrmLeadsParams = {},
+  scopeWhere: Prisma.LeadWhereInput = {},
+): Promise<ListCrmLeadsResult> {
   const emptyKpis = Object.fromEntries(
     CRM_LEAD_STATUSES.map((status) => [status, 0])
   ) as CrmLeadKpis;
@@ -457,10 +470,11 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
   try {
     await ensureCrmLeadsSynced();
 
-    const where: Prisma.LeadWhereInput = {};
+    const filters: Prisma.LeadWhereInput = {};
+    const where: Prisma.LeadWhereInput = { AND: [scopeWhere, filters] };
     const search = params.search?.trim();
     if (search) {
-      where.OR = [
+      filters.OR = [
         { fullName: { contains: search, mode: "insensitive" } },
         { contactName: { contains: search, mode: "insensitive" } },
         { companyName: { contains: search, mode: "insensitive" } },
@@ -471,11 +485,26 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
         { company: { contains: search, mode: "insensitive" } },
       ];
     }
-    if (params.source) where.source = params.source;
-    if (params.status) where.status = params.status;
-    if (params.priority) where.priority = params.priority;
+    if (params.source) filters.source = params.source;
+    if (params.status) filters.status = params.status;
+    if (params.priority) filters.priority = params.priority;
 
-    const limit = Math.min(200, Math.max(1, params.limit ?? 100));
+    if (params.unassigned) {
+      filters.AND = [{ assignedEmployeeId: null, assignedTo: null }];
+    } else if (params.assignedEmployeeId) {
+      filters.AND = [
+        {
+          OR: [
+            { assignedEmployeeId: params.assignedEmployeeId },
+            { assignedTo: params.assignedEmployeeId },
+          ],
+        },
+      ];
+    }
+
+    const page = Math.max(params.page ?? 1, 1);
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 50));
+    const skip = (page - 1) * pageSize;
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -511,38 +540,43 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
     ] = await Promise.all([
       prisma.lead.findMany({
         where,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        include: { customer: true },
+        orderBy: [{ nextFollowUpAt: "asc" }, { createdAt: "desc" }],
+        skip,
+        take: pageSize,
+        include: {
+          customer: true,
+          assignedEmployee: { select: { id: true, fullName: true, employeeCode: true } },
+        },
       }),
       prisma.lead.count({ where }),
       prisma.lead.groupBy({
         by: ["status"],
+        where: scopeWhere,
         _count: { _all: true },
       }),
       prisma.lead.count({
-        where: { ...activeFollowUp, ...followUpFilter },
+        where: { AND: [scopeWhere, activeFollowUp, followUpFilter] },
       }),
       prisma.lead.count({
-        where: { ...activeFollowUp, ...overdueFilter },
+        where: { AND: [scopeWhere, activeFollowUp, overdueFilter] },
       }),
       prisma.lead.findMany({
-        where: { ...activeFollowUp, ...followUpFilter },
+        where: { AND: [scopeWhere, activeFollowUp, followUpFilter] },
         orderBy: [{ nextFollowUpAt: "asc" }, { followUpAt: "asc" }],
         take: 20,
       }),
       prisma.lead.findMany({
-        where: { ...activeFollowUp, ...overdueFilter },
+        where: { AND: [scopeWhere, activeFollowUp, overdueFilter] },
         orderBy: [{ nextFollowUpAt: "asc" }, { followUpAt: "asc" }],
         take: 20,
       }),
       prisma.lead.aggregate({
         _sum: { estimatedValue: true },
-        where: { status: { notIn: ["WON", "LOST", "NOT_FIT"] } },
+        where: { AND: [scopeWhere, { status: { notIn: ["WON", "LOST", "NOT_FIT"] } }] },
       }),
       prisma.lead.aggregate({
         _sum: { estimatedValue: true },
-        where: { status: "WON" },
+        where: { AND: [scopeWhere, { status: "WON" }] },
       }),
     ]);
 
@@ -554,6 +588,8 @@ export async function listCrmLeads(params: ListCrmLeadsParams = {}): Promise<Lis
     return {
       leads: rows.map(mapLeadRow),
       total,
+      page,
+      pageSize,
       kpis,
       valueKpis: {
         pipelineTotal: decimalToString(pipelineAgg._sum.estimatedValue),
@@ -619,15 +655,17 @@ export async function updateCrmLead(
     const existing = await prisma.lead.findUnique({ where: { id } });
     if (!existing) return null;
 
+    const canonicalFollowUp =
+      data.nextFollowUpAt !== undefined ? data.nextFollowUpAt : data.followUpAt;
+
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.lead.update({
         where: { id },
         data: {
           ...(data.status !== undefined ? { status: data.status } : {}),
           ...(data.priority !== undefined ? { priority: data.priority } : {}),
-          ...(data.followUpAt !== undefined ? { followUpAt: data.followUpAt } : {}),
-          ...(data.nextFollowUpAt !== undefined
-            ? { nextFollowUpAt: data.nextFollowUpAt }
+          ...(canonicalFollowUp !== undefined
+            ? { nextFollowUpAt: canonicalFollowUp }
             : {}),
           ...(data.estimatedValue !== undefined
             ? { estimatedValue: data.estimatedValue }
@@ -647,8 +685,18 @@ export async function updateCrmLead(
                 company: data.companyName?.trim() || null,
               }
             : {}),
-          ...(data.phone !== undefined ? { phone: data.phone?.trim() || "—" } : {}),
-          ...(data.email !== undefined ? { email: data.email?.trim() || null } : {}),
+          ...(data.phone !== undefined
+            ? {
+                phone: data.phone?.trim() || "—",
+                phoneNormalized: normalizeLeadPhone(data.phone),
+              }
+            : {}),
+          ...(data.email !== undefined
+            ? {
+                email: data.email?.trim() || null,
+                emailNormalized: normalizeLeadEmail(data.email),
+              }
+            : {}),
           ...(data.zalo !== undefined ? { zalo: data.zalo?.trim() || null } : {}),
           ...(data.source !== undefined ? { source: data.source } : {}),
           ...(data.sourceDetail !== undefined
@@ -672,13 +720,47 @@ export async function updateCrmLead(
           },
         });
       }
+      if (data.priority !== undefined && data.priority !== existing.priority) {
+        await tx.cRMActivity.create({
+          data: {
+            leadId: id,
+            type: "NOTE",
+            title: "Cập nhật mức ưu tiên",
+            content: `${existing.priority} → ${data.priority}`,
+          },
+        });
+      }
+      if (
+        canonicalFollowUp !== undefined &&
+        canonicalFollowUp?.getTime() !== existing.nextFollowUpAt?.getTime()
+      ) {
+        await tx.cRMActivity.create({
+          data: {
+            leadId: id,
+            type: "FOLLOW_UP",
+            title: canonicalFollowUp ? "Đặt lịch follow-up" : "Xóa lịch follow-up",
+            nextFollowUpAt: canonicalFollowUp,
+          },
+        });
+      }
 
       return updated;
     });
 
     return getCrmLeadById(row.id);
-  } catch {
-    return null;
+  } catch (error) {
+    console.error("[CRM] updateCrmLead failed:", error);
+    throw error;
+  }
+}
+
+export class LeadCustomerDuplicateError extends Error {
+  readonly customerId: string;
+
+  constructor(customerId: string) {
+    super("Đã có khách hàng trùng SĐT hoặc email. Vui lòng chọn gắn với khách hàng có sẵn.");
+    this.name = "LeadCustomerDuplicateError";
+    this.customerId = customerId;
   }
 }
 
@@ -692,13 +774,31 @@ export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadReco
     lead.companyName?.trim() || lead.company?.trim() || lead.contactName?.trim() || lead.fullName;
 
   try {
+    const duplicateCustomer = await prisma.customer.findFirst({
+      where: {
+        OR: [
+          ...(lead.phone && lead.phone !== "—" ? [{ phone: lead.phone }] : []),
+          ...(lead.email ? [{ email: { equals: lead.email, mode: "insensitive" as const } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (duplicateCustomer) {
+      throw new LeadCustomerDuplicateError(duplicateCustomer.id);
+    }
+
+    const defaultBusinessType = await prisma.customerType.findUnique({
+      where: { code: "BUSINESS" },
+      select: { id: true },
+    });
+
     await prisma.$transaction(async (tx) => {
       const customerCode = await generateCustomerCode();
       const customer = await tx.customer.create({
         data: {
           code: customerCode,
           legacyType: "BUSINESS",
-          customerTypeId: "ct_business",
+          customerTypeId: defaultBusinessType?.id ?? null,
           name: customerName,
           phone: lead.phone !== "—" ? lead.phone : null,
           email: lead.email,
@@ -750,6 +850,7 @@ export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadReco
 
     return getCrmLeadById(leadId);
   } catch (err) {
+    if (err instanceof LeadCustomerDuplicateError) throw err;
     console.error("[CRM] convertLeadToCustomer failed:", err);
     return null;
   }
@@ -786,14 +887,12 @@ export async function linkLeadToExistingCustomer(
       }
 
       if (!contactId) {
-        const leadPhone = lead.phone !== "—" ? lead.phone.trim() : "";
-        const leadEmail = lead.email?.trim() || "";
+        const leadPhone = normalizeLeadPhone(lead.phone);
+        const leadEmail = normalizeLeadEmail(lead.email);
 
         const matched = customer.contacts.find((contact) => {
-          if (leadPhone && contact.phone?.trim() === leadPhone) return true;
-          if (leadEmail && contact.email?.trim()?.toLowerCase() === leadEmail.toLowerCase()) {
-            return true;
-          }
+          if (leadPhone && normalizeLeadPhone(contact.phone) === leadPhone) return true;
+          if (leadEmail && normalizeLeadEmail(contact.email) === leadEmail) return true;
           return false;
         });
 
@@ -810,7 +909,7 @@ export async function linkLeadToExistingCustomer(
               data: {
                 customerId: customer.id,
                 fullName: contactFullName,
-                phone: leadPhone || null,
+                phone: lead.phone !== "—" ? lead.phone : null,
                 email: lead.email,
                 zalo: lead.zalo,
                 isPrimary: customer.contacts.length === 0,

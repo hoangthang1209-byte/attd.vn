@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCRMProductInterest } from "@/features/crm/services/crm-product-interest.service";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
+import { prisma } from "@/lib/prisma";
+import { can } from "@/features/auth/admin-permissions";
+import { canAccessLeadRecord } from "@/features/auth/lead-scope";
+import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 
 export async function POST(req: NextRequest) {
   const permission = await requireAdminPermission({
@@ -30,6 +34,22 @@ export async function POST(req: NextRequest) {
       { message: "Cần leadId hoặc customerId" },
       { status: 400 }
     );
+  }
+
+  if (leadId) {
+    if (!can(permission.session, "leads.update")) {
+      return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+    }
+    const scopeRow = await prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { assignedEmployeeId: true, assignedTo: true },
+    });
+    if (!scopeRow) return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
+    if (!canAccessLeadRecord(permission.session, scopeRow, "leads.update")) {
+      return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+    }
+  } else if (customerId && !can(permission.session, "customers.update")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
   }
 
   const serviceNeedsRaw = raw.serviceNeeds;

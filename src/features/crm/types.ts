@@ -46,6 +46,35 @@ export type CrmProductInterestRecord = {
   updatedAt: string;
 };
 
+export type CrmLeadInboundEventRecord = {
+  id: string;
+  source: LeadSource;
+  channel: string;
+  externalId: string | null;
+  receivedAt: string;
+};
+
+export type CrmLeadAssignmentHistoryRecord = {
+  id: string;
+  fromEmployeeId: string | null;
+  toEmployeeId: string | null;
+  fromEmployeeName: string | null;
+  toEmployeeName: string | null;
+  actorId: string | null;
+  reason: string | null;
+  createdAt: string;
+};
+
+export type CrmLeadTaskRecord = {
+  id: string;
+  title: string;
+  note: string | null;
+  dueAt: string | null;
+  completedAt: string | null;
+  outcome: string | null;
+  owner: { id: string; fullName: string } | null;
+};
+
 export type CrmLeadRecord = {
   id: string;
   code: string | null;
@@ -67,6 +96,15 @@ export type CrmLeadRecord = {
   nextFollowUpAt: string | null;
   estimatedValue: string | null;
   assignedTo: string | null;
+  assignedEmployeeId: string | null;
+  assignedAt: string | null;
+  assignmentSource: string | null;
+  lastInboundAt: string | null;
+  assignedEmployee?: {
+    id: string;
+    fullName: string;
+    employeeCode: string;
+  } | null;
   customerId: string | null;
   contactId: string | null;
   convertedAt: string | null;
@@ -80,6 +118,9 @@ export type CrmLeadRecord = {
   notes?: CrmLeadNoteRecord[];
   activities?: CrmActivityRecord[];
   productInterests?: CrmProductInterestRecord[];
+  inboundEvents?: CrmLeadInboundEventRecord[];
+  assignmentHistory?: CrmLeadAssignmentHistoryRecord[];
+  tasks?: CrmLeadTaskRecord[];
   customer?: CrmCustomerRecord | null;
 };
 
@@ -263,6 +304,8 @@ export type UpdateContactInput = {
 export type ListCrmLeadsResult = {
   leads: CrmLeadRecord[];
   total: number;
+  page?: number;
+  pageSize?: number;
   kpis: CrmLeadKpis;
   valueKpis: CrmLeadValueKpis;
   reminders: CrmLeadReminders;
@@ -291,6 +334,8 @@ export const CRM_LEAD_PRIORITIES: LeadPriority[] = [
 
 export const CRM_LEAD_SOURCES: LeadSource[] = [
   "WEBSITE",
+  "EMAIL",
+  "WHATSAPP",
   "ZALO",
   "FACEBOOK",
   "PHONE",

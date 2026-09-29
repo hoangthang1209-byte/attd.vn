@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { LeadPriority, LeadStatus } from "@prisma/client";
@@ -18,6 +18,7 @@ import CrmRelatedOrders from "@/components/admin/crm/CrmRelatedOrders";
 import {
   CRM_PRIORITY_LABELS,
   CRM_STATUS_LABELS,
+  getLeadSourceLabel,
   displayLeadCompanyName,
   displayLeadContactName,
 } from "@/features/crm/labels";
@@ -52,9 +53,32 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
   const [note, setNote] = useState(initialLead.note ?? "");
   const [demand, setDemand] = useState(initialLead.demand ?? "");
   const [saving, setSaving] = useState(false);
+  const [salesEmployees, setSalesEmployees] = useState<Array<{ id: string; fullName: string }>>([]);
+  const [assignedEmployeeId, setAssignedEmployeeId] = useState(initialLead.assignedEmployeeId ?? "");
+  const [assigning, setAssigning] = useState(false);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDueAt, setTaskDueAt] = useState("");
+  const [taskSaving, setTaskSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   const isLinked = Boolean(lead.customerId);
+
+  useEffect(() => {
+    void fetch("/api/employees?active=1&role=SALES&limit=200")
+      .then((response) => (response.ok ? response.json() : { employees: [] }))
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : data.employees;
+        setSalesEmployees(
+          Array.isArray(rows)
+            ? rows.map((employee: { id: string; fullName: string }) => ({
+                id: employee.id,
+                fullName: employee.fullName,
+              }))
+            : [],
+        );
+      })
+      .catch(() => setSalesEmployees([]));
+  }, []);
 
   async function refreshLead() {
     const res = await fetch(`/api/crm/leads/${lead.id}`);
@@ -63,8 +87,74 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
       setLead(data.lead);
       setStatus(data.lead.status);
       setPriority(data.lead.priority);
+      setAssignedEmployeeId(data.lead.assignedEmployeeId ?? "");
     }
     router.refresh();
+  }
+
+  async function assignOwner() {
+    setAssigning(true);
+    await mutate({
+      loadingMessage: "Đang phân công lead…",
+      successMessage: "Đã cập nhật sales phụ trách.",
+      action: async () => {
+        const res = await fetch(`/api/crm/leads/${lead.id}/assign`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ employeeId: assignedEmployeeId || null }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.lead as CrmLeadRecord);
+      },
+      onSuccess: (updatedLead) => {
+        setLead(updatedLead);
+        setAssignedEmployeeId(updatedLead.assignedEmployeeId ?? "");
+        router.refresh();
+      },
+    });
+    setAssigning(false);
+  }
+
+  async function createTask() {
+    if (!taskTitle.trim()) return;
+    setTaskSaving(true);
+    await mutate({
+      loadingMessage: "Đang tạo việc cần làm…",
+      successMessage: "Đã tạo việc cần làm.",
+      action: async () => {
+        const res = await fetch(`/api/crm/leads/${lead.id}/tasks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: taskTitle,
+            dueAt: taskDueAt ? new Date(taskDueAt).toISOString() : null,
+            ownerId: assignedEmployeeId || null,
+          }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.task);
+      },
+      onSuccess: () => {
+        setTaskTitle("");
+        setTaskDueAt("");
+        void refreshLead();
+      },
+    });
+    setTaskSaving(false);
+  }
+
+  async function completeTask(taskId: string) {
+    await mutate({
+      loadingMessage: "Đang hoàn tất việc…",
+      successMessage: "Đã hoàn tất việc.",
+      action: async () => {
+        const res = await fetch(`/api/crm/leads/${lead.id}/tasks`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ taskId }),
+        });
+        return parseAdminJsonResponse(res, (data) => data.task);
+      },
+      onSuccess: () => void refreshLead(),
+    });
   }
 
   async function saveUpdates() {
@@ -143,6 +233,111 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
           {message.text}
         </p>
       )}
+
+      <section className="admin-section-card">
+        <div className="admin-section-header">
+          <div>
+            <h3>Sales phụ trách</h3>
+            <p className="admin-field-hint">
+              {lead.assignedEmployee?.fullName || lead.assignedTo || "Lead chưa được phân công"}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <select
+              className="admin-input"
+              value={assignedEmployeeId}
+              onChange={(event) => setAssignedEmployeeId(event.target.value)}
+              aria-label="Sales phụ trách"
+            >
+              <option value="">— Chưa phân công —</option>
+              {salesEmployees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.fullName}
+                </option>
+              ))}
+            </select>
+            <AdminLoadingButton
+              type="button"
+              variant="secondary"
+              pending={assigning}
+              pendingLabel="Đang phân công..."
+              onClick={() => void assignOwner()}
+            >
+              Cập nhật
+            </AdminLoadingButton>
+          </div>
+        </div>
+      </section>
+
+      <section className="admin-section-card">
+        <div className="admin-section-header">
+          <div>
+            <h3>Việc cần làm tiếp theo</h3>
+            <p className="admin-field-hint">
+              Ưu tiên một hành động cụ thể thay vì chỉ đặt trạng thái lead.
+            </p>
+          </div>
+        </div>
+        <div className="admin-form admin-form--compact admin-form-grid">
+          <label className="admin-form-grid-span-2">
+            Nội dung
+            <input
+              className="admin-input"
+              value={taskTitle}
+              onChange={(event) => setTaskTitle(event.target.value)}
+              placeholder="Ví dụ: Gọi xác nhận số lượng và deadline"
+            />
+          </label>
+          <label>
+            Thời hạn
+            <input
+              type="datetime-local"
+              className="admin-input"
+              value={taskDueAt}
+              onChange={(event) => setTaskDueAt(event.target.value)}
+            />
+          </label>
+          <div style={{ alignSelf: "end" }}>
+            <AdminLoadingButton
+              type="button"
+              variant="primary"
+              pending={taskSaving}
+              pendingLabel="Đang tạo..."
+              onClick={() => void createTask()}
+            >
+              + Thêm việc
+            </AdminLoadingButton>
+          </div>
+        </div>
+        {lead.tasks?.length ? (
+          <ul className="admin-crm-related-list">
+            {lead.tasks.slice(0, 8).map((task) => (
+              <li key={task.id}>
+                <div>
+                  <strong>{task.title}</strong>
+                  <span className="admin-field-hint">
+                    {task.owner?.fullName ? ` · ${task.owner.fullName}` : ""}
+                    {task.dueAt ? ` · ${formatCrmDateTime(task.dueAt)}` : ""}
+                  </span>
+                </div>
+                {task.completedAt ? (
+                  <span className="admin-badge admin-badge--success">Đã xong</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--secondary admin-btn--small"
+                    onClick={() => void completeTask(task.id)}
+                  >
+                    Hoàn tất
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="admin-empty-hint">Chưa có việc cần làm.</p>
+        )}
+      </section>
 
       <div className="admin-crm-detail-grid">
         <section className="admin-section-card">
@@ -249,6 +444,45 @@ export default function CrmLeadDetailView({ initialLead }: { initialLead: CrmLea
           <CrmProductInterestForm leadId={lead.id} onCreated={() => void refreshLead()} />
         </section>
       </div>
+
+      {(lead.inboundEvents?.length || lead.assignmentHistory?.length) ? (
+        <div className="admin-crm-detail-grid">
+          <section className="admin-section-card">
+            <h3>Dữ liệu nguồn</h3>
+            {lead.inboundEvents?.length ? (
+              <ul className="admin-crm-related-list">
+                {lead.inboundEvents.slice(0, 10).map((event) => (
+                  <li key={event.id}>
+                    <strong>{event.channel}</strong>
+                    <span>{getLeadSourceLabel(event.source)}</span>
+                    <span className="admin-field-hint">{formatCrmDateTime(event.receivedAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="admin-field-hint">Lead cũ chưa có dữ liệu intake event.</p>
+            )}
+          </section>
+
+          <section className="admin-section-card">
+            <h3>Lịch sử phân công</h3>
+            {lead.assignmentHistory?.length ? (
+              <ul className="admin-crm-related-list">
+                {lead.assignmentHistory.slice(0, 10).map((event) => (
+                  <li key={event.id}>
+                    <strong>{event.toEmployeeName || "Bỏ phân công"}</strong>
+                    {event.fromEmployeeName ? <span>Từ: {event.fromEmployeeName}</span> : null}
+                    {event.reason ? <span>{event.reason}</span> : null}
+                    <span className="admin-field-hint">{formatCrmDateTime(event.createdAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="admin-field-hint">Chưa có lịch sử phân công.</p>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       <CrmRelatedQuotes
         leadId={lead.id}

@@ -35,6 +35,8 @@ export function getLeadStatusLabel(status: LeadStatus | string): string {
 
 export const CRM_SOURCE_LABELS: Record<LeadSource, string> = {
   CONTACT: "Liên hệ báo giá",
+  EMAIL: "Email",
+  WHATSAPP: "WhatsApp",
   DEALER: "Đại lý",
   OEM: "OEM",
   SOURCING: "Nguồn hàng",

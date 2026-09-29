@@ -34,6 +34,11 @@ export function mapLeadRow(row: {
   nextFollowUpAt?: Date | null;
   estimatedValue?: Prisma.Decimal | null;
   assignedTo?: string | null;
+  assignedEmployeeId?: string | null;
+  assignedAt?: Date | null;
+  assignmentSource?: string | null;
+  lastInboundAt?: Date | null;
+  assignedEmployee?: { id: string; fullName: string; employeeCode: string } | null;
   customerId?: string | null;
   contactId?: string | null;
   convertedAt?: Date | null;
@@ -47,6 +52,32 @@ export function mapLeadRow(row: {
   notes?: { id: string; leadId: string; content: string; createdAt: Date }[];
   activities?: Parameters<typeof mapActivityRow>[0][];
   productInterests?: Parameters<typeof mapProductInterestRow>[0][];
+  inboundEvents?: Array<{
+    id: string;
+    source: LeadSource;
+    channel: string;
+    externalId: string | null;
+    receivedAt: Date;
+  }>;
+  tasks?: Array<{
+    id: string;
+    title: string;
+    note: string | null;
+    dueAt: Date | null;
+    completedAt: Date | null;
+    outcome: string | null;
+    owner?: { id: string; fullName: string } | null;
+  }>;
+  assignmentHistory?: Array<{
+    id: string;
+    fromEmployeeId: string | null;
+    toEmployeeId: string | null;
+    actorId: string | null;
+    reason: string | null;
+    createdAt: Date;
+    fromEmployee?: { fullName: string } | null;
+    toEmployee?: { fullName: string } | null;
+  }>;
   customer?: Parameters<typeof mapCustomerRow>[0] | null;
 }): CrmLeadRecord {
   return {
@@ -70,6 +101,17 @@ export function mapLeadRow(row: {
     nextFollowUpAt: row.nextFollowUpAt?.toISOString() ?? null,
     estimatedValue: decimalToString(row.estimatedValue),
     assignedTo: row.assignedTo ?? null,
+    assignedEmployeeId: row.assignedEmployeeId ?? null,
+    assignedAt: row.assignedAt?.toISOString() ?? null,
+    assignmentSource: row.assignmentSource ?? null,
+    lastInboundAt: row.lastInboundAt?.toISOString() ?? null,
+    assignedEmployee: row.assignedEmployee
+      ? {
+          id: row.assignedEmployee.id,
+          fullName: row.assignedEmployee.fullName,
+          employeeCode: row.assignedEmployee.employeeCode,
+        }
+      : null,
     customerId: row.customerId ?? null,
     contactId: row.contactId ?? null,
     convertedAt: row.convertedAt?.toISOString() ?? null,
@@ -90,6 +132,32 @@ export function mapLeadRow(row: {
     ),
     activities: row.activities?.map(mapActivityRow),
     productInterests: row.productInterests?.map(mapProductInterestRow),
+    inboundEvents: row.inboundEvents?.map((event) => ({
+      id: event.id,
+      source: event.source,
+      channel: event.channel,
+      externalId: event.externalId,
+      receivedAt: event.receivedAt.toISOString(),
+    })),
+    tasks: row.tasks?.map((task) => ({
+      id: task.id,
+      title: task.title,
+      note: task.note,
+      dueAt: task.dueAt?.toISOString() ?? null,
+      completedAt: task.completedAt?.toISOString() ?? null,
+      outcome: task.outcome,
+      owner: task.owner ? { id: task.owner.id, fullName: task.owner.fullName } : null,
+    })),
+    assignmentHistory: row.assignmentHistory?.map((event) => ({
+      id: event.id,
+      fromEmployeeId: event.fromEmployeeId,
+      toEmployeeId: event.toEmployeeId,
+      fromEmployeeName: event.fromEmployee?.fullName ?? null,
+      toEmployeeName: event.toEmployee?.fullName ?? null,
+      actorId: event.actorId,
+      reason: event.reason,
+      createdAt: event.createdAt.toISOString(),
+    })),
     customer: row.customer ? mapCustomerRow(row.customer) : null,
   };
 }
@@ -273,6 +341,24 @@ export const LEAD_DETAIL_INCLUDE = {
   activities: { orderBy: { createdAt: "desc" as const } },
   productInterests: { orderBy: { createdAt: "desc" as const } },
   customer: true,
+  assignedEmployee: { select: { id: true, fullName: true, employeeCode: true } },
+  tasks: {
+    orderBy: [{ completedAt: "asc" as const }, { dueAt: "asc" as const }, { createdAt: "desc" as const }],
+    take: 50,
+    include: { owner: { select: { id: true, fullName: true } } },
+  },
+  inboundEvents: {
+    orderBy: { receivedAt: "desc" as const },
+    take: 50,
+  },
+  assignmentHistory: {
+    orderBy: { createdAt: "desc" as const },
+    take: 50,
+    include: {
+      fromEmployee: { select: { fullName: true } },
+      toEmployee: { select: { fullName: true } },
+    },
+  },
 } satisfies Prisma.LeadInclude;
 
 export const CUSTOMER_LIST_INCLUDE = {
