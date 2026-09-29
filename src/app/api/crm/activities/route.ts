@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
     const scopeRow = await prisma.lead.findUnique({
       where: { id: leadId },
-      select: { assignedEmployeeId: true },
+      select: { assignedEmployeeId: true, assignedTo: true },
     });
     if (!scopeRow) return NextResponse.json({ message: "Không tìm thấy lead" }, { status: 404 });
     if (!canAccessLeadRecord(permission.session, scopeRow, "leads.update")) {
