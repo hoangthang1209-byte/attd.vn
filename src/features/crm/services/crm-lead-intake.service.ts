@@ -196,7 +196,10 @@ export async function ingestCrmLead(input: {
   let existingLeadId: string | null = null;
   if (keys.length) {
     const claimed = await prisma.leadIdentityKey.findFirst({
-      where: { key: { in: keys } },
+      where: {
+        key: { in: keys },
+        lead: { status: { in: [...ACTIVE_STATUSES] } },
+      },
       select: { leadId: true },
     });
     existingLeadId = claimed?.leadId ?? null;
@@ -222,6 +225,15 @@ export async function ingestCrmLead(input: {
       });
       existingLeadId = existing?.id ?? null;
     }
+  }
+
+  if (!existingLeadId && keys.length) {
+    await prisma.leadIdentityKey.deleteMany({
+      where: {
+        key: { in: keys },
+        lead: { status: { notIn: [...ACTIVE_STATUSES] } },
+      },
+    });
   }
 
   if (existingLeadId) {
@@ -327,7 +339,10 @@ export async function ingestCrmLead(input: {
       : null;
     const claimed = !event && keys.length
       ? await prisma.leadIdentityKey.findFirst({
-          where: { key: { in: keys } },
+          where: {
+            key: { in: keys },
+            lead: { status: { in: [...ACTIVE_STATUSES] } },
+          },
           select: { leadId: true },
         })
       : null;

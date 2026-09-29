@@ -12,6 +12,14 @@ export async function createLeadTask(input: {
   const title = input.title.trim();
   if (!title) throw new Error("Nội dung việc cần làm là bắt buộc.");
 
+  if (input.ownerId) {
+    const owner = await prisma.employee.findFirst({
+      where: { id: input.ownerId, isActive: true },
+      select: { id: true },
+    });
+    if (!owner) throw new Error("Người phụ trách việc không hợp lệ.");
+  }
+
   return prisma.$transaction(async (tx) => {
     const task = await tx.leadTask.create({
       data: {

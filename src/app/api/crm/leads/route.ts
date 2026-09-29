@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import type { LeadPriority, LeadSource, LeadStatus } from "@prisma/client";
 import {
   createAdminLead,
-  createCrmLead,
   getCrmDiagnostics,
   getCrmLeadById,
   isCrmLeadTableReady,
@@ -18,6 +17,7 @@ import { can } from "@/features/auth/admin-permissions";
 import { DATA_ACCESS_DENIED_MESSAGE } from "@/features/auth/admin-session.types";
 import { buildScopedLeadWhere } from "@/features/auth/lead-scope";
 import { assignLead, autoAssignLead } from "@/features/crm/services/crm-lead-assignment.service";
+import { ingestCrmLead } from "@/features/crm/services/crm-lead-intake.service";
 
 export async function GET(req: NextRequest) {
   const session = getAdminSessionFromRequest(req);
@@ -231,6 +231,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ lead: assignedLead ?? lead }, { status: 201 });
   }
 
+  const compatPermission = await requireAdminPermission({
+    platform: "crm",
+    action: "create",
+    request: req,
+  });
+  if (!compatPermission.ok) return compatPermission.response;
+  if (!can(compatPermission.session, "leads.create")) {
+    return NextResponse.json({ message: DATA_ACCESS_DENIED_MESSAGE }, { status: 403 });
+  }
+
   if (!fullName) {
     return NextResponse.json({ message: "Họ tên là bắt buộc" }, { status: 400 });
   }
@@ -251,23 +261,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Follow-up không hợp lệ" }, { status: 400 });
   }
 
-  const lead = await createCrmLead({
-    fullName,
-    phone,
-    email: typeof raw.email === "string" ? raw.email : null,
-    company: typeof raw.company === "string" ? raw.company : null,
-    source,
-    message: typeof raw.message === "string" ? raw.message : null,
-    status,
-    followUpAt,
-  });
-
-  if (!lead) {
+  try {
+    const result = await ingestCrmLead({
+      lead: {
+        fullName,
+        phone,
+        email: typeof raw.email === "string" ? raw.email : null,
+        company: typeof raw.company === "string" ? raw.company : null,
+        source,
+        message: typeof raw.message === "string" ? raw.message : null,
+        status,
+        followUpAt,
+      },
+      channel: "CRM_PUBLIC_COMPAT",
+      dedupeByIdentity: true,
+      payload: JSON.parse(JSON.stringify(raw)),
+    });
+    return NextResponse.json(
+      { lead: result.lead, deduplicated: result.deduplicated },
+      { status: result.deduplicated ? 200 : 201 },
+    );
+  } catch (error) {
+    console.error("[POST /api/crm/leads compat]", error);
     return NextResponse.json(
       { message: "Không thể tạo lead. Kiểm tra migration CRM." },
-      { status: 500 }
+      { status: 500 },
     );
   }
-
-  return NextResponse.json({ lead }, { status: 201 });
 }
