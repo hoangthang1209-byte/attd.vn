@@ -774,11 +774,39 @@ export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadReco
     lead.companyName?.trim() || lead.company?.trim() || lead.contactName?.trim() || lead.fullName;
 
   try {
+    const normalizedPhone = normalizeLeadPhone(lead.phone);
+    const normalizedEmail = normalizeLeadEmail(lead.email);
+    const phoneVariants = normalizedPhone
+      ? Array.from(
+          new Set([
+            normalizedPhone,
+            normalizedPhone.startsWith("0")
+              ? `84${normalizedPhone.slice(1)}`
+              : normalizedPhone,
+            normalizedPhone.startsWith("0")
+              ? `+84${normalizedPhone.slice(1)}`
+              : normalizedPhone,
+          ]),
+        )
+      : [];
+
     const duplicateCustomer = await prisma.customer.findFirst({
       where: {
         OR: [
-          ...(lead.phone && lead.phone !== "—" ? [{ phone: lead.phone }] : []),
-          ...(lead.email ? [{ email: { equals: lead.email, mode: "insensitive" as const } }] : []),
+          ...phoneVariants.map((phone) => ({ phone })),
+          ...(normalizedEmail
+            ? [{ email: { equals: normalizedEmail, mode: "insensitive" as const } }]
+            : []),
+          ...(phoneVariants.length
+            ? [{ contacts: { some: { phone: { in: phoneVariants } } } }]
+            : []),
+          ...(normalizedEmail
+            ? [{
+                contacts: {
+                  some: { email: { equals: normalizedEmail, mode: "insensitive" as const } },
+                },
+              }]
+            : []),
         ],
       },
       select: { id: true },
