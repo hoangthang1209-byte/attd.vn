@@ -489,8 +489,19 @@ export async function listCrmLeads(
     if (params.status) filters.status = params.status;
     if (params.priority) filters.priority = params.priority;
 
-    if (params.unassigned) filters.assignedEmployeeId = null;
-    else if (params.assignedEmployeeId) filters.assignedEmployeeId = params.assignedEmployeeId;
+    if (params.unassigned) {
+      filters.AND = [
+        ...(Array.isArray(filters.AND) ? filters.AND : []),
+        { assignedEmployeeId: null },
+        { assignedTo: null },
+      ];
+    } else if (params.assignedEmployeeId) {
+      filters.OR = [
+        ...(Array.isArray(filters.OR) ? filters.OR : []),
+        { assignedEmployeeId: params.assignedEmployeeId },
+        { assignedTo: params.assignedEmployeeId },
+      ];
+    }
 
     const page = Math.max(params.page ?? 1, 1);
     const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 50));
@@ -840,6 +851,7 @@ export async function convertLeadToCustomer(leadId: string): Promise<CrmLeadReco
 
     return getCrmLeadById(leadId);
   } catch (err) {
+    if (err instanceof LeadCustomerDuplicateError) throw err;
     console.error("[CRM] convertLeadToCustomer failed:", err);
     return null;
   }
