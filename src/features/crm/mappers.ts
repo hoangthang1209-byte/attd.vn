@@ -24,7 +24,10 @@ export function mapLeadRow(row: {
   zalo?: string | null;
   company: string | null;
   source: LeadSource;
+  sourceRef?: string | null;
   sourceDetail?: string | null;
+  receivedAt?: Date | null;
+  intakeMetadata?: unknown;
   demand?: string | null;
   status: LeadStatus;
   priority?: LeadPriority;
@@ -60,7 +63,13 @@ export function mapLeadRow(row: {
     zalo: row.zalo ?? null,
     company: row.company,
     source: row.source,
+    sourceRef: row.sourceRef ?? null,
     sourceDetail: row.sourceDetail ?? null,
+    receivedAt: row.receivedAt?.toISOString() ?? null,
+    intakeMetadata:
+      row.intakeMetadata && typeof row.intakeMetadata === "object" && !Array.isArray(row.intakeMetadata)
+        ? (row.intakeMetadata as Record<string, unknown>)
+        : null,
     demand: row.demand ?? null,
     status: row.status,
     priority: row.priority ?? "NORMAL",

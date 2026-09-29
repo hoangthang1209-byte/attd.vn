@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   try {
     const roleParam = searchParams.get("role");
+    const salesCapableOnly = searchParams.get("salesCapable") === "1";
     const result = await listEmployees({
       search: searchParams.get("search") ?? undefined,
       activeOnly: searchParams.get("active") === "1",
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest) {
         roleParam && isEmployeeRole(roleParam)
           ? roleParam
           : undefined,
+      salesCapableOnly,
       limit: searchParams.get("limit") ? Number(searchParams.get("limit")) : 100,
     });
     return NextResponse.json(result);

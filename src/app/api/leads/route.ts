@@ -1,6 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { createCrmLead } from "@/features/crm/services/crm-lead.service";
+import { runLeadIntakeAdapter } from "@/features/crm/lead-intake/run-intake-adapter";
+import type { PublicWebsiteLeadPayload } from "@/features/crm/lead-intake/adapters/website.adapter";
+import {
+  LEAD_INTAKE_WEBSITE_SITES,
+  resolveWebsiteSiteFromHost,
+} from "@/features/crm/lead-intake/taxonomy";
+import { LeadIntakeValidationError } from "@/features/crm/lead-intake.types";
+import { createWebsiteInboundAdapter } from "@/features/crm/lead-intake/adapters/website.adapter";
 
 export async function GET() {
   const leads = await prisma.lead.findMany({
@@ -9,88 +16,53 @@ export async function GET() {
   return NextResponse.json(leads);
 }
 
-type ProductInquiryBody = {
-  productId?: string | null;
-  productName?: string | null;
-  productUrl?: string | null;
-  variantId?: string | null;
-  variantLabel?: string | null;
-  optionSelections?: Record<string, string | null> | null;
-  moq?: number | null;
-  leadTime?: string | null;
-  quantity?: string | null;
-  note?: string | null;
-};
-
-function parseQuantity(value: string | null | undefined): number | null {
-  if (!value?.trim()) return null;
-  const n = parseInt(value.replace(/[,\s]/g, ""), 10);
-  return Number.isFinite(n) ? n : null;
-}
-
-function buildRequirementNote(inquiry: ProductInquiryBody): string | null {
-  const lines: string[] = [];
-  if (inquiry.productUrl?.trim()) lines.push(`URL: ${inquiry.productUrl.trim()}`);
-  if (inquiry.variantLabel?.trim()) lines.push(`Biến thể: ${inquiry.variantLabel.trim()}`);
-  if (inquiry.optionSelections) {
-    const options = Object.entries(inquiry.optionSelections)
-      .filter(([, value]) => value)
-      .map(([key, value]) => `${key}: ${value}`);
-    if (options.length) lines.push(`Tùy chọn: ${options.join(", ")}`);
+function resolveRequestSite(request: Request) {
+  const origin = request.headers.get("origin");
+  const referer = request.headers.get("referer");
+  let host: string | null = null;
+  if (origin) {
+    try {
+      host = new URL(origin).hostname;
+    } catch {
+      host = null;
+    }
   }
-  if (inquiry.moq != null) lines.push(`MOQ tham chiếu: ${inquiry.moq}`);
-  if (inquiry.leadTime?.trim()) lines.push(`Lead time: ${inquiry.leadTime.trim()}`);
-  if (inquiry.note?.trim()) {
-    lines.push("---");
-    lines.push(inquiry.note.trim());
+  if (!host && referer) {
+    try {
+      host = new URL(referer).hostname;
+    } catch {
+      host = null;
+    }
   }
-  return lines.length ? lines.join("\n") : null;
+  return resolveWebsiteSiteFromHost(host) ?? LEAD_INTAKE_WEBSITE_SITES.ATTD;
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-
-  if (!body.name?.trim()) {
-    return NextResponse.json({ message: "Họ tên là bắt buộc" }, { status: 400 });
-  }
-  if (!body.phone?.trim()) {
-    return NextResponse.json({ message: "Số điện thoại là bắt buộc" }, { status: 400 });
+  let body: PublicWebsiteLeadPayload;
+  try {
+    body = (await request.json()) as PublicWebsiteLeadPayload;
+  } catch {
+    return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
   }
 
-  const fullName = body.name.trim();
-  const phone = body.phone.trim();
-  const email = body.email?.trim() || null;
-  const company = body.company?.trim() || null;
-  const message = body.message?.trim() || null;
-  const inquiry = body.productInquiry as ProductInquiryBody | undefined;
+  const site = resolveRequestSite(request);
+  const adapter = createWebsiteInboundAdapter(site);
 
-  const lead = await createCrmLead({
-    fullName,
-    phone,
-    email,
-    company,
-    source: inquiry?.productId ? "PRODUCT_INQUIRY" : "CONTACT",
-    sourceDetail: inquiry?.productUrl?.trim() || null,
-    message,
-    ...(inquiry?.productId
-      ? {
-          productInterest: {
-            productId: inquiry.productId,
-            variantId: inquiry.variantId ?? null,
-            productNameSnapshot: inquiry.productName ?? inquiry.variantLabel ?? null,
-            quantity: parseQuantity(inquiry.quantity),
-            requirementNote: buildRequirementNote(inquiry),
-          },
-        }
-      : {}),
-  });
+  try {
+    const result = await runLeadIntakeAdapter(adapter, body);
+    if (!result) {
+      return NextResponse.json(
+        { message: "Không thể lưu lead. Vui lòng thử lại." },
+        { status: 500 }
+      );
+    }
 
-  if (!lead) {
-    return NextResponse.json(
-      { message: "Không thể lưu lead. Vui lòng thử lại." },
-      { status: 500 },
-    );
+    return NextResponse.json(result.lead, { status: result.created ? 201 : 200 });
+  } catch (err) {
+    if (err instanceof LeadIntakeValidationError) {
+      return NextResponse.json({ message: err.message }, { status: 400 });
+    }
+    console.error("[POST /api/leads]", err);
+    return NextResponse.json({ message: "Không thể lưu lead. Vui lòng thử lại." }, { status: 500 });
   }
-
-  return NextResponse.json(lead, { status: 201 });
 }
