@@ -2,7 +2,7 @@ import type { Lead, PermissionScope, Prisma } from "@prisma/client";
 import type { AdminSessionUser } from "@/features/auth/admin-session.types";
 import { can, getPermissionScope } from "@/features/auth/admin-permissions";
 
-type LeadScopeFields = Pick<Lead, "assignedEmployeeId">;
+type LeadScopeFields = Pick<Lead, "assignedEmployeeId" | "assignedTo">;
 const NO_ACCESS: Prisma.LeadWhereInput = { id: "__no_access__" };
 
 export function getLeadPermissionScope(
@@ -33,7 +33,8 @@ export function buildScopedLeadWhere(
     return {
       OR: [
         { assignedEmployeeId: session.employeeId },
-        { assignedEmployeeId: null },
+        { assignedTo: session.employeeId },
+        { AND: [{ assignedEmployeeId: null }, { assignedTo: null }] },
       ],
     };
   }
@@ -49,5 +50,7 @@ export function canAccessLeadRecord(
   if (scope === "NONE") return false;
   if (scope === "ALL" || scope === "TEAM") return true;
   if (!session.employeeId) return false;
-  return lead.assignedEmployeeId === null || lead.assignedEmployeeId === session.employeeId;
+  if (lead.assignedEmployeeId) return lead.assignedEmployeeId === session.employeeId;
+  if (lead.assignedTo) return lead.assignedTo === session.employeeId;
+  return true;
 }
