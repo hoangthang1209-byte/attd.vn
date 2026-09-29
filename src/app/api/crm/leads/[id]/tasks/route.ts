@@ -25,7 +25,7 @@ async function assertLeadUpdate(req: NextRequest, id: string) {
   }
   const lead = await prisma.lead.findUnique({
     where: { id },
-    select: { assignedEmployeeId: true },
+    select: { assignedEmployeeId: true, assignedTo: true },
   });
   if (!lead) {
     return {
