@@ -83,6 +83,7 @@ export async function createProductionMaterial(input: {
   gsm?: string | null;
   width?: string | null;
   supplierId?: string | null;
+  inventoryMaterialId?: string | null;
   defaultColor?: string | null;
   notes?: string | null;
   isActive?: boolean;
