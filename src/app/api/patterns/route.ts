@@ -7,6 +7,7 @@ import {
 } from "@/features/patterns/pattern.service";
 import { requireProductionUpdate, requireProductionView } from "@/lib/admin-auth/require-production-api";
 import { requireAdminPermission } from "@/lib/permissions/require-admin-permission";
+import { moveLegacyTestPatternsOutOfProductionSequence } from "@/features/patterns/pattern-bulk-import.service";
 
 export async function GET(req: NextRequest) {
   const auth = requireProductionView(req);
@@ -20,6 +21,10 @@ export async function GET(req: NextRequest) {
       : undefined;
 
   try {
+    // One-time production cleanup: move the two original test records out of
+    // the PT sequence as soon as the Pattern Library is loaded.
+    await moveLegacyTestPatternsOutOfProductionSequence();
+
     const pageParam = Number.parseInt(searchParams.get("page") ?? "1", 10);
     const pageSizeParam = Number.parseInt(
       searchParams.get("pageSize") ?? searchParams.get("limit") ?? "25",
