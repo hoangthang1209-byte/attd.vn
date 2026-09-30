@@ -80,6 +80,7 @@ export async function createProductionTrim(input: {
   name: string;
   category?: string;
   supplierId?: string | null;
+  inventoryMaterialId?: string | null;
   notes?: string | null;
   isActive?: boolean;
 }) {
