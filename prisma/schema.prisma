@@ -4872,6 +4872,8 @@ model Material {
   allocations           OrderMaterialAllocation[]
   purchaseRequestItems  PurchaseRequestItem[]
   supplierLinks         MaterialSupplierLink[]
+  productionMaterial     ProductionMaterial?          @relation("ProductionMaterialInventoryMaterial")
+  productionTrim         ProductionTrim?              @relation("ProductionTrimInventoryMaterial")
 
   @@index([materialCode])
   @@index([isActive])
@@ -5932,6 +5934,7 @@ model ProductionMaterial {
   gsm          String?
   width        String?
   supplierId   String?
+  inventoryMaterialId String?                  @unique
   defaultColor String?
   notes        String?                    @db.Text
   isActive     Boolean                    @default(true)
@@ -5939,6 +5942,7 @@ model ProductionMaterial {
   updatedAt    DateTime                   @updatedAt
 
   supplier            ProductionSupplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  inventoryMaterial   Material?             @relation("ProductionMaterialInventoryMaterial", fields: [inventoryMaterialId], references: [id], onDelete: SetNull)
   bomItems            TechPackBomItem[]
   costingSourcePrices CostingSourcePrice[]
 
@@ -5946,6 +5950,7 @@ model ProductionMaterial {
   @@index([isActive])
   @@index([category])
   @@index([supplierId])
+  @@index([inventoryMaterialId])
 }
 
 model ProductionTrim {
@@ -5954,12 +5959,14 @@ model ProductionTrim {
   name       String
   category   ProductionTrimCategory @default(OTHER)
   supplierId String?
+  inventoryMaterialId String?               @unique
   notes      String?                @db.Text
   isActive   Boolean                @default(true)
   createdAt  DateTime               @default(now())
   updatedAt  DateTime               @updatedAt
 
   supplier            ProductionSupplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  inventoryMaterial   Material?             @relation("ProductionTrimInventoryMaterial", fields: [inventoryMaterialId], references: [id], onDelete: SetNull)
   bomItems            TechPackBomItem[]
   costingSourcePrices CostingSourcePrice[]
 
@@ -5967,6 +5974,7 @@ model ProductionTrim {
   @@index([isActive])
   @@index([category])
   @@index([supplierId])
+  @@index([inventoryMaterialId])
 }
 
 model PrintMethod {

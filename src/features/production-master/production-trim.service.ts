@@ -6,8 +6,28 @@ import {
 } from "@/features/production-master/production-master.errors";
 
 import { getProductionTrimUsageCount } from "@/features/production-master/production-master-usage";
+import { validateInventoryMaterialLink } from "@/features/production-master/production-inventory-link.service";
 
-const INCLUDE = { supplier: { select: { id: true, code: true, name: true } } } satisfies Prisma.ProductionTrimInclude;
+const INCLUDE = {
+  supplier: { select: { id: true, code: true, name: true } },
+  inventoryMaterial: {
+    select: {
+      id: true,
+      materialCode: true,
+      name: true,
+      unit: true,
+      reorderPoint: true,
+      warehouseBalance: {
+        select: {
+          onHandQuantity: true,
+          reservedQuantity: true,
+          availableQuantity: true,
+          issuedQuantity: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.ProductionTrimInclude;
 
 export async function listProductionTrims(input?: {
   search?: string;
@@ -60,11 +80,13 @@ export async function createProductionTrim(input: {
   name: string;
   category?: string;
   supplierId?: string | null;
+  inventoryMaterialId?: string | null;
   notes?: string | null;
   isActive?: boolean;
 }) {
   const name = input.name?.trim();
   if (!name) throw new ProductionMasterValidationError("Tên phụ liệu là bắt buộc.");
+  await validateInventoryMaterialLink({ inventoryMaterialId: input.inventoryMaterialId ?? null });
   const code = await generateMasterCode("PT", "productionTrim");
   return prisma.productionTrim.create({
     data: {
@@ -72,6 +94,7 @@ export async function createProductionTrim(input: {
       name,
       category: (input.category as never) ?? "OTHER",
       supplierId: input.supplierId || null,
+      inventoryMaterialId: input.inventoryMaterialId || null,
       notes: input.notes?.trim() || null,
       isActive: input.isActive ?? true,
     },
@@ -85,18 +108,26 @@ export async function updateProductionTrim(
     name: string;
     category: string;
     supplierId: string | null;
+    inventoryMaterialId: string | null;
     notes: string | null;
     isActive: boolean;
   }>,
 ) {
   const existing = await prisma.productionTrim.findUnique({ where: { id } });
   if (!existing) throw new ProductionMasterValidationError("Không tìm thấy phụ liệu.");
+  if (input.inventoryMaterialId !== undefined) {
+    await validateInventoryMaterialLink({
+      inventoryMaterialId: input.inventoryMaterialId,
+      productionTrimId: id,
+    });
+  }
   return prisma.productionTrim.update({
     where: { id },
     data: {
       name: input.name?.trim() ?? undefined,
       category: input.category as never,
       supplierId: input.supplierId,
+      inventoryMaterialId: input.inventoryMaterialId,
       notes: input.notes,
       isActive: input.isActive,
     },

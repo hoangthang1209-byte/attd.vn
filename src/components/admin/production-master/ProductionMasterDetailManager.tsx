@@ -48,8 +48,30 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
   }, [config.apiPath, itemId]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+
+    void fetch(`${config.apiPath}/${itemId}`)
+      .then(async (itemRes) => {
+        const data = (await itemRes.json()) as Record<string, unknown> & { message?: string };
+        if (!itemRes.ok) throw new Error(data.message ?? "Không thể tải chi tiết");
+        return data;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setItem(data);
+        setError(null);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config.apiPath, itemId]);
 
   async function save(patch: Record<string, unknown>) {
     setSaving(true);
@@ -131,6 +153,22 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
   const statusTone = !isActive ? "danger" : isReferenced ? "success" : "neutral";
   const createdAt = item.createdAt ? new Date(String(item.createdAt)).toLocaleString("vi-VN") : "—";
   const updatedAt = item.updatedAt ? new Date(String(item.updatedAt)).toLocaleString("vi-VN") : "—";
+  const inventoryMaterial =
+    (item.inventoryMaterial as
+      | {
+          id: string;
+          materialCode: string;
+          name: string;
+          unit: string;
+          reorderPoint: { toString?: () => string } | string | number | null;
+          warehouseBalance: {
+            onHandQuantity: { toString?: () => string } | string | number;
+            reservedQuantity: { toString?: () => string } | string | number;
+            availableQuantity: { toString?: () => string } | string | number;
+            issuedQuantity: { toString?: () => string } | string | number;
+          } | null;
+        }
+      | null) ?? null;
 
   function fieldValue(key: string): string {
     const v = item?.[key];
@@ -338,6 +376,105 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
           })}
         </div>
       </SectionCard>
+
+      {(config.kind === "material" || config.kind === "trim") && (
+        <SectionCard title="Kho & mua hàng">
+          <div className="admin-form-grid">
+            <label className="admin-field admin-field--full">
+              <span>Mã vật tư kho liên kết</span>
+              <ProductionMasterSearchSelect
+                apiPath="/api/materials/search"
+                value={inventoryMaterial?.id ?? null}
+                displayLabel={
+                  inventoryMaterial
+                    ? `${inventoryMaterial.materialCode} — ${inventoryMaterial.name}`
+                    : null
+                }
+                placeholder="Tìm mã vật tư kho..."
+                onSelect={(picked) =>
+                  void save({ inventoryMaterialId: picked?.id ?? null })
+                }
+              />
+              <small className="admin-field-hint">
+                Liên kết master kỹ thuật với tồn kho và mua hàng. Không tự tạo hoặc gộp dữ liệu cũ.
+              </small>
+            </label>
+          </div>
+
+          {inventoryMaterial ? (
+            <div
+              className="admin-meta-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 12,
+                marginTop: 12,
+              }}
+            >
+              <div>
+                <strong>Tồn thực tế</strong>
+                <div>
+                  {inventoryMaterial.warehouseBalance
+                    ? String(inventoryMaterial.warehouseBalance.onHandQuantity)
+                    : "Chưa khai báo"}{" "}
+                  {inventoryMaterial.unit}
+                </div>
+              </div>
+              <div>
+                <strong>Đã giữ</strong>
+                <div>
+                  {inventoryMaterial.warehouseBalance
+                    ? String(inventoryMaterial.warehouseBalance.reservedQuantity)
+                    : "—"}{" "}
+                  {inventoryMaterial.unit}
+                </div>
+              </div>
+              <div>
+                <strong>Đã cấp SX</strong>
+                <div>
+                  {inventoryMaterial.warehouseBalance
+                    ? String(inventoryMaterial.warehouseBalance.issuedQuantity)
+                    : "—"}{" "}
+                  {inventoryMaterial.unit}
+                </div>
+              </div>
+              <div>
+                <strong>Khả dụng</strong>
+                <div>
+                  {inventoryMaterial.warehouseBalance
+                    ? String(inventoryMaterial.warehouseBalance.availableQuantity)
+                    : "—"}{" "}
+                  {inventoryMaterial.unit}
+                </div>
+              </div>
+              <div>
+                <strong>Mức tồn tối thiểu</strong>
+                <div>
+                  {inventoryMaterial.reorderPoint != null
+                    ? String(inventoryMaterial.reorderPoint)
+                    : "—"}{" "}
+                  {inventoryMaterial.unit}
+                </div>
+              </div>
+              <div>
+                <strong>Thao tác</strong>
+                <div>
+                  <Link
+                    href={`/admin/materials/warehouse?materialId=${inventoryMaterial.id}`}
+                    className="admin-btn admin-btn--secondary admin-btn--xs"
+                  >
+                    Mở kho
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="admin-muted" style={{ marginTop: 8 }}>
+              Chưa liên kết vật tư kho. Dữ liệu Tech Pack/Costing hiện tại vẫn hoạt động bình thường.
+            </p>
+          )}
+        </SectionCard>
+      )}
 
       {(config.kind === "material" || config.kind === "trim") && (
         <CostingSourcePricePanel
