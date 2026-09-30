@@ -12,10 +12,7 @@ import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [landing, heroMedia] = await Promise.all([
-    resolveBespokeLanding("qua-tang-doanh-nghiep"),
-    getPublicSurfaceMedia("corporateGift"),
-  ]);
+  const landing = await resolveBespokeLanding("qua-tang-doanh-nghiep");
   return {
     title: landing.metaTitle,
     description: landing.metaDescription,
@@ -55,7 +52,10 @@ const branding = [
 ];
 
 export default async function CorporateGiftsPage() {
-  const landing = await resolveBespokeLanding("qua-tang-doanh-nghiep");
+  const [landing, heroMedia] = await Promise.all([
+    resolveBespokeLanding("qua-tang-doanh-nghiep"),
+    getPublicSurfaceMedia("corporateGift"),
+  ]);
 
   return (
     <main>
