@@ -22,15 +22,9 @@ type CategoryCardProps = {
   ctaLabel?: string;
 };
 
-const CATEGORY_GRADIENTS: Record<string, string> = {
-  "ao-thun-tron": "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)",
-  "ao-polo-tron": "linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%)",
-  non: "linear-gradient(135deg, #16a34a 0%, #14532d 100%)",
-  tote: "linear-gradient(135deg, #d97706 0%, #92400e 100%)",
-  bandana: "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
-  "binh-giu-nhiet": "linear-gradient(135deg, #0891b2 0%, #164e63 100%)",
-  "qua-tang-doanh-nghiep": "linear-gradient(135deg, #be185d 0%, #831843 100%)",
-  oem: "linear-gradient(135deg, #374151 0%, #111827 100%)",
+const CATEGORY_FALLBACKS: Record<string, string> = {
+  oem: "linear-gradient(145deg, #18181b 0%, #27272a 100%)",
+  "qua-tang-doanh-nghiep": "linear-gradient(145deg, #7f1d1d 0%, #b91c1c 100%)",
 };
 
 export default function CategoryCard({
@@ -46,7 +40,9 @@ export default function CategoryCard({
   ctaLabel = "Xem nguồn hàng",
 }: CategoryCardProps) {
   const hasImage = imageUrl && isValidImageSrc(imageUrl);
-  const gradient = CATEGORY_GRADIENTS[slug] ?? "linear-gradient(135deg, #374151 0%, #111827 100%)";
+  const gradient =
+    CATEGORY_FALLBACKS[slug] ??
+    "linear-gradient(145deg, #e5e7eb 0%, #f8fafc 58%, #fecaca 100%)";
 
   const cardHref = href ?? publicCategoryHref(slug);
 
