@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
 import {
@@ -35,20 +35,17 @@ export default function ContactForm() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
-  const [message, setMessage] = useState("");
-  const [formStatus, setFormStatus] = useState<FormStatus>("idle");
-  const [errorMessage, setErrorMessage] = useState("");
-
-  useEffect(() => {
-    const prefill = buildPrefillMessage({
+  const [message, setMessage] = useState(() =>
+    buildPrefillMessage({
       productGroup: searchParams.get("product_group"),
       quantity: searchParams.get("quantity"),
       region: searchParams.get("region"),
       service: searchParams.get("service"),
       timeline: searchParams.get("timeline"),
-    });
-    if (prefill) setMessage(prefill);
-  }, [searchParams]);
+    }),
+  );
+  const [formStatus, setFormStatus] = useState<FormStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
   function validate(): string | null {
     if (!name.trim()) return "Vui lòng nhập họ tên.";
