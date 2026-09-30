@@ -847,6 +847,9 @@ function mapProduct(product: HomepageProductCard): HomepageProductItem {
     minimumOrderQuantity: product.defaultMoq ?? null,
     productionLeadTime: product.leadTime ?? null,
     availabilityLabel: deriveAvailabilityLabel(product.variants),
+    supportsPrinting: product.supportsPrinting,
+    supportsEmbroidery: product.supportsEmbroidery,
+    supportsOem: product.supportsOem,
     salesBadges: mapPublicProductCardSalesBadges(product),
     availableColors: mapProductCardAvailableColors(product),
   };
