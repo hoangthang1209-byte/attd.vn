@@ -48,8 +48,30 @@ export default function ProductionMasterDetailManager({ config, itemId }: Props)
   }, [config.apiPath, itemId]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+
+    void fetch(`${config.apiPath}/${itemId}`)
+      .then(async (itemRes) => {
+        const data = (await itemRes.json()) as Record<string, unknown> & { message?: string };
+        if (!itemRes.ok) throw new Error(data.message ?? "Không thể tải chi tiết");
+        return data;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setItem(data);
+        setError(null);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config.apiPath, itemId]);
 
   async function save(patch: Record<string, unknown>) {
     setSaving(true);
