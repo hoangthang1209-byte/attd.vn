@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import CompanyFacts from "@/components/public/company/CompanyFacts";
 import CompanyIntroSection from "@/components/public/company/CompanyIntroSection";
 import CompanyTimeline from "@/components/public/company/CompanyTimeline";
@@ -14,6 +15,7 @@ import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
 import { getCompanySettings } from "@/features/settings/services/settings.service";
 import { buildAboutMetadata } from "@/lib/seo/indexation-policy";
 import { VERIFIED_EXPERIENCE_YEARS } from "@/lib/company-trust";
+import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 
 export const revalidate = 3600;
 
@@ -28,29 +30,46 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function GioiThieuPage() {
-  const company = await getCompanySettings();
+  const [company, aboutMedia] = await Promise.all([
+    getCompanySettings(),
+    getPublicSurfaceMedia("about"),
+  ]);
 
   return (
     <main className="company-about-page">
-      <section className="company-about-hero">
-        <div className="container">
-          <p className="company-about-hero__eyebrow">Nguồn hàng B2B</p>
-          <h1 className="company-about-hero__title">
-            Đối tác nguồn hàng đồng phục &amp; OEM bạn có thể tin cậy
-          </h1>
-          <p className="company-about-hero__lead">
-            Hơn {VERIFIED_EXPERIENCE_YEARS} năm kinh nghiệm từ AOTHUNTHONGDIEP và VietnamClothing.
-            ATTD hỗ trợ đại lý, agency, xưởng in và doanh nghiệp lấy nguồn, báo giá và triển khai
-            đồng phục, phôi trơn, quà tặng hoặc OEM/Private Label.
-          </p>
-          <div className="company-about-hero__actions">
-            <Link href="/lien-he" className="btn-primary">
-              Yêu cầu báo giá
-            </Link>
-            <Link href="/dai-ly" className="btn-secondary">
-              Hợp tác đại lý
-            </Link>
+      <section className="company-about-hero company-about-hero--v3">
+        <div className="container company-about-hero__grid">
+          <div className="company-about-hero__copy">
+            <p className="company-about-hero__eyebrow">Nguồn hàng B2B</p>
+            <h1 className="company-about-hero__title">
+              Đối tác nguồn hàng đồng phục &amp; OEM bạn có thể tin cậy
+            </h1>
+            <p className="company-about-hero__lead">
+              Hơn {VERIFIED_EXPERIENCE_YEARS} năm kinh nghiệm từ AOTHUNTHONGDIEP và VietnamClothing.
+              ATTD hỗ trợ đại lý, agency, xưởng in và doanh nghiệp lấy nguồn, báo giá và triển khai
+              đồng phục, phôi trơn, quà tặng hoặc OEM/Private Label.
+            </p>
+            <div className="company-about-hero__actions">
+              <Link href="/lien-he" className="btn-primary">
+                Yêu cầu báo giá
+              </Link>
+              <Link href="/dai-ly" className="btn-secondary">
+                Hợp tác đại lý
+              </Link>
+            </div>
           </div>
+          {aboutMedia ? (
+            <div className="company-about-hero__media">
+              <Image
+                src={aboutMedia.url}
+                alt={aboutMedia.alt}
+                fill
+                priority
+                className="company-about-hero__media-image"
+                sizes="(max-width: 900px) 100vw, 48vw"
+              />
+            </div>
+          ) : null}
         </div>
       </section>
 

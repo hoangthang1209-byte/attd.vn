@@ -159,6 +159,9 @@ export type HomepageProductItem = {
   minimumOrderQuantity: number | null;
   productionLeadTime: string | null;
   availabilityLabel: string | null;
+  supportsPrinting: boolean;
+  supportsEmbroidery: boolean;
+  supportsOem: boolean;
   salesBadges: PublicProductSalesBadge[];
   availableColors: ProductCardColorSwatch[];
 };

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { Suspense } from "react";
 import ContactForm from "@/components/public/ContactForm";
 import PublicContactChannels from "@/components/public/PublicContactChannels";
@@ -11,6 +12,7 @@ import {
 } from "@/lib/b2b-trust-v2-copy";
 import { buildContactMetadata } from "@/lib/seo/indexation-policy";
 import { getCompanySettings } from "@/features/settings/services/settings.service";
+import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 
 export const revalidate = 3600;
 
@@ -39,7 +41,10 @@ const CONTEXT_CARDS = [
 ];
 
 export default async function LienHePage() {
-  const company = await getCompanySettings();
+  const [company, contactMedia] = await Promise.all([
+    getCompanySettings(),
+    getPublicSurfaceMedia("contact"),
+  ]);
 
   return (
     <main className="contact-page-v2">
@@ -59,6 +64,18 @@ export default async function LienHePage() {
                 phục và quà tặng số lượng lớn. Chúng tôi sẽ phản hồi trong
                 vòng 24 giờ làm việc.
               </p>
+
+              {contactMedia ? (
+                <figure className="contact-page-v2__media">
+                  <Image
+                    src={contactMedia.url}
+                    alt={contactMedia.alt}
+                    fill
+                    className="contact-page-v2__media-image"
+                    sizes="(max-width: 900px) 100vw, 520px"
+                  />
+                </figure>
+              ) : null}
 
               <div className="contact-page-v2__cards">
                 {CONTEXT_CARDS.map((card) => (

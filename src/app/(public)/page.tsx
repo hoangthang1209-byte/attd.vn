@@ -1,6 +1,5 @@
-import { getHomepageData, getPreCategoryEditorialSections } from "@/features/home/homepage.service";
+import { getHomepageData } from "@/features/home/homepage.service";
 import HomeHeroSection from "@/components/home/HomeHeroSection";
-import HomeProofStrip from "@/components/home/HomeProofStrip";
 import HomeSourcingPathwaysSection from "@/components/home/HomeSourcingPathwaysSection";
 import HomeOemBannerSection from "@/components/home/HomeOemBannerSection";
 import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
@@ -29,6 +28,7 @@ import {
 import { buildHomepageMetadata } from "@/lib/seo/indexation-policy";
 import { SITE_NAME, canonicalUrl, buildOgImages } from "@/lib/seo";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
+import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 
 export const revalidate = 3600;
 
@@ -120,38 +120,22 @@ const SOURCING_STEPS = [
   },
 ];
 
-function PreCategoryEditorialSections({
-  cms,
-}: {
-  cms: Awaited<ReturnType<typeof getHomepageData>>["cms"];
-}) {
-  const sectionOrder = getPreCategoryEditorialSections(cms);
-
-  return (
-    <>
-      {sectionOrder.map((key) => {
-        if (key === "proof" && cms.proofStrip.enabled) {
-          return <HomeProofStrip key="proof" items={cms.proofStrip.items} />;
-        }
-        if (key === "pathways" && cms.sourcingPathways.enabled) {
-          return (
-            <HomeSourcingPathwaysSection key="pathways" pathways={cms.sourcingPathways.items} />
-          );
-        }
-        return null;
-      })}
-    </>
-  );
-}
-
 export default async function HomePage() {
-  const { hero, cms, categories, gridChildCategories, gridChildCategoryTotal, showGridCategoryViewAllCta, latestProducts, blogPosts } = await getHomepageData();
+  const [
+    { hero, cms, categories, gridChildCategories, gridChildCategoryTotal, showGridCategoryViewAllCta, latestProducts, blogPosts },
+    heroMedia,
+  ] = await Promise.all([
+    getHomepageData(),
+    getPublicSurfaceMedia("homepage"),
+  ]);
 
   return (
-    <main className="mp-home mp-home--v271">
-      <HomeHeroSection hero={hero} categories={categories} />
+    <main className="mp-home mp-home--v3">
+      <HomeHeroSection hero={hero} categories={categories} heroMedia={heroMedia} />
 
-      <PreCategoryEditorialSections cms={cms} />
+      {cms.sourcingPathways.enabled ? (
+        <HomeSourcingPathwaysSection pathways={cms.sourcingPathways.items} />
+      ) : null}
 
       <HomeCategoryGridSection
         categories={gridChildCategories}
@@ -161,9 +145,13 @@ export default async function HomePage() {
 
       <HomeProductDiscoverySection products={latestProducts} />
 
+      <MarketplaceRFQStrip />
+
       <HomeOemBannerSection banner={cms.oemBanner} />
 
-      <MarketplaceRFQStrip />
+      <HomeWorkshopGallerySection gallery={cms.workshopGallery} />
+
+      <CompanyFacts className="home-company-facts" cms={cms.companyReality} />
 
       <section className="mp-section mp-section--tight home-b2b-benefits">
         <div className="container">
@@ -220,17 +208,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <HomeBlogTeaserSection posts={blogPosts} />
-
       <CompanyTrustMetrics />
 
       <CustomerLogoStrip />
 
       <CaseStudySection />
 
-      <CompanyFacts className="home-company-facts" cms={cms.companyReality} />
-
-      <HomeWorkshopGallerySection gallery={cms.workshopGallery} />
+      <HomeBlogTeaserSection posts={blogPosts} />
 
       <MarketplaceFinalCta />
     </main>

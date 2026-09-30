@@ -7,7 +7,7 @@ import FaqSchema from "@/components/seo/FaqSchema";
 import LandingHeroVisual from "@/components/public/LandingHeroVisual";
 import { getZaloUrl } from "@/lib/companyInfo";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
-import { getLandingDemoImage } from "@/features/demo/demo-image-map";
+import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 
 export const revalidate = 3600;
 
@@ -52,7 +52,10 @@ const branding = [
 ];
 
 export default async function CorporateGiftsPage() {
-  const landing = await resolveBespokeLanding("qua-tang-doanh-nghiep");
+  const [landing, heroMedia] = await Promise.all([
+    resolveBespokeLanding("qua-tang-doanh-nghiep"),
+    getPublicSurfaceMedia("corporateGift"),
+  ]);
 
   return (
     <main>
@@ -61,7 +64,7 @@ export default async function CorporateGiftsPage() {
         eyebrow="Corporate Gifts"
         title={landing.heroTitle}
         description={landing.heroDescription}
-        imageUrl={getLandingDemoImage("qua-tang-doanh-nghiep")}
+        imageUrl={heroMedia?.url}
         primaryCta={{ href: landing.primaryCtaHref, label: landing.primaryCtaLabel }}
         secondaryCta={{ href: landing.secondaryCtaHref, label: landing.secondaryCtaLabel }}
       />
@@ -118,7 +121,7 @@ export default async function CorporateGiftsPage() {
         <div className="container">
           <h2 className="section-title">Tùy chọn gắn thương hiệu</h2>
           <p className="section-description">
-            ATTD là nhà cung cấp nguồn hàng — hỗ trợ gắn nhãn và đóng gói, không cung cấp dịch vụ in ấn trực tiếp.
+            ATTD tư vấn và điều phối in, thêu, nhãn tag, đóng gói và hoàn thiện thương hiệu theo yêu cầu từng dự án.
           </p>
 
           <div

@@ -55,6 +55,9 @@ export default function ProductCard({
   hoverImageUrl,
   stockStatus,
   stockLabel,
+  supportsPrinting = false,
+  supportsEmbroidery = false,
+  supportsOem = false,
   compact = false,
   salesBadges = [],
   availableColors = [],
@@ -67,6 +70,11 @@ export default function ProductCard({
   const moqLabel = isPublicMoq(moq) ? formatProductCardMoq(moq) : null;
   const showCategory = Boolean(category?.trim());
   const showB2bMeta = Boolean(moqLabel || leadTime);
+  const capabilityLabels = [
+    supportsPrinting ? "In logo" : null,
+    supportsEmbroidery ? "Thêu" : null,
+    supportsOem ? "OEM" : null,
+  ].filter((label): label is string => Boolean(label));
 
   function openQuote(e: React.MouseEvent) {
     e.preventDefault();
@@ -129,6 +137,16 @@ export default function ProductCard({
           )}
 
           <ProductCardColorSwatches colors={availableColors} compact={compact} />
+
+          {capabilityLabels.length > 0 && (
+            <div className="product-card-capabilities" aria-label="Khả năng hoàn thiện">
+              {capabilityLabels.map((label) => (
+                <span key={label} className="product-card-capability">
+                  {label}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div className="product-card-footer">
             <button

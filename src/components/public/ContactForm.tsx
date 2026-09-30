@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import TrustReassuranceLine from "@/components/public/trust/TrustReassuranceLine";
 import {
@@ -17,10 +17,14 @@ function buildPrefillMessage(params: {
   productGroup?: string | null;
   quantity?: string | null;
   region?: string | null;
+  service?: string | null;
+  timeline?: string | null;
 }): string {
   const lines: string[] = [];
   if (params.productGroup?.trim()) lines.push(`Nhóm sản phẩm: ${params.productGroup.trim()}`);
   if (params.quantity?.trim()) lines.push(`Số lượng dự kiến: ${params.quantity.trim()}`);
+  if (params.service?.trim()) lines.push(`Nhu cầu hoàn thiện: ${params.service.trim()}`);
+  if (params.timeline?.trim()) lines.push(`Thời gian cần hàng: ${params.timeline.trim()}`);
   if (params.region?.trim()) lines.push(`Khu vực giao hàng: ${params.region.trim()}`);
   return lines.join("\n");
 }
@@ -31,18 +35,17 @@ export default function ContactForm() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
-  const [message, setMessage] = useState("");
-  const [formStatus, setFormStatus] = useState<FormStatus>("idle");
-  const [errorMessage, setErrorMessage] = useState("");
-
-  useEffect(() => {
-    const prefill = buildPrefillMessage({
+  const [message, setMessage] = useState(() =>
+    buildPrefillMessage({
       productGroup: searchParams.get("product_group"),
       quantity: searchParams.get("quantity"),
       region: searchParams.get("region"),
-    });
-    if (prefill) setMessage(prefill);
-  }, [searchParams]);
+      service: searchParams.get("service"),
+      timeline: searchParams.get("timeline"),
+    }),
+  );
+  const [formStatus, setFormStatus] = useState<FormStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
   function validate(): string | null {
     if (!name.trim()) return "Vui lòng nhập họ tên.";
