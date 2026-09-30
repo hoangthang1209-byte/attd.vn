@@ -7,7 +7,7 @@ import FaqSchema from "@/components/seo/FaqSchema";
 import LandingHeroVisual from "@/components/public/LandingHeroVisual";
 import { getZaloUrl } from "@/lib/companyInfo";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
-import { getLandingDemoImage } from "@/features/demo/demo-image-map";
+import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 
 export const revalidate = 3600;
 
@@ -40,7 +40,10 @@ const capabilities = [
 ];
 
 export default async function OemPage() {
-  const landing = await resolveBespokeLanding("oem");
+  const [landing, heroMedia] = await Promise.all([
+    resolveBespokeLanding("oem"),
+    getPublicSurfaceMedia("oem"),
+  ]);
   const faqItems = landing.faq.map((item) => {
     const answer = /không cung cấp dịch vụ in ấn/i.test(item.answer)
       ? "Có. ATTD tư vấn và điều phối các công đoạn in, thêu, nhãn tag, đóng gói và hoàn thiện thương hiệu theo yêu cầu từng dự án. Tùy cấu hình, một số công đoạn được thực hiện cùng mạng lưới đối tác sản xuất chuyên môn."
@@ -55,7 +58,7 @@ export default async function OemPage() {
         eyebrow="OEM / Private Label"
         title="OEM / Private Label cho đồng phục & merchandise doanh nghiệp"
         description="ATTD hỗ trợ từ chọn nguồn hàng, cấu hình sản phẩm, in/thêu, nhãn tag và đóng gói đến điều phối sản xuất, QC và giao hàng theo yêu cầu dự án."
-        imageUrl={getLandingDemoImage("oem")}
+        imageUrl={heroMedia?.url}
         primaryCta={{ href: landing.primaryCtaHref, label: landing.primaryCtaLabel }}
         secondaryCta={{ href: getZaloUrl(), label: "Chat Zalo" }}
       />
