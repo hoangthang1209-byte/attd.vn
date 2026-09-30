@@ -103,12 +103,12 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
   const displayTotal = calc.manualOverride && calc.manualTotalAmount != null
     ? calc.manualTotalAmount
     : calc.totalAmount;
+  const calculator =
+    calc.resultSnapshot && typeof calc.resultSnapshot === "object"
+      ? (calc.resultSnapshot as { calculator?: unknown }).calculator
+      : undefined;
   const calculationMethod =
-    calc.resultSnapshot &&
-    typeof calc.resultSnapshot === "object" &&
-    (calc.resultSnapshot as { calculator?: unknown }).calculator === "costing"
-      ? "COSTING"
-      : "BẢNG GIÁ";
+    calculator === "costing" ? "COSTING" : calculator === "price-list" ? "BẢNG GIÁ" : "KHÔNG XÁC ĐỊNH";
 
   return (
     <div className="admin-panel">
