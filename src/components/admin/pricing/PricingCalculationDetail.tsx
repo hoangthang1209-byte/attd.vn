@@ -5,6 +5,12 @@ import Link from "next/link";
 import { getPricingStatusLabel } from "@/features/pricing/labels";
 import { AdminLoadingState } from "@/components/admin/AdminUi";
 import { formatPricingCurrency, formatPricingDateTime, formatPricingPercent } from "@/features/pricing/format";
+import {
+  pricingCalculationMethodBadgeClass,
+  pricingCalculationMethodFromSnapshot,
+  pricingCalculationMethodLabel,
+} from "@/features/pricing/pricing-calculation-method";
+import { useAdminPermissions } from "@/components/admin/AdminPermissionsContext";
 
 type CalculationDetail = {
   id: string;
@@ -48,9 +54,11 @@ type CalculationDetail = {
     manualUnitPrice: number | null;
   }>;
   resultSnapshot: unknown;
+  inputSnapshot: unknown;
 };
 
 export default function PricingCalculationDetail({ id }: { id: string }) {
+  const { permissions } = useAdminPermissions();
   const [calc, setCalc] = useState<CalculationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +76,7 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
     void load()
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload when id changes
   }, [id]);
 
   async function handleFinalize() {
@@ -103,6 +112,7 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
   const displayTotal = calc.manualOverride && calc.manualTotalAmount != null
     ? calc.manualTotalAmount
     : calc.totalAmount;
+  const calculationMethod = pricingCalculationMethodFromSnapshot(calc.inputSnapshot ?? calc.resultSnapshot);
 
   return (
     <div className="admin-panel">
@@ -110,6 +120,10 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
         <div>
           <h3 className="admin-subtitle" style={{ margin: 0 }}>{calc.code}</h3>
           <p className="admin-field-hint">
+            <span className={pricingCalculationMethodBadgeClass(calculationMethod)}>
+              {pricingCalculationMethodLabel(calculationMethod)}
+            </span>
+            {" · "}
             {getPricingStatusLabel(calc.status as never)} · {formatPricingDateTime(calc.createdAt)}
             {calc.revisionLabel && (
               <> · <strong>{calc.isFinal ? `${calc.revisionLabel} — FINAL` : calc.revisionLabel}</strong></>
@@ -229,10 +243,12 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
         </Link>
       </div>
 
-      <details className="admin-import-error-detail" style={{ marginTop: 24 }}>
-        <summary>Snapshot (debug)</summary>
-        <pre style={{ fontSize: 11, overflow: "auto" }}>{JSON.stringify(calc.resultSnapshot, null, 2)}</pre>
-      </details>
+      {permissions.canManageUsers && (
+        <details className="admin-import-error-detail" style={{ marginTop: 24 }}>
+          <summary>Snapshot (debug)</summary>
+          <pre style={{ fontSize: 11, overflow: "auto" }}>{JSON.stringify(calc.resultSnapshot, null, 2)}</pre>
+        </details>
+      )}
     </div>
   );
 }

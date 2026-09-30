@@ -9,6 +9,17 @@ import type {
   PricingItemInput,
   PricingServiceOptionInput,
 } from "@/features/pricing/types";
+import {
+  assertTaxableBaseNonNegative,
+  assertVatRateInRange,
+  marginRateWhenCostKnown,
+  validatePricingCalculatorCommercialInput,
+} from "@/features/pricing/pricing-commercial-validation";
+import {
+  collectServiceRuleScopeIssues,
+  type ServiceRulePricingRow,
+} from "@/features/pricing/pricing-service-rule-scope";
+import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 
 const NO_TIER_WARNING = "Chưa có bảng giá phù hợp";
 
@@ -118,6 +129,7 @@ function computeServiceAmounts(
 
 export async function calculatePricing(input: CalculatePricingInput): Promise<CalculatePricingResult> {
   const warnings: string[] = [];
+  validatePricingCalculatorCommercialInput(input);
   let priceGroupRow = input.priceGroupId
     ? await prisma.priceGroup.findUnique({ where: { id: input.priceGroupId } })
     : await getDefaultPriceGroup();
@@ -166,17 +178,31 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
     tiersByProduct.set(tier.productId, list);
   }
 
-  const rulesById = new Map(
+  const rulesById = new Map<string, ServiceRulePricingRow>(
     serviceRules.map((r) => [
       r.id,
       {
+        id: r.id,
+        name: r.name,
+        priceGroupId: r.priceGroupId,
+        minQuantity: r.minQuantity,
+        maxQuantity: r.maxQuantity,
         calculationType: r.calculationType,
         unitPrice: r.unitPrice.toNumber(),
         setupFee: r.setupFee.toNumber(),
-        name: r.name,
+        isActive: r.isActive,
       },
-    ])
+    ]),
   );
+
+  const ruleScopeIssues = collectServiceRuleScopeIssues({
+    priceGroupId: priceGroupRow?.id ?? null,
+    items: input.items,
+    rulesById,
+  });
+  if (ruleScopeIssues.length > 0) {
+    throw new PricingValidationError(ruleScopeIssues.map((issue) => issue.message).join(" "));
+  }
 
   const itemBreakdowns: PricingItemBreakdown[] = [];
   let serviceTotal = 0;
@@ -233,7 +259,7 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
     if (costEstimate != null && lineTotal > 0) {
       const totalCost = roundMoney(costEstimate * item.quantity);
       marginAmount = roundMoney(lineTotal - totalCost);
-      marginRate = totalCost > 0 ? roundMoney((marginAmount / lineTotal) * 100) : null;
+      marginRate = marginRateWhenCostKnown({ lineTotal, totalCost, marginAmount });
     }
 
     itemBreakdowns.push({
@@ -268,7 +294,8 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
   const subtotal = roundMoney(itemBreakdowns.reduce((sum, i) => sum + i.lineTotal, 0));
   const discountAmount = input.discountAmount ?? 0;
   const shippingFee = input.shippingFee ?? 0;
-  const vatRate = input.vatRate ?? 0;
+  const vatRate = assertVatRateInRange(input.vatRate ?? 0);
+  assertTaxableBaseNonNegative(subtotal, discountAmount, shippingFee);
   const taxableBase = roundMoney(subtotal - discountAmount + shippingFee);
   const vatAmount = roundMoney((taxableBase * vatRate) / 100);
   const calculatedTotalAmount = roundMoney(taxableBase + vatAmount);

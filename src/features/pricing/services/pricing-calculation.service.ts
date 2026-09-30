@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { generatePricingCalculationCode } from "@/features/pricing/pricing-code";
 import { calculatePricing } from "@/features/pricing/services/pricing-engine.service";
+import { validatePricingCalculatorCommercialInput } from "@/features/pricing/pricing-commercial-validation";
 import type {
   CalculatePricingInput,
   PricingCalculationListRecord,
@@ -12,6 +13,7 @@ import {
   deriveRevisionLabel,
   extractCostingRevisionContext,
 } from "@/features/pricing/pricing-calculation-revision";
+import { pricingCalculationMethodFromSnapshot } from "@/features/pricing/pricing-calculation-method";
 
 function mapListRow(row: {
   id: string;
@@ -27,6 +29,7 @@ function mapListRow(row: {
   finalizedAt: Date | null;
   revisionLabel: string | null;
   createdAt: Date;
+  inputSnapshot: unknown;
   lead?: { fullName: string; company: string | null; companyName: string | null } | null;
   customer?: { name: string } | null;
   priceGroup?: { name: string } | null;
@@ -47,6 +50,7 @@ function mapListRow(row: {
     leadLabel,
     customerLabel: row.customer?.name ?? null,
     priceGroupName: row.priceGroup?.name ?? null,
+    calculationMethod: pricingCalculationMethodFromSnapshot(row.inputSnapshot),
     isFinal: row.isFinal,
     finalizedAt: row.finalizedAt?.toISOString() ?? null,
     revisionLabel: row.revisionLabel,
@@ -60,6 +64,7 @@ export async function savePricingCalculation(
   if (!input.items?.length) {
     throw new PricingValidationError("Cần ít nhất một dòng sản phẩm.");
   }
+  validatePricingCalculatorCommercialInput(input);
 
   const result = await calculatePricing(input);
   const code = await generatePricingCalculationCode();
