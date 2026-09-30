@@ -1,6 +1,5 @@
-import { getHomepageData, getPreCategoryEditorialSections } from "@/features/home/homepage.service";
+import { getHomepageData } from "@/features/home/homepage.service";
 import HomeHeroSection from "@/components/home/HomeHeroSection";
-import HomeProofStrip from "@/components/home/HomeProofStrip";
 import HomeSourcingPathwaysSection from "@/components/home/HomeSourcingPathwaysSection";
 import HomeOemBannerSection from "@/components/home/HomeOemBannerSection";
 import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
@@ -120,30 +119,6 @@ const SOURCING_STEPS = [
     description: "Triển khai giao hàng hoặc sản xuất theo tiến độ đã thống nhất.",
   },
 ];
-
-function PreCategoryEditorialSections({
-  cms,
-}: {
-  cms: Awaited<ReturnType<typeof getHomepageData>>["cms"];
-}) {
-  const sectionOrder = getPreCategoryEditorialSections(cms);
-
-  return (
-    <>
-      {sectionOrder.map((key) => {
-        if (key === "proof" && cms.proofStrip.enabled) {
-          return <HomeProofStrip key="proof" items={cms.proofStrip.items} />;
-        }
-        if (key === "pathways" && cms.sourcingPathways.enabled) {
-          return (
-            <HomeSourcingPathwaysSection key="pathways" pathways={cms.sourcingPathways.items} />
-          );
-        }
-        return null;
-      })}
-    </>
-  );
-}
 
 export default async function HomePage() {
   const [
