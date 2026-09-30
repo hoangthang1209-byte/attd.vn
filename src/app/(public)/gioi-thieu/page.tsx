@@ -20,10 +20,7 @@ import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const [company, aboutMedia] = await Promise.all([
-    getCompanySettings(),
-    getPublicSurfaceMedia("about"),
-  ]);
+  const company = await getCompanySettings();
 
   return buildAboutMetadata({
     title: `Giới thiệu ${company.name} | Nguồn hàng B2B & OEM`,
@@ -33,7 +30,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function GioiThieuPage() {
-  const company = await getCompanySettings();
+  const [company, aboutMedia] = await Promise.all([
+    getCompanySettings(),
+    getPublicSurfaceMedia("about"),
+  ]);
 
   return (
     <main className="company-about-page">
