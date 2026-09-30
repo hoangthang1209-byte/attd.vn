@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   COST_LIBRARY_CATEGORY_LABELS,
   type CostLibraryCategory,
@@ -88,7 +89,17 @@ export default function CostingCostPicker({
         </div>
 
         <div className="costing-picker__list">
-          {filtered.length === 0 ? (
+          {items.length === 0 ? (
+            <div className="costing-picker__empty">
+              <p>Thư viện chi phí chưa có dữ liệu vận hành.</p>
+              <p className="admin-field-hint">
+                Thêm chi phí thực tế trước khi dùng để tính giá, hoặc nhập một dòng thủ công cho lần này.
+              </p>
+              <Link href="/admin/pricing/cost-library" className="admin-btn admin-btn--secondary admin-btn--small">
+                Mở thư viện chi phí
+              </Link>
+            </div>
+          ) : filtered.length === 0 ? (
             <p className="admin-field-hint">Không tìm thấy chi phí phù hợp.</p>
           ) : (
             filtered.map((item) => (

@@ -149,6 +149,7 @@ export type PricingCalculationListRecord = {
   isFinal: boolean;
   finalizedAt: string | null;
   revisionLabel: string | null;
+  calculationMethod: "COSTING" | "PRICE_LIST" | "UNKNOWN";
   createdAt: string;
 };
 

@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -649,7 +651,7 @@ export default function CostingCalculator() {
               <input className="admin-input" value={unit} onChange={(e) => setUnit(e.target.value)} />
             </div>
             <div className="admin-field">
-              <label className="admin-label">Target margin (%)</label>
+              <label className="admin-label">Biên lợi nhuận mục tiêu (%)</label>
               <input
                 className="admin-input"
                 type="number"
@@ -658,9 +660,12 @@ export default function CostingCalculator() {
                 value={targetMarginRate}
                 onChange={(e) => setTargetMarginRate(e.target.value)}
               />
+              <p className="admin-field-hint">
+                Biên lợi nhuận trên doanh thu, không phải cộng % trực tiếp vào giá vốn.
+              </p>
             </div>
             <div className="admin-field">
-              <label className="admin-label">Nhóm giá</label>
+              <label className="admin-label">Nhóm giá tham chiếu</label>
               <select
                 className="admin-input"
                 value={priceGroupId}
@@ -675,6 +680,9 @@ export default function CostingCalculator() {
                     </option>
                   ))}
               </select>
+              <p className="admin-field-hint">
+                Dùng để phân loại/lưu bản tính; hiện không tự thay đổi công thức costing.
+              </p>
             </div>
           </div>
 
@@ -839,7 +847,7 @@ export default function CostingCalculator() {
         </details>
 
         <details className="costing-details">
-          <summary>Bảng giá theo số lượng</summary>
+          <summary>Mô phỏng theo số lượng</summary>
           <div className="admin-seo-brief-form-grid" style={{ marginTop: 12 }}>
             <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
               <label className="admin-label">Các mốc số lượng (phân tách bằng dấu phẩy)</label>
@@ -855,10 +863,10 @@ export default function CostingCalculator() {
                 variant="secondary"
                 onClick={() => void postQuantityBreaks()}
                 pending={loadingBreaks}
-                pendingLabel="Đang tính bảng giá…"
+                pendingLabel="Đang mô phỏng…"
                 disabled={loading || saving}
               >
-                Tính bảng giá
+                Mô phỏng giá
               </AdminLoadingButton>
             </div>
           </div>

@@ -2,6 +2,8 @@ import type { PricingCalculationType, ProductPriceTier } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDefaultPriceGroup, getPriceGroupById } from "@/features/pricing/services/price-group.service";
 import { getServiceRulesForPricing } from "@/features/pricing/services/service-rule.service";
+import { PricingValidationError } from "@/features/pricing/services/price-group.service";
+import { lineDiscountIsValid, pricingMarginRate } from "@/features/pricing/pricing-p1-guards";
 import type {
   CalculatePricingInput,
   CalculatePricingResult,
@@ -36,14 +38,21 @@ function pickBestTier(tiers: ProductPriceTier[], quantity: number, variantId?: s
 
   if (variantId) {
     const variantTiers = matching.filter((t) => t.variantId === variantId);
-    if (variantTiers.length > 0) {
-      return variantTiers.sort((a, b) => b.minQuantity - a.minQuantity)[0];
+    if (variantTiers.length > 1) {
+      throw new PricingValidationError(
+        "Có nhiều dòng giá biến thể cùng hiệu lực cho số lượng này. Vui lòng kiểm tra lại Bảng giá chuẩn trước khi báo giá.",
+      );
     }
+    if (variantTiers.length === 1) return variantTiers[0];
   }
 
   const productTiers = matching.filter((t) => !t.variantId);
-  if (productTiers.length === 0) return null;
-  return productTiers.sort((a, b) => b.minQuantity - a.minQuantity)[0];
+  if (productTiers.length > 1) {
+    throw new PricingValidationError(
+      "Có nhiều dòng giá sản phẩm cùng hiệu lực cho số lượng này. Vui lòng kiểm tra lại Bảng giá chuẩn trước khi báo giá.",
+    );
+  }
+  return productTiers[0] ?? null;
 }
 
 function variantLabel(variant: {
@@ -58,7 +67,14 @@ function variantLabel(variant: {
 function computeServiceAmounts(
   item: PricingItemInput,
   serviceOptions: PricingServiceOptionInput[],
-  rulesById: Map<string, { calculationType: PricingCalculationType; unitPrice: number; setupFee: number; name: string }>
+  rulesById: Map<string, {
+    calculationType: PricingCalculationType;
+    unitPrice: number;
+    setupFee: number;
+    name: string;
+    minQuantity: number;
+    maxQuantity: number | null;
+  }>
 ): { perItemAdd: number; lineServiceFee: number; lineSetupFee: number; serviceDetails: unknown[] } {
   let perItemAdd = 0;
   let lineServiceFee = 0;
@@ -67,6 +83,14 @@ function computeServiceAmounts(
 
   for (const opt of serviceOptions) {
     const rule = opt.ruleId ? rulesById.get(opt.ruleId) : undefined;
+    if (opt.ruleId && !rule) {
+      throw new PricingValidationError("Phí dịch vụ không thuộc nhóm giá đang chọn hoặc không còn hoạt động.");
+    }
+    if (rule && (item.quantity < rule.minQuantity || (rule.maxQuantity != null && item.quantity > rule.maxQuantity))) {
+      throw new PricingValidationError(
+        `Phí dịch vụ "${rule.name}" không áp dụng cho số lượng ${item.quantity}.`,
+      );
+    }
     const calcType = opt.calculationType ?? rule?.calculationType ?? "PER_ITEM";
     const unitPrice = opt.unitPrice ?? rule?.unitPrice ?? 0;
     const setupFee = opt.setupFee ?? rule?.setupFee ?? 0;
@@ -118,6 +142,30 @@ function computeServiceAmounts(
 
 export async function calculatePricing(input: CalculatePricingInput): Promise<CalculatePricingResult> {
   const warnings: string[] = [];
+  const nonNegativeFields: Array<[string, number | undefined]> = [
+    ["Chiết khấu", input.discountAmount],
+    ["Phí vận chuyển", input.shippingFee],
+    ["Tổng tiền chỉnh tay", input.manualTotalAmount],
+  ];
+  for (const [label, value] of nonNegativeFields) {
+    if (value != null && (!Number.isFinite(value) || value < 0)) {
+      throw new PricingValidationError(`${label} phải là số không âm.`);
+    }
+  }
+  if (input.vatRate != null && (!Number.isFinite(input.vatRate) || input.vatRate < 0 || input.vatRate > 100)) {
+    throw new PricingValidationError("VAT phải nằm trong khoảng 0–100%.");
+  }
+  for (const item of input.items) {
+    if (!Number.isFinite(item.quantity) || item.quantity < 1) {
+      throw new PricingValidationError("Số lượng sản phẩm phải lớn hơn 0.");
+    }
+    if (item.manualUnitPrice != null && (!Number.isFinite(item.manualUnitPrice) || item.manualUnitPrice < 0)) {
+      throw new PricingValidationError("Đơn giá chỉnh tay phải là số không âm.");
+    }
+    if (item.discountAmount != null && (!Number.isFinite(item.discountAmount) || item.discountAmount < 0)) {
+      throw new PricingValidationError("Chiết khấu dòng sản phẩm phải là số không âm.");
+    }
+  }
   let priceGroupRow = input.priceGroupId
     ? await prisma.priceGroup.findUnique({ where: { id: input.priceGroupId } })
     : await getDefaultPriceGroup();
@@ -174,6 +222,8 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
         unitPrice: r.unitPrice.toNumber(),
         setupFee: r.setupFee.toNumber(),
         name: r.name,
+        minQuantity: r.minQuantity,
+        maxQuantity: r.maxQuantity,
       },
     ])
   );
@@ -226,6 +276,11 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
 
     const lineSubtotal = roundMoney(unitPrice * item.quantity + lineSetupFee + lineServiceFee);
     const itemDiscount = item.discountAmount ?? 0;
+    if (!lineDiscountIsValid(lineSubtotal, itemDiscount)) {
+      throw new PricingValidationError(
+        `Chiết khấu dòng "${productName}" không được vượt quá thành tiền trước chiết khấu.`,
+      );
+    }
     const lineTotal = roundMoney(lineSubtotal - itemDiscount);
 
     let marginAmount: number | null = null;
@@ -233,7 +288,7 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
     if (costEstimate != null && lineTotal > 0) {
       const totalCost = roundMoney(costEstimate * item.quantity);
       marginAmount = roundMoney(lineTotal - totalCost);
-      marginRate = totalCost > 0 ? roundMoney((marginAmount / lineTotal) * 100) : null;
+      marginRate = pricingMarginRate(lineTotal, totalCost);
     }
 
     itemBreakdowns.push({
@@ -270,6 +325,9 @@ export async function calculatePricing(input: CalculatePricingInput): Promise<Ca
   const shippingFee = input.shippingFee ?? 0;
   const vatRate = input.vatRate ?? 0;
   const taxableBase = roundMoney(subtotal - discountAmount + shippingFee);
+  if (taxableBase < 0) {
+    throw new PricingValidationError("Tổng sau chiết khấu và vận chuyển không được âm.");
+  }
   const vatAmount = roundMoney((taxableBase * vatRate) / 100);
   const calculatedTotalAmount = roundMoney(taxableBase + vatAmount);
 

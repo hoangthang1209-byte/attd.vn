@@ -103,12 +103,21 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
   const displayTotal = calc.manualOverride && calc.manualTotalAmount != null
     ? calc.manualTotalAmount
     : calc.totalAmount;
+  const calculator =
+    calc.resultSnapshot && typeof calc.resultSnapshot === "object"
+      ? (calc.resultSnapshot as { calculator?: unknown }).calculator
+      : undefined;
+  const calculationMethod =
+    calculator === "costing" ? "COSTING" : calculator === "price-list" ? "BẢNG GIÁ" : "KHÔNG XÁC ĐỊNH";
 
   return (
     <div className="admin-panel">
       <div className="admin-section-header">
         <div>
-          <h3 className="admin-subtitle" style={{ margin: 0 }}>{calc.code}</h3>
+          <h3 className="admin-subtitle" style={{ margin: 0 }}>
+            {calc.code}{" "}
+            <span className="admin-kb-badge admin-kb-badge--medium">{calculationMethod}</span>
+          </h3>
           <p className="admin-field-hint">
             {getPricingStatusLabel(calc.status as never)} · {formatPricingDateTime(calc.createdAt)}
             {calc.revisionLabel && (
@@ -229,10 +238,6 @@ export default function PricingCalculationDetail({ id }: { id: string }) {
         </Link>
       </div>
 
-      <details className="admin-import-error-detail" style={{ marginTop: 24 }}>
-        <summary>Snapshot (debug)</summary>
-        <pre style={{ fontSize: 11, overflow: "auto" }}>{JSON.stringify(calc.resultSnapshot, null, 2)}</pre>
-      </details>
     </div>
   );
 }

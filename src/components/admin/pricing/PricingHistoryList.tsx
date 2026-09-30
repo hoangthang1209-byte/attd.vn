@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -41,7 +43,7 @@ export default function PricingHistoryList() {
     <div className="admin-panel">
       <div className="admin-section-header">
         <p>Tổng: {rows.length} bản tính</p>
-        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--primary">Bộ tính giá</Link>
+        <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">Tính giá mới</Link>
       </div>
 
       <form className="admin-crm-filters" onSubmit={(e) => { e.preventDefault(); void load(); }}>
@@ -67,6 +69,7 @@ export default function PricingHistoryList() {
             <thead>
               <tr>
                 <th>Mã bản tính</th>
+                <th>Loại</th>
                 <th>Lead</th>
                 <th>Khách hàng</th>
                 <th>Nhóm giá</th>
@@ -80,6 +83,11 @@ export default function PricingHistoryList() {
               {rows.map((r) => (
                 <tr key={r.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/pricing/history/${r.id}`)}>
                   <td><code>{r.code}</code></td>
+                  <td>
+                    <span className="admin-kb-badge admin-kb-badge--medium">
+                      {r.calculationMethod === "COSTING" ? "COSTING" : r.calculationMethod === "PRICE_LIST" ? "BẢNG GIÁ" : "KHÔNG XÁC ĐỊNH"}
+                    </span>
+                  </td>
                   <td>{r.leadLabel ?? "—"}</td>
                   <td>{r.customerLabel ?? "—"}</td>
                   <td>{r.priceGroupName ?? "—"}</td>

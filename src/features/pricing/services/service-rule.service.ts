@@ -2,6 +2,7 @@ import type { PricingCalculationType, PricingServiceType } from "@prisma/client"
 import { prisma } from "@/lib/prisma";
 import type { ServicePriceRuleRecord } from "@/features/pricing/types";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
+import { serviceRuleBelongsToPriceGroup } from "@/features/pricing/pricing-p1-guards";
 
 function mapRule(row: {
   id: string;
@@ -142,14 +143,12 @@ export async function updateServicePriceRule(
 }
 
 export async function getServiceRulesForPricing(priceGroupId: string | null, ruleIds: string[]) {
-  const rules = await prisma.servicePriceRule.findMany({
+  if (ruleIds.length === 0) return [];
+  const rows = await prisma.servicePriceRule.findMany({
     where: {
       isActive: true,
-      OR: [
-        { id: { in: ruleIds } },
-        ...(priceGroupId ? [{ priceGroupId }, { priceGroupId: null }] : [{ priceGroupId: null }]),
-      ],
+      id: { in: ruleIds },
     },
   });
-  return rules;
+  return rows.filter((rule) => serviceRuleBelongsToPriceGroup(rule.priceGroupId, priceGroupId));
 }

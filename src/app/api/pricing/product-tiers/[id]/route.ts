@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { updateProductPriceTier } from "@/features/pricing/services/product-tier.service";
 import { PricingValidationError } from "@/features/pricing/services/price-group.service";
 import { parseMoneyInput, parseOptionalInt } from "@/features/pricing/parse-money";
@@ -40,6 +41,12 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   } catch (err) {
     if (err instanceof PricingValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+      return NextResponse.json(
+        { message: "Dữ liệu bảng giá vừa thay đổi bởi thao tác khác. Vui lòng tải lại và thử lại." },
+        { status: 409 },
+      );
     }
     console.error("[PATCH /api/pricing/product-tiers/[id]]", err);
     return NextResponse.json({ message: "Không thể cập nhật dòng giá" }, { status: 500 });

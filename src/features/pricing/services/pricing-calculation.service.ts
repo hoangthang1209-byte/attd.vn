@@ -26,6 +26,7 @@ function mapListRow(row: {
   isFinal: boolean;
   finalizedAt: Date | null;
   revisionLabel: string | null;
+  resultSnapshot: unknown;
   createdAt: Date;
   lead?: { fullName: string; company: string | null; companyName: string | null } | null;
   customer?: { name: string } | null;
@@ -34,6 +35,13 @@ function mapListRow(row: {
   const leadLabel = row.lead
     ? [row.lead.fullName, row.lead.companyName ?? row.lead.company].filter(Boolean).join(" · ")
     : null;
+  const snapshot = row.resultSnapshot;
+  const calculator =
+    snapshot && typeof snapshot === "object"
+      ? (snapshot as { calculator?: unknown }).calculator
+      : undefined;
+  const calculationMethod: "COSTING" | "PRICE_LIST" | "UNKNOWN" =
+    calculator === "costing" ? "COSTING" : calculator === "price-list" ? "PRICE_LIST" : "UNKNOWN";
   return {
     id: row.id,
     code: row.code,
@@ -50,6 +58,7 @@ function mapListRow(row: {
     isFinal: row.isFinal,
     finalizedAt: row.finalizedAt?.toISOString() ?? null,
     revisionLabel: row.revisionLabel,
+    calculationMethod,
     createdAt: row.createdAt.toISOString(),
   };
 }
