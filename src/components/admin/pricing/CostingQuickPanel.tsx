@@ -302,7 +302,7 @@ export default function CostingQuickPanel({
               <div>
                 <span className="admin-field-hint">LN / SP</span>
                 <strong>
-                  {commercial && preview.totalCost > 0
+                  {commercial && commercial.revenue > 0
                     ? formatPricingCurrency(commercial.profit / commercial.quantity)
                     : "—"}
                 </strong>
@@ -310,7 +310,7 @@ export default function CostingQuickPanel({
               <div>
                 <span className="admin-field-hint">Margin</span>
                 <strong>
-                  {commercial && preview.totalCost > 0
+                  {commercial && commercial.revenue > 0
                     ? formatPricingPercent(commercial.marginRate)
                     : "—"}
                 </strong>
