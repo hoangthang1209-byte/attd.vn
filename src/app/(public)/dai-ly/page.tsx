@@ -7,7 +7,7 @@ import { TRUST_REASSURANCE_DEALER_PRIVACY } from "@/lib/b2b-trust-v2-copy";
 import { getManufacturingEvidenceForSurfaceAsync } from "@/lib/manufacturing-library.server";
 import { canonicalUrl, buildOgImages } from "@/lib/seo";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
-import { getLandingDemoImage } from "@/features/demo/demo-image-map";
+import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 
 export const revalidate = 3600;
 
@@ -95,11 +95,14 @@ const WORKFLOW = [
 ];
 
 export default async function DaiLyPage() {
-  const landing = await resolveBespokeLanding("dai-ly");
-  const dealerEvidence = await getManufacturingEvidenceForSurfaceAsync("dealer", {
-    limit: 3,
-    requireMedia: true,
-  });
+  const [landing, dealerEvidence, heroMedia] = await Promise.all([
+    resolveBespokeLanding("dai-ly"),
+    getManufacturingEvidenceForSurfaceAsync("dealer", {
+      limit: 3,
+      requireMedia: true,
+    }),
+    getPublicSurfaceMedia("dealer"),
+  ]);
 
   return (
     <main className="dealer-landing-v2">
@@ -107,7 +110,7 @@ export default async function DaiLyPage() {
         eyebrow="Chương trình đại lý"
         title={landing.heroTitle}
         description={landing.heroDescription}
-        imageUrl={getLandingDemoImage("dai-ly")}
+        imageUrl={heroMedia?.url}
         dark={false}
         primaryCta={{ href: "#dealer-form", label: "Đăng ký đại lý" }}
         secondaryCta={{ href: "/lien-he", label: "Trao đổi với ATTD" }}
