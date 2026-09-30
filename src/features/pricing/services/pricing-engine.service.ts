@@ -38,14 +38,21 @@ function pickBestTier(tiers: ProductPriceTier[], quantity: number, variantId?: s
 
   if (variantId) {
     const variantTiers = matching.filter((t) => t.variantId === variantId);
-    if (variantTiers.length > 0) {
-      return variantTiers.sort((a, b) => b.minQuantity - a.minQuantity)[0];
+    if (variantTiers.length > 1) {
+      throw new PricingValidationError(
+        "Có nhiều dòng giá biến thể cùng hiệu lực cho số lượng này. Vui lòng kiểm tra lại Bảng giá chuẩn trước khi báo giá.",
+      );
     }
+    if (variantTiers.length === 1) return variantTiers[0];
   }
 
   const productTiers = matching.filter((t) => !t.variantId);
-  if (productTiers.length === 0) return null;
-  return productTiers.sort((a, b) => b.minQuantity - a.minQuantity)[0];
+  if (productTiers.length > 1) {
+    throw new PricingValidationError(
+      "Có nhiều dòng giá sản phẩm cùng hiệu lực cho số lượng này. Vui lòng kiểm tra lại Bảng giá chuẩn trước khi báo giá.",
+    );
+  }
+  return productTiers[0] ?? null;
 }
 
 function variantLabel(variant: {
