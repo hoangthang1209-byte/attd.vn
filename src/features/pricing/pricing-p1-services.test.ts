@@ -67,6 +67,31 @@ describe("Pricing P1 service integration", () => {
     );
   });
 
+  it("fails safely if legacy overlapping active tiers already exist", async () => {
+    const legacy = await prisma.productPriceTier.create({
+      data: {
+        productId,
+        priceGroupId: dealerGroupId,
+        minQuantity: 50,
+        maxQuantity: 200,
+        unitPrice: 90000,
+        effectiveFrom: new Date("2026-06-01"),
+        isActive: true,
+      },
+    });
+    try {
+      await assert.rejects(
+        () => calculatePricing({
+          priceGroupId: dealerGroupId,
+          items: [{ productId, quantity: 75 }],
+        }),
+        /nhiều dòng giá/,
+      );
+    } finally {
+      await prisma.productPriceTier.delete({ where: { id: legacy.id } });
+    }
+  });
+
   it("rejects cross-group and out-of-range service rules", async () => {
     await assert.rejects(
       () => calculatePricing({
