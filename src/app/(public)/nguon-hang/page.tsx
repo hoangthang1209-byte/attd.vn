@@ -6,7 +6,7 @@ import DealerLeadForm from "@/components/forms/DealerLeadForm";
 import FaqSchema from "@/components/seo/FaqSchema";
 import LandingHeroVisual from "@/components/public/LandingHeroVisual";
 import { resolveBespokeLanding } from "@/features/landing-pages/resolve-bespoke-landing";
-import { getLandingDemoImage } from "@/features/demo/demo-image-map";
+import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 
 export const revalidate = 3600;
 
@@ -43,7 +43,7 @@ const whyItems = [
   {
     marker: "04",
     title: "Giao hàng toàn quốc",
-    body: "Hợp tác với đơn vị vận chuyển uy tín, giao nhanh đến 63 tỉnh thành.",
+    body: "Hợp tác với đơn vị vận chuyển uy tín, giao nhanh đến toàn quốc.",
   },
   {
     marker: "05",
@@ -67,8 +67,11 @@ const dealerBenefits = [
 ];
 
 export default async function WholesalePage() {
-  const categories = await getCategories();
-  const landing = await resolveBespokeLanding("nguon-hang");
+  const [categories, landing, heroMedia] = await Promise.all([
+    getCategories(),
+    resolveBespokeLanding("nguon-hang"),
+    getPublicSurfaceMedia("sourcing"),
+  ]);
 
   return (
     <main>
@@ -77,7 +80,7 @@ export default async function WholesalePage() {
         eyebrow="B2B Wholesale"
         title={landing.heroTitle}
         description={landing.heroDescription}
-        imageUrl={getLandingDemoImage("nguon-hang")}
+        imageUrl={heroMedia?.url}
         primaryCta={{ href: landing.primaryCtaHref, label: landing.primaryCtaLabel }}
         secondaryCta={{ href: landing.secondaryCtaHref, label: landing.secondaryCtaLabel }}
       />
@@ -87,7 +90,7 @@ export default async function WholesalePage() {
         <div className="container">
           <h2 className="section-title">Tại sao chọn ATTD?</h2>
           <p className="section-description">
-            Hơn 1.000 mã nguồn hàng trơn, hàng có sẵn kho, giao nhanh toàn quốc.
+            Nguồn hàng đồng phục, hàng trơn và quà tặng B2B với thông tin sản phẩm, MOQ và tiến độ rõ ràng.
           </p>
 
           <div
