@@ -45,6 +45,9 @@ export default function HomeProductDiscoverySection({ products }: Props) {
                 leadTime={product.productionLeadTime}
                 stockStatus={stockStatus}
                 stockLabel={stockLabel}
+                supportsPrinting={product.supportsPrinting}
+                supportsEmbroidery={product.supportsEmbroidery}
+                supportsOem={product.supportsOem}
                 compact
                 salesBadges={product.salesBadges}
                 availableColors={product.availableColors}
