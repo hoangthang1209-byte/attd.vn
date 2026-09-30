@@ -111,7 +111,7 @@ const LEGACY_TEST_PATTERNS = [
   { code: "PT0002", name: "IMIN JERSEY 2026 V2", targetCode: "TEST-0002" },
 ] as const;
 
-async function moveLegacyTestPatternsOutOfProductionSequence(): Promise<void> {
+export async function moveLegacyTestPatternsOutOfProductionSequence(): Promise<void> {
   const sourceCodes = LEGACY_TEST_PATTERNS.map((item) => item.code);
   const targetCodes = LEGACY_TEST_PATTERNS.map((item) => item.targetCode);
 
