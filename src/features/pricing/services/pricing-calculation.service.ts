@@ -36,10 +36,12 @@ function mapListRow(row: {
     ? [row.lead.fullName, row.lead.companyName ?? row.lead.company].filter(Boolean).join(" · ")
     : null;
   const snapshot = row.resultSnapshot;
-  const calculationMethod: "COSTING" | "PRICE_LIST" =
-    snapshot && typeof snapshot === "object" && (snapshot as { calculator?: unknown }).calculator === "costing"
-      ? "COSTING"
-      : "PRICE_LIST";
+  const calculator =
+    snapshot && typeof snapshot === "object"
+      ? (snapshot as { calculator?: unknown }).calculator
+      : undefined;
+  const calculationMethod: "COSTING" | "PRICE_LIST" | "UNKNOWN" =
+    calculator === "costing" ? "COSTING" : calculator === "price-list" ? "PRICE_LIST" : "UNKNOWN";
   return {
     id: row.id,
     code: row.code,
