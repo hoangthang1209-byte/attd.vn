@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   createProductPriceTier,
   listProductPriceTiers,
@@ -67,6 +68,12 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof PricingValidationError) {
       return NextResponse.json({ message: err.message }, { status: 400 });
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+      return NextResponse.json(
+        { message: "Dữ liệu bảng giá vừa thay đổi bởi thao tác khác. Vui lòng tải lại và thử lại." },
+        { status: 409 },
+      );
     }
     console.error("[POST /api/pricing/product-tiers]", err);
     return NextResponse.json({ message: "Không thể tạo dòng giá" }, { status: 500 });
