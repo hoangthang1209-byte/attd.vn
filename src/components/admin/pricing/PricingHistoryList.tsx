@@ -85,7 +85,7 @@ export default function PricingHistoryList() {
                   <td><code>{r.code}</code></td>
                   <td>
                     <span className="admin-kb-badge admin-kb-badge--medium">
-                      {r.calculationMethod === "COSTING" ? "COSTING" : "BẢNG GIÁ"}
+                      {r.calculationMethod === "COSTING" ? "COSTING" : r.calculationMethod === "PRICE_LIST" ? "BẢNG GIÁ" : "KHÔNG XÁC ĐỊNH"}
                     </span>
                   </td>
                   <td>{r.leadLabel ?? "—"}</td>
