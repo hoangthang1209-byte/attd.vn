@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { getZaloUrl } from "@/lib/companyInfo";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import { trackPdpMobileZaloClicked } from "@/lib/analytics";
@@ -18,27 +17,16 @@ export default function ProductPdpMobileBar({
   attentionKey = 0,
   isQuoteReady = false,
 }: Props) {
-  const [isQuoteHighlighted, setIsQuoteHighlighted] = useState(false);
-
-  useEffect(() => {
-    if (!attentionKey) return;
-
-    setIsQuoteHighlighted(true);
-    const timeout = window.setTimeout(() => {
-      setIsQuoteHighlighted(false);
-    }, 850);
-
-    return () => window.clearTimeout(timeout);
-  }, [attentionKey]);
 
   return (
     <div className="pdp-mobile-action-bar" role="navigation" aria-label="Hành động sản phẩm">
       <button
+        key={attentionKey}
         type="button"
         className={[
           "pdp-mobile-action-bar__btn pdp-mobile-action-bar__btn--quote",
           isQuoteReady ? "pdp-mobile-action-bar__btn--quote-active" : "",
-          isQuoteHighlighted ? "pdp-mobile-action-bar__btn--attention" : "",
+          attentionKey > 0 ? "pdp-mobile-action-bar__btn--attention" : "",
         ]
           .filter(Boolean)
           .join(" ")}
