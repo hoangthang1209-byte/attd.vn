@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { getProductsForPublicListing } from "@/features/products/services/product.service";
 import {
@@ -26,6 +27,7 @@ import { buildClearFiltersUrl, buildCatalogUrl, removeCatalogFilterParam } from 
 import { publicCategoryHref } from "@/features/categories/public-category-url";
 import { buildCatalogQuickNavCategories } from "@/features/categories/catalog-category-nav.utils";
 import { parseCatalogSort } from "@/lib/catalog-sort";
+import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 
 export const revalidate = 3600;
 
@@ -95,7 +97,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
     sort,
   };
 
-  const [{ products, total, perPage }, categoryTree, categoryContext] =
+  const [{ products, total, perPage }, categoryTree, categoryContext, catalogMedia] =
     await Promise.all([
       getProductsForPublicListing({
         categorySlug: category,
@@ -106,6 +108,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
       }),
       getCategoryTreeForCatalogFilter(),
       category ? resolveCatalogCategoryContext(category) : Promise.resolve(null),
+      getPublicSurfaceMedia("catalog"),
     ]);
 
   const quickNavCategories = buildCatalogQuickNavCategories(
@@ -139,22 +142,36 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
       <section className="mp-catalog-hero">
         <div className="container">
-          <div className="mp-catalog-hero-card">
+          <div className="mp-catalog-hero-card mp-catalog-hero-card--v3">
             <div className="mp-catalog-hero-copy">
               <p className="mp-catalog-eyebrow">Nguồn hàng B2B</p>
               <h1 className="mp-catalog-title">{pageTitle}</h1>
               <p className="mp-catalog-desc">{pageDescription}</p>
               <CatalogSourcingBadges />
             </div>
-            <div className="mp-catalog-hero-search">
-              <MarketplaceSearchBar
-                defaultValue={q ?? ""}
-                size="large"
-                catalogContext={quickNavBaseFilters}
-              />
-              <p className="mp-catalog-search-hint">
-                Tìm theo sản phẩm, mã hàng, chất liệu hoặc nhóm quà tặng doanh nghiệp.
-              </p>
+            <div className="mp-catalog-hero-aside">
+              {catalogMedia ? (
+                <div className="mp-catalog-hero-media">
+                  <Image
+                    src={catalogMedia.url}
+                    alt={catalogMedia.alt}
+                    fill
+                    priority
+                    className="mp-catalog-hero-media__image"
+                    sizes="(max-width: 900px) 100vw, 42vw"
+                  />
+                </div>
+              ) : null}
+              <div className="mp-catalog-hero-search">
+                <MarketplaceSearchBar
+                  defaultValue={q ?? ""}
+                  size="large"
+                  catalogContext={quickNavBaseFilters}
+                />
+                <p className="mp-catalog-search-hint">
+                  Tìm theo sản phẩm, mã hàng, chất liệu hoặc nhóm quà tặng doanh nghiệp.
+                </p>
+              </div>
             </div>
           </div>
         </div>
