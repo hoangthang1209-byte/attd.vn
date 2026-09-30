@@ -1,43 +1,42 @@
 /**
- * Shared layout component for wholesale áo trơn SEO cluster pages.
+ * Shared layout for the wholesale SEO cluster.
  *
- * Reuses CollectionSchema, FaqSchema, Breadcrumb.
- * Renders 8 sections: Hero → Suitable customers → Why ATTD →
- * Product categories → Cooperation process → FAQ → CTA.
+ * Design Language V2 intentionally reuses the same public visual primitives as
+ * the marketplace instead of page-specific gradients and inline styles.
  */
 
 import Link from "next/link";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import CollectionSchema from "@/components/seo/CollectionSchema";
 import FaqSchema from "@/components/seo/FaqSchema";
+import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
 import type { WholesaleContent } from "@/lib/wholesaleContent";
 
-// All 5 product category links — same across every wholesale page
 const PRODUCT_CATEGORIES = [
   {
     name: "Áo Thun Trơn",
     href: "/ao-thun-tron",
-    desc: "Cotton cao cấp, đa màu sắc, đủ size S-4XL — nền tảng cho xưởng in và đồng phục.",
+    desc: "Cotton, CVC và TC đa màu, đủ size cho xưởng in, đồng phục và merchandise.",
   },
   {
     name: "Áo Polo Trơn",
     href: "/ao-polo-tron",
-    desc: "Pique cotton lịch sự, phù hợp in thêu đồng phục doanh nghiệp.",
+    desc: "Polo trơn cho đồng phục doanh nghiệp, in/thêu logo và chương trình B2B.",
   },
   {
     name: "Nón Trơn",
     href: "/non",
-    desc: "Nón lưỡi trai, bucket, snapback — đa kiểu dáng cho đồng phục và sự kiện.",
+    desc: "Nón lưỡi trai, bucket và các cấu hình phù hợp sự kiện hoặc quà tặng.",
   },
   {
-    name: "Túi Tote Canvas",
+    name: "Túi Tote",
     href: "/tote",
-    desc: "Canvas bền đẹp, phù hợp in logo và quà tặng doanh nghiệp.",
+    desc: "Tote canvas và túi vải cho quà tặng, activation và nhu cầu gắn thương hiệu.",
   },
   {
     name: "Bình Giữ Nhiệt",
     href: "/binh-giu-nhiet",
-    desc: "Inox 304 an toàn thực phẩm — quà tặng doanh nghiệp phổ biến nhất.",
+    desc: "Nhóm quà tặng doanh nghiệp phổ biến, hỗ trợ hoàn thiện thương hiệu theo dự án.",
   },
 ] as const;
 
@@ -47,57 +46,13 @@ interface WholesaleLandingPageProps {
   canonicalUrl: string;
 }
 
-// ── Shared inline styles ───────────────────────────────────────────────────
-
-const sec: React.CSSProperties = { padding: "56px 0" };
-const secAlt: React.CSSProperties = {
-  padding: "56px 0",
-  background: "#f9fafb",
-  borderTop: "1px solid #e5e7eb",
-};
-const ctr: React.CSSProperties = {
-  maxWidth: "860px",
-  margin: "0 auto",
-  padding: "0 24px",
-};
-const h2: React.CSSProperties = {
-  fontSize: "22px",
-  fontWeight: 700,
-  color: "#111827",
-  marginBottom: "24px",
-};
-const grid2: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-  gap: "20px",
-};
-const card: React.CSSProperties = {
-  background: "#fff",
-  border: "1px solid #e5e7eb",
-  borderRadius: "10px",
-  padding: "20px 22px",
-};
-const cardTitle: React.CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 700,
-  color: "#111827",
-  marginBottom: "8px",
-};
-const cardDesc: React.CSSProperties = {
-  fontSize: "14px",
-  lineHeight: "1.7",
-  color: "#4b5563",
-  margin: 0,
-};
-
 export default function WholesaleLandingPage({
   slug,
   content,
   canonicalUrl,
 }: WholesaleLandingPageProps) {
   return (
-    <main>
-      {/* ── Structured Data ──────────────────────────────────────────────────── */}
+    <main className="wholesale-landing-v2">
       <CollectionSchema
         title={content.seoTitle}
         description={content.metaDescription}
@@ -105,386 +60,189 @@ export default function WholesaleLandingPage({
       />
       <FaqSchema items={content.faq} />
 
-      {/* ── Breadcrumb ───────────────────────────────────────────────────────── */}
       <Breadcrumb items={[{ name: content.h1, href: `/${slug}` }]} />
 
-      {/* ── SECTION 1: Hero ──────────────────────────────────────────────────── */}
-      <section
-        style={{
-          background: "linear-gradient(135deg, #0f2942 0%, #1d4ed8 100%)",
-          padding: "64px 0 56px",
-          color: "#fff",
-        }}
-      >
-        <div style={{ ...ctr, maxWidth: "780px", textAlign: "center" }}>
-          <h1
-            style={{
-              fontSize: "clamp(24px, 4vw, 36px)",
-              fontWeight: 800,
-              color: "#fff",
-              lineHeight: 1.25,
-              marginBottom: "20px",
-            }}
-          >
-            {content.h1}
-          </h1>
-          <p
-            style={{
-              fontSize: "17px",
-              lineHeight: "1.75",
-              color: "rgba(255,255,255,0.88)",
-              maxWidth: "640px",
-              margin: "0 auto 36px",
-            }}
-          >
-            {content.heroIntro}
-          </p>
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <Link
-              href={content.primaryCta?.href ?? "/lien-he"}
-              style={{
-                display: "inline-block",
-                padding: "13px 28px",
-                background: "#fff",
-                color: "#1d4ed8",
-                borderRadius: "8px",
-                fontWeight: 700,
-                fontSize: "15px",
-                textDecoration: "none",
-              }}
-            >
-              {content.primaryCta?.label ?? "Yêu cầu báo giá"}
-            </Link>
-            <Link
-              href={content.secondaryCta?.href ?? "/dai-ly"}
-              style={{
-                display: "inline-block",
-                padding: "13px 28px",
-                background: "rgba(255,255,255,0.15)",
-                color: "#fff",
-                border: "1px solid rgba(255,255,255,0.4)",
-                borderRadius: "8px",
-                fontWeight: 700,
-                fontSize: "15px",
-                textDecoration: "none",
-              }}
-            >
-              {content.secondaryCta?.label ?? "Nhận tư vấn"}
-            </Link>
+      <section className="wholesale-hero">
+        <div className="container wholesale-hero__grid">
+          <div className="wholesale-hero__copy">
+            <p className="public-eyebrow">Nguồn hàng B2B</p>
+            <h1 className="wholesale-hero__title">{content.h1}</h1>
+            <p className="wholesale-hero__lead">{content.heroIntro}</p>
+            <div className="wholesale-hero__actions">
+              <Link href={content.primaryCta?.href ?? "/lien-he"} className="btn-primary">
+                {content.primaryCta?.label ?? "Yêu cầu báo giá"}
+              </Link>
+              <Link href={content.secondaryCta?.href ?? "/dai-ly"} className="btn-secondary">
+                {content.secondaryCta?.label ?? "Nhận tư vấn"}
+              </Link>
+            </div>
           </div>
+
+          <aside className="wholesale-hero__decision" aria-label="Thông tin sourcing">
+            <p className="wholesale-hero__decision-label">ATTD hỗ trợ</p>
+            <dl className="wholesale-hero__decision-list">
+              <div>
+                <dt>Nguồn hàng</dt>
+                <dd>Hàng trơn · đồng phục · quà tặng</dd>
+              </div>
+              <div>
+                <dt>Hoàn thiện</dt>
+                <dd>In · thêu · nhãn · đóng gói</dd>
+              </div>
+              <div>
+                <dt>Sản xuất</dt>
+                <dd>OEM / Private Label theo yêu cầu</dd>
+              </div>
+              <div>
+                <dt>Báo giá</dt>
+                <dd>Theo sản phẩm, số lượng và tiến độ</dd>
+              </div>
+            </dl>
+          </aside>
         </div>
       </section>
 
-      {/* ── SECTION 2: Introduction ──────────────────────────────────────────── */}
-      <section style={secAlt}>
-        <div style={ctr}>
-          <h2 style={h2}>Về {content.h1}</h2>
+      <section className="public-editorial-section public-editorial-section--soft">
+        <div className="container public-editorial-narrow">
+          <p className="public-eyebrow">Tổng quan</p>
+          <h2 className="public-section-title">Về {content.h1}</h2>
           <div
-            style={{ fontSize: "15px", lineHeight: "1.8", color: "#374151" }}
+            className="wholesale-rich-copy"
             dangerouslySetInnerHTML={{ __html: content.intro }}
           />
         </div>
       </section>
 
-      {/* ── SECTION 3: Suitable Customers ────────────────────────────────────── */}
-      {content.suitableCustomers.length > 0 && (
-        <section style={sec}>
-          <div style={ctr}>
-            <h2 style={h2}>Phù hợp với đối tượng nào?</h2>
-            <div style={grid2}>
-              {content.suitableCustomers.map((c, i) => (
-                <article key={i} style={card}>
-                  <h3 style={cardTitle}>{c.title}</h3>
-                  <p style={cardDesc}>{c.description}</p>
+      {content.suitableCustomers.length > 0 ? (
+        <section className="public-editorial-section">
+          <div className="container">
+            <div className="public-section-heading">
+              <p className="public-eyebrow">Đối tượng phù hợp</p>
+              <h2 className="public-section-title">Phù hợp với nhu cầu nào?</h2>
+            </div>
+            <div className="public-card-grid public-card-grid--2">
+              {content.suitableCustomers.map((item) => (
+                <article key={item.title} className="public-info-card">
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
                 </article>
               ))}
             </div>
           </div>
         </section>
-      )}
+      ) : null}
 
-      {/* ── SECTION 4: Why ATTD ──────────────────────────────────────────────── */}
-      {content.whyAttd.length > 0 && (
-        <section style={secAlt}>
-          <div style={ctr}>
-            <h2 style={h2}>Tại sao chọn nguồn hàng ATTD?</h2>
-            <div style={grid2}>
-              {content.whyAttd.map((w, i) => (
-                <article key={i} style={card}>
-                  <h3 style={cardTitle}>{w.title}</h3>
-                  <p style={cardDesc}>{w.description}</p>
+      {content.whyAttd.length > 0 ? (
+        <section className="public-editorial-section public-editorial-section--soft">
+          <div className="container">
+            <div className="public-section-heading">
+              <p className="public-eyebrow">Năng lực ATTD</p>
+              <h2 className="public-section-title">Tại sao chọn nguồn hàng ATTD?</h2>
+            </div>
+            <div className="public-card-grid public-card-grid--2">
+              {content.whyAttd.map((item) => (
+                <article key={item.title} className="public-info-card public-info-card--quiet">
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
                 </article>
               ))}
             </div>
           </div>
         </section>
-      )}
+      ) : null}
 
-      {/* ── SECTION 5: Product Categories ────────────────────────────────────── */}
-      <section style={sec}>
-        <div style={ctr}>
-          <h2 style={h2}>Danh mục sản phẩm trơn</h2>
-          <p
-            style={{
-              fontSize: "15px",
-              color: "#4b5563",
-              marginBottom: "24px",
-              lineHeight: "1.7",
-            }}
-          >
-            ATTD cung cấp các nhóm hàng áo trơn phổ biến cho xưởng in, đại lý
-            và doanh nghiệp:
-          </p>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-              gap: "16px",
-            }}
-          >
-            {PRODUCT_CATEGORIES.map((cat) => (
-              <Link
-                key={cat.href}
-                href={cat.href}
-                style={{
-                  display: "block",
-                  ...card,
-                  textDecoration: "none",
-                }}
-              >
-                <h3
-                  style={{
-                    ...cardTitle,
-                    color: "#1d4ed8",
-                  }}
-                >
-                  {cat.name} →
-                </h3>
-                <p style={cardDesc}>{cat.desc}</p>
+      <section className="public-editorial-section">
+        <div className="container">
+          <div className="public-section-heading public-section-heading--split">
+            <div>
+              <p className="public-eyebrow">Danh mục</p>
+              <h2 className="public-section-title">Nhóm sản phẩm liên quan</h2>
+            </div>
+            <p className="public-section-copy">
+              Chọn nhóm sản phẩm để xem dữ liệu chi tiết, màu, size và khả năng hoàn thiện.
+            </p>
+          </div>
+          <div className="wholesale-category-grid">
+            {PRODUCT_CATEGORIES.map((category) => (
+              <Link key={category.href} href={category.href} className="wholesale-category-card">
+                <span className="wholesale-category-card__arrow" aria-hidden>↗</span>
+                <h3>{category.name}</h3>
+                <p>{category.desc}</p>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── SECTION 6: Cooperation Process ───────────────────────────────────── */}
-      {content.process.length > 0 && (
-        <section style={secAlt}>
-          <div style={ctr}>
-            <h2 style={h2}>Quy trình hợp tác</h2>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-              }}
-            >
-              {content.process.map((step) => (
-                <div
-                  key={step.step}
-                  style={{
-                    display: "flex",
-                    gap: "16px",
-                    alignItems: "flex-start",
-                    ...card,
-                  }}
-                >
-                  <div
-                    style={{
-                      flexShrink: 0,
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "50%",
-                      background: "#1d4ed8",
-                      color: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 700,
-                      fontSize: "14px",
-                    }}
-                    aria-hidden="true"
-                  >
-                    {step.step}
-                  </div>
-                  <div>
-                    <h3 style={{ ...cardTitle, marginBottom: "6px" }}>
-                      {step.title}
-                    </h3>
-                    <p style={cardDesc}>{step.description}</p>
-                  </div>
-                </div>
-              ))}
+      {content.process.length > 0 ? (
+        <section className="public-editorial-section public-editorial-section--soft">
+          <div className="container">
+            <div className="public-section-heading">
+              <p className="public-eyebrow">Cách làm việc</p>
+              <h2 className="public-section-title">Quy trình hợp tác</h2>
             </div>
+            <ol className="public-process-list">
+              {content.process.map((step) => (
+                <li key={step.step} className="public-process-item">
+                  <span className="public-process-item__num">{step.step}</span>
+                  <div>
+                    <h3>{step.title}</h3>
+                    <p>{step.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
-      )}
+      ) : null}
 
-      {/* ── SECTION 7: FAQ ───────────────────────────────────────────────────── */}
-      {content.faq.length > 0 && (
-        <section style={sec}>
-          <div style={ctr}>
-            <h2 style={h2}>Câu hỏi thường gặp</h2>
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-            >
-              {content.faq.map((item, i) => (
-                <details
-                  key={i}
-                  style={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "10px",
-                    overflow: "hidden",
-                  }}
-                >
-                  <summary
-                    style={{
-                      padding: "16px 20px",
-                      cursor: "pointer",
-                      fontWeight: 600,
-                      fontSize: "15px",
-                      color: "#111827",
-                      background: "#fff",
-                      listStyle: "none",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    {item.question}
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        color: "#9ca3af",
-                        fontSize: "18px",
-                        flexShrink: 0,
-                      }}
-                    >
-                      +
-                    </span>
-                  </summary>
-                  <div
-                    style={{
-                      padding: "0 20px 16px",
-                      fontSize: "14px",
-                      lineHeight: "1.75",
-                      color: "#4b5563",
-                      background: "#f9fafb",
-                      borderTop: "1px solid #e5e7eb",
-                    }}
-                  >
-                    <p style={{ margin: "16px 0 0" }}>{item.answer}</p>
+      <MarketplaceRFQStrip />
+
+      {content.faq.length > 0 ? (
+        <section className="public-editorial-section">
+          <div className="container public-editorial-narrow">
+            <div className="public-section-heading">
+              <p className="public-eyebrow">FAQ</p>
+              <h2 className="public-section-title">Câu hỏi thường gặp</h2>
+            </div>
+            <div className="faq-list">
+              {content.faq.map((item) => (
+                <details key={item.question} className="faq-item">
+                  <summary>{item.question}</summary>
+                  <div className="faq-answer">
+                    <p>{item.answer}</p>
                   </div>
                 </details>
               ))}
             </div>
           </div>
         </section>
-      )}
+      ) : null}
 
-      {/* ── SECTION 8: CTA ───────────────────────────────────────────────────── */}
-      <section
-        style={{
-          ...sec,
-          background: "linear-gradient(135deg, #0f2942 0%, #1d4ed8 100%)",
-          color: "#fff",
-        }}
-      >
-        <div style={{ ...ctr, textAlign: "center" }}>
-          <h2
-            style={{
-              fontSize: "26px",
-              fontWeight: 800,
-              color: "#fff",
-              marginBottom: "12px",
-            }}
-          >
-            {content.ctaTitle}
-          </h2>
-          <p
-            style={{
-              fontSize: "16px",
-              color: "rgba(255,255,255,0.85)",
-              maxWidth: "600px",
-              margin: "0 auto 32px",
-              lineHeight: "1.7",
-            }}
-          >
-            {content.ctaDescription}
-          </p>
-
-          <div
-            style={{
-              display: "flex",
-              gap: "12px",
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <Link
-              href={content.primaryCta?.href ?? "/lien-he"}
-              style={{
-                display: "inline-block",
-                padding: "13px 28px",
-                background: "#fff",
-                color: "#1d4ed8",
-                borderRadius: "8px",
-                fontWeight: 700,
-                fontSize: "15px",
-                textDecoration: "none",
-              }}
-            >
+      <section className="wholesale-final-cta">
+        <div className="container wholesale-final-cta__inner">
+          <div>
+            <p className="public-eyebrow public-eyebrow--inverse">Bắt đầu dự án</p>
+            <h2>{content.ctaTitle}</h2>
+            <p>{content.ctaDescription}</p>
+          </div>
+          <div className="wholesale-final-cta__actions">
+            <Link href={content.primaryCta?.href ?? "/lien-he"} className="btn-primary">
               {content.primaryCta?.label ?? "Yêu cầu báo giá"}
             </Link>
-            <Link
-              href={content.secondaryCta?.href ?? "/dai-ly"}
-              style={{
-                display: "inline-block",
-                padding: "13px 28px",
-                background: "rgba(255,255,255,0.15)",
-                color: "#fff",
-                border: "1px solid rgba(255,255,255,0.4)",
-                borderRadius: "8px",
-                fontWeight: 700,
-                fontSize: "15px",
-                textDecoration: "none",
-              }}
-            >
+            <Link href={content.secondaryCta?.href ?? "/dai-ly"} className="btn-secondary">
               {content.secondaryCta?.label ?? "Nhận tư vấn"}
             </Link>
           </div>
-
-          {/* Cluster cross-links */}
-          <p
-            style={{
-              marginTop: "28px",
-              fontSize: "13px",
-              color: "rgba(255,255,255,0.6)",
-            }}
-          >
-            Xem thêm:{" "}
-            {content.internalLinks.map((link, i) => (
-              <span key={i}>
-                {i > 0 && <span> · </span>}
-                <Link
-                  href={link.href}
-                  style={{
-                    color: "rgba(255,255,255,0.85)",
-                    textDecoration: "underline",
-                  }}
-                >
+          {content.internalLinks.length > 0 ? (
+            <nav className="wholesale-final-cta__links" aria-label="Liên kết liên quan">
+              {content.internalLinks.map((link) => (
+                <Link key={link.href} href={link.href}>
                   {link.label}
                 </Link>
-              </span>
-            ))}
-          </p>
+              ))}
+            </nav>
+          ) : null}
         </div>
       </section>
     </main>
