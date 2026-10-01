@@ -4,12 +4,14 @@ import { Suspense } from "react";
 import ContactForm from "@/components/public/ContactForm";
 import PublicContactChannels from "@/components/public/PublicContactChannels";
 import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
+import { buildContactMetadata } from "@/lib/seo/indexation-policy";
 
 export const revalidate = 3600;
-export const metadata: Metadata = {
+export const metadata: Metadata = buildContactMetadata({
   title: "Gửi brief & yêu cầu báo giá | ATTD",
-  description: "Gửi brief dự án cho ATTD: sản phẩm, số lượng, logo, ngân sách và deadline. Phù hợp đồng phục, sourcing, OEM, gifts và merchandise.",
-};
+  description:
+    "Gửi brief dự án cho ATTD: sản phẩm, số lượng, logo, ngân sách và deadline. Phù hợp đồng phục, sourcing, OEM, quà tặng và merchandise.",
+});
 
 const BRIEF = [
   ["01","Bạn cần gì?","Sản phẩm, nhóm hàng hoặc chỉ cần mô tả mục tiêu."],
