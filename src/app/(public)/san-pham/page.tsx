@@ -137,7 +137,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
   ];
 
   return (
-    <main className="mp-catalog">
+    <main className="mp-catalog mp-catalog--v4">
       <Breadcrumb items={breadcrumbItems} />
 
       <section className="mp-catalog-hero">
@@ -174,6 +174,29 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
               </div>
             </div>
           </div>
+
+          <nav className="mp-catalog-v4__intent" aria-label="Nhu cầu mua hàng">
+            <Link href="/san-pham?inStock=1">
+              <span>01</span>
+              <strong>Cần hàng có sẵn</strong>
+              <small>Ưu tiên sản phẩm có thể triển khai nhanh</small>
+            </Link>
+            <Link href="/san-pham?print=1">
+              <span>02</span>
+              <strong>Cần in logo</strong>
+              <small>Lọc sản phẩm hỗ trợ in theo thiết kế</small>
+            </Link>
+            <Link href="/san-pham?embroidery=1">
+              <span>03</span>
+              <strong>Cần thêu</strong>
+              <small>Lọc nhóm phù hợp thêu logo doanh nghiệp</small>
+            </Link>
+            <Link href="/san-pham?oem=1">
+              <span>04</span>
+              <strong>Cần OEM</strong>
+              <small>Tìm sản phẩm có thể phát triển riêng</small>
+            </Link>
+          </nav>
         </div>
       </section>
 
