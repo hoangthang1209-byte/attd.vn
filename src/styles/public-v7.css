@@ -2882,3 +2882,50 @@
     padding: 60px 0;
   }
 }
+
+
+/* Review hardening */
+.v7-catalog-search__field > p {
+  margin: 8px 0 0;
+  color: var(--v7-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.v7-collection-gallery {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 10px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--v7-line);
+}
+
+.v7-collection-gallery img {
+  width: 100%;
+  aspect-ratio: 1.45 / 1;
+  object-fit: cover;
+  background: var(--v7-soft);
+}
+
+@media (max-width: 900px) {
+  .v7-catalog-intents {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+
+  .v7-catalog-intents a:nth-child(3),
+  .v7-catalog-intents a:nth-child(4) {
+    border-top: 1px solid var(--v7-line);
+  }
+
+  .v7-collection-gallery {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .v7-collection-gallery {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+}
