@@ -96,16 +96,17 @@ export default async function Footer({
   return (
     <footer className="site-footer site-footer--v5">
       <div className="container">
-        <section className="footer-v5__cta" aria-label="Bắt đầu dự án">
-          <div>
-            <p className="footer-v5__eyebrow">Bắt đầu một dự án mới</p>
-            <h2>Gửi yêu cầu. ATTD lo phần nguồn hàng và sản xuất.</h2>
+        <section className="footer-v6__cta" aria-label="Bắt đầu dự án">
+          <div className="footer-v6__cta-index">01 / BẮT ĐẦU</div>
+          <div className="footer-v6__cta-copy">
+            <p>Đang có một dự án cần triển khai?</p>
+            <h2>Gửi brief cho ATTD.</h2>
           </div>
           <TrackedLink
             href={footerCta.href}
             trackEvent={(footerCta.trackEvent as "contact_quote") ?? "contact_quote"}
             trackSource="footer_contact"
-            className="footer-v5__cta-button"
+            className="footer-v6__cta-button"
             target={footerCta.openInNewTab ? "_blank" : undefined}
             rel={footerCta.openInNewTab ? "noopener noreferrer" : undefined}
           >
@@ -114,14 +115,16 @@ export default async function Footer({
           </TrackedLink>
         </section>
 
-        <div className="footer-v5__main">
-          <div className="footer-v5__brand">
+        <div className="footer-v6__brandword" aria-hidden="true">ATTD</div>
+
+        <div className="footer-v5__main footer-v6__main">
+          <div className="footer-v5__brand footer-v6__brand">
             <AttdLogo
               variant="desktop"
               src={branding.footerLogoUrl}
               className="footer-v5__logo"
             />
-            <p className="footer-v5__statement">
+            <p className="footer-v5__statement footer-v6__statement">
               Nguồn hàng B2B, đồng phục, quà tặng và OEM cho doanh nghiệp, đại lý,
               agency và thương hiệu.
             </p>
@@ -167,7 +170,7 @@ export default async function Footer({
             <FooterSocialLinks links={socialLinks} />
           </div>
 
-          <nav className="footer-v5__nav" aria-label="Điều hướng cuối trang">
+          <nav className="footer-v5__nav footer-v6__nav" aria-label="Điều hướng cuối trang">
             {footerGroups.map((group) => (
               <FooterLinkSection
                 key={group.key}
@@ -178,7 +181,7 @@ export default async function Footer({
           </nav>
         </div>
 
-        <div className="footer-v5__meta">
+        <div className="footer-v5__meta footer-v6__meta">
           <div className="footer-v5__address">
             {hasCompanyField(company.address) ? (
               <>
