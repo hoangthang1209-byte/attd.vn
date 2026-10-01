@@ -29,6 +29,8 @@ export default function BusinessSolutionPageV7({
   outcomes,
   ctaLabel = "Gửi brief dự án",
 }: Props) {
+  const contactHref = `/lien-he?service=${encodeURIComponent(kicker)}`;
+
   return (
     <main className="v7-solution-page">
       <section className="v7-solution-hero">
@@ -38,7 +40,7 @@ export default function BusinessSolutionPageV7({
             <h1>{title}</h1>
             <p className="v7-solution-hero__lead">{lead}</p>
             <div className="v7-solution-hero__actions">
-              <Link href="/lien-he" className="v7-btn v7-btn--primary">{ctaLabel}</Link>
+              <Link href={contactHref} className="v7-btn v7-btn--primary">{ctaLabel}</Link>
               <Link href="/san-pham" className="v7-btn v7-btn--ghost">Xem sản phẩm</Link>
             </div>
           </div>
@@ -120,7 +122,7 @@ export default function BusinessSolutionPageV7({
             <p className="v7-kicker v7-kicker--light">Next step</p>
             <h2>Gửi mục tiêu, số lượng và deadline.</h2>
           </div>
-          <Link href="/lien-he" className="v7-solution-final__link">
+          <Link href={contactHref} className="v7-solution-final__link">
             {ctaLabel} <ArrowUpRight size={22} />
           </Link>
         </div>
