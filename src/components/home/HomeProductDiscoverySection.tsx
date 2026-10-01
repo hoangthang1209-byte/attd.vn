@@ -1,3 +1,4 @@
+import Link from "next/link";
 import ProductCard from "@/components/public/ProductCard";
 import type { HomepageProductItem } from "@/features/home/homepage.types";
 
@@ -26,7 +27,7 @@ export default function HomeProductDiscoverySection({ products }: Props) {
           </div>
           <div className="home-product-showcase__heading-side">
             <p>Đi thẳng vào sản phẩm để xem màu, MOQ, thời gian và khả năng hoàn thiện.</p>
-            <a href="/san-pham" className="home-product-showcase__all">Xem toàn bộ sản phẩm →</a>
+            <Link href="/san-pham" className="home-product-showcase__all">Xem toàn bộ sản phẩm →</Link>
           </div>
         </div>
         <div className="home-product-showcase__grid">
