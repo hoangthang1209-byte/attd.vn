@@ -130,7 +130,7 @@ export default async function HomePage() {
   ]);
 
   return (
-    <main className="mp-home mp-home--v3">
+    <main className="mp-home mp-home--v4">
       <HomeHeroSection hero={hero} categories={categories} heroMedia={heroMedia} />
 
       {cms.sourcingPathways.enabled ? (
