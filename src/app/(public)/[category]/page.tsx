@@ -289,9 +289,18 @@ export default async function CategoryPage({ params }: PageProps) {
           </div>
         </div>
 
+        {galleryImages.length > 1 ? (
+          <div className="container v7-collection-gallery" aria-label={`Hình ảnh ${cat.name}`}>
+            {galleryImages.slice(0, 4).map((src) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={src} src={src} alt={`${cat.name} — hình ảnh sản phẩm`} />
+            ))}
+          </div>
+        ) : null}
+
         <div className="container v7-collection-hero__meta">
           <div><span>Sản phẩm</span><strong>{cat.products.length} lựa chọn</strong></div>
-          <div><span>Hoàn thiện</span><strong>In · thêu · OEM theo sản phẩm</strong></div>
+          <div><span>Hoàn thiện</span><strong>Tùy theo từng sản phẩm và cấu hình</strong></div>
           <div><span>Báo giá</span><strong>Theo MOQ · cấu hình · deadline</strong></div>
         </div>
       </section>
