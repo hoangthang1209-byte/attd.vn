@@ -171,11 +171,14 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
               <span>01 / TÌM NGUỒN HÀNG</span>
               <strong>Tìm theo sản phẩm, mã hàng hoặc chất liệu.</strong>
             </div>
-            <MarketplaceSearchBar
-              defaultValue={q ?? ""}
-              size="large"
-              catalogContext={quickNavBaseFilters}
-            />
+            <div className="v7-catalog-search__field">
+              <MarketplaceSearchBar
+                defaultValue={q ?? ""}
+                size="large"
+                catalogContext={quickNavBaseFilters}
+              />
+              <p>Tìm theo sản phẩm, mã hàng, chất liệu hoặc nhóm quà tặng doanh nghiệp.</p>
+            </div>
           </div>
 
           <nav className="v7-catalog-intents" aria-label="Nhu cầu mua hàng">
