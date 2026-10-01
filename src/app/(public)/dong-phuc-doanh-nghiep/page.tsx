@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default async function UniformPage() {
-  const media = await getPublicSurfaceMedia("about");
+  const media = await getPublicSurfaceMedia("uniform");
   return (
     <BusinessSolutionPageV7
       kicker="Corporate Uniform"
