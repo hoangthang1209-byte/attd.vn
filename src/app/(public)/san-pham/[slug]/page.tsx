@@ -167,7 +167,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
   ];
 
   return (
-    <main className="mp-pdp mp-pdp--anatomy mp-pdp--b2b">
+    <main className="mp-pdp mp-pdp--anatomy mp-pdp--b2b v7-pdp">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
@@ -183,6 +183,16 @@ export default async function ProductDetailPage({ params }: PageProps) {
           ]}
         />
       </div>
+
+      <section className="v7-pdp-intro">
+        <div className="container v7-pdp-intro__inner">
+          <div>
+            <p className="v7-kicker">Sản phẩm B2B</p>
+            <span>Chọn biến thể → kiểm tra MOQ → cấu hình hoàn thiện → gửi yêu cầu báo giá.</span>
+          </div>
+          <Link href="/lien-he" className="v7-pdp-intro__link">Cần tư vấn trước? ↗</Link>
+        </div>
+      </section>
 
       <section className="v7-pdp-context" aria-label="Ứng dụng sản phẩm">
         <div className="container v7-pdp-context__inner">
