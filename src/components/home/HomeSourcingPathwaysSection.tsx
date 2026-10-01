@@ -134,35 +134,43 @@ export default function HomeSourcingPathwaysSection({ pathways }: Props) {
   if (visible.length === 0) return null;
 
   return (
-    <section className="home-sourcing-pathways" aria-labelledby="home-sourcing-pathways-title">
+    <section className="home-sourcing-pathways home-sourcing-pathways--v4" aria-labelledby="home-sourcing-pathways-title">
       <div className="container">
-        <header className="home-sourcing-pathways__header">
-          <p className="home-sourcing-pathways__eyebrow">Chọn theo nhu cầu</p>
-          <h2 id="home-sourcing-pathways-title" className="home-sourcing-pathways__title">
-            Bạn đang cần nguồn hàng theo cách nào?
-          </h2>
-          <p className="home-sourcing-pathways__description">
-            Chọn nhanh giữa hàng sẵn, OEM / Private Label hoặc chương trình dành cho đại lý và agency.
+        <header className="home-sourcing-pathways-v4__header">
+          <div>
+            <p className="home-sourcing-pathways__eyebrow">Chọn theo nhu cầu</p>
+            <h2 id="home-sourcing-pathways-title" className="home-sourcing-pathways-v4__title">
+              Ba cách làm việc với ATTD
+            </h2>
+          </div>
+          <p className="home-sourcing-pathways-v4__description">
+            Không bắt khách đi qua cùng một funnel. Chọn đúng mô hình — hàng sẵn, OEM hoặc đại lý — rồi đi thẳng vào dữ liệu và báo giá phù hợp.
           </p>
         </header>
 
-        <ul className="home-sourcing-pathways__grid">
-          {visible.map((pathway) => (
-            <li key={pathway.slot} className="home-sourcing-pathways__grid-item">
-              <Link href={pathway.ctaUrl} className="home-sourcing-pathways__card">
-                <PathwayVisualPanel pathway={pathway} />
-                <div className="home-sourcing-pathways__body">
-                  <h3 className="home-sourcing-pathways__card-title">{pathway.title}</h3>
-                  <p className="home-sourcing-pathways__card-desc">{pathway.description}</p>
-                  <span className="home-sourcing-pathways__cta">
+        <ol className="home-sourcing-pathways-v4__list">
+          {visible.map((pathway, index) => (
+            <li key={pathway.slot} className="home-sourcing-pathways-v4__item">
+              <Link href={pathway.ctaUrl} className="home-sourcing-pathways-v4__row">
+                <div className="home-sourcing-pathways-v4__index">
+                  {String(index + 1).padStart(2, "0")}
+                </div>
+                <div className="home-sourcing-pathways-v4__visual">
+                  <PathwayVisualPanel pathway={pathway} />
+                </div>
+                <div className="home-sourcing-pathways-v4__content">
+                  <span className="home-sourcing-pathways-v4__micro">{pathway.microLabel}</span>
+                  <h3>{pathway.title}</h3>
+                  <p>{pathway.description}</p>
+                  <span className="home-sourcing-pathways-v4__cta">
                     {pathway.ctaLabel}
-                    <ArrowRight size={16} className="home-sourcing-pathways__cta-icon" aria-hidden />
+                    <ArrowRight size={16} aria-hidden />
                   </span>
                 </div>
               </Link>
             </li>
           ))}
-        </ul>
+        </ol>
       </div>
     </section>
   );
