@@ -84,4 +84,20 @@ describe("Public Platform V7 contracts", () => {
       assert.ok(header.includes(href), `header should link to ${href}`);
     }
   });
+  it("keeps V7 commerce surfaces wired across catalog, categories and PDP", () => {
+    const catalog = read("src/app/(public)/san-pham/page.tsx");
+    const categoryHub = read("src/app/(public)/danh-muc-san-pham/page.tsx");
+    const collection = read("src/app/(public)/[category]/page.tsx");
+    const pdp = read("src/app/(public)/san-pham/[slug]/page.tsx");
+
+    assert.match(catalog, /className="v7-catalog"/);
+    assert.match(catalog, /v7-catalog-intents/);
+    assert.match(categoryHub, /className="v7-category-hub"/);
+    assert.match(categoryHub, /publicCategoryHref\(section\.slug\)/);
+    assert.match(collection, /className="v7-category-page"/);
+    assert.match(collection, /v7-collection-gallery/);
+    assert.match(pdp, /v7-pdp/);
+    assert.match(pdp, /v7-pdp-context/);
+  });
+
 });
