@@ -28,7 +28,7 @@ export default async function ContactPage() {
       <section className="v7-contact__hero">
         <div className="container v7-contact__grid">
           <div className="v7-contact__intro">
-            <p className="v7-kicker">Start with a brief</p>
+            <p className="v7-kicker">Bắt đầu từ brief</p>
             <h1>Không cần viết một RFQ hoàn hảo.</h1>
             <p>
               Gửi những gì bạn đang có. ATTD sẽ giúp làm rõ sản phẩm, số lượng,
