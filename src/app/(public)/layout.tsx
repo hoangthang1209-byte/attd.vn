@@ -1,3 +1,4 @@
+import "@/styles/public-v7.css";
 import PublicHeaderV7 from "@/components/public/v7/PublicHeaderV7";
 import PublicFooterV7 from "@/components/public/v7/PublicFooterV7";
 import MobileActionBar from "@/components/public/MobileActionBar";
