@@ -1,29 +1,58 @@
 /**
  * Read-only environment badge shown in the authenticated admin shell.
  *
- * Renders nothing when the app runs in production, so the production UI is
- * unchanged. `process.env.NODE_ENV` is statically inlined into the client
- * bundle at build time, so the production build tree-shakes this badge away and
- * never ships a non-production label. Only a safe environment label is exposed —
- * no environment variable values or secrets.
+ * Renders nothing in production, so the production UI is unchanged. Vercel's
+ * public deployment environment distinguishes preview deployments (whose
+ * `NODE_ENV` is also "production") from the production deployment. Only a safe
+ * environment label and the public Vercel commit SHA are exposed — no secrets.
  */
 
 const NON_PRODUCTION_ENV_LABELS: Record<string, string> = {
   development: "DEV",
+  preview: "TEST",
   test: "TEST",
 };
 
 /** Returns a short badge label for non-production environments, or null in production. */
 export function getNonProductionEnvLabel(
   nodeEnv: string | undefined,
+  vercelEnv?: string,
 ): string | null {
+  const normalizedVercelEnv = vercelEnv?.trim().toLowerCase();
+  if (normalizedVercelEnv === "production") return null;
+  if (normalizedVercelEnv) {
+    return NON_PRODUCTION_ENV_LABELS[normalizedVercelEnv] ?? normalizedVercelEnv.toUpperCase();
+  }
+
   if (nodeEnv === "production") return null;
   if (!nodeEnv) return "NON-PROD";
   return NON_PRODUCTION_ENV_LABELS[nodeEnv] ?? nodeEnv.toUpperCase();
 }
 
+/** Builds the visible badge text, adding a safe short SHA when available. */
+export function getNonProductionBadgeLabel(
+  nodeEnv: string | undefined,
+  vercelEnv: string | undefined,
+  commitSha: string | undefined,
+): string | null {
+  const environmentLabel = getNonProductionEnvLabel(nodeEnv, vercelEnv);
+  if (!environmentLabel) return null;
+
+  const normalizedSha = commitSha?.trim().toLowerCase();
+  const shortSha =
+    normalizedSha && /^[0-9a-f]{7,64}$/.test(normalizedSha)
+      ? normalizedSha.slice(0, 7)
+      : null;
+
+  return shortSha ? `${environmentLabel} · ${shortSha}` : environmentLabel;
+}
+
 export default function AdminEnvironmentBadge() {
-  const label = getNonProductionEnvLabel(process.env.NODE_ENV);
+  const label = getNonProductionBadgeLabel(
+    process.env.NODE_ENV,
+    process.env.NEXT_PUBLIC_VERCEL_ENV,
+    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,
+  );
   if (!label) return null;
 
   return (
@@ -33,12 +62,12 @@ export default function AdminEnvironmentBadge() {
       style={{
         display: "inline-flex",
         alignItems: "center",
-        padding: "2px 8px",
+        flexShrink: 0,
+        padding: "2px 5px",
         borderRadius: 999,
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: 800,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
+        letterSpacing: "0.02em",
         lineHeight: 1.4,
         whiteSpace: "nowrap",
         color: "#0b1120",
