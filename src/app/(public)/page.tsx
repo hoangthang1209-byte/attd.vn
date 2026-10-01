@@ -121,7 +121,7 @@ export default async function HomePage() {
       <section className="v7-home-hero">
         <div className="container v7-home-hero__grid">
           <div className="v7-home-hero__copy">
-            <p className="v7-kicker">B2B sourcing & production partner</p>
+            <p className="v7-kicker">Đối tác sourcing & production B2B</p>
             <h1>
               Một đầu mối.
               <br />
@@ -169,7 +169,7 @@ export default async function HomePage() {
         <div className="container">
           <header className="v7-section-head">
             <div>
-              <p className="v7-kicker">05 business engines</p>
+              <p className="v7-kicker">05 nhóm giải pháp</p>
               <h2>Chọn theo bài toán kinh doanh, không phải theo loại áo.</h2>
             </div>
             <p>
@@ -206,7 +206,7 @@ export default async function HomePage() {
         <div className="container">
           <header className="v7-section-head v7-section-head--dark">
             <div>
-              <p className="v7-kicker v7-kicker--light">Operating model</p>
+              <p className="v7-kicker v7-kicker--light">Mô hình vận hành</p>
               <h2>ATTD không chỉ bán sản phẩm. ATTD vận hành cả dự án.</h2>
             </div>
             <p>
@@ -232,7 +232,7 @@ export default async function HomePage() {
       <section className="v7-proof">
         <div className="container">
           <div className="v7-proof__intro">
-            <p className="v7-kicker">Proof over claims</p>
+            <p className="v7-kicker">Năng lực thực tế</p>
             <h2>Năng lực phải nhìn thấy được.</h2>
             <p>
               Kho, QC, mẫu thật, quy trình hoàn thiện và dự án thực tế là cách ATTD chứng minh khả năng triển khai.
@@ -247,7 +247,7 @@ export default async function HomePage() {
 
       <section className="v7-home-final">
         <div className="container v7-home-final__inner">
-          <p className="v7-kicker v7-kicker--light">Start with a brief</p>
+          <p className="v7-kicker v7-kicker--light">Bắt đầu từ brief</p>
           <h2>Không cần biết chính xác phải đặt sản phẩm nào.</h2>
           <p>Chỉ cần cho ATTD biết mục tiêu, số lượng và deadline. Đội ngũ sẽ đề xuất phương án phù hợp.</p>
           <Link href="/lien-he" className="v7-home-final__link">
