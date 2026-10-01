@@ -264,9 +264,14 @@ export default function PatternListManager() {
             <button
               type="button"
               className="admin-btn"
-              onClick={() => setBulkEditing(true)}
-              disabled={selectedRows.length === 0}
-              title={selectedRows.length === 0 ? "Chọn ít nhất một rập bản nháp" : undefined}
+              onClick={() => {
+                if (selectedRows.length === 0) {
+                  setSelectedIds(new Set(editableRows.map((row) => row.id)));
+                }
+                setBulkEditing(true);
+              }}
+              disabled={editableRows.length === 0}
+              title={editableRows.length === 0 ? "Không có rập bản nháp để sửa" : undefined}
             >
               <PencilLine size={15} />
               &nbsp;Sửa hàng loạt{selectedRows.length > 0 ? ` (${selectedRows.length})` : ""}
@@ -532,37 +537,55 @@ export default function PatternListManager() {
       </div>
 
       {creating && (
-        <div className="admin-modal-backdrop">
-          <form className="admin-modal" onSubmit={(event) => void handleCreate(event)}>
-            <h3>Tạo rập mới</h3>
-            <label className="admin-field">
-              <span>Tên rập</span>
-              <input
-                className="admin-input"
-                value={newName}
-                onChange={(event) => setNewName(event.target.value)}
-                placeholder="Ví dụ: Jersey oversize unisex"
-                required
-              />
-            </label>
-            <p className={styles.subtle}>
-              Sau khi tạo, bạn sẽ bổ sung danh mục, size, nguồn rập, file và bảng thông số ở trang chi tiết.
-            </p>
-            <div className="admin-modal__actions">
-              <button type="button" className="admin-btn" onClick={() => setCreating(false)}>
-                Hủy
+        <div className={styles.modalBackdrop} role="dialog" aria-modal="true" aria-label="Tạo rập mới">
+          <form className={styles.createModal} onSubmit={(event) => void handleCreate(event)}>
+            <div className={styles.modalHeader}>
+              <div>
+                <h3 className={styles.modalTitle}>Tạo rập mới</h3>
+                <p className={styles.modalDescription}>
+                  Tạo rập bản nháp trước, sau đó bổ sung thông tin kỹ thuật ở trang chi tiết.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={() => setCreating(false)}
+                aria-label="Đóng"
+              >
+                ×
               </button>
-              <button type="submit" className="admin-btn admin-btn--primary">
-                Tạo rập
-              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <label className="admin-field">
+                <span>Tên rập</span>
+                <input
+                  className="admin-input"
+                  value={newName}
+                  onChange={(event) => setNewName(event.target.value)}
+                  placeholder="Ví dụ: Jersey oversize unisex"
+                  required
+                  autoFocus
+                />
+              </label>
+            </div>
+            <div className={styles.modalFooter}>
+              <span className={styles.footerHint}>Mã rập sẽ do hệ thống tự cấp.</span>
+              <div className={styles.footerActions}>
+                <button type="button" className="admin-btn" onClick={() => setCreating(false)}>
+                  Hủy
+                </button>
+                <button type="submit" className="admin-btn admin-btn--primary">
+                  Tạo rập
+                </button>
+              </div>
             </div>
           </form>
         </div>
       )}
 
-      {bulkEditing && selectedRows.length > 0 && (
+      {bulkEditing && (
         <PatternBulkEditDialog
-          rows={selectedRows}
+          rows={selectedRows.length > 0 ? selectedRows : editableRows}
           onClose={() => setBulkEditing(false)}
           onSaved={() => {
             setSelectedIds(new Set());
