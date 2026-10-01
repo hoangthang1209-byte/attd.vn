@@ -9,7 +9,9 @@ export type PublicSurfaceMedia =
   | "contact"
   | "sourcing"
   | "corporateGift"
-  | "about";
+  | "about"
+  | "uniform"
+  | "merchandise";
 
 type Candidate = {
   libraryCode: string;
@@ -56,6 +58,17 @@ const SURFACE_CANDIDATES: Record<PublicSurfaceMedia, Candidate[]> = {
     { libraryCode: "BRANDING", roleCode: "HERO" },
     { libraryCode: "MANUFACTURING", roleCode: "FACTORY" },
     { libraryCode: "HOMEPAGE", roleCode: "FEATURED" },
+  ],
+  uniform: [
+    { libraryCode: "UNIFORM", roleCode: "HERO" },
+    { libraryCode: "CUSTOMER", roleCode: "FEATURED" },
+    { libraryCode: "HOMEPAGE", roleCode: "FEATURED" },
+  ],
+  merchandise: [
+    { libraryCode: "MERCHANDISE", roleCode: "HERO" },
+    { libraryCode: "MERCHANDISE", roleCode: "FEATURED" },
+    { libraryCode: "MANUFACTURING", roleCode: "PROCESS" },
+    { libraryCode: "MARKETING", roleCode: "HERO" },
   ],
 };
 
