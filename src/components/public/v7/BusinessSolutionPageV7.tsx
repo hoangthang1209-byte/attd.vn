@@ -17,6 +17,7 @@ type Props = {
   outcomes: readonly string[];
   ctaLabel?: string;
   leadCapture?: ReactNode;
+  seoContent?: string | null;
 };
 
 export default function BusinessSolutionPageV7({
@@ -31,6 +32,7 @@ export default function BusinessSolutionPageV7({
   outcomes,
   ctaLabel = "Gửi brief dự án",
   leadCapture,
+  seoContent,
 }: Props) {
   const contactHref = `/lien-he?service=${encodeURIComponent(kicker)}`;
 
@@ -118,6 +120,15 @@ export default function BusinessSolutionPageV7({
           </ol>
         </div>
       </section>
+
+      {seoContent ? (
+        <section className="v7-seo-content">
+          <div
+            className="container v7-seo-content__inner"
+            dangerouslySetInnerHTML={{ __html: seoContent }}
+          />
+        </section>
+      ) : null}
 
       {leadCapture ? (
         <section className="v7-solution-lead">
