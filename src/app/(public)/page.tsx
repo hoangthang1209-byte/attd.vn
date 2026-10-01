@@ -101,11 +101,11 @@ export default async function HomePage() {
   ] = await Promise.all([
     getHomepageData(),
     getPublicSurfaceMedia("homepage"),
-    getPublicSurfaceMedia("about"),
+    getPublicSurfaceMedia("uniform"),
     getPublicSurfaceMedia("sourcing"),
     getPublicSurfaceMedia("oem"),
     getPublicSurfaceMedia("corporateGift"),
-    getPublicSurfaceMedia("dealer"),
+    getPublicSurfaceMedia("merchandise"),
   ]);
 
   const mediaByKey = {
