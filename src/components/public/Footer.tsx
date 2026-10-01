@@ -104,7 +104,7 @@ export default async function Footer({
           <TrackedLink
             href={footerCta.href}
             trackEvent={(footerCta.trackEvent as "contact_quote") ?? "contact_quote"}
-            trackSource="footer_v5"
+            trackSource="footer_contact"
             className="footer-v5__cta-button"
             target={footerCta.openInNewTab ? "_blank" : undefined}
             rel={footerCta.openInNewTab ? "noopener noreferrer" : undefined}
@@ -131,7 +131,7 @@ export default async function Footer({
                 <TrackedAnchor
                   href={`tel:${company.hotline.raw}`}
                   trackEvent="contact_hotline"
-                  trackSource="footer_v5"
+                  trackSource="footer_contact"
                 >
                   {company.hotline.display}
                 </TrackedAnchor>
@@ -141,7 +141,7 @@ export default async function Footer({
                 <TrackedAnchor
                   href={`mailto:${company.email}`}
                   trackEvent="contact_email"
-                  trackSource="footer_v5"
+                  trackSource="footer_contact"
                 >
                   {company.email}
                 </TrackedAnchor>
@@ -151,7 +151,7 @@ export default async function Footer({
                 <TrackedAnchor
                   href={zaloUrl}
                   trackEvent="contact_zalo"
-                  trackSource="footer_v5"
+                  trackSource="footer_contact"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -159,6 +159,10 @@ export default async function Footer({
                 </TrackedAnchor>
               ) : null}
             </div>
+
+            {hasCompanyField(company.workingHours) ? (
+              <p className="footer-v5__hours">{company.workingHours}</p>
+            ) : null}
 
             <FooterSocialLinks links={socialLinks} />
           </div>
@@ -190,7 +194,7 @@ export default async function Footer({
 
           <div className="footer-v5__bottom">
             <span>{footerBottomBar.copyright}</span>
-            {footerBottomBar.showTaxCode && hasCompanyField(company.taxCode) ? (
+            {hasCompanyField(company.taxCode) ? (
               <span>MST {company.taxCode}</span>
             ) : null}
             {footerBottomBar.originText ? <span>{footerBottomBar.originText}</span> : null}
