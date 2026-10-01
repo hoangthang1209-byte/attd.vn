@@ -8,7 +8,7 @@ import {
   getCachedCompanySettings,
   getBrandingSettings,
 } from "@/features/settings/services/settings.service";
-import { buildGoogleMapsSearchUrl, VERIFIED_EXPERIENCE_YEARS } from "@/lib/company-trust";
+import { buildGoogleMapsSearchUrl } from "@/lib/company-trust";
 import { hasCompanyField } from "@/lib/companyInfo";
 import {
   FOOTER_COMPANY_LINKS,
@@ -23,9 +23,6 @@ import type { FooterLink } from "@/lib/footer-config";
 import type { PublicSiteNavigation } from "@/features/site-navigation/site-navigation.types";
 import { publicNavLinkToNavLink } from "@/features/site-navigation/public-nav-utils";
 import { resolveFooterBottomBar } from "@/features/site-navigation/public-footer-bottom-bar";
-
-const BRAND_POSITIONING =
-  "Đồng hành cùng đại lý, agency, thương hiệu và doanh nghiệp trên toàn quốc.";
 
 const FOOTER_NAV_PRODUCT_LINKS: readonly FooterLink[] = [
   { href: "/ao-thun-tron", label: "Áo thun" },
@@ -43,20 +40,47 @@ export default async function Footer({
     getCachedCompanySettings(),
     getBrandingSettings(),
   ]);
+
   const company = normalizeFooterCompany(rawCompany);
   const branding = normalizeFooterBranding(rawBranding);
-
   const mapsUrl = hasCompanyField(company.address)
     ? buildGoogleMapsSearchUrl(company.address)
     : null;
+
   const socialLinks = siteNavigation?.socialLinks.length
     ? siteNavigation.socialLinks
     : resolveFooterSocialLinks(branding, company);
+
   const footerGroups = siteNavigation?.footerGroups ?? [
-    { key: "products" as const, title: "Sản phẩm", links: FOOTER_NAV_PRODUCT_LINKS.map((link) => ({ id: link.href, ...link, openInNewTab: false })) },
-    { key: "services" as const, title: "Dịch vụ", links: FOOTER_SERVICE_LINKS.map((link) => ({ id: link.href, ...link, openInNewTab: false })) },
-    { key: "company" as const, title: "Công ty", links: FOOTER_COMPANY_LINKS.map((link) => ({ id: link.href, ...link, openInNewTab: false })) },
+    {
+      key: "products" as const,
+      title: "Sản phẩm",
+      links: FOOTER_NAV_PRODUCT_LINKS.map((link) => ({
+        id: link.href,
+        ...link,
+        openInNewTab: false,
+      })),
+    },
+    {
+      key: "services" as const,
+      title: "Dịch vụ",
+      links: FOOTER_SERVICE_LINKS.map((link) => ({
+        id: link.href,
+        ...link,
+        openInNewTab: false,
+      })),
+    },
+    {
+      key: "company" as const,
+      title: "Công ty",
+      links: FOOTER_COMPANY_LINKS.map((link) => ({
+        id: link.href,
+        ...link,
+        openInNewTab: false,
+      })),
+    },
   ];
+
   const footerCta = siteNavigation?.ctas.FOOTER ?? {
     id: "footer-cta-fallback",
     href: "/lien-he",
@@ -64,35 +88,89 @@ export default async function Footer({
     openInNewTab: false,
     trackEvent: "contact_quote",
   };
+
   const zaloUrl = resolveFooterZaloUrl(branding, company);
   const showHotline = hasFooterHotline(company);
   const footerBottomBar = resolveFooterBottomBar(siteNavigation?.settings, company.name);
 
   return (
-    <footer className="site-footer site-footer--enterprise">
+    <footer className="site-footer site-footer--v5">
       <div className="container">
-        <div className="footer-enterprise">
-          <div className="footer-enterprise__brand">
+        <section className="footer-v6__cta" aria-label="Bắt đầu dự án">
+          <div className="footer-v6__cta-index">01 / BẮT ĐẦU</div>
+          <div className="footer-v6__cta-copy">
+            <p>Đang có một dự án cần triển khai?</p>
+            <h2>Gửi brief cho ATTD.</h2>
+          </div>
+          <TrackedLink
+            href={footerCta.href}
+            trackEvent={(footerCta.trackEvent as "contact_quote") ?? "contact_quote"}
+            trackSource="footer_contact"
+            className="footer-v6__cta-button"
+            target={footerCta.openInNewTab ? "_blank" : undefined}
+            rel={footerCta.openInNewTab ? "noopener noreferrer" : undefined}
+          >
+            {footerCta.label}
+            <span aria-hidden>↗</span>
+          </TrackedLink>
+        </section>
+
+        <div className="footer-v6__brandword" aria-hidden="true">ATTD</div>
+
+        <div className="footer-v5__main footer-v6__main">
+          <div className="footer-v5__brand footer-v6__brand">
             <AttdLogo
               variant="desktop"
               src={branding.footerLogoUrl}
-              className="footer-enterprise__logo"
+              className="footer-v5__logo"
             />
-            <h2 className="footer-enterprise__headline">
-              Đối tác sản xuất OEM &amp;
-              <span className="footer-enterprise__headline-line">Nguồn hàng B2B</span>
-            </h2>
-            <p className="footer-enterprise__positioning">{BRAND_POSITIONING}</p>
-            <ul className="footer-enterprise__credentials" aria-label="Thông tin doanh nghiệp">
-              <li>{VERIFIED_EXPERIENCE_YEARS}+ năm kinh nghiệm</li>
-              <li>OEM / Private Label</li>
-              <li>Made in Vietnam</li>
-              {hasCompanyField(company.taxCode) ? <li>MST {company.taxCode}</li> : null}
-            </ul>
+            <p className="footer-v5__statement footer-v6__statement">
+              Nguồn hàng B2B, đồng phục, quà tặng và OEM cho doanh nghiệp, đại lý,
+              agency và thương hiệu.
+            </p>
+
+            <div className="footer-v5__contact">
+              {showHotline ? (
+                <TrackedAnchor
+                  href={`tel:${company.hotline.raw}`}
+                  trackEvent="contact_hotline"
+                  trackSource="footer_contact"
+                >
+                  {company.hotline.display}
+                </TrackedAnchor>
+              ) : null}
+
+              {hasCompanyField(company.email) ? (
+                <TrackedAnchor
+                  href={`mailto:${company.email}`}
+                  trackEvent="contact_email"
+                  trackSource="footer_contact"
+                >
+                  {company.email}
+                </TrackedAnchor>
+              ) : null}
+
+              {zaloUrl ? (
+                <TrackedAnchor
+                  href={zaloUrl}
+                  trackEvent="contact_zalo"
+                  trackSource="footer_contact"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Zalo
+                </TrackedAnchor>
+              ) : null}
+            </div>
+
+            {hasCompanyField(company.workingHours) ? (
+              <p className="footer-v5__hours">{company.workingHours}</p>
+            ) : null}
+
             <FooterSocialLinks links={socialLinks} />
           </div>
 
-          <div className="footer-enterprise__nav">
+          <nav className="footer-v5__nav footer-v6__nav" aria-label="Điều hướng cuối trang">
             {footerGroups.map((group) => (
               <FooterLinkSection
                 key={group.key}
@@ -100,105 +178,35 @@ export default async function Footer({
                 links={group.links.map(publicNavLinkToNavLink) as readonly FooterLink[]}
               />
             ))}
-          </div>
-
-          <aside className="footer-enterprise__contact-card" aria-label="Liên hệ">
-            <h3 className="footer-enterprise__contact-title">Liên hệ</h3>
-            <ul className="footer-enterprise__contact-list">
-              {showHotline ? (
-                <li className="footer-enterprise__contact-row">
-                  <TrackedAnchor
-                    href={`tel:${company.hotline.raw}`}
-                    trackEvent="contact_hotline"
-                    trackSource="footer_contact"
-                    className="footer-enterprise__contact-primary"
-                  >
-                    {company.hotline.display}
-                  </TrackedAnchor>
-                  <span className="footer-enterprise__contact-meta">Hotline</span>
-                </li>
-              ) : null}
-              {hasCompanyField(company.email) ? (
-                <li className="footer-enterprise__contact-row">
-                  <TrackedAnchor
-                    href={`mailto:${company.email}`}
-                    trackEvent="contact_email"
-                    trackSource="footer_contact"
-                    className="footer-enterprise__contact-primary"
-                  >
-                    {company.email}
-                  </TrackedAnchor>
-                  <span className="footer-enterprise__contact-meta">Email</span>
-                </li>
-              ) : null}
-              {zaloUrl ? (
-                <li className="footer-enterprise__contact-row">
-                  <TrackedAnchor
-                    href={zaloUrl}
-                    trackEvent="contact_zalo"
-                    trackSource="footer_contact"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="footer-enterprise__contact-primary"
-                  >
-                    Chat Zalo
-                  </TrackedAnchor>
-                  <span className="footer-enterprise__contact-meta">Zalo OA</span>
-                </li>
-              ) : null}
-              {hasCompanyField(company.address) ? (
-                <li className="footer-enterprise__contact-row">
-                  <span className="footer-enterprise__contact-primary footer-enterprise__contact-primary--text">
-                    {company.address}
-                  </span>
-                  {mapsUrl ? (
-                    <a
-                      href={mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="footer-enterprise__contact-link"
-                    >
-                      Google Maps
-                    </a>
-                  ) : null}
-                </li>
-              ) : null}
-              {hasCompanyField(company.workingHours) ? (
-                <li className="footer-enterprise__contact-row">
-                  <span className="footer-enterprise__contact-primary footer-enterprise__contact-primary--text">
-                    {company.workingHours}
-                  </span>
-                </li>
-              ) : null}
-            </ul>
-            <TrackedLink
-              href={footerCta.href}
-              trackEvent={(footerCta.trackEvent as "contact_quote") ?? "contact_quote"}
-              trackSource="footer_contact_card"
-              className="footer-enterprise__cta"
-              target={footerCta.openInNewTab ? "_blank" : undefined}
-              rel={footerCta.openInNewTab ? "noopener noreferrer" : undefined}
-            >
-              {footerCta.label}
-            </TrackedLink>
-          </aside>
+          </nav>
         </div>
 
-        <div className="footer-enterprise__bottom">
-          <div className="footer-enterprise__bottom-start">
-            <p className="footer-enterprise__copyright">{footerBottomBar.copyright}</p>
-            {footerBottomBar.showTaxCode && hasCompanyField(company.taxCode) ? (
-              <p className="footer-enterprise__copyright-meta">MST {company.taxCode}</p>
+        <div className="footer-v5__meta footer-v6__meta">
+          <div className="footer-v5__address">
+            {hasCompanyField(company.address) ? (
+              <>
+                <span>{company.address}</span>
+                {mapsUrl ? (
+                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                    Google Maps ↗
+                  </a>
+                ) : null}
+              </>
             ) : null}
           </div>
-          {footerBottomBar.originText ? (
-            <p className="footer-enterprise__bottom-origin">{footerBottomBar.originText}</p>
-          ) : null}
-          {footerBottomBar.legalLink ? (
-            <Link href={footerBottomBar.legalLink.href} className="footer-enterprise__legal-link">
-              {footerBottomBar.legalLink.label}
-            </Link>
-          ) : null}
+
+          <div className="footer-v5__bottom">
+            <span>{footerBottomBar.copyright}</span>
+            {hasCompanyField(company.taxCode) ? (
+              <span>MST {company.taxCode}</span>
+            ) : null}
+            {footerBottomBar.originText ? <span>{footerBottomBar.originText}</span> : null}
+            {footerBottomBar.legalLink ? (
+              <Link href={footerBottomBar.legalLink.href}>
+                {footerBottomBar.legalLink.label}
+              </Link>
+            ) : null}
+          </div>
         </div>
       </div>
     </footer>

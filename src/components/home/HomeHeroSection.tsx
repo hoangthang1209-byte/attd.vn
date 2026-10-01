@@ -21,96 +21,97 @@ function HeroSecondaryCta({ hero }: { hero: HomepageHeroConfig }) {
         href={hero.secondaryCtaUrl}
         trackEvent="contact_quote"
         trackSource="HERO"
-        className="btn-secondary home-hero-v4__secondary"
+        className="home-hero-v6__text-link"
       >
         {hero.secondaryCtaLabel}
+        <span aria-hidden>↗</span>
       </TrackedLink>
     );
   }
 
   return (
-    <Link href={hero.secondaryCtaUrl} className="btn-secondary home-hero-v4__secondary">
+    <Link href={hero.secondaryCtaUrl} className="home-hero-v6__text-link">
       {hero.secondaryCtaLabel}
+      <span aria-hidden>↗</span>
     </Link>
   );
 }
 
-const DECISIONS = [
-  { href: "/san-pham?inStock=1", index: "01", title: "Tìm hàng có sẵn", copy: "Duyệt sản phẩm, màu, MOQ và khả năng hoàn thiện." },
-  { href: "/oem", index: "02", title: "Sản xuất OEM", copy: "Phát triển mẫu, nhãn, đóng gói và cấu hình riêng." },
-  { href: "/qua-tang-doanh-nghiep", index: "03", title: "Quà tặng doanh nghiệp", copy: "Nguồn hàng và hoàn thiện thương hiệu theo dự án." },
-  { href: "/dai-ly", index: "04", title: "Dành cho đại lý", copy: "Nguồn hàng, dữ liệu sản phẩm và hỗ trợ bán hàng B2B." },
+const HERO_PATHS = [
+  { href: "/san-pham?inStock=1", index: "01", label: "Hàng có sẵn" },
+  { href: "/oem", index: "02", label: "OEM / Nhãn riêng" },
+  { href: "/qua-tang-doanh-nghiep", index: "03", label: "Quà tặng doanh nghiệp" },
+  { href: "/dai-ly", index: "04", label: "Đại lý & Agency" },
 ] as const;
 
 export default function HomeHeroSection({ hero, categories, heroMedia }: Props) {
   return (
-    <section className="home-hero home-hero--v4" aria-labelledby="home-hero-title">
+    <section className="home-hero home-hero--v6" aria-labelledby="home-hero-title">
       <div className="container">
-        <div className="home-hero-v4__frame">
-          <div className="home-hero-v4__copy">
-            <p className="home-hero__eyebrow">{hero.eyebrow}</p>
-            <h1 id="home-hero-title" className="home-hero-v4__title">
-              {hero.heading}
-            </h1>
-            <p className="home-hero-v4__body">{hero.description}</p>
+        <div className="home-hero-v6__topline">
+          <span>ATTD® · TP.HCM</span>
+          <span>Nguồn hàng · Đồng phục · OEM</span>
+        </div>
 
-            <div className="home-hero-v4__actions">
-              <Link href={hero.primaryCtaUrl} className="btn-primary home-hero-v4__primary">
-                {hero.primaryCtaLabel}
-              </Link>
-              <HeroSecondaryCta hero={hero} />
-            </div>
-
-            <dl className="home-hero-v4__facts" aria-label="Năng lực ATTD">
-              <div>
-                <dt>Vận hành</dt>
-                <dd>Kho · QC · đóng gói tại TP.HCM</dd>
-              </div>
-              <div>
-                <dt>Hoàn thiện</dt>
-                <dd>In · thêu · nhãn · OEM</dd>
-              </div>
-              <div>
-                <dt>Phạm vi</dt>
-                <dd>Đơn hàng B2B toàn quốc</dd>
-              </div>
-            </dl>
-          </div>
-
-          <div className="home-hero-v4__media" aria-label="Hình ảnh thực tế ATTD">
+        <div className="home-hero-v6__stage">
+          <div className="home-hero-v6__visual" aria-label="Hình ảnh thực tế ATTD">
             {heroMedia ? (
               <Image
                 src={heroMedia.url}
                 alt={heroMedia.alt}
                 fill
                 priority
-                className="home-hero-v4__media-image"
-                sizes="(max-width: 900px) 100vw, 50vw"
+                className="home-hero-v6__image"
+                sizes="(max-width: 760px) 100vw, 62vw"
               />
             ) : (
-              <div className="home-hero-v4__media-fallback">
-                <span>ATTD</span>
-                <small>Đồng phục · Quà tặng · OEM</small>
+              <div className="home-hero-v6__fallback">
+                <strong>ATTD</strong>
+                <span>Đồng phục · Quà tặng · OEM</span>
               </div>
             )}
-            <div className="home-hero-v4__media-caption">
-              <span>ATTD / NGUỒN HÀNG B2B</span>
-              <strong>Nguồn hàng &amp; sản xuất theo yêu cầu</strong>
+
+            <div className="home-hero-v6__image-label">
+              <span>01 / HÌNH ẢNH THỰC TẾ</span>
+              <strong>Kho · QC · hoàn thiện tại TP.HCM</strong>
+            </div>
+          </div>
+
+          <div className="home-hero-v6__copy">
+            <p className="home-hero-v6__eyebrow">{hero.eyebrow}</p>
+            <h1 id="home-hero-title" className="home-hero-v6__title">
+              {hero.heading}
+            </h1>
+            <p className="home-hero-v6__body">{hero.description}</p>
+
+            <div className="home-hero-v6__actions">
+              <Link href={hero.primaryCtaUrl} className="home-hero-v6__primary">
+                {hero.primaryCtaLabel}
+                <span aria-hidden>↗</span>
+              </Link>
+              <HeroSecondaryCta hero={hero} />
+            </div>
+
+            <div className="home-hero-v6__capabilities" aria-label="Năng lực ATTD">
+              <span>In</span>
+              <span>Thêu</span>
+              <span>OEM</span>
+              <span>Đóng gói</span>
             </div>
           </div>
         </div>
 
-        <nav className="home-decision-dock" aria-label="Chọn nhu cầu chính">
-          {DECISIONS.map((item) => (
-            <Link key={item.href} href={item.href} className="home-decision-dock__item">
-              <span className="home-decision-dock__index">{item.index}</span>
-              <span className="home-decision-dock__content">
-                <strong>{item.title}</strong>
-                <small>{item.copy}</small>
-              </span>
-              <span className="home-decision-dock__arrow" aria-hidden>↗</span>
-            </Link>
-          ))}
+        <nav className="home-hero-v6__paths" aria-label="Chọn nhu cầu">
+          <span className="home-hero-v6__paths-title">Bắt đầu theo nhu cầu</span>
+          <div className="home-hero-v6__path-grid">
+            {HERO_PATHS.map((item) => (
+              <Link key={item.href} href={item.href} className="home-hero-v6__path">
+                <span>{item.index}</span>
+                <strong>{item.label}</strong>
+                <span aria-hidden>↗</span>
+              </Link>
+            ))}
+          </div>
         </nav>
 
         <HomeCategoryDiscoveryRail categories={categories} />
