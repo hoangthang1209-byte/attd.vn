@@ -137,70 +137,65 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
   ];
 
   return (
-    <main className="mp-catalog mp-catalog--v7">
+    <main className="v7-catalog">
       <Breadcrumb items={breadcrumbItems} />
 
-      <section className="mp-catalog-hero">
+      <section className="v7-catalog-hero">
         <div className="container">
-          <div className="mp-catalog-hero-card mp-catalog-hero-card--v3">
-            <div className="mp-catalog-hero-copy">
-              <p className="mp-catalog-eyebrow">Nguồn hàng B2B</p>
-              <h1 className="mp-catalog-title">{pageTitle}</h1>
-              <p className="mp-catalog-desc">{pageDescription}</p>
+          <div className="v7-catalog-hero__grid">
+            <div className="v7-catalog-hero__copy">
+              <p className="v7-kicker">Nguồn hàng B2B</p>
+              <h1>{pageTitle}</h1>
+              <p>{pageDescription}</p>
               <CatalogSourcingBadges />
             </div>
-            <div className="mp-catalog-hero-aside">
+
+            <div className="v7-catalog-hero__visual">
               {catalogMedia ? (
-                <div className="mp-catalog-hero-media">
-                  <Image
-                    src={catalogMedia.url}
-                    alt={catalogMedia.alt}
-                    fill
-                    priority
-                    className="mp-catalog-hero-media__image"
-                    sizes="(max-width: 900px) 100vw, 42vw"
-                  />
-                </div>
-              ) : null}
-              <div className="mp-catalog-hero-search">
-                <MarketplaceSearchBar
-                  defaultValue={q ?? ""}
-                  size="large"
-                  catalogContext={quickNavBaseFilters}
+                <Image
+                  src={catalogMedia.url}
+                  alt={catalogMedia.alt}
+                  fill
+                  priority
+                  className="v7-catalog-hero__image"
+                  sizes="(max-width: 900px) 100vw, 46vw"
                 />
-                <p className="mp-catalog-search-hint">
-                  Tìm theo sản phẩm, mã hàng, chất liệu hoặc nhóm quà tặng doanh nghiệp.
-                </p>
-              </div>
+              ) : (
+                <div className="v7-catalog-hero__fallback">ATTD</div>
+              )}
             </div>
           </div>
 
-          <nav className="mp-catalog-v4__intent" aria-label="Nhu cầu mua hàng">
+          <div className="v7-catalog-search">
+            <div>
+              <span>01 / TÌM NGUỒN HÀNG</span>
+              <strong>Tìm theo sản phẩm, mã hàng hoặc chất liệu.</strong>
+            </div>
+            <MarketplaceSearchBar
+              defaultValue={q ?? ""}
+              size="large"
+              catalogContext={quickNavBaseFilters}
+            />
+          </div>
+
+          <nav className="v7-catalog-intents" aria-label="Nhu cầu mua hàng">
             <Link href="/san-pham?inStock=1">
-              <span>01</span>
-              <strong>Cần hàng có sẵn</strong>
-              <small>Ưu tiên sản phẩm có thể triển khai nhanh</small>
+              <span>01</span><strong>Hàng có sẵn</strong><small>Ưu tiên tốc độ triển khai</small>
             </Link>
             <Link href="/san-pham?print=1">
-              <span>02</span>
-              <strong>Cần in logo</strong>
-              <small>Lọc sản phẩm hỗ trợ in theo thiết kế</small>
+              <span>02</span><strong>In logo</strong><small>Sản phẩm hỗ trợ in theo thiết kế</small>
             </Link>
             <Link href="/san-pham?embroidery=1">
-              <span>03</span>
-              <strong>Cần thêu</strong>
-              <small>Lọc nhóm phù hợp thêu logo doanh nghiệp</small>
+              <span>03</span><strong>Thêu</strong><small>Phù hợp đồng phục & branding</small>
             </Link>
             <Link href="/san-pham?oem=1">
-              <span>04</span>
-              <strong>Cần OEM</strong>
-              <small>Tìm sản phẩm có thể phát triển riêng</small>
+              <span>04</span><strong>OEM</strong><small>Phát triển sản phẩm riêng</small>
             </Link>
           </nav>
         </div>
       </section>
 
-      <section className="mp-catalog-body">
+      <section className="v7-catalog-body">
         <div className="container">
           <CatalogCategoryNav
             categories={quickNavCategories}
@@ -209,9 +204,9 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
           />
 
           <CatalogSearchTracking query={q} resultCount={products.length} />
-          <div className="mp-catalog-layout mp-catalog-layout--compact">
-            <div className="mp-catalog-main">
-              <div className="mp-catalog-results-bar">
+          <div className="v7-catalog-layout">
+            <div className="v7-catalog-main">
+              <div className="v7-catalog-results">
                 <div className="mp-catalog-results-summary">
                   <p className="mp-catalog-results-kicker">Danh sách sản phẩm</p>
                   <p className="mp-catalog-count">
