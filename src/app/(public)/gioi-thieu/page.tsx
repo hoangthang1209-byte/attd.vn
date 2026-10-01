@@ -35,7 +35,7 @@ export default async function AboutPage() {
       <section className="v7-about-hero">
         <div className="container v7-about-hero__grid">
           <div>
-            <p className="v7-kicker">About ATTD</p>
+            <p className="v7-kicker">Về ATTD</p>
             <h1>Không phải một xưởng đơn lẻ. Là một hệ thống triển khai B2B.</h1>
             <p>
               ATTD kết nối sourcing, customization, OEM, merchandise và corporate gifts
@@ -53,7 +53,7 @@ export default async function AboutPage() {
         <div className="container">
           <header className="v7-section-head">
             <div>
-              <p className="v7-kicker">Business model</p>
+              <p className="v7-kicker">Mô hình kinh doanh</p>
               <h2>Giá trị của ATTD nằm ở khả năng giảm độ phức tạp.</h2>
             </div>
             <p>
@@ -72,7 +72,7 @@ export default async function AboutPage() {
       <section className="v7-about-company">
         <div className="container v7-about-company__grid">
           <div>
-            <p className="v7-kicker v7-kicker--light">Company</p>
+            <p className="v7-kicker v7-kicker--light">Doanh nghiệp</p>
             <h2>{company.name}</h2>
           </div>
           <div>
