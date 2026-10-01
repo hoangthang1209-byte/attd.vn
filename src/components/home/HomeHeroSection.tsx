@@ -36,7 +36,7 @@ function HeroSecondaryCta({ hero }: { hero: HomepageHeroConfig }) {
 }
 
 const DECISIONS = [
-  { href: "/san-pham", index: "01", title: "Tìm hàng có sẵn", copy: "Duyệt sản phẩm, màu, MOQ và khả năng hoàn thiện." },
+  { href: "/san-pham?inStock=1", index: "01", title: "Tìm hàng có sẵn", copy: "Duyệt sản phẩm, màu, MOQ và khả năng hoàn thiện." },
   { href: "/oem", index: "02", title: "Sản xuất OEM", copy: "Phát triển mẫu, nhãn, đóng gói và cấu hình riêng." },
   { href: "/qua-tang-doanh-nghiep", index: "03", title: "Quà tặng doanh nghiệp", copy: "Nguồn hàng và hoàn thiện thương hiệu theo dự án." },
   { href: "/dai-ly", index: "04", title: "Dành cho đại lý", copy: "Nguồn hàng, dữ liệu sản phẩm và hỗ trợ bán hàng B2B." },
@@ -94,7 +94,7 @@ export default function HomeHeroSection({ hero, categories, heroMedia }: Props) 
               </div>
             )}
             <div className="home-hero-v4__media-caption">
-              <span>ATTD / B2B SOURCING</span>
+              <span>ATTD / NGUỒN HÀNG B2B</span>
               <strong>Nguồn hàng &amp; sản xuất theo yêu cầu</strong>
             </div>
           </div>
