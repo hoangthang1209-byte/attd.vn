@@ -3,15 +3,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { getCompanySettings } from "@/features/settings/services/settings.service";
+import { buildAboutMetadata } from "@/lib/seo/indexation-policy";
 import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 import CustomerLogoStrip from "@/components/public/company/CustomerLogoStrip";
 import CaseStudySection from "@/components/public/CaseStudySection";
 
 export const revalidate = 3600;
-export const metadata: Metadata = {
-  title: "Về ATTD | B2B Sourcing & Production Partner",
-  description: "ATTD là đối tác sourcing, customization, OEM và merchandise cho doanh nghiệp, agency, đại lý và thương hiệu.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const company = await getCompanySettings();
+  return buildAboutMetadata({
+    title: `Về ${company.name} | B2B Sourcing, OEM & Merchandise`,
+    description:
+      "ATTD là đối tác sourcing, customization, OEM và merchandise cho doanh nghiệp, agency, đại lý và thương hiệu.",
+  });
+}
 
 const MODEL = [
   ["01","Asset-light","ATTD không cố sở hữu mọi công đoạn. Chúng tôi sở hữu cách điều phối dự án, dữ liệu và chuẩn kiểm soát."],
