@@ -2929,3 +2929,214 @@
     gap: 6px;
   }
 }
+
+
+/* ==========================================================================
+   V7 UX POLISH — customer-first hierarchy
+   ========================================================================== */
+
+.v7-home-hero__copy,
+.v7-solution-hero__copy,
+.v7-contact__intro,
+.v7-about-hero__grid > div:first-child {
+  max-width: 720px;
+}
+
+.v7-home-hero__lead,
+.v7-solution-hero__lead,
+.v7-contact__intro > p:not(.v7-kicker),
+.v7-about-hero__grid > div:first-child > p {
+  max-width: 620px;
+  font-size: 16px;
+  line-height: 1.72;
+}
+
+.v7-btn {
+  min-height: 48px;
+  padding-inline: 22px;
+  font-weight: 720;
+}
+
+.v7-btn--primary {
+  box-shadow: none;
+}
+
+.v7-header__actions .v7-btn--primary {
+  min-width: 126px;
+  justify-content: center;
+}
+
+.v7-header__search span {
+  font-weight: 650;
+}
+
+.v7-section-head {
+  align-items: start;
+}
+
+.v7-section-head > p {
+  max-width: 520px;
+  line-height: 1.75;
+}
+
+.v7-solutions__list {
+  border-top: 1px solid var(--v7-line);
+}
+
+.v7-solution-row {
+  min-height: 250px;
+  padding-block: 24px;
+}
+
+.v7-solution-row__index {
+  opacity: .55;
+  font-size: 10px;
+}
+
+.v7-solution-row__copy > span {
+  color: var(--v7-red);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.v7-solution-row__copy h3 {
+  max-width: 680px;
+  font-size: clamp(27px, 3vw, 42px);
+  line-height: 1.06;
+}
+
+.v7-solution-row__copy p {
+  max-width: 650px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.v7-operating__steps li > span,
+.v7-capabilities__grid article > span,
+.v7-process__list li > span,
+.v7-contact__brief-list > div > span,
+.v7-about-model__grid article > span {
+  opacity: .55;
+}
+
+.v7-operating__steps li h3,
+.v7-capabilities__grid article h3,
+.v7-contact__brief-list strong,
+.v7-about-model__grid article h3 {
+  font-weight: 680;
+}
+
+.v7-solution-hero__brief {
+  min-height: 78px;
+}
+
+.v7-solution-hero__brief > div {
+  padding-block: 18px;
+}
+
+.v7-solution-hero__brief span {
+  font-size: 9px;
+}
+
+.v7-solution-hero__brief strong {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.v7-solution-lead__intro h2 {
+  max-width: 640px;
+}
+
+.v7-solution-lead__intro > p:not(.v7-kicker) {
+  max-width: 560px;
+  line-height: 1.75;
+}
+
+.v7-contact__grid {
+  align-items: start;
+}
+
+.v7-contact__form {
+  position: sticky;
+  top: calc(var(--mp-header-stack-height, 88px) + 24px);
+}
+
+.v7-contact__brief-list > div {
+  min-height: 120px;
+}
+
+.v7-footer__lead h2 {
+  max-width: 900px;
+  font-size: clamp(36px, 4.6vw, 64px);
+  line-height: 1.02;
+}
+
+.v7-footer__lead-link {
+  white-space: nowrap;
+}
+
+.v7-footer__brand > p {
+  max-width: 430px;
+  line-height: 1.7;
+}
+
+.v7-catalog-intents a {
+  min-height: 108px;
+}
+
+.v7-catalog-intents span {
+  opacity: .55;
+}
+
+.v7-pdp-intro__inner {
+  min-height: 52px;
+}
+
+.v7-pdp-intro__inner span {
+  font-size: 12px;
+}
+
+.v7-pdp-context__links a {
+  padding-block: 7px;
+}
+
+@media (max-width: 900px) {
+  .v7-contact__form {
+    position: static;
+  }
+
+  .v7-header__actions .v7-header__search {
+    display: none;
+  }
+
+  .v7-solution-row {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .v7-home-hero__actions,
+  .v7-solution-hero__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .v7-home-hero__actions .v7-btn,
+  .v7-solution-hero__actions .v7-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .v7-solution-row__index {
+    display: none;
+  }
+
+  .v7-solution-row__copy h3 {
+    font-size: 28px;
+  }
+
+  .v7-footer__lead-link {
+    white-space: normal;
+  }
+}
