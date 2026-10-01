@@ -1,9 +1,11 @@
 import Link from "next/link";
 import AttdLogo from "@/components/public/AttdLogo";
+import FooterSocialLinks from "@/components/public/FooterSocialLinks";
 import TrackedAnchor from "@/components/analytics/TrackedAnchor";
 import { getCachedCompanySettings, getBrandingSettings } from "@/features/settings/services/settings.service";
 import { hasCompanyField } from "@/lib/companyInfo";
 import { normalizeFooterBranding, normalizeFooterCompany } from "@/lib/footer-config";
+import type { PublicSiteNavigation } from "@/features/site-navigation/site-navigation.types";
 
 const SOLUTIONS = [
   { href: "/dong-phuc-doanh-nghiep", label: "Đồng phục doanh nghiệp" },
@@ -13,21 +15,23 @@ const SOLUTIONS = [
   { href: "/merchandise", label: "Artist & Event Merchandise" },
 ] as const;
 
-const COMPANY = [
-  { href: "/gioi-thieu", label: "Về ATTD" },
-  { href: "/san-pham", label: "Danh mục sản phẩm" },
-  { href: "/dai-ly", label: "Hợp tác đại lý" },
-  { href: "/blog", label: "Kiến thức & tin tức" },
-  { href: "/lien-he", label: "Liên hệ" },
-] as const;
-
-export default async function PublicFooterV7() {
+export default async function PublicFooterV7({
+  siteNavigation,
+}: {
+  siteNavigation: PublicSiteNavigation;
+}) {
   const [rawCompany, rawBranding] = await Promise.all([
     getCachedCompanySettings(),
     getBrandingSettings(),
   ]);
   const company = normalizeFooterCompany(rawCompany);
   const branding = normalizeFooterBranding(rawBranding);
+  const footerCta = siteNavigation.ctas.FOOTER ?? {
+    id: "v7-footer-cta",
+    href: "/lien-he",
+    label: "Bắt đầu một dự án",
+    openInNewTab: false,
+  };
 
   return (
     <footer className="v7-footer">
@@ -37,8 +41,13 @@ export default async function PublicFooterV7() {
             <p className="v7-kicker v7-kicker--light">Một đầu mối cho toàn bộ dự án B2B</p>
             <h2>Có brief. Có deadline. ATTD triển khai phần còn lại.</h2>
           </div>
-          <Link href="/lien-he" className="v7-footer__lead-link">
-            Bắt đầu một dự án <span>↗</span>
+          <Link
+            href={footerCta.href}
+            className="v7-footer__lead-link"
+            target={footerCta.openInNewTab ? "_blank" : undefined}
+            rel={footerCta.openInNewTab ? "noopener noreferrer" : undefined}
+          >
+            {footerCta.label} <span>↗</span>
           </Link>
         </div>
 
@@ -61,24 +70,44 @@ export default async function PublicFooterV7() {
                 </TrackedAnchor>
               ) : null}
             </div>
+            {siteNavigation.socialLinks.length > 0 ? (
+              <FooterSocialLinks links={siteNavigation.socialLinks} />
+            ) : null}
           </div>
 
-          <div className="v7-footer__nav">
+          <div className="v7-footer__nav v7-footer__nav--cms">
             <div>
               <h3>Giải pháp</h3>
               {SOLUTIONS.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
             </div>
-            <div>
-              <h3>ATTD</h3>
-              {COMPANY.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
-            </div>
+            {siteNavigation.footerGroups.map((group) => (
+              <div key={group.key}>
+                <h3>{group.title}</h3>
+                {group.links.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    target={item.openInNewTab ? "_blank" : undefined}
+                    rel={item.openInNewTab ? "noopener noreferrer" : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            ))}
           </div>
         </div>
 
         <div className="v7-footer__bottom">
-          <span>© {new Date().getFullYear()} ATTD</span>
+          <span>
+            {siteNavigation.settings.copyrightText || "© ATTD"}
+            {siteNavigation.settings.showCurrentYear ? ` ${new Date().getFullYear()}` : ""}
+          </span>
           <span>{hasCompanyField(company.address) ? company.address : "TP. Hồ Chí Minh, Việt Nam"}</span>
-          {hasCompanyField(company.taxCode) ? <span>MST {company.taxCode}</span> : null}
+          {siteNavigation.settings.showTaxCode && hasCompanyField(company.taxCode) ? <span>MST {company.taxCode}</span> : null}
+          {siteNavigation.settings.showLegalLink ? (
+            <Link href={siteNavigation.settings.legalLinkHref}>{siteNavigation.settings.legalLinkLabel}</Link>
+          ) : null}
         </div>
       </div>
     </footer>
