@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default async function MerchandisePage() {
-  const media = await getPublicSurfaceMedia("dealer");
+  const media = await getPublicSurfaceMedia("merchandise");
   return (
     <BusinessSolutionPageV7
       kicker="Artist & Event Merchandise"
