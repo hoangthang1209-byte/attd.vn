@@ -8,6 +8,7 @@ import {
   ChevronRight,
   FileUp,
   MoreHorizontal,
+  PencilLine,
   Plus,
   Search,
   Trash2,
@@ -26,6 +27,7 @@ import PatternCategoryThumbnail from "@/components/admin/patterns/PatternCategor
 import { normalizePatternCategoryVisual } from "@/features/patterns/pattern-category-visual";
 import { formatPatternSupplierListLabel } from "@/features/patterns/pattern-supplier-display";
 import PatternBulkImportDialog from "@/components/admin/patterns/PatternBulkImportDialog";
+import PatternBulkEditDialog from "@/components/admin/patterns/PatternBulkEditDialog";
 import styles from "./PatternLibrary.module.css";
 
 type PatternCategoryVisual = {
@@ -117,6 +119,8 @@ export default function PatternListManager() {
   const [appliedSearch, setAppliedSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [bulkEditing, setBulkEditing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [newName, setNewName] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [archivingId, setArchivingId] = useState<string | null>(null);
@@ -139,6 +143,7 @@ export default function PatternListManager() {
       if (!res.ok) throw new Error(data.message ?? "Không thể tải danh sách rập");
 
       setItems(data.items ?? []);
+      setSelectedIds(new Set());
       setStats(data.stats ?? EMPTY_STATS);
       setTotal(data.total ?? 0);
       setPageCount(data.pageCount ?? 1);
@@ -222,6 +227,26 @@ export default function PatternListManager() {
     }
   }
 
+  const editableRows = items.filter((row) => row.status === "DRAFT");
+  const selectedRows = items.filter((row) => selectedIds.has(row.id) && row.status === "DRAFT");
+  const allEditableSelected =
+    editableRows.length > 0 && editableRows.every((row) => selectedIds.has(row.id));
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllEditable() {
+    setSelectedIds(() =>
+      allEditableSelected ? new Set() : new Set(editableRows.map((row) => row.id)),
+    );
+  }
+
   const firstItem = total === 0 ? 0 : (page - 1) * 25 + 1;
   const lastItem = Math.min(page * 25, total);
 
@@ -236,7 +261,17 @@ export default function PatternListManager() {
             </p>
           </div>
           <div className={styles.heroActions}>
-            <button type="button" className="admin-btn" onClick={() => setImporting(true)}>
+            <button
+              type="button"
+              className="admin-btn"
+              onClick={() => setBulkEditing(true)}
+              disabled={selectedRows.length === 0}
+              title={selectedRows.length === 0 ? "Chọn ít nhất một rập bản nháp" : undefined}
+            >
+              <PencilLine size={15} />
+              &nbsp;Sửa hàng loạt{selectedRows.length > 0 ? ` (${selectedRows.length})` : ""}
+            </button>
+            <button type="button" className="admin-btn" onClick={() => setImporting(true)}> 
               <FileUp size={15} />
               &nbsp;Nhập hàng loạt
             </button>
@@ -341,6 +376,15 @@ export default function PatternListManager() {
               <table className={styles.table}>
                 <thead>
                   <tr>
+                    <th className={styles.selectCell}>
+                      <input
+                        type="checkbox"
+                        checked={allEditableSelected}
+                        onChange={toggleSelectAllEditable}
+                        disabled={editableRows.length === 0}
+                        aria-label="Chọn tất cả rập bản nháp trên trang"
+                      />
+                    </th>
                     <th aria-label="Ảnh" />
                     <th>Rập</th>
                     <th>Kỹ thuật</th>
@@ -354,7 +398,17 @@ export default function PatternListManager() {
                 </thead>
                 <tbody>
                   {items.map((row) => (
-                    <tr key={row.id}>
+                    <tr key={row.id} className={selectedIds.has(row.id) ? styles.selectedRow : undefined}>
+                      <td className={styles.selectCell}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => toggleSelected(row.id)}
+                          disabled={row.status !== "DRAFT"}
+                          title={row.status !== "DRAFT" ? "Chỉ rập bản nháp mới sửa hàng loạt" : undefined}
+                          aria-label={`Chọn ${row.code}`}
+                        />
+                      </td>
                       <td>
                         <PatternCategoryThumbnail
                           category={normalizePatternCategoryVisual(row.productCategory)}
@@ -504,6 +558,17 @@ export default function PatternListManager() {
             </div>
           </form>
         </div>
+      )}
+
+      {bulkEditing && selectedRows.length > 0 && (
+        <PatternBulkEditDialog
+          rows={selectedRows}
+          onClose={() => setBulkEditing(false)}
+          onSaved={() => {
+            setSelectedIds(new Set());
+            void load();
+          }}
+        />
       )}
 
       {importing && (
