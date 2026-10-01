@@ -259,65 +259,45 @@ export default async function CategoryPage({ params }: PageProps) {
         ]}
       />
 
-      {/* ── Category Hero ──────────────────────────────────────────────── */}
-      <section className="mp-category-listing-hero">
-        <div className="container">
-          <div className="mp-category-listing-hero__card">
-            <div className="mp-category-listing-hero__copy">
-              <p className="mp-catalog-eyebrow">Danh mục nguồn hàng B2B</p>
-              <h1 className="mp-catalog-title">{cat.name}</h1>
-
-              <p className="mp-catalog-desc">
-                {content?.shortIntro ??
-                  cat.description ??
-                  `Nguồn hàng ${cat.name.toLowerCase()} dành cho đại lý, xưởng in và doanh nghiệp.`}
-              </p>
-
-              <CatalogSourcingBadges />
-
-              <div className="mp-category-hero-actions" aria-label="Hành động danh mục">
-                <Link href="/lien-he" className="btn-primary">
-                  Yêu cầu báo giá
-                </Link>
-                <a href="#category-products" className="btn-secondary">
-                  Xem sản phẩm
-                </a>
-              </div>
+      <section className="v7-collection-hero">
+        <div className="container v7-collection-hero__grid">
+          <div className="v7-collection-hero__copy">
+            <p className="v7-kicker">Danh mục nguồn hàng B2B</p>
+            <h1>{cat.name}</h1>
+            <p>
+              {content?.shortIntro ??
+                cat.description ??
+                `Nguồn hàng ${cat.name.toLowerCase()} dành cho đại lý, xưởng in và doanh nghiệp.`}
+            </p>
+            <CatalogSourcingBadges />
+            <div className="v7-collection-hero__actions">
+              <Link href="/lien-he" className="v7-btn v7-btn--primary">Yêu cầu báo giá</Link>
+              <a href="#category-products" className="v7-btn v7-btn--ghost">Xem sản phẩm</a>
             </div>
-
-            {(heroImage && isValidImageSrc(heroImage)) || galleryImages.length > 0 ? (
-              <div className="mp-category-listing-hero__media">
-                {heroImage && isValidImageSrc(heroImage) && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={heroImage}
-                    alt={cat.name}
-                    className="category-hero-img"
-                  />
-                )}
-
-                {galleryImages.length > 0 && (
-                  <div className="category-gallery-grid">
-                    {galleryImages.map((src) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={src}
-                        src={src}
-                        alt={`${cat.name} — gallery`}
-                        className="category-gallery-item"
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="mp-category-listing-hero__media mp-category-listing-hero__media--empty" aria-hidden>
-                <span>ATTD</span>
-                <small>Nguồn hàng B2B</small>
-              </div>
-            )}
           </div>
 
+          <div className="v7-collection-hero__media">
+            {heroImage && isValidImageSrc(heroImage) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={heroImage} alt={cat.name} className="v7-collection-hero__image" />
+            ) : galleryImages[0] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={galleryImages[0]} alt={cat.name} className="v7-collection-hero__image" />
+            ) : (
+              <div className="v7-collection-hero__fallback">ATTD</div>
+            )}
+          </div>
+        </div>
+
+        <div className="container v7-collection-hero__meta">
+          <div><span>Sản phẩm</span><strong>{cat.products.length} lựa chọn</strong></div>
+          <div><span>Hoàn thiện</span><strong>In · thêu · OEM theo sản phẩm</strong></div>
+          <div><span>Báo giá</span><strong>Theo MOQ · cấu hình · deadline</strong></div>
+        </div>
+      </section>
+
+      <section className="v7-collection-body">
+        <div className="container">
           {navContext.children.length > 0 ? (
             <CatalogCategoryNav
               categories={navContext.children}
@@ -327,17 +307,17 @@ export default async function CategoryPage({ params }: PageProps) {
             />
           ) : null}
 
-          <div id="category-products" className="mp-category-listing-section-header">
+          <div id="category-products" className="v7-collection-products__head">
             <div>
-              <p className="mp-catalog-results-kicker">Sản phẩm trong danh mục</p>
-              <h2 className="mp-category-listing-section-title">
+              <p className="v7-kicker">Nguồn hàng trong danh mục</p>
+              <h2>
                 {cat.products.length > 0
                   ? `${cat.products.length} sản phẩm ${cat.name}`
                   : `Nguồn hàng ${cat.name}`}
               </h2>
             </div>
-            <p className="mp-category-listing-section-desc">
-              Chọn mẫu phù hợp, gửi số lượng/logo để ATTD tư vấn MOQ, tồn kho và báo giá B2B.
+            <p>
+              Chọn mẫu phù hợp, gửi số lượng/logo để ATTD tư vấn MOQ, tồn kho và phương án hoàn thiện.
             </p>
           </div>
 
@@ -347,7 +327,7 @@ export default async function CategoryPage({ params }: PageProps) {
                 title="ATTD có thể tư vấn nguồn hàng phù hợp"
                 description="Gửi số lượng, chất liệu và ngân sách dự kiến để ATTD đề xuất sản phẩm thay thế, MOQ và báo giá B2B."
               />
-              <Link href="/lien-he" className="btn-primary mp-catalog-empty-cta">
+              <Link href="/lien-he" className="v7-btn v7-btn--primary">
                 Gửi yêu cầu báo giá
               </Link>
             </div>
@@ -408,16 +388,15 @@ export default async function CategoryPage({ params }: PageProps) {
             />
           ) : null}
 
-          <section className="mp-category-use-cases" aria-labelledby="category-use-cases-title">
-            <div className="mp-category-use-cases__header">
-              <p className="mp-catalog-results-kicker">Ứng dụng B2B</p>
-              <h2 id="category-use-cases-title" className="mp-category-listing-section-title">
-                {cat.name} thường được dùng cho
-              </h2>
-            </div>
-            <div className="mp-category-use-case-grid">
-              {getCategoryUseCases(cat.name).map((item) => (
-                <article key={item.title} className="mp-category-use-case-card">
+          <section className="v7-collection-use-cases" aria-labelledby="category-use-cases-title">
+            <header>
+              <p className="v7-kicker">Ứng dụng B2B</p>
+              <h2 id="category-use-cases-title">{cat.name} thường được dùng cho</h2>
+            </header>
+            <div className="v7-collection-use-cases__grid">
+              {getCategoryUseCases(cat.name).map((item, index) => (
+                <article key={item.title}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
                   <h3>{item.title}</h3>
                   <p>{item.description}</p>
                 </article>
