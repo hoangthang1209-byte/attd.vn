@@ -187,19 +187,19 @@ export default async function ProductDetailPage({ params }: PageProps) {
       <section className="v7-pdp-intro">
         <div className="container v7-pdp-intro__inner">
           <div>
-            <p className="v7-kicker">Sản phẩm B2B</p>
-            <span>Chọn biến thể → kiểm tra MOQ → cấu hình hoàn thiện → gửi yêu cầu báo giá.</span>
+            <p className="v7-kicker">Thông tin đặt hàng</p>
+            <span>Chọn màu/size nếu có, xem số lượng tối thiểu và gửi yêu cầu để nhận báo giá.</span>
           </div>
-          <Link href="/lien-he" className="v7-pdp-intro__link">Cần tư vấn trước? ↗</Link>
+          <Link href="/lien-he" className="v7-pdp-intro__link">Chưa chắc chọn mẫu nào? Nhận tư vấn ↗</Link>
         </div>
       </section>
 
       <section className="v7-pdp-context" aria-label="Ứng dụng sản phẩm">
         <div className="container v7-pdp-context__inner">
-          <span className="v7-pdp-context__label">Có thể triển khai cho</span>
+          <span className="v7-pdp-context__label">Phù hợp với</span>
           <div className="v7-pdp-context__links">
             <Link href="/dong-phuc-doanh-nghiep">Đồng phục doanh nghiệp <span>↗</span></Link>
-            <Link href="/qua-tang-doanh-nghiep">Corporate Gifts <span>↗</span></Link>
+            <Link href="/qua-tang-doanh-nghiep">Quà tặng doanh nghiệp <span>↗</span></Link>
             {product.supportsOem ? (
               <Link href="/oem">OEM / Private Label <span>↗</span></Link>
             ) : null}
@@ -221,7 +221,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
             <header className="mp-pdp-section-head">
               <h2 className="mp-pdp-section-title">Hỏi đáp thường gặp</h2>
               <p className="mp-pdp-section-subtitle">
-                Câu hỏi phổ biến từ đối tác B2B và đại lý đồng phục.
+                Một số câu hỏi thường gặp trước khi đặt hàng.
               </p>
             </header>
             <ProductFaqList items={faqItems} />
@@ -232,7 +232,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
       <ProductDiscoveryRail
         id="mp-pdp-related"
         title="Sản phẩm liên quan"
-        description="Cùng nhóm sản phẩm để bạn so sánh nhanh chất liệu, MOQ và tiến độ."
+        description="Các sản phẩm cùng nhóm để bạn so sánh chất liệu, số lượng tối thiểu và thời gian."
         products={relatedDiscoveryCards}
         action={
           <Link href={`/${product.category?.slug ?? "san-pham"}`} className="link-chip">
@@ -246,7 +246,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
       <ProductDiscoveryRail
         title="Có thể bạn quan tâm"
-        description="Một số lựa chọn B2B khác phù hợp khi cần mở rộng danh mục nguồn hàng."
+        description="Một số sản phẩm khác có thể phù hợp với nhu cầu của bạn."
         products={recommendedDiscoveryCards}
       />
 
