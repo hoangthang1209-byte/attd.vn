@@ -1,17 +1,12 @@
-import Header from "@/components/public/Header";
-import Footer from "@/components/public/Footer";
+import PublicHeaderV7 from "@/components/public/v7/PublicHeaderV7";
+import PublicFooterV7 from "@/components/public/v7/PublicFooterV7";
 import MobileActionBar from "@/components/public/MobileActionBar";
 import FloatingContactWidget from "@/components/public/FloatingContactWidget";
 import NavigationProgress from "@/components/public/NavigationProgress";
 import OrganizationSchema from "@/components/seo/OrganizationSchema";
 import { getBrandingSettings } from "@/features/settings/services/settings.service";
-import { getMarketplaceCategoryTree } from "@/features/categories/marketplace-category-tree";
 import { getPublicSiteNavigation } from "@/features/site-navigation/site-navigation.service";
 
-/**
- * Public shell is visitor-shared (branding / nav / categories). Freshness comes from
- * tagged data caches + mutation-time revalidation — not force-dynamic.
- */
 export const revalidate = 3600;
 
 export default async function PublicLayout({
@@ -19,9 +14,8 @@ export default async function PublicLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [branding, categoryTree, siteNavigation] = await Promise.all([
+  const [branding, siteNavigation] = await Promise.all([
     getBrandingSettings(),
-    getMarketplaceCategoryTree(),
     getPublicSiteNavigation(),
   ]);
 
@@ -29,16 +23,11 @@ export default async function PublicLayout({
     <>
       <OrganizationSchema />
       <NavigationProgress />
-      <Header
-        headerLogoUrl={branding.headerLogoUrl}
-        companyTagline={branding.companyTagline}
-        categoryTree={categoryTree}
-        siteNavigation={siteNavigation}
-      />
+      <PublicHeaderV7 logoUrl={branding.headerLogoUrl} />
 
-      <div className="public-main">{children}</div>
+      <div className="public-main public-main--v7">{children}</div>
 
-      <Footer siteNavigation={siteNavigation} />
+      <PublicFooterV7 />
       <MobileActionBar siteNavigation={siteNavigation} />
       <FloatingContactWidget />
     </>
