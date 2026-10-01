@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { listMediaAssets } from "@/features/media/services/media.service";
 import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 
@@ -9,7 +10,9 @@ export type PublicSurfaceMedia =
   | "contact"
   | "sourcing"
   | "corporateGift"
-  | "about";
+  | "about"
+  | "uniform"
+  | "merchandise";
 
 type Candidate = {
   libraryCode: string;
@@ -57,7 +60,28 @@ const SURFACE_CANDIDATES: Record<PublicSurfaceMedia, Candidate[]> = {
     { libraryCode: "MANUFACTURING", roleCode: "FACTORY" },
     { libraryCode: "HOMEPAGE", roleCode: "FEATURED" },
   ],
+  uniform: [
+    { libraryCode: "UNIFORM", roleCode: "HERO" },
+    { libraryCode: "CUSTOMER", roleCode: "FEATURED" },
+    { libraryCode: "HOMEPAGE", roleCode: "FEATURED" },
+  ],
+  merchandise: [
+    { libraryCode: "MERCHANDISE", roleCode: "HERO" },
+    { libraryCode: "MERCHANDISE", roleCode: "FEATURED" },
+    { libraryCode: "MANUFACTURING", roleCode: "PROCESS" },
+    { libraryCode: "MARKETING", roleCode: "HERO" },
+  ],
 };
+
+const listPublicSurfaceAssets = cache(
+  async (libraryCode: string, roleCode?: string) =>
+    listMediaAssets({
+      libraryCode,
+      roleCode,
+      visibility: "PUBLIC",
+      limit: 12,
+    }),
+);
 
 function resolveAssetUrl(asset: {
   url?: string | null;
@@ -74,12 +98,10 @@ export async function getPublicSurfaceMedia(
   surface: PublicSurfaceMedia,
 ): Promise<{ url: string; alt: string } | null> {
   for (const candidate of SURFACE_CANDIDATES[surface]) {
-    const assets = await listMediaAssets({
-      libraryCode: candidate.libraryCode,
-      roleCode: candidate.roleCode,
-      visibility: "PUBLIC",
-      limit: 12,
-    });
+    const assets = await listPublicSurfaceAssets(
+      candidate.libraryCode,
+      candidate.roleCode,
+    );
 
     const usable = assets.find((asset) => {
       if (!asset.mimeType?.startsWith("image/")) return false;

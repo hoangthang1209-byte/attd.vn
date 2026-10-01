@@ -1,116 +1,56 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import Image from "next/image";
 import { Suspense } from "react";
 import ContactForm from "@/components/public/ContactForm";
 import PublicContactChannels from "@/components/public/PublicContactChannels";
-import CompanyContactCard from "@/components/public/company/CompanyContactCard";
-import ProcessTrustBlock from "@/components/public/trust/ProcessTrustBlock";
-import {
-  CONTACT_PROCESS_STEPS,
-  TRUST_REASSURANCE_PRIVACY,
-} from "@/lib/b2b-trust-v2-copy";
-import { buildContactMetadata } from "@/lib/seo/indexation-policy";
-import { getCompanySettings } from "@/features/settings/services/settings.service";
 import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
+import { buildContactMetadata } from "@/lib/seo/indexation-policy";
 
 export const revalidate = 3600;
-
 export const metadata: Metadata = buildContactMetadata({
-  title: "Liên hệ báo giá | ATTD",
+  title: "Gửi brief & yêu cầu báo giá | ATTD",
   description:
-    "Gửi yêu cầu báo giá nguồn hàng đồng phục và quà tặng doanh nghiệp. ATTD phản hồi trong 24 giờ làm việc.",
+    "Gửi brief dự án cho ATTD: sản phẩm, số lượng, logo, ngân sách và deadline. Phù hợp đồng phục, sourcing, OEM, quà tặng và merchandise.",
 });
 
-const CONTEXT_CARDS = [
-  {
-    title: "Báo giá nguồn hàng",
-    description:
-      "Áo thun, polo, nón, tote và quà tặng doanh nghiệp. Giá sỉ theo số lượng, giao hàng toàn quốc.",
-  },
-  {
-    title: "Yêu cầu OEM",
-    description:
-      "Sản xuất Private Label theo thiết kế riêng. Phù hợp cho xưởng in và thương hiệu.",
-  },
-  {
-    title: "Hỗ trợ doanh nghiệp",
-    description:
-      "Đồng phục và quà tặng doanh nghiệp theo số lượng. Tư vấn mẫu và chất liệu phù hợp.",
-  },
-];
+const BRIEF = [
+  ["01","Bạn cần gì?","Sản phẩm, nhóm hàng hoặc chỉ cần mô tả mục tiêu."],
+  ["02","Số lượng","Ước tính ban đầu cũng đủ để ATTD chọn đúng hướng."],
+  ["03","Branding","Logo, artwork, in/thêu, nhãn, packaging nếu có."],
+  ["04","Deadline","Ngày cần hàng hoặc ngày diễn ra campaign/event."],
+] as const;
 
-export default async function LienHePage() {
-  const [company, contactMedia] = await Promise.all([
-    getCompanySettings(),
-    getPublicSurfaceMedia("contact"),
-  ]);
+export default async function ContactPage() {
+  const media = await getPublicSurfaceMedia("contact");
 
   return (
-    <main className="contact-page-v2">
-      <section className="section contact-page-v2__section">
-        <div className="container">
-          <div className="contact-page-v2__grid">
-            {/* Left: Context */}
-            <div>
-              <div className="contact-page-v2__eyebrow">
-                Liên hệ B2B
+    <main className="v7-contact">
+      <section className="v7-contact__hero">
+        <div className="container v7-contact__grid">
+          <div className="v7-contact__intro">
+            <p className="v7-kicker">Bắt đầu từ brief</p>
+            <h1>Không cần viết một RFQ hoàn hảo.</h1>
+            <p>
+              Gửi những gì bạn đang có. ATTD sẽ giúp làm rõ sản phẩm, số lượng,
+              cấu hình và timeline trước khi báo giá.
+            </p>
+            {media ? (
+              <div className="v7-contact__media">
+                <Image src={media.url} alt={media.alt} fill className="v7-contact__image" sizes="(max-width:900px) 100vw, 44vw" />
               </div>
-
-              <h1 className="contact-page-v2__title">Liên hệ báo giá</h1>
-
-              <p className="contact-page-v2__lead">
-                Dành cho đại lý, xưởng in, doanh nghiệp cần nguồn hàng đồng
-                phục và quà tặng số lượng lớn. Chúng tôi sẽ phản hồi trong
-                vòng 24 giờ làm việc.
-              </p>
-
-              {contactMedia ? (
-                <figure className="contact-page-v2__media">
-                  <Image
-                    src={contactMedia.url}
-                    alt={contactMedia.alt}
-                    fill
-                    className="contact-page-v2__media-image"
-                    sizes="(max-width: 900px) 100vw, 520px"
-                  />
-                </figure>
-              ) : null}
-
-              <div className="contact-page-v2__cards">
-                {CONTEXT_CARDS.map((card) => (
-                  <div key={card.title} className="card contact-page-v2__card">
-                    <h3>{card.title}</h3>
-                    <p>{card.description}</p>
-                  </div>
-                ))}
-              </div>
-
-              <ProcessTrustBlock
-                title="Sau khi gửi yêu cầu"
-                steps={CONTACT_PROCESS_STEPS}
-                reassurance={TRUST_REASSURANCE_PRIVACY}
-                className="contact-page-v2__process"
-              />
-
-              <PublicContactChannels className="contact-page-v2__channels" />
-
-              <CompanyContactCard company={company} className="contact-page-v2__company-card" />
-
-              <p className="contact-page-v2__dealer-link">
-                Muốn trở thành đại lý chính thức?{" "}
-                <Link href="/dai-ly">
-                  Đăng ký đại lý →
-                </Link>
-              </p>
+            ) : null}
+            <div className="v7-contact__brief-list">
+              {BRIEF.map(([index,title,description])=>(
+                <div key={index}><span>{index}</span><strong>{title}</strong><p>{description}</p></div>
+              ))}
             </div>
+            <PublicContactChannels className="v7-contact__channels" />
+          </div>
 
-            {/* Right: Form */}
-            <div>
-              <Suspense fallback={<div className="lead-form public-lead-form public-lead-form--contact" aria-busy="true" />}>
-                <ContactForm />
-              </Suspense>
-            </div>
+          <div className="v7-contact__form">
+            <Suspense fallback={<div className="lead-form public-lead-form public-lead-form--contact" aria-busy="true" />}>
+              <ContactForm />
+            </Suspense>
           </div>
         </div>
       </section>

@@ -1,128 +1,92 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import Image from "next/image";
-import CompanyFacts from "@/components/public/company/CompanyFacts";
-import CompanyIntroSection from "@/components/public/company/CompanyIntroSection";
-import CompanyTimeline from "@/components/public/company/CompanyTimeline";
-import WhyChooseAttd from "@/components/public/company/WhyChooseAttd";
-import FactoryOverview from "@/components/public/company/FactoryOverview";
-import CustomerLogoStrip from "@/components/public/company/CustomerLogoStrip";
-import CompanyTrustMetrics from "@/components/public/company/CompanyTrustMetrics";
-import TestimonialSection from "@/components/public/company/TestimonialSection";
-import CaseStudySection from "@/components/public/CaseStudySection";
-import CompanyContactCard from "@/components/public/company/CompanyContactCard";
-import MarketplaceRFQStrip from "@/components/marketplace/MarketplaceRFQStrip";
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import { getCompanySettings } from "@/features/settings/services/settings.service";
 import { buildAboutMetadata } from "@/lib/seo/indexation-policy";
-import { VERIFIED_EXPERIENCE_YEARS } from "@/lib/company-trust";
 import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
+import CustomerLogoStrip from "@/components/public/company/CustomerLogoStrip";
+import CaseStudySection from "@/components/public/CaseStudySection";
 
 export const revalidate = 3600;
-
 export async function generateMetadata(): Promise<Metadata> {
   const company = await getCompanySettings();
-
   return buildAboutMetadata({
-    title: `Giới thiệu ${company.name} | Nguồn hàng B2B & OEM`,
+    title: `Về ${company.name} | B2B Sourcing, OEM & Merchandise`,
     description:
-      `Tìm hiểu năng lực ATTD — hơn ${VERIFIED_EXPERIENCE_YEARS} năm kinh nghiệm, showroom & kho hàng, OEM/Private Label và mạng lưới sản xuất cho đại lý, xưởng in và doanh nghiệp.`,
+      "ATTD là đối tác sourcing, customization, OEM và merchandise cho doanh nghiệp, agency, đại lý và thương hiệu.",
   });
 }
 
-export default async function GioiThieuPage() {
-  const [company, aboutMedia] = await Promise.all([
+const MODEL = [
+  ["01","Asset-light","ATTD không cố sở hữu mọi công đoạn. Chúng tôi sở hữu cách điều phối dự án, dữ liệu và chuẩn kiểm soát."],
+  ["02","Operations-heavy","Nguồn hàng, sample, production, QC, packing và delivery được quản lý như một hệ thống."],
+  ["03","B2B-first","Website, báo giá và quy trình được thiết kế cho đơn hàng có MOQ, nhiều SKU và yêu cầu riêng."],
+] as const;
+
+export default async function AboutPage() {
+  const [company, media] = await Promise.all([
     getCompanySettings(),
     getPublicSurfaceMedia("about"),
   ]);
 
   return (
-    <main className="company-about-page">
-      <section className="company-about-hero company-about-hero--v3">
-        <div className="container company-about-hero__grid">
-          <div className="company-about-hero__copy">
-            <p className="company-about-hero__eyebrow">Nguồn hàng B2B</p>
-            <h1 className="company-about-hero__title">
-              Đối tác nguồn hàng đồng phục &amp; OEM bạn có thể tin cậy
-            </h1>
-            <p className="company-about-hero__lead">
-              Hơn {VERIFIED_EXPERIENCE_YEARS} năm kinh nghiệm từ AOTHUNTHONGDIEP và VietnamClothing.
-              ATTD hỗ trợ đại lý, agency, xưởng in và doanh nghiệp lấy nguồn, báo giá và triển khai
-              đồng phục, phôi trơn, quà tặng hoặc OEM/Private Label.
+    <main className="v7-about">
+      <section className="v7-about-hero">
+        <div className="container v7-about-hero__grid">
+          <div>
+            <p className="v7-kicker">Về ATTD</p>
+            <h1>Không phải một xưởng đơn lẻ. Là một hệ thống triển khai B2B.</h1>
+            <p>
+              ATTD kết nối sourcing, customization, OEM, merchandise và corporate gifts
+              trong cùng một mô hình vận hành — một đầu mối xuyên suốt từ brief đến bàn giao.
             </p>
-            <div className="company-about-hero__actions">
-              <Link href="/lien-he" className="btn-primary">
-                Yêu cầu báo giá
-              </Link>
-              <Link href="/dai-ly" className="btn-secondary">
-                Hợp tác đại lý
-              </Link>
-            </div>
+            <Link href="/lien-he" className="v7-btn v7-btn--primary">Trao đổi dự án</Link>
           </div>
-          {aboutMedia ? (
-            <div className="company-about-hero__media">
-              <Image
-                src={aboutMedia.url}
-                alt={aboutMedia.alt}
-                fill
-                priority
-                className="company-about-hero__media-image"
-                sizes="(max-width: 900px) 100vw, 48vw"
-              />
-            </div>
-          ) : null}
+          <div className="v7-about-hero__media">
+            {media ? <Image src={media.url} alt={media.alt} fill priority className="v7-about-hero__image" sizes="(max-width:900px) 100vw, 50vw" /> : null}
+          </div>
         </div>
       </section>
 
-      <CompanyFacts
-        title="Vì sao đối tác chọn ATTD"
-        description="Những điểm cốt lõi giúp bạn đánh giá năng lực trước khi gửi yêu cầu báo giá."
-        variant="compact"
-      />
+      <section className="v7-about-model">
+        <div className="container">
+          <header className="v7-section-head">
+            <div>
+              <p className="v7-kicker">Mô hình kinh doanh</p>
+              <h2>Giá trị của ATTD nằm ở khả năng giảm độ phức tạp.</h2>
+            </div>
+            <p>
+              Khách hàng không cần tự kết nối nhiều xưởng, nhiều nguồn hàng và nhiều bên hoàn thiện.
+              ATTD đứng giữa và chịu trách nhiệm điều phối.
+            </p>
+          </header>
+          <div className="v7-about-model__grid">
+            {MODEL.map(([index,title,description])=>(
+              <article key={index}><span>{index}</span><h3>{title}</h3><p>{description}</p></article>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <WhyChooseAttd
-        title="ATTD phù hợp khi bạn cần"
-        description="Từ nguồn hàng trơn đến OEM — một đối tác B2B rõ ràng về năng lực và cách làm việc."
-      />
-
-      <MarketplaceRFQStrip />
-
-      <FactoryOverview />
-
-      <CompanyTrustMetrics />
+      <section className="v7-about-company">
+        <div className="container v7-about-company__grid">
+          <div>
+            <p className="v7-kicker v7-kicker--light">Doanh nghiệp</p>
+            <h2>{company.name}</h2>
+          </div>
+          <div>
+            <p>
+              Từ nền tảng đồng phục và hàng may mặc, ATTD mở rộng thành một hệ thống B2B
+              phục vụ nhiều loại nhu cầu: hàng có sẵn, OEM, corporate gifts và merchandise.
+            </p>
+            <Link href="/#giai-phap">Xem 5 nhóm giải pháp <ArrowUpRight size={18}/></Link>
+          </div>
+        </div>
+      </section>
 
       <CustomerLogoStrip />
-
-      <TestimonialSection />
-
       <CaseStudySection />
-
-      <CompanyIntroSection company={company} />
-
-      <CompanyTimeline
-        title="Bối cảnh phát triển"
-        description="Hành trình hình thành năng lực nguồn hàng và nền tảng B2B của ATTD."
-      />
-
-      <section className="mp-section mp-section--tight company-about-contact">
-        <div className="container company-about-contact__grid">
-          <div className="company-about-contact__copy">
-            <h2 className="company-about-contact__title">Sẵn sàng nhận báo giá?</h2>
-            <p className="company-about-contact__description">
-              Gửi yêu cầu để đội ngũ ATTD tư vấn sản phẩm, số lượng, OEM và tiến độ phù hợp
-              nhu cầu thực tế của bạn.
-            </p>
-            <div className="company-about-hero__actions">
-              <Link href="/lien-he" className="btn-primary">
-                Gửi yêu cầu báo giá
-              </Link>
-              <Link href="/san-pham" className="btn-secondary">
-                Xem danh mục sản phẩm
-              </Link>
-            </div>
-          </div>
-          <CompanyContactCard company={company} showIntroLink={false} />
-        </div>
-      </section>
     </main>
   );
 }

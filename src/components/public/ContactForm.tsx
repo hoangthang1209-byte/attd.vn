@@ -23,7 +23,7 @@ function buildPrefillMessage(params: {
   const lines: string[] = [];
   if (params.productGroup?.trim()) lines.push(`Nhóm sản phẩm: ${params.productGroup.trim()}`);
   if (params.quantity?.trim()) lines.push(`Số lượng dự kiến: ${params.quantity.trim()}`);
-  if (params.service?.trim()) lines.push(`Nhu cầu hoàn thiện: ${params.service.trim()}`);
+  if (params.service?.trim()) lines.push(`Giải pháp quan tâm: ${params.service.trim()}`);
   if (params.timeline?.trim()) lines.push(`Thời gian cần hàng: ${params.timeline.trim()}`);
   if (params.region?.trim()) lines.push(`Khu vực giao hàng: ${params.region.trim()}`);
   return lines.join("\n");
@@ -35,6 +35,7 @@ export default function ContactForm() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
+  const sourceDetail = searchParams.get("service")?.trim() || null;
   const [message, setMessage] = useState(() =>
     buildPrefillMessage({
       productGroup: searchParams.get("product_group"),
@@ -71,7 +72,7 @@ export default function ContactForm() {
       const response = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, email, company, message }),
+        body: JSON.stringify({ name, phone, email, company, message, sourceDetail }),
       });
 
       const data = await response.json();

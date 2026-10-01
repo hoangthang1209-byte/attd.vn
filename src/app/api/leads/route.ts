@@ -60,6 +60,8 @@ export async function POST(request: Request) {
   const email = body.email?.trim() || null;
   const company = body.company?.trim() || null;
   const message = body.message?.trim() || null;
+  const sourceDetailInput =
+    typeof body.sourceDetail === "string" ? body.sourceDetail.trim().slice(0, 255) || null : null;
   const inquiry = body.productInquiry as ProductInquiryBody | undefined;
 
   const source = inquiry?.productId ? "PRODUCT_INQUIRY" : "CONTACT";
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
     email,
     company,
     source,
-    sourceDetail: inquiry?.productUrl?.trim() || null,
+    sourceDetail: inquiry?.productUrl?.trim() || sourceDetailInput,
     message,
     ...(inquiry?.productId
       ? {
@@ -99,6 +101,7 @@ export async function POST(request: Request) {
           variantId: inquiry?.variantId ?? null,
           quantity: inquiry?.quantity ?? null,
           message,
+          sourceDetail: sourceDetailInput,
         }),
       }),
       payload: {
@@ -107,6 +110,7 @@ export async function POST(request: Request) {
         email,
         company,
         message,
+        sourceDetail: sourceDetailInput,
         productId: inquiry?.productId ?? null,
         variantId: inquiry?.variantId ?? null,
         quantity: inquiry?.quantity ?? null,

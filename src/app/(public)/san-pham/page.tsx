@@ -55,8 +55,8 @@ type Props = {
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const params = await searchParams;
   return {
-    title: `Danh sách sản phẩm sỉ | ${SITE_NAME}`,
-    description: `Danh mục sản phẩm đồng phục và quà tặng doanh nghiệp sỉ — áo thun, polo, nón, tote bag, bình giữ nhiệt, bandana và gift set. ${DEFAULT_DESCRIPTION}`,
+    title: `Danh mục nguồn hàng B2B | ${SITE_NAME}`,
+    description: `Khám phá nguồn hàng B2B cho đồng phục, quà tặng, agency, OEM và merchandise — lọc theo danh mục, tồn kho và khả năng hoàn thiện. ${DEFAULT_DESCRIPTION}`,
     ...buildCatalogMetadata(params),
   };
 }
@@ -123,7 +123,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
     return buildCatalogUrl(catalogFilters, { page: nextPage });
   }
 
-  const pageTitle = categoryContext?.title ?? "Sản phẩm";
+  const pageTitle = categoryContext?.title ?? "Nguồn hàng B2B";
   const pageDescription =
     categoryContext?.subtitle ??
     "Danh sách nguồn hàng đồng phục và quà tặng B2B — lọc theo danh mục, tình trạng hàng và khả năng in/thêu/OEM.";
@@ -137,7 +137,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
   ];
 
   return (
-    <main className="mp-catalog mp-catalog--v4">
+    <main className="mp-catalog mp-catalog--v7">
       <Breadcrumb items={breadcrumbItems} />
 
       <section className="mp-catalog-hero">
