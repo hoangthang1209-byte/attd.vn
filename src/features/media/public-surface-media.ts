@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { listMediaAssets } from "@/features/media/services/media.service";
 import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 
@@ -72,6 +73,16 @@ const SURFACE_CANDIDATES: Record<PublicSurfaceMedia, Candidate[]> = {
   ],
 };
 
+const listPublicSurfaceAssets = cache(
+  async (libraryCode: string, roleCode?: string) =>
+    listMediaAssets({
+      libraryCode,
+      roleCode,
+      visibility: "PUBLIC",
+      limit: 12,
+    }),
+);
+
 function resolveAssetUrl(asset: {
   url?: string | null;
   thumbnailUrl?: string | null;
@@ -87,12 +98,10 @@ export async function getPublicSurfaceMedia(
   surface: PublicSurfaceMedia,
 ): Promise<{ url: string; alt: string } | null> {
   for (const candidate of SURFACE_CANDIDATES[surface]) {
-    const assets = await listMediaAssets({
-      libraryCode: candidate.libraryCode,
-      roleCode: candidate.roleCode,
-      visibility: "PUBLIC",
-      limit: 12,
-    });
+    const assets = await listPublicSurfaceAssets(
+      candidate.libraryCode,
+      candidate.roleCode,
+    );
 
     const usable = assets.find((asset) => {
       if (!asset.mimeType?.startsWith("image/")) return false;
