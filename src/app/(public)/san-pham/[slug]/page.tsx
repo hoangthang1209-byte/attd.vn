@@ -184,6 +184,20 @@ export default async function ProductDetailPage({ params }: PageProps) {
         />
       </div>
 
+      <section className="v7-pdp-context" aria-label="Ứng dụng sản phẩm">
+        <div className="container v7-pdp-context__inner">
+          <span className="v7-pdp-context__label">Có thể triển khai cho</span>
+          <div className="v7-pdp-context__links">
+            <Link href="/dong-phuc-doanh-nghiep">Đồng phục doanh nghiệp <span>↗</span></Link>
+            <Link href="/qua-tang-doanh-nghiep">Corporate Gifts <span>↗</span></Link>
+            {product.supportsOem ? (
+              <Link href="/oem">OEM / Private Label <span>↗</span></Link>
+            ) : null}
+            <Link href="/merchandise">Merchandise <span>↗</span></Link>
+          </div>
+        </div>
+      </section>
+
       <ProductDetailInteractive
         product={product}
         displayName={displayName}
