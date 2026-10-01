@@ -52,7 +52,7 @@ export default function WholesaleLandingPage({
   canonicalUrl,
 }: WholesaleLandingPageProps) {
   return (
-    <main className="wholesale-landing-v2">
+    <main className="wholesale-landing-v2 v7-seo-landing">
       <CollectionSchema
         title={content.seoTitle}
         description={content.metaDescription}
