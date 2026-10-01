@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import type { ReactNode } from "react";
 
 type Media = { url: string; alt: string } | null;
 
@@ -15,6 +16,7 @@ type Props = {
   process: readonly { title: string; description: string }[];
   outcomes: readonly string[];
   ctaLabel?: string;
+  leadCapture?: ReactNode;
 };
 
 export default function BusinessSolutionPageV7({
@@ -28,6 +30,7 @@ export default function BusinessSolutionPageV7({
   process,
   outcomes,
   ctaLabel = "Gửi brief dự án",
+  leadCapture,
 }: Props) {
   const contactHref = `/lien-he?service=${encodeURIComponent(kicker)}`;
 
@@ -115,6 +118,22 @@ export default function BusinessSolutionPageV7({
           </ol>
         </div>
       </section>
+
+      {leadCapture ? (
+        <section className="v7-solution-lead">
+          <div className="container v7-solution-lead__grid">
+            <div className="v7-solution-lead__intro">
+              <p className="v7-kicker">Request for quotation</p>
+              <h2>Đưa nhu cầu vào hệ thống để ATTD tư vấn đúng flow.</h2>
+              <p>
+                Form này giữ nguyên source attribution, UTM và dữ liệu cần thiết cho CRM,
+                nhưng được đặt trong trải nghiệm V7 mới.
+              </p>
+            </div>
+            <div className="v7-solution-lead__form">{leadCapture}</div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="v7-solution-final">
         <div className="container v7-solution-final__inner">
