@@ -228,7 +228,7 @@ export default async function CategoryPage({ params }: PageProps) {
   const galleryImages = getCategoryGalleryImages(category);
 
   return (
-    <main>
+    <main className="v7-category-page">
       {/* ── Structured Data ────────────────────────────────────────────── */}
       <CollectionSchema
         title={pageTitle}
