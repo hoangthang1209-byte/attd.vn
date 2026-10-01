@@ -1,5 +1,4 @@
 import ProductCard from "@/components/public/ProductCard";
-import MarketplaceSectionHeader from "@/components/marketplace/MarketplaceSectionHeader";
 import type { HomepageProductItem } from "@/features/home/homepage.types";
 
 type Props = {
@@ -18,14 +17,19 @@ export default function HomeProductDiscoverySection({ products }: Props) {
   }
 
   return (
-    <section className="mp-section mp-section--tight">
+    <section className="home-product-showcase">
       <div className="container">
-        <MarketplaceSectionHeader
-          title="Sản phẩm sỉ nổi bật"
-          actionHref="/san-pham"
-          actionLabel="Xem tất cả"
-        />
-        <div className="mp-product-grid mp-product-grid--compact">
+        <div className="home-product-showcase__heading">
+          <div>
+            <p className="public-eyebrow">Sản phẩm nổi bật</p>
+            <h2>Nguồn hàng đang được hỏi nhiều</h2>
+          </div>
+          <div className="home-product-showcase__heading-side">
+            <p>Đi thẳng vào sản phẩm để xem màu, MOQ, thời gian và khả năng hoàn thiện.</p>
+            <a href="/san-pham" className="home-product-showcase__all">Xem toàn bộ sản phẩm →</a>
+          </div>
+        </div>
+        <div className="home-product-showcase__grid">
           {products.map((product) => {
             const stockLabel = product.availabilityLabel ?? undefined;
             const stockStatus = stockLabel
@@ -33,8 +37,8 @@ export default function HomeProductDiscoverySection({ products }: Props) {
               : undefined;
 
             return (
+              <div key={product.id} className="home-product-showcase__item">
               <ProductCard
-                key={product.id}
                 id={product.id}
                 slug={product.slug}
                 name={product.name}
@@ -52,6 +56,7 @@ export default function HomeProductDiscoverySection({ products }: Props) {
                 salesBadges={product.salesBadges}
                 availableColors={product.availableColors}
               />
+              </div>
             );
           })}
         </div>
