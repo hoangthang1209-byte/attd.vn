@@ -4,6 +4,7 @@ import CategoryCard from "@/components/public/CategoryCard";
 import Breadcrumb from "@/components/seo/Breadcrumb";
 import { getPublicCmsCategoryTree } from "@/features/categories/services/category.service";
 import { buildPublicCategoryHierarchy } from "@/features/categories/public-category-hierarchy.utils";
+import { publicCategoryHref } from "@/features/categories/public-category-url";
 import { PUBLIC_ALL_CATEGORIES_PATH } from "@/features/home/homepage-category.constants";
 import { canonicalUrl, buildOgImages } from "@/lib/seo";
 
@@ -65,7 +66,7 @@ export default async function ProductCategoriesPage() {
                       <p>Nhóm sản phẩm</p>
                       <h2>{section.name}</h2>
                     </div>
-                    <Link href={section.href ?? "/san-pham"}>Xem nhóm ↗</Link>
+                    <Link href={publicCategoryHref(section.slug)}>Xem nhóm ↗</Link>
                   </header>
 
                   <div className="v7-category-group__grid">
