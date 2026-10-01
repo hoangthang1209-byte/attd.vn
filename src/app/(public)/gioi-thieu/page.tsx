@@ -12,16 +12,16 @@ export const revalidate = 3600;
 export async function generateMetadata(): Promise<Metadata> {
   const company = await getCompanySettings();
   return buildAboutMetadata({
-    title: `Về ${company.name} | B2B Sourcing, OEM & Merchandise`,
+    title: `Về ${company.name} | Đồng phục, OEM, nguồn hàng & merchandise`,
     description:
-      "ATTD là đối tác sourcing, customization, OEM và merchandise cho doanh nghiệp, agency, đại lý và thương hiệu.",
+      "ATTD đồng hành cùng doanh nghiệp, agency, đại lý và thương hiệu từ tìm nguồn hàng, làm mẫu, sản xuất đến hoàn thiện và giao hàng.",
   });
 }
 
 const MODEL = [
-  ["01","Asset-light","ATTD không cố sở hữu mọi công đoạn. Chúng tôi sở hữu cách điều phối dự án, dữ liệu và chuẩn kiểm soát."],
-  ["02","Operations-heavy","Nguồn hàng, sample, production, QC, packing và delivery được quản lý như một hệ thống."],
-  ["03","B2B-first","Website, báo giá và quy trình được thiết kế cho đơn hàng có MOQ, nhiều SKU và yêu cầu riêng."],
+  ["01","Một đầu mối","Khách hàng không cần tự làm việc với nhiều bên. ATTD đứng giữa để điều phối và theo sát toàn bộ dự án."],
+  ["02","Theo sát từng công đoạn","Nguồn hàng, làm mẫu, sản xuất, kiểm hàng, đóng gói và giao hàng được quản lý theo cùng một kế hoạch."],
+  ["03","Phù hợp đơn hàng B2B","Quy trình phù hợp các đơn có số lượng, nhiều mẫu, nhiều size hoặc yêu cầu hoàn thiện riêng."],
 ] as const;
 
 export default async function AboutPage() {
@@ -36,10 +36,10 @@ export default async function AboutPage() {
         <div className="container v7-about-hero__grid">
           <div>
             <p className="v7-kicker">Về ATTD</p>
-            <h1>Không phải một xưởng đơn lẻ. Là một hệ thống triển khai B2B.</h1>
+            <h1>Một đầu mối để triển khai nhiều loại sản phẩm B2B.</h1>
             <p>
-              ATTD kết nối sourcing, customization, OEM, merchandise và corporate gifts
-              trong cùng một mô hình vận hành — một đầu mối xuyên suốt từ brief đến bàn giao.
+              ATTD kết nối nguồn hàng, đồng phục, OEM, quà tặng và merchandise
+              trong cùng một quy trình — từ nhu cầu ban đầu đến khi giao hàng.
             </p>
             <Link href="/lien-he" className="v7-btn v7-btn--primary">Trao đổi dự án</Link>
           </div>
@@ -54,11 +54,11 @@ export default async function AboutPage() {
           <header className="v7-section-head">
             <div>
               <p className="v7-kicker">Mô hình kinh doanh</p>
-              <h2>Giá trị của ATTD nằm ở khả năng giảm độ phức tạp.</h2>
+              <h2>Giúp khách hàng làm việc đơn giản hơn.</h2>
             </div>
             <p>
-              Khách hàng không cần tự kết nối nhiều xưởng, nhiều nguồn hàng và nhiều bên hoàn thiện.
-              ATTD đứng giữa và chịu trách nhiệm điều phối.
+              Thay vì phải tự kết nối nhiều xưởng, nguồn hàng và đơn vị hoàn thiện,
+              khách hàng có thể làm việc với một đầu mối tại ATTD.
             </p>
           </header>
           <div className="v7-about-model__grid">
@@ -77,10 +77,10 @@ export default async function AboutPage() {
           </div>
           <div>
             <p>
-              Từ nền tảng đồng phục và hàng may mặc, ATTD mở rộng thành một hệ thống B2B
-              phục vụ nhiều loại nhu cầu: hàng có sẵn, OEM, corporate gifts và merchandise.
+              Từ nền tảng đồng phục và hàng may mặc, ATTD mở rộng để phục vụ thêm
+              nguồn hàng, OEM, quà tặng doanh nghiệp và merchandise.
             </p>
-            <Link href="/#giai-phap">Xem 5 nhóm giải pháp <ArrowUpRight size={18}/></Link>
+            <Link href="/#giai-phap">Xem các dịch vụ của ATTD <ArrowUpRight size={18}/></Link>
           </div>
         </div>
       </section>
