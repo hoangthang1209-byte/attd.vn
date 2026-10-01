@@ -67,7 +67,7 @@ export default function BusinessSolutionPageV7({
         <div className="container">
           <header className="v7-section-head">
             <div>
-              <p className="v7-kicker">Scope of work</p>
+              <p className="v7-kicker">Phạm vi triển khai</p>
               <h2>Một đối tác xuyên suốt thay vì nhiều nhà cung cấp rời rạc.</h2>
             </div>
             <p>
@@ -89,7 +89,7 @@ export default function BusinessSolutionPageV7({
       <section className="v7-deliverables">
         <div className="container v7-deliverables__grid">
           <div>
-            <p className="v7-kicker v7-kicker--light">What you get</p>
+            <p className="v7-kicker v7-kicker--light">Kết quả bàn giao</p>
             <h2>Kết quả phải rõ trước khi bắt đầu sản xuất.</h2>
           </div>
           <ul>
@@ -102,7 +102,7 @@ export default function BusinessSolutionPageV7({
         <div className="container">
           <header className="v7-section-head">
             <div>
-              <p className="v7-kicker">Project flow</p>
+              <p className="v7-kicker">Quy trình dự án</p>
               <h2>Từ brief đến giao hàng.</h2>
             </div>
             <p>Mỗi bước đều có đầu ra rõ để giảm vòng sửa, kiểm soát cost và giữ đúng deadline.</p>
@@ -134,7 +134,7 @@ export default function BusinessSolutionPageV7({
         <section className="v7-solution-lead">
           <div className="container v7-solution-lead__grid">
             <div className="v7-solution-lead__intro">
-              <p className="v7-kicker">Request for quotation</p>
+              <p className="v7-kicker">Yêu cầu báo giá</p>
               <h2>Đưa nhu cầu vào hệ thống để ATTD tư vấn đúng flow.</h2>
               <p>
                 Form này giữ nguyên source attribution, UTM và dữ liệu cần thiết cho CRM,
@@ -149,7 +149,7 @@ export default function BusinessSolutionPageV7({
       <section className="v7-solution-final">
         <div className="container v7-solution-final__inner">
           <div>
-            <p className="v7-kicker v7-kicker--light">Next step</p>
+            <p className="v7-kicker v7-kicker--light">Bước tiếp theo</p>
             <h2>Gửi mục tiêu, số lượng và deadline.</h2>
           </div>
           <Link href={contactHref} className="v7-solution-final__link">
