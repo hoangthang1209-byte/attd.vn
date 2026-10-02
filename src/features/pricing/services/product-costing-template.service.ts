@@ -102,19 +102,51 @@ export async function getProductCostingTemplate(input: {
       .filter((row) => !row.materialId && row.materialCode?.trim())
       .map((row) => row.materialCode!.trim()),
   )];
-  const fallbackMaterials = missingCodes.length
-    ? await prisma.material.findMany({
-        where: { materialCode: { in: missingCodes }, isActive: true },
-        select: INVENTORY_MATERIAL_SOURCE_SELECT,
-      })
-    : [];
+  const [fallbackMaterials, fallbackProductionMaterials, fallbackProductionTrims] = missingCodes.length
+    ? await Promise.all([
+        prisma.material.findMany({
+          where: { materialCode: { in: missingCodes }, isActive: true },
+          select: INVENTORY_MATERIAL_SOURCE_SELECT,
+        }),
+        prisma.productionMaterial.findMany({
+          where: { code: { in: missingCodes }, isActive: true },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            supplierId: true,
+            costingSourcePrices: {
+              where: { isActive: true },
+              select: SOURCE_PRICE_SELECT,
+              orderBy: { updatedAt: "desc" },
+            },
+          },
+        }),
+        prisma.productionTrim.findMany({
+          where: { code: { in: missingCodes }, isActive: true },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            supplierId: true,
+            costingSourcePrices: {
+              where: { isActive: true },
+              select: SOURCE_PRICE_SELECT,
+              orderBy: { updatedAt: "desc" },
+            },
+          },
+        }),
+      ])
+    : [[], [], []] as const;
   const fallbackByCode = new Map(fallbackMaterials.map((material) => [material.materialCode, material]));
+  const productionMaterialByCode = new Map(fallbackProductionMaterials.map((material) => [material.code, material]));
+  const productionTrimByCode = new Map(fallbackProductionTrims.map((material) => [material.code, material]));
 
   const drafts: ProductCostingRequirementDraft[] = rows.map((row) => {
-    const inventoryMaterial =
-      row.material ?? (row.materialCode ? fallbackByCode.get(row.materialCode.trim()) ?? null : null);
-    const materialSource = inventoryMaterial?.productionMaterial;
-    const trimSource = inventoryMaterial?.productionTrim;
+    const code = row.materialCode?.trim() ?? "";
+    const inventoryMaterial = row.material ?? (code ? fallbackByCode.get(code) ?? null : null);
+    const materialSource = inventoryMaterial?.productionMaterial ?? (code ? productionMaterialByCode.get(code) ?? null : null);
+    const trimSource = inventoryMaterial?.productionTrim ?? (code ? productionTrimByCode.get(code) ?? null : null);
     const source = materialSource
       ? {
           type: "PRODUCTION_MATERIAL" as const,
