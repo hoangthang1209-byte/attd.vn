@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type { QuoteItemRow } from "@/components/admin/quotes/QuoteItemFormRow";
 import MediaPicker from "@/components/admin/media/MediaPicker";
 
@@ -262,6 +263,17 @@ export default function QuickQuoteProductLine({
               });
             }}
           />
+          <p className="admin-field-hint">
+            Giá nhập tại Quick Quote là giá thủ công, không tự kiểm tra giá vốn.
+          </p>
+          {item.productId && (
+            <Link
+              className="admin-btn admin-btn--secondary admin-btn--xs"
+              href={`/admin/pricing/costing?productId=${encodeURIComponent(item.productId)}&quantity=${Math.max(1, item.quantity || 1)}`}
+            >
+              Tính giá từ cost
+            </Link>
+          )}
         </div>
 
         <div className="admin-field admin-field--full">

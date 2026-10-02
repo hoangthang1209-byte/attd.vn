@@ -41,6 +41,7 @@ import {
   structuredLineFromSourcePick,
 } from "@/features/pricing/costing-v2";
 import { parseCostingCustomerIdParam } from "@/features/crm/customer-costing-bridge";
+import type { ProductCostingTemplate } from "@/features/pricing/product-costing-template";
 
 type ProductOption = { id: string; name: string; productCode: string | null };
 type VariantOption = { id: string; sku: string; colorName: string | null; sizeName: string | null };
@@ -74,12 +75,19 @@ function variantLabel(variant: VariantOption | undefined): string | null {
   return [variant.sku, variant.colorName, variant.sizeName].filter(Boolean).join(" · ") || variant.sku;
 }
 
+function marginFromSellingPrice(costPerUnit: number, sellingPricePerUnit: number): number {
+  if (!Number.isFinite(costPerUnit) || !Number.isFinite(sellingPricePerUnit) || sellingPricePerUnit <= 0) return 0;
+  return Math.min(99, Math.max(0, Math.round(((sellingPricePerUnit - costPerUnit) / sellingPricePerUnit) * 10000) / 100));
+}
+
 export default function CostingCalculator() {
   const router = useRouter();
   const toast = useAdminToast();
   const searchParams = useSearchParams();
   const fromCalculationId = searchParams.get("fromCalculation");
   const customerIdFromUrl = parseCostingCustomerIdParam(searchParams.get("customerId"));
+  const productIdFromUrl = searchParams.get("productId")?.trim() ?? "";
+  const quantityFromUrl = searchParams.get("quantity")?.trim() ?? "";
   const batchId = searchParams.get("batchId");
   const batchItemId = searchParams.get("batchItemId");
   const [products, setProducts] = useState<ProductOption[]>([]);
@@ -113,6 +121,8 @@ export default function CostingCalculator() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingBreaks, setLoadingBreaks] = useState(false);
+  const [loadingProductBom, setLoadingProductBom] = useState(false);
+  const [productBomWarnings, setProductBomWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [materialPickerOpen, setMaterialPickerOpen] = useState(false);
   const [servicePickerOpen, setServicePickerOpen] = useState(false);
@@ -226,10 +236,23 @@ export default function CostingCalculator() {
         if (!fromCalculationId) {
           const defaultGroup = nextGroups.find((group) => group.isDefault);
           if (defaultGroup) setPriceGroupId(defaultGroup.id);
+          if (productIdFromUrl) {
+            const deepLinkQuantity =
+              quantityFromUrl && Number(quantityFromUrl) > 0 ? Number(quantityFromUrl) : parsedQuantity;
+            setProductId(productIdFromUrl);
+            if (quantityFromUrl && Number(quantityFromUrl) > 0) setQuantity(quantityFromUrl);
+            void loadVariants(productIdFromUrl);
+            void loadProductBom(productIdFromUrl, undefined, {
+              quantityOverride: deepLinkQuantity,
+              resetAll: true,
+            });
+          }
         }
       })
       .catch(() => setError("Không thể tải dữ liệu nền cho bộ tính giá."));
-  }, [fromCalculationId]);
+  // Bootstrap is intentionally keyed to URL params; loaders read the current costing context.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromCalculationId, productIdFromUrl, quantityFromUrl]);
 
   useEffect(() => {
     if (!fromCalculationId) return;
@@ -270,6 +293,8 @@ export default function CostingCalculator() {
     return () => {
       cancelled = true;
     };
+  // Clone hydration must run only when the source calculation changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromCalculationId]);
 
   useEffect(() => {
@@ -332,8 +357,61 @@ export default function CostingCalculator() {
   async function loadVariants(nextProductId: string) {
     if (!nextProductId || variantsMap[nextProductId]) return;
     const res = await fetch(`/api/admin/products/${nextProductId}`);
-    const data = await res.json() as { variants?: VariantOption[] };
+    const data = await res.json() as ProductOption & { variants?: VariantOption[] };
+    if (!res.ok) return;
     setVariantsMap((prev) => ({ ...prev, [nextProductId]: data.variants ?? [] }));
+    setProducts((prev) =>
+      prev.some((product) => product.id === nextProductId)
+        ? prev
+        : [{ id: data.id, name: data.name, productCode: data.productCode ?? null }, ...prev],
+    );
+  }
+
+  async function loadProductBom(
+    nextProductId: string,
+    nextVariantId?: string,
+    options?: { quantityOverride?: number; resetAll?: boolean },
+  ) {
+    if (!nextProductId) {
+      setProductBomWarnings([]);
+      return;
+    }
+    setLoadingProductBom(true);
+    setProductBomWarnings([]);
+    try {
+      const quantityForBom = Math.max(1, Math.round(options?.quantityOverride ?? parsedQuantity));
+      const params = new URLSearchParams({
+        productId: nextProductId,
+        quantity: String(quantityForBom),
+      });
+      if (nextVariantId) params.set("variantId", nextVariantId);
+      const res = await fetch(`/api/pricing/product-costing-template?${params.toString()}`);
+      const data = await res.json() as { template?: ProductCostingTemplate; message?: string };
+      if (!res.ok) throw new Error(data.message ?? "Không thể nạp BOM sản phẩm");
+      const template = data.template;
+      if (!template) return;
+      setCostLines((prev) => {
+        if (options?.resetAll) return template.lines;
+        return [
+          ...template.lines,
+          ...prev.filter((line) => !line.key.startsWith("product-bom-")),
+        ];
+      });
+      setProductBomWarnings(template.warnings);
+      setResult(null);
+      setQuantityBreaks([]);
+      if (template.requirementCount > 0) {
+        toast.success(`Đã nạp ${template.requirementCount} dòng nguyên phụ liệu từ BOM sản phẩm.`);
+      } else {
+        toast.info("Sản phẩm chưa có BOM nguyên phụ liệu. Bạn có thể thêm dòng thủ công.");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Không thể nạp BOM sản phẩm";
+      setProductBomWarnings([message]);
+      toast.error(message);
+    } finally {
+      setLoadingProductBom(false);
+    }
   }
 
   function buildPayload(mode = "calculate") {
@@ -600,9 +678,11 @@ export default function CostingCalculator() {
                 className="admin-input"
                 value={productId}
                 onChange={(e) => {
-                  setProductId(e.target.value);
+                  const nextProductId = e.target.value;
+                  setProductId(nextProductId);
                   setVariantId("");
-                  void loadVariants(e.target.value);
+                  void loadVariants(nextProductId);
+                  void loadProductBom(nextProductId, undefined, { resetAll: true });
                 }}
               >
                 <option value="">— Sản phẩm tùy chỉnh —</option>
@@ -616,7 +696,11 @@ export default function CostingCalculator() {
               <select
                 className="admin-input"
                 value={variantId}
-                onChange={(e) => setVariantId(e.target.value)}
+                onChange={(e) => {
+                  const nextVariantId = e.target.value;
+                  setVariantId(nextVariantId);
+                  if (productId) void loadProductBom(productId, nextVariantId);
+                }}
                 disabled={!productId}
               >
                 <option value="">— Không chọn —</option>
@@ -665,26 +749,53 @@ export default function CostingCalculator() {
               </p>
             </div>
             <div className="admin-field">
-              <label className="admin-label">Nhóm giá tham chiếu</label>
-              <select
+              <label className="admin-label">Lợi nhuận / SP</label>
+              <input
                 className="admin-input"
-                value={priceGroupId}
-                onChange={(e) => setPriceGroupId(e.target.value)}
-              >
-                <option value="">— Không chọn —</option>
-                {groups
-                  .filter((group) => group.isActive)
-                  .map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name} {group.isDefault ? "(mặc định)" : ""}
-                    </option>
-                  ))}
-              </select>
-              <p className="admin-field-hint">
-                Dùng để phân loại/lưu bản tính; hiện không tự thay đổi công thức costing.
-              </p>
+                type="number"
+                min="0"
+                value={Math.max(0, Math.round(livePreview.suggestedSellingPricePerUnit - livePreview.totalCostPerUnit))}
+                onChange={(e) => {
+                  const profit = Math.max(0, Number(e.target.value) || 0);
+                  const selling = livePreview.totalCostPerUnit + profit;
+                  setTargetMarginRate(String(marginFromSellingPrice(livePreview.totalCostPerUnit, selling)));
+                }}
+              />
+              <p className="admin-field-hint">Có thể nhập trực tiếp mức lời mong muốn như cách tính Excel hiện tại.</p>
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Giá bán / SP</label>
+              <input
+                className="admin-input"
+                type="number"
+                min={Math.max(0, livePreview.totalCostPerUnit)}
+                value={Math.round(livePreview.suggestedSellingPricePerUnit)}
+                onChange={(e) => {
+                  const selling = Math.max(livePreview.totalCostPerUnit, Number(e.target.value) || 0);
+                  setTargetMarginRate(String(marginFromSellingPrice(livePreview.totalCostPerUnit, selling)));
+                }}
+              />
+              <p className="admin-field-hint">Nhập giá bán để hệ thống tự quy đổi về margin tương ứng.</p>
             </div>
           </div>
+
+          {productId && (
+            <div className="costing-bom-status" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-btn--small"
+                disabled={loadingProductBom}
+                onClick={() => void loadProductBom(productId, variantId)}
+              >
+                {loadingProductBom ? "Đang nạp BOM…" : "Nạp lại BOM nguyên phụ liệu"}
+              </button>
+              {productBomWarnings.length > 0 && (
+                <ul className="admin-kb-warning-list" style={{ marginTop: 8 }}>
+                  {productBomWarnings.map((warning) => <li key={warning}>{warning}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
 
           <details className="costing-details">
             <summary>Thông tin bổ sung (lead, liên hệ)</summary>
@@ -833,6 +944,17 @@ export default function CostingCalculator() {
                 value={vatRate}
                 onChange={(e) => setVatRate(e.target.value)}
               />
+            </div>
+            <div className="admin-field">
+              <label className="admin-label">Nhóm giá tham chiếu</label>
+              <select className="admin-input" value={priceGroupId} onChange={(e) => setPriceGroupId(e.target.value)}>
+                <option value="">— Không chọn —</option>
+                {groups.filter((group) => group.isActive).map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name} {group.isDefault ? "(mặc định)" : ""}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="admin-field" style={{ gridColumn: "1 / -1" }}>
               <label className="admin-label">Ghi chú nội bộ</label>

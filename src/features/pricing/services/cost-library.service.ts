@@ -4,7 +4,6 @@ import {
   BUILTIN_COST_LIBRARY,
   findBuiltinCostLibraryById,
   isCostLibraryCategory,
-  mergeCostLibraryCatalog,
   normalizeCostLibraryName,
   type CostLibraryCategory,
   type CostLibraryItem,
@@ -225,7 +224,7 @@ export async function listCostLibraryItems(): Promise<CostLibraryItem[]> {
   const dbRows = await prisma.pricingCostLibraryItem.findMany({
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
-  return mergeCostLibraryCatalog(dbRows.map(mapDbRow), BUILTIN_COST_LIBRARY);
+  return dbRows.map(mapDbRow);
 }
 
 export type CreateCostLibraryItemInput = {
@@ -248,14 +247,6 @@ export async function createCostLibraryItem(input: CreateCostLibraryItemInput): 
   }
 
   const nameNormalized = normalizeCostLibraryName(name);
-  const builtinMatch = findBuiltinCostLibraryItem(name, input.category);
-  if (builtinMatch) {
-    throw new CostLibraryValidationError(
-      `Chi phí "${builtinMatch.name}" đã có trong thư viện mặc định.`,
-      "DUPLICATE_BUILTIN",
-      builtinMatch,
-    );
-  }
 
   const existing = await prisma.pricingCostLibraryItem.findUnique({
     where: {
