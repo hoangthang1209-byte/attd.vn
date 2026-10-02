@@ -56,7 +56,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const params = await searchParams;
   return {
     title: `Danh mục nguồn hàng B2B | ${SITE_NAME}`,
-    description: `Khám phá nguồn hàng B2B cho đồng phục, quà tặng, agency, Cần làm riêng và merchandise — lọc theo danh mục, tồn kho và khả năng hoàn thiện. ${DEFAULT_DESCRIPTION}`,
+    description: `Khám phá nguồn hàng B2B cho đồng phục, quà tặng, agency, OEM / làm riêng và merchandise — lọc theo danh mục, tồn kho và khả năng hoàn thiện. ${DEFAULT_DESCRIPTION}`,
     ...buildCatalogMetadata(params),
   };
 }
