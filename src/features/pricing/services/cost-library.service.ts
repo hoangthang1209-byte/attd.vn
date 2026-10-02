@@ -4,7 +4,6 @@ import {
   BUILTIN_COST_LIBRARY,
   findBuiltinCostLibraryById,
   isCostLibraryCategory,
-  mergeCostLibraryCatalog,
   normalizeCostLibraryName,
   type CostLibraryCategory,
   type CostLibraryItem,
