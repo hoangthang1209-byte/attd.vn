@@ -36,7 +36,7 @@ describe("CostingSourcePrice routes and permissions", () => {
     assert.doesNotMatch(lookup, /export async function POST/);
     assert.match(search, /COSTING_SOURCE_SEARCH_LIMIT/);
     assert.match(search, /tokenizeSearchQuery/);
-    assert.match(search, /mergeCostLibraryCatalog/);
+    assert.doesNotMatch(search, /mergeCostLibraryCatalog/);
     assert.match(searchRoute, /take: COSTING_SOURCE_SEARCH_LIMIT/);
     assert.doesNotMatch(search, /include:\s*\{[\s\S]*costingSourcePrices/);
   });
@@ -76,7 +76,7 @@ describe("CostingSourcePrice routes and permissions", () => {
     assert.doesNotMatch(library, /ensureCanonicalCostLibraryItems/);
     assert.match(library, /promoteBuiltinCostLibraryItem/);
     assert.match(library, /findCostLibraryDbIdReadOnly/);
-    assert.match(library, /listCostLibraryItems[\s\S]*mergeCostLibraryCatalog/);
+    assert.doesNotMatch(library, /listCostLibraryItems[\s\S]*mergeCostLibraryCatalog/);
     assert.doesNotMatch(search, /promoteBuiltinCostLibraryItem/);
     assert.doesNotMatch(search, /ensureCanonical/);
     assert.doesNotMatch(lookup, /promoteBuiltin/);
