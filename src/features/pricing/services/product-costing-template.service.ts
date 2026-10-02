@@ -15,6 +15,37 @@ const SOURCE_PRICE_SELECT = {
   supplier: { select: { name: true, isActive: true } },
 } satisfies Prisma.CostingSourcePriceSelect;
 
+const INVENTORY_MATERIAL_SOURCE_SELECT = {
+  id: true,
+  materialCode: true,
+  productionMaterial: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      supplierId: true,
+      costingSourcePrices: {
+        where: { isActive: true },
+        select: SOURCE_PRICE_SELECT,
+        orderBy: { updatedAt: "desc" as const },
+      },
+    },
+  },
+  productionTrim: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      supplierId: true,
+      costingSourcePrices: {
+        where: { isActive: true },
+        select: SOURCE_PRICE_SELECT,
+        orderBy: { updatedAt: "desc" as const },
+      },
+    },
+  },
+} satisfies Prisma.MaterialSelect;
+
 function mapPrices(
   rows: Array<{
     id: string;
@@ -61,44 +92,29 @@ export async function getProductCostingTemplate(input: {
         : { variantId: null }),
     },
     include: {
-      material: {
-        select: {
-          id: true,
-          productionMaterial: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              supplierId: true,
-              costingSourcePrices: {
-                where: { isActive: true },
-                select: SOURCE_PRICE_SELECT,
-                orderBy: { updatedAt: "desc" },
-              },
-            },
-          },
-          productionTrim: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              supplierId: true,
-              costingSourcePrices: {
-                where: { isActive: true },
-                select: SOURCE_PRICE_SELECT,
-                orderBy: { updatedAt: "desc" },
-              },
-            },
-          },
-        },
-      },
+      material: { select: INVENTORY_MATERIAL_SOURCE_SELECT },
     },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });
 
+  const missingCodes = [...new Set(
+    rows
+      .filter((row) => !row.materialId && row.materialCode?.trim())
+      .map((row) => row.materialCode!.trim()),
+  )];
+  const fallbackMaterials = missingCodes.length
+    ? await prisma.material.findMany({
+        where: { materialCode: { in: missingCodes }, isActive: true },
+        select: INVENTORY_MATERIAL_SOURCE_SELECT,
+      })
+    : [];
+  const fallbackByCode = new Map(fallbackMaterials.map((material) => [material.materialCode, material]));
+
   const drafts: ProductCostingRequirementDraft[] = rows.map((row) => {
-    const materialSource = row.material?.productionMaterial;
-    const trimSource = row.material?.productionTrim;
+    const inventoryMaterial =
+      row.material ?? (row.materialCode ? fallbackByCode.get(row.materialCode.trim()) ?? null : null);
+    const materialSource = inventoryMaterial?.productionMaterial;
+    const trimSource = inventoryMaterial?.productionTrim;
     const source = materialSource
       ? {
           type: "PRODUCTION_MATERIAL" as const,
