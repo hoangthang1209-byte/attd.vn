@@ -1,9 +1,7 @@
 import { Prisma, type CostingSourceType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
-  BUILTIN_COST_LIBRARY,
   costLibraryItemMatchesTokens,
-  mergeCostLibraryCatalog,
   type CostLibraryItem,
 } from "@/features/pricing/cost-library";
 import {
@@ -123,10 +121,8 @@ export async function searchCostingSources(input: {
     description: row.description ?? undefined,
     legacyBuiltinId: row.legacyBuiltinId,
   }));
-  const merged = mergeCostLibraryCatalog(dbItems, BUILTIN_COST_LIBRARY).filter((item) =>
-    costLibraryItemMatchesTokens(item, tokens),
-  );
-  return merged.slice(0, take).map((item) => ({
+  const filtered = dbItems.filter((item) => costLibraryItemMatchesTokens(item, tokens));
+  return filtered.slice(0, take).map((item) => ({
     id: item.id,
     type: "COST_LIBRARY" as const,
     name: item.name,
