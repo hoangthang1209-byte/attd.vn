@@ -236,15 +236,22 @@ export default function CostingCalculator() {
         if (!fromCalculationId) {
           const defaultGroup = nextGroups.find((group) => group.isDefault);
           if (defaultGroup) setPriceGroupId(defaultGroup.id);
-          if (productIdFromUrl && (productsData as { products?: ProductOption[] }).products?.some((p) => p.id === productIdFromUrl)) {
+          if (productIdFromUrl) {
+            const deepLinkQuantity =
+              quantityFromUrl && Number(quantityFromUrl) > 0 ? Number(quantityFromUrl) : parsedQuantity;
             setProductId(productIdFromUrl);
             if (quantityFromUrl && Number(quantityFromUrl) > 0) setQuantity(quantityFromUrl);
             void loadVariants(productIdFromUrl);
-            void loadProductBom(productIdFromUrl);
+            void loadProductBom(productIdFromUrl, undefined, {
+              quantityOverride: deepLinkQuantity,
+              resetAll: true,
+            });
           }
         }
       })
       .catch(() => setError("Không thể tải dữ liệu nền cho bộ tính giá."));
+  // Bootstrap is intentionally keyed to URL params; loaders read the current costing context.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromCalculationId, productIdFromUrl, quantityFromUrl]);
 
   useEffect(() => {
@@ -286,6 +293,8 @@ export default function CostingCalculator() {
     return () => {
       cancelled = true;
     };
+  // Clone hydration must run only when the source calculation changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromCalculationId]);
 
   useEffect(() => {
@@ -348,11 +357,21 @@ export default function CostingCalculator() {
   async function loadVariants(nextProductId: string) {
     if (!nextProductId || variantsMap[nextProductId]) return;
     const res = await fetch(`/api/admin/products/${nextProductId}`);
-    const data = await res.json() as { variants?: VariantOption[] };
+    const data = await res.json() as ProductOption & { variants?: VariantOption[] };
+    if (!res.ok) return;
     setVariantsMap((prev) => ({ ...prev, [nextProductId]: data.variants ?? [] }));
+    setProducts((prev) =>
+      prev.some((product) => product.id === nextProductId)
+        ? prev
+        : [{ id: data.id, name: data.name, productCode: data.productCode ?? null }, ...prev],
+    );
   }
 
-  async function loadProductBom(nextProductId: string, nextVariantId?: string) {
+  async function loadProductBom(
+    nextProductId: string,
+    nextVariantId?: string,
+    options?: { quantityOverride?: number; resetAll?: boolean },
+  ) {
     if (!nextProductId) {
       setProductBomWarnings([]);
       return;
@@ -360,9 +379,10 @@ export default function CostingCalculator() {
     setLoadingProductBom(true);
     setProductBomWarnings([]);
     try {
+      const quantityForBom = Math.max(1, Math.round(options?.quantityOverride ?? parsedQuantity));
       const params = new URLSearchParams({
         productId: nextProductId,
-        quantity: String(parsedQuantity),
+        quantity: String(quantityForBom),
       });
       if (nextVariantId) params.set("variantId", nextVariantId);
       const res = await fetch(`/api/pricing/product-costing-template?${params.toString()}`);
@@ -370,10 +390,13 @@ export default function CostingCalculator() {
       if (!res.ok) throw new Error(data.message ?? "Không thể nạp BOM sản phẩm");
       const template = data.template;
       if (!template) return;
-      setCostLines((prev) => [
-        ...template.lines,
-        ...prev.filter((line) => line.section !== "MATERIAL"),
-      ]);
+      setCostLines((prev) => {
+        if (options?.resetAll) return template.lines;
+        return [
+          ...template.lines,
+          ...prev.filter((line) => !line.key.startsWith("product-bom-")),
+        ];
+      });
       setProductBomWarnings(template.warnings);
       setResult(null);
       setQuantityBreaks([]);
@@ -659,7 +682,7 @@ export default function CostingCalculator() {
                   setProductId(nextProductId);
                   setVariantId("");
                   void loadVariants(nextProductId);
-                  void loadProductBom(nextProductId);
+                  void loadProductBom(nextProductId, undefined, { resetAll: true });
                 }}
               >
                 <option value="">— Sản phẩm tùy chỉnh —</option>
