@@ -12,7 +12,7 @@ const SOLUTIONS = [
   { href: "/nguon-hang", label: "Nguồn hàng B2B" },
   { href: "/oem", label: "OEM / Private Label" },
   { href: "/qua-tang-doanh-nghiep", label: "Quà tặng doanh nghiệp" },
-  { href: "/merchandise", label: "Artist & Event Merchandise" },
+  { href: "/merchandise", label: "Merchandise nghệ sĩ & sự kiện" },
 ] as const;
 
 export default async function PublicFooterV7({
@@ -29,7 +29,7 @@ export default async function PublicFooterV7({
   const footerCta = siteNavigation.ctas.FOOTER ?? {
     id: "v7-footer-cta",
     href: "/lien-he",
-    label: "Bắt đầu một dự án",
+    label: "Nhận tư vấn & báo giá",
     openInNewTab: false,
   };
 
@@ -38,8 +38,8 @@ export default async function PublicFooterV7({
       <div className="container">
         <div className="v7-footer__lead">
           <div>
-            <p className="v7-kicker v7-kicker--light">Một đầu mối cho toàn bộ dự án B2B</p>
-            <h2>Có brief. Có deadline. ATTD triển khai phần còn lại.</h2>
+            <p className="v7-kicker v7-kicker--light">Bạn đang có nhu cầu cần triển khai?</p>
+            <h2>Gửi nhu cầu cho ATTD, đội ngũ sẽ cùng bạn tìm phương án phù hợp.</h2>
           </div>
           <Link
             href={footerCta.href}
@@ -55,8 +55,8 @@ export default async function PublicFooterV7({
           <div className="v7-footer__brand">
             <AttdLogo src={branding.footerLogoUrl} className="v7-footer__logo" />
             <p>
-              Đối tác sourcing, customization, OEM và merchandise cho doanh nghiệp,
-              agency, đại lý và thương hiệu.
+              Đồng phục, nguồn hàng, OEM, quà tặng và merchandise
+              cho doanh nghiệp, đại lý, agency và thương hiệu.
             </p>
             <div className="v7-footer__contact">
               {company.hotline.raw ? (

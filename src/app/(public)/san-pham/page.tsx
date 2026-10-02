@@ -56,7 +56,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const params = await searchParams;
   return {
     title: `Danh mục nguồn hàng B2B | ${SITE_NAME}`,
-    description: `Khám phá nguồn hàng B2B cho đồng phục, quà tặng, agency, OEM và merchandise — lọc theo danh mục, tồn kho và khả năng hoàn thiện. ${DEFAULT_DESCRIPTION}`,
+    description: `Khám phá nguồn hàng B2B cho đồng phục, quà tặng, agency, OEM / làm riêng và merchandise — lọc theo danh mục, tồn kho và khả năng hoàn thiện. ${DEFAULT_DESCRIPTION}`,
     ...buildCatalogMetadata(params),
   };
 }
@@ -144,7 +144,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
         <div className="container">
           <div className="v7-catalog-hero__grid">
             <div className="v7-catalog-hero__copy">
-              <p className="v7-kicker">Nguồn hàng B2B</p>
+              <p className="v7-kicker">Danh mục sản phẩm</p>
               <h1>{pageTitle}</h1>
               <p>{pageDescription}</p>
               <CatalogSourcingBadges />
@@ -168,8 +168,8 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
           <div className="v7-catalog-search">
             <div>
-              <span>01 / TÌM NGUỒN HÀNG</span>
-              <strong>Tìm theo sản phẩm, mã hàng hoặc chất liệu.</strong>
+              <span>TÌM SẢN PHẨM</span>
+              <strong>Tìm theo tên sản phẩm, mã hàng hoặc chất liệu.</strong>
             </div>
             <div className="v7-catalog-search__field">
               <MarketplaceSearchBar
@@ -183,16 +183,16 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
           <nav className="v7-catalog-intents" aria-label="Nhu cầu mua hàng">
             <Link href="/san-pham?inStock=1">
-              <span>01</span><strong>Hàng có sẵn</strong><small>Ưu tiên tốc độ triển khai</small>
+              <span>01</span><strong>Cần hàng có sẵn</strong><small>Ưu tiên sản phẩm có thể triển khai nhanh</small>
             </Link>
             <Link href="/san-pham?print=1">
-              <span>02</span><strong>In logo</strong><small>Sản phẩm hỗ trợ in theo thiết kế</small>
+              <span>02</span><strong>Cần in logo</strong><small>Lọc sản phẩm phù hợp để in logo</small>
             </Link>
             <Link href="/san-pham?embroidery=1">
-              <span>03</span><strong>Thêu</strong><small>Phù hợp đồng phục & branding</small>
+              <span>03</span><strong>Cần thêu logo</strong><small>Lọc sản phẩm phù hợp để thêu</small>
             </Link>
             <Link href="/san-pham?oem=1">
-              <span>04</span><strong>OEM</strong><small>Phát triển sản phẩm riêng</small>
+              <span>04</span><strong>OEM</strong><small>Xem sản phẩm có thể phát triển theo yêu cầu</small>
             </Link>
           </nav>
         </div>

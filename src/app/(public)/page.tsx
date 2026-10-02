@@ -14,9 +14,9 @@ import CaseStudySection from "@/components/public/CaseStudySection";
 
 export const revalidate = 3600;
 
-const TITLE = "ATTD | B2B Sourcing, Đồng phục, OEM & Merchandise";
+const TITLE = "ATTD | Đồng phục, nguồn hàng, OEM, quà tặng & merchandise";
 const DESCRIPTION =
-  "ATTD là đối tác B2B sourcing và production cho đồng phục doanh nghiệp, nguồn hàng, OEM/Private Label, quà tặng và merchandise.";
+  "ATTD đồng hành cùng doanh nghiệp, đại lý, agency và thương hiệu từ chọn sản phẩm, làm mẫu, sản xuất, hoàn thiện đến giao hàng.";
 
 export async function generateMetadata(): Promise<Metadata> {
   const branding = await getBrandingSettings();
@@ -44,49 +44,49 @@ const SOLUTIONS = [
     href: "/dong-phuc-doanh-nghiep",
     index: "01",
     label: "Đồng phục doanh nghiệp",
-    title: "Từ brief đến bộ đồng phục sẵn sàng bàn giao.",
-    description: "Tư vấn mẫu, chất liệu, in/thêu, size set, đóng gói và triển khai theo deadline.",
+    title: "Làm đồng phục doanh nghiệp từ mẫu đến giao hàng.",
+    description: "Tư vấn mẫu, chất liệu, in/thêu, chia size, đóng gói và giao theo kế hoạch của doanh nghiệp.",
   },
   {
     key: "sourcing",
     href: "/nguon-hang",
     index: "02",
     label: "Nguồn hàng B2B",
-    title: "Nguồn sản phẩm cho đại lý, agency và xưởng in.",
-    description: "Hàng trơn, nhiều nhóm sản phẩm, MOQ rõ và hỗ trợ mở rộng danh mục bán hàng.",
+    title: "Tìm nguồn hàng ổn định để bán hoặc hoàn thiện theo đơn.",
+    description: "Áo, nón, túi, quà tặng và nhiều nhóm hàng khác, có thông tin số lượng tối thiểu và thời gian rõ ràng.",
   },
   {
     key: "oem",
     href: "/oem",
     index: "03",
     label: "OEM / Private Label",
-    title: "Phát triển sản phẩm riêng thay vì mua mẫu có sẵn.",
-    description: "Từ chất liệu, form, màu, nhãn đến packaging và quy trình duyệt mẫu trước bulk.",
+    title: "Phát triển sản phẩm riêng theo yêu cầu thương hiệu.",
+    description: "Từ chất liệu, form, màu, nhãn, bao bì đến làm mẫu và sản xuất số lượng lớn.",
   },
   {
     key: "gift",
     href: "/qua-tang-doanh-nghiep",
     index: "04",
-    label: "Corporate Gifts",
-    title: "Quà tặng doanh nghiệp được cấu hình theo chiến dịch.",
-    description: "Gift set, apparel, túi, nón, bình và packaging đồng bộ nhận diện thương hiệu.",
+    label: "Quà tặng doanh nghiệp",
+    title: "Làm bộ quà tặng theo ngân sách và mục tiêu chương trình.",
+    description: "Kết hợp nhiều sản phẩm, in logo, đóng bộ và hoàn thiện bao bì theo nhận diện thương hiệu.",
   },
   {
     key: "merch",
     href: "/merchandise",
     index: "05",
-    label: "Artist & Event Merchandise",
-    title: "Merchandise cho concert, nghệ sĩ và chiến dịch quy mô lớn.",
-    description: "Multi-SKU, sample approval, production, QC, packing và phân bổ giao hàng theo sự kiện.",
+    label: "Merchandise nghệ sĩ & sự kiện",
+    title: "Sản xuất merchandise cho nghệ sĩ, concert và sự kiện.",
+    description: "Quản lý nhiều mẫu, nhiều size, duyệt mẫu, sản xuất, kiểm hàng, đóng gói và giao theo lịch sự kiện.",
   },
 ] as const;
 
 const OPERATING_MODEL = [
-  ["01", "Brief", "Sản phẩm, số lượng, ngân sách, logo, deadline và yêu cầu thương hiệu."],
-  ["02", "Develop", "ATTD chọn nguồn, cấu hình sản phẩm, costing và phát triển mẫu nếu cần."],
-  ["03", "Approve", "Duyệt mẫu, màu, artwork, thông số và phương án hoàn thiện."],
-  ["04", "Produce", "Điều phối sản xuất, in/thêu/OEM và kiểm soát tiến độ theo từng hạng mục."],
-  ["05", "QC & Deliver", "Kiểm hàng, đóng gói, chia batch và giao theo kế hoạch dự án."],
+  ["01", "Tiếp nhận nhu cầu", "Sản phẩm, số lượng, ngân sách, logo, thời gian cần hàng và các yêu cầu đặc biệt."],
+  ["02", "Đề xuất phương án", "ATTD chọn nguồn hàng, đề xuất cấu hình, tính giá và làm mẫu khi cần."],
+  ["03", "Duyệt mẫu", "Chốt mẫu, màu, thiết kế in/thêu, thông số và cách hoàn thiện."],
+  ["04", "Sản xuất", "Điều phối các công đoạn và theo dõi tiến độ theo từng hạng mục."],
+  ["05", "Kiểm hàng & giao", "Kiểm chất lượng, đóng gói, chia đợt và giao theo kế hoạch."],
 ] as const;
 
 export default async function HomePage() {
@@ -121,25 +121,25 @@ export default async function HomePage() {
       <section className="v7-home-hero">
         <div className="container v7-home-hero__grid">
           <div className="v7-home-hero__copy">
-            <p className="v7-kicker">Đối tác sourcing & production B2B</p>
+            <p className="v7-kicker">Đồng phục · nguồn hàng · OEM · quà tặng · merchandise</p>
             <h1>
-              Một đầu mối.
+              Từ một nhu cầu.
               <br />
-              Nhiều loại sản phẩm.
+              Thành sản phẩm hoàn chỉnh.
               <br />
-              Một chuẩn triển khai.
+              Qua một đầu mối.
             </h1>
             <p className="v7-home-hero__lead">
-              ATTD giúp doanh nghiệp, agency, đại lý và thương hiệu biến một brief thành
-              sản phẩm hoàn chỉnh — từ sourcing, customization đến OEM và merchandise.
+              Bạn chỉ cần cho ATTD biết cần làm gì, số lượng bao nhiêu và khi nào cần hàng.
+              Đội ngũ sẽ cùng bạn chọn phương án phù hợp, báo giá và theo sát đến khi giao hàng.
             </p>
             <div className="v7-home-hero__actions">
-              <Link href="/lien-he" className="v7-btn v7-btn--primary">Gửi brief dự án</Link>
-              <Link href="/san-pham" className="v7-btn v7-btn--ghost">Xem nguồn hàng</Link>
+              <Link href="/lien-he" className="v7-btn v7-btn--primary">Nhận tư vấn & báo giá</Link>
+              <Link href="/san-pham" className="v7-btn v7-btn--ghost">Xem sản phẩm</Link>
             </div>
             <div className="v7-home-hero__meta">
-              <span>Kho · QC · hoàn thiện tại TP.HCM</span>
-              <span>In · thêu · OEM · packaging</span>
+              <span>Kho · kiểm hàng · đóng gói tại TP.HCM</span>
+              <span>In · thêu · OEM · đóng gói</span>
               <span>Giao hàng toàn quốc</span>
             </div>
           </div>
@@ -158,8 +158,8 @@ export default async function HomePage() {
               <div className="v7-home-hero__fallback">ATTD</div>
             )}
             <div className="v7-home-hero__caption">
-              <span>ATTD / 2026</span>
-              <strong>Sourcing → Development → Production → Delivery</strong>
+              <span>ATTD / TP.HCM</span>
+              <strong>Tư vấn → Làm mẫu → Sản xuất → Giao hàng</strong>
             </div>
           </div>
         </div>
@@ -169,12 +169,12 @@ export default async function HomePage() {
         <div className="container">
           <header className="v7-section-head">
             <div>
-              <p className="v7-kicker">05 nhóm giải pháp</p>
-              <h2>Chọn theo bài toán kinh doanh, không phải theo loại áo.</h2>
+              <p className="v7-kicker">ATTD có thể hỗ trợ bạn</p>
+              <h2>Bạn đang cần làm gì?</h2>
             </div>
             <p>
-              Mỗi nhu cầu có một flow khác nhau. ATTD tách rõ để đội mua hàng đi thẳng
-              vào đúng sản phẩm, đúng cách báo giá và đúng mô hình triển khai.
+              Chọn đúng nhu cầu để xem cách ATTD triển khai, sản phẩm phù hợp
+              và những thông tin cần chuẩn bị để nhận báo giá nhanh hơn.
             </p>
           </header>
 
@@ -206,12 +206,12 @@ export default async function HomePage() {
         <div className="container">
           <header className="v7-section-head v7-section-head--dark">
             <div>
-              <p className="v7-kicker v7-kicker--light">Mô hình vận hành</p>
-              <h2>ATTD không chỉ bán sản phẩm. ATTD vận hành cả dự án.</h2>
+              <p className="v7-kicker v7-kicker--light">Cách ATTD làm việc</p>
+              <h2>Một đầu mối theo dự án từ đầu đến cuối.</h2>
             </div>
             <p>
-              Giá trị cốt lõi nằm ở việc giảm độ phức tạp của procurement: một đầu mối
-              quản lý nguồn hàng, mẫu, production, QC và delivery.
+              Thay vì phải làm việc với nhiều bên, bạn có thể trao đổi với một đầu mối
+              từ chọn hàng, làm mẫu, sản xuất, kiểm hàng đến giao hàng.
             </p>
           </header>
 
@@ -233,9 +233,9 @@ export default async function HomePage() {
         <div className="container">
           <div className="v7-proof__intro">
             <p className="v7-kicker">Năng lực thực tế</p>
-            <h2>Năng lực phải nhìn thấy được.</h2>
+            <h2>Xem năng lực qua công việc thực tế.</h2>
             <p>
-              Kho, QC, mẫu thật, quy trình hoàn thiện và dự án thực tế là cách ATTD chứng minh khả năng triển khai.
+              Hình ảnh kho, mẫu thật, công đoạn hoàn thiện và các dự án đã làm giúp bạn đánh giá ATTD trước khi hợp tác.
             </p>
           </div>
           <HomeWorkshopGallerySection gallery={cms.workshopGallery} />
@@ -247,11 +247,11 @@ export default async function HomePage() {
 
       <section className="v7-home-final">
         <div className="container v7-home-final__inner">
-          <p className="v7-kicker v7-kicker--light">Bắt đầu từ brief</p>
-          <h2>Không cần biết chính xác phải đặt sản phẩm nào.</h2>
-          <p>Chỉ cần cho ATTD biết mục tiêu, số lượng và deadline. Đội ngũ sẽ đề xuất phương án phù hợp.</p>
+          <p className="v7-kicker v7-kicker--light">Bắt đầu đơn giản</p>
+          <h2>Bạn chưa chốt sản phẩm cũng không sao.</h2>
+          <p>Hãy gửi nhu cầu, số lượng dự kiến và thời gian cần hàng. ATTD sẽ cùng bạn chọn phương án phù hợp.</p>
           <Link href="/lien-he" className="v7-home-final__link">
-            Gửi yêu cầu dự án <ArrowUpRight size={22} />
+            Nhận tư vấn & báo giá <ArrowUpRight size={22} />
           </Link>
         </div>
       </section>

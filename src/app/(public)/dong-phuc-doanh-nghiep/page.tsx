@@ -12,17 +12,17 @@ export default async function UniformPage() {
   const media = await getPublicSurfaceMedia("uniform");
   return (
     <BusinessSolutionPageV7
-      kicker="Corporate Uniform"
-      title="Đồng phục được quản lý như một dự án, không phải một đơn áo."
-      lead="ATTD đồng hành từ chọn mẫu, vật liệu, logo và size set đến sản xuất, QC, đóng gói và bàn giao theo deadline."
-      audience="Doanh nghiệp · Trường học · Event · Chuỗi cửa hàng"
-      promise="Tư vấn · In/thêu · Size set · QC · Delivery"
+      kicker="Đồng phục doanh nghiệp"
+      title="Làm đồng phục dễ hơn khi mọi việc đi qua một đầu mối."
+      lead="ATTD hỗ trợ từ chọn mẫu, chất liệu, logo và chia size đến sản xuất, kiểm hàng, đóng gói và giao đúng kế hoạch."
+      audience="Doanh nghiệp · Trường học · Sự kiện · Chuỗi cửa hàng"
+      promise="Tư vấn · In/thêu · Chia size · Kiểm hàng · Giao hàng"
       media={media}
       capabilities={[
-        { title: "Uniform planning", description: "Chọn kiểu sản phẩm và cấu hình theo môi trường sử dụng, ngân sách và nhận diện." },
-        { title: "Material & fit", description: "Tư vấn chất liệu, GSM, form, màu và size set phù hợp đội ngũ." },
-        { title: "Logo finishing", description: "In lụa, DTF, decal, thêu và các kỹ thuật phù hợp từng vị trí." },
-        { title: "Rollout", description: "QC, đóng theo size/phòng ban và giao theo kế hoạch triển khai." },
+        { title: "Chọn mẫu phù hợp", description: "Chọn kiểu áo và cách hoàn thiện theo môi trường sử dụng, ngân sách và nhận diện." },
+        { title: "Chất liệu & form dáng", description: "Tư vấn chất liệu, định lượng, form, màu và cách chia size phù hợp đội ngũ." },
+        { title: "In & thêu logo", description: "Tư vấn kỹ thuật in/thêu phù hợp với chất liệu, vị trí và yêu cầu sử dụng." },
+        { title: "Kiểm hàng & giao", description: "Kiểm chất lượng, đóng theo size/phòng ban và giao theo kế hoạch." },
       ]}
       outcomes={[
         "Mẫu và màu được duyệt trước sản xuất",
@@ -31,11 +31,11 @@ export default async function UniformPage() {
         "Đóng gói và bàn giao theo đơn vị/phòng ban nếu cần",
       ]}
       process={[
-        { title: "Nhận brief", description: "Số lượng, bộ phận sử dụng, ngân sách, logo và deadline." },
+        { title: "Nhận nhu cầu", description: "Số lượng, người sử dụng, ngân sách, logo và thời gian cần hàng." },
         { title: "Đề xuất", description: "Mẫu, chất liệu, màu, kỹ thuật logo và mức giá phù hợp." },
-        { title: "Sample & size", description: "Duyệt mẫu/logo và chốt size set." },
-        { title: "Production", description: "Sản xuất và theo dõi tiến độ theo batch." },
-        { title: "QC & handover", description: "Kiểm hàng, đóng gói và bàn giao." },
+        { title: "Duyệt mẫu & size", description: "Duyệt mẫu, logo và chốt cách chia size." },
+        { title: "Sản xuất", description: "Triển khai sản xuất và theo dõi tiến độ theo từng đợt." },
+        { title: "Kiểm hàng & bàn giao", description: "Kiểm chất lượng, đóng gói và bàn giao theo kế hoạch." },
       ]}
       ctaLabel="Nhận tư vấn đồng phục"
     />

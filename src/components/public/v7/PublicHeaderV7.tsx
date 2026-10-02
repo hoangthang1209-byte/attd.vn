@@ -9,11 +9,11 @@ import TrackedLink from "@/components/analytics/TrackedLink";
 import type { MarketplaceCategoryTreeNode } from "@/features/categories/marketplace-category-tree";
 
 const SOLUTIONS = [
-  { href: "/dong-phuc-doanh-nghiep", label: "Đồng phục doanh nghiệp", desc: "Uniform từ brief đến bàn giao" },
-  { href: "/nguon-hang", label: "Nguồn hàng B2B", desc: "Cho đại lý, agency và xưởng in" },
-  { href: "/oem", label: "OEM / Private Label", desc: "Phát triển sản phẩm riêng" },
-  { href: "/qua-tang-doanh-nghiep", label: "Corporate Gifts", desc: "Quà tặng theo campaign" },
-  { href: "/merchandise", label: "Merchandise", desc: "Artist, concert & event" },
+  { href: "/dong-phuc-doanh-nghiep", label: "Đồng phục doanh nghiệp", desc: "Tư vấn, sản xuất và giao đồng phục" },
+  { href: "/nguon-hang", label: "Nguồn hàng B2B", desc: "Hàng trơn và nguồn sản phẩm B2B" },
+  { href: "/oem", label: "OEM / Private Label", desc: "Làm sản phẩm theo yêu cầu riêng" },
+  { href: "/qua-tang-doanh-nghiep", label: "Quà tặng doanh nghiệp", desc: "Quà tặng theo ngân sách và chương trình" },
+  { href: "/merchandise", label: "Merchandise", desc: "Cho nghệ sĩ, concert và sự kiện" },
 ] as const;
 
 const NAV = [
@@ -45,9 +45,9 @@ export default function PublicHeaderV7({
             <Link href="/#giai-phap">Giải pháp</Link>
             <div className="v7-header__solutions-panel">
               <div className="v7-header__solutions-intro">
-                <span>05 nhóm giải pháp</span>
-                <strong>Chọn theo bài toán cần giải quyết.</strong>
-                <p>Không cần bắt đầu từ tên sản phẩm.</p>
+                <span>ATTD có thể hỗ trợ</span>
+                <strong>Bạn đang cần làm gì?</strong>
+                <p>Chọn nhu cầu phù hợp để xem cách triển khai.</p>
               </div>
               <div className="v7-header__solutions-links">
                 {SOLUTIONS.map((item, index) => (
@@ -69,8 +69,8 @@ export default function PublicHeaderV7({
             <div className="v7-header__products-panel">
               <div className="v7-header__products-top">
                 <div>
-                  <span>Danh mục nguồn hàng</span>
-                  <strong>Duyệt nhanh theo nhóm sản phẩm.</strong>
+                  <span>Danh mục sản phẩm</span>
+                  <strong>Tìm nhanh theo nhóm sản phẩm.</strong>
                 </div>
                 <Link href="/danh-muc-san-pham">Xem tất cả danh mục ↗</Link>
               </div>
@@ -105,7 +105,7 @@ export default function PublicHeaderV7({
         <div className="v7-header__actions">
           <Link href="/san-pham" className="v7-header__search" aria-label="Tìm sản phẩm">
             <Search size={18} />
-            <span>Tìm nguồn hàng</span>
+            <span>Tìm sản phẩm</span>
           </Link>
           <TrackedLink
             href="/lien-he"
@@ -113,7 +113,7 @@ export default function PublicHeaderV7({
             trackSource="HEADER"
             className="v7-btn v7-btn--primary"
           >
-            Yêu cầu báo giá
+            Nhận báo giá
           </TrackedLink>
         </div>
 
@@ -151,7 +151,7 @@ export default function PublicHeaderV7({
               </Link>
             ))}
             <Link href="/lien-he" className="v7-btn v7-btn--primary" onClick={() => setOpen(false)}>
-              Gửi yêu cầu
+              Nhận tư vấn & báo giá
             </Link>
           </nav>
         </div>

@@ -8,16 +8,16 @@ import { buildContactMetadata } from "@/lib/seo/indexation-policy";
 
 export const revalidate = 3600;
 export const metadata: Metadata = buildContactMetadata({
-  title: "Gửi brief & yêu cầu báo giá | ATTD",
+  title: "Liên hệ tư vấn & báo giá | ATTD",
   description:
-    "Gửi brief dự án cho ATTD: sản phẩm, số lượng, logo, ngân sách và deadline. Phù hợp đồng phục, sourcing, OEM, quà tặng và merchandise.",
+    "Gửi nhu cầu cho ATTD để được tư vấn sản phẩm, số lượng, ngân sách, thời gian và nhận báo giá phù hợp.",
 });
 
 const BRIEF = [
-  ["01","Bạn cần gì?","Sản phẩm, nhóm hàng hoặc chỉ cần mô tả mục tiêu."],
-  ["02","Số lượng","Ước tính ban đầu cũng đủ để ATTD chọn đúng hướng."],
-  ["03","Branding","Logo, artwork, in/thêu, nhãn, packaging nếu có."],
-  ["04","Deadline","Ngày cần hàng hoặc ngày diễn ra campaign/event."],
+  ["01","Bạn cần làm gì?","Có thể gửi tên sản phẩm, hình tham khảo hoặc chỉ cần mô tả nhu cầu."],
+  ["02","Số lượng dự kiến","Chưa cần chính xác ngay, số lượng ước tính cũng đủ để tư vấn ban đầu."],
+  ["03","Logo & hoàn thiện","Logo, hình in/thêu, nhãn hoặc yêu cầu đóng gói nếu có."],
+  ["04","Thời gian cần hàng","Cho ATTD biết ngày cần nhận hàng hoặc ngày diễn ra sự kiện."],
 ] as const;
 
 export default async function ContactPage() {
@@ -28,11 +28,11 @@ export default async function ContactPage() {
       <section className="v7-contact__hero">
         <div className="container v7-contact__grid">
           <div className="v7-contact__intro">
-            <p className="v7-kicker">Bắt đầu từ brief</p>
-            <h1>Không cần viết một RFQ hoàn hảo.</h1>
+            <p className="v7-kicker">Gửi nhu cầu cho ATTD</p>
+            <h1>Bạn chưa cần chuẩn bị mọi thứ thật đầy đủ.</h1>
             <p>
-              Gửi những gì bạn đang có. ATTD sẽ giúp làm rõ sản phẩm, số lượng,
-              cấu hình và timeline trước khi báo giá.
+              Chỉ cần gửi những thông tin bạn đang có. ATTD sẽ cùng bạn làm rõ sản phẩm,
+              số lượng, cách hoàn thiện và thời gian trước khi báo giá.
             </p>
             {media ? (
               <div className="v7-contact__media">

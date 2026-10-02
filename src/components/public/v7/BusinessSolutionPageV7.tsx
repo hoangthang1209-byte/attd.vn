@@ -30,7 +30,7 @@ export default function BusinessSolutionPageV7({
   capabilities,
   process,
   outcomes,
-  ctaLabel = "Gửi brief dự án",
+  ctaLabel = "Nhận tư vấn & báo giá",
   leadCapture,
   seoContent,
 }: Props) {
@@ -58,8 +58,8 @@ export default function BusinessSolutionPageV7({
           </div>
         </div>
         <div className="container v7-solution-hero__brief">
-          <div><span>Phù hợp cho</span><strong>{audience}</strong></div>
-          <div><span>ATTD chịu trách nhiệm</span><strong>{promise}</strong></div>
+          <div><span>Phù hợp với</span><strong>{audience}</strong></div>
+          <div><span>ATTD hỗ trợ</span><strong>{promise}</strong></div>
         </div>
       </section>
 
@@ -67,11 +67,11 @@ export default function BusinessSolutionPageV7({
         <div className="container">
           <header className="v7-section-head">
             <div>
-              <p className="v7-kicker">Phạm vi triển khai</p>
-              <h2>Một đối tác xuyên suốt thay vì nhiều nhà cung cấp rời rạc.</h2>
+              <p className="v7-kicker">ATTD sẽ hỗ trợ những gì?</p>
+              <h2>Một đầu mối để bạn dễ làm việc và dễ kiểm soát tiến độ.</h2>
             </div>
             <p>
-              ATTD kết nối sourcing, phát triển sản phẩm, hoàn thiện thương hiệu và vận hành production thành một flow duy nhất.
+              ATTD phối hợp từ chọn sản phẩm, làm mẫu, hoàn thiện thương hiệu đến sản xuất và giao hàng.
             </p>
           </header>
           <div className="v7-capabilities__grid">
@@ -89,8 +89,8 @@ export default function BusinessSolutionPageV7({
       <section className="v7-deliverables">
         <div className="container v7-deliverables__grid">
           <div>
-            <p className="v7-kicker v7-kicker--light">Kết quả bàn giao</p>
-            <h2>Kết quả phải rõ trước khi bắt đầu sản xuất.</h2>
+            <p className="v7-kicker v7-kicker--light">Bạn sẽ nhận được gì?</p>
+            <h2>Chốt rõ trước khi sản xuất để hạn chế phát sinh.</h2>
           </div>
           <ul>
             {outcomes.map((item) => <li key={item}><span>✓</span>{item}</li>)}
@@ -102,10 +102,10 @@ export default function BusinessSolutionPageV7({
         <div className="container">
           <header className="v7-section-head">
             <div>
-              <p className="v7-kicker">Quy trình dự án</p>
-              <h2>Từ brief đến giao hàng.</h2>
+              <p className="v7-kicker">Cách triển khai</p>
+              <h2>Từ yêu cầu ban đầu đến khi nhận hàng.</h2>
             </div>
-            <p>Mỗi bước đều có đầu ra rõ để giảm vòng sửa, kiểm soát cost và giữ đúng deadline.</p>
+            <p>Mỗi bước đều được chốt rõ để giảm sửa đổi, kiểm soát chi phí và giữ đúng tiến độ.</p>
           </header>
           <ol className="v7-process__list">
             {process.map((item, index) => (
@@ -134,11 +134,11 @@ export default function BusinessSolutionPageV7({
         <section className="v7-solution-lead">
           <div className="container v7-solution-lead__grid">
             <div className="v7-solution-lead__intro">
-              <p className="v7-kicker">Yêu cầu báo giá</p>
-              <h2>Đưa nhu cầu vào hệ thống để ATTD tư vấn đúng flow.</h2>
+              <p className="v7-kicker">Nhận tư vấn & báo giá</p>
+              <h2>Gửi nhu cầu để ATTD tư vấn phương án phù hợp.</h2>
               <p>
-                Form này giữ nguyên source attribution, UTM và dữ liệu cần thiết cho CRM,
-                nhưng được đặt trong trải nghiệm V7 mới.
+                Bạn có thể gửi thông tin đang có trước. Đội ngũ ATTD sẽ liên hệ lại
+                để làm rõ sản phẩm, số lượng, ngân sách và thời gian cần hàng.
               </p>
             </div>
             <div className="v7-solution-lead__form">{leadCapture}</div>
@@ -149,8 +149,8 @@ export default function BusinessSolutionPageV7({
       <section className="v7-solution-final">
         <div className="container v7-solution-final__inner">
           <div>
-            <p className="v7-kicker v7-kicker--light">Bước tiếp theo</p>
-            <h2>Gửi mục tiêu, số lượng và deadline.</h2>
+            <p className="v7-kicker v7-kicker--light">Trao đổi với ATTD</p>
+            <h2>Gửi nhu cầu, số lượng và thời gian cần hàng.</h2>
           </div>
           <Link href={contactHref} className="v7-solution-final__link">
             {ctaLabel} <ArrowUpRight size={22} />
