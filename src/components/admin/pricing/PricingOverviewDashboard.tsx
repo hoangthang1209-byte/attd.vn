@@ -31,12 +31,12 @@ export default function PricingOverviewDashboard() {
     reload();
   }, []);
 
-  if (loading) return <AdminLoadingState label="Đang tải tổng quan giá…" />;
+  if (loading) return <AdminLoadingState label="Đang tải khu vực tính giá…" />;
   if (error) {
     return (
       <EmptyState
         tone="error"
-        title="Không tải được tổng quan giá"
+        title="Không tải được khu vực tính giá"
         description={error}
         action={
           <button type="button" className="admin-btn admin-btn--secondary" onClick={() => reload()}>
@@ -49,63 +49,66 @@ export default function PricingOverviewDashboard() {
 
   return (
     <div className="admin-panel">
-      <div className="admin-catalog-kpi-bar">
-        <div className="admin-catalog-kpi">
-          <strong>{stats?.activePriceGroups ?? 0}</strong>
-          <span>Nhóm giá đang hoạt động</span>
+      <div className="admin-section-header">
+        <div>
+          <h3 className="admin-subtitle">Tính giá đơn hàng</h3>
+          <p className="admin-field-hint">
+            Luồng chính: nguyên phụ liệu & giá NCC → BOM sản phẩm → cost → giá bán → báo giá.
+          </p>
         </div>
-        <div className="admin-catalog-kpi">
-          <strong>{stats?.productTierCount ?? 0}</strong>
-          <span>Dòng bảng giá sản phẩm</span>
-        </div>
-        <div className="admin-catalog-kpi">
-          <strong>{stats?.serviceRuleCount ?? 0}</strong>
-          <span>Quy tắc phí dịch vụ</span>
-        </div>
-        <div className="admin-catalog-kpi">
-          <strong>{stats?.recentCalculations.length ?? 0}</strong>
-          <span>Bản tính gần đây</span>
-        </div>
-      </div>
-
-      <div className="admin-section-header" style={{ marginTop: 24 }}>
-        <h3 className="admin-subtitle">Tính giá</h3>
       </div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">
-          Tính giá nhanh
+          + Tính giá mới
         </Link>
-        <Link href="/admin/pricing/costing/batch" className="admin-btn admin-btn--primary">
-          Tính giá nhiều sản phẩm
+        <Link href="/admin/pricing/costing/batch" className="admin-btn admin-btn--secondary">
+          Nhiều sản phẩm
         </Link>
-        <Link href="/admin/pricing/history" className="admin-btn admin-btn--primary">
-          Lịch sử tính giá
+        <Link href="/admin/pricing/history" className="admin-btn admin-btn--secondary">
+          Lịch sử
         </Link>
       </div>
 
-      <div className="admin-section-header" style={{ marginTop: 24 }}>
-        <h3 className="admin-subtitle">Cấu hình giá</h3>
+      <div className="admin-section-header" style={{ marginTop: 28 }}>
+        <div>
+          <h3 className="admin-subtitle">Dữ liệu dùng để tính cost</h3>
+          <p className="admin-field-hint">
+            Cập nhật nguyên phụ liệu, nhà cung cấp và chi phí gia công trước khi sales chốt giá.
+          </p>
+        </div>
       </div>
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <Link href="/admin/pricing/price-groups" className="admin-btn admin-btn--secondary">
-          Nhóm giá
-        </Link>
-        <Link href="/admin/pricing/product-tiers" className="admin-btn admin-btn--secondary">
-          Bảng giá chuẩn
+        <Link href="/admin/production-materials" className="admin-btn admin-btn--secondary">
+          Nguyên phụ liệu & giá NCC
         </Link>
         <Link href="/admin/pricing/cost-library" className="admin-btn admin-btn--secondary">
-          Thư viện chi phí
-        </Link>
-        <Link href="/admin/pricing/service-rules" className="admin-btn admin-btn--secondary">
-          Phí dịch vụ
-        </Link>
-        <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary">
-          Tính theo bảng giá / quy tắc
+          Gia công & dịch vụ
         </Link>
       </div>
 
+      <details className="costing-details" style={{ marginTop: 24 }}>
+        <summary>Cấu hình giá cũ / nâng cao</summary>
+        <p className="admin-field-hint" style={{ marginTop: 8 }}>
+          Các màn hình này được giữ để tương thích dữ liệu cũ, không phải luồng tính giá chính cho sales.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+          <Link href="/admin/pricing/price-groups" className="admin-btn admin-btn--secondary admin-btn--small">
+            Nhóm giá
+          </Link>
+          <Link href="/admin/pricing/product-tiers" className="admin-btn admin-btn--secondary admin-btn--small">
+            Bảng giá chuẩn
+          </Link>
+          <Link href="/admin/pricing/service-rules" className="admin-btn admin-btn--secondary admin-btn--small">
+            Quy tắc dịch vụ
+          </Link>
+          <Link href="/admin/pricing/calculator" className="admin-btn admin-btn--secondary admin-btn--small">
+            Bộ tính giá cũ
+          </Link>
+        </div>
+      </details>
+
       <div className="admin-section-header" style={{ marginTop: 32 }}>
-        <h3 className="admin-subtitle">Bản tính giá gần đây</h3>
+        <h3 className="admin-subtitle">Bản tính gần đây</h3>
         <Link href="/admin/pricing/history" className="admin-btn admin-btn--secondary admin-btn--xs">
           Xem tất cả
         </Link>
@@ -114,10 +117,10 @@ export default function PricingOverviewDashboard() {
       {(stats?.recentCalculations.length ?? 0) === 0 ? (
         <EmptyState
           title="Chưa có bản tính giá nào"
-          description="Khi có bản tính giá, danh sách gần đây sẽ hiển thị tại đây."
+          description="Tạo cost sheet đầu tiên để bắt đầu lưu lịch sử giá và tạo báo giá."
           action={
             <Link href="/admin/pricing/costing" className="admin-btn admin-btn--primary">
-              Tạo costing đầu tiên
+              Tạo bản tính đầu tiên
             </Link>
           }
         />
@@ -126,9 +129,8 @@ export default function PricingOverviewDashboard() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Mã bản tính</th>
+                <th>Mã</th>
                 <th>Khách hàng / Lead</th>
-                <th>Nhóm giá</th>
                 <th>Tổng tiền</th>
                 <th>Trạng thái</th>
                 <th>Ngày tạo</th>
@@ -141,7 +143,6 @@ export default function PricingOverviewDashboard() {
                     <Link href={`/admin/pricing/history/${row.id}`}>{row.code}</Link>
                   </td>
                   <td>{row.customerLabel ?? row.leadLabel ?? "—"}</td>
-                  <td>{row.priceGroupName ?? "—"}</td>
                   <td>
                     {formatPricingCurrency(
                       row.manualOverride && row.manualTotalAmount != null
