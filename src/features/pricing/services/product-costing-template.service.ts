@@ -1,0 +1,143 @@
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import {
+  buildProductCostingTemplate,
+  type ProductCostingRequirementDraft,
+  type ProductCostingSourcePrice,
+  type ProductCostingTemplate,
+} from "@/features/pricing/product-costing-template";
+
+const SOURCE_PRICE_SELECT = {
+  id: true,
+  supplierId: true,
+  unitPrice: true,
+  unit: true,
+  supplier: { select: { name: true, isActive: true } },
+} satisfies Prisma.CostingSourcePriceSelect;
+
+function mapPrices(
+  rows: Array<{
+    id: string;
+    supplierId: string;
+    unitPrice: Prisma.Decimal;
+    unit: string;
+    supplier: { name: string; isActive: boolean };
+  }>,
+): ProductCostingSourcePrice[] {
+  return rows
+    .filter((row) => row.supplier.isActive)
+    .map((row) => ({
+      id: row.id,
+      supplierId: row.supplierId,
+      supplierName: row.supplier.name,
+      unitPrice: row.unitPrice.toNumber(),
+      unit: row.unit,
+    }));
+}
+
+export async function getProductCostingTemplate(input: {
+  productId: string;
+  variantId?: string | null;
+  quantity: number;
+}): Promise<ProductCostingTemplate> {
+  const product = await prisma.product.findUnique({
+    where: { id: input.productId },
+    select: { id: true },
+  });
+  if (!product) {
+    return {
+      lines: [],
+      warnings: ["Không tìm thấy sản phẩm."],
+      requirementCount: 0,
+    };
+  }
+
+  const rows = await prisma.productMaterialRequirement.findMany({
+    where: {
+      productId: input.productId,
+      isActive: true,
+      ...(input.variantId
+        ? { OR: [{ variantId: null }, { variantId: input.variantId }] }
+        : { variantId: null }),
+    },
+    include: {
+      material: {
+        select: {
+          id: true,
+          productionMaterial: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              supplierId: true,
+              costingSourcePrices: {
+                where: { isActive: true },
+                select: SOURCE_PRICE_SELECT,
+                orderBy: { updatedAt: "desc" },
+              },
+            },
+          },
+          productionTrim: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              supplierId: true,
+              costingSourcePrices: {
+                where: { isActive: true },
+                select: SOURCE_PRICE_SELECT,
+                orderBy: { updatedAt: "desc" },
+              },
+            },
+          },
+        },
+      },
+    },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+  });
+
+  const drafts: ProductCostingRequirementDraft[] = rows.map((row) => {
+    const materialSource = row.material?.productionMaterial;
+    const trimSource = row.material?.productionTrim;
+    const source = materialSource
+      ? {
+          type: "PRODUCTION_MATERIAL" as const,
+          id: materialSource.id,
+          code: materialSource.code,
+          name: materialSource.name,
+          defaultSupplierId: materialSource.supplierId,
+          prices: mapPrices(materialSource.costingSourcePrices),
+        }
+      : trimSource
+        ? {
+            type: "PRODUCTION_TRIM" as const,
+            id: trimSource.id,
+            code: trimSource.code,
+            name: trimSource.name,
+            defaultSupplierId: trimSource.supplierId,
+            prices: mapPrices(trimSource.costingSourcePrices),
+          }
+        : null;
+
+    return {
+      id: row.id,
+      materialId: row.materialId,
+      variantId: row.variantId,
+      materialType: row.materialType,
+      materialName: row.materialName,
+      materialCode: row.materialCode,
+      unit: row.unit,
+      consumptionPerUnit: row.consumptionPerUnit.toNumber(),
+      wastagePercent: row.wastagePercent.toNumber(),
+      note: row.note,
+      sortOrder: row.sortOrder,
+      source,
+    };
+  });
+
+  return buildProductCostingTemplate(
+    drafts,
+    Math.max(1, Math.round(input.quantity)),
+    input.variantId,
+  );
+}
