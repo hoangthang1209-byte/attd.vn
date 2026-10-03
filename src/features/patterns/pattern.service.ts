@@ -103,6 +103,12 @@ export async function listPatterns(input?: {
           product: { select: { id: true, name: true, productCode: true } },
           customer: { select: { id: true, name: true, code: true } },
           patternSupplier: { select: PATTERN_SUPPLIER_SELECT },
+          files: {
+            where: { title: "__PATTERN_COVER__" },
+            orderBy: { createdAt: "desc" as const },
+            take: 1,
+            select: { id: true, title: true, mimeType: true, type: true },
+          },
           _count: { select: { files: true, techPacks: true } },
         },
         orderBy: [{ updatedAt: "desc" }],
@@ -487,6 +493,33 @@ export async function archivePattern(id: string) {
   });
 }
 
+
+export async function setAllPatternStatuses(
+  status: PatternStatus,
+  changedBy?: string | null,
+): Promise<{ updated: number }> {
+  const now = new Date();
+  const data: Prisma.PatternUpdateManyMutationInput =
+    status === PatternStatus.APPROVED
+      ? {
+          status,
+          approvedAt: now,
+          approvedBy: changedBy?.trim() || null,
+        }
+      : status === PatternStatus.DRAFT
+        ? {
+            status,
+            approvedAt: null,
+            approvedBy: null,
+          }
+        : {
+            status,
+          };
+
+  const result = await prisma.pattern.updateMany({ data });
+  return { updated: result.count };
+}
+
 export async function deletePattern(id: string): Promise<{
   ok: true;
   storageWarnings: string[];
@@ -556,11 +589,36 @@ export async function addPatternFile(
     throw new PatternValidationError("Rập đã duyệt được khóa. Hãy tạo phiên bản mới trước khi thêm file.");
   }
 
+  const normalizedTitle = input.title?.trim() || null;
+  if (normalizedTitle === "__PATTERN_COVER__") {
+    return prisma.$transaction(async (tx) => {
+      await tx.patternFile.updateMany({
+        where: { patternId, title: "__PATTERN_COVER__" },
+        data: { title: null },
+      });
+      return tx.patternFile.create({
+        data: {
+          patternId,
+          type: input.type,
+          title: normalizedTitle,
+          description: input.description?.trim() || null,
+          r2ObjectKey: input.r2ObjectKey || null,
+          cloudinaryPublicId: input.cloudinaryPublicId || null,
+          previewUrl: input.previewUrl || null,
+          originalFileName: input.originalFileName || null,
+          mimeType: input.mimeType || null,
+          fileSizeBytes: input.fileSizeBytes ?? null,
+          sortOrder: input.sortOrder ?? 0,
+        },
+      });
+    });
+  }
+
   return prisma.patternFile.create({
     data: {
       patternId,
       type: input.type,
-      title: input.title?.trim() || null,
+      title: normalizedTitle,
       description: input.description?.trim() || null,
       r2ObjectKey: input.r2ObjectKey || null,
       cloudinaryPublicId: input.cloudinaryPublicId || null,
