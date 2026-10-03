@@ -360,17 +360,7 @@ export async function getCategoryBySlug(slug: string) {
   )();
 }
 
-async function loadCategoryBySlugUncached(slug: string) {
-  const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
-  if (!accessible) return null;
-
-  const category = await prisma.category.findUnique({
-    where: { slug },
-    include: {
-      mediaAsset: { select: MEDIA_ASSET_PUBLIC_SELECT },
-      products: {
-        where: buildPublicProductVisibilityWhere(),
-        select: {
+const publicCategoryProductSelect = {
           id: true, name: true, slug: true, productCode: true,
           featuredImage: true, gallery: true,
           defaultMoq: true, leadTime: true,
@@ -384,12 +374,33 @@ async function loadCategoryBySlugUncached(slug: string) {
             select: { imageUrl: true, altText: true, sortOrder: true },
             orderBy: { sortOrder: "asc" },
           },
-        },
+        } as const;
+
+async function loadCategoryBySlugUncached(slug: string) {
+  const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
+  if (!accessible) return null;
+
+  const category = await prisma.category.findUnique({
+    where: { slug },
+    include: {
+      mediaAsset: { select: MEDIA_ASSET_PUBLIC_SELECT },
+      products: {
+        where: buildPublicProductVisibilityWhere(),
+        select: publicCategoryProductSelect,
         orderBy: { createdAt: "desc" },
       },
     },
   });
   if (!category) return null;
+  // Parent landings must use the same descendant scope as the catalog filter.
+  const categoryIds = await getCategoryFilterIdsBySlug(slug);
+  const products = categoryIds.length > 1
+    ? await prisma.product.findMany({
+        where: buildPublicProductVisibilityWhere({ categoryId: { in: categoryIds } }),
+        select: publicCategoryProductSelect,
+        orderBy: { createdAt: "desc" },
+      })
+    : category.products;
   const resolvedImageUrl =
     resolveEntityMediaSrc({
       mediaAsset: category.mediaAsset,
@@ -399,7 +410,7 @@ async function loadCategoryBySlugUncached(slug: string) {
   return {
     ...category,
     imageUrl: resolvedImageUrl,
-    products: category.products.filter(
+    products: products.filter(
       (product) => !isDemoOrSampleProductMetadata(product.metadata),
     ),
   };

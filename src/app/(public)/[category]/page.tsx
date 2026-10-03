@@ -301,7 +301,7 @@ export default async function CategoryPage({ params }: PageProps) {
         <div className="container v7-collection-hero__meta">
           <div><span>Sản phẩm</span><strong>{cat.products.length} lựa chọn</strong></div>
           <div><span>Hoàn thiện</span><strong>Tùy theo từng sản phẩm và cấu hình</strong></div>
-          <div><span>Báo giá</span><strong>Theo MOQ · cấu hình · deadline</strong></div>
+          <div><span>Báo giá</span><strong>Theo số lượng · yêu cầu · thời gian</strong></div>
         </div>
       </section>
 

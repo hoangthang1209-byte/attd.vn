@@ -17,7 +17,9 @@ export default async function CustomerLogoStrip({
   variant = "section",
 }: Props) {
   const logos = (await getVisibleClientLogosFromDb()).filter((client) =>
-    isValidImageSrc(client.imageSrc),
+    isValidImageSrc(client.imageSrc) &&
+    !/\bdemo\b/i.test(client.companyName) &&
+    !/https?:\/\/(www\.)?example\.(com|org|net)([/:]|$)/i.test(client.website ?? ""),
   );
   if (logos.length === 0) return null;
 

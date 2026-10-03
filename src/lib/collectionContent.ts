@@ -54,46 +54,42 @@ const content: Record<string, CollectionContent> = {
       "Danh mục áo thun trơn ATTD cho xưởng in, đại lý, agency và local brand. Xem sản phẩm thực, chọn form/chất liệu rồi yêu cầu báo giá theo nhu cầu.",
     displayName: "Áo thun trơn",
     shortIntro:
-      "Danh mục áo thun trơn sẵn kho — điểm vào để chọn sản phẩm thật trước khi yêu cầu báo giá nguồn hàng.",
-    intro: `<p><strong>Áo thun trơn</strong> là category thương mại gắn với sản phẩm đang ACTIVE tại ATTD. Đây là nơi xem form, chất liệu và dòng hàng cụ thể — khác hub mua sỉ <a href="/ao-thun-tron-si">áo thun trơn sỉ</a> (góc giao dịch) và khác blog giáo dục (cách chọn nguồn/chất liệu/form).</p>
-
-<p>Khi chọn áo thun trơn cho xưởng in hoặc đại lý, hãy đối chiếu mục đích trang trí (in lụa, DTF, thêu), cảm giác mặc của khách cuối và khả năng tái nhập màu/size. Đừng chỉ so ảnh catalogue.</p>
-
-<p>ATTD không niêm yết trên trang category các số liệu thương mại cố định như MOQ, chiết khấu hay lead time. Điều kiện đi kèm <a href="/lien-he">yêu cầu báo giá</a> theo sản phẩm và số lượng thực tế.</p>
-
-<p>Cần góc kho hoặc sourcing? Xem thêm <a href="/kho-ao-thun-tron">kho áo thun trơn</a> và <a href="/nguon-hang-ao-thun-tron">nguồn hàng áo thun trơn</a>.</p>`,
+      "Chọn áo thun trơn theo chất liệu, form dáng và màu sắc cho đơn hàng in/thêu, đồng phục hoặc bán sỉ.",
+    intro: `<p><strong>Áo thun trơn</strong> phù hợp cho xưởng in, đại lý và doanh nghiệp cần làm đồng phục hoặc merchandise. Chọn mẫu theo chất liệu, form dáng, màu sắc và kỹ thuật in/thêu dự kiến.</p>
+<p>ATTD hỗ trợ chọn sản phẩm và kiểm tra khả năng cung ứng theo màu, size và số lượng. Bạn có thể <a href="/lien-he">gửi yêu cầu báo giá</a> để nhận phương án phù hợp với ngân sách và thời gian cần hàng.</p>
+<p>Tham khảo thêm <a href="/ao-thun-tron-si">áo thun trơn sỉ</a>, <a href="/kho-ao-thun-tron">kho áo thun trơn</a> và <a href="/nguon-hang-ao-thun-tron">nguồn hàng áo thun trơn</a>.</p>`,
     benefits: [
       {
-        title: "Sản phẩm là nguồn sự thật",
+        title: "Dễ chọn mẫu phù hợp",
         description:
-          "Mỗi dòng trong danh mục phản ánh catalogue đang vận hành — bạn chọn SKU cụ thể trước khi hỏi giá.",
+          "Xem mẫu, chất liệu và màu sắc trước khi gửi số lượng để nhận báo giá.",
       },
       {
         title: "Phù hợp nhiều kỹ thuật trang trí",
         description:
-          "Cotton, CVC hay blend — chọn theo brief in/thêu và thử trên mẫu đúng dòng sẽ nhập.",
+          "Chọn cotton, CVC hoặc vải pha theo yêu cầu in/thêu; kiểm tra mẫu trước khi đặt số lượng lớn.",
       },
       {
-        title: "Kết nối hub sỉ & kho",
+        title: "Tư vấn nguồn hàng",
         description:
-          "Từ category đi sang áo thun trơn sỉ hoặc kho áo thun trơn tùy intent mua hàng hay kiểm tra hướng sẵn kho.",
+          "ATTD kiểm tra nguồn hàng, màu và size để đề xuất phương án theo thời gian bạn cần.",
       },
       {
         title: "Báo giá theo nhu cầu",
         description:
-          "Không chiết khấu/MOQ cố định trên trang. Báo giá theo màu, size, số lượng và điều kiện giao nhận.",
+          "Báo giá theo mẫu, màu, size, số lượng và yêu cầu in/thêu, đóng gói.",
       },
     ],
     applications: [
       {
         title: "Xưởng in",
         description:
-          "Chọn phôi trơn theo kỹ thuật in và giữ màu core để nhận đơn nhanh.",
+          "Chọn áo trơn phù hợp kỹ thuật in và các màu thường dùng để triển khai đơn hàng.",
       },
       {
         title: "Đại lý",
         description:
-          "Nhập các dòng bán chạy, theo dõi tái đơn theo size curve thực tế.",
+          "Chọn dòng sản phẩm phù hợp khách hàng và phân bổ size theo nhu cầu thực tế.",
       },
       {
         title: "Đồng phục / merchandise",

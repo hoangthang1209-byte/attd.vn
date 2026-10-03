@@ -142,7 +142,7 @@ export default async function ProductCatalogPage({ searchParams }: Props) {
 
       <section className="v7-catalog-hero">
         <div className="container">
-          <div className="v7-catalog-hero__grid">
+          <div className={`v7-catalog-hero__grid${catalogMedia ? "" : " v7-catalog-hero__grid--no-media"}`}>
             <div className="v7-catalog-hero__copy">
               <p className="v7-kicker">Danh mục sản phẩm</p>
               <h1>{pageTitle}</h1>
