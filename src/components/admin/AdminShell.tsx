@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
@@ -320,17 +320,28 @@ function AdminShellMain({
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [desktopNavCollapsed, setDesktopNavCollapsed] = useState(true);
   const isLogin = pathname === "/admin/login";
 
   useEffect(() => {
     if (isLogin) return;
     const root = document.documentElement;
     root.classList.add("admin-cms");
+    const stored = window.localStorage.getItem("attd-admin-sidebar-collapsed");
+    if (stored !== null) setDesktopNavCollapsed(stored === "true");
     return () => {
       root.classList.remove("admin-cms");
       root.style.removeProperty("--admin-header-height");
     };
   }, [isLogin]);
+
+  function toggleDesktopNav() {
+    setDesktopNavCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("attd-admin-sidebar-collapsed", String(next));
+      return next;
+    });
+  }
 
   if (isLogin) {
     return children;
@@ -350,7 +361,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             />
           ) : null}
           <aside
-            className={`${styles.sidebar}${mobileNavOpen ? ` ${styles.sidebarOpen}` : ""}`}
+            className={`${styles.sidebar}${desktopNavCollapsed ? ` ${styles.sidebarCollapsed}` : ""}${mobileNavOpen ? ` ${styles.sidebarOpen}` : ""}`}
             onClick={(event) => {
               if ((event.target as HTMLElement).closest("a")) {
                 setMobileNavOpen(false);
@@ -359,14 +370,25 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           >
             <div className={styles.sidebarTop}>
               <div className={styles.brandRow}>
-                <Link href="/admin/dashboard" scroll={false} className={styles.brand}>
+                <Link href="/admin/dashboard" scroll={false} className={styles.brand} title="ATTD CMS">
                   <span className={styles.brandMark}>ATTD CMS</span>
                   <span className={styles.brandSub}>Design Authority</span>
                 </Link>
-                <AdminEnvironmentBadge />
+                <span className={styles.environmentBadge}><AdminEnvironmentBadge /></span>
               </div>
               <div className={styles.sidebarActions}>
-                <AdminLogoutButton />
+                <span className={styles.logoutAction}><AdminLogoutButton /></span>
+                <button
+                  type="button"
+                  className={styles.desktopToggle}
+                  onClick={toggleDesktopNav}
+                  aria-expanded={!desktopNavCollapsed}
+                  aria-controls="admin-primary-navigation"
+                  aria-label={desktopNavCollapsed ? "Mở rộng menu quản trị" : "Thu gọn menu quản trị"}
+                  title={desktopNavCollapsed ? "Mở menu" : "Thu gọn menu"}
+                >
+                  {desktopNavCollapsed ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
+                </button>
                 <button
                   type="button"
                   className={styles.mobileToggle}
