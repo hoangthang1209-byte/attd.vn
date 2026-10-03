@@ -43,8 +43,7 @@ function rowChanged(original: BulkEditablePattern, draft: DraftRow): boolean {
     original.name !== draft.name ||
     normalize(original.baseSize) !== normalize(draft.baseSize) ||
     normalize(original.sizeRange) !== normalize(draft.sizeRange) ||
-    original.sourceType !== draft.sourceType ||
-    original.status !== draft.status
+    original.sourceType !== draft.sourceType
   );
 }
 
@@ -83,16 +82,23 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
 
     for (const row of changedRows) {
       try {
+        const payload =
+          row.status === "DRAFT"
+            ? {
+                code: row.code.trim().toUpperCase(),
+                name: row.name.trim(),
+                baseSize: normalize(row.baseSize) || null,
+                sizeRange: normalize(row.sizeRange) || null,
+                sourceType: row.sourceType,
+              }
+            : {
+                code: row.code.trim().toUpperCase(),
+              };
+
         const response = await fetch(`/api/patterns/${row.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code: row.code.trim().toUpperCase(),
-            name: row.name.trim(),
-            baseSize: normalize(row.baseSize) || null,
-            sizeRange: normalize(row.sizeRange) || null,
-            sourceType: row.sourceType,
-          }),
+          body: JSON.stringify(payload),
         });
 
         const data = (await response.json().catch(() => ({}))) as {
@@ -104,22 +110,6 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
             `${row.code}: ${data.message ?? data.error ?? "Không thể cập nhật"}`,
           );
           continue;
-        }
-        const original = rows.find((item) => item.id === row.id);
-        if (original && original.status !== row.status) {
-          const statusUrl = row.status === "APPROVED"
-            ? `/api/patterns/${row.id}/approve`
-            : row.status === "ARCHIVED"
-              ? `/api/patterns/${row.id}/archive`
-              : null;
-          if (statusUrl) {
-            const statusResponse = await fetch(statusUrl, { method: "POST" });
-            const statusData = (await statusResponse.json().catch(() => ({}))) as { message?: string };
-            if (!statusResponse.ok) {
-              failures.push(`${row.code}: ${statusData.message ?? "Không thể đổi trạng thái"}`);
-              continue;
-            }
-          }
         }
         saved += 1;
       } catch {
@@ -150,7 +140,7 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
           <div>
             <h3 className={styles.modalTitle}>Sửa rập hàng loạt</h3>
             <p className={styles.modalDescription}>
-              Chỉnh trực tiếp nhiều rập bản nháp rồi lưu một lần. Rập đã duyệt hoặc đã lưu trữ không được sửa tại đây.
+              Chỉnh thông tin của các rập đã chọn rồi lưu một lần. Với rập đã duyệt/lưu trữ, chỉ mã rập được phép sửa; hãy đổi trạng thái về Bản nháp nếu cần sửa thông tin kỹ thuật.
             </p>
           </div>
           <button
@@ -173,7 +163,6 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
                 <tr>
                   <th>Mã rập</th>
                   <th>Tên rập</th>
-                  <th>Trạng thái</th>
                   <th>Base size</th>
                   <th>Dải size</th>
                   <th>Nguồn</th>
@@ -193,26 +182,18 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
                       <input
                         className="admin-input"
                         value={row.name}
+                        disabled={row.status !== "DRAFT"}
+                        title={row.status !== "DRAFT" ? "Đổi về Bản nháp trước để sửa thông tin kỹ thuật." : undefined}
                         onChange={(event) =>
                           updateDraft(row.id, { name: event.target.value })
                         }
                       />
                     </td>
                     <td>
-                      <select
-                        className="admin-select"
-                        value={row.status}
-                        onChange={(event) => updateDraft(row.id, { status: event.target.value as PatternStatus })}
-                      >
-                        <option value="DRAFT">Bản nháp</option>
-                        <option value="APPROVED">Đã duyệt</option>
-                        <option value="ARCHIVED">Lưu trữ</option>
-                      </select>
-                    </td>
-                    <td>
                       <input
                         className="admin-input"
                         value={row.baseSize ?? ""}
+                        disabled={row.status !== "DRAFT"}
                         onChange={(event) =>
                           updateDraft(row.id, { baseSize: event.target.value })
                         }
@@ -223,6 +204,7 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
                       <input
                         className="admin-input"
                         value={row.sizeRange ?? ""}
+                        disabled={row.status !== "DRAFT"}
                         onChange={(event) =>
                           updateDraft(row.id, { sizeRange: event.target.value })
                         }
@@ -233,6 +215,7 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
                       <select
                         className="admin-select"
                         value={row.sourceType ?? ""}
+                        disabled={row.status !== "DRAFT"}
                         onChange={(event) =>
                           updateDraft(row.id, {
                             sourceType: (event.target.value || null) as PatternSourceType | null,
