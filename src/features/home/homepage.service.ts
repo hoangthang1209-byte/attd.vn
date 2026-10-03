@@ -881,7 +881,7 @@ function mapBlogPost(post: {
 /** Single CMS-backed data loader for the public homepage. */
 async function loadHomepageData(): Promise<HomepageData> {
   const [products, categoryTree, { posts: blogPostsRaw }, cms] = await Promise.all([
-    getHomepageLatestProducts(12),
+    getHomepageLatestProducts(6),
     getPublicCmsCategoryTree(),
     getPublishedBlogPosts(1, 3),
     getCachedHomepageCmsConfig(),

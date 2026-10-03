@@ -123,11 +123,8 @@ export default async function HomePage() {
           <div className="v7-home-hero__copy">
             <p className="v7-kicker">Đồng phục · nguồn hàng · OEM · quà tặng · merchandise</p>
             <h1>
-              Từ một nhu cầu.
-              <br />
-              Thành sản phẩm hoàn chỉnh.
-              <br />
-              Qua một đầu mối.
+              Đồng phục, quà tặng & merchandise.
+              <span className="v7-home-hero__accent">Một đầu mối từ mẫu đến giao hàng.</span>
             </h1>
             <p className="v7-home-hero__lead">
               Bạn chỉ cần cho ATTD biết cần làm gì, số lượng bao nhiêu và khi nào cần hàng.
@@ -155,7 +152,16 @@ export default async function HomePage() {
                 sizes="(max-width: 900px) 100vw, 52vw"
               />
             ) : (
-              <div className="v7-home-hero__fallback">ATTD</div>
+              <div className="v7-home-hero__fallback v7-home-hero__service-card">
+                <span className="v7-kicker v7-kicker--light">ATTD / TP.HCM</span>
+                <strong>Từ ý tưởng đến sản phẩm.</strong>
+                <ol>
+                  <li><span>01</span> Tư vấn sản phẩm & chất liệu</li>
+                  <li><span>02</span> Làm mẫu & duyệt thiết kế</li>
+                  <li><span>03</span> Sản xuất & hoàn thiện</li>
+                  <li><span>04</span> Kiểm hàng & giao hàng</li>
+                </ol>
+              </div>
             )}
             <div className="v7-home-hero__caption">
               <span>ATTD / TP.HCM</span>
@@ -182,7 +188,7 @@ export default async function HomePage() {
             {SOLUTIONS.map((solution) => {
               const media = mediaByKey[solution.key];
               return (
-                <Link key={solution.key} href={solution.href} className="v7-solution-row">
+                <Link key={solution.key} href={solution.href} className={`v7-solution-row${media ? "" : " v7-solution-row--no-media"}`}>
                   <span className="v7-solution-row__index">{solution.index}</span>
                   <div className="v7-solution-row__media">
                     {media ? (
