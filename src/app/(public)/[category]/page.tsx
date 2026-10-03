@@ -299,7 +299,7 @@ export default async function CategoryPage({ params }: PageProps) {
         ) : null}
 
         <div className="container v7-collection-hero__meta">
-          <div><span>Sản phẩm</span><strong>{cat.products.length} lựa chọn</strong></div>
+          <div><span>Sản phẩm</span><strong>{cat.products.length}{cat.hasMoreProducts ? "+" : ""} lựa chọn</strong></div>
           <div><span>Hoàn thiện</span><strong>Tùy theo từng sản phẩm và cấu hình</strong></div>
           <div><span>Báo giá</span><strong>Theo số lượng · yêu cầu · thời gian</strong></div>
         </div>
@@ -321,7 +321,7 @@ export default async function CategoryPage({ params }: PageProps) {
               <p className="v7-kicker">Nguồn hàng trong danh mục</p>
               <h2>
                 {cat.products.length > 0
-                  ? `${cat.products.length} sản phẩm ${cat.name}`
+                  ? `${cat.products.length}${cat.hasMoreProducts ? "+" : ""} sản phẩm ${cat.name}`
                   : `Nguồn hàng ${cat.name}`}
               </h2>
             </div>

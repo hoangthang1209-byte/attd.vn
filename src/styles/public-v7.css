@@ -3171,7 +3171,7 @@
 }
 @media (max-width: 900px) {
   .v7-home-hero__grid { grid-template-columns: 1fr; gap: 0; }
-  .v7-mobile-nav { position: absolute; top: 100%; width: 100%; max-height: calc(100dvh - 68px); overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .v7-mobile-nav { position: absolute; top: 100%; width: 100%; max-height: calc(100dvh - var(--mp-header-stack-height, 68px)); overflow-y: auto; overscroll-behavior: contain; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
   .v7-home-hero__visual, .v7-home-hero__service-card { min-height: 400px; }
   .v7-footer__nav--cms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
