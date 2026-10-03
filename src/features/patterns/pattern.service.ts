@@ -494,6 +494,37 @@ export async function archivePattern(id: string) {
 }
 
 
+export async function setPatternStatus(
+  id: string,
+  status: PatternStatus,
+  changedBy?: string | null,
+) {
+  const pattern = await prisma.pattern.findUnique({ where: { id } });
+  if (!pattern) throw new PatternValidationError("Không tìm thấy rập.");
+
+  const data: Prisma.PatternUpdateInput =
+    status === PatternStatus.APPROVED
+      ? {
+          status,
+          approvedAt: new Date(),
+          approvedBy: changedBy?.trim() || null,
+        }
+      : status === PatternStatus.DRAFT
+        ? {
+            status,
+            approvedAt: null,
+            approvedBy: null,
+          }
+        : { status };
+
+  return prisma.pattern.update({
+    where: { id },
+    data,
+    include: PATTERN_INCLUDE,
+  });
+}
+
+
 export async function setAllPatternStatuses(
   status: PatternStatus,
   changedBy?: string | null,
