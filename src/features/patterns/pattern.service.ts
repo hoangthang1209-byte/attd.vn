@@ -208,6 +208,7 @@ export async function createPattern(input: {
 
 function buildPatternUpdateData(
   input: Partial<{
+    code: string;
     name: string;
     version: number;
     productCategoryId: string | null;
@@ -230,6 +231,15 @@ function buildPatternUpdateData(
   }>,
 ): Prisma.PatternUncheckedUpdateInput {
   const data: Prisma.PatternUncheckedUpdateInput = {};
+
+  if (input.code !== undefined) {
+    const code = input.code.trim().toUpperCase();
+    if (!code) throw new PatternValidationError("Mã rập không được để trống.");
+    if (!/^[A-Z0-9][A-Z0-9_-]{1,31}$/.test(code)) {
+      throw new PatternValidationError("Mã rập chỉ dùng chữ in hoa, số, dấu gạch ngang hoặc gạch dưới.");
+    }
+    data.code = code;
+  }
 
   if (input.name !== undefined) {
     const name = input.name.trim();
@@ -279,6 +289,10 @@ function mapPatternPrismaError(err: unknown): PatternValidationError | null {
     return new PatternValidationError("Danh mục hoặc sản phẩm liên kết không hợp lệ.");
   }
   if (err.code === "P2002") {
+    const target = Array.isArray(err.meta?.target) ? err.meta?.target.join(",") : String(err.meta?.target ?? "");
+    if (target.toLowerCase().includes("code")) {
+      return new PatternValidationError("Mã rập đã tồn tại.", { code: "Mã rập đã tồn tại." }, "CONFLICT");
+    }
     return new PatternValidationError(
       "Bảng đo có cột size hoặc điểm đo bị trùng.",
       undefined,
@@ -330,6 +344,7 @@ function patternMeasurementCreateInput(
 export async function updatePattern(
   id: string,
   input: Partial<{
+    code: string;
     name: string;
     version: number;
     productCategoryId: string | null;
@@ -355,12 +370,16 @@ export async function updatePattern(
   const existing = await prisma.pattern.findUnique({ where: { id } });
   if (!existing) throw new PatternValidationError("Không tìm thấy rập.");
 
-  if (existing.status === PatternStatus.ARCHIVED) {
-    throw new PatternValidationError("Rập đã lưu trữ, không thể chỉnh sửa.");
-  }
-  if (existing.status === PatternStatus.APPROVED) {
+  const requestedKeys = Object.entries(input)
+    .filter(([, value]) => value !== undefined)
+    .map(([key]) => key);
+  const onlyCodeChange = requestedKeys.length > 0 && requestedKeys.every((key) => key === "code");
+
+  if (existing.status !== PatternStatus.DRAFT && !onlyCodeChange) {
     throw new PatternValidationError(
-      "Rập đã duyệt được khóa để bảo toàn dữ liệu sản xuất. Hãy tạo phiên bản mới trước khi chỉnh sửa.",
+      existing.status === PatternStatus.ARCHIVED
+        ? "Rập đã lưu trữ, chỉ được phép sửa mã rập."
+        : "Rập đã duyệt được khóa; chỉ được phép sửa mã rập. Hãy tạo phiên bản mới để sửa nội dung kỹ thuật.",
       undefined,
       "CONFLICT",
     );

@@ -128,6 +128,7 @@ type MeasurementDraftRow = Array<{
 }>;
 
 type PatternDraft = {
+  code: string;
   name: string;
   version: string;
   productCategoryId: string;
@@ -186,6 +187,7 @@ function measurementsToDraft(rows: MeasurementRow[]): MeasurementDraftRow {
 
 function createDraft(pattern: PatternDetail): PatternDraft {
   return {
+    code: pattern.code,
     name: pattern.name,
     version: String(pattern.version),
     productCategoryId: pattern.productCategory?.id ?? "",
@@ -505,14 +507,21 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   }
 
   async function savePatternDraft() {
-    if (!pattern || !draft || pattern.status !== "DRAFT" || saveBusyRef.current) return;
+    if (!pattern || !draft || saveBusyRef.current) return;
+    if (!draft.code.trim()) {
+      setError("Mã rập không được để trống.");
+      setSaveStatus("error");
+      return;
+    }
     if (!draft.name.trim()) {
       setError("Tên rập không được để trống.");
       setSaveStatus("error");
       return;
     }
 
-    const patch = {
+    const patch = pattern.status === "DRAFT"
+      ? {
+      code: draft.code.trim().toUpperCase(),
       name: draft.name.trim(),
       productCategoryId: draft.productCategoryId || null,
       baseSize: draft.baseSize.trim() || null,
@@ -530,7 +539,8 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
       sourceNotes: draft.sourceNotes.trim() || null,
       notes: draft.notes.trim() || null,
       measurements: draft.measurements,
-    };
+    }
+      : { code: draft.code.trim().toUpperCase() };
 
     saveBusyRef.current = true;
     setSaveStatus("saving");
@@ -773,7 +783,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                   {entityTitle}
                 </h2>
                 <p className="pattern-workspace__title-subline">
-                  {pattern.code}
+                  {draft.code || pattern.code}
                   {categoryLabel !== "—" ? ` · ${categoryLabel}` : ""}
                 </p>
                 <div className="pattern-workspace__badges">
@@ -822,7 +832,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
                   Lưu trữ
                 </button>
               )}
-              {!readOnly && (
+              {(!readOnly || draft.code.trim().toUpperCase() !== pattern.code) && (
                 <AdminLoadingButton
                   variant="primary"
                   size="xs"
@@ -945,7 +955,12 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
               </label>
               <label className="admin-field">
                 <span className="admin-field__label">Mã rập</span>
-                <input className="admin-input" value={pattern.code} disabled readOnly />
+                <input
+                  className="admin-input"
+                  value={draft.code}
+                  onChange={(e) => updateDraft({ code: e.target.value.toUpperCase() })}
+                  maxLength={32}
+                />
               </label>
               <label className="admin-field">
                 <span className="admin-field__label">Version</span>

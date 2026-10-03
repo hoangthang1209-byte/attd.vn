@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Save, X } from "lucide-react";
-import type { PatternSourceType } from "@prisma/client";
+import type { PatternSourceType, PatternStatus } from "@prisma/client";
 import { formatPatternSourceLabel } from "@/features/patterns/pattern-source-labels";
 import styles from "./PatternLibrary.module.css";
 
@@ -10,6 +10,7 @@ export type BulkEditablePattern = {
   id: string;
   code: string;
   name: string;
+  status: PatternStatus;
   baseSize: string | null;
   sizeRange: string | null;
   sourceType: PatternSourceType | null;
@@ -38,10 +39,12 @@ function normalize(value: string | null | undefined): string {
 
 function rowChanged(original: BulkEditablePattern, draft: DraftRow): boolean {
   return (
+    original.code !== draft.code ||
     original.name !== draft.name ||
     normalize(original.baseSize) !== normalize(draft.baseSize) ||
     normalize(original.sizeRange) !== normalize(draft.sizeRange) ||
-    original.sourceType !== draft.sourceType
+    original.sourceType !== draft.sourceType ||
+    original.status !== draft.status
   );
 }
 
@@ -84,6 +87,7 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            code: row.code.trim().toUpperCase(),
             name: row.name.trim(),
             baseSize: normalize(row.baseSize) || null,
             sizeRange: normalize(row.sizeRange) || null,
@@ -100,6 +104,22 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
             `${row.code}: ${data.message ?? data.error ?? "Không thể cập nhật"}`,
           );
           continue;
+        }
+        const original = rows.find((item) => item.id === row.id);
+        if (original && original.status !== row.status) {
+          const statusUrl = row.status === "APPROVED"
+            ? `/api/patterns/${row.id}/approve`
+            : row.status === "ARCHIVED"
+              ? `/api/patterns/${row.id}/archive`
+              : null;
+          if (statusUrl) {
+            const statusResponse = await fetch(statusUrl, { method: "POST" });
+            const statusData = (await statusResponse.json().catch(() => ({}))) as { message?: string };
+            if (!statusResponse.ok) {
+              failures.push(`${row.code}: ${statusData.message ?? "Không thể đổi trạng thái"}`);
+              continue;
+            }
+          }
         }
         saved += 1;
       } catch {
@@ -153,6 +173,7 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
                 <tr>
                   <th>Mã rập</th>
                   <th>Tên rập</th>
+                  <th>Trạng thái</th>
                   <th>Base size</th>
                   <th>Dải size</th>
                   <th>Nguồn</th>
@@ -162,7 +183,11 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
                 {drafts.map((row) => (
                   <tr key={row.id}>
                     <td>
-                      <strong>{row.code}</strong>
+                      <input
+                        className="admin-input"
+                        value={row.code}
+                        onChange={(event) => updateDraft(row.id, { code: event.target.value.toUpperCase() })}
+                      />
                     </td>
                     <td>
                       <input
@@ -172,6 +197,17 @@ export default function PatternBulkEditDialog({ rows, onClose, onSaved }: Props)
                           updateDraft(row.id, { name: event.target.value })
                         }
                       />
+                    </td>
+                    <td>
+                      <select
+                        className="admin-select"
+                        value={row.status}
+                        onChange={(event) => updateDraft(row.id, { status: event.target.value as PatternStatus })}
+                      >
+                        <option value="DRAFT">Bản nháp</option>
+                        <option value="APPROVED">Đã duyệt</option>
+                        <option value="ARCHIVED">Lưu trữ</option>
+                      </select>
                     </td>
                     <td>
                       <input

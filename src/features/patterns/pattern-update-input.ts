@@ -11,6 +11,7 @@ export type PatternMeasurementInput = {
 };
 
 export type PatternUpdateInput = {
+  code?: string;
   name?: string;
   version?: number;
   productCategoryId?: string | null;
@@ -189,12 +190,17 @@ export function parsePatternUpdateBody(body: unknown): PatternUpdateInput {
   }
 
   const raw = body as Record<string, unknown>;
+  const code = optionalString(raw.code);
+  if (code !== undefined && !code.trim()) {
+    throw new PatternValidationError("Mã rập không được để trống.");
+  }
   const name = optionalString(raw.name);
   if (name !== undefined && !name.trim()) {
     throw new PatternValidationError("Tên rập không được để trống.");
   }
 
   return {
+    code: code?.trim().toUpperCase(),
     name: name?.trim(),
     version: parseVersion(raw.version),
     productCategoryId: nullableString(raw.productCategoryId),
