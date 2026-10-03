@@ -230,15 +230,35 @@ export default function ContentAiAdminClient({ prompts }: { prompts: PromptSumma
 
   const rr = status.rolloutReadiness;
 
+  if (!developerMode) {
+    return (
+      <div className="admin-panel">
+        <section className="admin-sidebar-card" style={{ margin: 0 }}>
+          <h3 className="admin-sidebar-title">Trạng thái AI nội dung</h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <StatusBadge tone={cg.enabled ? "success" : "neutral"}>
+              {cg.enabled ? "Đang hoạt động" : "Đang tắt"}
+            </StatusBadge>
+            <StatusBadge tone={rolloutTone(cg.rolloutStage)}>
+              {ROLLOUT_STAGE_LABELS[cg.rolloutStage] ?? cg.rolloutStage}
+            </StatusBadge>
+          </div>
+          <p className="admin-field-hint" style={{ margin: 0 }}>
+            {cg.enabled
+              ? "Hệ thống AI hỗ trợ soạn nội dung đang sẵn sàng cho đội biên tập."
+              : "AI nội dung đang tắt. Liên hệ kỹ thuật nếu cần bật lại."}
+          </p>
+          <p className="admin-field-hint" style={{ margin: "8px 0 0" }}>
+            Bật Developer Mode ở thanh trên để xem cấu hình provider, hạn mức và chi phí kỹ thuật.
+          </p>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="admin-panel">
       <div style={{ display: "grid", gap: 16 }}>
-        {!developerMode && (
-          <p className="admin-message admin-message--warning" role="status">
-            Developer Mode recommended — trang này hiển thị cấu hình provider, rollout và chi phí AI kỹ thuật. Bật
-            Developer Mode ở thanh trên để xem đầy đủ, trang vẫn hoạt động bình thường nếu để tắt.
-          </p>
-        )}
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <Link href="/admin/content/ai/smoke" className="admin-btn admin-btn--secondary">
             Mở AI Smoke Workspace

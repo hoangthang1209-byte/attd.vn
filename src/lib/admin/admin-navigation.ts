@@ -267,6 +267,9 @@ export const SOLO_HIDDEN_CONTENT_HREFS: readonly string[] = [
   "/admin/content/launch",
 ];
 
+/** Technical ops screens — hidden from main nav unless Developer Mode is on. */
+export const DEV_ONLY_NAV_HREFS: readonly string[] = ["/admin/automation"];
+
 /**
  * Pure filter over the static navigation registry — never mutates
  * `adminNavigationSections`. Team mode (or `isSolo=false`) returns the
@@ -291,4 +294,24 @@ export function filterNavigationForWorkspaceMode(
       })),
     };
   });
+}
+
+/**
+ * Hides technical automation nav unless Developer Mode is on.
+ * Routes remain reachable by direct URL.
+ */
+export function filterNavigationForDeveloperMode(
+  sections: AdminNavigationSection[],
+  developerMode: boolean,
+): AdminNavigationSection[] {
+  if (developerMode) return sections;
+  return sections.map((section) => ({
+    ...section,
+    platforms: section.platforms.map((platform) => ({
+      ...platform,
+      items: platform.items.filter(
+        (item) => !item.href || !DEV_ONLY_NAV_HREFS.includes(item.href),
+      ),
+    })),
+  }));
 }
