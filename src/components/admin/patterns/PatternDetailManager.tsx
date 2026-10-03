@@ -408,6 +408,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
   const [, setUploading] = useState(false);
   const [activeFileMenuId, setActiveFileMenuId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -678,12 +679,13 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     if (res.ok) void load();
   }
 
-  async function uploadFile(file: File): Promise<void> {
+  async function uploadFile(file: File, title?: string): Promise<void> {
     setError(null);
     setUploading(true);
     const fd = new FormData();
     fd.append("file", file);
     fd.append("type", "OTHER");
+    if (title) fd.append("title", title);
     try {
       const res = await fetch(`/api/patterns/${patternId}/files`, { method: "POST", body: fd });
       if (res.ok) await load();
@@ -753,6 +755,7 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
     categories.find((category) => category.id === draft.productCategoryId)?.name
     ?? pattern.productCategory?.name
     ?? "—";
+  const coverFile = pattern.files.find((file) => file.title === "__PATTERN_COVER__") ?? null;
   const entityTitle = draft.name || pattern.name;
 
   return (
@@ -943,6 +946,54 @@ export default function PatternDetailManager({ patternId }: { patternId: string 
         <div className="pattern-workspace__secondary">
           <section className="pattern-workspace__panel admin-panel">
             <h2 className="pattern-workspace__panel-title">Thông tin rập</h2>
+
+            <div className="pattern-workspace__cover-editor">
+              <div className="pattern-workspace__cover-preview">
+                {coverFile ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`/api/patterns/${patternId}/files/${coverFile.id}/open`}
+                    alt={`Ảnh đại diện ${pattern.code}`}
+                    className="pattern-workspace__cover-image"
+                  />
+                ) : (
+                  <PatternCategoryThumbnail
+                    category={draftCategoryVisual}
+                    size="header"
+                    showName={false}
+                  />
+                )}
+              </div>
+              <div className="pattern-workspace__cover-actions">
+                <strong>Ảnh đại diện</strong>
+                <p className="admin-field-hint">
+                  Ảnh này hiển thị trong Thư viện rập. Nên dùng ảnh JPG, PNG hoặc WEBP rõ mặt trước sản phẩm/rập.
+                </p>
+                {!readOnly && (
+                  <>
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void uploadFile(file, "__PATTERN_COVER__");
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--xs"
+                      onClick={() => coverInputRef.current?.click()}
+                    >
+                      {coverFile ? "Đổi ảnh đại diện" : "Thêm ảnh đại diện"}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
             <div className="pattern-workspace__info-grid admin-form-grid">
               <label className="admin-field">
                 <span className="admin-field__label">Tên rập</span>

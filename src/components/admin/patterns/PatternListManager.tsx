@@ -54,6 +54,7 @@ type PatternRow = {
   productCategory?: PatternCategoryVisual | null;
   product?: { id: string; name: string; productCode: string | null } | null;
   customer?: { name: string; code: string } | null;
+  files?: Array<{ id: string; title: string | null; mimeType: string | null; type: string }>;
   _count?: { files: number; techPacks: number };
 };
 
@@ -120,6 +121,8 @@ export default function PatternListManager() {
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [bulkEditing, setBulkEditing] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkStatusUpdating, setBulkStatusUpdating] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [newName, setNewName] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -227,6 +230,42 @@ export default function PatternListManager() {
     }
   }
 
+  async function handleSetAllStatus(nextStatus: string) {
+    if (!nextStatus || bulkStatusUpdating) return;
+    const label =
+      nextStatus === "DRAFT"
+        ? "Bản nháp"
+        : nextStatus === "APPROVED"
+          ? "Đã duyệt"
+          : "Lưu trữ";
+    const confirmed = window.confirm(
+      `Đổi trạng thái TOÀN BỘ ${stats.all} rập thành "${label}"? Hành động này áp dụng cho toàn bộ thư viện, không cần tick từng rập.`,
+    );
+    if (!confirmed) {
+      setBulkStatus("");
+      return;
+    }
+
+    setBulkStatusUpdating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/patterns/bulk-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { message?: string };
+      if (!res.ok) throw new Error(data.message ?? "Không thể đổi trạng thái toàn bộ rập.");
+      setBulkStatus("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể đổi trạng thái toàn bộ rập.");
+      setBulkStatus("");
+    } finally {
+      setBulkStatusUpdating(false);
+    }
+  }
+
   const editableRows = items.filter((row) => row.status === "DRAFT");
   const selectedRows = items.filter((row) => selectedIds.has(row.id) && row.status === "DRAFT");
   const allEditableSelected =
@@ -261,6 +300,23 @@ export default function PatternListManager() {
             </p>
           </div>
           <div className={styles.heroActions}>
+            <select
+              className="admin-select"
+              value={bulkStatus}
+              disabled={bulkStatusUpdating || stats.all === 0}
+              onChange={(event) => {
+                const next = event.target.value;
+                setBulkStatus(next);
+                void handleSetAllStatus(next);
+              }}
+              aria-label="Đổi trạng thái toàn bộ rập"
+              title="Áp dụng cho toàn bộ rập trong thư viện, không cần chọn từng dòng"
+            >
+              <option value="">{bulkStatusUpdating ? "Đang cập nhật..." : "Đổi trạng thái toàn bộ..."}</option>
+              <option value="DRAFT">Toàn bộ → Bản nháp</option>
+              <option value="APPROVED">Toàn bộ → Đã duyệt</option>
+              <option value="ARCHIVED">Toàn bộ → Lưu trữ</option>
+            </select>
             <button
               type="button"
               className="admin-btn"
@@ -415,10 +471,19 @@ export default function PatternListManager() {
                         />
                       </td>
                       <td>
-                        <PatternCategoryThumbnail
-                          category={normalizePatternCategoryVisual(row.productCategory)}
-                          size="list"
-                        />
+                        {row.files?.[0]?.id ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={`/api/patterns/${row.id}/files/${row.files[0].id}/open`}
+                            alt={`Ảnh đại diện ${row.code}`}
+                            className={styles.patternCoverThumb}
+                          />
+                        ) : (
+                          <PatternCategoryThumbnail
+                            category={normalizePatternCategoryVisual(row.productCategory)}
+                            size="list"
+                          />
+                        )}
                       </td>
                       <td>
                         <div className={styles.patternIdentity}>
