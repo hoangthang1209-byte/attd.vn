@@ -121,8 +121,8 @@ export default function PatternListManager() {
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [bulkEditing, setBulkEditing] = useState(false);
-  const [bulkStatus, setBulkStatus] = useState("");
-  const [bulkStatusUpdating, setBulkStatusUpdating] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedStatusUpdating, setSelectedStatusUpdating] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [newName, setNewName] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -230,46 +230,8 @@ export default function PatternListManager() {
     }
   }
 
-  async function handleSetAllStatus(nextStatus: string) {
-    if (!nextStatus || bulkStatusUpdating) return;
-    const label =
-      nextStatus === "DRAFT"
-        ? "Bản nháp"
-        : nextStatus === "APPROVED"
-          ? "Đã duyệt"
-          : "Lưu trữ";
-    const confirmed = window.confirm(
-      `Đổi trạng thái TOÀN BỘ ${stats.all} rập thành "${label}"? Hành động này áp dụng cho toàn bộ thư viện, không cần tick từng rập.`,
-    );
-    if (!confirmed) {
-      setBulkStatus("");
-      return;
-    }
-
-    setBulkStatusUpdating(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/patterns/bulk-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Không thể đổi trạng thái toàn bộ rập.");
-      setBulkStatus("");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể đổi trạng thái toàn bộ rập.");
-      setBulkStatus("");
-    } finally {
-      setBulkStatusUpdating(false);
-    }
-  }
-
-  const editableRows = items.filter((row) => row.status === "DRAFT");
-  const selectedRows = items.filter((row) => selectedIds.has(row.id) && row.status === "DRAFT");
-  const allEditableSelected =
-    editableRows.length > 0 && editableRows.every((row) => selectedIds.has(row.id));
+  const selectedRows = items.filter((row) => selectedIds.has(row.id));
+  const allPageSelected = items.length > 0 && items.every((row) => selectedIds.has(row.id));
 
   function toggleSelected(id: string) {
     setSelectedIds((current) => {
@@ -280,10 +242,62 @@ export default function PatternListManager() {
     });
   }
 
-  function toggleSelectAllEditable() {
+  function toggleSelectAllPage() {
     setSelectedIds(() =>
-      allEditableSelected ? new Set() : new Set(editableRows.map((row) => row.id)),
+      allPageSelected ? new Set() : new Set(items.map((row) => row.id)),
     );
+  }
+
+  async function handleSelectedStatus(nextStatus: string) {
+    if (!nextStatus || selectedRows.length === 0 || selectedStatusUpdating) return;
+    const label =
+      nextStatus === "DRAFT"
+        ? "Bản nháp"
+        : nextStatus === "APPROVED"
+          ? "Đã duyệt"
+          : "Lưu trữ";
+    if (!window.confirm(`Đổi trạng thái ${selectedRows.length} rập đã chọn thành "${label}"?`)) {
+      setSelectedStatus("");
+      return;
+    }
+
+    setSelectedStatusUpdating(true);
+    setError(null);
+    const failures: string[] = [];
+
+    for (const row of selectedRows) {
+      try {
+        if (row.status === nextStatus) continue;
+
+        let res: Response;
+        if (nextStatus === "APPROVED") {
+          res = await fetch(`/api/patterns/${row.id}/approve`, { method: "POST" });
+        } else if (nextStatus === "ARCHIVED") {
+          res = await fetch(`/api/patterns/${row.id}/archive`, { method: "POST" });
+        } else {
+          res = await fetch(`/api/patterns/${row.id}/status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "DRAFT" }),
+          });
+        }
+
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { message?: string };
+          failures.push(`${row.code}: ${data.message ?? "Không thể đổi trạng thái"}`);
+        }
+      } catch {
+        failures.push(`${row.code}: lỗi kết nối`);
+      }
+    }
+
+    setSelectedStatus("");
+    setSelectedStatusUpdating(false);
+    if (failures.length) setError(failures.join(" · "));
+    else {
+      setSelectedIds(new Set());
+      await load();
+    }
   }
 
   const firstItem = total === 0 ? 0 : (page - 1) * 25 + 1;
@@ -300,34 +314,12 @@ export default function PatternListManager() {
             </p>
           </div>
           <div className={styles.heroActions}>
-            <select
-              className="admin-select"
-              value={bulkStatus}
-              disabled={bulkStatusUpdating || stats.all === 0}
-              onChange={(event) => {
-                const next = event.target.value;
-                setBulkStatus(next);
-                void handleSetAllStatus(next);
-              }}
-              aria-label="Đổi trạng thái toàn bộ rập"
-              title="Áp dụng cho toàn bộ rập trong thư viện, không cần chọn từng dòng"
-            >
-              <option value="">{bulkStatusUpdating ? "Đang cập nhật..." : "Đổi trạng thái toàn bộ..."}</option>
-              <option value="DRAFT">Toàn bộ → Bản nháp</option>
-              <option value="APPROVED">Toàn bộ → Đã duyệt</option>
-              <option value="ARCHIVED">Toàn bộ → Lưu trữ</option>
-            </select>
             <button
               type="button"
               className="admin-btn"
-              onClick={() => {
-                if (selectedRows.length === 0) {
-                  setSelectedIds(new Set(editableRows.map((row) => row.id)));
-                }
-                setBulkEditing(true);
-              }}
-              disabled={editableRows.length === 0}
-              title={editableRows.length === 0 ? "Không có rập bản nháp để sửa" : undefined}
+              onClick={() => setBulkEditing(true)}
+              disabled={selectedRows.length === 0}
+              title={selectedRows.length === 0 ? "Chọn rập trước khi sửa hàng loạt" : undefined}
             >
               <PencilLine size={15} />
               &nbsp;Sửa hàng loạt{selectedRows.length > 0 ? ` (${selectedRows.length})` : ""}
@@ -401,6 +393,36 @@ export default function PatternListManager() {
           </button>
         </div>
 
+        {selectedRows.length > 0 && (
+          <div className={styles.bulkSelectionBar}>
+            <strong>Đã chọn {selectedRows.length} rập</strong>
+            <div className={styles.bulkSelectionActions}>
+              <select
+                className="admin-select"
+                value={selectedStatus}
+                disabled={selectedStatusUpdating}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setSelectedStatus(next);
+                  void handleSelectedStatus(next);
+                }}
+              >
+                <option value="">{selectedStatusUpdating ? "Đang cập nhật..." : "Đổi trạng thái"}</option>
+                <option value="DRAFT">Chuyển sang Bản nháp</option>
+                <option value="APPROVED">Chuyển sang Đã duyệt</option>
+                <option value="ARCHIVED">Chuyển sang Lưu trữ</option>
+              </select>
+              <button type="button" className="admin-btn" onClick={() => setBulkEditing(true)}>
+                <PencilLine size={14} />
+                &nbsp;Sửa thông tin
+              </button>
+              <button type="button" className="admin-btn" onClick={() => setSelectedIds(new Set())}>
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <AdminLoadingState label="Đang tải thư viện rập..." />
         ) : error && items.length === 0 ? (
@@ -440,10 +462,10 @@ export default function PatternListManager() {
                     <th className={styles.selectCell}>
                       <input
                         type="checkbox"
-                        checked={allEditableSelected}
-                        onChange={toggleSelectAllEditable}
-                        disabled={editableRows.length === 0}
-                        aria-label="Chọn tất cả rập bản nháp trên trang"
+                        checked={allPageSelected}
+                        onChange={toggleSelectAllPage}
+                        disabled={items.length === 0}
+                        aria-label="Chọn tất cả rập trên trang"
                       />
                     </th>
                     <th aria-label="Ảnh" />
@@ -465,8 +487,6 @@ export default function PatternListManager() {
                           type="checkbox"
                           checked={selectedIds.has(row.id)}
                           onChange={() => toggleSelected(row.id)}
-                          disabled={row.status !== "DRAFT"}
-                          title={row.status !== "DRAFT" ? "Chỉ rập bản nháp mới sửa hàng loạt" : undefined}
                           aria-label={`Chọn ${row.code}`}
                         />
                       </td>
@@ -650,7 +670,7 @@ export default function PatternListManager() {
 
       {bulkEditing && (
         <PatternBulkEditDialog
-          rows={selectedRows.length > 0 ? selectedRows : editableRows}
+          rows={selectedRows}
           onClose={() => setBulkEditing(false)}
           onSaved={() => {
             setSelectedIds(new Set());
