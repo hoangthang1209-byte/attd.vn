@@ -1,0 +1,44 @@
+name: Public Mobile QA
+on:
+  push:
+    branches: [fix/public-browser-audit-oct03]
+    paths: [scripts/public-mobile-qa.mjs, .github/workflows/public-mobile-qa.yml, package.json, package-lock.json]
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Exact deployment URL to verify (preview or production)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Wait for updated preview UI
+        if: github.event_name == 'push'
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$QA_BASE_URL" | grep -q 'Ảnh đang cập nhật'; then exit 0; fi
+            sleep 10
+          done
+          echo 'Updated preview UI is not ready'; exit 1
+        env:
+          QA_BASE_URL: https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app
+      - run: npm run qa:public:mobile
+        env:
+          QA_BASE_URL: ${{ inputs.base_url || 'https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-mobile-393x852-${{ github.sha }}
+          path: test-results/public-mobile
+          retention-days: 14

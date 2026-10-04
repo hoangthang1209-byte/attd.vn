@@ -16,7 +16,7 @@ export default function ImagePlaceholder({
   const displayLabel =
     label ??
     (variant === "product"
-      ? "ATTD"
+      ? "Liên hệ xem mẫu"
       : variant === "category"
         ? "Danh mục"
         : variant === "client"
@@ -28,7 +28,7 @@ export default function ImagePlaceholder({
       className={`image-placeholder image-placeholder--${variant}${compact ? " image-placeholder--compact" : ""} ${className}`}
       aria-hidden={variant !== "product"}
     >
-      <span className="image-placeholder-mark">ATTD</span>
+      <span className="image-placeholder-mark">{variant === "product" ? "Ảnh đang cập nhật" : "ATTD"}</span>
       {!compact && (
         <span className="image-placeholder-label">{displayLabel}</span>
       )}
