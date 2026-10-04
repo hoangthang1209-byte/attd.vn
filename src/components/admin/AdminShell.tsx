@@ -14,6 +14,7 @@ import { WorkspaceModeProvider, useWorkspaceMode } from "@/components/admin/cont
 import {
   adminDashboardNavItem,
   adminNavigationSections,
+  filterNavigationForDeveloperMode,
   filterNavigationForWorkspaceMode,
   type AdminNavigationItem,
 } from "@/lib/admin/admin-navigation";
@@ -69,7 +70,7 @@ function AdminShellNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { permissions, loading } = useAdminPermissions();
-  const { isSolo } = useWorkspaceMode();
+  const { isSolo, developerMode } = useWorkspaceMode();
 
   const visibleNavigation = useMemo(() => {
     if (loading) {
@@ -81,7 +82,10 @@ function AdminShellNav() {
         ? adminDashboardNavItem
         : null;
 
-    const modeFilteredSections = filterNavigationForWorkspaceMode(adminNavigationSections, isSolo);
+    const modeFilteredSections = filterNavigationForDeveloperMode(
+      filterNavigationForWorkspaceMode(adminNavigationSections, isSolo),
+      developerMode,
+    );
 
     const sections = modeFilteredSections
       .map((section) => ({
@@ -102,7 +106,7 @@ function AdminShellNav() {
       .filter((section) => section.platforms.length > 0);
 
     return { dashboard, sections };
-  }, [permissions, loading, isSolo]);
+  }, [permissions, loading, isSolo, developerMode]);
 
   const activeHref = useMemo(() => {
     const hrefs: string[] = [];
@@ -188,7 +192,7 @@ function WorkspaceModeToggle() {
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 6 }}
-      title="Solo ẩn bớt màn hình vận hành nâng cao. Developer Mode hiện thông số kỹ thuật AI."
+      title="Solo ẩn bớt màn hình vận hành nâng cao. Developer Mode hiện thông số kỹ thuật, tự động hóa và chẩn đoán hệ thống."
     >
       <button
         type="button"
