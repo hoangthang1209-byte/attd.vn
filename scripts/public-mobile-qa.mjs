@@ -54,6 +54,22 @@ try {
       check(!metrics.brokenImages.length, route, "broken image", metrics.brokenImages);
       check(!metrics.demoLinks.length, route, "demo content", metrics.demoLinks);
       check(!metrics.placeholders.some(text => /^ATTD\s*ATTD$/.test(text)), route, "generic product fallback", metrics.placeholders);
+      if (route === "/" || routes.slice(1, 6).includes(route)) {
+        const heroCta = page.locator(".v7-home-hero__actions a, .v7-solution-hero__actions a").first();
+        const rect = await heroCta.boundingBox();
+        check(rect && rect.y + rect.height <= 852, route, "hero CTA below first viewport", rect);
+      }
+      // Bring each conversion control into view and check hit-testing against fixed overlays.
+      for (const control of await page.locator("main .product-card-quote-btn, main a.v7-btn--primary, main button[type=submit]").all()) {
+        await control.scrollIntoViewIfNeeded();
+        const reachable = await control.evaluate(el => {
+          const r = el.getBoundingClientRect();
+          const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return top && (el.contains(top) || top.contains(el));
+        });
+        check(reachable, route, "sticky CTA covers conversion control", await control.textContent());
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: path.join(output, `${route === "/" ? "home" : route.slice(1).replaceAll("/", "--")}.png`), fullPage: true });
       // At the footer, fixed CTA must not obscure the last content/links.
       await page.locator("footer").last().scrollIntoViewIfNeeded();

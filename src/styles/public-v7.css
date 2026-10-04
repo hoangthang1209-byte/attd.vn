@@ -3160,6 +3160,7 @@
 .v7-solution-hero__grid--no-media .v7-solution-hero__copy,
 .v7-catalog-hero__grid--no-media .v7-catalog-hero__copy { max-width: 960px; padding: 56px 0; }
 .v7-solution-hero__copy h1, .v7-collection-hero__copy h1, .v7-pdp .mp-pdp-overview-title { line-height: 1.14; letter-spacing: -.035em; text-wrap: balance; }
+.v7-solution-hero__copy h1 { font-size: clamp(38px, 4vw, 56px); }
 .v7-section-head h2, .v7-footer__lead h2 { line-height: 1.16; letter-spacing: -.035em; text-wrap: balance; }
 .v7-footer__grid { grid-template-columns: minmax(220px, .65fr) minmax(0, 1.35fr); gap: 48px; }
 .v7-footer__nav--cms { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; }

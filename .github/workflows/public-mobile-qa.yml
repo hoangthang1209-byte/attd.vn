@@ -2,17 +2,19 @@ name: Public Mobile QA
 on:
   push:
     branches: [fix/public-browser-audit-oct03]
-    paths: [scripts/public-mobile-qa.mjs, .github/workflows/public-mobile-qa.yml, package.json, package-lock.json]
+    paths: [scripts/public-mobile-qa.mjs, .github/workflows/public-mobile-qa.yml, package.json, package-lock.json, 'src/**']
   workflow_dispatch:
     inputs:
       base_url:
         description: Exact deployment URL to verify (preview or production)
         required: true
         type: string
+  deployment_status:
 permissions:
   contents: read
 jobs:
   mobile:
+    if: github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.ref == 'main' && (github.event.deployment.environment == 'Production' || github.event.deployment.environment == 'production'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -26,16 +28,16 @@ jobs:
       - name: Wait for updated preview UI
         if: github.event_name == 'push'
         run: |
-          for attempt in $(seq 1 30); do
-            if curl -fsS "$QA_BASE_URL" | grep -q 'Ảnh đang cập nhật'; then exit 0; fi
-            sleep 10
+          for attempt in $(seq 1 40); do
+            if curl -fsS -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/status" | python3 -c 'import json,sys; s=json.load(sys.stdin); sys.exit(0 if any(x["context"] == "Vercel" and x["state"] == "success" for x in s["statuses"]) else 1)'; then exit 0; fi
+            sleep 15
           done
           echo 'Updated preview UI is not ready'; exit 1
         env:
-          QA_BASE_URL: https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app
+          GH_TOKEN: ${{ github.token }}
       - run: npm run qa:public:mobile
         env:
-          QA_BASE_URL: ${{ inputs.base_url || 'https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app' }}
+          QA_BASE_URL: ${{ github.event_name == 'deployment_status' && 'https://www.attd.vn' || inputs.base_url || 'https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
