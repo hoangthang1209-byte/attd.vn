@@ -1,7 +1,7 @@
 name: Public Mobile QA
 on:
   push:
-    branches: [fix/public-browser-audit-oct03]
+    branches: [fix/public-browser-audit-oct03, main]
     paths: [scripts/public-mobile-qa.mjs, .github/workflows/public-mobile-qa.yml, package.json, package-lock.json, 'src/**']
   workflow_dispatch:
     inputs:
@@ -9,12 +9,14 @@ on:
         description: Exact deployment URL to verify (preview or production)
         required: true
         type: string
-  deployment_status:
 permissions:
   contents: read
+  statuses: read
+concurrency:
+  group: public-mobile-qa-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   mobile:
-    if: github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.ref == 'main' && (github.event.deployment.environment == 'Production' || github.event.deployment.environment == 'production'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -37,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - run: npm run qa:public:mobile
         env:
-          QA_BASE_URL: ${{ github.event_name == 'deployment_status' && 'https://www.attd.vn' || inputs.base_url || 'https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app' }}
+          QA_BASE_URL: ${{ inputs.base_url || (github.ref == 'refs/heads/main' && 'https://www.attd.vn') || 'https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
