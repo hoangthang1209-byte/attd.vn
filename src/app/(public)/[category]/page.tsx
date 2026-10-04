@@ -265,7 +265,7 @@ export default async function CategoryPage({ params }: PageProps) {
             <p className="v7-kicker">Danh mục nguồn hàng B2B</p>
             <h1>{cat.name}</h1>
             <p>
-              {content?.shortIntro ??
+              {cat.products.length === 0 ? `Liên hệ ATTD để chọn mẫu ${cat.name.toLowerCase()}, chất liệu và phương án hoàn thiện phù hợp với nhu cầu của bạn.` : content?.shortIntro ??
                 cat.description ??
                 `Nguồn hàng ${cat.name.toLowerCase()} dành cho đại lý, xưởng in và doanh nghiệp.`}
             </p>

@@ -232,7 +232,7 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 14px 30px;
-  padding: 22px 0 28px;
+  padding: 22px 76px 28px 0;
   border-top: 1px solid rgba(255,255,255,.1);
   color: #7f858e;
   font-size: 11px;
@@ -3183,6 +3183,7 @@
   .v7-home-hero__visual, .v7-home-hero__service-card { min-height: 360px; }
   .v7-home-hero__service-card { padding: 28px; }
   .v7-home-hero__meta { padding-top: 28px; }
+  .v7-home .home-product-showcase__item:first-child .product-card-media { min-height: 0; aspect-ratio: 1 / 1; }
   .v7-solution-row, .v7-solution-row--no-media { grid-template-columns: minmax(0, 1fr) 24px; gap: 16px; }
   .v7-solution-row__media { grid-column: 1 / -1; }
   .v7-solution-row__copy { grid-column: 1; }

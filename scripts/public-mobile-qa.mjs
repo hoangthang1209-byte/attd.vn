@@ -11,6 +11,7 @@ const browser = await chromium.launch(process.env.CHROME_EXECUTABLE_PATH ? { exe
 const context = await browser.newContext({ ...devices["iPhone 15 Pro"], viewport: { width: 393, height: 852 } });
 const routes = ["/", "/dong-phuc-doanh-nghiep", "/nguon-hang", "/oem", "/qua-tang-doanh-nghiep", "/merchandise", "/san-pham", "/danh-muc-san-pham", "/ao-thun-tron", "/ao-polo-tron", "/san-pham/ao-thun-cotton-4-chieu-cao-cap", "/lien-he"];
 const report = { base, viewport: { width: 393, height: 852 }, results: [], failures: [] };
+const probeOnly = process.env.QA_PROBE_ONLY === "1";
 function check(ok, route, name, detail) {
   if (!ok) report.failures.push({ route, name, detail });
 }
@@ -24,6 +25,10 @@ try {
     try {
       const response = await page.goto(new URL(route, base).href, { waitUntil: "networkidle", timeout: 60000 });
       await page.evaluate(() => document.fonts.ready);
+      const identity = await page.evaluate(() => ({ title: document.title, location: location.origin + location.pathname, heading: document.querySelector("h1")?.textContent, main: !!document.querySelector(".public-main main"), text: document.body.innerText.slice(0, 240) }));
+      console.log(`PAGE ${route} ${JSON.stringify(identity)}`);
+      if (probeOnly) break;
+      if (!identity.main) throw new Error(`Expected ATTD public main; received ${JSON.stringify(identity)}`);
       check(response?.ok(), route, "HTTP", response?.status());
       check(await page.locator("h1").count() === 1, route, "single visible page heading", await page.locator("h1").allTextContents());
       // Load lazy media through the entire page before inspecting fallbacks.
@@ -104,6 +109,8 @@ try {
       console.log(`CHECKED ${route} cards=${metrics.cards.length} overflow=${metrics.scrollWidth - metrics.width}`);
     } catch (error) {
       report.failures.push({ route, name: "navigation/interaction", detail: error.message });
+      await page.screenshot({ path: path.join(output, `failed-${route === "/" ? "home" : route.slice(1).replaceAll("/", "--")}.png`), fullPage: true }).catch(() => {});
+      if (/Expected ATTD public main/.test(error.message)) break;
     } finally { await page.close(); }
   }
 } finally {
@@ -111,4 +118,4 @@ try {
   await fs.writeFile(path.join(output, "report.json"), JSON.stringify(report, null, 2));
 }
 console.log(JSON.stringify({ checked: report.results.length, failures: report.failures }, null, 2));
-process.exitCode = report.failures.length || report.results.length !== routes.length ? 1 : 0;
+process.exitCode = probeOnly ? 0 : report.failures.length || report.results.length !== routes.length ? 1 : 0;
