@@ -27,7 +27,16 @@ function classifyTaskWorkload(status: NormalizedTaskStatus, isOpen: boolean): ke
   return null;
 }
 
-export function buildAgentSummaryCards(tasks: readonly AutomationTask[]): AgentSummaryCard[] {
+export type BuildAgentSummaryOptions = {
+  /** When true, open-task counts may omit issues beyond the GitHub fetch cap. */
+  isPartial?: boolean;
+};
+
+export function buildAgentSummaryCards(
+  tasks: readonly AutomationTask[],
+  options: BuildAgentSummaryOptions = {},
+): AgentSummaryCard[] {
+  const isPartial = options.isPartial ?? false;
   const countsByAgent = new Map<AgentId, AgentWorkloadCounts>();
   for (const agent of listActiveAgents()) {
     countsByAgent.set(agent.id, emptyCounts());
@@ -47,5 +56,6 @@ export function buildAgentSummaryCards(tasks: readonly AutomationTask[]): AgentS
     displayName: agent.displayName,
     active: agent.active,
     counts: countsByAgent.get(agent.id) ?? emptyCounts(),
+    isPartial,
   }));
 }

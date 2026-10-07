@@ -5,6 +5,7 @@ const DEFAULT_AGENT_ASSIGNMENT: AutomationTask["agentAssignment"] = {
   agentDisplayName: "ATTD CTO",
   routingReason: "default_cto",
   requiresHumanEscalation: false,
+  agentOverrideAreaMismatch: false,
 };
 
 /** Shared defaults for AutomationTask test fixtures (Phase G1 agent fields). */

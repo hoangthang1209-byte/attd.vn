@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   AGENT_REGISTRY,
+  agentSupportsTaskArea,
   assertRegistryInvariants,
   getActiveAgent,
+  getAgentById,
   isKnownAgentId,
   listActiveAgents,
 } from "@/features/agent-os/agent-registry";
@@ -23,5 +25,12 @@ describe("agent registry", () => {
   it("rejects unknown agent ids", () => {
     assert.equal(isKnownAgentId("NOT_AN_AGENT"), false);
     assert.equal(getActiveAgent("NOT_AN_AGENT" as never), null);
+  });
+
+  it("matches agent allowed task areas by lane label or id", () => {
+    const crm = getAgentById("CRM_AGENT");
+    assert.equal(agentSupportsTaskArea(crm, "Lead & Sales / CRM"), true);
+    assert.equal(agentSupportsTaskArea(crm, "lead-sales-crm"), true);
+    assert.equal(agentSupportsTaskArea(crm, "Marketing / Content / SEO"), false);
   });
 });

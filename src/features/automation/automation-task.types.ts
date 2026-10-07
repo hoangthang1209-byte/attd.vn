@@ -1,3 +1,10 @@
+import type {
+  AgentId,
+  AgentRoutingReason,
+  AgentSummaryCard,
+  AgentTaskPriority,
+} from "@/features/agent-os/agent.types";
+
 export type NormalizedTaskStatus =
   | "backlog"
   | "approved"
@@ -14,13 +21,6 @@ export type NormalizedTaskStatus =
   | "superseded"
   | "unknown";
 
-import type {
-  AgentId,
-  AgentRoutingReason,
-  AgentSummaryCard,
-  AgentTaskPriority,
-} from "@/features/agent-os/agent.types";
-
 export type AutomationTaskRisk = "low" | "medium" | "high" | "unknown";
 
 export type AutomationTaskAgentAssignment = {
@@ -28,6 +28,8 @@ export type AutomationTaskAgentAssignment = {
   agentDisplayName: string;
   routingReason: AgentRoutingReason;
   requiresHumanEscalation: boolean;
+  /** True when ATTD_AGENT override does not match the agent's allowed task areas. */
+  agentOverrideAreaMismatch: boolean;
 };
 
 export type ProductionDeploymentStatus = "live" | "deploying" | "not_live" | "unknown";

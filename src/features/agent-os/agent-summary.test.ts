@@ -31,6 +31,7 @@ function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
       agentDisplayName: "ATTD CTO",
       routingReason: "task_area",
       requiresHumanEscalation: false,
+      agentOverrideAreaMismatch: false,
     },
     taskPriority: "P1",
     ...overrides,
@@ -49,6 +50,7 @@ describe("buildAgentSummaryCards", () => {
           agentDisplayName: "CRM Agent",
           routingReason: "task_area",
           requiresHumanEscalation: false,
+          agentOverrideAreaMismatch: false,
         },
       }),
       taskFixture({
@@ -59,6 +61,7 @@ describe("buildAgentSummaryCards", () => {
           agentDisplayName: "CRM Agent",
           routingReason: "task_area",
           requiresHumanEscalation: false,
+          agentOverrideAreaMismatch: false,
         },
       }),
       taskFixture({ issueNumber: 4, isOpen: false, status: "merged" }),
@@ -69,5 +72,10 @@ describe("buildAgentSummaryCards", () => {
     assert.equal(cto?.counts.active, 1);
     assert.equal(crm?.counts.queued, 1);
     assert.equal(crm?.counts.blocked, 1);
+  });
+
+  it("marks cards partial when open-task data is truncated", () => {
+    const cards = buildAgentSummaryCards([taskFixture()], { isPartial: true });
+    assert.equal(cards.every((card) => card.isPartial), true);
   });
 });

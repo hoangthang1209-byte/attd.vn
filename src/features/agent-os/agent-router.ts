@@ -1,12 +1,18 @@
 import { resolveCanonicalLaneId } from "@/features/automation/automation-lane.constants";
 import { TASK_AREA_UNCLASSIFIED } from "@/features/automation/automation-status.parser";
-import { getActiveAgent, getAgentById } from "@/features/agent-os/agent-registry";
+import {
+  agentSupportsTaskArea,
+  getActiveAgent,
+  getAgentById,
+} from "@/features/agent-os/agent-registry";
 import { parseAgentIssueMetadata } from "@/features/agent-os/agent-metadata.parser";
 import type { AgentId, AgentRouteResult, AgentTaskPriority } from "@/features/agent-os/agent.types";
 import type { AutomationTaskRisk } from "@/features/automation/automation-task.types";
 
 const HIGH_RISK_KEYWORD_PATTERN =
   /\b(pricing|payment|banking|sepay|reconciliation|invoice|accounting|authentication|authorization|permission|migrate|migration)\b/i;
+
+const HIGH_RISK_DOMAIN_LANE_IDS = new Set<string>(["quotation-quote-builder"]);
 
 const KEYWORD_AGENT_RULES: Array<{ pattern: RegExp; agentId: AgentId }> = [
   { pattern: /\b(crm|lead|sales)\b/i, agentId: "CRM_AGENT" },
@@ -36,10 +42,30 @@ export type RouteAutomationTaskInput = {
   risk: AutomationTaskRisk;
 };
 
-function isHighRiskTask(input: RouteAutomationTaskInput): boolean {
+function isHighRiskKeywordOrLabel(input: RouteAutomationTaskInput): boolean {
   if (input.risk === "high") return true;
   const haystack = [input.title, input.body ?? "", ...input.comments.map((c) => c.body)].join("\n");
   return HIGH_RISK_KEYWORD_PATTERN.test(haystack);
+}
+
+function isHighRiskDomainTaskArea(taskArea: string): boolean {
+  if (!taskArea || taskArea === TASK_AREA_UNCLASSIFIED) return false;
+  const laneId = resolveCanonicalLaneId(taskArea);
+  return laneId !== null && HIGH_RISK_DOMAIN_LANE_IDS.has(laneId);
+}
+
+/**
+ * Human-escalation hint for dashboard display (G1 read-only).
+ * Aligns with factory policy: non-low risk labels and pricing/quotation lanes require human approval.
+ */
+function requiresHumanEscalationHint(
+  input: RouteAutomationTaskInput,
+  effectiveTaskArea: string,
+  routedViaHighRiskEscalation: boolean,
+): boolean {
+  if (routedViaHighRiskEscalation) return true;
+  if (input.risk !== "low") return true;
+  return isHighRiskDomainTaskArea(effectiveTaskArea);
 }
 
 function resolveEffectiveTaskArea(
@@ -76,6 +102,27 @@ function resolvePriority(
   return agentDefault;
 }
 
+function buildRouteResult(
+  input: RouteAutomationTaskInput,
+  effectiveTaskArea: string,
+  partial: Omit<AgentRouteResult, "metadata" | "effectiveTaskArea" | "effectivePriority">,
+  metadata: AgentRouteResult["metadata"],
+  agentDefaultPriority: AgentTaskPriority,
+): AgentRouteResult {
+  const routedViaHighRiskEscalation = partial.reason === "high_risk_escalation";
+  return {
+    ...partial,
+    requiresHumanEscalation: requiresHumanEscalationHint(
+      input,
+      effectiveTaskArea,
+      routedViaHighRiskEscalation,
+    ),
+    metadata,
+    effectiveTaskArea,
+    effectivePriority: resolvePriority(metadata.priority, agentDefaultPriority),
+  };
+}
+
 /**
  * Pure routing: maps a normalized task to an agent. Does not perform GitHub writes.
  */
@@ -86,48 +133,61 @@ export function routeAutomationTask(input: RouteAutomationTaskInput): AgentRoute
   });
 
   const effectiveTaskArea = resolveEffectiveTaskArea(metadata.taskAreaOverride, input.taskArea);
-  const highRisk = isHighRiskTask(input);
+  const highRiskEscalation = isHighRiskKeywordOrLabel(input);
 
-  if (highRisk) {
+  if (highRiskEscalation) {
     const cto = getAgentById("ATTD_CTO");
-    return {
-      agentId: "ATTD_CTO",
-      displayName: cto.displayName,
-      reason: "high_risk_escalation",
-      requiresHumanEscalation: true,
-      metadata,
+    return buildRouteResult(
+      input,
       effectiveTaskArea,
-      effectivePriority: resolvePriority(metadata.priority, cto.defaultPriority),
-    };
+      {
+        agentId: "ATTD_CTO",
+        displayName: cto.displayName,
+        reason: "high_risk_escalation",
+        requiresHumanEscalation: true,
+        agentOverrideAreaMismatch: false,
+      },
+      metadata,
+      cto.defaultPriority,
+    );
   }
 
   if (metadata.agentOverrideValid && metadata.agentOverride) {
     const overrideAgent = getActiveAgent(metadata.agentOverride as AgentId);
     if (overrideAgent) {
-      return {
-        agentId: overrideAgent.id,
-        displayName: overrideAgent.displayName,
-        reason: "metadata_agent_override",
-        requiresHumanEscalation: false,
-        metadata,
+      const areaMismatch = !agentSupportsTaskArea(overrideAgent, effectiveTaskArea);
+      return buildRouteResult(
+        input,
         effectiveTaskArea,
-        effectivePriority: resolvePriority(metadata.priority, overrideAgent.defaultPriority),
-      };
+        {
+          agentId: overrideAgent.id,
+          displayName: overrideAgent.displayName,
+          reason: "metadata_agent_override",
+          requiresHumanEscalation: false,
+          agentOverrideAreaMismatch: areaMismatch,
+        },
+        metadata,
+        overrideAgent.defaultPriority,
+      );
     }
   }
 
   const areaAgent = routeByTaskArea(effectiveTaskArea);
   if (areaAgent) {
     const agent = getAgentById(areaAgent);
-    return {
-      agentId: areaAgent,
-      displayName: agent.displayName,
-      reason: "task_area",
-      requiresHumanEscalation: false,
-      metadata,
+    return buildRouteResult(
+      input,
       effectiveTaskArea,
-      effectivePriority: resolvePriority(metadata.priority, agent.defaultPriority),
-    };
+      {
+        agentId: areaAgent,
+        displayName: agent.displayName,
+        reason: "task_area",
+        requiresHumanEscalation: false,
+        agentOverrideAreaMismatch: false,
+      },
+      metadata,
+      agent.defaultPriority,
+    );
   }
 
   const keywordHaystack = [
@@ -139,25 +199,33 @@ export function routeAutomationTask(input: RouteAutomationTaskInput): AgentRoute
   const keywordAgent = routeByKeywords(keywordHaystack);
   if (keywordAgent) {
     const agent = getAgentById(keywordAgent);
-    return {
-      agentId: keywordAgent,
-      displayName: agent.displayName,
-      reason: "keyword_fallback",
-      requiresHumanEscalation: false,
-      metadata,
+    return buildRouteResult(
+      input,
       effectiveTaskArea,
-      effectivePriority: resolvePriority(metadata.priority, agent.defaultPriority),
-    };
+      {
+        agentId: keywordAgent,
+        displayName: agent.displayName,
+        reason: "keyword_fallback",
+        requiresHumanEscalation: false,
+        agentOverrideAreaMismatch: false,
+      },
+      metadata,
+      agent.defaultPriority,
+    );
   }
 
   const cto = getAgentById("ATTD_CTO");
-  return {
-    agentId: "ATTD_CTO",
-    displayName: cto.displayName,
-    reason: "default_cto",
-    requiresHumanEscalation: false,
-    metadata,
+  return buildRouteResult(
+    input,
     effectiveTaskArea,
-    effectivePriority: resolvePriority(metadata.priority, cto.defaultPriority),
-  };
+    {
+      agentId: "ATTD_CTO",
+      displayName: cto.displayName,
+      reason: "default_cto",
+      requiresHumanEscalation: false,
+      agentOverrideAreaMismatch: false,
+    },
+    metadata,
+    cto.defaultPriority,
+  );
 }

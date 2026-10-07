@@ -1,4 +1,4 @@
-import { isKnownAgentId } from "@/features/agent-os/agent-registry";
+import { isKnownAgentId, normalizeAgentId } from "@/features/agent-os/agent-registry";
 import type { AgentTaskPriority, ParsedAgentIssueMetadata } from "@/features/agent-os/agent.types";
 
 const METADATA_LINE_PATTERN =
@@ -39,14 +39,15 @@ function applyMetadataLine(
   const normalizedKey = key.toUpperCase();
   switch (normalizedKey) {
     case "AGENT": {
-      const agentOverride = value.trim();
-      if (!agentOverride) {
+      const rawOverride = value.trim();
+      if (!rawOverride) {
         return { ...accumulator, agentOverride: null, agentOverrideValid: false };
       }
+      const agentOverride = normalizeAgentId(rawOverride);
       const valid = isKnownAgentId(agentOverride);
       return {
         ...accumulator,
-        agentOverride,
+        agentOverride: valid ? agentOverride : rawOverride,
         agentOverrideValid: valid,
       };
     }

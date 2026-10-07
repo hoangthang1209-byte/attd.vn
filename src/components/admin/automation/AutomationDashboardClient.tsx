@@ -438,6 +438,12 @@ export default function AutomationDashboardClient() {
               {data.agentSummary && data.agentSummary.length > 0 ? (
                 <section className="automation-agent-summary" aria-label="Tổng quan agent">
                   <h2 className="admin-section-title">Agent OS (G1)</h2>
+                  {data.agentSummary.some((card) => card.isPartial) ||
+                  data.dataCompleteness?.openTasksTruncated ? (
+                    <p className="admin-error automation-lane-board__incompleteness" role="status">
+                      Số liệu agent có thể chưa đầy đủ: danh sách task đang mở bị giới hạn khi tải từ GitHub.
+                    </p>
+                  ) : null}
                   <div className="automation-agent-summary__grid">
                     {data.agentSummary.map((card) => (
                       <article key={card.agentId} className="automation-agent-summary__card">
@@ -446,15 +452,24 @@ export default function AutomationDashboardClient() {
                         <dl className="automation-agent-summary__counts">
                           <div>
                             <dt>Đang xử lý</dt>
-                            <dd>{card.counts.active}</dd>
+                            <dd title={card.isPartial ? "Số liệu chưa đầy đủ" : undefined}>
+                              {card.counts.active}
+                              {card.isPartial ? " (một phần)" : ""}
+                            </dd>
                           </div>
                           <div>
                             <dt>Bị chặn</dt>
-                            <dd>{card.counts.blocked}</dd>
+                            <dd title={card.isPartial ? "Số liệu chưa đầy đủ" : undefined}>
+                              {card.counts.blocked}
+                              {card.isPartial ? " (một phần)" : ""}
+                            </dd>
                           </div>
                           <div>
                             <dt>Đang chờ</dt>
-                            <dd>{card.counts.queued}</dd>
+                            <dd title={card.isPartial ? "Số liệu chưa đầy đủ" : undefined}>
+                              {card.counts.queued}
+                              {card.isPartial ? " (một phần)" : ""}
+                            </dd>
                           </div>
                         </dl>
                       </article>
@@ -703,6 +718,9 @@ function AutomationTaskDetails({
       <p>
         <strong>Agent:</strong> {task.agentAssignment.agentDisplayName} ({task.agentAssignment.agentId})
         {task.agentAssignment.requiresHumanEscalation ? " · Cần leo thang con người" : ""}
+        {task.agentAssignment.agentOverrideAreaMismatch
+          ? " · ATTD_AGENT không khớp mảng được phép"
+          : ""}
         {" · "}
         {AUTOMATION_AGENT_ROUTING_LABELS[task.agentAssignment.routingReason]}
       </p>

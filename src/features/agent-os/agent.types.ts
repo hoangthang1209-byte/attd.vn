@@ -53,6 +53,7 @@ export type AgentRouteResult = {
   displayName: string;
   reason: AgentRoutingReason;
   requiresHumanEscalation: boolean;
+  agentOverrideAreaMismatch: boolean;
   metadata: ParsedAgentIssueMetadata;
   effectiveTaskArea: string;
   effectivePriority: AgentTaskPriority;
@@ -69,4 +70,6 @@ export type AgentSummaryCard = {
   displayName: string;
   active: boolean;
   counts: AgentWorkloadCounts;
+  /** True when open-task fetch was capped and counts may be incomplete. */
+  isPartial: boolean;
 };

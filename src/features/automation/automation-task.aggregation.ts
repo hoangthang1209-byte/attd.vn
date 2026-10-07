@@ -68,6 +68,7 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
       agentDisplayName: routing.displayName,
       routingReason: routing.reason,
       requiresHumanEscalation: routing.requiresHumanEscalation,
+      agentOverrideAreaMismatch: routing.agentOverrideAreaMismatch,
     },
     taskPriority: routing.effectivePriority,
     parentTaskIssueNumber: routing.metadata.parentTaskIssueNumber,

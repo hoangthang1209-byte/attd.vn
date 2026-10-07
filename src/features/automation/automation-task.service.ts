@@ -151,7 +151,10 @@ async function loadAutomationTasksUncached(view: AutomationDashboardView): Promi
   return {
     tasks,
     laneBoardTasks,
-    agentSummary: view === "active" ? buildAgentSummaryCards(openTasksForAgentSummary) : null,
+    agentSummary:
+      view === "active"
+        ? buildAgentSummaryCards(openTasksForAgentSummary, { isPartial: openTasksTruncated })
+        : null,
     dataCompleteness: {
       openTasksTruncated,
       openTasksTotalCount,

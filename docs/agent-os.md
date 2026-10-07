@@ -53,26 +53,37 @@ Backward-compatible markers in the **issue body** and/or **comments** (later lin
 
 ```text
 ATTD_AGENT: PUBLIC_WEBSITE_AGENT
-ATTD_AREA: PUBLIC_UI
+ATTD_AREA: Public Website UI
 ATTD_PRIORITY: P1
 ATTD_PARENT_TASK: #123
 ```
 
+Canonical `ATTD_AREA` values match lane labels or ids from `src/features/automation/automation-lane.constants.ts`, for example:
+
+- `Public Website UI` or `public-website-ui`
+- `Lead & Sales / CRM` or `lead-sales-crm`
+- `Quotation / Quote Builder` or `quotation-quote-builder`
+- `Automation Platform` or `automation-platform`
+
 - Issues **without** these markers behave as before (routing uses TASK_AREA comments, risk labels, and conservative keyword fallback).
 - `TASK_AREA:` comments continue to drive lane board classification (`docs/github-automation-dashboard.md`).
 - Invalid `ATTD_AGENT` values are ignored (no throw); routing falls through.
+- Valid `ATTD_AGENT` overrides that do not match the agent’s allowed task areas still display the override with a mismatch flag on the dashboard.
+- `ATTD_AGENT` ids are matched case-insensitively (normalized to uppercase registry ids).
 
 ## Routing precedence
 
 Implemented in `src/features/agent-os/agent-router.ts`:
 
 1. **High-risk escalation** → `ATTD_CTO` with human escalation (`risk:high` label and/or conservative high-risk domain keywords). Overrides invalid or valid `ATTD_AGENT` when risk applies.
-2. **Valid `ATTD_AGENT` override** when the agent is active.
+2. **Valid `ATTD_AGENT` override** when the agent is active (mismatch with allowed task areas is flagged, not silently hidden).
 3. **Task area** — canonical lane mapping from TASK_AREA / `ATTD_AREA` context.
 4. **Keyword fallback** on title/body/comments (last resort).
 5. **Default** → `ATTD_CTO`.
 
 High-risk domains align with `AGENTS.md` (pricing, payment, banking, auth, permissions, invoices, accounting, destructive migrations, etc.).
+
+**Human escalation hints (G1 display-only):** Tasks show “Cần leo thang con người” when routed via high-risk escalation, when the issue lacks `risk:low`, or when the effective task area is the quotation/pricing lane — matching factory safety gates in `docs/github-build-orchestrator.md` without changing orchestrator behavior in G1.
 
 ## Dashboard integration
 

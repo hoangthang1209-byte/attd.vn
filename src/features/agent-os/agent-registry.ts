@@ -1,4 +1,6 @@
 import type { AgentContract, AgentId } from "@/features/agent-os/agent.types";
+import { resolveCanonicalLaneId } from "@/features/automation/automation-lane.constants";
+import { TASK_AREA_UNCLASSIFIED } from "@/features/automation/automation-status.parser";
 
 const BASE_FORBIDDEN_SCOPES = [
   "production database writes",
@@ -176,8 +178,31 @@ export function getAgentById(id: AgentId): AgentContract {
   return agent;
 }
 
+export function normalizeAgentId(value: string): string {
+  return value.trim().toUpperCase();
+}
+
 export function isKnownAgentId(value: string): value is AgentId {
-  return AGENT_BY_ID.has(value as AgentId);
+  return AGENT_BY_ID.has(normalizeAgentId(value) as AgentId);
+}
+
+/** Whether the task area is within the agent contract (lane id or documented alias). */
+export function agentSupportsTaskArea(agent: AgentContract, taskArea: string): boolean {
+  if (!taskArea || taskArea === TASK_AREA_UNCLASSIFIED) {
+    return true;
+  }
+  const taskLaneId = resolveCanonicalLaneId(taskArea);
+  const normalizedTaskArea = taskArea.trim().toLowerCase();
+  for (const allowed of agent.allowedTaskAreas) {
+    if (allowed.trim().toLowerCase() === normalizedTaskArea) {
+      return true;
+    }
+    const allowedLaneId = resolveCanonicalLaneId(allowed);
+    if (taskLaneId && allowedLaneId && taskLaneId === allowedLaneId) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function getActiveAgent(id: AgentId): AgentContract | null {

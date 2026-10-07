@@ -31,6 +31,14 @@ describe("parseAgentIssueMetadata", () => {
     assert.equal(parsed.parentTaskIssueNumber, 123);
   });
 
+  it("normalizes ATTD_AGENT ids case-insensitively", () => {
+    const parsed = parseAgentIssueMetadata({
+      body: "ATTD_AGENT: crm_agent",
+    });
+    assert.equal(parsed.agentOverride, "CRM_AGENT");
+    assert.equal(parsed.agentOverrideValid, true);
+  });
+
   it("treats invalid agent overrides as invalid without throwing", () => {
     const parsed = parseAgentIssueMetadata({
       body: "ATTD_AGENT: UNKNOWN_AGENT",
