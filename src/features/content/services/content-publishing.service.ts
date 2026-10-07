@@ -1,5 +1,7 @@
 import "server-only";
 
+import { tryLockDueBlogPost } from "@/features/content/scheduled-publish-lock";
+
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidateBlogPaths } from "@/features/blog/revalidate";
@@ -505,14 +507,16 @@ export async function sendBlogBackToReview(input: {
 
 export async function processDueScheduledPosts(input?: { limit?: number; now?: Date }) {
   const now = input?.now ?? new Date();
-  const limit = Math.min(input?.limit ?? DUE_BATCH_SIZE, 50);
+  if (Number.isNaN(now.getTime())) throw new ContentPublishError("Thời gian không hợp lệ", "INVALID_TIME");
+  const requestedLimit = input?.limit ?? DUE_BATCH_SIZE;
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.max(1, Math.min(Math.floor(requestedLimit), 50))
+    : DUE_BATCH_SIZE;
   const due = await prisma.blogPost.findMany({
-    where: {
-      status: "SCHEDULED",
-      scheduledAt: { lte: now },
-    },
+    where: { status: "SCHEDULED", scheduledAt: { lte: now } },
     orderBy: { scheduledAt: "asc" },
     take: limit,
+    select: { id: true },
   });
 
   let published = 0;
@@ -520,140 +524,98 @@ export async function processDueScheduledPosts(input?: { limit?: number; now?: D
   let skipped = 0;
   const results: Array<{ blogPostId: string; ok: boolean; message: string }> = [];
 
-  for (const post of due) {
-    const event = await prisma.contentPublishEvent.create({
-      data: {
-        blogPostId: post.id,
-        action: "PUBLISH_NOW",
-        status: "PENDING",
-        requestedBy: "cron:publish-due",
-        scheduledFor: post.scheduledAt,
-        previousStatus: post.status,
-        nextStatus: "PUBLISHED",
-        sourceHandoffId: post.sourceHandoffRecordId,
-        sourceWritingDraftId: post.sourceWritingDraftId,
-        sourceDraftVersion: post.sourceWritingDraftVersion,
-        metadata: { dueProcessor: true },
-      },
-    });
-
+  for (const candidate of due) {
     try {
-      // Claim-ish: only proceed if still SCHEDULED
-      const claimed = await prisma.blogPost.updateMany({
-        where: { id: post.id, status: "SCHEDULED", scheduledAt: { lte: now } },
-        data: { updatedAt: new Date() },
-      });
-      if (claimed.count === 0) {
-        skipped += 1;
-        await prisma.contentPublishEvent.update({
-          where: { id: event.id },
-          data: { status: "CANCELLED", errorMessage: "Already processed", completedAt: new Date() },
+      const outcome = await prisma.$transaction(async (tx) => {
+        // Lock before reading. Concurrent cron calls skip this row; editor writes
+        // wait until the checked snapshot and its publish event commit together.
+        if (!(await tryLockDueBlogPost(tx, candidate.id, now))) {
+          return { kind: "skipped" as const, message: "Already processed or locked" };
+        }
+        const post = await tx.blogPost.findUnique({ where: { id: candidate.id } });
+        if (!post) return { kind: "skipped" as const, message: "Not found" };
+        const readiness = await getContentPublishReadiness(post.id, {
+          forScheduleExecution: true,
+          db: tx,
         });
-        results.push({ blogPostId: post.id, ok: false, message: "skipped" });
-        continue;
-      }
-
-      const readiness = await getContentPublishReadiness(post.id, { forScheduleExecution: true });
-      await prisma.contentPublishEvent.update({
-        where: { id: event.id },
-        data: {
-          readinessSnapshot: readinessSnapshot(readiness),
-          contentSnapshotHash: readiness.contentHash,
-        },
-      });
-
-      if (!readiness.ready) {
-        failed += 1;
-        await prisma.$transaction(async (tx) => {
-          await tx.blogPost.update({
-            where: { id: post.id },
-            data: {
-              status: "DRAFT",
-              scheduledAt: null,
-              scheduledBy: null,
-            },
-          });
-          await tx.contentPublishEvent.update({
-            where: { id: event.id },
-            data: {
-              status: "FAILED",
-              nextStatus: "DRAFT",
-              errorMessage: readiness.errors.join("; "),
-              completedAt: new Date(),
-            },
-          });
-        });
-        results.push({ blogPostId: post.id, ok: false, message: readiness.errors.join("; ") });
-        continue;
-      }
-
-      if (
-        post.lastPublishedContentHash &&
-        post.lastPublishedContentHash === readiness.contentHash &&
-        post.status === "PUBLISHED"
-      ) {
-        skipped += 1;
-        continue;
-      }
-
-      await prisma.$transaction(async (tx) => {
+        const nextStatus = readiness.ready ? "PUBLISHED" as const : "DRAFT" as const;
         await tx.blogPost.update({
           where: { id: post.id },
+          data: readiness.ready
+            ? {
+                status: nextStatus,
+                publishedAt: now,
+                lastPublishedAt: now,
+                publishedBy: post.scheduledBy ?? "cron:publish-due",
+                scheduledAt: null,
+                scheduledBy: null,
+                publishVersion: { increment: 1 },
+                lastPublishedContentHash: readiness.contentHash,
+                needsContentReview: false,
+              }
+            : { status: nextStatus, scheduledAt: null, scheduledBy: null },
+        });
+        await tx.contentPublishEvent.create({
           data: {
-            status: "PUBLISHED",
-            publishedAt: now,
-            lastPublishedAt: now,
-            publishedBy: post.scheduledBy ?? "cron:publish-due",
-            scheduledAt: null,
-            scheduledBy: null,
-            publishVersion: { increment: 1 },
-            lastPublishedContentHash: readiness.contentHash,
+            blogPostId: post.id,
+            action: "PUBLISH_NOW",
+            status: readiness.ready ? "COMPLETED" : "FAILED",
+            requestedBy: "cron:publish-due",
+            scheduledFor: post.scheduledAt,
+            previousStatus: "SCHEDULED",
+            nextStatus,
+            sourceHandoffId: post.sourceHandoffRecordId,
+            sourceWritingDraftId: post.sourceWritingDraftId,
+            sourceDraftVersion: post.sourceWritingDraftVersion,
+            readinessSnapshot: readinessSnapshot(readiness),
+            contentSnapshotHash: readiness.contentHash,
+            errorMessage: readiness.ready ? null : readiness.errors.join("; "),
+            completedAt: new Date(),
+            metadata: { dueProcessor: true },
           },
         });
-        await tx.contentPublishEvent.update({
-          where: { id: event.id },
-          data: { status: "COMPLETED", completedAt: new Date(), nextStatus: "PUBLISHED" },
-        });
-      });
+        return readiness.ready
+          ? { kind: "published" as const, slug: post.slug, message: "published" }
+          : { kind: "failed" as const, message: readiness.errors.join("; ") };
+      }, { maxWait: 5_000, timeout: 30_000 });
 
-      try {
-        revalidateBlogPaths(post.slug);
-      } catch {
-        // log-only
-      }
-      published += 1;
-      results.push({ blogPostId: post.id, ok: true, message: "published" });
+      if (outcome.kind === "published") {
+        published += 1;
+        try {
+          revalidateBlogPaths(outcome.slug);
+        } catch (err) {
+          outcome.message = "published; cache revalidation failed";
+          console.warn("[content:publish-due] Cache revalidation failed", candidate.id,
+            err instanceof Error ? err.message : "unknown");
+        }
+      } else if (outcome.kind === "failed") failed += 1;
+      else skipped += 1;
+      results.push({ blogPostId: candidate.id, ok: outcome.kind === "published", message: outcome.message });
     } catch (err) {
+      // The transaction rolls back the post and event together. Leave the
+      // scheduled row retryable; never demote a row another worker published.
       failed += 1;
-      await prisma.contentPublishEvent.update({
-        where: { id: event.id },
-        data: {
-          status: "FAILED",
-          errorMessage: err instanceof Error ? err.message : "due failed",
-          completedAt: new Date(),
-        },
-      });
-      await prisma.blogPost
-        .update({
-          where: { id: post.id },
-          data: { status: "DRAFT", scheduledAt: null, scheduledBy: null },
-        })
-        .catch(() => undefined);
-      results.push({
-        blogPostId: post.id,
-        ok: false,
-        message: err instanceof Error ? err.message : "failed",
-      });
+      const message = err instanceof Error ? err.message : "due failed";
+      results.push({ blogPostId: candidate.id, ok: false, message });
+      console.error("[content:publish-due] Transaction failed", candidate.id, message);
+      try {
+        await prisma.contentPublishEvent.create({
+          data: {
+            blogPostId: candidate.id,
+            action: "PUBLISH_NOW",
+            status: "FAILED",
+            requestedBy: "cron:publish-due",
+            errorMessage: message,
+            completedAt: new Date(),
+            metadata: { dueProcessor: true, retryable: true },
+          },
+        });
+      } catch {
+        // Preserve the original failure if the database itself is unavailable.
+      }
     }
   }
-
-  return {
-    scanned: due.length,
-    published,
-    failed,
-    skipped,
-    results,
-  };
+  return { scanned: due.length, published, failed, skipped, results };
 }
 
 export async function getPublishEvent(eventId: string) {
@@ -787,3 +749,4 @@ export async function publishContentTarget(input: {
     confirmChecked: input.confirmChecked,
   });
 }
+

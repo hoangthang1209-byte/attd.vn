@@ -1,5 +1,8 @@
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
+import { validateEditorialCompletion } from "@/features/content/content-editorial-guards";
+
 import { prisma } from "@/lib/prisma";
 import { buildContentQualityWarnings } from "@/features/blog/blog-readiness";
 import type { BlogFaqItem } from "@/features/blog/types";
@@ -47,9 +50,10 @@ function hasPipelineReviewLink(post: {
  */
 export async function getContentPublishReadiness(
   blogPostId: string,
-  options?: { forScheduleExecution?: boolean }
+  options?: { forScheduleExecution?: boolean; db?: Prisma.TransactionClient }
 ): Promise<ContentPublishReadiness> {
-  const post = await prisma.blogPost.findUnique({ where: { id: blogPostId } });
+  const db = options?.db ?? prisma;
+  const post = await db.blogPost.findUnique({ where: { id: blogPostId } });
   const errors: string[] = [];
   const warnings: string[] = [];
   const checks = emptyPublishChecks();
@@ -99,7 +103,7 @@ export async function getContentPublishReadiness(
   if (slugErr) errors.push(slugErr);
 
   if (post.slug?.trim()) {
-    const dup = await prisma.blogPost.findFirst({
+    const dup = await db.blogPost.findFirst({
       where: {
         slug: post.slug.trim(),
         NOT: { id: post.id },
@@ -114,6 +118,12 @@ export async function getContentPublishReadiness(
 
   checks.contentValid = Boolean(post.content?.trim());
   if (!checks.contentValid) errors.push("Thiếu nội dung");
+  const editorialErrors = validateEditorialCompletion([
+    post.title, post.excerpt, post.content, post.metaTitle, post.metaDescription,
+    JSON.stringify(post.faqJson ?? []),
+  ].join("\n"));
+  errors.push(...editorialErrors);
+  if (editorialErrors.length > 0) checks.contentValid = false;
 
   checks.seoMetadataValid = !missingSeoMetadataBlocks(post.metaTitle, post.metaDescription);
   if (!post.metaTitle?.trim()) errors.push("Thiếu meta title");
@@ -202,12 +212,12 @@ export async function getContentPublishReadiness(
 
   // Brief policy: launch workflow treats Brief approval as required before Context,
   // but Blog publish historically does not hard-block on Brief. Keep as explicit warning.
-  const linkedTopic = await prisma.seoTopic.findFirst({
+  const linkedTopic = await db.seoTopic.findFirst({
     where: { targetEntityType: "BLOG_POST", targetEntityId: post.id },
     select: { id: true },
   });
   if (linkedTopic) {
-    const brief = await prisma.seoContentBrief.findUnique({
+    const brief = await db.seoContentBrief.findUnique({
       where: { topicId: linkedTopic.id },
       select: { approvedAt: true, approvedBy: true },
     });
@@ -218,7 +228,7 @@ export async function getContentPublishReadiness(
 
   // Blocking QA from linked writing draft (warning-only QA does not block)
   if (post.sourceWritingDraftId) {
-    const draft = await prisma.writingDraftRecord.findUnique({
+    const draft = await db.writingDraftRecord.findUnique({
       where: { id: post.sourceWritingDraftId },
       select: { qaReport: true },
     });
@@ -238,7 +248,7 @@ export async function getContentPublishReadiness(
     checks.reviewStillValid = false;
 
     const handoff = post.sourceHandoffRecordId
-      ? await prisma.contentHandoffRecord.findUnique({ where: { id: post.sourceHandoffRecordId } })
+      ? await db.contentHandoffRecord.findUnique({ where: { id: post.sourceHandoffRecordId } })
       : null;
     if (!handoff || handoff.status !== "COMPLETED") {
       errors.push("Handoff chưa COMPLETED");
@@ -252,7 +262,7 @@ export async function getContentPublishReadiness(
     }
 
     const review = post.sourceReviewSessionId
-      ? await prisma.contentReviewSession.findUnique({ where: { id: post.sourceReviewSessionId } })
+      ? await db.contentReviewSession.findUnique({ where: { id: post.sourceReviewSessionId } })
       : null;
     const gate = evaluateReviewPublishGate(review?.status);
     if (!gate.ok) {
@@ -263,7 +273,7 @@ export async function getContentPublishReadiness(
     }
 
     const draft = post.sourceWritingDraftId
-      ? await prisma.writingDraftRecord.findUnique({ where: { id: post.sourceWritingDraftId } })
+      ? await db.writingDraftRecord.findUnique({ where: { id: post.sourceWritingDraftId } })
       : null;
     if (!draft || draft.status !== "APPROVED") {
       errors.push("Writing Draft nguồn chưa APPROVED");
@@ -298,7 +308,7 @@ export async function getContentPublishReadiness(
     checks.sourceApproved = false;
     checks.reviewStillValid = false;
 
-    const review = await prisma.contentReviewSession.findUnique({
+    const review = await db.contentReviewSession.findUnique({
       where: { id: post.sourceReviewSessionId! },
     });
     const gate = evaluateReviewPublishGate(review?.status);
