@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
-import { validateEditorialCompletion } from "@/features/content/content-editorial-guards";
+import { validateEditorialFields } from "@/features/content/content-editorial-guards";
 
 import { prisma } from "@/lib/prisma";
 import { buildContentQualityWarnings } from "@/features/blog/blog-readiness";
@@ -118,10 +118,7 @@ export async function getContentPublishReadiness(
 
   checks.contentValid = Boolean(post.content?.trim());
   if (!checks.contentValid) errors.push("Thiếu nội dung");
-  const editorialErrors = validateEditorialCompletion([
-    post.title, post.excerpt, post.content, post.metaTitle, post.metaDescription,
-    JSON.stringify(post.faqJson ?? []),
-  ].join("\n"));
+  const editorialErrors = validateEditorialFields(post);
   errors.push(...editorialErrors);
   if (editorialErrors.length > 0) checks.contentValid = false;
 

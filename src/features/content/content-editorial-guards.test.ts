@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { validateEditorialCompletion } from "./content-editorial-guards";
+import { validateEditorialCompletion, validateEditorialFields } from "./content-editorial-guards";
 
 test("blocks the unfinished sections found in the public polo article", () => {
   assert.equal(validateEditorialCompletion("Kết luận: nội dung hướng dẫn mua hàng B2B — bổ sung chi tiết khi review.").length, 1);
@@ -23,4 +23,9 @@ test("allows completed factual customer copy and ordinary review terminology", (
 
 test("accepts missing content without replacing the existing empty-body gate", () => {
   assert.deepEqual(validateEditorialCompletion(null), []);
+});
+
+test("blocks placeholders in metadata and FAQ even when the body is complete", () => {
+  assert.equal(validateEditorialFields({ content: "Nội dung hoàn chỉnh.", metaDescription: "[TBD]" }).length, 1);
+  assert.equal(validateEditorialFields({ content: "Nội dung hoàn chỉnh.", faqJson: [{ question: "Cách đặt hàng?", answer: "bổ sung chi tiết khi review" }] }).length, 1);
 });

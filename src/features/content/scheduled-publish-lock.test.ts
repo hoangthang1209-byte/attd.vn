@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import { prisma } from "@/lib/prisma";
 import { tryLockDueBlogPost } from "./scheduled-publish-lock";
+import { createBlogPost, updateBlogPost } from "@/features/blog/services/blog-admin.service";
 
 const now = new Date();
 const id = `seo-lock-${randomUUID()}`;
@@ -68,4 +69,17 @@ test("a rolled-back publish releases its lock and leaves the post retryable", as
 test("future schedules are not claimable", async () => {
   await prisma.blogPost.update({ where: { id }, data: { scheduledAt: new Date(now.getTime() + 60_000) } });
   assert.equal(await prisma.$transaction((tx) => tryLockDueBlogPost(tx, id, now)), false);
+});
+
+test("direct admin creation and published edits cannot bypass editorial blockers", async () => {
+  await assert.rejects(createBlogPost({
+    title: "Incomplete public article", slug: `${id}-invalid`, status: "PUBLISHED",
+    content: "Kết luận — bổ sung chi tiết khi review.",
+  }), /chưa hoàn thiện/);
+  assert.equal(await prisma.blogPost.count({ where: { slug: `${id}-invalid` } }), 0);
+  await prisma.blogPost.update({ where: { id }, data: { status: "PUBLISHED", content: "Nội dung đã hoàn thiện." } });
+  await assert.rejects(updateBlogPost(id, { content: "[TODO]" }), /chưa hoàn thiện/);
+  const row = await prisma.blogPost.findUniqueOrThrow({ where: { id } });
+  assert.equal(row.content, "Nội dung đã hoàn thiện.");
+  assert.equal(row.status, "PUBLISHED");
 });

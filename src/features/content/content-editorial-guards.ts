@@ -1,4 +1,20 @@
 /** Blocking editorial checks shared by every publishing path. */
+export type EditorialFields = {
+  title?: string | null;
+  excerpt?: string | null;
+  content?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  faqJson?: unknown;
+};
+
+export function validateEditorialFields(input: EditorialFields): string[] {
+  return validateEditorialCompletion([
+    input.title, input.excerpt, input.content, input.metaTitle, input.metaDescription,
+    JSON.stringify(input.faqJson ?? []),
+  ].join("\n"));
+}
+
 export function validateEditorialCompletion(content: string | null | undefined): string[] {
   const text = (content ?? "")
     .replace(/<[^>]*>/g, " ")
