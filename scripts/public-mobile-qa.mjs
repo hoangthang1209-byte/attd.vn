@@ -3,33 +3,63 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 // Read-only public QA: never submits leads or connects to a database.
-const base = process.env.QA_BASE_URL;
-if (!base || !/^https?:\/\//.test(base)) throw new Error("Set QA_BASE_URL to the deployment to verify");
+const configuredBase = process.env.QA_BASE_URL;
+if (!configuredBase || !/^https?:\/\//.test(configuredBase)) throw new Error("Set QA_BASE_URL to the deployment to verify");
+const base = new URL(configuredBase).origin;
+const shareUrl = process.env.QA_PREVIEW_SHARE_URL;
+let shareToken;
+if (shareUrl) {
+  let parsed;
+  try { parsed = new URL(shareUrl); } catch { throw new Error("Invalid QA preview share URL"); }
+  if (parsed.origin !== base || !parsed.searchParams.get("_vercel_share")) {
+    throw new Error("QA preview share URL must match the target origin and include its share parameter");
+  }
+  shareToken = parsed.searchParams.get("_vercel_share");
+}
+const redact = value => {
+  let result = String(value);
+  for (const secret of [shareUrl, shareToken, shareToken && encodeURIComponent(shareToken)].filter(Boolean)) {
+    result = result.split(secret).join("[REDACTED]");
+  }
+  return result.replace(/([?&]_vercel_share=)[^\s&#"]+/g, "$1[REDACTED]");
+};
 const output = process.env.QA_OUTPUT_DIR || "test-results/public-mobile";
 await fs.mkdir(output, { recursive: true });
 const browser = await chromium.launch(process.env.CHROME_EXECUTABLE_PATH ? { executablePath: process.env.CHROME_EXECUTABLE_PATH } : {});
 const context = await browser.newContext({ ...devices["iPhone 15 Pro"], viewport: { width: 393, height: 852 } });
 const routes = ["/", "/dong-phuc-doanh-nghiep", "/nguon-hang", "/oem", "/qua-tang-doanh-nghiep", "/merchandise", "/san-pham", "/danh-muc-san-pham", "/ao-thun-tron", "/ao-polo-tron", "/san-pham/ao-thun-cotton-4-chieu-cao-cap", "/lien-he"];
-const report = { base, viewport: { width: 393, height: 852 }, results: [], failures: [] };
+const report = { base, commit: process.env.GITHUB_SHA || null, viewport: { width: 393, height: 852 }, results: [], failures: [] };
 const probeOnly = process.env.QA_PROBE_ONLY === "1";
 function check(ok, route, name, detail) {
   if (!ok) report.failures.push({ route, name, detail });
 }
 try {
+  // Establish access once; every route reuses this context's cookies.
+  if (shareUrl) {
+    const accessPage = await context.newPage();
+    try {
+      await accessPage.goto(shareUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await accessPage.locator(".public-main main").waitFor({ timeout: 30000 });
+      if (new URL(accessPage.url()).origin !== base) throw new Error("Unexpected preview origin");
+    } catch {
+      report.failures.push({ route: "/", name: "preview authentication", detail: "Shared preview did not reach the ATTD public website" });
+      throw new Error("Preview authentication failed; no mobile acceptance was run");
+    } finally { await accessPage.close(); }
+  }
   for (const route of routes) {
     const page = await context.newPage();
     const errors = [];
-    page.on("pageerror", error => errors.push(error.message));
+    page.on("pageerror", error => errors.push(redact(error.message)));
     // Fail closed if any UI interaction tries to create/update data.
     await page.route("**/*", request => ["GET", "HEAD", "OPTIONS"].includes(request.request().method()) ? request.continue() : request.abort());
     try {
       const response = await page.goto(new URL(route, base).href, { waitUntil: "networkidle", timeout: 60000 });
       await page.evaluate(() => document.fonts.ready);
       const identity = await page.evaluate(() => ({ title: document.title, location: location.origin + location.pathname, heading: document.querySelector("h1")?.textContent, main: !!document.querySelector(".public-main main"), text: document.body.innerText.slice(0, 240) }));
-      console.log(`PAGE ${route} ${JSON.stringify(identity)}`);
-      if (probeOnly) break;
+      console.log(redact(`PAGE ${route} ${JSON.stringify(identity)}`));
       if (!identity.main) throw new Error(`Expected ATTD public main; received ${JSON.stringify(identity)}`);
       check(response?.ok(), route, "HTTP", response?.status());
+      if (probeOnly) break;
       check(await page.locator("h1").count() === 1, route, "single visible page heading", await page.locator("h1").allTextContents());
       // Load lazy media through the entire page before inspecting fallbacks.
       await page.evaluate(async () => {
@@ -108,14 +138,14 @@ try {
       report.results.push({ route, metrics, errors });
       console.log(`CHECKED ${route} cards=${metrics.cards.length} overflow=${metrics.scrollWidth - metrics.width}`);
     } catch (error) {
-      report.failures.push({ route, name: "navigation/interaction", detail: error.message });
-      await page.screenshot({ path: path.join(output, `failed-${route === "/" ? "home" : route.slice(1).replaceAll("/", "--")}.png`), fullPage: true }).catch(() => {});
+      report.failures.push({ route, name: "navigation/interaction", detail: redact(error.message) });
+      if (await page.locator(".public-main main").count()) await page.screenshot({ path: path.join(output, `failed-${route === "/" ? "home" : route.slice(1).replaceAll("/", "--")}.png`), fullPage: true }).catch(() => {});
       if (/Expected ATTD public main/.test(error.message)) break;
     } finally { await page.close(); }
   }
 } finally {
   await browser.close();
-  await fs.writeFile(path.join(output, "report.json"), JSON.stringify(report, null, 2));
+  await fs.writeFile(path.join(output, "report.json"), redact(JSON.stringify(report, null, 2)));
 }
-console.log(JSON.stringify({ checked: report.results.length, failures: report.failures }, null, 2));
-process.exitCode = probeOnly ? 0 : report.failures.length || report.results.length !== routes.length ? 1 : 0;
+console.log(redact(JSON.stringify({ checked: report.results.length, failures: report.failures }, null, 2)));
+process.exitCode = probeOnly ? (report.failures.length ? 1 : 0) : report.failures.length || report.results.length !== routes.length ? 1 : 0;

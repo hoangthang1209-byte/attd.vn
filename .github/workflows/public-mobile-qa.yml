@@ -27,11 +27,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Diagnose public preview response
-        run: npm run qa:public:mobile
-        env:
-          QA_PROBE_ONLY: '1'
-          QA_BASE_URL: ${{ inputs.base_url || (github.ref == 'refs/heads/main' && 'https://www.attd.vn') || 'https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app' }}
       - name: Wait for updated preview UI
         if: github.event_name == 'push'
         run: |
@@ -42,8 +37,10 @@ jobs:
           echo 'Updated preview UI is not ready'; exit 1
         env:
           GH_TOKEN: ${{ github.token }}
-      - run: npm run qa:public:mobile
+      - name: Run authenticated mobile QA
+        run: npm run qa:public:mobile
         env:
+          QA_PREVIEW_SHARE_URL: ${{ github.ref != 'refs/heads/main' && secrets.QA_PREVIEW_SHARE_URL || '' }}
           QA_BASE_URL: ${{ inputs.base_url || (github.ref == 'refs/heads/main' && 'https://www.attd.vn') || 'https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app' }}
       - uses: actions/upload-artifact@v4
         if: always()
