@@ -1,4 +1,5 @@
 import type { BlogPostStatus, Prisma } from "@prisma/client";
+import { validateEditorialFields } from "@/features/content/content-editorial-guards";
 import { prisma } from "@/lib/prisma";
 import { normalizeBlogContent } from "@/features/blog/markdown";
 import { parseFaqJson, parseTagsJson } from "@/features/blog/content-processor";
@@ -188,6 +189,10 @@ export async function getBlogPostById(id: string): Promise<BlogPostRecord | null
 export async function createBlogPost(input: BlogPostInput): Promise<BlogPostRecord> {
   const status = input.status ?? "DRAFT";
   const content = input.content ? normalizeBlogContent(input.content) : null;
+  if (status === "PUBLISHED") {
+    const errors = validateEditorialFields({ ...input, content });
+    if (errors.length > 0) throw new Error(`Chưa sẵn sàng xuất bản: ${errors.join("; ")}`);
+  }
   const { resolveBlogCanonical } = await import("@/features/content/editorial/blog-canonical");
   const slug = input.slug.trim();
   const canonicalUrl = resolveBlogCanonical({
@@ -232,6 +237,18 @@ export async function updateBlogPost(
   if (!existing) return null;
 
   const nextStatus = input.status ?? existing.status;
+  // Validate the proposed public snapshot, including edits to already published posts.
+  // Draft saves remain available so incomplete content can be repaired safely.
+  if (nextStatus === "PUBLISHED") {
+    const errors = validateEditorialFields({
+      ...existing,
+      ...input,
+      content: input.content !== undefined
+        ? input.content ? normalizeBlogContent(input.content) : null
+        : existing.content,
+    });
+    if (errors.length > 0) throw new Error(`Chưa sẵn sàng xuất bản: ${errors.join("; ")}`);
+  }
   const publishedAt =
     nextStatus === "PUBLISHED"
       ? existing.publishedAt ?? new Date()

@@ -103,5 +103,10 @@ jobs:
       - name: SEO structured data tests
         run: npx tsx --test src/lib/organization-schema.test.ts src/lib/seo/indexation-policy.test.ts
 
+      - name: SEO publishing foundation tests
+        run: |
+          npx tsx --test src/features/content/content-editorial-guards.test.ts src/lib/seo/commercial-route-registry.test.ts
+          NODE_OPTIONS=--conditions=react-server npx tsx --test src/features/content/scheduled-publish-lock.test.ts
+
       - name: Production build
         run: npm run build
