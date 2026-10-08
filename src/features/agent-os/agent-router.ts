@@ -155,7 +155,18 @@ export function routeAutomationTask(input: RouteAutomationTaskInput): AgentRoute
   if (metadata.agentOverrideValid && metadata.agentOverride) {
     const overrideAgent = getActiveAgent(metadata.agentOverride as AgentId);
     if (overrideAgent) {
-      const areaMismatch = !agentSupportsTaskArea(overrideAgent, effectiveTaskArea);
+      const keywordHaystack = [
+        input.title,
+        input.body ?? "",
+        ...input.comments.map((comment) => comment.body),
+      ].join("\n");
+      const keywordAgent =
+        effectiveTaskArea === TASK_AREA_UNCLASSIFIED ? routeByKeywords(keywordHaystack) : null;
+      const areaMismatch =
+        !agentSupportsTaskArea(overrideAgent, effectiveTaskArea) ||
+        (effectiveTaskArea === TASK_AREA_UNCLASSIFIED &&
+          keywordAgent !== null &&
+          keywordAgent !== overrideAgent.id);
       return buildRouteResult(
         input,
         effectiveTaskArea,
