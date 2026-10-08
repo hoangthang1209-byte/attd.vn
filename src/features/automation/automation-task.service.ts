@@ -146,7 +146,7 @@ async function loadAutomationTasksUncached(view: AutomationDashboardView): Promi
     );
   }
 
-  const openTasksForAgentSummary = allMappedTasks.filter((task) => task.isOpen);
+  const openTasksForAgentSummary = baseTasks.filter((task) => task.isOpen);
 
   return {
     tasks,
