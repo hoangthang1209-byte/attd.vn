@@ -10,6 +10,7 @@ import {
   resolveMergeTimestamp,
 } from "@/features/automation/automation-status.parser";
 import { createInitialProductionStatus } from "@/features/automation/automation-production";
+import { routeAutomationTask } from "@/features/agent-os/agent-router";
 import type {
   AutomationDashboardView,
   AutomationDataCompleteness,
@@ -29,11 +30,20 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
     body: comment.body,
     createdAt: comment.createdAt,
   }));
+  const taskArea = parseTaskArea(comments);
+  const routing = routeAutomationTask({
+    title: issue.title,
+    body: issue.body,
+    comments,
+    taskArea,
+    risk,
+  });
 
   return {
     issueNumber: issue.number,
     title: issue.title,
-    taskArea: parseTaskArea(comments),
+    taskArea,
+    metadataTaskArea: routing.metadata.taskAreaOverride,
     status,
     statusLabel,
     risk,
@@ -53,6 +63,15 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
     recentStatusComments: filterRecentStatusComments(comments),
     hasBuildApproved: hasBuildApprovedComment(comments),
     productionStatus: createInitialProductionStatus(checkedAt),
+    agentAssignment: {
+      agentId: routing.agentId,
+      agentDisplayName: routing.displayName,
+      routingReason: routing.reason,
+      requiresHumanEscalation: routing.requiresHumanEscalation,
+      agentOverrideAreaMismatch: routing.agentOverrideAreaMismatch,
+    },
+    taskPriority: routing.effectivePriority,
+    parentTaskIssueNumber: routing.metadata.parentTaskIssueNumber,
   };
 }
 

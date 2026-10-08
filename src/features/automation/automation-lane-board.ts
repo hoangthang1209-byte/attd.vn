@@ -364,6 +364,11 @@ export function formatLaneCiReview(task: AutomationTask | null): string {
   return isRawStatusLabel(task.statusLabel) ? "Chưa có dữ liệu CI/Review" : (task.statusLabel ?? "—");
 }
 
+/** Same effective area as agent routing and dashboard "Mảng" (ATTD_AREA overrides TASK_AREA). */
+export function resolveLaneBoardTaskArea(task: AutomationTask): string {
+  return task.metadataTaskArea ?? task.taskArea;
+}
+
 export function groupTasksByLane(
   tasks: AutomationTask[],
 ): Map<AutomationCanonicalLaneId, AutomationTask[]> {
@@ -374,7 +379,7 @@ export function groupTasksByLane(
   }
 
   for (const task of tasks) {
-    const laneId = resolveCanonicalLaneId(task.taskArea);
+    const laneId = resolveCanonicalLaneId(resolveLaneBoardTaskArea(task));
     if (!laneId) continue;
     grouped.get(laneId)?.push(task);
   }

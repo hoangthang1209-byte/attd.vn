@@ -26,6 +26,7 @@ import {
 } from "@/features/automation/automation-github-write.client";
 import { getProductionCommitShaFromEnv } from "@/features/automation/automation-production";
 import { enrichTasksWithProductionStatus } from "@/features/automation/automation-production.enrichment";
+import { buildAgentSummaryCards } from "@/features/agent-os/agent-summary";
 import { buildSummary, mapIssueToTask } from "@/features/automation/automation-task.aggregation";
 import type {
   AutomationDashboardResponse,
@@ -39,6 +40,7 @@ const CACHE_REVALIDATE_SECONDS = 60;
 type CachedAutomationPayload = {
   tasks: AutomationTask[];
   laneBoardTasks: AutomationTask[] | null;
+  agentSummary: ReturnType<typeof buildAgentSummaryCards> | null;
   dataCompleteness: AutomationDataCompleteness;
   productionCommitSha: string | null;
   productionCheckedAt: string;
@@ -147,6 +149,10 @@ async function loadAutomationTasksUncached(view: AutomationDashboardView): Promi
   return {
     tasks,
     laneBoardTasks,
+    agentSummary:
+      view === "active"
+        ? buildAgentSummaryCards(tasks, { isPartial: openTasksTruncated })
+        : null,
     dataCompleteness: {
       openTasksTruncated,
       openTasksTotalCount,
@@ -237,8 +243,14 @@ export async function getAutomationDashboard(
   }
 
   try {
-    const { tasks, laneBoardTasks, dataCompleteness, productionCommitSha, productionCheckedAt } =
-      await getCachedAutomationTasks(config.repoSlug, view)();
+    const {
+      tasks,
+      laneBoardTasks,
+      agentSummary,
+      dataCompleteness,
+      productionCommitSha,
+      productionCheckedAt,
+    } = await getCachedAutomationTasks(config.repoSlug, view)();
     const writeAction = await resolveWriteActionState();
     return {
       configured: true,
@@ -247,6 +259,7 @@ export async function getAutomationDashboard(
       summary: buildSummary(tasks, dataCompleteness, view),
       tasks,
       laneBoardTasks: laneBoardTasks ?? undefined,
+      agentSummary: agentSummary ?? undefined,
       fetchedAt: new Date().toISOString(),
       view,
       dataCompleteness,
