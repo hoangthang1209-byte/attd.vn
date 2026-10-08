@@ -58,6 +58,20 @@ describe("automation lane constants", () => {
 });
 
 describe("automation lane board", () => {
+  it("buckets tasks by metadata task area when present", () => {
+    const task = taskFixture({
+      taskArea: "Automation Platform",
+      metadataTaskArea: "Marketing / Content / SEO",
+    });
+
+    const board = buildLaneBoard([task]);
+    const seoLane = board.find((entry) => entry.laneId === "marketing-content-seo");
+    const automationLane = board.find((entry) => entry.laneId === "automation-platform");
+
+    assert.equal(seoLane?.task?.issueNumber, task.issueNumber);
+    assert.equal(automationLane?.task, null);
+  });
+
   it("always renders all seven canonical lanes", () => {
     const board = buildLaneBoard([]);
     assert.equal(board.length, 7);
