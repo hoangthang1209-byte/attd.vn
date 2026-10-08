@@ -125,4 +125,17 @@ describe("routeAutomationTask", () => {
     assert.equal(result.reason, "metadata_agent_override");
     assert.equal(result.agentOverrideAreaMismatch, true);
   });
+  it("flags override mismatch from keyword context when task area is unclassified", () => {
+    const result = routeAutomationTask({
+      title: "Improve SEO metadata on blog",
+      body: "ATTD_AGENT: QA_AGENT",
+      comments: [],
+      taskArea: "Chưa phân loại",
+      risk: "low",
+    });
+    assert.equal(result.agentId, "QA_AGENT");
+    assert.equal(result.reason, "metadata_agent_override");
+    assert.equal(result.agentOverrideAreaMismatch, true);
+  });
+
 });
