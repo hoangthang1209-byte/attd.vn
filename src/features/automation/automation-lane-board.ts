@@ -374,7 +374,7 @@ export function groupTasksByLane(
   }
 
   for (const task of tasks) {
-    const laneId = resolveCanonicalLaneId(task.taskArea);
+    const laneId = resolveCanonicalLaneId(task.metadataTaskArea ?? task.taskArea);
     if (!laneId) continue;
     grouped.get(laneId)?.push(task);
   }
