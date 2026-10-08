@@ -66,7 +66,7 @@ Canonical `ATTD_AREA` values match lane labels or ids from `src/features/automat
 - `Automation Platform` or `automation-platform`
 
 - Issues **without** these markers behave as before (routing uses TASK_AREA comments, risk labels, and conservative keyword fallback).
-- `TASK_AREA:` comments continue to drive lane board classification (`docs/github-automation-dashboard.md`).
+- The seven-lane board buckets tasks by the same effective area as routing and the “Mảng” column (`ATTD_AREA` when set, else `TASK_AREA:` comments; see `docs/github-automation-dashboard.md`).
 - Invalid `ATTD_AGENT` values are ignored (no throw); routing falls through.
 - Valid `ATTD_AGENT` overrides that do not match the agent’s allowed task areas still display the override with a mismatch flag on the dashboard.
 - `ATTD_AGENT` ids are matched case-insensitively (normalized to uppercase registry ids).

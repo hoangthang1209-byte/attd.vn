@@ -186,10 +186,15 @@ export function isKnownAgentId(value: string): value is AgentId {
   return AGENT_BY_ID.has(normalizeAgentId(value) as AgentId);
 }
 
+function isClassifiedTaskArea(taskArea: string): boolean {
+  const trimmed = taskArea?.trim() ?? "";
+  return trimmed.length > 0 && trimmed !== TASK_AREA_UNCLASSIFIED;
+}
+
 /** Whether the task area is within the agent contract (lane id or documented alias). */
 export function agentSupportsTaskArea(agent: AgentContract, taskArea: string): boolean {
-  if (!taskArea || taskArea === TASK_AREA_UNCLASSIFIED) {
-    return true;
+  if (!isClassifiedTaskArea(taskArea)) {
+    return false;
   }
   const taskLaneId = resolveCanonicalLaneId(taskArea);
   const normalizedTaskArea = taskArea.trim().toLowerCase();
@@ -203,6 +208,30 @@ export function agentSupportsTaskArea(agent: AgentContract, taskArea: string): b
     }
   }
   return false;
+}
+
+/**
+ * Detect override vs area mismatch using effective routing area and legacy TASK_AREA.
+ * Unclassified-only tasks do not flag mismatch; classified hints on either field do.
+ */
+export function detectAgentOverrideAreaMismatch(
+  agent: AgentContract,
+  effectiveTaskArea: string,
+  legacyTaskArea: string,
+): boolean {
+  const seen = new Set<string>();
+  const classifiedAreas: string[] = [];
+  for (const area of [effectiveTaskArea, legacyTaskArea]) {
+    if (!isClassifiedTaskArea(area)) continue;
+    const key = area.trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    classifiedAreas.push(area);
+  }
+  if (classifiedAreas.length === 0) {
+    return false;
+  }
+  return classifiedAreas.some((area) => !agentSupportsTaskArea(agent, area));
 }
 
 export function getActiveAgent(id: AgentId): AgentContract | null {

@@ -1,7 +1,7 @@
 import { resolveCanonicalLaneId } from "@/features/automation/automation-lane.constants";
 import { TASK_AREA_UNCLASSIFIED } from "@/features/automation/automation-status.parser";
 import {
-  agentSupportsTaskArea,
+  detectAgentOverrideAreaMismatch,
   getActiveAgent,
   getAgentById,
 } from "@/features/agent-os/agent-registry";
@@ -155,7 +155,11 @@ export function routeAutomationTask(input: RouteAutomationTaskInput): AgentRoute
   if (metadata.agentOverrideValid && metadata.agentOverride) {
     const overrideAgent = getActiveAgent(metadata.agentOverride as AgentId);
     if (overrideAgent) {
-      const areaMismatch = !agentSupportsTaskArea(overrideAgent, effectiveTaskArea);
+      const areaMismatch = detectAgentOverrideAreaMismatch(
+        overrideAgent,
+        effectiveTaskArea,
+        input.taskArea,
+      );
       return buildRouteResult(
         input,
         effectiveTaskArea,

@@ -125,4 +125,16 @@ describe("routeAutomationTask", () => {
     assert.equal(result.reason, "metadata_agent_override");
     assert.equal(result.agentOverrideAreaMismatch, true);
   });
+
+  it("flags ATTD_AGENT mismatch when ATTD_AREA is classified but TASK_AREA is unclassified", () => {
+    const result = routeAutomationTask({
+      title: "SEO landing copy",
+      body: "ATTD_AGENT: QA_AGENT\nATTD_AREA: Marketing / Content / SEO",
+      comments: [],
+      taskArea: "Chưa phân loại",
+      risk: "low",
+    });
+    assert.equal(result.agentId, "QA_AGENT");
+    assert.equal(result.agentOverrideAreaMismatch, true);
+  });
 });

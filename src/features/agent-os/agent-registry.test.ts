@@ -4,6 +4,7 @@ import {
   AGENT_REGISTRY,
   agentSupportsTaskArea,
   assertRegistryInvariants,
+  detectAgentOverrideAreaMismatch,
   getActiveAgent,
   getAgentById,
   isKnownAgentId,
@@ -32,5 +33,26 @@ describe("agent registry", () => {
     assert.equal(agentSupportsTaskArea(crm, "Lead & Sales / CRM"), true);
     assert.equal(agentSupportsTaskArea(crm, "lead-sales-crm"), true);
     assert.equal(agentSupportsTaskArea(crm, "Marketing / Content / SEO"), false);
+    assert.equal(agentSupportsTaskArea(crm, "Chưa phân loại"), false);
+  });
+
+  it("detects override mismatch from ATTD_AREA when TASK_AREA is unclassified", () => {
+    const qa = getAgentById("QA_AGENT");
+    assert.equal(
+      detectAgentOverrideAreaMismatch(qa, "Marketing / Content / SEO", "Chưa phân loại"),
+      true,
+    );
+    assert.equal(
+      detectAgentOverrideAreaMismatch(qa, "Chưa phân loại", "Chưa phân loại"),
+      false,
+    );
+  });
+
+  it("detects override mismatch from legacy TASK_AREA when effective area is unclassified", () => {
+    const qa = getAgentById("QA_AGENT");
+    assert.equal(
+      detectAgentOverrideAreaMismatch(qa, "Chưa phân loại", "Marketing / Content / SEO"),
+      true,
+    );
   });
 });
