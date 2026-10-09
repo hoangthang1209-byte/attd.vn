@@ -13,6 +13,7 @@ function issueFixture(overrides: Partial<GitHubIssuePayload> = {}): GitHubIssueP
     closedAt: "2026-09-20T08:00:00.000Z",
     labels: [{ name: "status:merged" }],
     comments: [],
+    body: null,
     ...overrides,
   };
 }
@@ -170,5 +171,19 @@ describe("automation task service", () => {
   it("defaults taskArea to Chưa phân loại when marker is missing", () => {
     const task = mapIssueToTask(issueFixture());
     assert.equal(task.taskArea, "Chưa phân loại");
+  });
+
+  it("assigns agents from issue metadata and TASK_AREA", () => {
+    const task = mapIssueToTask(
+      issueFixture({
+        body: "ATTD_AGENT: SEO_AGENT\nATTD_PRIORITY: P2\nATTD_PARENT_TASK: #99",
+        comments: [
+          { author: { login: "owner" }, body: "TASK_AREA: Marketing / Content / SEO", createdAt: "2026-01-01T00:00:00Z" },
+        ],
+      }),
+    );
+    assert.equal(task.agentAssignment.agentId, "SEO_AGENT");
+    assert.equal(task.taskPriority, "P2");
+    assert.equal(task.parentTaskIssueNumber, 99);
   });
 });

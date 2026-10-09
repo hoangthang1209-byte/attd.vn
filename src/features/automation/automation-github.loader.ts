@@ -137,6 +137,7 @@ type GitHubSearchIssuesResponse = {
     updated_at: string;
     closed_at: string | null;
     labels: Array<{ name: string }>;
+    body?: string | null;
     pull_request?: { url: string };
   }>;
 };
@@ -225,6 +226,7 @@ type GitHubRestIssueItem = {
   updated_at: string;
   closed_at: string | null;
   labels: Array<{ name: string }>;
+  body?: string | null;
   pull_request?: { url: string };
 };
 
@@ -241,6 +243,7 @@ function restIssueToIssuePayload(
   return {
     number: item.number,
     title: item.title,
+    body: item.body ?? null,
     state: item.state === "open" ? "OPEN" : "CLOSED",
     url: item.html_url,
     updatedAt: item.updated_at,
@@ -261,6 +264,7 @@ function searchItemToIssuePayload(
   return {
     number: item.number,
     title: item.title,
+    body: item.body ?? null,
     state: item.state === "open" ? "OPEN" : "CLOSED",
     url: item.html_url,
     updatedAt: item.updated_at,
