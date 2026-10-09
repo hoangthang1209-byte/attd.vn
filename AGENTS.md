@@ -6,6 +6,22 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # ATTD Engineering Rules
 
+## Mandatory operating bootstrap
+Before material implementation or status claims, read and follow:
+- `docs/authority/README.md`
+- `docs/authority/cto-principles.md`
+- `docs/authority/definition-of-done.md`
+- `docs/authority/single-source-of-truth.md`
+- `docs/authority/operating-agent.md`
+- `docs/attd-os.yaml`
+- relevant accepted ADRs in `docs/decisions`
+- the linked GitHub issue/specification
+
+The ATTD Operating Agent is the top-level governor for cross-domain prioritization, delegation, verification, and escalation.
+
+**Memory is context, not authority.** Never claim CI, merge, production deployment, runtime business state, or task completion from conversation memory alone. Verify against the authoritative system defined in the Single Source of Truth policy.
+
+
 ## Project
 - Product: ATTD Business OS / B2B sourcing platform.
 - Stack: Next.js App Router, TypeScript, Tailwind CSS, Prisma, Neon PostgreSQL, Vercel.
