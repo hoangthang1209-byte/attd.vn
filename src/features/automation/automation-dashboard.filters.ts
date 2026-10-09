@@ -29,6 +29,7 @@ export function matchesAutomationTaskFilters(
   return (
     task.title.toLowerCase().includes(query) ||
     task.taskArea.toLowerCase().includes(query) ||
+    (task.metadataTaskArea?.toLowerCase().includes(query) ?? false) ||
     task.agentAssignment.agentDisplayName.toLowerCase().includes(query) ||
     task.agentAssignment.agentId.toLowerCase().includes(query) ||
     String(task.issueNumber).includes(query) ||
