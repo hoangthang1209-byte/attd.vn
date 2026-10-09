@@ -138,4 +138,26 @@ describe("routeAutomationTask", () => {
     assert.equal(result.agentOverrideAreaMismatch, true);
   });
 
+  it("does not force CTO routing for low-risk authorization or migration notes", () => {
+    const authorization = routeAutomationTask({
+      title: "CRM lead filters",
+      body: "Verify authorization checks in the admin surface",
+      comments: [],
+      taskArea: "Lead & Sales / CRM",
+      risk: "low",
+    });
+    assert.equal(authorization.agentId, "CRM_AGENT");
+    assert.equal(authorization.reason, "task_area");
+
+    const migration = routeAutomationTask({
+      title: "Automation docs cleanup",
+      body: "Document migration notes only; no destructive migration",
+      comments: [],
+      taskArea: "Automation Platform",
+      risk: "low",
+    });
+    assert.equal(migration.agentId, "ATTD_CTO");
+    assert.notEqual(migration.reason, "high_risk_escalation");
+  });
+
 });
