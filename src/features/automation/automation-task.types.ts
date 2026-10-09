@@ -1,3 +1,10 @@
+import type {
+  AgentId,
+  AgentRoutingReason,
+  AgentSummaryCard,
+  AgentTaskPriority,
+} from "@/features/agent-os/agent.types";
+
 export type NormalizedTaskStatus =
   | "backlog"
   | "approved"
@@ -15,6 +22,15 @@ export type NormalizedTaskStatus =
   | "unknown";
 
 export type AutomationTaskRisk = "low" | "medium" | "high" | "unknown";
+
+export type AutomationTaskAgentAssignment = {
+  agentId: AgentId;
+  agentDisplayName: string;
+  routingReason: AgentRoutingReason;
+  requiresHumanEscalation: boolean;
+  /** True when ATTD_AGENT override does not match the agent's allowed task areas. */
+  agentOverrideAreaMismatch: boolean;
+};
 
 export type ProductionDeploymentStatus = "live" | "deploying" | "not_live" | "unknown";
 
@@ -62,6 +78,8 @@ export type AutomationTask = {
   title: string;
   /** Parsed from latest TASK_AREA issue comment, or Chưa phân loại when absent. */
   taskArea: string;
+  /** Optional ATTD_AREA metadata override for display/routing context. */
+  metadataTaskArea: string | null;
   status: NormalizedTaskStatus;
   statusLabel: string | null;
   risk: AutomationTaskRisk;
@@ -78,6 +96,10 @@ export type AutomationTask = {
   /** True when any issue comment body is exactly BUILD_APPROVED. */
   hasBuildApproved: boolean;
   productionStatus: AutomationProductionStatus;
+  /** G1 agent routing (read-only; derived from metadata + task context). */
+  agentAssignment: AutomationTaskAgentAssignment;
+  taskPriority: AgentTaskPriority;
+  parentTaskIssueNumber: number | null;
 };
 
 export type AutomationSummaryMetric = {
@@ -132,4 +154,6 @@ export type AutomationDashboardResponse = {
   dataCompleteness?: AutomationDataCompleteness;
   productionCommitSha: string | null;
   productionCheckedAt: string | null;
+  /** Per-agent workload snapshot for open tasks (active view). */
+  agentSummary?: AgentSummaryCard[];
 };

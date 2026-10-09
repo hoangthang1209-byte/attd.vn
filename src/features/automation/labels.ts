@@ -1,3 +1,4 @@
+import type { AgentRoutingReason, AgentTaskPriority } from "@/features/agent-os/agent.types";
 import type {
   AutomationTaskRisk,
   NormalizedTaskStatus,
@@ -107,4 +108,20 @@ export const AUTOMATION_PRODUCTION_STATUS_BADGE_CLASS: Record<ProductionDeployme
   deploying: "admin-status-badge admin-status-badge--info",
   not_live: "admin-status-badge admin-status-badge--neutral",
   unknown: "admin-status-badge admin-status-badge--warning",
+};
+
+export const AUTOMATION_AGENT_PRIORITY_LABELS: Record<AgentTaskPriority, string> = {
+  P0: "P0",
+  P1: "P1",
+  P2: "P2",
+  P3: "P3",
+  unknown: "—",
+};
+
+export const AUTOMATION_AGENT_ROUTING_LABELS: Record<AgentRoutingReason, string> = {
+  high_risk_escalation: "Leo thang rủi ro cao",
+  metadata_agent_override: "ATTD_AGENT",
+  task_area: "Theo mảng",
+  keyword_fallback: "Từ khóa",
+  default_cto: "Mặc định CTO",
 };
