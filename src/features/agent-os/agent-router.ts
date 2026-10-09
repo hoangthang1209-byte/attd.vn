@@ -10,7 +10,7 @@ import type { AgentId, AgentRouteResult, AgentTaskPriority } from "@/features/ag
 import type { AutomationTaskRisk } from "@/features/automation/automation-task.types";
 
 const HIGH_RISK_KEYWORD_PATTERN =
-  /\b(pricing|payment|banking|sepay|reconciliation|invoice|accounting|authentication|authorization|permission|migrate|migration)\b/i;
+  /\b(pricing engine|payment|banking|sepay|reconciliation|invoice settlement|accounting|auth bypass|permission escalation|destructive migration)\b/i;
 
 const HIGH_RISK_DOMAIN_LANE_IDS = new Set<string>(["quotation-quote-builder"]);
 
