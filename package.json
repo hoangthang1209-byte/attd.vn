@@ -12,7 +12,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "security:public-token": "node scripts/security/check-public-token-safety.mjs",
-    "test": "npx tsx --test src/lib/catalog-filter-url.test.ts src/lib/catalog-sort.test.ts src/features/categories/catalog-category-nav.utils.test.ts src/components/quotes/QuoteDocumentNotes.test.tsx src/features/materials/material-decimal.test.ts src/features/crm/lead-foundation.test.ts src/features/pricing/pricing-p1-guards.test.ts src/features/pricing/product-costing-template.test.ts && NODE_OPTIONS=--conditions=react-server npx tsx --test src/features/pricing/pricing-p1-services.test.ts",
+    "test": "npx tsx --test src/lib/catalog-filter-url.test.ts src/lib/catalog-sort.test.ts src/features/categories/catalog-category-nav.utils.test.ts src/features/categories/category-landing-products.test.ts src/components/quotes/QuoteDocumentNotes.test.tsx src/features/materials/material-decimal.test.ts src/features/crm/lead-foundation.test.ts src/features/pricing/pricing-p1-guards.test.ts src/features/pricing/product-costing-template.test.ts && NODE_OPTIONS=--conditions=react-server npx tsx --test src/features/pricing/pricing-p1-services.test.ts",
     "ci:verify": "npm run lint && npm run typecheck && npm run security:public-token && npm test --if-present && npm run build",
     "postinstall": "prisma generate",
     "media:recalculate-intelligence": "npx tsx scripts/recalculate-media-intelligence.ts",
@@ -34,7 +34,8 @@
     "knowledge-graph:prepare-media-evidence-pilot": "npx tsx scripts/knowledge-graph-prepare-media-evidence-pilot.ts",
     "knowledge-graph:confirm-topic-content-links": "npx tsx scripts/knowledge-graph-confirm-topic-content-links.ts",
     "knowledge-graph:refine-curated-relations": "npx tsx scripts/knowledge-graph-refine-curated-relations.ts",
-    "knowledge-graph:health": "npx tsx scripts/knowledge-graph-health.ts"
+    "knowledge-graph:health": "npx tsx scripts/knowledge-graph-health.ts",
+    "qa:public:mobile": "node scripts/public-mobile-qa.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1073.0",
@@ -73,6 +74,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
+    "playwright": "^1.58.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

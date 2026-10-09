@@ -1,3 +1,4 @@
+import { loadCategoryLandingProducts } from "@/features/categories/category-landing-products";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import {
@@ -13,7 +14,7 @@ import {
 } from "@/features/categories/category-public-visibility";
 import { isReservedStaticPublicSlug } from "@/lib/seo/indexable-category-routes";
 import { PRODUCT_CARD_COLOR_VARIANT_SELECT } from "@/features/products/product-card-color-swatches";
-import { buildPublicProductVisibilityWhere, isDemoOrSampleProductMetadata } from "@/features/products/product-public-visibility";
+import { buildPublicProductVisibilityWhere } from "@/features/products/product-public-visibility";
 import {
   MEDIA_ASSET_PUBLIC_SELECT,
   resolveEntityMediaSrc,
@@ -360,6 +361,22 @@ export async function getCategoryBySlug(slug: string) {
   )();
 }
 
+const publicCategoryProductSelect = {
+  id: true, name: true, slug: true, productCode: true,
+  featuredImage: true, gallery: true,
+  defaultMoq: true, leadTime: true,
+  supportsPrinting: true, supportsEmbroidery: true, supportsOem: true,
+  metadata: true,
+  variants: {
+    where: { variantStatus: "ACTIVE" as const },
+    select: PRODUCT_CARD_COLOR_VARIANT_SELECT,
+  },
+  images: {
+    select: { imageUrl: true, altText: true, sortOrder: true },
+    orderBy: { sortOrder: "asc" },
+  },
+} as const;
+
 async function loadCategoryBySlugUncached(slug: string) {
   const accessible = await isCategoryPubliclyAccessibleBySlug(slug);
   if (!accessible) return null;
@@ -368,28 +385,15 @@ async function loadCategoryBySlugUncached(slug: string) {
     where: { slug },
     include: {
       mediaAsset: { select: MEDIA_ASSET_PUBLIC_SELECT },
-      products: {
-        where: buildPublicProductVisibilityWhere(),
-        select: {
-          id: true, name: true, slug: true, productCode: true,
-          featuredImage: true, gallery: true,
-          defaultMoq: true, leadTime: true,
-          supportsPrinting: true, supportsEmbroidery: true, supportsOem: true,
-          metadata: true,
-          variants: {
-            where: { variantStatus: "ACTIVE" as const },
-            select: PRODUCT_CARD_COLOR_VARIANT_SELECT,
-          },
-          images: {
-            select: { imageUrl: true, altText: true, sortOrder: true },
-            orderBy: { sortOrder: "asc" },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      },
     },
   });
   if (!category) return null;
+  // Parent landings must use the same descendant scope as the catalog filter.
+  const categoryIds = await getCategoryFilterIdsBySlug(slug);
+  const { products, hasMoreProducts } = await loadCategoryLandingProducts(
+    categoryIds,
+    (query) => prisma.product.findMany({ ...query, select: publicCategoryProductSelect }),
+  );
   const resolvedImageUrl =
     resolveEntityMediaSrc({
       mediaAsset: category.mediaAsset,
@@ -399,9 +403,8 @@ async function loadCategoryBySlugUncached(slug: string) {
   return {
     ...category,
     imageUrl: resolvedImageUrl,
-    products: category.products.filter(
-      (product) => !isDemoOrSampleProductMetadata(product.metadata),
-    ),
+    products,
+    hasMoreProducts,
   };
 }
 
