@@ -72,6 +72,18 @@ describe("automation lane board", () => {
     assert.equal(automationLane?.task, null);
   });
 
+  it("falls back to TASK_AREA when metadataTaskArea is non-canonical", () => {
+    const task = taskFixture({
+      taskArea: "Automation Platform",
+      metadataTaskArea: "PUBLIC_UI",
+    });
+
+    const board = buildLaneBoard([task]);
+    const automationLane = board.find((entry) => entry.laneId === "automation-platform");
+
+    assert.equal(automationLane?.task?.issueNumber, task.issueNumber);
+  });
+
   it("always renders all seven canonical lanes", () => {
     const board = buildLaneBoard([]);
     assert.equal(board.length, 7);
