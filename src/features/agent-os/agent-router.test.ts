@@ -151,7 +151,7 @@ describe("routeAutomationTask", () => {
 
     const migration = routeAutomationTask({
       title: "Automation docs cleanup",
-      body: "Document migration notes only; no destructive migration",
+      body: "Document migration notes only; no schema changes",
       comments: [],
       taskArea: "Automation Platform",
       risk: "low",
