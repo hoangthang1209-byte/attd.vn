@@ -19,14 +19,14 @@ describe("parseAgentIssueMetadata", () => {
     const parsed = parseAgentIssueMetadata({
       body: [
         "ATTD_AGENT: PUBLIC_WEBSITE_AGENT",
-        "ATTD_AREA: PUBLIC_UI",
+        "ATTD_AREA: Public Website UI",
         "ATTD_PRIORITY: P1",
         "ATTD_PARENT_TASK: #123",
       ].join("\n"),
     });
     assert.equal(parsed.agentOverride, "PUBLIC_WEBSITE_AGENT");
     assert.equal(parsed.agentOverrideValid, true);
-    assert.equal(parsed.taskAreaOverride, "PUBLIC_UI");
+    assert.equal(parsed.taskAreaOverride, "Public Website UI");
     assert.equal(parsed.priority, "P1");
     assert.equal(parsed.parentTaskIssueNumber, 123);
   });
